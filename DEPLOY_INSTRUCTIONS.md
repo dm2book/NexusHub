@@ -1,87 +1,53 @@
-# 🚀 NexusHub Deploy Guide
+# 🚀 ForgeMarket Deploy Guide
 
-## Optie 1: GitHub + Vercel (Automatisch - Aanbevolen)
+ForgeMarket is now a full-stack app: a React storefront/dashboard (`/`) and an
+Express API (`/server`). See `ARCHITECTURE.md` for the system overview.
 
-### Stap 1: Push naar GitHub
-```bash
-git init
-git add .
-git commit -m "NexusHub - Gaming Webshop"
-git branch -M main
-git remote add origin https://github.com/JOUW-USERNAME/gamehub.git
-git push -u origin main
-```
-
-### Stap 2: Vercel Setup
-1. Ga naar [vercel.com](https://vercel.com) en log in
-2. Click "Add New..." → "Project"
-3. Import je GitHub repository "gamehub"
-4. Framework: Vite (automatisch gedetecteerd)
-5. Click "Deploy"
-
-✅ Klaar! Je site is nu live op een Vercel subdomein.
-
----
-
-## Optie 2: Handmatig Deployen (Snel)
-
-### Stap 1: Download het project
-De `dist` folder bevat je gecompileerde website.
-
-### Stap 2: Ga naar Vercel
-1. Ga naar [vercel.com](https://vercel.com)
-2. Log in of maak account
-3. Click "Add New..." → "Project"
-4. Scroll naar beneden en click "Import Third-Party Git Repository..."
-5. Of direct uploaden met "Or drop a folder here"
-
-### Stap 3: Upload de bestanden
-- Sleep de hele project folder naar Vercel
-- Vercel detecteert automatisch dat het een Vite project is
-
-✅ Klaar!
-
----
-
-## Optie 3: Via Terminal (Met Vercel CLI)
+## 1. Backend API (`server/`)
 
 ```bash
-# Installeer Vercel CLI
-npm i -g vercel
-
-# Log in
-vercel login
-
-# Deploy
-vercel
-
-# Voor productie
-vercel --prod
+cd server
+cp .env.example .env        # fill in JWT_SECRET, SMTP_URL, OAuth keys for prod
+npm install
+npm run setup               # runs migrations + seeds roles/permissions/email templates
+npm start                   # listens on PORT (default 4000)
 ```
 
----
+Bootstrap the first admin after they log in once:
 
-## Je site is klaar voor deployment!
-
-### Check wat er gebouwd is:
-```
-dist/
-├── index.html
-└── assets/
-    ├── index-Cydel2-0.css (32 KB)
-    └── index-DH5817Wq.js (300 KB)
+```bash
+node src/db/seed.js grant you@example.com owner
 ```
 
-### Alle pagina's werken:
-- ✅ Home (/)
-- ✅ Shop (/shop)
-- ✅ Product detail (/product/:id)
-- ✅ Winkelwagen (/cart)
-- ✅ Checkout (/checkout)
-- ✅ Account (/account)
-- ✅ Discord (/discord)
-- ✅ FAQ (/faq)
-- ✅ Contact (/contact)
-- ✅ Over Ons (/about)
-- ✅ Algemene Voorwaarden (/terms)
-- ✅ Privacybeleid (/privacy)
+**Required in production** (`assertProductionConfig` enforces): `JWT_SECRET`, `SMTP_URL`.
+Configure `GOOGLE_*` / `DISCORD_*` to enable those logins (otherwise hidden). Point
+`DATABASE_FILE` at a persistent volume. Host on any Node platform (Render, Fly,
+Railway, a VM, or a container) behind HTTPS.
+
+## 2. Frontend (repo root)
+
+```bash
+npm install
+npm run dev      # dev server on :3000, proxies /api → :4000
+npm run build    # production bundle in dist/
+```
+
+The SPA calls the API on the **same origin** by default (works behind one domain /
+reverse proxy). For a separate API host, set `VITE_API_URL=https://api.yourdomain.com`
+at build time and ensure CORS `APP_URL` matches the storefront origin.
+
+### Vercel (storefront)
+
+Import the repo, framework **Vite**, build `npm run build`, output `dist`. Set
+`VITE_API_URL` to your deployed API. `vercel.json` already SPA-rewrites and adds
+security headers.
+
+## 3. Recommended production topology
+
+```
+yourdomain.com         → static SPA (dist/)
+yourdomain.com/api/*   → reverse-proxy to the Express API (same origin = no CORS)
+```
+
+Keeping API and SPA same-origin lets the httpOnly refresh cookie and JWT flow work with
+zero CORS configuration.

@@ -1,0 +1,67 @@
+import { Outlet, NavLink, Link, useNavigate } from 'react-router-dom';
+import {
+  Zap, LayoutDashboard, ShoppingBag, Download, LifeBuoy,
+  CreditCard, Bell, Settings, LogOut, Shield,
+} from 'lucide-react';
+import { useAuth } from '../context/AuthContext.jsx';
+
+const NAV = [
+  { to: '/account', icon: LayoutDashboard, label: 'Overview', end: true },
+  { to: '/account/orders', icon: ShoppingBag, label: 'Orders' },
+  { to: '/account/downloads', icon: Download, label: 'Downloads' },
+  { to: '/account/tickets', icon: LifeBuoy, label: 'Support' },
+  { to: '/account/billing', icon: CreditCard, label: 'Billing' },
+  { to: '/account/notifications', icon: Bell, label: 'Notifications' },
+  { to: '/account/settings', icon: Settings, label: 'Settings' },
+];
+
+export default function AccountLayout() {
+  const { user, isStaff, logout } = useAuth();
+  const navigate = useNavigate();
+
+  return (
+    <div className="min-h-screen flex">
+      <aside className="w-64 shrink-0 border-r border-white/5 bg-elevated/50 hidden md:flex flex-col">
+        <Link to="/" className="flex items-center gap-2 px-6 h-16 border-b border-white/5">
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center"
+               style={{ backgroundImage: 'linear-gradient(135deg,#6366f1,#a855f7)' }}>
+            <Zap size={16} className="text-white" />
+          </div>
+          <span className="font-display text-white">ForgeMarket</span>
+        </Link>
+        <nav className="flex-1 p-3 space-y-1">
+          {NAV.map(({ to, icon: Icon, label, end }) => (
+            <NavLink key={to} to={to} end={end}
+              className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition
+                ${isActive ? 'bg-primary/15 text-white' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}>
+              <Icon size={18} /> {label}
+            </NavLink>
+          ))}
+        </nav>
+        <div className="p-3 border-t border-white/5 space-y-1">
+          {isStaff && (
+            <Link to="/admin" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-indigo-300 hover:bg-white/5">
+              <Shield size={18} /> Admin Console
+            </Link>
+          )}
+          <button onClick={() => logout().then(() => navigate('/'))}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-slate-400 hover:text-white hover:bg-white/5">
+            <LogOut size={18} /> Sign out
+          </button>
+        </div>
+      </aside>
+      <div className="flex-1 min-w-0">
+        <header className="h-16 border-b border-white/5 flex items-center justify-between px-6">
+          <span className="text-slate-400 text-sm">My Account</span>
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-slate-300 hidden sm:block">{user?.email}</span>
+            <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary text-sm font-semibold">
+              {(user?.displayName || user?.email || '?')[0].toUpperCase()}
+            </div>
+          </div>
+        </header>
+        <div className="p-6 max-w-6xl"><Outlet /></div>
+      </div>
+    </div>
+  );
+}
