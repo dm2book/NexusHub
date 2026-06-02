@@ -9,15 +9,15 @@ import { ApiError } from '../utils/errors.js';
 
 const router = Router();
 
-router.get('/products', (_req, res) => {
-  res.json({ products: listProducts({ activeOnly: true }) });
-});
+router.get('/products', asyncHandler(async (_req, res) => {
+  res.json({ products: await listProducts({ activeOnly: true }) });
+}));
 
-router.get('/products/:id', (req, res, next) => {
-  const p = getProduct(req.params.id);
-  if (!p || !p.active) return next(new ApiError(404, 'Product not found'));
+router.get('/products/:id', asyncHandler(async (req, res) => {
+  const p = await getProduct(req.params.id);
+  if (!p || !p.active) throw new ApiError(404, 'Product not found');
   res.json({ product: p });
-});
+}));
 
 // Place an order. Authenticated users get it linked to their account; guests
 // may order by email. Checkout/payment capture would call markPaymentReceived.
@@ -34,21 +34,21 @@ router.post('/orders', rateLimit({ bucket: 'checkout', windowMs: 60_000, max: 20
       currency: z.string().length(3).optional(),
     }).parse(req.body);
 
-    const order = createOrder(
+    const order = await createOrder(
       { ...body, userId: req.user?.id || null },
       { user: req.user, actorId: req.user?.id });
     res.status(201).json({ order });
   }));
 
 // Public tracking by order number (no PII beyond status timeline).
-router.get('/track/:number', (req, res, next) => {
-  const order = getOrderByNumber(req.params.number);
-  if (!order) return next(new ApiError(404, 'Order not found'));
+router.get('/track/:number', asyncHandler(async (req, res) => {
+  const order = await getOrderByNumber(req.params.number);
+  if (!order) throw new ApiError(404, 'Order not found');
   res.json({
     number: order.number, status: order.status, statusLabel: order.statusLabel,
     history: order.history.map((h) => ({ to: h.to_status, at: h.created_at })),
     updatedAt: order.updatedAt,
   });
-});
+}));
 
 export default router;

@@ -1,29 +1,31 @@
 /** Admin analytics dashboard endpoints. */
 import { Router } from 'express';
+import { asyncHandler } from '../../middleware/error.js';
 import { requirePermission } from '../../middleware/rbac.js';
 import * as analytics from '../../services/analyticsService.js';
 
 const router = Router();
 router.use(requirePermission('analytics.read'));
 
-router.get('/overview', (req, res) => {
+router.get('/overview', asyncHandler(async (req, res) => {
   const days = Math.min(Number(req.query.days) || 30, 365);
-  res.json({
-    overview: analytics.overview({ days }),
-    revenueSeries: analytics.revenueSeries({ days }),
-    statusBreakdown: analytics.statusBreakdown(),
-  });
-});
+  const [overview, revenueSeries, statusBreakdown] = await Promise.all([
+    analytics.overview({ days }),
+    analytics.revenueSeries({ days }),
+    analytics.statusBreakdown(),
+  ]);
+  res.json({ overview, revenueSeries, statusBreakdown });
+}));
 
-router.get('/top-products', (req, res) => {
-  res.json({ products: analytics.topProducts({
+router.get('/top-products', asyncHandler(async (req, res) => {
+  res.json({ products: await analytics.topProducts({
     days: Math.min(Number(req.query.days) || 90, 365),
     limit: Math.min(Number(req.query.limit) || 10, 50),
   }) });
-});
+}));
 
-router.get('/clv', (_req, res) => {
-  res.json(analytics.customerLifetimeValue({ limit: 10 }));
-});
+router.get('/clv', asyncHandler(async (_req, res) => {
+  res.json(await analytics.customerLifetimeValue({ limit: 10 }));
+}));
 
 export default router;

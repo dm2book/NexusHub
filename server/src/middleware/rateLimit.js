@@ -31,11 +31,11 @@ export function rateLimit({ windowMs, max, bucket = 'global' } = {}) {
     res.set('X-RateLimit-Remaining', String(remaining));
 
     if (entry.count > limit) {
-      // Persist the breach for security review.
+      // Persist the breach for security review (best-effort; never blocks).
       run(`INSERT INTO rate_limit_hits (key, window_start, count)
            VALUES (@k, @w, @c)
            ON CONFLICT(key, window_start) DO UPDATE SET count = @c`,
-          { k: key, w: windowStart, c: entry.count });
+          { k: key, w: windowStart, c: entry.count }).catch(() => {});
       res.set('Retry-After', String(Math.ceil((windowStart + win - now) / 1000)));
       return next(tooMany());
     }

@@ -3,7 +3,7 @@ dist/
 .env
 .env.local
 server/.env
-server/data/
 *.log
 .DS_Store
 .vite/
+.vercel/

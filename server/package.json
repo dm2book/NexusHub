@@ -13,13 +13,13 @@
     "setup": "npm run migrate && npm run seed"
   },
   "dependencies": {
-    "better-sqlite3": "^12.10.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "express": "^4.21.2",
     "jsonwebtoken": "^9.0.2",
     "nanoid": "^5.0.9",
     "nodemailer": "^6.10.0",
+    "pg": "^8.13.1",
     "zod": "^3.24.1"
   }
 }

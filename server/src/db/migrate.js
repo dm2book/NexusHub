@@ -1,46 +1,41 @@
 /**
- * Forward-only migration runner. Applies any .sql file in ./migrations that has
- * not yet been recorded in the schema_migrations table, in filename order.
+ * Forward-only migration runner. Applies any embedded migration (see
+ * migrations.js) not yet recorded in schema_migrations, in order. Idempotent and
+ * safe to call on serverless cold start.
  */
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { db, run, all, nowIso } from './index.js';
+import { pool, run, all, nowIso } from './index.js';
+import { MIGRATIONS } from './migrations.js';
 
-const dir = path.join(path.dirname(fileURLToPath(import.meta.url)), 'migrations');
-
-export function migrate() {
-  run(`CREATE TABLE IF NOT EXISTS schema_migrations (
+export async function migrate() {
+  await run(`CREATE TABLE IF NOT EXISTS schema_migrations (
     id TEXT PRIMARY KEY, applied_at TEXT NOT NULL)`);
 
-  const applied = new Set(all('SELECT id FROM schema_migrations').map((r) => r.id));
-  const files = fs.readdirSync(dir).filter((f) => f.endsWith('.sql')).sort();
+  const applied = new Set((await all('SELECT id FROM schema_migrations')).map((r) => r.id));
 
   let count = 0;
-  for (const file of files) {
-    if (applied.has(file)) continue;
-    const sql = fs.readFileSync(path.join(dir, file), 'utf8');
-    db.exec('BEGIN');
+  for (const m of MIGRATIONS) {
+    if (applied.has(m.id)) continue;
+    const client = await pool.connect();
     try {
-      db.exec(sql);
-      run('INSERT INTO schema_migrations (id, applied_at) VALUES (@id, @at)', {
-        id: file,
-        at: nowIso(),
-      });
-      db.exec('COMMIT');
+      await client.query('BEGIN');
+      await client.query(m.sql);
+      await client.query('INSERT INTO schema_migrations (id, applied_at) VALUES ($1, $2)',
+        [m.id, nowIso()]);
+      await client.query('COMMIT');
       count++;
-      console.log(`✓ migrated ${file}`);
+      console.log(`✓ migrated ${m.id}`);
     } catch (err) {
-      db.exec('ROLLBACK');
-      throw new Error(`Migration ${file} failed: ${err.message}`);
+      await client.query('ROLLBACK');
+      throw new Error(`Migration ${m.id} failed: ${err.message}`);
+    } finally {
+      client.release();
     }
   }
   if (!count) console.log('Schema already up to date.');
   return count;
 }
 
-// Allow `npm run migrate`.
 if (import.meta.url === `file://${process.argv[1]}`) {
-  migrate();
-  console.log('Migrations complete.');
+  migrate().then(() => { console.log('Migrations complete.'); process.exit(0); })
+    .catch((e) => { console.error(e); process.exit(1); });
 }

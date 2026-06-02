@@ -2,21 +2,15 @@
  * Append-only audit logging for security-relevant actions. Audit entries are
  * never updated or deleted by the application.
  */
-import { run, all, get, nowIso } from '../db/index.js';
+import { run, all, nowIso } from '../db/index.js';
 import { newId } from '../utils/ids.js';
 
 /**
- * Record an audit event.
- * @param {object} e
- * @param {object} [e.actor]  - { id, email } performing the action (or null for system)
- * @param {string} e.action   - dotted action name, e.g. 'order.refund'
- * @param {string} [e.targetType]
- * @param {string} [e.targetId]
- * @param {object} [e.metadata]
- * @param {object} [e.req]    - express req for ip/user-agent capture
+ * Record an audit event. Awaitable so the write completes before a serverless
+ * function suspends.
  */
-export function audit(e) {
-  run(`INSERT INTO audit_logs
+export async function audit(e) {
+  await run(`INSERT INTO audit_logs
         (id, actor_id, actor_email, action, target_type, target_id, ip, user_agent, metadata, created_at)
        VALUES (@id, @aid, @aemail, @action, @tt, @tid, @ip, @ua, @meta, @at)`, {
     id: newId('aud'),
@@ -32,7 +26,7 @@ export function audit(e) {
   });
 }
 
-export function listAuditLogs({ limit = 100, offset = 0, action, targetId } = {}) {
+export async function listAuditLogs({ limit = 100, offset = 0, action, targetId } = {}) {
   const where = [];
   const params = { limit, offset };
   if (action) { where.push('action = @action'); params.action = action; }

@@ -10,26 +10,31 @@ through real flows (signup, checkout, supplier sync, fulfillment).
 
 ```
 ┌──────────────────────────────┐        ┌──────────────────────────────────────┐
-│  React SPA (Vite + Tailwind) │  HTTPS │  Express API (server/)                 │
-│  src/                        │ ─────▶ │  routes → middleware → services → DB   │
-│  - storefront                │  JWT   │                                        │
-│  - customer dashboard        │ +cookie│  SQLite (better-sqlite3) via a thin    │
-│  - admin console             │ ◀───── │  data-access layer (Postgres-swappable)│
+│  React SPA (Vite + Tailwind) │  HTTPS │  Express API                           │
+│  src/   (static on Vercel)   │ ─────▶ │  routes → middleware → services → DB   │
+│  - storefront                │  JWT   │  Runs as a Vercel serverless function  │
+│  - customer dashboard        │ +cookie│  (api/[...path].js → server/src/app.js)│
+│  - admin console             │ ◀───── │  or standalone (server/src/index.js)   │
 └──────────────────────────────┘        └──────────────────────────────────────┘
                                               │            │             │
                                        Supplier connectors │      SMTP / email log
-                                       (API / CSV / Manual) │
+                                       (API / CSV / Manual) │      PostgreSQL
 ```
+
+Single-deploy on Vercel: SPA served statically; `/api/*` routed to one function.
+The data-access layer (`server/src/db/index.js`) is async and isolated, so the
+same code runs standalone on any Node host. On serverless cold start the app
+lazily runs migrations + seed once (`ensureReady`).
 
 ## Tech stack
 
 | Layer     | Choice                                  | Why |
 |-----------|-----------------------------------------|-----|
 | Frontend  | React 18, React Router, Tailwind, Vite  | Already scaffolded; fast, componentized |
-| Backend   | Node 18+, Express                       | Ubiquitous, simple, async-friendly |
-| Database  | SQLite via `better-sqlite3`             | Zero-config, ACID; isolated behind `db/index.js` so Postgres can replace it |
+| Backend   | Node 18+, Express (serverless or standalone) | Ubiquitous; one app, two entrypoints |
+| Database  | PostgreSQL via `pg`                     | Serverless-friendly; isolated behind `db/index.js` (an `@name`→`$n` translator keeps SQL portable; AsyncLocalStorage powers transactions) |
 | Auth      | Passwordless OTP + OAuth, JWT + sessions| No passwords to leak; stateless access tokens, revocable refresh sessions |
-| Email     | Nodemailer (SMTP) with DB fallback      | Real delivery in prod; recorded in dev |
+| Email     | Nodemailer (SMTP) with DB fallback      | Real delivery in prod; recorded to `email_log` otherwise |
 
 ---
 
@@ -155,8 +160,8 @@ Lifetime Value** (+ AOV, revenue time-series, status breakdown).
 `email_templates`, `email_log`, `notifications`, `support_tickets`, `ticket_messages`,
 `refund_requests`, `audit_logs`, `fraud_signals`, `rate_limit_hits`.
 
-Schema: `server/src/db/migrations/001_init.sql`. Money is stored in integer minor units;
-timestamps are ISO-8601 UTC.
+Schema: `server/src/db/migrations.js` (embedded so it bundles on serverless).
+Money is stored as BIGINT minor units; timestamps are ISO-8601 UTC TEXT.
 
 ## API surface (selected)
 
@@ -179,7 +184,7 @@ ADMIN  /api/admin/orders[/:id/{payment-received,fulfill,complete,refund,cancel,c
 ## Running locally
 
 ```bash
-# API
+# API (needs a local Postgres; point DATABASE_URL at it in server/.env)
 cd server && cp .env.example .env && npm install && npm run setup && npm start
 # (optional) make yourself an owner after first login:
 node src/db/seed.js grant you@example.com owner
@@ -187,5 +192,8 @@ node src/db/seed.js grant you@example.com owner
 # Storefront (separate terminal, from repo root)
 npm install && npm run dev      # proxies /api → :4000
 ```
+
+Deploying everything on Vercel (one project, Postgres) is covered in
+`DEPLOY_INSTRUCTIONS.md`.
 
 See `DEPLOY_INSTRUCTIONS.md` for production deployment.

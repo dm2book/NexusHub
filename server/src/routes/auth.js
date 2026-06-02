@@ -49,12 +49,12 @@ router.post('/otp/verify', otpLimiter, asyncHandler(async (req, res) => {
     sendEmailAsync('account_created', session.user.email,
       { user: { name: session.user.display_name || email.split('@')[0] } });
   }
-  audit({ actor: { id: session.user.id, email: session.user.email },
+  await audit({ actor: { id: session.user.id, email: session.user.email },
     action: 'auth.login', metadata: { method: 'otp' }, req });
   setSessionCookie(res, session.refreshToken);
   res.json({
     accessToken: session.accessToken,
-    user: publicUser(session.user.id),
+    user: await publicUser(session.user.id),
     firstLogin: !!session.firstLogin,
   });
 }));
@@ -84,7 +84,7 @@ router.get('/oauth/:provider/callback', asyncHandler(async (req, res) => {
   }
   res.clearCookie(`oauth_state_${provider}`, { path: '/api/auth' });
   const session = await handleOAuthCallback(provider, String(code), ctxOf(req));
-  audit({ actor: { id: session.user.id, email: session.user.email },
+  await audit({ actor: { id: session.user.id, email: session.user.email },
     action: 'auth.login', metadata: { method: provider }, req });
   setSessionCookie(res, session.refreshToken);
   // Hand the access token to the SPA via a short-lived fragment.
@@ -98,12 +98,12 @@ router.post('/refresh', asyncHandler(async (req, res) => {
   res.json(refreshSession(refreshToken));
 }));
 
-router.post('/logout', requireAuth, (req, res) => {
-  if (req.auth?.sid) revokeSession(req.auth.sid);
+router.post('/logout', requireAuth, asyncHandler(async (req, res) => {
+  if (req.auth?.sid) await revokeSession(req.auth.sid);
   res.clearCookie(config.auth.cookieName, { path: '/api/auth' });
-  audit({ actor: { id: req.user.id, email: req.user.email }, action: 'auth.logout', req });
+  await audit({ actor: { id: req.user.id, email: req.user.email }, action: 'auth.logout', req });
   res.json({ ok: true });
-});
+}));
 
 router.get('/me', requireAuth, (req, res) => {
   res.json({ user: req.user });

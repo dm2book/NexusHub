@@ -1,53 +1,79 @@
-# 🚀 ForgeMarket Deploy Guide
+# 🚀 ForgeMarket — Deploy everything on Vercel
 
-ForgeMarket is now a full-stack app: a React storefront/dashboard (`/`) and an
-Express API (`/server`). See `ARCHITECTURE.md` for the system overview.
+ForgeMarket runs as a single Vercel project: the React storefront/dashboards are
+served as static files, and the whole Express API runs as one serverless
+function under `/api/*` (`api/[...path].js` → `server/src/app.js`). Data lives in
+Postgres. On the first request after a deploy the API **auto-migrates and seeds**
+the database (roles, permissions, email templates) — no manual step.
 
-## 1. Backend API (`server/`)
+## Step 1 — Push the repo to GitHub
+This branch already contains everything (`api/`, `server/`, the SPA, `vercel.json`).
 
+## Step 2 — Create the Vercel project
+1. Go to **vercel.com → Add New → Project** and import this GitHub repo.
+2. Framework preset: **Vite** (auto-detected). Build `npm run build`, output `dist`.
+   `vercel.json` already wires the API function + SPA routing — leave the rest default.
+3. Don't deploy yet — add the database + env vars first (Step 3-4).
+
+## Step 3 — Add a Postgres database
+In the project's **Storage** tab → **Create Database → Postgres** (Neon-backed).
+Vercel injects `POSTGRES_URL` (pooled) into the project automatically — the API
+reads it. (Any external Neon/Supabase Postgres works too: set `DATABASE_URL`.)
+
+## Step 4 — Set environment variables
+Project → **Settings → Environment Variables**:
+
+| Variable | Required | Value |
+|----------|----------|-------|
+| `JWT_SECRET` | ✅ | a long random string |
+| `NODE_ENV` | ✅ | `production` |
+| `DATABASE_SSL` | ✅ | `true` |
+| `APP_URL` | ✅ | your deployed URL, e.g. `https://forgemarket.vercel.app` |
+| `API_URL` | ✅ | same URL (API is same-origin) |
+| `POSTGRES_URL` | auto | set by Vercel Postgres (or set `DATABASE_URL` yourself) |
+| `SMTP_URL` | optional | e.g. `smtps://user:pass@smtp.host:465` — without it, emails are recorded to `email_log` instead of delivered |
+| `EMAIL_FROM_NAME` / `EMAIL_FROM_ADDRESS` | optional | branded sender |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | optional | enables Google login |
+| `DISCORD_CLIENT_ID` / `DISCORD_CLIENT_SECRET` | optional | enables Discord login |
+
+For OAuth, set the provider redirect URLs to
+`https://YOUR-URL/api/auth/oauth/google/callback` and `/discord/callback`.
+
+## Step 5 — Deploy
+Click **Deploy**. After the build, open the URL — the storefront loads and the
+first API call migrates + seeds Postgres.
+
+## Step 6 — Make yourself the Owner
+Sign in once (email OTP) to create your account, then promote it. Either:
+
+- **Locally** against the same DB:
+  ```bash
+  cd server && npm install
+  DATABASE_URL="<your POSTGRES_URL>" DATABASE_SSL=true \
+    node src/db/seed.js grant you@example.com owner
+  ```
+- **Or** one row in the Vercel Postgres query console:
+  ```sql
+  INSERT INTO user_roles (user_id, role_id, granted_at)
+  SELECT id, 'owner', now()::text FROM users WHERE email='you@example.com';
+  ```
+
+Now `/admin` is unlocked. 🎉
+
+---
+
+## Run locally
 ```bash
-cd server
-cp .env.example .env        # fill in JWT_SECRET, SMTP_URL, OAuth keys for prod
-npm install
-npm run setup               # runs migrations + seeds roles/permissions/email templates
-npm start                   # listens on PORT (default 4000)
+# Postgres (any local instance), then:
+cd server && cp .env.example .env   # point DATABASE_URL at your DB
+npm install && npm run setup        # migrate + seed
+npm start                           # API on :4000
+
+# storefront (repo root, separate terminal)
+npm install && npm run dev          # :3000, proxies /api → :4000
 ```
 
-Bootstrap the first admin after they log in once:
-
-```bash
-node src/db/seed.js grant you@example.com owner
-```
-
-**Required in production** (`assertProductionConfig` enforces): `JWT_SECRET`, `SMTP_URL`.
-Configure `GOOGLE_*` / `DISCORD_*` to enable those logins (otherwise hidden). Point
-`DATABASE_FILE` at a persistent volume. Host on any Node platform (Render, Fly,
-Railway, a VM, or a container) behind HTTPS.
-
-## 2. Frontend (repo root)
-
-```bash
-npm install
-npm run dev      # dev server on :3000, proxies /api → :4000
-npm run build    # production bundle in dist/
-```
-
-The SPA calls the API on the **same origin** by default (works behind one domain /
-reverse proxy). For a separate API host, set `VITE_API_URL=https://api.yourdomain.com`
-at build time and ensure CORS `APP_URL` matches the storefront origin.
-
-### Vercel (storefront)
-
-Import the repo, framework **Vite**, build `npm run build`, output `dist`. Set
-`VITE_API_URL` to your deployed API. `vercel.json` already SPA-rewrites and adds
-security headers.
-
-## 3. Recommended production topology
-
-```
-yourdomain.com         → static SPA (dist/)
-yourdomain.com/api/*   → reverse-proxy to the Express API (same origin = no CORS)
-```
-
-Keeping API and SPA same-origin lets the httpOnly refresh cookie and JWT flow work with
-zero CORS configuration.
+## Alternative host (stateful Node)
+The same code runs on Render/Railway/Fly/containers: set `DATABASE_URL`, run
+`npm run setup` once, then `npm start` (uses `server/src/index.js`). On those
+platforms you can serve the SPA separately or behind the same domain.

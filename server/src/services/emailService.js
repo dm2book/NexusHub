@@ -16,12 +16,9 @@ import { renderTemplate, baseContext } from './templateService.js';
 let transporter = null;
 function getTransport() {
   if (transporter) return transporter;
-  if (config.email.smtpUrl) {
-    transporter = nodemailer.createTransport(config.email.smtpUrl);
-  } else {
-    // JSON transport: produces a serialized message without sending.
-    transporter = nodemailer.createTransport({ jsonTransport: true });
-  }
+  transporter = config.email.smtpUrl
+    ? nodemailer.createTransport(config.email.smtpUrl)
+    : nodemailer.createTransport({ jsonTransport: true });
   return transporter;
 }
 
@@ -36,10 +33,10 @@ function loadTemplate(eventKey) {
 export async function sendEmail(eventKey, to, context = {}) {
   const id = newId('eml');
   const at = nowIso();
-  const tpl = loadTemplate(eventKey);
+  const tpl = await loadTemplate(eventKey);
 
   if (!tpl || !tpl.enabled) {
-    run(`INSERT INTO email_log (id, template_id, to_email, status, error, context, created_at)
+    await run(`INSERT INTO email_log (id, template_id, to_email, status, error, context, created_at)
          VALUES (@id, @t, @to, 'failed', @err, @ctx, @at)`,
         { id, t: eventKey, to, err: tpl ? 'template disabled' : 'template missing',
           ctx: JSON.stringify(context), at });
@@ -53,13 +50,13 @@ export async function sendEmail(eventKey, to, context = {}) {
   try {
     const info = await getTransport().sendMail({ from, to, subject, html });
     const status = config.email.smtpUrl ? 'sent' : 'recorded';
-    run(`INSERT INTO email_log (id, template_id, to_email, subject, status, provider_ref, context, created_at)
+    await run(`INSERT INTO email_log (id, template_id, to_email, subject, status, provider_ref, context, created_at)
          VALUES (@id, @t, @to, @subj, @st, @ref, @ctx, @at)`,
         { id, t: eventKey, to, subj: subject, st: status,
           ref: info.messageId || null, ctx: JSON.stringify(context), at });
     return id;
   } catch (err) {
-    run(`INSERT INTO email_log (id, template_id, to_email, subject, status, error, context, created_at)
+    await run(`INSERT INTO email_log (id, template_id, to_email, subject, status, error, context, created_at)
          VALUES (@id, @t, @to, @subj, 'failed', @err, @ctx, @at)`,
         { id, t: eventKey, to, subj: subject, err: err.message,
           ctx: JSON.stringify(context), at });
@@ -67,8 +64,15 @@ export async function sendEmail(eventKey, to, context = {}) {
   }
 }
 
-/** Fire-and-forget helper for non-critical notifications. */
-export function sendEmailAsync(eventKey, to, context = {}) {
-  sendEmail(eventKey, to, context).catch((err) =>
-    console.error(`[email] ${eventKey} -> ${to} failed:`, err.message));
+/**
+ * Best-effort send used in request flows: awaits the send but never throws, so a
+ * mail failure cannot break the order operation. Awaitable to guarantee the
+ * write completes before a serverless function suspends.
+ */
+export async function sendEmailAsync(eventKey, to, context = {}) {
+  try {
+    await sendEmail(eventKey, to, context);
+  } catch (err) {
+    console.error(`[email] ${eventKey} -> ${to} failed:`, err.message);
+  }
 }

@@ -20,8 +20,8 @@ import { notify } from './notificationService.js';
 
 const parse = (s) => { try { return JSON.parse(s || 'null'); } catch { return null; } };
 
-export function logFulfillment(action, { requestId, orderId, actor, detail } = {}) {
-  run(`INSERT INTO fulfillment_logs (id, request_id, order_id, action, actor, detail, created_at)
+export async function logFulfillment(action, { requestId, orderId, actor, detail } = {}) {
+  await run(`INSERT INTO fulfillment_logs (id, request_id, order_id, action, actor, detail, created_at)
        VALUES (@id, @rid, @oid, @action, @actor, @detail, @at)`,
       { id: newId('flog'), rid: requestId || null, oid: orderId || null,
         action, actor: actor || 'system',
@@ -31,36 +31,33 @@ export function logFulfillment(action, { requestId, orderId, actor, detail } = {
 /**
  * Kick off fulfillment for an entire order. Moves the order into
  * awaiting_fulfillment, then attempts auto-fulfillment per item.
- * @returns {object} summary { auto, manual, requests }
  */
 export async function fulfillOrder(orderId, ctx = {}) {
-  const order = getOrder(orderId);
+  let order = await getOrder(orderId);
   if (!order) throw notFound('Order not found');
   if (!['processing', 'awaiting_fulfillment', 'payment_received'].includes(order.status)) {
     throw conflict(`Order in status "${order.status}" cannot be fulfilled`);
   }
 
-  // Ensure the order is at awaiting_fulfillment (advance through processing).
   if (order.status === 'payment_received') {
-    transitionOrder(orderId, 'processing', { actorId: ctx.actorId, reason: 'Begin fulfillment' });
+    await transitionOrder(orderId, 'processing', { actorId: ctx.actorId, reason: 'Begin fulfillment' });
   }
-  if (getOrder(orderId).status === 'processing' &&
-      canTransition('processing', 'awaiting_fulfillment')) {
-    transitionOrder(orderId, 'awaiting_fulfillment',
+  order = await getOrder(orderId);
+  if (order.status === 'processing' && canTransition('processing', 'awaiting_fulfillment')) {
+    await transitionOrder(orderId, 'awaiting_fulfillment',
       { actorId: ctx.actorId, reason: 'Awaiting fulfillment' });
+    order = await getOrder(orderId);
   }
 
   const summary = { auto: 0, manual: 0, requests: [] };
   for (const item of order.items) {
-    const resolved = item.product_id ? resolveFulfillmentSupplier(item.product_id) : null;
+    const resolved = item.product_id ? await resolveFulfillmentSupplier(item.product_id) : null;
     if (resolved) {
-      const req = await runAutoFulfillment(order, item, resolved, ctx);
+      summary.requests.push(await runAutoFulfillment(order, item, resolved, ctx));
       summary.auto++;
-      summary.requests.push(req);
     } else {
-      const req = openManualFulfillment(order, item, ctx);
+      summary.requests.push(await openManualFulfillment(order, item, ctx));
       summary.manual++;
-      summary.requests.push(req);
     }
   }
 
@@ -71,17 +68,17 @@ export async function fulfillOrder(orderId, ctx = {}) {
 async function runAutoFulfillment(order, item, { supplier, supplierProduct }, ctx) {
   const reqId = newId('ful');
   const at = nowIso();
-  run(`INSERT INTO fulfillment_requests
+  await run(`INSERT INTO fulfillment_requests
         (id, order_id, order_item_id, supplier_id, mode, status, payload, created_at, updated_at)
        VALUES (@id, @oid, @iid, @sup, 'auto', 'requested', @payload, @at, @at)`,
       { id: reqId, oid: order.id, iid: item.id, sup: supplier.id,
         payload: JSON.stringify({ sku: supplierProduct.supplier_sku, quantity: item.quantity }), at });
-  logFulfillment('created', { requestId: reqId, orderId: order.id, actor: ctx.actorId,
+  await logFulfillment('created', { requestId: reqId, orderId: order.id, actor: ctx.actorId,
     detail: { mode: 'auto', supplier: supplier.id, item: item.id } });
 
   try {
     const connector = createConnector(supplier);
-    logFulfillment('dispatched', { requestId: reqId, orderId: order.id, actor: supplier.id,
+    await logFulfillment('dispatched', { requestId: reqId, orderId: order.id, actor: supplier.id,
       detail: { sku: supplierProduct.supplier_sku, quantity: item.quantity } });
 
     const result = await connector.createFulfillment({
@@ -92,48 +89,47 @@ async function runAutoFulfillment(order, item, { supplier, supplierProduct }, ct
       metadata: item.metadata,
     });
 
-    persistResult(reqId, order, item, result);
-    logFulfillment('result', { requestId: reqId, orderId: order.id, actor: supplier.id,
+    await persistResult(reqId, order, item, result);
+    await logFulfillment('result', { requestId: reqId, orderId: order.id, actor: supplier.id,
       detail: { status: result.status, deliveries: result.deliveries?.length || 0 } });
-    return get('SELECT * FROM fulfillment_requests WHERE id=@id', { id: reqId });
   } catch (err) {
-    run(`UPDATE fulfillment_requests SET status='failed', result=@r, updated_at=@at WHERE id=@id`,
+    await run(`UPDATE fulfillment_requests SET status='failed', result=@r, updated_at=@at WHERE id=@id`,
         { r: JSON.stringify({ error: err.message }), at: nowIso(), id: reqId });
-    logFulfillment('error', { requestId: reqId, orderId: order.id, actor: supplier.id,
+    await logFulfillment('error', { requestId: reqId, orderId: order.id, actor: supplier.id,
       detail: { error: err.message } });
-    return get('SELECT * FROM fulfillment_requests WHERE id=@id', { id: reqId });
   }
+  return get('SELECT * FROM fulfillment_requests WHERE id=@id', { id: reqId });
 }
 
-function persistResult(reqId, order, item, result) {
+async function persistResult(reqId, order, item, result) {
   const status = result.status === 'fulfilled' ? 'fulfilled'
     : result.status === 'failed' ? 'failed' : 'in_progress';
-  run(`UPDATE fulfillment_requests SET status=@st, external_ref=@ref, result=@res, updated_at=@at
+  await run(`UPDATE fulfillment_requests SET status=@st, external_ref=@ref, result=@res, updated_at=@at
        WHERE id=@id`,
       { st: status, ref: result.externalRef || null,
         res: JSON.stringify(result.raw ?? result), at: nowIso(), id: reqId });
 
   for (const d of result.deliveries || []) {
-    createDelivery(order.id, item.id, d);
+    await createDelivery(order.id, item.id, d);
   }
 }
 
-function createDelivery(orderId, itemId, d) {
-  run(`INSERT INTO deliveries (id, order_id, order_item_id, type, content, filename, max_downloads, created_at)
+async function createDelivery(orderId, itemId, d) {
+  await run(`INSERT INTO deliveries (id, order_id, order_item_id, type, content, filename, max_downloads, created_at)
        VALUES (@id, @oid, @iid, @type, @content, @file, @max, @at)`,
       { id: newId('dlv'), oid: orderId, iid: itemId, type: d.type || 'code',
         content: d.content || null, file: d.filename || null,
         max: d.maxDownloads ?? null, at: nowIso() });
 }
 
-function openManualFulfillment(order, item, ctx) {
+async function openManualFulfillment(order, item, ctx) {
   const reqId = newId('ful');
   const at = nowIso();
-  run(`INSERT INTO fulfillment_requests
+  await run(`INSERT INTO fulfillment_requests
         (id, order_id, order_item_id, mode, status, created_at, updated_at)
        VALUES (@id, @oid, @iid, 'manual', 'pending', @at, @at)`,
       { id: reqId, oid: order.id, iid: item.id, at });
-  logFulfillment('created', { requestId: reqId, orderId: order.id, actor: ctx.actorId,
+  await logFulfillment('created', { requestId: reqId, orderId: order.id, actor: ctx.actorId,
     detail: { mode: 'manual', item: item.id, reason: 'No supplier integration available' } });
   return get('SELECT * FROM fulfillment_requests WHERE id=@id', { id: reqId });
 }
@@ -143,16 +139,16 @@ function openManualFulfillment(order, item, ctx) {
  * (code/file/message). Logged and may auto-complete the order.
  */
 export async function completeManualFulfillment(requestId, { deliveries = [], note } = {}, ctx = {}) {
-  const req = get('SELECT * FROM fulfillment_requests WHERE id=@id', { id: requestId });
+  const req = await get('SELECT * FROM fulfillment_requests WHERE id=@id', { id: requestId });
   if (!req) throw notFound('Fulfillment request not found');
   if (req.mode !== 'manual') throw badRequest('Not a manual fulfillment request');
 
-  for (const d of deliveries) createDelivery(req.order_id, req.order_item_id, d);
-  run(`UPDATE fulfillment_requests SET status='fulfilled', assigned_to=@by,
+  for (const d of deliveries) await createDelivery(req.order_id, req.order_item_id, d);
+  await run(`UPDATE fulfillment_requests SET status='fulfilled', assigned_to=@by,
         result=@res, updated_at=@at WHERE id=@id`,
       { by: ctx.actorId || null, res: JSON.stringify({ deliveries, note }),
         at: nowIso(), id: requestId });
-  logFulfillment('manual_note', { requestId, orderId: req.order_id, actor: ctx.actorId,
+  await logFulfillment('manual_note', { requestId, orderId: req.order_id, actor: ctx.actorId,
     detail: { note, deliveries: deliveries.length } });
 
   await maybeCompleteOrder(req.order_id, ctx);
@@ -161,17 +157,17 @@ export async function completeManualFulfillment(requestId, { deliveries = [], no
 
 /** Re-poll an in-progress async supplier fulfillment. */
 export async function refreshFulfillment(requestId, ctx = {}) {
-  const req = get('SELECT * FROM fulfillment_requests WHERE id=@id', { id: requestId });
+  const req = await get('SELECT * FROM fulfillment_requests WHERE id=@id', { id: requestId });
   if (!req) throw notFound('Fulfillment request not found');
   if (req.mode !== 'auto' || !req.external_ref) {
     throw badRequest('Nothing to refresh for this request');
   }
-  const supplier = getSupplier(req.supplier_id);
-  const order = getOrder(req.order_id);
-  const item = order.items.find((i) => i.id === req.order_item_id);
+  const supplier = await getSupplier(req.supplier_id);
+  const order = await getOrder(req.order_id);
+  const item = order.items.find((i) => i.id === req.order_item_id) || { id: req.order_item_id };
   const result = await createConnector(supplier).checkFulfillment(req.external_ref);
-  persistResult(requestId, order, item || { id: req.order_item_id }, result);
-  logFulfillment('retried', { requestId, orderId: req.order_id, actor: ctx.actorId,
+  await persistResult(requestId, order, item, result);
+  await logFulfillment('retried', { requestId, orderId: req.order_id, actor: ctx.actorId,
     detail: { status: result.status } });
   await maybeCompleteOrder(req.order_id, ctx);
   return get('SELECT * FROM fulfillment_requests WHERE id=@id', { id: requestId });
@@ -179,32 +175,32 @@ export async function refreshFulfillment(requestId, ctx = {}) {
 
 /** If every fulfillment request for an order is fulfilled, complete the order. */
 async function maybeCompleteOrder(orderId, ctx) {
-  const reqs = all('SELECT status FROM fulfillment_requests WHERE order_id=@id', { id: orderId });
+  const reqs = await all('SELECT status FROM fulfillment_requests WHERE order_id=@id', { id: orderId });
   if (!reqs.length) return;
   const allDone = reqs.every((r) => r.status === 'fulfilled');
-  const order = getOrder(orderId);
+  const order = await getOrder(orderId);
   if (allDone && canTransition(order.status, 'completed')) {
-    transitionOrder(orderId, 'completed',
+    await transitionOrder(orderId, 'completed',
       { actorId: ctx.actorId || 'system', reason: 'All items fulfilled' });
-    logFulfillment('order_completed', { orderId, actor: ctx.actorId || 'system' });
+    await logFulfillment('order_completed', { orderId, actor: ctx.actorId || 'system' });
     if (order.userId) {
-      notify(order.userId, { type: 'delivery', title: `Order ${order.number} delivered`,
+      await notify(order.userId, { type: 'delivery', title: `Order ${order.number} delivered`,
         body: 'Your deliveries are ready in your dashboard.',
         link: `/account/orders/${orderId}` });
     }
   }
 }
 
-export function listFulfillment(orderId) {
-  return all('SELECT * FROM fulfillment_requests WHERE order_id=@id ORDER BY created_at ASC',
-             { id: orderId })
-    .map((r) => ({ ...r, payload: parse(r.payload), result: parse(r.result) }));
+export async function listFulfillment(orderId) {
+  const rows = await all('SELECT * FROM fulfillment_requests WHERE order_id=@id ORDER BY created_at ASC',
+             { id: orderId });
+  return rows.map((r) => ({ ...r, payload: parse(r.payload), result: parse(r.result) }));
 }
 
-export function listFulfillmentLogs(orderId) {
-  return all('SELECT * FROM fulfillment_logs WHERE order_id=@id ORDER BY created_at ASC',
-             { id: orderId })
-    .map((r) => ({ ...r, detail: parse(r.detail) }));
+export async function listFulfillmentLogs(orderId) {
+  const rows = await all('SELECT * FROM fulfillment_logs WHERE order_id=@id ORDER BY created_at ASC',
+             { id: orderId });
+  return rows.map((r) => ({ ...r, detail: parse(r.detail) }));
 }
 
 export function listManualQueue() {

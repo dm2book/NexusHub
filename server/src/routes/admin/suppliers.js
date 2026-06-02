@@ -6,6 +6,7 @@ import { requirePermission } from '../../middleware/rbac.js';
 import * as suppliers from '../../services/supplier/supplierService.js';
 import { availableKinds } from '../../services/supplier/registry.js';
 import { audit } from '../../services/auditService.js';
+import { notFound } from '../../utils/errors.js';
 
 const router = Router();
 
@@ -13,15 +14,15 @@ router.get('/connector-kinds', requirePermission('suppliers.read'), (_req, res) 
   res.json({ kinds: availableKinds() });
 });
 
-router.get('/', requirePermission('suppliers.read'), (_req, res) => {
-  res.json({ suppliers: suppliers.listSuppliers() });
-});
+router.get('/', requirePermission('suppliers.read'), asyncHandler(async (_req, res) => {
+  res.json({ suppliers: await suppliers.listSuppliers() });
+}));
 
-router.get('/:id', requirePermission('suppliers.read'), (req, res) => {
-  const s = suppliers.getSupplier(req.params.id);
-  if (!s) return res.status(404).json({ error: { message: 'Supplier not found' } });
-  res.json({ supplier: s, syncRuns: suppliers.listSyncRuns(req.params.id) });
-});
+router.get('/:id', requirePermission('suppliers.read'), asyncHandler(async (req, res) => {
+  const supplier = await suppliers.getSupplier(req.params.id);
+  if (!supplier) throw notFound('Supplier not found');
+  res.json({ supplier, syncRuns: await suppliers.listSyncRuns(req.params.id) });
+}));
 
 router.post('/', requirePermission('suppliers.manage'), asyncHandler(async (req, res) => {
   const body = z.object({
@@ -30,8 +31,8 @@ router.post('/', requirePermission('suppliers.manage'), asyncHandler(async (req,
     config: z.record(z.any()).optional(),
     credentialsRef: z.string().optional(),
   }).parse(req.body);
-  const supplier = suppliers.createSupplier(body);
-  audit({ actor: req.user, action: 'supplier.create', targetType: 'supplier',
+  const supplier = await suppliers.createSupplier(body);
+  await audit({ actor: req.user, action: 'supplier.create', targetType: 'supplier',
     targetId: supplier.id, metadata: { kind: body.connectorKind }, req });
   res.status(201).json({ supplier });
 }));
@@ -43,18 +44,18 @@ router.patch('/:id', requirePermission('suppliers.manage'), asyncHandler(async (
     config: z.record(z.any()).optional(),
     credentialsRef: z.string().optional(),
   }).parse(req.body);
-  const supplier = suppliers.updateSupplier(req.params.id, body);
-  audit({ actor: req.user, action: 'supplier.update', targetType: 'supplier',
+  const supplier = await suppliers.updateSupplier(req.params.id, body);
+  await audit({ actor: req.user, action: 'supplier.update', targetType: 'supplier',
     targetId: supplier.id, req });
   res.json({ supplier });
 }));
 
-router.delete('/:id', requirePermission('suppliers.manage'), (req, res) => {
-  suppliers.deleteSupplier(req.params.id);
-  audit({ actor: req.user, action: 'supplier.delete', targetType: 'supplier',
+router.delete('/:id', requirePermission('suppliers.manage'), asyncHandler(async (req, res) => {
+  await suppliers.deleteSupplier(req.params.id);
+  await audit({ actor: req.user, action: 'supplier.delete', targetType: 'supplier',
     targetId: req.params.id, req });
   res.json({ ok: true });
-});
+}));
 
 router.post('/:id/test', requirePermission('suppliers.read'), asyncHandler(async (req, res) => {
   res.json(await suppliers.testSupplier(req.params.id));
@@ -69,7 +70,8 @@ router.post('/:id/products', requirePermission('suppliers.manage'),
       cost: z.number().int().optional(),
       priority: z.number().int().optional(),
     }).parse(req.body);
-    res.status(201).json({ mapping: suppliers.mapSupplierProduct({ supplierId: req.params.id, ...body }) });
+    const mapping = await suppliers.mapSupplierProduct({ supplierId: req.params.id, ...body });
+    res.status(201).json({ mapping });
   }));
 
 // Trigger a sync (inventory | price | status | full).
@@ -78,7 +80,7 @@ router.post('/:id/sync', requirePermission('suppliers.sync'), asyncHandler(async
     type: z.enum(['inventory', 'price', 'status', 'full']).optional(),
   }).parse(req.body || {});
   const run = await suppliers.syncSupplier(req.params.id, type || 'full');
-  audit({ actor: req.user, action: 'supplier.sync', targetType: 'supplier',
+  await audit({ actor: req.user, action: 'supplier.sync', targetType: 'supplier',
     targetId: req.params.id, metadata: { type: type || 'full', status: run.status }, req });
   res.json({ run });
 }));

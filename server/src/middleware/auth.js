@@ -15,14 +15,14 @@ function extractToken(req) {
 }
 
 /** Populate req.user if a valid token is present; never throws. */
-export function attachUser(req, _res, next) {
+export async function attachUser(req, _res, next) {
   const token = extractToken(req);
   if (!token) return next();
   try {
     const claims = verifyAccess(token);
-    if (claims.sid && !isSessionActive(claims.sid)) return next();
+    if (claims.sid && !(await isSessionActive(claims.sid))) return next();
     req.auth = claims;
-    req.user = publicUser(claims.sub);
+    req.user = await publicUser(claims.sub);
   } catch {
     /* invalid/expired token → treat as anonymous */
   }

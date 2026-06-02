@@ -10,9 +10,9 @@ import { audit } from '../../services/auditService.js';
 
 const router = Router();
 
-router.get('/queue', requirePermission('fulfillment.manage'), (_req, res) => {
-  res.json({ queue: listManualQueue() });
-});
+router.get('/queue', requirePermission('fulfillment.manage'), asyncHandler(async (_req, res) => {
+  res.json({ queue: await listManualQueue() });
+}));
 
 // Complete a manual fulfillment request by recording the delivery payload.
 router.post('/:requestId/complete', requirePermission('fulfillment.manage'),
@@ -28,7 +28,7 @@ router.post('/:requestId/complete', requirePermission('fulfillment.manage'),
     }).parse(req.body);
     const request = await completeManualFulfillment(req.params.requestId, body,
       { actorId: req.user.id });
-    audit({ actor: req.user, action: 'fulfillment.manual_complete',
+    await audit({ actor: req.user, action: 'fulfillment.manual_complete',
       targetType: 'fulfillment_request', targetId: req.params.requestId, req });
     res.json({ request });
   }));

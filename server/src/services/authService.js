@@ -8,7 +8,7 @@ import { config } from '../config/env.js';
 import { run, get, nowIso } from '../db/index.js';
 import { newId, newOtp } from '../utils/ids.js';
 import { sha256, safeEqual, randomToken } from '../utils/crypto.js';
-import { ApiError, badRequest, unauthorized, tooMany } from '../utils/errors.js';
+import { badRequest, unauthorized, tooMany } from '../utils/errors.js';
 import { sendEmail } from './emailService.js';
 import { upsertUserByEmail, touchLogin, getUserPermissions } from './userService.js';
 
@@ -19,9 +19,9 @@ export async function requestEmailOtp(email) {
   const e = String(email || '').trim().toLowerCase();
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) throw badRequest('Enter a valid email address');
 
-  // Throttle: max 3 unconsumed codes within the TTL window per address.
+  // Throttle: max 3 codes within the TTL window per address.
   const since = new Date(Date.now() - config.auth.otpTtlMinutes * 60_000).toISOString();
-  const recent = get(
+  const recent = await get(
     `SELECT COUNT(*) AS n FROM otp_codes WHERE email = @e AND created_at > @since`,
     { e, since });
   if (recent.n >= 3) throw tooMany('Too many codes requested. Try again shortly.');
@@ -30,7 +30,7 @@ export async function requestEmailOtp(email) {
   const id = newId('otp');
   const at = nowIso();
   const expires = new Date(Date.now() + config.auth.otpTtlMinutes * 60_000).toISOString();
-  run(`INSERT INTO otp_codes (id, email, code_hash, purpose, expires_at, created_at)
+  await run(`INSERT INTO otp_codes (id, email, code_hash, purpose, expires_at, created_at)
        VALUES (@id, @e, @h, 'login', @exp, @at)`,
       { id, e, h: sha256(code), exp: expires, at });
 
@@ -44,7 +44,7 @@ export async function requestEmailOtp(email) {
 /** Verify an OTP and return an authenticated session. */
 export async function verifyEmailOtp(email, code, ctx = {}) {
   const e = String(email || '').trim().toLowerCase();
-  const row = get(
+  const row = await get(
     `SELECT * FROM otp_codes WHERE email = @e AND consumed_at IS NULL
       ORDER BY created_at DESC LIMIT 1`, { e });
   if (!row) throw badRequest('No active code. Request a new one.');
@@ -53,14 +53,14 @@ export async function verifyEmailOtp(email, code, ctx = {}) {
     throw tooMany('Too many attempts. Request a new code.');
   }
   if (!safeEqual(row.code_hash, sha256(String(code).trim()))) {
-    run('UPDATE otp_codes SET attempts = attempts + 1 WHERE id = @id', { id: row.id });
+    await run('UPDATE otp_codes SET attempts = attempts + 1 WHERE id = @id', { id: row.id });
     throw badRequest('Incorrect code');
   }
-  run('UPDATE otp_codes SET consumed_at = @at WHERE id = @id', { at: nowIso(), id: row.id });
+  await run('UPDATE otp_codes SET consumed_at = @at WHERE id = @id', { at: nowIso(), id: row.id });
 
-  const { user, created } = upsertUserByEmail(e, { email_verified: true });
+  const { user, created } = await upsertUserByEmail(e, { email_verified: true });
   if (!user.email_verified) {
-    run('UPDATE users SET email_verified = 1 WHERE id = @id', { id: user.id });
+    await run('UPDATE users SET email_verified = 1 WHERE id = @id', { id: user.id });
   }
   return finalizeLogin(user, ctx, { firstLogin: created });
 }
@@ -68,28 +68,23 @@ export async function verifyEmailOtp(email, code, ctx = {}) {
 // ── Sessions / tokens ────────────────────────────────────────────────────
 
 /** Issue access JWT + refresh session for a user. Shared by all login paths. */
-export function finalizeLogin(user, ctx = {}, extra = {}) {
-  touchLogin(user.id);
+export async function finalizeLogin(user, ctx = {}, extra = {}) {
+  await touchLogin(user.id);
   const sessionId = newId('ses');
   const refresh = randomToken(32);
   const at = nowIso();
   const expires = new Date(Date.now() + config.auth.refreshTtlDays * 86_400_000).toISOString();
-  run(`INSERT INTO sessions (id, user_id, refresh_hash, user_agent, ip, expires_at, created_at)
+  await run(`INSERT INTO sessions (id, user_id, refresh_hash, user_agent, ip, expires_at, created_at)
        VALUES (@id, @uid, @rh, @ua, @ip, @exp, @at)`,
       { id: sessionId, uid: user.id, rh: sha256(refresh),
         ua: ctx.userAgent || null, ip: ctx.ip || null, exp: expires, at });
 
-  const accessToken = signAccess(user, sessionId);
-  return {
-    accessToken,
-    refreshToken: `${sessionId}.${refresh}`,
-    user,
-    ...extra,
-  };
+  const accessToken = await signAccess(user, sessionId);
+  return { accessToken, refreshToken: `${sessionId}.${refresh}`, user, ...extra };
 }
 
-function signAccess(user, sessionId) {
-  const perms = [...getUserPermissions(user.id)];
+async function signAccess(user, sessionId) {
+  const perms = [...(await getUserPermissions(user.id))];
   return jwt.sign(
     { sub: user.id, email: user.email, sid: sessionId, perms },
     config.auth.jwtSecret,
@@ -105,26 +100,25 @@ export function verifyAccess(token) {
 }
 
 /** Exchange a refresh token for a fresh access token (rotation-safe). */
-export function refreshSession(refreshToken) {
+export async function refreshSession(refreshToken) {
   const [sessionId, secret] = String(refreshToken || '').split('.');
-  const session = get('SELECT * FROM sessions WHERE id = @id', { id: sessionId });
+  const session = await get('SELECT * FROM sessions WHERE id = @id', { id: sessionId });
   if (!session || session.revoked_at) throw unauthorized('Invalid session');
   if (new Date(session.expires_at) < new Date()) throw unauthorized('Session expired');
   if (!safeEqual(session.refresh_hash, sha256(secret || ''))) {
-    // Possible token theft — revoke the session defensively.
-    run('UPDATE sessions SET revoked_at = @at WHERE id = @id', { at: nowIso(), id: sessionId });
+    await run('UPDATE sessions SET revoked_at = @at WHERE id = @id', { at: nowIso(), id: sessionId });
     throw unauthorized('Invalid session');
   }
-  const user = get('SELECT * FROM users WHERE id = @id', { id: session.user_id });
+  const user = await get('SELECT * FROM users WHERE id = @id', { id: session.user_id });
   if (!user || user.status !== 'active') throw unauthorized('Account unavailable');
-  return { accessToken: signAccess(user, sessionId) };
+  return { accessToken: await signAccess(user, sessionId) };
 }
 
-export function revokeSession(sessionId) {
-  run('UPDATE sessions SET revoked_at = @at WHERE id = @id', { at: nowIso(), id: sessionId });
+export async function revokeSession(sessionId) {
+  await run('UPDATE sessions SET revoked_at = @at WHERE id = @id', { at: nowIso(), id: sessionId });
 }
 
-export function isSessionActive(sessionId) {
-  const s = get('SELECT revoked_at, expires_at FROM sessions WHERE id = @id', { id: sessionId });
+export async function isSessionActive(sessionId) {
+  const s = await get('SELECT revoked_at, expires_at FROM sessions WHERE id = @id', { id: sessionId });
   return !!s && !s.revoked_at && new Date(s.expires_at) > new Date();
 }

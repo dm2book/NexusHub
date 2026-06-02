@@ -23,9 +23,12 @@ export const config = {
   apiUrl: env.API_URL || 'http://localhost:4000',
 
   db: {
-    // Path to the SQLite database file. In production point this at a mounted
-    // volume; the data-access layer is isolated so Postgres can be dropped in.
-    file: env.DATABASE_FILE || './data/forgemarket.db',
+    // Postgres connection string. Vercel Postgres sets POSTGRES_URL; a generic
+    // DATABASE_URL is also honoured. Use a POOLED connection string in
+    // serverless (Neon/Vercel pooler) to avoid exhausting connections.
+    url: env.DATABASE_URL || env.POSTGRES_URL || env.POSTGRES_PRISMA_URL || '',
+    // Enable SSL for hosted databases (Neon/Vercel/Supabase require it).
+    ssl: bool(env.DATABASE_SSL, isProd),
   },
 
   auth: {
@@ -75,8 +78,13 @@ export function assertProductionConfig() {
   if (!isProd) return;
   const missing = [];
   if (config.auth.jwtSecret.startsWith('dev-only')) missing.push('JWT_SECRET');
-  if (!config.email.smtpUrl) missing.push('SMTP_URL');
+  if (!config.db.url) missing.push('DATABASE_URL (or POSTGRES_URL)');
   if (missing.length) {
     throw new Error(`Refusing to start in production without: ${missing.join(', ')}`);
+  }
+  // SMTP is optional: without it, emails are still rendered and recorded in the
+  // email_log table (nothing is dropped). Warn so it's not a silent surprise.
+  if (!config.email.smtpUrl) {
+    console.warn('[config] SMTP_URL not set — emails will be recorded to email_log, not delivered.');
   }
 }

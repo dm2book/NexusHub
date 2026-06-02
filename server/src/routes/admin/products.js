@@ -8,9 +8,9 @@ import { audit } from '../../services/auditService.js';
 
 const router = Router();
 
-router.get('/', requirePermission('orders.read'), (_req, res) => {
-  res.json({ products: listProducts() });
-});
+router.get('/', requirePermission('orders.read'), asyncHandler(async (_req, res) => {
+  res.json({ products: await listProducts() });
+}));
 
 const productSchema = z.object({
   name: z.string().min(1),
@@ -26,15 +26,15 @@ const productSchema = z.object({
 });
 
 router.post('/', requirePermission('suppliers.manage'), asyncHandler(async (req, res) => {
-  const product = createProduct(productSchema.parse(req.body));
-  audit({ actor: req.user, action: 'product.create', targetType: 'product',
+  const product = await createProduct(productSchema.parse(req.body));
+  await audit({ actor: req.user, action: 'product.create', targetType: 'product',
     targetId: product.id, req });
   res.status(201).json({ product });
 }));
 
 router.patch('/:id', requirePermission('suppliers.manage'), asyncHandler(async (req, res) => {
-  const product = updateProduct(req.params.id, productSchema.partial().parse(req.body));
-  audit({ actor: req.user, action: 'product.update', targetType: 'product',
+  const product = await updateProduct(req.params.id, productSchema.partial().parse(req.body));
+  await audit({ actor: req.user, action: 'product.update', targetType: 'product',
     targetId: product.id, req });
   res.json({ product });
 }));

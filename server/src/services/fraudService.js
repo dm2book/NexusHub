@@ -1,9 +1,9 @@
 /**
  * Lightweight, explainable fraud scoring run at order placement.
  *
- * Rather than a black box, each rule contributes a weighted signal; the total
- * score maps to a decision (ok | review | block) using configurable thresholds.
- * Signals are persisted to fraud_signals for review and audit.
+ * Each rule contributes a weighted signal; the total maps to a decision
+ * (ok | review | block) using configurable thresholds. Signals are persisted to
+ * fraud_signals for review and audit.
  */
 import { config } from '../config/env.js';
 import { run, get, all, nowIso } from '../db/index.js';
@@ -19,11 +19,11 @@ const RULES = [
   {
     id: 'velocity',
     weight: 30,
-    test: ({ email }) => {
+    test: async ({ email }) => {
       const since = new Date(Date.now() - 3600_000).toISOString();
-      const n = get(`SELECT COUNT(*) AS n FROM orders WHERE email=@e AND created_at>@since`,
-        { e: email, since }).n;
-      return n >= 3;
+      const row = await get(`SELECT COUNT(*) AS n FROM orders WHERE email=@e AND created_at>@since`,
+        { e: email, since });
+      return row.n >= 3;
     },
     detail: '3+ orders from this email in the last hour',
   },
@@ -55,21 +55,23 @@ const RULES = [
   {
     id: 'prior_chargeback',
     weight: 40,
-    test: ({ email }) => get(
-      `SELECT COUNT(*) AS n FROM orders WHERE email=@e AND status='refunded'`,
-      { e: email }).n >= 2,
+    test: async ({ email }) => {
+      const row = await get(
+        `SELECT COUNT(*) AS n FROM orders WHERE email=@e AND status='refunded'`, { e: email });
+      return row.n >= 2;
+    },
     detail: 'Multiple prior refunds for this email',
   },
 ];
 
 /** Evaluate fraud rules for an order context. Returns {score, decision, signals}. */
-export function scoreOrder({ order, user, email }) {
+export async function scoreOrder({ order, user, email }) {
   const ctx = { order, user, email: (email || order.email || '').toLowerCase() };
   const signals = [];
   let score = 0;
   for (const rule of RULES) {
     let hit = false;
-    try { hit = rule.test(ctx); } catch { hit = false; }
+    try { hit = await rule.test(ctx); } catch { hit = false; }
     if (hit) {
       score += rule.weight;
       signals.push({ rule: rule.id, weight: rule.weight, detail: rule.detail });
@@ -80,7 +82,7 @@ export function scoreOrder({ order, user, email }) {
     : score >= config.security.fraudReviewThreshold ? 'review' : 'ok';
 
   if (order?.id) {
-    run(`INSERT INTO fraud_signals (id, order_id, user_id, score, decision, signals, created_at)
+    await run(`INSERT INTO fraud_signals (id, order_id, user_id, score, decision, signals, created_at)
          VALUES (@id, @oid, @uid, @score, @dec, @sig, @at)`,
         { id: newId('frd'), oid: order.id, uid: user?.id || null,
           score, dec: decision, sig: JSON.stringify(signals), at: nowIso() });

@@ -1,34 +1,110 @@
 /**
- * Data-access layer.
+ * Data-access layer — PostgreSQL (serverless-friendly).
  *
- * The rest of the app talks to the database exclusively through this module so
- * the underlying engine (SQLite today, Postgres tomorrow) stays swappable. We
- * expose a tiny query surface plus a transaction helper.
+ * The rest of the app talks to the database exclusively through this module.
+ * To keep our existing `@name` parameterised SQL intact, queries are translated
+ * to Postgres positional params ($1,$2,…) on the fly. Transactions use
+ * AsyncLocalStorage so nested run/get/all calls inside `tx(async () => …)`
+ * automatically run on the transaction's client.
+ *
+ * Works locally and on Vercel: pass a pooled connection string via DATABASE_URL
+ * (or POSTGRES_URL, which Vercel Postgres sets automatically).
  */
-import fs from 'node:fs';
-import path from 'node:path';
-import Database from 'better-sqlite3';
+import { AsyncLocalStorage } from 'node:async_hooks';
+import pg from 'pg';
 import { config } from '../config/env.js';
 
-const dbFile = config.db.file;
-fs.mkdirSync(path.dirname(dbFile), { recursive: true });
+// Return BIGINT (int8) and NUMERIC as JS numbers — our values (cents, counts)
+// are well within Number's safe range, and this keeps arithmetic simple.
+pg.types.setTypeParser(20, (v) => (v === null ? null : Number(v)));   // int8
+pg.types.setTypeParser(1700, (v) => (v === null ? null : Number(v))); // numeric
 
-export const db = new Database(dbFile);
-db.pragma('journal_mode = WAL');
-db.pragma('foreign_keys = ON');
+const connectionString = config.db.url;
+if (!connectionString) {
+  throw new Error('DATABASE_URL (or POSTGRES_URL) is not set');
+}
 
-/** Run a statement that returns no rows (INSERT/UPDATE/DELETE/DDL). */
-export const run = (sql, params = {}) => db.prepare(sql).run(params);
-/** Fetch a single row or undefined. */
-export const get = (sql, params = {}) => db.prepare(sql).get(params);
-/** Fetch all matching rows. */
-export const all = (sql, params = {}) => db.prepare(sql).all(params);
+export const pool = new pg.Pool({
+  connectionString,
+  // Vercel/Neon poolers terminate idle connections; keep the pool small.
+  max: Number(process.env.PG_POOL_MAX || 5),
+  ssl: config.db.ssl ? { rejectUnauthorized: false } : undefined,
+});
+
+const txStore = new AsyncLocalStorage();
 
 /**
- * Execute `fn` inside a transaction. Nested calls reuse the outer transaction
- * because better-sqlite3 transactions are synchronous and savepoint-free.
+ * Convert `@name` placeholders to `$n`, returning [sql, valuesArray].
+ * Only names present as keys in `params` are substituted, so stray `@` inside
+ * string literals (e.g. an email like a@b.com) are left untouched.
  */
-export const tx = (fn) => db.transaction(fn);
+function translate(sql, params = {}) {
+  const order = [];
+  const seen = new Map();
+  const out = sql.replace(/@([a-zA-Z_][a-zA-Z0-9_]*)/g, (match, name) => {
+    if (!Object.prototype.hasOwnProperty.call(params, name)) return match;
+    if (!seen.has(name)) { seen.set(name, seen.size + 1); order.push(name); }
+    return `$${seen.get(name)}`;
+  });
+  const values = order.map((n) => (params[n] === undefined ? null : params[n]));
+  return [out, values];
+}
+
+function executor() {
+  // Inside a transaction, use the bound client; otherwise the pool.
+  return txStore.getStore() || pool;
+}
+
+async function query(sql, params) {
+  const [text, values] = translate(sql, params);
+  return executor().query(text, values);
+}
+
+/** INSERT/UPDATE/DELETE/DDL. Returns { changes }. */
+export async function run(sql, params = {}) {
+  const res = await query(sql, params);
+  return { changes: res.rowCount };
+}
+/** Fetch a single row or undefined. */
+export async function get(sql, params = {}) {
+  const res = await query(sql, params);
+  return res.rows[0];
+}
+/** Fetch all matching rows. */
+export async function all(sql, params = {}) {
+  const res = await query(sql, params);
+  return res.rows;
+}
+
+/**
+ * Run `fn` inside a transaction. Acquires a dedicated client and binds it for
+ * the duration via AsyncLocalStorage so all run/get/all calls inside join it.
+ */
+export async function tx(fn) {
+  // Reuse an outer transaction if already inside one.
+  if (txStore.getStore()) return fn();
+  const client = await pool.connect();
+  try {
+    return await txStore.run(client, async () => {
+      await client.query('BEGIN');
+      try {
+        const result = await fn();
+        await client.query('COMMIT');
+        return result;
+      } catch (err) {
+        await client.query('ROLLBACK');
+        throw err;
+      }
+    });
+  } finally {
+    client.release();
+  }
+}
+
+/** Execute a raw multi-statement SQL string (used by migrations). */
+export async function exec(sql) {
+  return executor().query(sql);
+}
 
 export function nowIso() {
   return new Date().toISOString();

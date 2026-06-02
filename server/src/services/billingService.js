@@ -11,31 +11,31 @@ export function listBilling(userId) {
              { u: userId });
 }
 
-export function saveBilling(userId, d = {}) {
+export async function saveBilling(userId, d = {}) {
   const id = newId('bil');
   const at = nowIso();
-  tx(() => {
+  await tx(async () => {
     if (d.isDefault) {
-      run('UPDATE billing_details SET is_default=0 WHERE user_id=@u', { u: userId });
+      await run('UPDATE billing_details SET is_default=0 WHERE user_id=@u', { u: userId });
     }
-    run(`INSERT INTO billing_details
+    await run(`INSERT INTO billing_details
           (id, user_id, label, full_name, email, line1, line2, city, postal_code, country, vat_number, is_default, created_at, updated_at)
          VALUES (@id, @u, @label, @name, @email, @l1, @l2, @city, @zip, @country, @vat, @def, @at, @at)`,
         { id, u: userId, label: d.label || 'Billing', name: d.fullName || null,
           email: d.email || null, l1: d.line1 || null, l2: d.line2 || null,
           city: d.city || null, zip: d.postalCode || null, country: d.country || null,
           vat: d.vatNumber || null, def: d.isDefault ? 1 : 0, at });
-  })();
+  });
   return get('SELECT * FROM billing_details WHERE id=@id', { id });
 }
 
-export function deleteBilling(userId, id) {
-  run('DELETE FROM billing_details WHERE id=@id AND user_id=@u', { id, u: userId });
+export async function deleteBilling(userId, id) {
+  await run('DELETE FROM billing_details WHERE id=@id AND user_id=@u', { id, u: userId });
 }
 
 /** Render a simple, self-contained HTML invoice for an order. */
-export function renderInvoice(orderId) {
-  const order = getOrder(orderId);
+export async function renderInvoice(orderId) {
+  const order = await getOrder(orderId);
   if (!order) throw notFound('Order not found');
   const rows = order.items.map((i) => `
     <tr>

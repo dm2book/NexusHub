@@ -100,7 +100,7 @@ export async function handleOAuthCallback(providerId, code, ctx = {}) {
   if (!profile.email) throw badRequest('Provider did not return an email address');
 
   // Link by stable provider uid first, then fall back to email.
-  const existingLink = get(
+  const existingLink = await get(
     `SELECT user_id FROM oauth_accounts WHERE provider = @prov AND provider_uid = @uid`,
     { prov: providerId, uid: profile.uid });
 
@@ -108,18 +108,18 @@ export async function handleOAuthCallback(providerId, code, ctx = {}) {
   if (existingLink) {
     userId = existingLink.user_id;
   } else {
-    const { user } = upsertUserByEmail(profile.email, {
+    const { user } = await upsertUserByEmail(profile.email, {
       email_verified: profile.emailVerified,
       display_name: profile.displayName,
       avatar_url: profile.avatarUrl,
     });
     userId = user.id;
-    run(`INSERT INTO oauth_accounts (id, user_id, provider, provider_uid, email, raw_profile, created_at)
+    await run(`INSERT INTO oauth_accounts (id, user_id, provider, provider_uid, email, raw_profile, created_at)
          VALUES (@id, @uid, @prov, @puid, @email, @raw, @at)`,
         { id: newId('oau'), uid: userId, prov: providerId, puid: profile.uid,
           email: profile.email, raw: JSON.stringify(profile), at: nowIso() });
   }
 
-  const user = get('SELECT * FROM users WHERE id = @id', { id: userId });
+  const user = await get('SELECT * FROM users WHERE id = @id', { id: userId });
   return finalizeLogin(user, ctx, { provider: providerId });
 }
