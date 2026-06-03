@@ -38,6 +38,11 @@ export async function requestEmailOtp(email) {
     otp: { code, ttl: config.auth.otpTtlMinutes },
     user: { name: e.split('@')[0] },
   });
+  // Dev convenience: when email isn't actually delivered (no SMTP, non-prod),
+  // print the code to the server console so local login works without a mailbox.
+  if (!config.isProd && !config.email.smtpUrl) {
+    console.log(`\n🔑  [dev] Login code for ${e}:  ${code}\n`);
+  }
   return { sent: true, expiresAt: expires };
 }
 
