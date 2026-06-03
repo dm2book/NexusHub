@@ -116,11 +116,12 @@ router.post('/:id/contact', requirePermission('orders.contact'),
     const order = await getOrder(req.params.id);
     if (!order) throw notFound('Order not found');
 
-    await sendEmail('order_processing', order.email, {
-      user: { name: order.email.split('@')[0] },
+    await sendEmail('custom_message', order.email, {
+      user: { name: order.billing?.full_name || order.email.split('@')[0] },
+      subject,
+      message,
       order: { number: order.number, total: order.totalFormatted, status: order.statusLabel,
         url: `${config.appUrl}/account/orders/${order.id}` },
-      message,
     }).catch(() => {});
     if (order.userId) {
       await notify(order.userId, { type: 'support', title: subject, body: message,

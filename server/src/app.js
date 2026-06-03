@@ -20,6 +20,7 @@ import authRoutes from './routes/auth.js';
 import accountRoutes from './routes/account.js';
 import catalogRoutes from './routes/catalog.js';
 import discordRoutes from './routes/discord.js';
+import paymentRoutes from './routes/payments.js';
 import adminRoutes from './routes/admin/index.js';
 
 let readyPromise = null;
@@ -44,6 +45,9 @@ export function createApp({ lazyReady = false } = {}) {
   // CORS: allow the storefront origin. Same-origin deploys don't need it but it
   // is harmless and supports split frontend/api domains.
   app.use(cors({ origin: config.appUrl, credentials: true }));
+  // Stripe webhook needs the raw body for signature verification — mount it
+  // BEFORE the JSON parser.
+  app.use('/api/payments/stripe/webhook', express.raw({ type: '*/*' }));
   app.use(express.json({ limit: '1mb' }));
   app.use(cookieParser());
 
@@ -62,6 +66,7 @@ export function createApp({ lazyReady = false } = {}) {
   app.use('/api/auth', authRoutes);
   app.use('/api/account', accountRoutes);
   app.use('/api/discord', discordRoutes);
+  app.use('/api/payments', paymentRoutes);
   app.use('/api', catalogRoutes);
   app.use('/api/admin', adminRoutes);
 

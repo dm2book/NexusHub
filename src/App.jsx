@@ -9,6 +9,7 @@ import Shop from './pages/Shop.jsx';
 import ProductDetail from './pages/ProductDetail.jsx';
 import Cart from './pages/Cart.jsx';
 import Checkout from './pages/Checkout.jsx';
+import CheckoutSuccess from './pages/CheckoutSuccess.jsx';
 import Discord from './pages/Discord.jsx';
 import Track from './pages/Track.jsx';
 import Login from './pages/Login.jsx';
@@ -50,6 +51,7 @@ export default function App() {
         <Route path="/product/:id" element={<ProductDetail />} />
         <Route path="/cart" element={<Cart />} />
         <Route path="/checkout" element={<Checkout />} />
+        <Route path="/checkout/success" element={<CheckoutSuccess />} />
         <Route path="/discord" element={<Discord />} />
         <Route path="/track" element={<Track />} />
         <Route path="/about" element={<About />} />

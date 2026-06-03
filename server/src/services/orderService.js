@@ -261,6 +261,22 @@ function statusBlurb(status) {
   }[status] || `Order status: ${labelFor(status)}`;
 }
 
+/** Build an email-safe HTML summary table of the order's line items + total. */
+function itemsHtml(order) {
+  if (!order.items?.length) return '';
+  const rows = order.items.map((i) =>
+    `<tr><td>${escapeHtml(i.name)} × ${i.quantity}</td>` +
+    `<td class="r">${formatMoney(i.unit_price * i.quantity, order.currency)}</td></tr>`).join('');
+  return `<table class="summary"><tbody>${rows}` +
+    `<tr class="tot"><td>Total</td><td class="r">${formatMoney(order.total, order.currency)}</td></tr>` +
+    `</tbody></table>`;
+}
+
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, (c) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
 function emailContext(order, ctx = {}) {
   return {
     user: { name: order.billing?.full_name || order.email.split('@')[0] },
@@ -268,6 +284,7 @@ function emailContext(order, ctx = {}) {
       number: order.number,
       total: order.totalFormatted,
       status: order.statusLabel,
+      itemsHtml: itemsHtml(order),
       url: `${config.appUrl}/account/orders/${order.id}`,
     },
     refund: ctx.refundAmount != null

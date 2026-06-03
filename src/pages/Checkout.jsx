@@ -16,10 +16,10 @@ export default function Checkout() {
   const [email, setEmail] = useState('');
   const [fullName, setFullName] = useState('');
   const [busy, setBusy] = useState(false);
-  const [demoPayments, setDemoPayments] = useState(false);
+  const [provider, setProvider] = useState('none'); // stripe | demo | none
 
   useEffect(() => { if (user?.email) setEmail(user.email); }, [user]);
-  useEffect(() => { api.get('/api/config').then((c) => setDemoPayments(c.demoPayments)).catch(() => {}); }, []);
+  useEffect(() => { api.get('/api/config').then((c) => setProvider(c.paymentProvider)).catch(() => {}); }, []);
 
   if (items.length === 0) {
     return (
@@ -41,8 +41,15 @@ export default function Checkout() {
         billing: { full_name: fullName, email },
         currency,
       });
-      // Demo mode: confirm payment immediately so the order starts progressing.
-      if (demoPayments) {
+
+      if (provider === 'stripe') {
+        // Redirect to Stripe Checkout; payment is confirmed via webhook.
+        const { url } = await api.post(`/api/orders/${order.id}/checkout`, { email });
+        clear();
+        window.location.href = url;
+        return;
+      }
+      if (provider === 'demo') {
         await api.post(`/api/orders/${order.id}/pay`, { email }).catch(() => {});
       }
       clear();
@@ -80,9 +87,11 @@ export default function Checkout() {
           <div className="card p-6">
             <h3 className="text-white mb-2 flex items-center gap-2"><Lock size={16} className="text-indigo-300" /> Payment</h3>
             <p className="text-slate-400 text-sm">
-              {demoPayments
-                ? <>Demo mode is on: your order is marked <span className="text-emerald-300">paid</span> instantly so you can watch it progress. Swap in a real provider (e.g. Stripe) for production.</>
-                : <>This places a real order in <span className="text-white">pending</span> status. Connect a payment provider to capture funds — the order then advances automatically.</>}
+              {provider === 'stripe'
+                ? <>You’ll be redirected to <span className="text-white">Stripe</span> to pay securely by card. We never see your card details.</>
+                : provider === 'demo'
+                  ? <>Demo mode is on: your order is marked <span className="text-emerald-300">paid</span> instantly so you can watch it progress. Add Stripe keys for live card payments.</>
+                  : <>This places a real order in <span className="text-white">pending</span> status. Configure Stripe (or demo mode) to capture payment.</>}
             </p>
           </div>
         </div>
@@ -102,7 +111,9 @@ export default function Checkout() {
             <span className="text-white font-semibold">{money(subtotal, currency)}</span>
           </div>
           <button disabled={busy} className="btn-primary w-full py-3">
-            {busy ? <Loader2 size={18} className="animate-spin" /> : <>Place order</>}
+            {busy ? <Loader2 size={18} className="animate-spin" />
+              : provider === 'stripe' ? <>Pay with card</>
+              : <>Place order</>}
           </button>
           <div className="flex items-center justify-center gap-2 mt-4 text-xs text-slate-500">
             <ShieldCheck size={14} /> Fraud-screened & encrypted

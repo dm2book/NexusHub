@@ -24,9 +24,8 @@ export const DEFAULT_TEMPLATES = [
     subject: 'We received your order {{order.number}}',
     body_html: `
       <h1>Thanks for your order!</h1>
-      <p>Hi {{user.name}}, we've received order <strong>{{order.number}}</strong>
-      and it's now pending payment confirmation.</p>
-      <p>Total: <strong>{{order.total}}</strong></p>
+      <p>Hi {{user.name}}, we've received order <strong>{{order.number}}</strong>.</p>
+      {{order.itemsHtml}}
       <p><a class="btn" href="{{order.url}}">Track your order</a></p>`,
   },
   {
@@ -57,6 +56,7 @@ export const DEFAULT_TEMPLATES = [
       <h1>Order complete!</h1>
       <p>Hi {{user.name}}, your order <strong>{{order.number}}</strong> is done.
       Any digital deliveries are available in your dashboard.</p>
+      {{order.itemsHtml}}
       <p><a class="btn" href="{{order.url}}">View deliveries & downloads</a></p>`,
   },
   {
@@ -69,6 +69,17 @@ export const DEFAULT_TEMPLATES = [
       <strong>{{order.number}}</strong>. It may take a few business days to
       appear on your statement.</p>
       <p><a class="btn" href="{{order.url}}">View order</a></p>`,
+  },
+  {
+    id: 'custom_message',
+    name: 'Message from Support',
+    subject: 'A message about your order {{order.number}}',
+    body_html: `
+      <h1>{{subject}}</h1>
+      <p>Hi {{user.name}}, our team sent you a message regarding order
+      <strong>{{order.number}}</strong>:</p>
+      <div class="quote">{{message}}</div>
+      <p><a class="btn" href="{{order.url}}">View your order</a></p>`,
   },
   {
     id: 'login_otp',

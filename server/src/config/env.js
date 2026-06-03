@@ -90,6 +90,10 @@ export const config = {
     // the full order → fulfillment loop is usable in a demo. Defaults ON outside
     // production; set DEMO_PAYMENTS=true to enable it on a live deploy.
     demoMode: bool(env.DEMO_PAYMENTS, !isProd),
+    stripe: {
+      secretKey: env.STRIPE_SECRET_KEY || '',
+      webhookSecret: env.STRIPE_WEBHOOK_SECRET || '',
+    },
   },
 };
 

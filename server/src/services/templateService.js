@@ -35,9 +35,15 @@ export function wrapBranded(contentHtml) {
   h1{font-size:20px;color:#fff;margin:0 0 12px}
   p{font-size:14px;line-height:1.6;color:#b8bcc8;margin:0 0 14px}
   a.btn{display:inline-block;background:${color};color:#fff !important;text-decoration:none;
-        padding:12px 22px;border-radius:10px;font-weight:bold;margin:6px 0 18px}
+        padding:13px 26px;border-radius:10px;font-weight:bold;margin:6px 0 18px}
   .code{font:700 28px/1 'Courier New',monospace;letter-spacing:6px;color:#fff;
         background:#1a1a2e;border-radius:10px;padding:16px;text-align:center}
+  .quote{border-left:3px solid ${color};background:#1a1a2e;border-radius:0 10px 10px 0;
+         padding:12px 16px;margin:0 0 18px;color:#cbd1de;font-size:14px}
+  .summary{width:100%;border-collapse:collapse;margin:0 0 18px;font-size:14px}
+  .summary td{padding:9px 0;border-bottom:1px solid #232336;color:#cbd1de}
+  .summary .r{text-align:right;color:#fff;white-space:nowrap}
+  .summary .tot td{border-top:2px solid #232336;border-bottom:0;font-weight:bold;color:#fff;padding-top:12px}
   .foot{padding:18px 28px 28px;color:#64748b;font-size:12px}
   .foot a{color:#94a3b8}
 </style></head>

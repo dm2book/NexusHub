@@ -7,19 +7,32 @@ import { rateLimit } from '../middleware/rateLimit.js';
 import { listProducts, getProduct } from '../services/productService.js';
 import { createOrder, getOrderByNumber, getOrder, markPaymentReceived } from '../services/orderService.js';
 import { listEnabledProviders } from '../services/oauthService.js';
+import { isEnabled as stripeEnabled, createCheckoutSession } from '../services/stripeService.js';
 import { ApiError, forbidden } from '../utils/errors.js';
 
 const router = Router();
 
+// Which payment path the storefront should use.
+const paymentProvider = () =>
+  stripeEnabled() ? 'stripe' : config.payments.demoMode ? 'demo' : 'none';
+
 // Public runtime config the SPA can read (feature flags, enabled providers).
 router.get('/config', (_req, res) => {
   res.json({
+    paymentProvider: paymentProvider(),
     demoPayments: config.payments.demoMode,
     oauthProviders: listEnabledProviders(),
     discordEnabled: !!config.discord.inviteUrl || !!config.discord.guildId,
     brand: config.email.fromName,
   });
 });
+
+// Helper: confirm the requester owns the order (account holder or guest email).
+async function assertOwnsOrder(req, order, email) {
+  const owns = (req.user && order.email.toLowerCase() === req.user.email.toLowerCase()) ||
+    (email && email.toLowerCase() === order.email.toLowerCase());
+  if (!owns) throw forbidden('This order is not yours');
+}
 
 router.get('/products', asyncHandler(async (_req, res) => {
   res.json({ products: await listProducts({ activeOnly: true }) });
@@ -52,18 +65,27 @@ router.post('/orders', rateLimit({ bucket: 'checkout', windowMs: 60_000, max: 20
     res.status(201).json({ order });
   }));
 
+// Create a Stripe Checkout Session for an order and return its redirect URL.
+router.post('/orders/:id/checkout', rateLimit({ bucket: 'pay', windowMs: 60_000, max: 30 }),
+  asyncHandler(async (req, res) => {
+    if (!stripeEnabled()) throw new ApiError(400, 'Card payments are not configured');
+    const order = await getOrder(req.params.id);
+    if (!order) throw new ApiError(404, 'Order not found');
+    const { email } = z.object({ email: z.string().email().optional() }).parse(req.body || {});
+    await assertOwnsOrder(req, order, email);
+    if (order.status !== 'pending') return res.json({ alreadyPaid: true });
+    const session = await createCheckoutSession(order);
+    res.json({ url: session.url });
+  }));
+
 // Demo payment — marks an order paid without a real PSP, gated by DEMO_PAYMENTS.
-// Authorised by ownership: the requester must be the order's account holder or
-// supply the matching order email (guest checkout).
 router.post('/orders/:id/pay', rateLimit({ bucket: 'pay', windowMs: 60_000, max: 30 }),
   asyncHandler(async (req, res) => {
     if (!config.payments.demoMode) throw new ApiError(404, 'Not found');
     const order = await getOrder(req.params.id);
     if (!order) throw new ApiError(404, 'Order not found');
     const { email } = z.object({ email: z.string().email().optional() }).parse(req.body || {});
-    const owns = (req.user && order.email.toLowerCase() === req.user.email.toLowerCase()) ||
-      (email && email.toLowerCase() === order.email.toLowerCase());
-    if (!owns) throw forbidden('This order is not yours');
+    await assertOwnsOrder(req, order, email);
     if (order.status !== 'pending') return res.json({ order });
     const updated = await markPaymentReceived(order.id, `demo_${Date.now()}`,
       { actorId: req.user?.id || 'customer', reason: 'Demo payment' });
