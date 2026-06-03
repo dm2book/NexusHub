@@ -10,7 +10,7 @@ export function validate(schema: ZodSchema, source: Source = 'body') {
     try {
       const parsed = schema.parse(req[source]);
       // Replace with the parsed/coerced value.
-      (req as Record<string, unknown>)[source] = parsed;
+      (req as unknown as Record<string, unknown>)[source] = parsed;
       next();
     } catch (err) {
       if (err instanceof ZodError) {

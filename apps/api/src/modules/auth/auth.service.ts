@@ -92,10 +92,10 @@ export async function verifyOtp(email: string, code: string, ctx: { ua?: string;
 
 /** Create a refresh session + return both tokens. */
 export async function issueSession(
-  user: { id: string; email: string; role: Role },
+  user: { id: string; email: string; role: string },
   ctx: { ua?: string; ip?: string },
 ) {
-  const jwtUser = { id: user.id, email: user.email, role: user.role };
+  const jwtUser = { id: user.id, email: user.email, role: user.role as Role };
   const refreshToken = signRefreshToken(jwtUser);
   const accessToken = signAccessToken(jwtUser);
   const refreshHash = await bcrypt.hash(refreshToken, 8);
