@@ -1,0 +1,51 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: memeforge-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: memeforge
+      POSTGRES_PASSWORD: memeforge
+      POSTGRES_DB: memeforge
+    ports:
+      - "5432:5432"
+    volumes:
+      - memeforge_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U memeforge"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: memeforge-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://memeforge:memeforge@postgres:5432/memeforge?schema=public
+      API_PORT: 4000
+    ports:
+      - "4000:4000"
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    container_name: memeforge-web
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:4000
+      WEB_PORT: 3000
+    ports:
+      - "3000:3000"
+
+volumes:
+  memeforge_pg:
