@@ -2,7 +2,7 @@
 
 ForgeMarket runs as a single Vercel project: the React storefront/dashboards are
 served as static files, and the whole Express API runs as one serverless
-function under `/api/*` (`api/[...path].js` → `server/src/app.js`). Data lives in
+function under `/api/*` (`api/index.js` → `server/src/app.js`). Data lives in
 Postgres. On the first request after a deploy the API **auto-migrates and seeds**
 the database (roles, permissions, email templates) — no manual step.
 

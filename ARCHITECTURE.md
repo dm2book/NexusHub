@@ -13,7 +13,7 @@ through real flows (signup, checkout, supplier sync, fulfillment).
 │  React SPA (Vite + Tailwind) │  HTTPS │  Express API                           │
 │  src/   (static on Vercel)   │ ─────▶ │  routes → middleware → services → DB   │
 │  - storefront                │  JWT   │  Runs as a Vercel serverless function  │
-│  - customer dashboard        │ +cookie│  (api/[...path].js → server/src/app.js)│
+│  - customer dashboard        │ +cookie│  (api/index.js → server/src/app.js)│
 │  - admin console             │ ◀───── │  or standalone (server/src/index.js)   │
 └──────────────────────────────┘        └──────────────────────────────────────┘
                                               │            │             │
