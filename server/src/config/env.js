@@ -84,6 +84,13 @@ export const config = {
     fraudReviewThreshold: Number(env.FRAUD_REVIEW_THRESHOLD || 60),
     fraudBlockThreshold: Number(env.FRAUD_BLOCK_THRESHOLD || 85),
   },
+
+  payments: {
+    // Demo mode lets the storefront mark an order paid without a real PSP, so
+    // the full order → fulfillment loop is usable in a demo. Defaults ON outside
+    // production; set DEMO_PAYMENTS=true to enable it on a live deploy.
+    demoMode: bool(env.DEMO_PAYMENTS, !isProd),
+  },
 };
 
 /** Throws on startup if production is missing critical secrets. */

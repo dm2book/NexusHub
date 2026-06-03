@@ -16,8 +16,10 @@ export default function Checkout() {
   const [email, setEmail] = useState('');
   const [fullName, setFullName] = useState('');
   const [busy, setBusy] = useState(false);
+  const [demoPayments, setDemoPayments] = useState(false);
 
   useEffect(() => { if (user?.email) setEmail(user.email); }, [user]);
+  useEffect(() => { api.get('/api/config').then((c) => setDemoPayments(c.demoPayments)).catch(() => {}); }, []);
 
   if (items.length === 0) {
     return (
@@ -39,6 +41,10 @@ export default function Checkout() {
         billing: { full_name: fullName, email },
         currency,
       });
+      // Demo mode: confirm payment immediately so the order starts progressing.
+      if (demoPayments) {
+        await api.post(`/api/orders/${order.id}/pay`, { email }).catch(() => {});
+      }
       clear();
       toast.success(`Order ${order.number} placed!`);
       navigate(user ? `/account/orders/${order.id}` : `/track?number=${order.number}`);
@@ -74,8 +80,9 @@ export default function Checkout() {
           <div className="card p-6">
             <h3 className="text-white mb-2 flex items-center gap-2"><Lock size={16} className="text-indigo-300" /> Payment</h3>
             <p className="text-slate-400 text-sm">
-              This demo places a real order in <span className="text-white">pending</span> status. Connect a payment
-              provider (e.g. Stripe) to capture funds — the order then advances automatically.
+              {demoPayments
+                ? <>Demo mode is on: your order is marked <span className="text-emerald-300">paid</span> instantly so you can watch it progress. Swap in a real provider (e.g. Stripe) for production.</>
+                : <>This places a real order in <span className="text-white">pending</span> status. Connect a payment provider to capture funds — the order then advances automatically.</>}
             </p>
           </div>
         </div>

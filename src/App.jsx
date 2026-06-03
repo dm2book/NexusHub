@@ -27,10 +27,18 @@ import Settings from './pages/account/Settings.jsx';
 import AdminAnalytics from './pages/admin/Analytics.jsx';
 import AdminOrders from './pages/admin/Orders.jsx';
 import AdminOrderDetail from './pages/admin/OrderDetail.jsx';
+import AdminProducts from './pages/admin/Products.jsx';
 import AdminSuppliers from './pages/admin/Suppliers.jsx';
 import AdminFulfillment from './pages/admin/Fulfillment.jsx';
 import AdminEmails from './pages/admin/Emails.jsx';
+import AdminSupport from './pages/admin/Support.jsx';
 import AdminSecurity from './pages/admin/Security.jsx';
+
+import About from './pages/info/About.jsx';
+import Contact from './pages/info/Contact.jsx';
+import Faq from './pages/info/Faq.jsx';
+import Legal from './pages/info/Legal.jsx';
+import NotFound from './pages/NotFound.jsx';
 
 export default function App() {
   return (
@@ -44,6 +52,11 @@ export default function App() {
         <Route path="/checkout" element={<Checkout />} />
         <Route path="/discord" element={<Discord />} />
         <Route path="/track" element={<Track />} />
+        <Route path="/about" element={<About />} />
+        <Route path="/contact" element={<Contact />} />
+        <Route path="/faq" element={<Faq />} />
+        <Route path="/terms" element={<Legal kind="terms" />} />
+        <Route path="/privacy" element={<Legal kind="privacy" />} />
         <Route path="/login" element={<Login />} />
         <Route path="/auth/callback" element={<AuthCallback />} />
       </Route>
@@ -66,16 +79,15 @@ export default function App() {
         <Route path="/admin" element={<AdminAnalytics />} />
         <Route path="/admin/orders" element={<AdminOrders />} />
         <Route path="/admin/orders/:id" element={<AdminOrderDetail />} />
+        <Route path="/admin/products" element={<AdminProducts />} />
         <Route path="/admin/suppliers" element={<AdminSuppliers />} />
         <Route path="/admin/fulfillment" element={<AdminFulfillment />} />
         <Route path="/admin/emails" element={<AdminEmails />} />
+        <Route path="/admin/support" element={<AdminSupport />} />
         <Route path="/admin/security" element={<AdminSecurity />} />
       </Route>
 
-      <Route path="*" element={
-        <div className="min-h-screen flex items-center justify-center text-slate-400">
-          404 — page not found
-        </div>} />
+      <Route path="*" element={<NotFound />} />
     </Routes>
   );
 }

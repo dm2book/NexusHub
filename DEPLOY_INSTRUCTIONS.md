@@ -31,6 +31,7 @@ Project → **Settings → Environment Variables**:
 | `APP_URL` | ✅ | your deployed URL, e.g. `https://forgemarket.vercel.app` |
 | `API_URL` | ✅ | same URL (API is same-origin) |
 | `POSTGRES_URL` | auto | set by Vercel Postgres (or set `DATABASE_URL` yourself) |
+| `DEMO_PAYMENTS` | optional | `true` marks orders paid instantly (no PSP) so the full order→fulfillment loop works in a demo. Off in production by default. |
 | `SMTP_URL` | optional | e.g. `smtps://user:pass@smtp.host:465` — without it, emails are recorded to `email_log` instead of delivered |
 | `EMAIL_FROM_NAME` / `EMAIL_FROM_ADDRESS` | optional | branded sender |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | optional | enables Google login |
