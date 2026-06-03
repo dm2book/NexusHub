@@ -9,6 +9,7 @@
     "packages/*"
   ],
   "scripts": {
+    "predev": "npm run build -w @memeforge/shared",
     "dev": "concurrently -n api,web,bot -c blue,magenta,cyan \"npm:dev:api\" \"npm:dev:web\" \"npm:dev:bot\"",
     "dev:api": "npm run dev -w @memeforge/api",
     "dev:web": "npm run dev -w @memeforge/web",
