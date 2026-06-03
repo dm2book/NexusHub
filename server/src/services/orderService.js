@@ -18,6 +18,7 @@ import { sendEmailAsync } from './emailService.js';
 import { notify } from './notificationService.js';
 import { scoreOrder } from './fraudService.js';
 import { getProduct } from './productService.js';
+import { postOrderEvent } from './discordService.js';
 
 export const STATUSES = [
   'pending', 'payment_received', 'processing', 'awaiting_fulfillment',
@@ -102,6 +103,7 @@ export async function createOrder(input, ctx = {}) {
   // Customer comms.
   const fresh = await getOrder(orderId);
   await sendEmailAsync('order_received', email, emailContext(fresh));
+  await postOrderEvent(fresh, 'received').catch(() => {});
   if (input.userId) {
     await notify(input.userId, {
       type: 'order_update', title: `Order ${number} received`,
@@ -137,6 +139,8 @@ export async function transitionOrder(orderId, to, ctx = {}) {
   if (emailEvent) {
     await sendEmailAsync(emailEvent, updated.email, emailContext(updated, ctx));
   }
+  if (to === 'completed') await postOrderEvent(updated, 'completed').catch(() => {});
+  if (to === 'refunded') await postOrderEvent(updated, 'refunded').catch(() => {});
   if (updated.userId) {
     await notify(updated.userId, {
       type: 'order_update',

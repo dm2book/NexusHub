@@ -1,22 +1,31 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Search, Loader2 } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { StatusBadge, STATUS_META } from '../components/ui.jsx';
 
 export default function Track() {
+  const [params] = useSearchParams();
   const [number, setNumber] = useState('');
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
-  const track = async (e) => {
-    e.preventDefault();
+  const lookup = async (num) => {
     setBusy(true); setError(''); setResult(null);
     try {
-      setResult(await api.get(`/api/track/${encodeURIComponent(number.trim())}`));
+      setResult(await api.get(`/api/track/${encodeURIComponent(num.trim())}`));
     } catch (err) { setError(err.message); }
     finally { setBusy(false); }
   };
+
+  // Auto-track when arriving with ?number= (e.g. after guest checkout).
+  useEffect(() => {
+    const n = params.get('number');
+    if (n) { setNumber(n.toUpperCase()); lookup(n); }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const track = (e) => { e.preventDefault(); lookup(number); };
 
   return (
     <div className="max-w-2xl mx-auto px-5 py-16">

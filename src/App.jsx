@@ -6,6 +6,10 @@ import ProtectedRoute from './components/ProtectedRoute.jsx';
 
 import Home from './pages/Home.jsx';
 import Shop from './pages/Shop.jsx';
+import ProductDetail from './pages/ProductDetail.jsx';
+import Cart from './pages/Cart.jsx';
+import Checkout from './pages/Checkout.jsx';
+import Discord from './pages/Discord.jsx';
 import Track from './pages/Track.jsx';
 import Login from './pages/Login.jsx';
 import AuthCallback from './pages/AuthCallback.jsx';
@@ -35,6 +39,10 @@ export default function App() {
       <Route element={<SiteLayout />}>
         <Route path="/" element={<Home />} />
         <Route path="/shop" element={<Shop />} />
+        <Route path="/product/:id" element={<ProductDetail />} />
+        <Route path="/cart" element={<Cart />} />
+        <Route path="/checkout" element={<Checkout />} />
+        <Route path="/discord" element={<Discord />} />
         <Route path="/track" element={<Track />} />
         <Route path="/login" element={<Login />} />
         <Route path="/auth/callback" element={<AuthCallback />} />

@@ -4,7 +4,11 @@ import { newId } from '../utils/ids.js';
 import { notFound, badRequest } from '../utils/errors.js';
 
 const parse = (s) => { try { return JSON.parse(s || '{}'); } catch { return {}; } };
-const hydrate = (r) => (r ? { ...r, metadata: parse(r.metadata), active: !!r.active } : r);
+const hydrate = (r) => {
+  if (!r) return r;
+  const metadata = parse(r.metadata);
+  return { ...r, metadata, active: !!r.active, featured: !!metadata.featured };
+};
 
 export async function listProducts({ activeOnly = false } = {}) {
   const clause = activeOnly ? 'WHERE active = 1' : '';

@@ -61,6 +61,21 @@ export function StatusBadge({ status }) {
   );
 }
 
+export function Skeleton({ className = '' }) {
+  return <div className={`skeleton rounded-xl ${className}`} />;
+}
+
+/** Marketing section heading with eyebrow + gradient title. */
+export function SectionHeading({ eyebrow, title, subtitle, center = true }) {
+  return (
+    <div className={`${center ? 'text-center mx-auto' : ''} max-w-2xl mb-12`}>
+      {eyebrow && <span className="eyebrow mb-4">{eyebrow}</span>}
+      <h2 className="text-3xl sm:text-4xl text-white mt-4 leading-tight">{title}</h2>
+      {subtitle && <p className="text-slate-400 mt-4 text-base sm:text-lg">{subtitle}</p>}
+    </div>
+  );
+}
+
 export function EmptyState({ icon: Icon, title, hint, action }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">

@@ -35,6 +35,10 @@ Project → **Settings → Environment Variables**:
 | `EMAIL_FROM_NAME` / `EMAIL_FROM_ADDRESS` | optional | branded sender |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | optional | enables Google login |
 | `DISCORD_CLIENT_ID` / `DISCORD_CLIENT_SECRET` | optional | enables Discord login |
+| `DISCORD_GUILD_ID` | optional | shows **live** online count + member avatars on `/discord` (enable the server Widget in Discord) |
+| `DISCORD_INVITE_URL` | optional | the `https://discord.gg/…` link behind the Join button |
+| `DISCORD_ORDER_WEBHOOK_URL` | optional | posts order events (received/completed/refunded) to a Discord channel |
+| `DISCORD_SERVER_NAME` / `DISCORD_TAGLINE` | optional | branding for the community page |
 
 For OAuth, set the provider redirect URLs to
 `https://YOUR-URL/api/auth/oauth/google/callback` and `/discord/callback`.
@@ -59,6 +63,17 @@ Sign in once (email OTP) to create your account, then promote it. Either:
   ```
 
 Now `/admin` is unlocked. 🎉
+
+## Optional — fill the shop with a demo catalog
+A fresh store is empty. To showcase the storefront instantly with realistic
+products (Robux, Nitro, Steam/PSN/Xbox cards, V-Bucks), run once against your DB:
+
+```bash
+cd server && DATABASE_URL="<your POSTGRES_URL>" DATABASE_SSL=true npm run seed:demo
+```
+
+It's opt-in, safe to re-run, and you can edit/remove the items in the admin
+console. Skip it if you'll add your own products.
 
 ---
 
