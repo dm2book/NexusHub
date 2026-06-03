@@ -1,0 +1,64 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Sora:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  background: #06060a;
+  color: #e2e8f0;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  background-image:
+    radial-gradient(60rem 40rem at 80% -10%, rgba(139, 92, 246, 0.12), transparent),
+    radial-gradient(50rem 40rem at -10% 20%, rgba(34, 211, 238, 0.08), transparent);
+  background-attachment: fixed;
+}
+
+/* Glassmorphism panel */
+@layer components {
+  .glass {
+    @apply bg-ink-700/60 backdrop-blur-xl border border-white/5 rounded-2xl shadow-card;
+  }
+  .glass-hover {
+    @apply transition-all duration-200 hover:border-brand/30 hover:shadow-glow;
+  }
+  .stat-label {
+    @apply text-[11px] uppercase tracking-widest text-slate-500 font-medium;
+  }
+  .pill {
+    @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-all;
+  }
+  .btn-primary {
+    @apply btn bg-brand-gradient text-white shadow-glow hover:opacity-90;
+  }
+  .btn-ghost {
+    @apply btn bg-white/5 text-slate-200 hover:bg-white/10 border border-white/5;
+  }
+  .input {
+    @apply w-full rounded-xl bg-ink-800 border border-white/10 px-4 py-2.5 text-sm text-slate-100 outline-none focus:border-brand/50 focus:shadow-glow transition;
+  }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(139, 92, 246, 0.25); border-radius: 8px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(139, 92, 246, 0.45); }
+
+.shimmer {
+  background: linear-gradient(90deg, rgba(255,255,255,0.03) 25%, rgba(255,255,255,0.08) 37%, rgba(255,255,255,0.03) 63%);
+  background-size: 400% 100%;
+}
+
+.tabular { font-variant-numeric: tabular-nums; }
