@@ -28,10 +28,10 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-10">
         {cards.map(({ icon: Icon, label, value, to }) => (
-          <Link key={label} to={to} className="card p-5 hover:border-primary/40 transition">
+          <Link key={label} to={to} className="card p-5 hover:border-primary/40 transition hover:-translate-y-0.5 duration-200">
             <Icon size={20} className="text-primary mb-3" />
-            <div className="text-2xl text-white font-semibold">{value}</div>
-            <div className="text-slate-400 text-sm">{label}</div>
+            <div className="text-3xl font-display gradient-text">{value}</div>
+            <div className="text-slate-400 text-sm mt-1">{label}</div>
           </Link>
         ))}
       </div>

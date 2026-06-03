@@ -33,7 +33,7 @@ export default function AccountLayout() {
           {NAV.map(({ to, icon: Icon, label, end }) => (
             <NavLink key={to} to={to} end={end}
               className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition
-                ${isActive ? 'bg-primary/15 text-white' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}>
+                ${isActive ? 'bg-gradient-to-r from-primary/25 to-fuchsia-500/10 text-white ring-1 ring-primary/30' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}>
               <Icon size={18} /> {label}
             </NavLink>
           ))}
@@ -50,17 +50,18 @@ export default function AccountLayout() {
           </button>
         </div>
       </aside>
-      <div className="flex-1 min-w-0">
-        <header className="h-16 border-b border-white/5 flex items-center justify-between px-6">
+      <div className="flex-1 min-w-0 relative">
+        <div className="orb w-96 h-96 bg-primary/10 -top-40 right-0 pointer-events-none" />
+        <header className="relative h-16 border-b border-white/5 flex items-center justify-between px-6 backdrop-blur-sm">
           <span className="text-slate-400 text-sm">My Account</span>
           <div className="flex items-center gap-3">
             <span className="text-sm text-slate-300 hidden sm:block">{user?.email}</span>
-            <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary text-sm font-semibold">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-fuchsia-500 flex items-center justify-center text-white text-sm font-semibold">
               {(user?.displayName || user?.email || '?')[0].toUpperCase()}
             </div>
           </div>
         </header>
-        <div className="p-6 max-w-6xl"><Outlet /></div>
+        <div className="relative p-6 max-w-6xl"><Outlet /></div>
       </div>
     </div>
   );

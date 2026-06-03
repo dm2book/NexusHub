@@ -33,10 +33,10 @@ export default function Analytics() {
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         {kpis.map(({ icon: Icon, label, value, sub }) => (
-          <div key={label} className="card p-5">
+          <div key={label} className="card p-5 hover:border-primary/30 transition">
             <Icon size={18} className="text-primary mb-3" />
             <div className="text-slate-400 text-sm">{label}</div>
-            <div className="text-2xl text-white font-semibold mt-1">{value}</div>
+            <div className="text-3xl font-display gradient-text mt-1">{value}</div>
             <div className="text-slate-500 text-xs mt-1">{sub}</div>
           </div>
         ))}
@@ -48,12 +48,12 @@ export default function Analytics() {
           {data.revenueSeries.length === 0 ? (
             <p className="text-slate-500 text-sm py-12 text-center">No revenue yet.</p>
           ) : (
-            <div className="flex items-end gap-1 h-48">
+            <div className="flex items-end gap-1.5 h-48">
               {data.revenueSeries.map((d) => (
-                <div key={d.day} className="flex-1 group relative">
-                  <div className="w-full rounded-t bg-gradient-to-t from-indigo-600 to-fuchsia-500 transition-all"
-                       style={{ height: `${Math.max(4, (d.revenue / maxRev) * 100)}%` }} />
-                  <div className="absolute -top-8 left-1/2 -translate-x-1/2 hidden group-hover:block
+                <div key={d.day} className="flex-1 h-full flex items-end justify-center group relative">
+                  <div className="w-full max-w-[40px] rounded-t bg-gradient-to-t from-indigo-600 to-fuchsia-500 transition-all hover:from-indigo-500 hover:to-fuchsia-400"
+                       style={{ height: `${Math.max(3, (d.revenue / maxRev) * 100)}%` }} />
+                  <div className="absolute -top-9 left-1/2 -translate-x-1/2 hidden group-hover:block z-10
                        bg-space-black border border-white/10 rounded px-2 py-1 text-xs text-white whitespace-nowrap">
                     {money(d.revenue)} · {d.day.slice(5)}
                   </div>
