@@ -1,0 +1,514 @@
+// MemeForge database schema
+// Generate: npm run db:generate  |  Migrate: npm run db:migrate
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ───────────────────────────── Enums ─────────────────────────────
+
+enum Role {
+  OWNER
+  ADMIN
+  VIEWER
+}
+
+enum PositionStatus {
+  OPEN
+  CLOSED
+}
+
+enum TradeSide {
+  BUY
+  SELL
+}
+
+enum TradeSource {
+  MANUAL
+  AUTO_SELL
+  TRAILING_STOP
+}
+
+enum AlertType {
+  PRICE_UP
+  PRICE_DOWN
+  VOLUME_SPIKE
+  LIQUIDITY_SPIKE
+  WHALE_BUY
+  WHALE_SELL
+  RISK
+}
+
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+  DISCORD
+  TELEGRAM
+  PUSH
+}
+
+enum ReportType {
+  DAILY
+  WEEKLY
+  MARKET
+  RISK
+  OPPORTUNITY
+}
+
+enum WatchlistSection {
+  FAVORITES
+  TRENDING
+  NEW_LAUNCHES
+  VOLUME_MOVERS
+  WHALE_ACTIVITY
+  SMART_MONEY
+}
+
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum OAuthProvider {
+  GOOGLE
+  DISCORD
+}
+
+// ──────────────────────── Identity & access ──────────────────────
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  avatarUrl String?
+  role      Role     @default(VIEWER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sessions          Session[]
+  otpCodes          OtpCode[]
+  oauthAccounts     OAuthAccount[]
+  notificationPref  NotificationPref?
+  pushSubscriptions PushSubscription[]
+  notifications     Notification[]
+  wallets           Wallet[]
+  alerts            Alert[]
+  watchlist         WatchlistItem[]
+  journalEntries    JournalEntry[]
+  reports           AiReport[]
+  profitLockConfig  ProfitLockConfig?
+
+  @@index([role])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshHash  String // hashed refresh token
+  userAgent    String?
+  ip           String?
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  createdAt    DateTime @default(now())
+
+  @@index([userId])
+}
+
+model OtpCode {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  codeHash  String
+  expiresAt DateTime
+  consumedAt DateTime?
+  attempts  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model OAuthAccount {
+  id             String        @id @default(cuid())
+  userId         String
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider       OAuthProvider
+  providerUserId String
+  createdAt      DateTime      @default(now())
+
+  @@unique([provider, providerUserId])
+  @@index([userId])
+}
+
+// ───────────────────────── Notifications ─────────────────────────
+
+model NotificationPref {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  inApp     Boolean  @default(true)
+  email     Boolean  @default(true)
+  discord   Boolean  @default(false)
+  telegram  Boolean  @default(false)
+  push      Boolean  @default(false)
+  // JSON: customized alert thresholds; null = platform defaults
+  thresholds Json?
+  updatedAt DateTime @updatedAt
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  title     String
+  body      String
+  emoji     String?
+  meta      Json?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, readAt])
+  @@index([createdAt])
+}
+
+// ─────────────────────────── Tokens ──────────────────────────────
+
+model Token {
+  id             String   @id @default(cuid())
+  address        String   @unique
+  chain          String   @default("solana")
+  symbol         String
+  name           String
+  imageUrl       String?
+  // latest snapshot (denormalized for fast reads; history in PriceCandle)
+  priceUsd       Float    @default(0)
+  priceChange1h  Float    @default(0)
+  priceChange24h Float    @default(0)
+  volume24h      Float    @default(0)
+  liquidityUsd   Float    @default(0)
+  marketCap      Float    @default(0)
+  fdv            Float    @default(0)
+  holders        Int      @default(0)
+  launchedAt     DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  createdAt      DateTime @default(now())
+
+  positions       Position[]
+  candles         PriceCandle[]
+  whaleTransfers  WhaleTransfer[]
+  smartTrades     SmartTrade[]
+  discoveryScans  DiscoveryScan[]
+  riskAssessments RiskAssessment[]
+  watchlistItems  WatchlistItem[]
+  alerts          Alert[]
+
+  @@index([chain])
+  @@index([volume24h])
+}
+
+model PriceCandle {
+  id        String   @id @default(cuid())
+  tokenId   String
+  token     Token    @relation(fields: [tokenId], references: [id], onDelete: Cascade)
+  interval  String   @default("1m")
+  open      Float
+  high      Float
+  low       Float
+  close     Float
+  volume    Float    @default(0)
+  timestamp DateTime
+
+  @@unique([tokenId, interval, timestamp])
+  @@index([tokenId, interval, timestamp])
+}
+
+// ───────────────────────── Portfolio ─────────────────────────────
+
+model Wallet {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label     String
+  address   String
+  chain     String   @default("solana")
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  positions      Position[]
+  reserveLedger  ReserveLedger[]
+
+  @@unique([userId, address])
+  @@index([userId])
+}
+
+model Position {
+  id            String         @id @default(cuid())
+  walletId      String
+  wallet        Wallet         @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  tokenId       String
+  token         Token          @relation(fields: [tokenId], references: [id])
+  status        PositionStatus @default(OPEN)
+  entryPriceUsd Float
+  sizeTokens    Float // remaining token amount
+  initialTokens Float // original token amount at open
+  peakPriceUsd  Float          @default(0)
+  realizedUsd   Float          @default(0) // realized PnL from partial/full sells
+  costBasisUsd  Float // USD spent to open (for PnL math)
+  openedAt      DateTime       @default(now())
+  closedAt      DateTime?
+  updatedAt     DateTime       @updatedAt
+
+  trades        Trade[]
+  autoSellRules AutoSellRule[]
+  trailingStop  TrailingStop?
+
+  @@index([walletId, status])
+  @@index([tokenId])
+}
+
+model Trade {
+  id         String      @id @default(cuid())
+  positionId String
+  position   Position    @relation(fields: [positionId], references: [id], onDelete: Cascade)
+  side       TradeSide
+  source     TradeSource @default(MANUAL)
+  priceUsd   Float
+  amountTokens Float
+  amountUsd  Float
+  pnlUsd     Float       @default(0)
+  note       String?
+  createdAt  DateTime    @default(now())
+
+  @@index([positionId])
+}
+
+model ReserveLedger {
+  id        String   @id @default(cuid())
+  walletId  String
+  wallet    Wallet   @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  amountUsd Float // positive = deposit to reserve, negative = manual withdrawal
+  reason    String
+  createdAt DateTime @default(now())
+
+  @@index([walletId])
+}
+
+// ───────────────────────── Automation ────────────────────────────
+
+model AutoSellRule {
+  id         String   @id @default(cuid())
+  positionId String
+  position   Position @relation(fields: [positionId], references: [id], onDelete: Cascade)
+  triggerPct Float // at +triggerPct% from entry
+  sellPct    Float // sell sellPct% of the current position
+  enabled    Boolean  @default(true)
+  triggeredAt DateTime?
+  createdAt  DateTime @default(now())
+
+  @@index([positionId])
+}
+
+model TrailingStop {
+  id         String   @id @default(cuid())
+  positionId String   @unique
+  position   Position @relation(fields: [positionId], references: [id], onDelete: Cascade)
+  armAtPct   Float    @default(200) // arm once position is up this much
+  dropPct    Float    @default(15) // sell if price retraces this % from peak
+  sellPct    Float    @default(100)
+  armed      Boolean  @default(false)
+  enabled    Boolean  @default(true)
+  triggeredAt DateTime?
+  createdAt  DateTime @default(now())
+}
+
+model ProfitLockConfig {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  enabled   Boolean  @default(true)
+  sweepPct  Float    @default(50) // % of realized daily profit moved to reserve
+  updatedAt DateTime @updatedAt
+}
+
+// ─────────────────────────── Alerts ──────────────────────────────
+
+model Alert {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenId    String?
+  token      Token?    @relation(fields: [tokenId], references: [id], onDelete: Cascade)
+  type       AlertType
+  threshold  Float? // percent / multiple depending on type
+  enabled    Boolean   @default(true)
+  oneShot    Boolean   @default(false)
+  lastFiredAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  events AlertEvent[]
+
+  @@index([userId])
+  @@index([tokenId])
+}
+
+model AlertEvent {
+  id        String   @id @default(cuid())
+  alertId   String
+  alert     Alert    @relation(fields: [alertId], references: [id], onDelete: Cascade)
+  message   String
+  value     Float?
+  createdAt DateTime @default(now())
+
+  @@index([alertId])
+}
+
+// ─────────────────────── Discovery / Intel ───────────────────────
+
+model DiscoveryScan {
+  id              String   @id @default(cuid())
+  tokenId         String
+  token           Token    @relation(fields: [tokenId], references: [id], onDelete: Cascade)
+  momentumScore   Int
+  opportunityScore Int
+  riskScore       Int
+  confidenceScore Int
+  reason          String?
+  createdAt       DateTime @default(now())
+
+  @@index([tokenId])
+  @@index([createdAt])
+}
+
+model WhaleWallet {
+  id         String   @id @default(cuid())
+  address    String   @unique
+  label      String?
+  winRate    Float    @default(0)
+  totalPnlUsd Float   @default(0)
+  createdAt  DateTime @default(now())
+
+  transfers WhaleTransfer[]
+}
+
+model WhaleTransfer {
+  id          String      @id @default(cuid())
+  whaleId     String?
+  whale       WhaleWallet? @relation(fields: [whaleId], references: [id], onDelete: SetNull)
+  tokenId     String
+  token       Token       @relation(fields: [tokenId], references: [id], onDelete: Cascade)
+  txHash      String      @unique
+  side        TradeSide
+  amountUsd   Float
+  amountTokens Float
+  timestamp   DateTime
+
+  @@index([tokenId, timestamp])
+  @@index([whaleId])
+}
+
+model SmartWallet {
+  id          String   @id @default(cuid())
+  address     String   @unique
+  label       String?
+  roiPct      Float    @default(0)
+  winRate     Float    @default(0)
+  totalPnlUsd Float    @default(0)
+  holdingsJson Json? // current holdings snapshot
+  createdAt   DateTime @default(now())
+
+  trades SmartTrade[]
+}
+
+model SmartTrade {
+  id         String      @id @default(cuid())
+  walletId   String
+  wallet     SmartWallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  tokenId    String
+  token      Token       @relation(fields: [tokenId], references: [id], onDelete: Cascade)
+  side       TradeSide
+  amountUsd  Float
+  priceUsd   Float
+  timestamp  DateTime
+
+  @@index([walletId])
+  @@index([tokenId])
+}
+
+model RiskAssessment {
+  id        String    @id @default(cuid())
+  tokenId   String
+  token     Token     @relation(fields: [tokenId], references: [id], onDelete: Cascade)
+  score     Int // 0..100 higher = riskier
+  level     RiskLevel
+  warnings  Json // RiskWarning[]
+  createdAt DateTime  @default(now())
+
+  @@index([tokenId, createdAt])
+}
+
+// ──────────────────── Watchlist / Journal / AI ───────────────────
+
+model WatchlistItem {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenId   String
+  token     Token            @relation(fields: [tokenId], references: [id], onDelete: Cascade)
+  section   WatchlistSection @default(FAVORITES)
+  note      String?
+  createdAt DateTime         @default(now())
+
+  @@unique([userId, tokenId, section])
+  @@index([userId, section])
+}
+
+model JournalEntry {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenSymbol   String
+  tokenAddress  String?
+  entryReason   String?
+  exitReason    String?
+  lesson        String?
+  screenshotUrls Json? // string[]
+  pnlUsd        Float?
+  pnlPct        Float?
+  createdAt     DateTime @default(now())
+
+  @@index([userId])
+}
+
+model AiReport {
+  id        String     @id @default(cuid())
+  userId    String
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      ReportType
+  title     String
+  summary   String
+  payload   Json // AiReportPayload
+  createdAt DateTime   @default(now())
+
+  @@index([userId, type])
+  @@index([createdAt])
+}
