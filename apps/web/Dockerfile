@@ -8,7 +8,7 @@ RUN npm install
 COPY packages/shared packages/shared
 COPY apps/web apps/web
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN npm run build -w @memeforge/web
+RUN npm run build -w @memeforge/shared && npm run build -w @memeforge/web
 
 FROM node:20-alpine AS runner
 WORKDIR /app
