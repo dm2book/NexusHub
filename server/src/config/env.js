@@ -5,6 +5,7 @@
  * No secrets are hardcoded. In production the listed *_REQUIRED values must be
  * supplied via the environment (see .env.example).
  */
+import 'dotenv/config'; // load server/.env (no-op on platforms that inject env, e.g. Vercel)
 import process from 'node:process';
 
 const bool = (v, def = false) =>
