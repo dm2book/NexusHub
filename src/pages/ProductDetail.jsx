@@ -68,14 +68,19 @@ export default function ProductDetail() {
           <div className="text-3xl text-white font-semibold mt-4">{money(product.price, product.currency)}</div>
           {product.description && <p className="text-slate-400 mt-5 leading-relaxed">{product.description}</p>}
 
-          <div className="flex items-center gap-4 mt-8">
-            <div className="flex items-center glass rounded-xl">
-              <button onClick={() => setQty((q) => Math.max(1, q - 1))} className="p-3 text-slate-300 hover:text-white"><Minus size={16} /></button>
-              <span className="w-10 text-center text-white">{qty}</span>
-              <button onClick={() => setQty((q) => q + 1)} className="p-3 text-slate-300 hover:text-white"><Plus size={16} /></button>
+          <div className="mt-8 space-y-3">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center glass rounded-xl">
+                <button onClick={() => setQty((q) => Math.max(1, q - 1))} className="p-3 text-slate-300 hover:text-white"><Minus size={16} /></button>
+                <span className="w-10 text-center text-white">{qty}</span>
+                <button onClick={() => setQty((q) => q + 1)} className="p-3 text-slate-300 hover:text-white"><Plus size={16} /></button>
+              </div>
+              <span className="text-slate-500 text-sm font-rajdhani uppercase tracking-wide">Quantity</span>
             </div>
-            <button onClick={addToCart} className="btn-ghost flex-1 py-3"><ShoppingCart size={18} /> Add to cart</button>
-            <button onClick={buyNow} className="btn-primary flex-1 py-3">Buy now</button>
+            <div className="grid grid-cols-2 gap-3">
+              <button onClick={addToCart} className="btn-ghost py-3"><ShoppingCart size={18} /> Add to cart</button>
+              <button onClick={buyNow} className="btn-primary py-3">Buy now</button>
+            </div>
           </div>
 
           <div className="grid grid-cols-3 gap-3 mt-8">

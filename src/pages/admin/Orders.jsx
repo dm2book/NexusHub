@@ -71,7 +71,38 @@ export default function AdminOrders() {
       {data.orders.length === 0 ? (
         <EmptyState icon={Search} title="No orders found" />
       ) : (
-        <div className="card overflow-x-auto">
+       <>
+        {/* Mobile: cards */}
+        <div className="space-y-3 lg:hidden">
+          {data.orders.map((o) => (
+            <div key={o.id} className="card p-4">
+              <div className="flex items-center justify-between gap-2">
+                <button onClick={() => navigate(`/admin/orders/${o.id}`)} className="text-indigo-400 font-mono text-sm flex items-center gap-1.5">
+                  {o.number}
+                  {o.fraudStatus && o.fraudStatus !== 'ok' && <AlertTriangle size={13} className="text-amber-400" />}
+                </button>
+                <StatusBadge status={o.status} />
+              </div>
+              <div className="text-slate-300 text-sm mt-2">{o.product}</div>
+              <div className="flex items-center justify-between mt-1 text-sm">
+                <span className="text-slate-500 truncate pr-2">{o.customer}</span>
+                <span className="text-white shrink-0">{money(o.amount, o.currency)}</span>
+              </div>
+              <div className="flex items-center gap-2 mt-3 pt-3 border-t border-white/5">
+                <button onClick={() => navigate(`/admin/orders/${o.id}`)} className="btn-ghost text-xs flex-1"><Eye size={14} /> View</button>
+                {hasPermission('orders.fulfill') && !['completed', 'refunded', 'cancelled'].includes(o.status) && (
+                  <button onClick={() => act(o, 'fulfill')} className="btn-ghost text-xs flex-1"><Truck size={14} /> Fulfill</button>
+                )}
+                {hasPermission('orders.complete') && o.status !== 'completed' && o.status !== 'refunded' && (
+                  <button onClick={() => setConfirm(o)} className="btn-primary text-xs flex-1"><CheckCircle2 size={14} /> Complete</button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Desktop: table */}
+        <div className="card overflow-x-auto hidden lg:block">
           <table className="w-full text-sm min-w-[900px]">
             <thead className="text-left text-slate-400 border-b border-white/5">
               <tr>
@@ -125,6 +156,7 @@ export default function AdminOrders() {
             </tbody>
           </table>
         </div>
+       </>
       )}
 
       {/* Complete Order — large CTA + confirmation modal */}

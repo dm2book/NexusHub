@@ -66,7 +66,43 @@ export default function AdminProducts() {
           hint="Add your first product, or run the demo seeder (npm run seed:demo)."
           action={<button onClick={openNew} className="btn-primary">Add product</button>} />
       ) : (
-        <div className="card overflow-x-auto">
+       <>
+        {/* Mobile: cards */}
+        <div className="space-y-3 lg:hidden">
+          {products.map((p) => {
+            const v = categoryVisual(p.category); const Icon = v.icon;
+            return (
+              <div key={p.id} className="card p-4">
+                <div className="flex items-center gap-3">
+                  <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${v.grad} flex items-center justify-center shrink-0`}>
+                    <Icon size={18} className="text-white" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-white flex items-center gap-1.5">
+                      <span className="truncate">{p.name}</span>
+                      {p.featured && <Star size={12} className="text-amber-400 fill-amber-400 shrink-0" />}
+                    </div>
+                    <div className="text-slate-500 text-xs">{v.label} · {p.stock ?? '∞'} stock</div>
+                  </div>
+                  <div className="text-white font-medium shrink-0">{money(p.price, p.currency)}</div>
+                </div>
+                <div className="flex items-center gap-2 mt-3 pt-3 border-t border-white/5">
+                  <span className={`text-xs px-2 py-1 rounded-md ${p.active ? 'bg-emerald-500/15 text-emerald-300' : 'bg-slate-500/15 text-slate-400'}`}>
+                    {p.active ? 'Active' : 'Hidden'}
+                  </span>
+                  <div className="flex-1" />
+                  <button onClick={() => toggleActive(p)} className="btn-ghost text-xs">
+                    {p.active ? <><EyeOff size={14} /> Hide</> : <><Eye size={14} /> Show</>}
+                  </button>
+                  <button onClick={() => openEdit(p)} className="btn-ghost text-xs"><Pencil size={14} /> Edit</button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Desktop: table */}
+        <div className="card overflow-x-auto hidden lg:block">
           <table className="w-full text-sm min-w-[760px]">
             <thead className="text-left text-slate-400 border-b border-white/5">
               <tr>
@@ -120,6 +156,7 @@ export default function AdminProducts() {
             </tbody>
           </table>
         </div>
+       </>
       )}
 
       <Modal open={!!editing} onClose={() => setEditing(null)}
