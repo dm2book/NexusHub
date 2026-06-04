@@ -1,0 +1,38 @@
+# MemeForge — Render blueprint (one-click API + PostgreSQL).
+# Render → New → Blueprint → connect this repo. It provisions the API (Docker)
+# and a managed Postgres, runs migrations on boot, and wires DATABASE_URL.
+# After it's live, set WEB_BASE_URL to your Vercel domain (for CORS).
+
+databases:
+  - name: memeforge-db
+    plan: free
+
+services:
+  - type: web
+    name: memeforge-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./apps/api/Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/v1/health
+    autoDeploy: true
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: memeforge-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: OWNER_EMAIL
+        value: mohamedelhannouti51@gmail.com
+      - key: NODE_ENV
+        value: production
+      - key: ENABLE_CRON
+        value: "true"
+      - key: ENABLE_AUTOMATION
+        value: "true"
+      - key: DATA_PROVIDER
+        value: mock
+      # Set this to your Vercel domain after the web deploy (CORS allow-list):
+      - key: WEB_BASE_URL
+        sync: false

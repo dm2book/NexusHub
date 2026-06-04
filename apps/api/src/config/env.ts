@@ -18,9 +18,16 @@ const num = (v: string | undefined, d: number): number => {
 export const env = {
   nodeEnv: process.env.NODE_ENV ?? 'development',
   isProd: process.env.NODE_ENV === 'production',
-  apiPort: num(process.env.API_PORT, 4000),
+  // Most hosts (Render/Railway/Fly/Heroku) inject PORT; fall back to API_PORT.
+  apiPort: num(process.env.PORT ?? process.env.API_PORT, 4000),
   apiBaseUrl: process.env.API_BASE_URL ?? 'http://localhost:4000',
   webBaseUrl: process.env.WEB_BASE_URL ?? 'http://localhost:3000',
+  // Allow-listed browser origins in production (comma-separated). Defaults to
+  // WEB_BASE_URL so a single Vercel domain works out of the box.
+  corsOrigins: (process.env.CORS_ORIGINS ?? process.env.WEB_BASE_URL ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean),
 
   databaseUrl: process.env.DATABASE_URL ?? '',
 
