@@ -12,6 +12,7 @@ import cors from 'cors';
 import { config } from './config/env.js';
 import { migrate } from './db/migrate.js';
 import { seed, isSeeded } from './db/seed.js';
+import { seedDemoCatalog } from './db/demoSeed.js';
 import { attachUser } from './middleware/auth.js';
 import { rateLimit } from './middleware/rateLimit.js';
 import { errorHandler, notFoundHandler } from './middleware/error.js';
@@ -30,6 +31,8 @@ export function ensureReady() {
     readyPromise = (async () => {
       await migrate();
       if (!(await isSeeded())) await seed();
+      // Optionally populate a demo catalog so a fresh deploy isn't an empty shop.
+      if (config.seedDemo) await seedDemoCatalog();
     })().catch((err) => {
       readyPromise = null; // allow retry on next request
       throw err;

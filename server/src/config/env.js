@@ -24,13 +24,16 @@ export const config = {
   apiUrl: env.API_URL || 'http://localhost:4000',
 
   db: {
-    // Postgres connection string. Vercel Postgres sets POSTGRES_URL; a generic
-    // DATABASE_URL is also honoured. Use a POOLED connection string in
-    // serverless (Neon/Vercel pooler) to avoid exhausting connections.
-    url: env.DATABASE_URL || env.POSTGRES_URL || env.POSTGRES_PRISMA_URL || '',
+    // Postgres connection string. Different hosts/integrations expose it under
+    // different names — accept all common ones (Vercel Postgres, Neon, Supabase).
+    url: env.DATABASE_URL || env.POSTGRES_URL || env.POSTGRES_PRISMA_URL
+      || env.POSTGRES_URL_NON_POOLING || env.DATABASE_URL_UNPOOLED || '',
     // Enable SSL for hosted databases (Neon/Vercel/Supabase require it).
     ssl: bool(env.DATABASE_SSL, isProd),
   },
+
+  // Optionally seed a demo catalog on first boot (handy for a fresh deploy).
+  seedDemo: bool(env.SEED_DEMO, false),
 
   auth: {
     // Signing secret for session JWTs. MUST be overridden in production.

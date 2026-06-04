@@ -13,22 +13,42 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import pg from 'pg';
 import { config } from '../config/env.js';
+import { ApiError } from '../utils/errors.js';
 
 // Return BIGINT (int8) and NUMERIC as JS numbers — our values (cents, counts)
 // are well within Number's safe range, and this keeps arithmetic simple.
 pg.types.setTypeParser(20, (v) => (v === null ? null : Number(v)));   // int8
 pg.types.setTypeParser(1700, (v) => (v === null ? null : Number(v))); // numeric
 
-const connectionString = config.db.url;
-if (!connectionString) {
-  throw new Error('DATABASE_URL (or POSTGRES_URL) is not set');
+// Lazily create the pool on first use. This way a missing/incorrect connection
+// string surfaces as a clean JSON error from a request (and lets DB-free routes
+// like /api/config keep working) instead of crashing the whole function at
+// cold-start with an opaque "A server error has occurred".
+let _pool = null;
+function getPool() {
+  if (_pool) return _pool;
+  const connectionString = config.db.url;
+  if (!connectionString) {
+    throw new ApiError(503, 'Database not configured. On Vercel: connect a Postgres ' +
+      'database in the Storage tab and redeploy (sets DATABASE_URL).');
+  }
+  _pool = new pg.Pool({
+    connectionString,
+    // Vercel/Neon poolers terminate idle connections; keep the pool small.
+    max: Number(process.env.PG_POOL_MAX || 5),
+    ssl: config.db.ssl ? { rejectUnauthorized: false } : undefined,
+  });
+  return _pool;
 }
 
-export const pool = new pg.Pool({
-  connectionString,
-  // Vercel/Neon poolers terminate idle connections; keep the pool small.
-  max: Number(process.env.PG_POOL_MAX || 5),
-  ssl: config.db.ssl ? { rejectUnauthorized: false } : undefined,
+// Proxy so existing `pool.connect()` / `pool.query()` calls work, but the real
+// pool is only constructed on first access.
+export const pool = new Proxy({}, {
+  get(_t, prop) {
+    const p = getPool();
+    const value = p[prop];
+    return typeof value === 'function' ? value.bind(p) : value;
+  },
 });
 
 const txStore = new AsyncLocalStorage();
