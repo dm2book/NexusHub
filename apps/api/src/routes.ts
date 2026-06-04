@@ -15,6 +15,7 @@ import { analyticsRouter } from './modules/analytics/analytics.routes.js';
 import { aiRouter } from './modules/ai/ai.routes.js';
 import { notificationRouter } from './modules/notifications/notification.routes.js';
 import { adminRouter } from './modules/admin/admin.routes.js';
+import { cronRouter } from './modules/cron/cron.routes.js';
 
 export const apiRouter = Router();
 
@@ -45,3 +46,4 @@ apiRouter.use('/analytics', analyticsRouter);
 apiRouter.use('/ai', aiRouter);
 apiRouter.use('/notifications', notificationRouter);
 apiRouter.use('/admin', adminRouter);
+apiRouter.use('/cron', cronRouter);

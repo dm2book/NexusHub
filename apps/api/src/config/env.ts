@@ -31,10 +31,12 @@ export const env = {
 
   databaseUrl: process.env.DATABASE_URL ?? '',
 
-  jwtSecret: process.env.JWT_SECRET ?? 'dev-insecure-secret-change-me',
-  jwtAccessTtl: process.env.JWT_ACCESS_TTL ?? '15m',
+  jwtSecret: process.env.JWT_SECRET ?? 'dev-insecure-secret-change-me',  jwtAccessTtl: process.env.JWT_ACCESS_TTL ?? '15m',
   jwtRefreshTtl: process.env.JWT_REFRESH_TTL ?? '30d',
   ownerEmail: (process.env.OWNER_EMAIL ?? '').toLowerCase(),
+  // Secret used to authorize serverless cron invocations (Vercel injects
+  // "Authorization: Bearer <CRON_SECRET>" when this env var is set).
+  cronSecret: process.env.CRON_SECRET ?? '',
 
   google: {
     clientId: process.env.GOOGLE_CLIENT_ID ?? '',

@@ -2,6 +2,12 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
   "installCommand": "npm install",
-  "buildCommand": "npm run build -w @memeforge/shared && npm run build -w @memeforge/web",
-  "outputDirectory": "apps/web/.next"
+  "buildCommand": "npm run build -w @memeforge/shared && npm run build -w @memeforge/api && npm run build -w @memeforge/web",
+  "outputDirectory": "apps/web/.next",
+  "crons": [
+    { "path": "/api/v1/cron/tick", "schedule": "* * * * *" },
+    { "path": "/api/v1/cron/scan", "schedule": "*/2 * * * *" },
+    { "path": "/api/v1/cron/daily", "schedule": "0 8 * * *" },
+    { "path": "/api/v1/cron/weekly", "schedule": "0 8 * * 1" }
+  ]
 }

@@ -8,7 +8,7 @@ import {
 
 const prisma = new PrismaClient();
 
-const OWNER_EMAIL = (process.env.OWNER_EMAIL ?? 'mohamedelhannouti51@gmail.com').toLowerCase();
+const OWNER_EMAIL = (process.env.OWNER_EMAIL ?? 't6202600@gmail.com').toLowerCase();
 
 function addr(): string {
   const chars = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';

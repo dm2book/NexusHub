@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { WS_URL } from './config';
+import { REALTIME_ENABLED, WS_URL } from './config';
 import { useAuth } from './auth';
 
 type Handler = (payload: unknown) => void;
@@ -23,7 +23,8 @@ export function useRealtime(handlers: Record<string, Handler>) {
   handlersRef.current = handlers;
 
   useEffect(() => {
-    if (!token) return;
+    // On serverless (Vercel) there is no WS server — SWR polling carries data.
+    if (!token || !REALTIME_ENABLED || !WS_URL) return;
     let ws: WebSocket | null = null;
     let retry = 0;
     let closed = false;

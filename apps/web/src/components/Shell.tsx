@@ -23,6 +23,7 @@ import {
 import { clsx } from '@/lib/clsx';
 import { useAuth } from '@/lib/auth';
 import { useRealtime } from '@/lib/useRealtime';
+import { REALTIME_ENABLED } from '@/lib/config';
 import { useNotifications } from '@/lib/useNotifications';
 
 const NAV = [
@@ -125,11 +126,11 @@ export function Shell({ children }: { children: React.ReactNode }) {
             <span
               className={clsx(
                 'pill',
-                connected ? 'bg-up/10 text-up' : 'bg-down/10 text-down',
+                connected || !REALTIME_ENABLED ? 'bg-up/10 text-up' : 'bg-down/10 text-down',
               )}
             >
-              {connected ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
-              {connected ? 'Live' : 'Offline'}
+              {connected || !REALTIME_ENABLED ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
+              {connected ? 'Live' : REALTIME_ENABLED ? 'Offline' : 'Polling'}
             </span>
             <Link href="/alerts" className="relative rounded-lg p-2 hover:bg-white/5">
               <Bell className="h-5 w-5 text-slate-300" />
