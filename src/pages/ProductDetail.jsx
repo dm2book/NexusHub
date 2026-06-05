@@ -51,9 +51,15 @@ export default function ProductDetail() {
       <div className="grid lg:grid-cols-2 gap-10">
         {/* visual */}
         <div className={`relative rounded-3xl bg-gradient-to-br ${grad} h-80 lg:h-[420px] overflow-hidden`}>
-          <div className="absolute inset-0 bg-grid opacity-30" />
-          <Icon className="absolute right-8 top-8 text-white/90" size={44} />
-          <Icon className="absolute -right-10 -bottom-12 text-white/10" size={260} />
+          {product.image ? (
+            <img src={product.image} alt={product.name} className="absolute inset-0 w-full h-full object-cover" />
+          ) : (
+            <>
+              <div className="absolute inset-0 bg-grid opacity-30" />
+              <Icon className="absolute right-8 top-8 text-white/90" size={44} />
+              <Icon className="absolute -right-10 -bottom-12 text-white/10" size={260} />
+            </>
+          )}
           {product.featured && (
             <span className="absolute left-5 top-5 inline-flex items-center gap-1 text-xs font-bold uppercase bg-black/40 text-amber-300 px-3 py-1.5 rounded-full backdrop-blur">
               <Zap size={13} /> Featured

@@ -7,7 +7,11 @@ const parse = (s) => { try { return JSON.parse(s || '{}'); } catch { return {}; 
 const hydrate = (r) => {
   if (!r) return r;
   const metadata = parse(r.metadata);
-  return { ...r, metadata, active: !!r.active, featured: !!metadata.featured };
+  return {
+    ...r, metadata, active: !!r.active,
+    featured: !!metadata.featured,
+    image: metadata.image || null,
+  };
 };
 
 export async function listProducts({ activeOnly = false } = {}) {

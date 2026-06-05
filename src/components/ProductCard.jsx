@@ -11,9 +11,17 @@ export default function ProductCard({ product, onAdd }) {
       {/* visual header */}
       <Link to={`/product/${product.id}`} className="block">
         <div className={`relative h-36 bg-gradient-to-br ${grad} overflow-hidden`}>
-          <div className="absolute inset-0 bg-grid opacity-30" />
-          <Icon className="absolute right-4 top-4 text-white/80" size={28} />
-          <Icon className="absolute -right-6 -bottom-8 text-white/10 group-hover:scale-110 transition-transform duration-500" size={130} />
+          {product.image ? (
+            <img src={product.image} alt={product.name}
+              className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+              loading="lazy" />
+          ) : (
+            <>
+              <div className="absolute inset-0 bg-grid opacity-30" />
+              <Icon className="absolute right-4 top-4 text-white/80" size={28} />
+              <Icon className="absolute -right-6 -bottom-8 text-white/10 group-hover:scale-110 transition-transform duration-500" size={130} />
+            </>
+          )}
           {product.featured && (
             <span className="absolute left-3 top-3 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide bg-black/40 text-amber-300 px-2 py-1 rounded-full backdrop-blur">
               <Zap size={11} /> Featured

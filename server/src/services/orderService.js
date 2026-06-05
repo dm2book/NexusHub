@@ -272,6 +272,18 @@ function itemsHtml(order) {
     `</tbody></table>`;
 }
 
+/** Render delivered digital goods (codes/keys/messages) for the completion email. */
+function deliveriesHtml(order) {
+  if (!order.deliveries?.length) return '';
+  const items = order.deliveries.map((d) => {
+    const label = (d.type || 'code').toUpperCase();
+    const value = d.content ? escapeHtml(d.content) : (d.filename ? escapeHtml(d.filename) : '—');
+    return `<div style="margin:0 0 8px"><div style="font-size:11px;text-transform:uppercase;` +
+      `letter-spacing:1px;color:#8b8fa3">${label}</div><div class="code">${value}</div></div>`;
+  }).join('');
+  return `<p style="margin:0 0 6px">Your items:</p>${items}`;
+}
+
 function escapeHtml(s) {
   return String(s ?? '').replace(/[&<>"']/g, (c) =>
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -285,6 +297,7 @@ function emailContext(order, ctx = {}) {
       total: order.totalFormatted,
       status: order.statusLabel,
       itemsHtml: itemsHtml(order),
+      deliveriesHtml: deliveriesHtml(order),
       url: `${config.appUrl}/account/orders/${order.id}`,
     },
     refund: ctx.refundAmount != null

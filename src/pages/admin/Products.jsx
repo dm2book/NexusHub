@@ -6,7 +6,7 @@ import { PageLoader, EmptyState, Modal } from '../../components/ui.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
 
 const BLANK = { name: '', sku: '', category: '', description: '', priceEuro: '',
-  kind: 'digital', stock: '', active: true, featured: false };
+  kind: 'digital', stock: '', active: true, featured: false, imageUrl: '' };
 
 export default function AdminProducts() {
   const toast = useToast();
@@ -26,6 +26,7 @@ export default function AdminProducts() {
       name: p.name, sku: p.sku || '', category: p.category || '', description: p.description || '',
       priceEuro: (p.price / 100).toFixed(2), kind: p.kind || 'digital',
       stock: p.stock ?? '', active: !!p.active, featured: !!p.featured,
+      imageUrl: p.image || '',
     });
   };
 
@@ -38,7 +39,7 @@ export default function AdminProducts() {
         price: Math.round(parseFloat(form.priceEuro || '0') * 100),
         kind: form.kind, active: form.active,
         stock: form.stock === '' ? null : Number(form.stock),
-        metadata: { featured: form.featured },
+        metadata: { featured: form.featured, image: form.imageUrl || undefined },
       };
       if (editing === 'new') await api.post('/api/admin/products', payload);
       else await api.patch(`/api/admin/products/${editing.id}`, payload);
@@ -179,6 +180,9 @@ export default function AdminProducts() {
           <div><label className="label">Stock</label>
             <input type="number" className="input" value={form.stock}
               onChange={(e) => setForm({ ...form, stock: e.target.value })} placeholder="blank = unlimited" /></div>
+          <div className="sm:col-span-2"><label className="label">Image URL</label>
+            <input className="input" value={form.imageUrl} placeholder="https://… (product photo)"
+              onChange={(e) => setForm({ ...form, imageUrl: e.target.value })} /></div>
           <div className="sm:col-span-2"><label className="label">Description</label>
             <textarea rows={3} className="input" value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>

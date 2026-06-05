@@ -54,10 +54,11 @@ export const DEFAULT_TEMPLATES = [
     subject: 'Your order {{order.number}} is complete 🎁',
     body_html: `
       <h1>Order complete!</h1>
-      <p>Hi {{user.name}}, your order <strong>{{order.number}}</strong> is done.
-      Any digital deliveries are available in your dashboard.</p>
+      <p>Hi {{user.name}}, your order <strong>{{order.number}}</strong> is done — here
+      are your items. Keep this email safe.</p>
+      {{order.deliveriesHtml}}
       {{order.itemsHtml}}
-      <p><a class="btn" href="{{order.url}}">View deliveries & downloads</a></p>`,
+      <p><a class="btn" href="{{order.url}}">View in your dashboard</a></p>`,
   },
   {
     id: 'refund_issued',
