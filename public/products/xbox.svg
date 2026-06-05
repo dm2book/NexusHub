@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 300" width="480" height="300">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#065f46"/><stop offset="1" stop-color="#16a34a"/>
+    </linearGradient>
+    <radialGradient id="sphere" cx="0.4" cy="0.35" r="0.75">
+      <stop offset="0" stop-color="#dcfce7"/><stop offset="1" stop-color="#15803d"/>
+    </radialGradient>
+  </defs>
+  <rect width="480" height="300" fill="url(#bg)"/>
+  <g stroke="#ffffff" stroke-opacity="0.06" stroke-width="1">
+    <path d="M0 75H480M0 150H480M0 225H480"/>
+  </g>
+  <circle cx="240" cy="135" r="74" fill="url(#sphere)" stroke="#14532d" stroke-width="3"/>
+  <g stroke="#0b3d22" stroke-width="12" stroke-linecap="round">
+    <path d="M212 103 L268 167"/>
+    <path d="M268 103 L212 167"/>
+  </g>
+  <text x="32" y="262" font-family="Arial, sans-serif" font-size="22" font-weight="800"
+        fill="#ffffff" letter-spacing="3">XBOX</text>
+</svg>

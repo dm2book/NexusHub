@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 300" width="480" height="300">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1e3a8a"/><stop offset="1" stop-color="#0ea5e9"/>
+    </linearGradient>
+  </defs>
+  <rect width="480" height="300" fill="url(#bg)"/>
+  <g fill="#ffffff" fill-opacity="0.06">
+    <circle cx="60" cy="240" r="50"/><circle cx="430" cy="60" r="40"/>
+  </g>
+  <!-- controller-button shapes -->
+  <g transform="translate(240 130)" stroke="#ffffff" stroke-width="7" fill="none" stroke-opacity="0.95">
+    <path d="M0,-70 L-22,-32 L22,-32 Z"/>            <!-- triangle -->
+    <circle cx="60" cy="0" r="24"/>                   <!-- circle -->
+    <path d="M-78,-18 L-42,18 M-42,-18 L-78,18"/>     <!-- cross -->
+    <rect x="-22" y="38" width="44" height="44" rx="6"/> <!-- square -->
+  </g>
+  <text x="32" y="262" font-family="Arial, sans-serif" font-size="22" font-weight="800"
+        fill="#ffffff" letter-spacing="3">PLAYSTATION</text>
+</svg>

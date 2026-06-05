@@ -1,14 +1,24 @@
 /**
- * OPTIONAL demo catalog seeder — run explicitly with `npm run seed:demo`.
+ * OPTIONAL demo catalog seeder — run explicitly with `npm run seed:demo` (or set
+ * SEED_DEMO=true to run it on first boot).
  *
- * This is NOT part of the normal setup and is never run automatically. It just
- * gives a fresh install a realistic-looking storefront to show off. Safe to run
- * repeatedly (skips SKUs that already exist). Delete the products anytime from
- * the admin console.
+ * Gives a fresh install a realistic, good-looking storefront with per-category
+ * cover images (served from /public/products/*.svg). Safe to run repeatedly: it
+ * creates missing products and backfills the image on existing ones that lack it.
  */
 import { run, get, nowIso } from './index.js';
 import { migrate } from './migrate.js';
 import { newId } from '../utils/ids.js';
+
+// Category → cover image (static asset shipped in /public, so it always loads).
+const IMAGES = {
+  robux: '/products/robux.svg',
+  'discord-nitro': '/products/nitro.svg',
+  steam: '/products/steam.svg',
+  playstation: '/products/playstation.svg',
+  xbox: '/products/xbox.svg',
+  'v-bucks': '/products/vbucks.svg',
+};
 
 // price is in minor units (cents).
 const CATALOG = [
@@ -42,22 +52,39 @@ const CATALOG = [
     description: 'A big stack of V-Bucks delivered instantly.' },
 ];
 
+const parse = (s) => { try { return JSON.parse(s || '{}'); } catch { return {}; } };
+
 export async function seedDemoCatalog() {
   await migrate();
   let created = 0;
+  let updated = 0;
   for (const p of CATALOG) {
-    const exists = await get('SELECT id FROM products WHERE sku = @sku', { sku: p.sku });
-    if (exists) continue;
+    const image = IMAGES[p.category] || null;
+    const existing = await get('SELECT id, metadata FROM products WHERE sku = @sku', { sku: p.sku });
     const at = nowIso();
+
+    if (existing) {
+      // Backfill the cover image if the product doesn't have one yet.
+      const meta = parse(existing.metadata);
+      if (image && !meta.image) {
+        meta.image = image;
+        await run('UPDATE products SET metadata = @m, updated_at = @at WHERE id = @id',
+          { m: JSON.stringify(meta), at, id: existing.id });
+        updated++;
+      }
+      continue;
+    }
+
     await run(`INSERT INTO products
         (id, sku, name, category, description, price, currency, kind, active, metadata, created_at, updated_at)
        VALUES (@id, @sku, @name, @cat, @desc, @price, 'EUR', 'digital', 1, @meta, @at, @at)`, {
       id: newId('prd'), sku: p.sku, name: p.name, cat: p.category, desc: p.description,
-      price: p.price, meta: JSON.stringify({ featured: !!p.featured }), at,
+      price: p.price, meta: JSON.stringify({ featured: !!p.featured, image }), at,
     });
     created++;
   }
-  console.log(`Demo catalog: ${created} products created (${CATALOG.length - created} already existed).`);
+  console.log(`Demo catalog: ${created} created, ${updated} image-backfilled ` +
+    `(${CATALOG.length - created - updated} unchanged).`);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

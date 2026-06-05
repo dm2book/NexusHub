@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 300" width="480" height="300">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7c3aed"/><stop offset="1" stop-color="#2563eb"/>
+    </linearGradient>
+    <linearGradient id="coin" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#bae6fd"/><stop offset="1" stop-color="#38bdf8"/>
+    </linearGradient>
+  </defs>
+  <rect width="480" height="300" fill="url(#bg)"/>
+  <g fill="#ffffff" fill-opacity="0.08">
+    <path d="M70 40 l8 20 20 8 -20 8 -8 20 -8 -20 -20 -8 20 -8 z"/>
+    <path d="M410 220 l10 26 26 10 -26 10 -10 26 -10 -26 -26 -10 26 -10 z"/>
+  </g>
+  <circle cx="240" cy="135" r="74" fill="#000" fill-opacity="0.12"/>
+  <circle cx="240" cy="130" r="74" fill="url(#coin)" stroke="#1d4ed8" stroke-width="3"/>
+  <text x="240" y="132" font-family="Arial, sans-serif" font-size="64" font-weight="900"
+        fill="#1e3a8a" text-anchor="middle" dominant-baseline="central">V</text>
+  <text x="32" y="262" font-family="Arial, sans-serif" font-size="22" font-weight="800"
+        fill="#ffffff" letter-spacing="3">V-BUCKS</text>
+</svg>
