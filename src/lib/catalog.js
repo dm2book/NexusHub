@@ -1,5 +1,6 @@
 import {
   Gamepad2, Gift, Coins, Crown, Sparkles, Ticket, CreditCard, Package,
+  Crosshair, Gem, Swords,
 } from 'lucide-react';
 
 // Visual treatment per category — gradient + icon used across the storefront.
@@ -11,6 +12,12 @@ const MAP = {
   xbox: { icon: Gamepad2, grad: 'from-green-500 to-emerald-500', label: 'Xbox' },
   steam: { icon: Gamepad2, grad: 'from-sky-500 to-blue-600', label: 'Steam' },
   'v-bucks': { icon: Sparkles, grad: 'from-purple-500 to-fuchsia-500', label: 'V-Bucks' },
+  cod: { icon: Crosshair, grad: 'from-orange-500 to-red-600', label: 'Call of Duty' },
+  brawl: { icon: Gem, grad: 'from-amber-400 to-yellow-500', label: 'Brawl Stars' },
+  apex: { icon: Crosshair, grad: 'from-red-500 to-rose-800', label: 'Apex Legends' },
+  valorant: { icon: Crosshair, grad: 'from-rose-500 to-red-600', label: 'Valorant' },
+  genshin: { icon: Sparkles, grad: 'from-cyan-400 to-indigo-500', label: 'Genshin Impact' },
+  clash: { icon: Gem, grad: 'from-violet-500 to-blue-600', label: 'Clash of Clans' },
   giftcard: { icon: Gift, grad: 'from-pink-500 to-rose-500', label: 'Gift Cards' },
   subscription: { icon: Ticket, grad: 'from-amber-500 to-orange-500', label: 'Subscriptions' },
 };

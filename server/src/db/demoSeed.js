@@ -38,6 +38,64 @@ const CATALOG = [
   { sku: 'VBUCKS-13500', name: '13,500 V-Bucks', category: 'v-bucks', price: 3699, featured: true,
     image: '/products/packs/vbucks-13500.svg', description: 'The biggest V-Bucks stack at the best rate.' },
 
+  // ── Call of Duty Points (estimate; verify) ───────────────────────────────
+  { sku: 'COD-2400', name: '2,400 CP — Call of Duty', category: 'cod', price: 2399,
+    image: '/products/packs/cod-2400.svg', description: 'Call of Duty Points for skins, bundles and Battle Pass.' },
+  { sku: 'COD-5000', name: '5,000 CP — Call of Duty', category: 'cod', price: 4499, featured: true,
+    image: '/products/packs/cod-5000.svg', description: 'Best-value CoD Points bundle, instant delivery.' },
+  { sku: 'COD-9500', name: '9,500 CP — Call of Duty', category: 'cod', price: 7999,
+    image: '/products/packs/cod-9500.svg', description: 'Large CoD Points top-up.' },
+  { sku: 'COD-21000', name: '21,000 CP — Call of Duty', category: 'cod', price: 15999,
+    image: '/products/packs/cod-21000.svg', description: 'Maximum CoD Points stack.' },
+
+  // ── Brawl Stars Gems (estimate; verify) ──────────────────────────────────
+  { sku: 'BRAWL-360', name: '360 Gems — Brawl Stars', category: 'brawl', price: 699,
+    image: '/products/packs/brawl-360.svg', description: 'Brawl Stars gems for brawlers, skins and the Pass.' },
+  { sku: 'BRAWL-950', name: '950 Gems — Brawl Stars', category: 'brawl', price: 1799, featured: true,
+    image: '/products/packs/brawl-950.svg', description: 'Popular Brawl Stars gem bundle.' },
+  { sku: 'BRAWL-2000', name: '2,000 Gems — Brawl Stars', category: 'brawl', price: 3499,
+    image: '/products/packs/brawl-2000.svg', description: 'Big Brawl Stars gem stack.' },
+
+  // ── Apex Coins (estimate; verify) ────────────────────────────────────────
+  { sku: 'APEX-1000', name: '1,000 Apex Coins', category: 'apex', price: 999,
+    image: '/products/packs/apex-1000.svg', description: 'Apex Coins for skins, the Battle Pass and packs.' },
+  { sku: 'APEX-2150', name: '2,150 Apex Coins', category: 'apex', price: 1899,
+    image: '/products/packs/apex-2150.svg', description: 'Apex Coins bundle, instant delivery.' },
+  { sku: 'APEX-4350', name: '4,350 Apex Coins', category: 'apex', price: 3699, featured: true,
+    image: '/products/packs/apex-4350.svg', description: 'Great-value Apex Coins pack.' },
+  { sku: 'APEX-11500', name: '11,500 Apex Coins', category: 'apex', price: 8999,
+    image: '/products/packs/apex-11500.svg', description: 'Maximum Apex Coins top-up.' },
+
+  // ── Valorant Points (estimate; verify) ───────────────────────────────────
+  { sku: 'VAL-1000', name: '1,000 VP — Valorant', category: 'valorant', price: 999,
+    image: '/products/packs/valorant-1000.svg', description: 'Valorant Points for skins and the Battle Pass.' },
+  { sku: 'VAL-2050', name: '2,050 VP — Valorant', category: 'valorant', price: 1799,
+    image: '/products/packs/valorant-2050.svg', description: 'Valorant Points bundle.' },
+  { sku: 'VAL-3650', name: '3,650 VP — Valorant', category: 'valorant', price: 3199, featured: true,
+    image: '/products/packs/valorant-3650.svg', description: 'Popular Valorant Points pack.' },
+  { sku: 'VAL-5350', name: '5,350 VP — Valorant', category: 'valorant', price: 4499,
+    image: '/products/packs/valorant-5350.svg', description: 'Large Valorant Points top-up.' },
+
+  // ── Genshin Genesis Crystals (estimate; verify) ──────────────────────────
+  { sku: 'GEN-980', name: '980 Genesis Crystals — Genshin', category: 'genshin', price: 1599,
+    image: '/products/packs/genshin-980.svg', description: 'Genesis Crystals for wishes and the Battle Pass.' },
+  { sku: 'GEN-1980', name: '1,980 Genesis Crystals — Genshin', category: 'genshin', price: 2999, featured: true,
+    image: '/products/packs/genshin-1980.svg', description: 'Popular Genshin crystals bundle.' },
+  { sku: 'GEN-3280', name: '3,280 Genesis Crystals — Genshin', category: 'genshin', price: 4999,
+    image: '/products/packs/genshin-3280.svg', description: 'Large Genesis Crystals pack.' },
+  { sku: 'GEN-6480', name: '6,480 Genesis Crystals — Genshin', category: 'genshin', price: 9499,
+    image: '/products/packs/genshin-6480.svg', description: 'Maximum Genesis Crystals top-up.' },
+
+  // ── Clash of Clans Gems (estimate; verify) ───────────────────────────────
+  { sku: 'COC-500', name: '500 Gems — Clash of Clans', category: 'clash', price: 499,
+    image: '/products/packs/clash-500.svg', description: 'Clash of Clans gems to speed up your village.' },
+  { sku: 'COC-1200', name: '1,200 Gems — Clash of Clans', category: 'clash', price: 999,
+    image: '/products/packs/clash-1200.svg', description: 'Clash of Clans gem bundle.' },
+  { sku: 'COC-2500', name: '2,500 Gems — Clash of Clans', category: 'clash', price: 1999, featured: true,
+    image: '/products/packs/clash-2500.svg', description: 'Popular Clash of Clans gem pack.' },
+  { sku: 'COC-6500', name: '6,500 Gems — Clash of Clans', category: 'clash', price: 4999,
+    image: '/products/packs/clash-6500.svg', description: 'Big Clash of Clans gem stack.' },
+
   // ── Discord Nitro (market price; not on Eldorado) ────────────────────────
   { sku: 'NITRO-1M', name: 'Discord Nitro — 1 Month', category: 'discord-nitro', price: 999,
     image: '/products/nitro.svg', description: 'Full Nitro for a month: HD streaming, emojis, boosts.' },
