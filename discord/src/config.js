@@ -203,6 +203,78 @@ export const MESSAGES = {
       "❓ **Other** — anything else\n\n" +
       "Average first response: **under 10 minutes** during open hours.",
   },
+  products: {
+    title: '🛒 The ForgeMarket catalog',
+    description:
+      "Game currency, top-ups, gift cards and subscriptions — **delivered in seconds**, " +
+      "buyer-protected, with verified reviews.\n\n" +
+      "**Popular:** Robux • V-Bucks • Valorant VP • CoD Points • Apex Coins • Genshin • Brawl Stars • Clash of Clans\n\n" +
+      "Not sure what you need? Ask in <#ask-the-bot> and our assistant will recommend the right pack.\n\n" +
+      "👇 Tap **Browse the shop** to see live prices.",
+  },
+  howToBuy: {
+    title: '💳 How to buy (it takes ~30 seconds)',
+    description:
+      "**1.** Open the shop and pick your pack.\n" +
+      "**2.** Check out securely (card payment).\n" +
+      "**3.** Your code is delivered **instantly** to your dashboard **and** email.\n" +
+      "**4.** Redeem in-game. Done! 🎮\n\n" +
+      "Problem with an order? Open a ticket in <#open-a-ticket> — eligible orders are money-back guaranteed.",
+  },
+  deals: {
+    title: '🔥 Deals & bundles',
+    description:
+      "Limited-time offers and best-value bundles drop here.\n\n" +
+      "🔔 Turn on notifications for this channel so you never miss a deal.\n" +
+      "💜 **VIP Customers** get early access and extra discounts.",
+  },
+  announcement: {
+    title: '📢 Welcome to ForgeMarket — we’re live!',
+    description:
+      "The fastest, most trusted place to top up your favourite games. ⚡\n\n" +
+      "• **Instant delivery** on every order\n" +
+      "• **Buyer protection** + money-back guarantee\n" +
+      "• **Verified reviews** and real proof of delivery\n" +
+      "• **24/7 support** right here on Discord\n\n" +
+      "Verify in <#verify>, then browse <#products>. Welcome aboard! 🎉",
+  },
+  supportInfo: {
+    title: '📋 How support works',
+    description:
+      "**Open hours:** every day, with fast responses (avg. under 10 min).\n" +
+      "**Order issues:** open a ticket in <#open-a-ticket> with your order number.\n" +
+      "**Refunds:** request from your order page or via a ticket — approved refunds go to your original method.\n" +
+      "**Safety:** our staff will **never DM you first** and never ask for passwords. Report anyone who does.",
+  },
+  reviewsIntro: {
+    title: '⭐ Verified customer reviews',
+    description:
+      "Every review here is tied to a **real, completed order** — no fakes.\n\n" +
+      "See genuine delivery screenshots in <#proof-of-delivery>, and bought from us? " +
+      "Leave a quick vouch in <#vouches> 💚",
+  },
+  proofIntro: {
+    title: '📸 Proof of delivery',
+    description: "Real screenshots of completed, instant deliveries. Transparency builds trust. 🔒",
+  },
+  giveawaysIntro: {
+    title: '🎉 Giveaways',
+    description:
+      "Free top-ups, every week! 🎁\n\n" +
+      "• Active giveaways are posted here — react/enter to join.\n" +
+      "• **VIP Customers** get bonus entries.\n" +
+      "• Winners are announced in <#winners>.\n\nGood luck! 🍀",
+  },
+  eventsIntro: {
+    title: '📅 Community events',
+    description: "Tournaments, drops and community nights. Sign up in <#event-signup> and hop into <#events-stage> when we go live.",
+  },
+  staffIntro: {
+    title: '🛠️ Staff HQ',
+    description:
+      "Internal area. Tickets log to <#ticket-logs>, moderation to <#mod-log>, and the bot posts joins, " +
+      "tickets, buying-intent leads and sales to <#leads>.\n\nKeep it professional — customers come first. 💪",
+  },
 };
 
 // FAQ — powers the #faq channel AND the AI fallback.

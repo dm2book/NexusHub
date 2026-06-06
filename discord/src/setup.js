@@ -1,11 +1,12 @@
 /**
  * One-shot, idempotent server builder. Creates roles, categories, channels,
- * topics and permissions from config.js, then posts the onboarding panels
- * (welcome, rules, start-here, verify button, ticket button, FAQ).
+ * topics and permissions from config.js, then posts rich onboarding + info panels
+ * (welcome, rules, start-here, verify button, products, how-to-buy, deals,
+ * announcement, FAQ, support info, ticket panel, reviews, giveaways, events…).
  *
- * Run again any time — it reuses anything that already exists by name.
- * The Owner is never touched; invite the bot with Administrator so it can manage
- * the server (the Owner still outranks it).
+ * Resilient: a failure on one item is logged and skipped, never aborting the run.
+ * Safe to re-run — it reuses anything that already exists and fills in what's
+ * missing. The Owner is never touched; invite the bot with Administrator.
  *
  *   npm run setup
  */
@@ -16,7 +17,10 @@ import {
 } from 'discord.js';
 import { ROLES, CATEGORIES, MESSAGES, FAQ, STAFF, MEMBERS } from './config.js';
 
-const { DISCORD_TOKEN, DISCORD_GUILD_ID, STORE_URL = 'https://forgemarket.app' } = process.env;
+const { DISCORD_TOKEN, DISCORD_GUILD_ID } = process.env;
+let STORE_URL = process.env.STORE_URL || 'https://forgemarket.app';
+if (!/^https?:\/\//.test(STORE_URL)) STORE_URL = `https://${STORE_URL}`;
+
 const MARKER = 'forgemarket-setup';
 const P = PermissionFlagsBits;
 const TYPE = {
@@ -25,8 +29,10 @@ const TYPE = {
 };
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
-
 const resolvePerms = (arr = []) => arr.map((n) => P[n]).filter(Boolean);
+const embed = (m) => new EmbedBuilder().setColor(0x6366f1).setTitle(m.title).setDescription(m.description).setFooter({ text: MARKER });
+const row = (...buttons) => new ActionRowBuilder().addComponents(...buttons);
+const link = (label, url) => new ButtonBuilder().setLabel(label).setStyle(ButtonStyle.Link).setURL(url);
 
 client.once('ready', async () => {
   try {
@@ -36,86 +42,107 @@ client.once('ready', async () => {
     const everyone = guild.roles.everyone.id;
     console.log(`▶ Building "${guild.name}"`);
 
-    // 1) Roles (skip if a role with the same name exists) ───────────────────
+    // 1) Roles ───────────────────────────────────────────────────────────────
     const roleIds = {};
     for (const r of ROLES) {
-      let role = guild.roles.cache.find((x) => x.name === r.name);
-      if (!role) {
-        role = await guild.roles.create({
-          name: r.name, color: r.color, hoist: r.hoist, mentionable: r.mentionable,
-          permissions: resolvePerms(r.perms), reason: 'ForgeMarket setup',
-        });
-        console.log(`  + role ${r.name}`);
-      }
-      roleIds[r.key] = role.id;
+      try {
+        let role = guild.roles.cache.find((x) => x.name === r.name);
+        if (!role) {
+          role = await guild.roles.create({
+            name: r.name, color: r.color, hoist: r.hoist, mentionable: r.mentionable,
+            permissions: resolvePerms(r.perms), reason: 'ForgeMarket setup',
+          });
+          console.log(`  + role ${r.name}`);
+        }
+        roleIds[r.key] = role.id;
+      } catch (e) { console.log(`  ! role ${r.name} failed: ${e.message}`); }
     }
 
-    // helper: which roles may VIEW a category
-    const viewers = (access) =>
-      access === 'staff' ? STAFF
-        : access === 'vip' ? ['vip', ...STAFF]
-          : MEMBERS; // verified
+    const viewers = (access) => access === 'staff' ? STAFF
+      : access === 'vip' ? ['vip', ...STAFF] : MEMBERS;
 
-    // 2) Categories + channels ──────────────────────────────────────────────
+    // 2) Categories + channels ────────────────────────────────────────────────
     const channelByName = {};
     for (const cat of CATEGORIES) {
-      let category = guild.channels.cache.find(
-        (c) => c.type === ChannelType.GuildCategory && c.name === cat.name);
-      if (!category) {
-        category = await guild.channels.create({
-          name: cat.name, type: ChannelType.GuildCategory,
-          permissionOverwrites: cat.access === 'public'
+      let category;
+      try {
+        category = guild.channels.cache.find(
+          (c) => c.type === ChannelType.GuildCategory && c.name === cat.name);
+        if (!category) {
+          const ow = cat.access === 'public'
             ? [{ id: everyone, allow: [P.ViewChannel] }]
             : [{ id: everyone, deny: [P.ViewChannel] },
-               ...viewers(cat.access).map((k) => ({ id: roleIds[k], allow: [P.ViewChannel] }))],
-          reason: 'ForgeMarket setup',
-        });
-        console.log(`  + category ${cat.name}`);
-      }
+               ...viewers(cat.access).filter((k) => roleIds[k]).map((k) => ({ id: roleIds[k], allow: [P.ViewChannel] }))];
+          category = await guild.channels.create({
+            name: cat.name, type: ChannelType.GuildCategory, permissionOverwrites: ow, reason: 'ForgeMarket setup',
+          });
+          console.log(`  + category ${cat.name}`);
+        }
+      } catch (e) { console.log(`  ! category ${cat.name} failed: ${e.message}`); continue; }
 
       for (const ch of cat.channels) {
-        const existing = guild.channels.cache.find(
-          (c) => c.name === ch.name && c.parentId === category.id);
-        const overwrites = [];
-        // read-only: members read, staff post
-        if (ch.readOnly) {
-          overwrites.push({ id: everyone, deny: [P.SendMessages, P.SendMessagesInThreads, P.CreatePublicThreads] });
-          for (const k of STAFF) overwrites.push({ id: roleIds[k], allow: [P.SendMessages] });
-        }
-        let channel = existing;
-        if (!channel) {
-          channel = await guild.channels.create({
-            name: ch.name, type: TYPE[ch.type] ?? ChannelType.GuildText, parent: category.id,
-            topic: ch.type === 'voice' ? undefined : (ch.topic || '').replace('{STORE_URL}', STORE_URL),
-            rateLimitPerUser: ch.slowmode || 0,
-            permissionOverwrites: overwrites.length ? overwrites : undefined,
-            reason: 'ForgeMarket setup',
-          });
-          console.log(`    + #${ch.name}`);
-        }
-        channelByName[ch.name] = channel;
+        try {
+          let channel = guild.channels.cache.find((c) => c.name === ch.name && c.parentId === category.id);
+          if (!channel) {
+            const overwrites = [];
+            if (ch.readOnly) {
+              overwrites.push({ id: everyone, deny: [P.SendMessages, P.SendMessagesInThreads, P.CreatePublicThreads] });
+              for (const k of STAFF) if (roleIds[k]) overwrites.push({ id: roleIds[k], allow: [P.SendMessages] });
+            }
+            channel = await guild.channels.create({
+              name: ch.name, type: TYPE[ch.type] ?? ChannelType.GuildText, parent: category.id,
+              topic: ch.type === 'voice' ? undefined : (ch.topic || '').replace('{STORE_URL}', STORE_URL),
+              rateLimitPerUser: ch.slowmode || 0,
+              permissionOverwrites: overwrites.length ? overwrites : undefined,
+              reason: 'ForgeMarket setup',
+            });
+            console.log(`    + #${ch.name}`);
+          }
+          channelByName[ch.name] = channel;
+        } catch (e) { console.log(`    ! #${ch.name} failed: ${e.message}`); }
       }
     }
 
-    // 3) Onboarding panels (post once) ───────────────────────────────────────
-    await postOnce(channelByName['welcome'], embed(MESSAGES.welcome(guild.name)));
-    await postOnce(channelByName['start-here'], embed(MESSAGES.startHere));
-    await postOnce(channelByName['rules'], embed(MESSAGES.rules));
-    await postOnce(channelByName['verify'], embed(MESSAGES.verify),
-      row(new ButtonBuilder().setCustomId('verify').setLabel('✅ Verify').setStyle(ButtonStyle.Success)));
-    await postOnce(channelByName['open-a-ticket'], embed(MESSAGES.ticketPanel),
-      row(
-        new ButtonBuilder().setCustomId('ticket:order').setLabel('Order issue').setEmoji('🛒').setStyle(ButtonStyle.Primary),
-        new ButtonBuilder().setCustomId('ticket:payment').setLabel('Payment').setEmoji('💳').setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder().setCustomId('ticket:partner').setLabel('Partnership').setEmoji('🤝').setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder().setCustomId('ticket:other').setLabel('Other').setEmoji('❓').setStyle(ButtonStyle.Secondary),
-      ));
+    // 3) Panels (rich content in every key channel) ───────────────────────────
     const faqEmbed = new EmbedBuilder().setColor(0x6366f1).setTitle('❓ Frequently Asked Questions')
       .setDescription(FAQ.map((f) => `**${f.q}**\n${f.a}`).join('\n\n')).setFooter({ text: MARKER });
-    await postOnce(channelByName['faq'], faqEmbed);
 
-    console.log('\n✅ Setup complete. Channels, roles and panels are ready.');
-    console.log('   Tip: drag the bot’s role just under Admin so it can manage members.');
+    const ticketButtons = [
+      new ButtonBuilder().setCustomId('ticket:order').setLabel('Order issue').setEmoji('🛒').setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId('ticket:payment').setLabel('Payment').setEmoji('💳').setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId('ticket:partner').setLabel('Partnership').setEmoji('🤝').setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId('ticket:other').setLabel('Other').setEmoji('❓').setStyle(ButtonStyle.Secondary),
+    ];
+    const verifyButton = new ButtonBuilder().setCustomId('verify').setLabel('Verify me').setEmoji('✅').setStyle(ButtonStyle.Success);
+
+    const PANELS = [
+      ['welcome', embed(MESSAGES.welcome(guild.name))],
+      ['start-here', embed(MESSAGES.startHere)],
+      ['rules', embed(MESSAGES.rules)],
+      ['verify', embed(MESSAGES.verify), [verifyButton]],
+      ['announcements', embed(MESSAGES.announcement)],
+      ['products', embed(MESSAGES.products), [link('🛍️ Browse the shop', `${STORE_URL}/shop`)]],
+      ['how-to-buy', embed(MESSAGES.howToBuy), [link('Go to shop', `${STORE_URL}/shop`)]],
+      ['deals', embed(MESSAGES.deals)],
+      ['faq', faqEmbed],
+      ['support-info', embed(MESSAGES.supportInfo)],
+      ['open-a-ticket', embed(MESSAGES.ticketPanel), ticketButtons],
+      ['reviews', embed(MESSAGES.reviewsIntro)],
+      ['proof-of-delivery', embed(MESSAGES.proofIntro)],
+      ['giveaways', embed(MESSAGES.giveawaysIntro)],
+      ['events', embed(MESSAGES.eventsIntro)],
+      ['staff-announcements', embed(MESSAGES.staffIntro)],
+    ];
+
+    for (const [name, emb, btns] of PANELS) {
+      try {
+        await postOnce(channelByName[name], emb, btns ? row(...btns) : undefined);
+        console.log(`  · panel #${name}`);
+      } catch (e) { console.log(`  ! panel #${name} failed: ${e.message}`); }
+    }
+
+    console.log('\n✅ Setup complete. Re-run any time to fill in anything missing.');
+    console.log('   Reminder: drag the "Bot" role just under "Admin" so it can grant the Verified role.');
     process.exit(0);
   } catch (err) {
     console.error('Setup failed:', err);
@@ -123,14 +150,9 @@ client.once('ready', async () => {
   }
 });
 
-function embed(m) {
-  return new EmbedBuilder().setColor(0x6366f1).setTitle(m.title).setDescription(m.description).setFooter({ text: MARKER });
-}
-function row(...buttons) { return new ActionRowBuilder().addComponents(...buttons); }
-
 async function postOnce(channel, embedBuilder, components) {
   if (!channel || !channel.isTextBased?.()) return;
-  const recent = await channel.messages.fetch({ limit: 15 }).catch(() => null);
+  const recent = await channel.messages.fetch({ limit: 20 }).catch(() => null);
   const already = recent?.some((msg) => msg.author.id === client.user.id
     && msg.embeds[0]?.footer?.text === MARKER);
   if (already) return;
