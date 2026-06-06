@@ -65,3 +65,14 @@ h1, h2, h3, .font-display { font-family: 'Orbitron', sans-serif; letter-spacing:
   background-size: 400% 100%;
   animation: shimmer 1.4s ease infinite;
 }
+
+/* Scroll reveal — elements fade + rise into view as they enter the viewport */
+.reveal { opacity: 0; transform: translateY(24px); transition: opacity .7s cubic-bezier(.2,.7,.2,1), transform .7s cubic-bezier(.2,.7,.2,1); will-change: opacity, transform; }
+.reveal.in-view { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) {
+  .reveal { opacity: 1; transform: none; transition: none; }
+}
+
+/* Card lift on hover for product/feature tiles */
+.lift { transition: transform .25s ease, box-shadow .25s ease, border-color .25s ease; }
+.lift:hover { transform: translateY(-4px); box-shadow: 0 18px 40px -18px rgba(139,92,246,.55); }

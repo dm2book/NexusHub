@@ -5,6 +5,7 @@ import { api } from '../lib/api.js';
 import { useCart } from '../context/CartContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { categoryVisual } from '../lib/catalog.js';
+import { withFallback } from '../lib/sampleCatalog.js';
 import ProductCard from '../components/ProductCard.jsx';
 import { Skeleton, EmptyState } from '../components/ui.jsx';
 import { usePageMeta } from '../lib/useMeta.js';
@@ -26,7 +27,11 @@ export default function Shop() {
   const category = params.get('category') || '';
   usePageMeta('Shop', 'Browse game currency, gift cards and subscriptions — instant delivery.');
 
-  useEffect(() => { api.get('/api/products').then((r) => setProducts(r.products)).catch(() => setProducts([])); }, []);
+  useEffect(() => {
+    api.get('/api/products')
+      .then((r) => setProducts(withFallback(r.products)))
+      .catch(() => setProducts(withFallback([])));
+  }, []);
 
   const categories = useMemo(
     () => [...new Set((products || []).map((p) => p.category).filter(Boolean))], [products]);

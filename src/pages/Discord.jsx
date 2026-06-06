@@ -39,7 +39,7 @@ export default function Discord() {
 
   useEffect(() => { api.get('/api/discord/server').then((r) => setServer(r.server)).catch(() => setServer({})); }, []);
 
-  const invite = server?.inviteUrl;
+  const invite = server?.inviteUrl || 'https://discord.gg/vNcfgDbVd';
   const JoinBtn = ({ className = '' }) => (
     invite
       ? <a href={invite} target="_blank" rel="noreferrer" className={`btn-primary ${className}`} style={{ background: 'linear-gradient(120deg,#5865F2,#a855f7)' }}><MessageCircle size={18} /> Join the server</a>

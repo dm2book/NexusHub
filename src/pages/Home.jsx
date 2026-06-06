@@ -8,8 +8,10 @@ import { api } from '../lib/api.js';
 import { useCart } from '../context/CartContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { categoryVisual } from '../lib/catalog.js';
+import { withFallback } from '../lib/sampleCatalog.js';
 import ProductCard from '../components/ProductCard.jsx';
 import { SectionHeading, Skeleton } from '../components/ui.jsx';
+import Reveal from '../components/Reveal.jsx';
 import { usePageMeta } from '../lib/useMeta.js';
 
 const FEATURES = [
@@ -52,7 +54,11 @@ export default function Home() {
   usePageMeta('Digital goods, delivered instantly',
     'Buy Robux, V-Bucks, game currency, gift cards and subscriptions — instant, automated delivery with secure payments.');
 
-  useEffect(() => { api.get('/api/products').then((r) => setProducts(r.products)).catch(() => setProducts([])); }, []);
+  useEffect(() => {
+    api.get('/api/products')
+      .then((r) => setProducts(withFallback(r.products)))
+      .catch(() => setProducts(withFallback([])));
+  }, []);
 
   const popular = (products || []).filter((p) => p.featured).concat((products || []).filter((p) => !p.featured)).slice(0, 8);
   const categories = [...new Set((products || []).map((p) => p.category).filter(Boolean))];
@@ -144,14 +150,16 @@ export default function Home() {
         <SectionHeading eyebrow="Why ForgeMarket" title="Built for serious buyers"
           subtitle="A premium storefront powered by real fulfillment, security and support infrastructure." />
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          {FEATURES.map(({ icon: Icon, title, text }) => (
-            <div key={title} className="card p-6 hover:border-primary/40 transition group">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500/20 to-fuchsia-500/20 border border-white/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                <Icon size={22} className="text-indigo-300" />
+          {FEATURES.map(({ icon: Icon, title, text }, i) => (
+            <Reveal key={title} delay={i * 80}>
+              <div className="card lift p-6 hover:border-primary/40 transition group h-full">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500/20 to-fuchsia-500/20 border border-white/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                  <Icon size={22} className="text-indigo-300" />
+                </div>
+                <h3 className="text-white text-base mb-1.5">{title}</h3>
+                <p className="text-slate-400 text-sm">{text}</p>
               </div>
-              <h3 className="text-white text-base mb-1.5">{title}</h3>
-              <p className="text-slate-400 text-sm">{text}</p>
-            </div>
+            </Reveal>
           ))}
         </div>
       </section>
@@ -161,14 +169,16 @@ export default function Home() {
         <SectionHeading eyebrow="How it works" title="Three steps to delivery" />
         <div className="grid md:grid-cols-3 gap-5">
           {STEPS.map(({ icon: Icon, title, text }, i) => (
-            <div key={title} className="relative card p-7">
-              <span className="absolute top-5 right-6 font-display text-5xl text-white/5">{i + 1}</span>
-              <div className="w-12 h-12 rounded-xl bg-primary/15 flex items-center justify-center mb-4">
-                <Icon size={22} className="text-primary" />
+            <Reveal key={title} delay={i * 100}>
+              <div className="relative card lift p-7 h-full">
+                <span className="absolute top-5 right-6 font-display text-5xl text-white/5">{i + 1}</span>
+                <div className="w-12 h-12 rounded-xl bg-primary/15 flex items-center justify-center mb-4">
+                  <Icon size={22} className="text-primary" />
+                </div>
+                <h3 className="text-white text-lg mb-1.5">{title}</h3>
+                <p className="text-slate-400 text-sm">{text}</p>
               </div>
-              <h3 className="text-white text-lg mb-1.5">{title}</h3>
-              <p className="text-slate-400 text-sm">{text}</p>
-            </div>
+            </Reveal>
           ))}
         </div>
       </section>
@@ -177,8 +187,8 @@ export default function Home() {
       <section className="section py-16">
         <SectionHeading eyebrow="Loved by gamers" title="What customers say" />
         <div className="grid md:grid-cols-3 gap-5">
-          {REVIEWS.map((r) => (
-            <div key={r.name} className="card p-6">
+          {REVIEWS.map((r, i) => (
+            <Reveal key={r.name} delay={i * 90} className="card lift p-6">
               <div className="flex gap-0.5 mb-3 text-amber-400">
                 {Array.from({ length: 5 }).map((_, i) => <Star key={i} size={15} fill="currentColor" />)}
               </div>
@@ -192,7 +202,7 @@ export default function Home() {
                   <div className="text-slate-500 text-xs">{r.tag}</div>
                 </div>
               </div>
-            </div>
+            </Reveal>
           ))}
         </div>
       </section>
