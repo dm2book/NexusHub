@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 300" width="480" height="300">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1b2838"/><stop offset="1" stop-color="#2563eb"/>
+    </linearGradient>
+    <radialGradient id="orb" cx="0.35" cy="0.35" r="0.8">
+      <stop offset="0" stop-color="#bfdbfe"/><stop offset="1" stop-color="#1d4ed8"/>
+    </radialGradient>
+  </defs>
+  <rect width="480" height="300" fill="url(#bg)"/>
+  <g stroke="#ffffff" stroke-opacity="0.06" stroke-width="1">
+    <path d="M0 75H480M0 150H480M0 225H480"/>
+  </g>
+  <!-- steam-like connected orbs -->
+  <line x1="190" y1="150" x2="290" y2="110" stroke="#93c5fd" stroke-width="6" stroke-opacity="0.6"/>
+  <circle cx="195" cy="152" r="46" fill="url(#orb)" stroke="#1e3a8a" stroke-width="3"/>
+  <circle cx="195" cy="152" r="16" fill="#0b1220"/>
+  <circle cx="300" cy="108" r="26" fill="url(#orb)" stroke="#1e3a8a" stroke-width="3"/>
+  <text x="32" y="262" font-family="Arial, sans-serif" font-size="22" font-weight="800"
+        fill="#ffffff" letter-spacing="3">STEAM</text>
+</svg>
