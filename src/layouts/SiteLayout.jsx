@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useCart } from '../context/CartContext.jsx';
+import ChatWidget from '../components/ChatWidget.jsx';
 
 const NAV = [
   { to: '/shop', label: 'Shop' },
@@ -82,6 +83,8 @@ export default function SiteLayout() {
       </header>
 
       <main className="flex-1"><Outlet /></main>
+
+      <ChatWidget />
 
       <footer className="relative border-t border-white/[0.06] mt-20 overflow-hidden">
         <div className="orb w-72 h-72 bg-primary/20 -bottom-32 left-1/4" />

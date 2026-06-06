@@ -9,7 +9,7 @@ import { run, get, nowIso } from '../db/index.js';
 import { newId, newOtp } from '../utils/ids.js';
 import { sha256, safeEqual, randomToken } from '../utils/crypto.js';
 import { badRequest, unauthorized, tooMany } from '../utils/errors.js';
-import { sendEmail } from './emailService.js';
+import { sendEmailAsync } from './emailService.js';
 import { upsertUserByEmail, touchLogin, getUserPermissions } from './userService.js';
 
 // ── Email OTP ──────────────────────────────────────────────────────────────
@@ -34,7 +34,9 @@ export async function requestEmailOtp(email) {
        VALUES (@id, @e, @h, 'login', @exp, @at)`,
       { id, e, h: sha256(code), exp: expires, at });
 
-  await sendEmail('login_otp', e, {
+  // Deliver the code, but never let a mail failure break login: the code is
+  // already stored, and the failure is recorded in email_log for diagnosis.
+  await sendEmailAsync('login_otp', e, {
     otp: { code, ttl: config.auth.otpTtlMinutes },
     user: { name: e.split('@')[0] },
   });

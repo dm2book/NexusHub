@@ -7,6 +7,7 @@ import { api } from '../lib/api.js';
 import { useCart } from '../context/CartContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { categoryVisual, money } from '../lib/catalog.js';
+import { SAMPLE_PRODUCTS, withFallback } from '../lib/sampleCatalog.js';
 import { PageLoader } from '../components/ui.jsx';
 import ProductCard from '../components/ProductCard.jsx';
 import { usePageMeta } from '../lib/useMeta.js';
@@ -24,8 +25,14 @@ export default function ProductDetail() {
 
   useEffect(() => {
     setProduct(null); setQty(1); setNotFound(false);
-    api.get(`/api/products/${id}`).then((r) => setProduct(r.product)).catch(() => setNotFound(true));
-    api.get('/api/products').then((r) => setAll(r.products)).catch(() => {});
+    api.get(`/api/products/${id}`)
+      .then((r) => setProduct(r.product))
+      .catch(() => {
+        // Fall back to the built-in showcase product if the API has no catalog yet.
+        const sample = SAMPLE_PRODUCTS.find((p) => p.id === id);
+        if (sample) setProduct(sample); else setNotFound(true);
+      });
+    api.get('/api/products').then((r) => setAll(withFallback(r.products))).catch(() => setAll(SAMPLE_PRODUCTS));
   }, [id]);
 
   if (notFound) {
