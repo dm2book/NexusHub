@@ -30,7 +30,7 @@ const SCAM = /(discord\.(gg|com\/invite)\/|free\s*nitro|steamcommunity\.com\/(gi
 
 const {
   DISCORD_TOKEN, ANTHROPIC_API_KEY, AI_MODEL = 'claude-sonnet-4-6',
-  FORGEMARKET_API_URL = '', STORE_URL = 'https://forgemarket.app',
+  FORGEMARKET_API_URL = '', STORE_URL = 'https://nexus-hub-aigq.vercel.app',
 } = process.env;
 
 const P = PermissionFlagsBits;

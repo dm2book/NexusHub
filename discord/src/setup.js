@@ -18,7 +18,7 @@ import {
 import { ROLES, CATEGORIES, MESSAGES, FAQ, STAFF, MEMBERS, GAME_ROLES, NOTIFY_ROLES } from './config.js';
 
 const { DISCORD_TOKEN, DISCORD_GUILD_ID } = process.env;
-let STORE_URL = process.env.STORE_URL || 'https://forgemarket.app';
+let STORE_URL = process.env.STORE_URL || 'https://nexus-hub-aigq.vercel.app';
 if (!/^https?:\/\//.test(STORE_URL)) STORE_URL = `https://${STORE_URL}`;
 
 const MARKER = 'forgemarket-setup';

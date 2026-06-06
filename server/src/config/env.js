@@ -75,7 +75,10 @@ export const config = {
     // dropping them). This keeps non-production environments fully functional.
     smtpUrl: env.SMTP_URL || '',
     fromName: env.EMAIL_FROM_NAME || 'ForgeMarket',
-    fromAddress: env.EMAIL_FROM_ADDRESS || 'no-reply@forgemarket.app',
+    // Default to Resend's shared sender, which delivers WITHOUT verifying a
+    // custom domain — so login codes work the moment SMTP_URL is set. Switch to
+    // your own address (e.g. no-reply@yourdomain) once that domain is verified.
+    fromAddress: env.EMAIL_FROM_ADDRESS || 'onboarding@resend.dev',
     brandColor: env.EMAIL_BRAND_COLOR || '#6366f1',
     logoUrl: env.EMAIL_LOGO_URL || '',
   },
