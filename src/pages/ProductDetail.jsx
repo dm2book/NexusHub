@@ -9,6 +9,7 @@ import { useToast } from '../context/ToastContext.jsx';
 import { categoryVisual, money } from '../lib/catalog.js';
 import { PageLoader } from '../components/ui.jsx';
 import ProductCard from '../components/ProductCard.jsx';
+import { usePageMeta } from '../lib/useMeta.js';
 
 export default function ProductDetail() {
   const { id } = useParams();
@@ -19,6 +20,7 @@ export default function ProductDetail() {
   const [all, setAll] = useState([]);
   const [qty, setQty] = useState(1);
   const [notFound, setNotFound] = useState(false);
+  usePageMeta(product?.name || 'Product', product?.description || 'Instant digital delivery.');
 
   useEffect(() => {
     setProduct(null); setQty(1); setNotFound(false);

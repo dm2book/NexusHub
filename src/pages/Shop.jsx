@@ -7,6 +7,7 @@ import { useToast } from '../context/ToastContext.jsx';
 import { categoryVisual } from '../lib/catalog.js';
 import ProductCard from '../components/ProductCard.jsx';
 import { Skeleton, EmptyState } from '../components/ui.jsx';
+import { usePageMeta } from '../lib/useMeta.js';
 
 const SORTS = {
   popular: { label: 'Popular', fn: (a, b) => (b.featured === true) - (a.featured === true) },
@@ -23,6 +24,7 @@ export default function Shop() {
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState('popular');
   const category = params.get('category') || '';
+  usePageMeta('Shop', 'Browse game currency, gift cards and subscriptions — instant delivery.');
 
   useEffect(() => { api.get('/api/products').then((r) => setProducts(r.products)).catch(() => setProducts([])); }, []);
 

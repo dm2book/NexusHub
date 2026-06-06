@@ -10,6 +10,7 @@ import { useToast } from '../context/ToastContext.jsx';
 import { categoryVisual } from '../lib/catalog.js';
 import ProductCard from '../components/ProductCard.jsx';
 import { SectionHeading, Skeleton } from '../components/ui.jsx';
+import { usePageMeta } from '../lib/useMeta.js';
 
 const FEATURES = [
   { icon: Zap, title: 'Instant Delivery', text: 'Automated fulfillment delivers your codes in seconds, 24/7.' },
@@ -48,6 +49,8 @@ export default function Home() {
   const { add } = useCart();
   const toast = useToast();
   const [products, setProducts] = useState(null);
+  usePageMeta('Digital goods, delivered instantly',
+    'Buy Robux, V-Bucks, game currency, gift cards and subscriptions — instant, automated delivery with secure payments.');
 
   useEffect(() => { api.get('/api/products').then((r) => setProducts(r.products)).catch(() => setProducts([])); }, []);
 

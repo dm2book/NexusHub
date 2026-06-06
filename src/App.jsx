@@ -1,95 +1,102 @@
 import { Routes, Route } from 'react-router-dom';
+import { lazy, Suspense } from 'react';
 import SiteLayout from './layouts/SiteLayout.jsx';
 import AdminLayout from './layouts/AdminLayout.jsx';
 import AccountLayout from './layouts/AccountLayout.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
+import { PageLoader } from './components/ui.jsx';
 
+// Eager: first-paint storefront pages (small, instant).
 import Home from './pages/Home.jsx';
 import Shop from './pages/Shop.jsx';
 import ProductDetail from './pages/ProductDetail.jsx';
-import Cart from './pages/Cart.jsx';
-import Checkout from './pages/Checkout.jsx';
-import CheckoutSuccess from './pages/CheckoutSuccess.jsx';
-import Discord from './pages/Discord.jsx';
-import Track from './pages/Track.jsx';
 import Login from './pages/Login.jsx';
-import AuthCallback from './pages/AuthCallback.jsx';
 
-import Dashboard from './pages/account/Dashboard.jsx';
-import Orders from './pages/account/Orders.jsx';
-import OrderDetail from './pages/account/OrderDetail.jsx';
-import Downloads from './pages/account/Downloads.jsx';
-import Tickets from './pages/account/Tickets.jsx';
-import TicketDetail from './pages/account/TicketDetail.jsx';
-import Billing from './pages/account/Billing.jsx';
-import Notifications from './pages/account/Notifications.jsx';
-import Settings from './pages/account/Settings.jsx';
+// Lazy: everything else is split into its own chunk so customers never download
+// the admin console / account / info code on first load.
+const Cart = lazy(() => import('./pages/Cart.jsx'));
+const Checkout = lazy(() => import('./pages/Checkout.jsx'));
+const CheckoutSuccess = lazy(() => import('./pages/CheckoutSuccess.jsx'));
+const Discord = lazy(() => import('./pages/Discord.jsx'));
+const Track = lazy(() => import('./pages/Track.jsx'));
+const AuthCallback = lazy(() => import('./pages/AuthCallback.jsx'));
+const About = lazy(() => import('./pages/info/About.jsx'));
+const Contact = lazy(() => import('./pages/info/Contact.jsx'));
+const Faq = lazy(() => import('./pages/info/Faq.jsx'));
+const Legal = lazy(() => import('./pages/info/Legal.jsx'));
+const NotFound = lazy(() => import('./pages/NotFound.jsx'));
 
-import AdminAnalytics from './pages/admin/Analytics.jsx';
-import AdminOrders from './pages/admin/Orders.jsx';
-import AdminOrderDetail from './pages/admin/OrderDetail.jsx';
-import AdminProducts from './pages/admin/Products.jsx';
-import AdminSuppliers from './pages/admin/Suppliers.jsx';
-import AdminFulfillment from './pages/admin/Fulfillment.jsx';
-import AdminEmails from './pages/admin/Emails.jsx';
-import AdminSupport from './pages/admin/Support.jsx';
-import AdminSecurity from './pages/admin/Security.jsx';
+const Dashboard = lazy(() => import('./pages/account/Dashboard.jsx'));
+const Orders = lazy(() => import('./pages/account/Orders.jsx'));
+const OrderDetail = lazy(() => import('./pages/account/OrderDetail.jsx'));
+const Downloads = lazy(() => import('./pages/account/Downloads.jsx'));
+const Tickets = lazy(() => import('./pages/account/Tickets.jsx'));
+const TicketDetail = lazy(() => import('./pages/account/TicketDetail.jsx'));
+const Billing = lazy(() => import('./pages/account/Billing.jsx'));
+const Notifications = lazy(() => import('./pages/account/Notifications.jsx'));
+const Settings = lazy(() => import('./pages/account/Settings.jsx'));
 
-import About from './pages/info/About.jsx';
-import Contact from './pages/info/Contact.jsx';
-import Faq from './pages/info/Faq.jsx';
-import Legal from './pages/info/Legal.jsx';
-import NotFound from './pages/NotFound.jsx';
+const AdminAnalytics = lazy(() => import('./pages/admin/Analytics.jsx'));
+const AdminOrders = lazy(() => import('./pages/admin/Orders.jsx'));
+const AdminOrderDetail = lazy(() => import('./pages/admin/OrderDetail.jsx'));
+const AdminProducts = lazy(() => import('./pages/admin/Products.jsx'));
+const AdminSuppliers = lazy(() => import('./pages/admin/Suppliers.jsx'));
+const AdminFulfillment = lazy(() => import('./pages/admin/Fulfillment.jsx'));
+const AdminEmails = lazy(() => import('./pages/admin/Emails.jsx'));
+const AdminSupport = lazy(() => import('./pages/admin/Support.jsx'));
+const AdminSecurity = lazy(() => import('./pages/admin/Security.jsx'));
 
 export default function App() {
   return (
-    <Routes>
-      {/* Public + storefront */}
-      <Route element={<SiteLayout />}>
-        <Route path="/" element={<Home />} />
-        <Route path="/shop" element={<Shop />} />
-        <Route path="/product/:id" element={<ProductDetail />} />
-        <Route path="/cart" element={<Cart />} />
-        <Route path="/checkout" element={<Checkout />} />
-        <Route path="/checkout/success" element={<CheckoutSuccess />} />
-        <Route path="/discord" element={<Discord />} />
-        <Route path="/track" element={<Track />} />
-        <Route path="/about" element={<About />} />
-        <Route path="/contact" element={<Contact />} />
-        <Route path="/faq" element={<Faq />} />
-        <Route path="/terms" element={<Legal kind="terms" />} />
-        <Route path="/privacy" element={<Legal kind="privacy" />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/auth/callback" element={<AuthCallback />} />
-      </Route>
+    <Suspense fallback={<PageLoader />}>
+      <Routes>
+        {/* Public + storefront */}
+        <Route element={<SiteLayout />}>
+          <Route path="/" element={<Home />} />
+          <Route path="/shop" element={<Shop />} />
+          <Route path="/product/:id" element={<ProductDetail />} />
+          <Route path="/cart" element={<Cart />} />
+          <Route path="/checkout" element={<Checkout />} />
+          <Route path="/checkout/success" element={<CheckoutSuccess />} />
+          <Route path="/discord" element={<Discord />} />
+          <Route path="/track" element={<Track />} />
+          <Route path="/about" element={<About />} />
+          <Route path="/contact" element={<Contact />} />
+          <Route path="/faq" element={<Faq />} />
+          <Route path="/terms" element={<Legal kind="terms" />} />
+          <Route path="/privacy" element={<Legal kind="privacy" />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/auth/callback" element={<AuthCallback />} />
+        </Route>
 
-      {/* Customer dashboard */}
-      <Route element={<ProtectedRoute><AccountLayout /></ProtectedRoute>}>
-        <Route path="/account" element={<Dashboard />} />
-        <Route path="/account/orders" element={<Orders />} />
-        <Route path="/account/orders/:id" element={<OrderDetail />} />
-        <Route path="/account/downloads" element={<Downloads />} />
-        <Route path="/account/tickets" element={<Tickets />} />
-        <Route path="/account/tickets/:id" element={<TicketDetail />} />
-        <Route path="/account/billing" element={<Billing />} />
-        <Route path="/account/notifications" element={<Notifications />} />
-        <Route path="/account/settings" element={<Settings />} />
-      </Route>
+        {/* Customer dashboard */}
+        <Route element={<ProtectedRoute><AccountLayout /></ProtectedRoute>}>
+          <Route path="/account" element={<Dashboard />} />
+          <Route path="/account/orders" element={<Orders />} />
+          <Route path="/account/orders/:id" element={<OrderDetail />} />
+          <Route path="/account/downloads" element={<Downloads />} />
+          <Route path="/account/tickets" element={<Tickets />} />
+          <Route path="/account/tickets/:id" element={<TicketDetail />} />
+          <Route path="/account/billing" element={<Billing />} />
+          <Route path="/account/notifications" element={<Notifications />} />
+          <Route path="/account/settings" element={<Settings />} />
+        </Route>
 
-      {/* Admin */}
-      <Route element={<ProtectedRoute staff><AdminLayout /></ProtectedRoute>}>
-        <Route path="/admin" element={<AdminAnalytics />} />
-        <Route path="/admin/orders" element={<AdminOrders />} />
-        <Route path="/admin/orders/:id" element={<AdminOrderDetail />} />
-        <Route path="/admin/products" element={<AdminProducts />} />
-        <Route path="/admin/suppliers" element={<AdminSuppliers />} />
-        <Route path="/admin/fulfillment" element={<AdminFulfillment />} />
-        <Route path="/admin/emails" element={<AdminEmails />} />
-        <Route path="/admin/support" element={<AdminSupport />} />
-        <Route path="/admin/security" element={<AdminSecurity />} />
-      </Route>
+        {/* Admin */}
+        <Route element={<ProtectedRoute staff><AdminLayout /></ProtectedRoute>}>
+          <Route path="/admin" element={<AdminAnalytics />} />
+          <Route path="/admin/orders" element={<AdminOrders />} />
+          <Route path="/admin/orders/:id" element={<AdminOrderDetail />} />
+          <Route path="/admin/products" element={<AdminProducts />} />
+          <Route path="/admin/suppliers" element={<AdminSuppliers />} />
+          <Route path="/admin/fulfillment" element={<AdminFulfillment />} />
+          <Route path="/admin/emails" element={<AdminEmails />} />
+          <Route path="/admin/support" element={<AdminSupport />} />
+          <Route path="/admin/security" element={<AdminSecurity />} />
+        </Route>
 
-      <Route path="*" element={<NotFound />} />
-    </Routes>
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </Suspense>
   );
 }
