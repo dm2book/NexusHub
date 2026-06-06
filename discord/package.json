@@ -1,0 +1,17 @@
+{
+  "name": "forgemarket-discord",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "ForgeMarket Discord ecosystem — server setup + AI support/community bot.",
+  "scripts": {
+    "setup": "node src/setup.js",
+    "start": "node src/bot.js",
+    "register": "node src/register-commands.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.32.1",
+    "discord.js": "^14.16.3",
+    "dotenv": "^16.4.7"
+  }
+}
