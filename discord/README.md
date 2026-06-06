@@ -211,6 +211,37 @@ Persona: helpful, concise, trustworthy, never pushy — tuned for Discord length
 
 All categories ≥ 9/10.
 
-**Next upgrades** (optional): native Discord Onboarding questions, a giveaway
-command suite, auto-post verified reviews from the store webhook into `#reviews`,
-and a `/order <number>` lookup for Support via the ForgeMarket API.
+**Next upgrades** (optional): native Discord Onboarding questions, auto-post
+verified reviews from the store webhook into `#reviews`, and a leveling/XP system.
+
+---
+
+## 11. Full feature list (what the bot does)
+
+- **Builds the whole server** (10 categories, 47 channels) with topics, least-
+  privilege permissions and **rich panels/text in every key channel** — idempotent,
+  resilient (one failure never aborts the run), and re-postable with `REPOST=1`.
+- **Always-can-post fix:** the bot gets its own permission overwrite in every
+  category, so panels post even in read-only channels **without needing
+  Administrator**.
+- **Onboarding:** welcome DM + Verify button → grants *Verified Customer*.
+- **Self-roles** (`#roles`): one-tap game roles (Roblox, Fortnite, Valorant, CoD,
+  Apex, Genshin, Brawl, Clash) + alert roles (Drops, Deals, Giveaways).
+- **Tickets:** topic buttons → private channel, **Claim** + **Close**, staff
+  routing, transcript saved to `#ticket-logs`.
+- **AI assistant "Forge"** (`#ask-the-bot`, `/ask`, `/recommend`): FAQ + live
+  product recommendations (Claude + prompt caching, rule-based fallback).
+- **Giveaways:** `/giveaway prize minutes` → Enter button, auto winner to
+  `#winners`.
+- **Order lookup:** `/order <number>` via the store's public tracking API.
+- **Vouches:** `/vouch` posts a formatted, starred vouch to `#vouchers`.
+- **Auto-moderation:** removes Discord invites / "free nitro"-style scams from
+  non-staff (outside tickets) and logs to `#mod-log`.
+- **Logging + leads:** joins, leaves, tickets and buying-intent posted to staff
+  channels.
+- **Slash commands:** `/help /ask /recommend /order /vouch /giveaway`.
+
+## 12. Brand assets
+
+- `assets/logo.svg` — the ForgeMarket mark. A ready-to-upload **512×512 PNG** is
+  provided for your Discord **server icon / bot avatar** (Server Settings → upload).

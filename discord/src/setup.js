@@ -15,7 +15,7 @@ import {
   Client, GatewayIntentBits, PermissionFlagsBits, ChannelType,
   EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle,
 } from 'discord.js';
-import { ROLES, CATEGORIES, MESSAGES, FAQ, STAFF, MEMBERS } from './config.js';
+import { ROLES, CATEGORIES, MESSAGES, FAQ, STAFF, MEMBERS, GAME_ROLES, NOTIFY_ROLES } from './config.js';
 
 const { DISCORD_TOKEN, DISCORD_GUILD_ID } = process.env;
 let STORE_URL = process.env.STORE_URL || 'https://forgemarket.app';
@@ -43,6 +43,9 @@ client.once('ready', async () => {
     await guild.roles.fetch();
     await guild.channels.fetch();
     const everyone = guild.roles.everyone.id;
+    // The bot's own member overwrite — guarantees it can always view + post,
+    // even in read-only channels and gated categories, without Administrator.
+    const botOW = { id: client.user.id, allow: [P.ViewChannel, P.SendMessages, P.ManageMessages, P.ManageChannels] };
     console.log(`▶ Building "${guild.name}"`);
 
     // 1) Roles ───────────────────────────────────────────────────────────────
@@ -61,6 +64,16 @@ client.once('ready', async () => {
       } catch (e) { console.log(`  ! role ${r.name} failed: ${e.message}`); }
     }
 
+    // Self-assignable game + notification roles (toggled via #roles buttons).
+    for (const r of [...GAME_ROLES, ...NOTIFY_ROLES]) {
+      try {
+        if (!guild.roles.cache.find((x) => x.name === r.label)) {
+          await guild.roles.create({ name: r.label, color: r.color, mentionable: true, reason: 'ForgeMarket self-roles' });
+          console.log(`  + self-role ${r.label}`);
+        }
+      } catch (e) { console.log(`  ! self-role ${r.label} failed: ${e.message}`); }
+    }
+
     const viewers = (access) => access === 'staff' ? STAFF
       : access === 'vip' ? ['vip', ...STAFF] : MEMBERS;
 
@@ -73,14 +86,17 @@ client.once('ready', async () => {
           (c) => c.type === ChannelType.GuildCategory && c.name === cat.name);
         if (!category) {
           const ow = cat.access === 'public'
-            ? [{ id: everyone, allow: [P.ViewChannel] }]
-            : [{ id: everyone, deny: [P.ViewChannel] },
+            ? [{ id: everyone, allow: [P.ViewChannel] }, botOW]
+            : [{ id: everyone, deny: [P.ViewChannel] }, botOW,
                ...viewers(cat.access).filter((k) => roleIds[k]).map((k) => ({ id: roleIds[k], allow: [P.ViewChannel] }))];
           category = await guild.channels.create({
             name: cat.name, type: ChannelType.GuildCategory, permissionOverwrites: ow, reason: 'ForgeMarket setup',
           });
           console.log(`  + category ${cat.name}`);
         }
+        // Ensure the bot can always view+post here (also fixes pre-existing categories).
+        await category.permissionOverwrites.edit(client.user.id,
+          { ViewChannel: true, SendMessages: true, ManageMessages: true }).catch(() => {});
       } catch (e) { console.log(`  ! category ${cat.name} failed: ${e.message}`); continue; }
 
       for (const ch of cat.channels) {
@@ -150,11 +166,23 @@ client.once('ready', async () => {
     let posted = 0;
     for (const [name, emb, btns] of PANELS) {
       try {
-        const status = await postOnce(channelByName[name], emb, btns ? row(...btns) : undefined);
+        const status = await postOnce(channelByName[name], emb, btns ? [row(...btns)] : []);
         if (status === 'posted') posted++;
         console.log(`  · #${name}: ${status}`);
       } catch (e) { console.log(`  ! #${name} FAILED: ${e.message}`); }
     }
+
+    // Self-roles panel (#roles) — multiple button rows.
+    try {
+      const mkBtn = (r) => new ButtonBuilder().setCustomId(`role:${r.key}`).setLabel(r.label)
+        .setEmoji(r.emoji).setStyle(ButtonStyle.Secondary);
+      const rows = [];
+      for (let i = 0; i < GAME_ROLES.length; i += 5) rows.push(row(...GAME_ROLES.slice(i, i + 5).map(mkBtn)));
+      rows.push(row(...NOTIFY_ROLES.map(mkBtn)));
+      const status = await postOnce(channelByName['roles'], embed(MESSAGES.rolesPanel), rows);
+      if (status === 'posted') posted++;
+      console.log(`  · #roles: ${status}`);
+    } catch (e) { console.log(`  ! #roles FAILED: ${e.message}`); }
     console.log(`\n✅ Setup complete. Panels posted now: ${posted}. ${REPOST ? '(REPOST mode)' : 'Run with REPOST=1 to re-post all.'}`);
     console.log('   Reminder: drag the "Bot" role just under "Admin" so it can grant the Verified role.');
     process.exit(0);
@@ -164,14 +192,14 @@ client.once('ready', async () => {
   }
 });
 
-async function postOnce(channel, embedBuilder, components) {
+async function postOnce(channel, embedBuilder, rows = []) {
   if (!channel || !channel.isTextBased?.()) return 'no-channel';
   const recent = await channel.messages.fetch({ limit: 25 }).catch(() => null);
   const mine = recent ? [...recent.values()].filter(
     (m) => m.author.id === client.user.id && m.embeds[0]?.footer?.text === MARKER) : [];
   if (mine.length && !REPOST) return 'exists';
   if (REPOST) { for (const m of mine) await m.delete().catch(() => {}); }
-  const sent = await channel.send({ embeds: [embedBuilder], components: components ? [components] : [] });
+  const sent = await channel.send({ embeds: [embedBuilder], components: rows });
   await sent.pin().catch(() => {});
   return 'posted';
 }

@@ -16,7 +16,17 @@ import {
   EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, AttachmentBuilder,
 } from 'discord.js';
 import Anthropic from '@anthropic-ai/sdk';
-import { FAQ } from './config.js';
+import { FAQ, GAME_ROLES, NOTIFY_ROLES } from './config.js';
+
+const SELF_ROLES = [...GAME_ROLES, ...NOTIFY_ROLES];
+const STAFF_ROLE_NAMES = ['Owner', 'Admin', 'Moderator', 'Support'];
+const isStaff = (member) => member?.permissions?.has?.(PermissionFlagsBits.ManageMessages)
+  || member?.roles?.cache?.some((r) => STAFF_ROLE_NAMES.includes(r.name));
+
+// Simple in-memory giveaway store (one bot instance).
+const GIVEAWAYS = new Map(); // messageId -> { prize, entries:Set<string>, endsAt, channelId }
+// Anti-scam: invite links + common scam phrases.
+const SCAM = /(discord\.(gg|com\/invite)\/|free\s*nitro|steamcommunity\.com\/(gift|trade)|t\.me\/|claim\s+your\s+(reward|prize|nitro)|airdrop|nitro\s+giveaway\s+http)/i;
 
 const {
   DISCORD_TOKEN, ANTHROPIC_API_KEY, AI_MODEL = 'claude-sonnet-4-6',
@@ -144,8 +154,34 @@ async function handleButton(i) {
     return i.reply({ content: '✅ Verified! Welcome in — check out #products and #ask-the-bot. 🎮', ephemeral: true });
   }
 
-  if (i.customId.startsWith('ticket:')) return openTicket(i, i.customId.split(':')[1]);
+  if (i.customId.startsWith('role:')) return toggleRole(i, i.customId.split(':')[1]);
   if (i.customId === 'ticket:close') return closeTicket(i);
+  if (i.customId === 'ticket:claim') return claimTicket(i);
+  if (i.customId.startsWith('ticket:')) return openTicket(i, i.customId.split(':')[1]);
+  if (i.customId.startsWith('gw:enter:')) return enterGiveaway(i, i.customId.split(':')[2]);
+}
+
+async function toggleRole(i, key) {
+  const def = SELF_ROLES.find((r) => r.key === key);
+  if (!def) return i.reply({ content: 'Unknown role.', ephemeral: true });
+  const role = i.guild.roles.cache.find((r) => r.name === def.label);
+  if (!role) return i.reply({ content: 'That role is missing — ask an admin to run setup.', ephemeral: true });
+  const has = i.member.roles.cache.has(role.id);
+  await (has ? i.member.roles.remove(role) : i.member.roles.add(role)).catch(() => {});
+  return i.reply({ content: `${has ? '➖ Removed' : '➕ Added'} **${def.label}**`, ephemeral: true });
+}
+
+async function claimTicket(i) {
+  if (!isStaff(i.member)) return i.reply({ content: 'Only staff can claim tickets.', ephemeral: true });
+  await i.reply(`🛠️ Ticket claimed by <@${i.user.id}> — they’ll help you from here.`);
+}
+
+async function enterGiveaway(i, messageId) {
+  const gw = GIVEAWAYS.get(messageId);
+  if (!gw) return i.reply({ content: 'This giveaway has ended.', ephemeral: true });
+  if (gw.entries.has(i.user.id)) return i.reply({ content: 'You’re already entered ✅ Good luck! 🍀', ephemeral: true });
+  gw.entries.add(i.user.id);
+  return i.reply({ content: `🎉 You’re in! **${gw.entries.size}** entries so far.`, ephemeral: true });
 }
 
 async function openTicket(i, type) {
@@ -174,6 +210,7 @@ async function openTicket(i, type) {
       `Hi <@${i.user.id}>, thanks for reaching out. A team member will be with you shortly.\n\n` +
       "To speed things up, please share:\n• Your **order number** (if any)\n• A short description\n• Screenshots if relevant");
   const close = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('ticket:claim').setLabel('Claim').setEmoji('🛠️').setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId('ticket:close').setLabel('Close ticket').setEmoji('🔒').setStyle(ButtonStyle.Danger));
   const supportPing = findRole(i.guild, 'Support');
   await channel.send({ content: supportPing ? `<@&${supportPing.id}>` : '', embeds: [embed], components: [close] });
@@ -198,8 +235,13 @@ async function closeTicket(i) {
 async function handleCommand(i) {
   if (i.commandName === 'help') {
     return i.reply({ ephemeral: true, content:
-      "**Forge — your assistant**\n`/ask` — ask anything\n`/recommend` — get a product recommendation\nButtons: verify in #verify, open a ticket in #open-a-ticket." });
+      "**Forge — your assistant**\n`/ask` — ask anything\n`/recommend` — product recommendation\n" +
+      "`/order` — check an order status\n`/vouch` — leave a vouch\n`/giveaway` — staff: start a giveaway\n" +
+      "Buttons: verify in #verify, pick roles in #roles, open a ticket in #open-a-ticket." });
   }
+  if (i.commandName === 'order') return lookupOrder(i);
+  if (i.commandName === 'vouch') return postVouch(i);
+  if (i.commandName === 'giveaway') return startGiveaway(i);
   if (i.commandName === 'ask' || i.commandName === 'recommend') {
     await i.deferReply();
     const products = await getProducts();
@@ -221,5 +263,90 @@ client.on(Events.MessageCreate, async (m) => {
   if (BUY_INTENT.test(m.content)) leadLog(m.guild, `💡 Buying intent from <@${m.author.id}>: "${m.content.slice(0, 120)}"`);
   m.reply(answer.slice(0, 1900)).catch(() => {});
 });
+
+// ── Auto-moderation: remove invites / scam promos (non-staff, outside tickets) ─
+client.on(Events.MessageCreate, async (m) => {
+  if (m.author.bot || !m.guild) return;
+  if (m.channel.name?.startsWith('ticket-')) return;
+  if (isStaff(m.member)) return;
+  if (!SCAM.test(m.content)) return;
+  await m.delete().catch(() => {});
+  const warn = await m.channel.send(
+    `⚠️ <@${m.author.id}> invites & "free" offers aren’t allowed. **Staff never DM you first** — stay safe.`).catch(() => null);
+  setTimeout(() => warn?.delete().catch(() => {}), 8000);
+  const log = findChannel(m.guild, 'mod-log');
+  if (log) log.send(`🚫 Auto-removed from <@${m.author.id}> in <#${m.channel.id}>: \`${m.content.slice(0, 140).replace(/`/g, "'")}\``).catch(() => {});
+});
+
+// ── Member leave logging ────────────────────────────────────────────────────
+client.on(Events.GuildMemberRemove, (member) => {
+  const log = findChannel(member.guild, 'mod-log');
+  if (log) log.send(`🔴 ${member.user?.tag || member.id} left the server.`).catch(() => {});
+});
+
+// ── /order lookup (uses the store's public tracking endpoint) ─────────────────
+async function lookupOrder(i) {
+  await i.deferReply({ ephemeral: true });
+  const num = i.options.getString('number').trim();
+  if (!FORGEMARKET_API_URL) return i.editReply('Order lookup isn’t configured yet.');
+  try {
+    const res = await fetch(`${FORGEMARKET_API_URL}/api/track/${encodeURIComponent(num)}`);
+    if (!res.ok) return i.editReply(`No order found for \`${num}\`. Check the number or open a ticket in #open-a-ticket.`);
+    const o = await res.json();
+    const hist = (o.history || []).map((h) => `• ${h.to || h.to_status} — ${new Date(h.at || h.created_at).toLocaleString()}`).join('\n') || '—';
+    const e = new EmbedBuilder().setColor(0x6366f1).setTitle(`Order ${o.number}`)
+      .setDescription(`**Status:** ${o.statusLabel || o.status}\n\n**Timeline:**\n${hist}`);
+    return i.editReply({ embeds: [e] });
+  } catch { return i.editReply('Couldn’t reach the store right now — try again shortly or open a ticket.'); }
+}
+
+// ── /vouch → posts to #vouchers ───────────────────────────────────────────────
+async function postVouch(i) {
+  const message = i.options.getString('message');
+  const stars = Math.min(5, Math.max(1, i.options.getInteger('stars') || 5));
+  const ch = findChannel(i.guild, 'vouchers');
+  const e = new EmbedBuilder().setColor(0x22c55e)
+    .setAuthor({ name: i.user.username, iconURL: i.user.displayAvatarURL() })
+    .setDescription(`${'⭐'.repeat(stars)}\n\n${message}`)
+    .setFooter({ text: 'Community vouch' }).setTimestamp();
+  if (ch) await ch.send({ embeds: [e] }).catch(() => {});
+  return i.reply({ content: 'Thanks for the vouch! 💚 Posted in #vouchers.', ephemeral: true });
+}
+
+// ── /giveaway (staff) ─────────────────────────────────────────────────────────
+async function startGiveaway(i) {
+  if (!isStaff(i.member)) return i.reply({ content: 'Only staff can start giveaways.', ephemeral: true });
+  const prize = i.options.getString('prize');
+  const minutes = i.options.getInteger('minutes') || 10;
+  await i.reply({ content: `Starting a giveaway for **${prize}** (${minutes} min)…`, ephemeral: true });
+  const endsAt = Date.now() + minutes * 60_000;
+  const ch = findChannel(i.guild, 'giveaways') || i.channel;
+  const gwRole = i.guild.roles.cache.find((r) => r.name === 'Giveaways');
+  const e = new EmbedBuilder().setColor(0xa855f7).setTitle('🎉 GIVEAWAY')
+    .setDescription(`**Prize:** ${prize}\n**Ends:** <t:${Math.floor(endsAt / 1000)}:R>\n\nTap **Enter** below to join!\nHosted by <@${i.user.id}>`)
+    .setFooter({ text: 'ForgeMarket giveaway' });
+  const msg = await ch.send({ content: gwRole ? `<@&${gwRole.id}>` : '', embeds: [e] });
+  const btn = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId(`gw:enter:${msg.id}`).setLabel('Enter').setEmoji('🎉').setStyle(ButtonStyle.Success));
+  await msg.edit({ components: [btn] });
+  GIVEAWAYS.set(msg.id, { prize, entries: new Set(), endsAt, channelId: ch.id });
+  setTimeout(() => endGiveaway(i.guild, msg.id, msg), minutes * 60_000);
+}
+
+async function endGiveaway(guild, id, msg) {
+  const gw = GIVEAWAYS.get(id);
+  if (!gw) return;
+  GIVEAWAYS.delete(id);
+  const ids = [...gw.entries];
+  const winner = ids.length ? ids[Math.floor(Math.random() * ids.length)] : null;
+  const text = winner
+    ? `🏆 The **${gw.prize}** giveaway winner is <@${winner}>! Congrats 🎉 (${ids.length} entries)\nOpen a ticket in #open-a-ticket to claim.`
+    : `The **${gw.prize}** giveaway ended with no entries 😢`;
+  const winners = findChannel(guild, 'winners');
+  if (winners) winners.send(text).catch(() => {});
+  const chan = guild.channels.cache.get(gw.channelId);
+  if (chan) chan.send(text).catch(() => {});
+  await msg?.edit?.({ components: [] }).catch(() => {});
+}
 
 client.login(DISCORD_TOKEN);

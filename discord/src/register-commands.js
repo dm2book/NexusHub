@@ -14,6 +14,14 @@ const commands = [
   new SlashCommandBuilder().setName('recommend').setDescription('Get a product recommendation')
     .addStringOption((o) => o.setName('game').setDescription('Which game? e.g. Roblox, Fortnite'))
     .addStringOption((o) => o.setName('budget').setDescription('Your budget, e.g. €20')),
+  new SlashCommandBuilder().setName('order').setDescription('Check the status of an order')
+    .addStringOption((o) => o.setName('number').setDescription('Your order number, e.g. FM-2026-XXXX').setRequired(true)),
+  new SlashCommandBuilder().setName('vouch').setDescription('Leave a vouch for ForgeMarket')
+    .addStringOption((o) => o.setName('message').setDescription('Your experience').setRequired(true))
+    .addIntegerOption((o) => o.setName('stars').setDescription('1–5 stars').setMinValue(1).setMaxValue(5)),
+  new SlashCommandBuilder().setName('giveaway').setDescription('Staff: start a giveaway')
+    .addStringOption((o) => o.setName('prize').setDescription('What are you giving away?').setRequired(true))
+    .addIntegerOption((o) => o.setName('minutes').setDescription('Duration in minutes (default 10)')),
 ].map((c) => c.toJSON());
 
 const rest = new REST({ version: '10' }).setToken(DISCORD_TOKEN);

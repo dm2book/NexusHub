@@ -96,6 +96,7 @@ export const CATEGORIES = [
   {
     name: '💬 COMMUNITY', access: 'verified',
     channels: [
+      { name: 'roles', type: 'text', readOnly: true, topic: 'Pick your games & notifications to get the right pings.' },
       { name: 'introductions', type: 'text', slowmode: 10, topic: 'New here? Say hi 👋' },
       { name: 'general', type: 'text', topic: 'General chat for the ForgeMarket community.' },
       { name: 'gaming', type: 'text', topic: 'Talk games, tips and updates.' },
@@ -163,6 +164,23 @@ export const CATEGORIES = [
 ];
 
 export { STAFF, MEMBERS };
+
+// Self-assignable roles (created by setup, toggled by buttons in #roles).
+export const GAME_ROLES = [
+  { key: 'robux', label: 'Roblox', emoji: '🟩', color: '#22c55e' },
+  { key: 'fortnite', label: 'Fortnite', emoji: '🟦', color: '#60a5fa' },
+  { key: 'valorant', label: 'Valorant', emoji: '🟥', color: '#fb7185' },
+  { key: 'cod', label: 'Call of Duty', emoji: '🟧', color: '#f97316' },
+  { key: 'apex', label: 'Apex Legends', emoji: '🔺', color: '#ef4444' },
+  { key: 'genshin', label: 'Genshin', emoji: '🟦', color: '#22d3ee' },
+  { key: 'brawl', label: 'Brawl Stars', emoji: '🟨', color: '#eab308' },
+  { key: 'clash', label: 'Clash of Clans', emoji: '🟪', color: '#a78bfa' },
+];
+export const NOTIFY_ROLES = [
+  { key: 'drops', label: 'Drops & Restocks', emoji: '🔔', color: '#6366f1' },
+  { key: 'deals', label: 'Deals', emoji: '🔥', color: '#ec4899' },
+  { key: 'giveaways', label: 'Giveaways', emoji: '🎉', color: '#a855f7' },
+];
 
 // ── Onboarding & content ────────────────────────────────────────────────────
 export const MESSAGES = {
@@ -348,6 +366,13 @@ export const MESSAGES = {
     description:
       "• Affiliate/revenue share\n• Exclusive partner channel & support\n• Co-marketing and shoutouts\n" +
       "• Early access to drops and codes\n\nApply via a ticket — see <#partnerships>.",
+  },
+  rolesPanel: {
+    title: '🎮 Pick your roles',
+    description:
+      "Tap the games you play and the alerts you want — get pinged only for what you care about.\n\n" +
+      "**Games** give you a colour + access to LFG pings.\n**Alerts** notify you about drops, deals & giveaways.\n\n" +
+      "Tap again to remove a role.",
   },
 };
 
