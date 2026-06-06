@@ -32,16 +32,31 @@ async function refresh() {
   return true;
 }
 
-async function request(path, { method = 'GET', body, raw = false, retry = true } = {}) {
+async function request(path, { method = 'GET', body, raw = false, retry = true, timeout = 12000 } = {}) {
   const headers = {};
   const token = getAccessToken();
   if (token) headers.authorization = `Bearer ${token}`;
   if (body !== undefined) headers['content-type'] = 'application/json';
 
-  const res = await fetch(`${API_BASE}${path}`, {
-    method, headers, credentials: 'include',
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
+  // Abort hung requests so the UI never spins forever (e.g. API/DB unreachable).
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeout);
+  let res;
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+      method, headers, credentials: 'include',
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+      signal: ctrl.signal,
+    });
+  } catch (e) {
+    clearTimeout(timer);
+    const err = new Error(e.name === 'AbortError'
+      ? 'The server took too long to respond. Please try again.'
+      : 'Network error. Please check your connection and try again.');
+    err.status = 0;
+    throw err;
+  }
+  clearTimeout(timer);
 
   if (res.status === 401 && retry && getAccessToken()) {
     if (await refresh()) return request(path, { method, body, raw, retry: false });
