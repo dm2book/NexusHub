@@ -23,7 +23,7 @@ export default function Community() {
               and live support, all in one server. Link your account for verified roles.
             </p>
             <div className="flex flex-wrap items-center gap-3 mt-7">
-              <a href="https://discord.gg" target="_blank" rel="noreferrer" className="btn-discord px-7 py-4 text-base"><MessageCircle size={18} /> Join the server</a>
+              <a href="https://discord.gg/vNcfgDbVd" target="_blank" rel="noreferrer" className="btn-discord px-7 py-4 text-base"><MessageCircle size={18} /> Join the server</a>
               <span className="glass rounded-full px-4 py-2.5 text-sm text-emerald-300 flex items-center gap-2">
                 <span className="relative flex h-2.5 w-2.5">
                   <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60 animate-pulse-ring" />

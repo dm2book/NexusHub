@@ -31,7 +31,7 @@ export default async function HomePage() {
             <p className="text-slate-300 mt-4 max-w-xl mx-auto">Instant delivery, buyer protection and a community that has your back.</p>
             <div className="flex flex-wrap items-center justify-center gap-4 mt-8">
               <Link href="/shop" className="btn-primary px-7 py-4 text-base">Shop now <ArrowRight size={18} /></Link>
-              <a href="https://discord.gg" target="_blank" rel="noreferrer" className="btn-discord px-7 py-4 text-base"><MessageCircle size={18} /> Join Discord</a>
+              <a href="https://discord.gg/vNcfgDbVd" target="_blank" rel="noreferrer" className="btn-discord px-7 py-4 text-base"><MessageCircle size={18} /> Join Discord</a>
             </div>
           </div>
         </div>

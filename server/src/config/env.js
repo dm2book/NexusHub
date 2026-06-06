@@ -63,8 +63,8 @@ export const config = {
     // Guild id enables live stats via the public widget.json (widget must be
     // enabled in Discord → Server Settings → Widget).
     guildId: env.DISCORD_GUILD_ID || '',
-    // Invite link for the Join button. Falls back gracefully if unset.
-    inviteUrl: env.DISCORD_INVITE_URL || '',
+    // Invite link for the Join button. Falls back to the official server invite.
+    inviteUrl: env.DISCORD_INVITE_URL || 'https://discord.gg/vNcfgDbVd',
     // Optional webhook to post order events into an ops/sales channel.
     orderWebhookUrl: env.DISCORD_ORDER_WEBHOOK_URL || '',
   },

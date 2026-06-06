@@ -38,7 +38,7 @@ export default function Hero() {
         </p>
         <div className="hero-anim reveal flex flex-wrap items-center justify-center gap-4 mt-10">
           <Link href="/shop" className="btn-primary px-7 py-4 text-base">Browse the shop <ArrowRight size={18} /></Link>
-          <a href="https://discord.gg" target="_blank" rel="noreferrer" className="btn-discord px-7 py-4 text-base"><MessageCircle size={18} /> Join Discord</a>
+          <a href="https://discord.gg/vNcfgDbVd" target="_blank" rel="noreferrer" className="btn-discord px-7 py-4 text-base"><MessageCircle size={18} /> Join Discord</a>
         </div>
         <div className="hero-anim reveal flex flex-wrap items-center justify-center gap-x-8 gap-y-3 mt-12 text-sm text-slate-400">
           <span className="flex items-center gap-2"><Star size={16} className="text-amber-400 fill-amber-400" /> 4.9/5 from 18,400+ reviews</span>
