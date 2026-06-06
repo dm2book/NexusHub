@@ -28,9 +28,12 @@ const TYPE = {
   announcement: ChannelType.GuildAnnouncement, forum: ChannelType.GuildForum,
 };
 
+const REPOST = /^(1|true|yes)$/i.test(process.env.REPOST || ''); // REPOST=1 → re-post all panels
+
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 const resolvePerms = (arr = []) => arr.map((n) => P[n]).filter(Boolean);
-const embed = (m) => new EmbedBuilder().setColor(0x6366f1).setTitle(m.title).setDescription(m.description).setFooter({ text: MARKER });
+const sub = (s) => String(s).replaceAll('{STORE_URL}', STORE_URL);
+const embed = (m) => new EmbedBuilder().setColor(0x6366f1).setTitle(sub(m.title)).setDescription(sub(m.description)).setFooter({ text: MARKER });
 const row = (...buttons) => new ActionRowBuilder().addComponents(...buttons);
 const link = (label, url) => new ButtonBuilder().setLabel(label).setStyle(ButtonStyle.Link).setURL(url);
 
@@ -116,32 +119,43 @@ client.once('ready', async () => {
     const verifyButton = new ButtonBuilder().setCustomId('verify').setLabel('Verify me').setEmoji('✅').setStyle(ButtonStyle.Success);
 
     const PANELS = [
-      ['welcome', embed(MESSAGES.welcome(guild.name))],
+      ['welcome', embed(MESSAGES.welcome(guild.name)), [link('🛍️ Visit the shop', `${STORE_URL}/shop`)]],
       ['start-here', embed(MESSAGES.startHere)],
       ['rules', embed(MESSAGES.rules)],
       ['verify', embed(MESSAGES.verify), [verifyButton]],
+      ['links', embed(MESSAGES.links), [
+        link('🛍️ Shop', `${STORE_URL}/shop`), link('🏠 Home', STORE_URL),
+        link('📦 Track order', `${STORE_URL}/track`), link('👤 Account', `${STORE_URL}/account`)]],
       ['announcements', embed(MESSAGES.announcement)],
+      ['status', embed(MESSAGES.status)],
       ['products', embed(MESSAGES.products), [link('🛍️ Browse the shop', `${STORE_URL}/shop`)]],
+      ['price-list', embed(MESSAGES.priceList), [link('See live prices', `${STORE_URL}/shop`)]],
       ['how-to-buy', embed(MESSAGES.howToBuy), [link('Go to shop', `${STORE_URL}/shop`)]],
       ['deals', embed(MESSAGES.deals)],
       ['faq', faqEmbed],
       ['support-info', embed(MESSAGES.supportInfo)],
+      ['report-a-scam', embed(MESSAGES.reportScam)],
       ['open-a-ticket', embed(MESSAGES.ticketPanel), ticketButtons],
       ['reviews', embed(MESSAGES.reviewsIntro)],
+      ['vouchers', embed(MESSAGES.vouchersIntro)],
       ['proof-of-delivery', embed(MESSAGES.proofIntro)],
+      ['discount-codes', embed(MESSAGES.discountCodes)],
       ['giveaways', embed(MESSAGES.giveawaysIntro)],
       ['events', embed(MESSAGES.eventsIntro)],
+      ['partnerships', embed(MESSAGES.partnersIntro)],
+      ['partner-perks', embed(MESSAGES.partnerPerks)],
       ['staff-announcements', embed(MESSAGES.staffIntro)],
     ];
 
+    let posted = 0;
     for (const [name, emb, btns] of PANELS) {
       try {
-        await postOnce(channelByName[name], emb, btns ? row(...btns) : undefined);
-        console.log(`  · panel #${name}`);
-      } catch (e) { console.log(`  ! panel #${name} failed: ${e.message}`); }
+        const status = await postOnce(channelByName[name], emb, btns ? row(...btns) : undefined);
+        if (status === 'posted') posted++;
+        console.log(`  · #${name}: ${status}`);
+      } catch (e) { console.log(`  ! #${name} FAILED: ${e.message}`); }
     }
-
-    console.log('\n✅ Setup complete. Re-run any time to fill in anything missing.');
+    console.log(`\n✅ Setup complete. Panels posted now: ${posted}. ${REPOST ? '(REPOST mode)' : 'Run with REPOST=1 to re-post all.'}`);
     console.log('   Reminder: drag the "Bot" role just under "Admin" so it can grant the Verified role.');
     process.exit(0);
   } catch (err) {
@@ -151,13 +165,15 @@ client.once('ready', async () => {
 });
 
 async function postOnce(channel, embedBuilder, components) {
-  if (!channel || !channel.isTextBased?.()) return;
-  const recent = await channel.messages.fetch({ limit: 20 }).catch(() => null);
-  const already = recent?.some((msg) => msg.author.id === client.user.id
-    && msg.embeds[0]?.footer?.text === MARKER);
-  if (already) return;
+  if (!channel || !channel.isTextBased?.()) return 'no-channel';
+  const recent = await channel.messages.fetch({ limit: 25 }).catch(() => null);
+  const mine = recent ? [...recent.values()].filter(
+    (m) => m.author.id === client.user.id && m.embeds[0]?.footer?.text === MARKER) : [];
+  if (mine.length && !REPOST) return 'exists';
+  if (REPOST) { for (const m of mine) await m.delete().catch(() => {}); }
   const sent = await channel.send({ embeds: [embedBuilder], components: components ? [components] : [] });
   await sent.pin().catch(() => {});
+  return 'posted';
 }
 
 client.login(DISCORD_TOKEN);

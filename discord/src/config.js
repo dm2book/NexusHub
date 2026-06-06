@@ -70,7 +70,8 @@ export const CATEGORIES = [
       { name: 'welcome', type: 'text', readOnly: true, topic: 'Welcome to ForgeMarket — instant, trusted game top-ups. Start here 👇' },
       { name: 'start-here', type: 'text', readOnly: true, topic: 'A 30-second guide to the server: verify, browse, buy, get support.' },
       { name: 'rules', type: 'text', readOnly: true, topic: 'The rules. Be cool, no scams, no spam. Breaking them = removal.' },
-      { name: 'verify', type: 'text', topic: 'Tap the button to verify and unlock the community.' },
+      { name: 'verify', type: 'text', readOnly: true, topic: 'Tap the button to verify and unlock the community.' },
+      { name: 'links', type: 'text', readOnly: true, topic: 'All official ForgeMarket links — shop, track order, sign in & socials.' },
     ],
   },
   {
@@ -79,12 +80,14 @@ export const CATEGORIES = [
       { name: 'announcements', type: 'announcement', readOnly: true, topic: 'Official ForgeMarket news. Follow this channel to never miss a drop.' },
       { name: 'updates', type: 'text', readOnly: true, topic: 'Product, pricing and feature updates.' },
       { name: 'restocks', type: 'text', readOnly: true, topic: 'Back-in-stock alerts for popular top-ups.' },
+      { name: 'status', type: 'text', readOnly: true, topic: 'Store & delivery status — all systems operational ✅' },
     ],
   },
   {
     name: '🛒 MARKETPLACE', access: 'verified',
     channels: [
       { name: 'products', type: 'text', readOnly: true, topic: 'Browse the catalog. Every order is instant + buyer-protected → {STORE_URL}' },
+      { name: 'price-list', type: 'text', readOnly: true, topic: 'Live prices for our most popular top-ups.' },
       { name: 'deals', type: 'text', readOnly: true, topic: 'Limited-time deals and bundle prices.' },
       { name: 'ask-the-bot', type: 'text', slowmode: 3, topic: 'Ask our AI assistant anything — get product recommendations & help in seconds.' },
       { name: 'how-to-buy', type: 'text', readOnly: true, topic: 'Step-by-step: how to order and receive your code instantly.' },
@@ -95,19 +98,23 @@ export const CATEGORIES = [
     channels: [
       { name: 'introductions', type: 'text', slowmode: 10, topic: 'New here? Say hi 👋' },
       { name: 'general', type: 'text', topic: 'General chat for the ForgeMarket community.' },
-      { name: 'gaming', type: 'text', topic: 'Talk games, LFG, tips and clips.' },
+      { name: 'gaming', type: 'text', topic: 'Talk games, tips and updates.' },
+      { name: 'looking-for-group', type: 'text', topic: 'Find teammates and squads — LFG here.' },
+      { name: 'clips', type: 'text', topic: 'Drop your best plays and clips.' },
       { name: 'screenshots-media', type: 'text', topic: 'Share your best gaming moments.' },
+      { name: 'memes', type: 'text', topic: 'Gaming memes & fun.' },
       { name: 'off-topic', type: 'text', topic: 'Anything goes (within the rules).' },
       { name: 'lounge', type: 'voice', topic: 'Hang out in voice.' },
       { name: 'game-night', type: 'voice', topic: 'Community game nights.' },
     ],
   },
   {
-    name: '⭐ REVIEWS', access: 'public',
+    name: '⭐ REVIEWS & TRUST', access: 'public',
     channels: [
       { name: 'reviews', type: 'text', readOnly: true, topic: 'Verified customer reviews. Posted automatically after real orders.' },
+      { name: 'vouchers', type: 'text', slowmode: 30, topic: 'Bought from us? Leave a quick voucher/vouch for the community 💚' },
       { name: 'proof-of-delivery', type: 'text', readOnly: true, topic: 'Screenshots of real, completed deliveries.' },
-      { name: 'vouches', type: 'text', slowmode: 30, topic: 'Verified customers: leave a quick vouch after your purchase.' },
+      { name: 'discount-codes', type: 'text', readOnly: true, topic: 'Active discount/voucher codes — redeem at checkout.' },
     ],
   },
   {
@@ -116,6 +123,7 @@ export const CATEGORIES = [
       { name: 'open-a-ticket', type: 'text', readOnly: true, topic: 'Need help? Tap the button to open a private ticket with our team.' },
       { name: 'faq', type: 'text', readOnly: true, topic: 'Answers to the most common questions.' },
       { name: 'support-info', type: 'text', readOnly: true, topic: 'Hours, response times and how support works.' },
+      { name: 'report-a-scam', type: 'text', readOnly: true, topic: 'Staff never DM first. Report suspicious users here via a ticket.' },
     ],
   },
   {
@@ -132,6 +140,13 @@ export const CATEGORIES = [
       { name: 'giveaways', type: 'text', readOnly: true, topic: 'Enter active giveaways. Hosted by the team & the bot.' },
       { name: 'giveaway-chat', type: 'text', topic: 'Talk about current giveaways.' },
       { name: 'winners', type: 'text', readOnly: true, topic: 'Hall of winners 🏆' },
+    ],
+  },
+  {
+    name: '🤝 PARTNERS', access: 'public',
+    channels: [
+      { name: 'partnerships', type: 'text', readOnly: true, topic: 'Want to partner or become an affiliate? Open a ticket to apply.' },
+      { name: 'partner-perks', type: 'text', readOnly: true, topic: 'Perks & benefits for approved partners.' },
     ],
   },
   {
@@ -274,6 +289,65 @@ export const MESSAGES = {
     description:
       "Internal area. Tickets log to <#ticket-logs>, moderation to <#mod-log>, and the bot posts joins, " +
       "tickets, buying-intent leads and sales to <#leads>.\n\nKeep it professional — customers come first. 💪",
+  },
+  links: {
+    title: '🔗 Official ForgeMarket links',
+    description:
+      "Only trust links posted here or by staff.\n\n" +
+      "🛍️ **Shop:** {STORE_URL}/shop\n" +
+      "🏠 **Home:** {STORE_URL}\n" +
+      "📦 **Track your order:** {STORE_URL}/track\n" +
+      "👤 **Your account:** {STORE_URL}/account\n" +
+      "❓ **FAQ:** see <#faq>\n\n" +
+      "Buttons below take you straight there 👇",
+  },
+  status: {
+    title: '🟢 Status — all systems operational',
+    description:
+      "**Store:** online ✅\n**Instant delivery:** operational ✅\n**Payments:** operational ✅\n\n" +
+      "We post here if anything is ever delayed. No news = all good.",
+  },
+  priceList: {
+    title: '🏷️ Live price list',
+    description:
+      "Our most popular top-ups (full catalog + live prices on the site):\n\n" +
+      "• **Robux** — from €9.99\n• **V-Bucks** — from €6.99\n• **Valorant VP** — from €9.99\n" +
+      "• **CoD Points** — from €23.99\n• **Apex Coins** — from €9.99\n• **Genshin Crystals** — from €15.99\n" +
+      "• **Brawl Stars Gems** — from €6.99\n• **Clash of Clans Gems** — from €4.99\n\n" +
+      "Prices may change — always check the shop for the live price 👇",
+  },
+  vouchersIntro: {
+    title: '💚 Vouchers & vouches',
+    description:
+      "Bought from us? Leave a quick **voucher** here — a screenshot + a line about your experience " +
+      "helps the whole community shop with confidence.\n\n" +
+      "Real customers only. Verified reviews are also posted in <#reviews>.",
+  },
+  discountCodes: {
+    title: '🏷️ Discount & voucher codes',
+    description:
+      "Active codes drop here — redeem them at checkout for money off.\n\n" +
+      "💜 **VIP Customers** get exclusive codes.\n🔔 Turn on notifications so you never miss one.",
+  },
+  reportScam: {
+    title: '🚨 Report a scam',
+    description:
+      "**Staff will NEVER DM you first** and will never ask for your password or codes.\n\n" +
+      "If someone impersonates the team or DMs you a 'deal', **don't engage** — open a ticket in " +
+      "<#open-a-ticket> and report them. We keep this community safe. 🛡️",
+  },
+  partnersIntro: {
+    title: '🤝 Partner with ForgeMarket',
+    description:
+      "Content creator, community owner or reseller? Let's work together.\n\n" +
+      "Open a ticket in <#open-a-ticket> (choose **Partnership**) with a bit about you and your audience. " +
+      "Approved partners get the **Partner** role, perks and co-marketing.",
+  },
+  partnerPerks: {
+    title: '🎁 Partner perks',
+    description:
+      "• Affiliate/revenue share\n• Exclusive partner channel & support\n• Co-marketing and shoutouts\n" +
+      "• Early access to drops and codes\n\nApply via a ticket — see <#partnerships>.",
   },
 };
 
