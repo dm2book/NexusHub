@@ -18,7 +18,7 @@ export default function Footer() {
         <FooterCol title="Company" links={[['Why us', '/#trust'], ['Reviews', '/#reviews'], ['FAQ', '/#faq'], ['Community', '/#community']]} />
         <div>
           <h4 className="font-tech uppercase tracking-wider text-sm mb-4">Community</h4>
-          <a href="https://discord.gg" target="_blank" rel="noreferrer" className="btn-discord text-sm"><MessageCircle size={16} /> Join Discord</a>
+          <a href="https://discord.gg/vNcfgDbVd" target="_blank" rel="noreferrer" className="btn-discord text-sm"><MessageCircle size={16} /> Join Discord</a>
         </div>
       </div>
       <div className="container-x border-t border-white/[0.06] py-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-slate-500 text-sm">

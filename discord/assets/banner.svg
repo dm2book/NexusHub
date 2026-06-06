@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1500 500" width="1500" height="500">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#4f46e5"/><stop offset="0.5" stop-color="#a855f7"/><stop offset="1" stop-color="#ec4899"/>
+    </linearGradient>
+    <linearGradient id="sheen" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.18"/><stop offset="0.55" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="bolt" x1="0" y1="0" x2="0.4" y2="1">
+      <stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#e7e2ff"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff3b0"/><stop offset="0.5" stop-color="#ffd95e"/><stop offset="1" stop-color="#f5b324"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.38" r="0.75">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.4"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="boltShadow" x="-60%" y="-60%" width="220%" height="220%">
+      <feDropShadow dx="0" dy="8" stdDeviation="18" flood-color="#3b1d6e" flood-opacity="0.45"/>
+      <feDropShadow dx="0" dy="0" stdDeviation="14" flood-color="#ffffff" flood-opacity="0.55"/>
+    </filter>
+    <filter id="textShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="5" stdDeviation="8" flood-color="#2a1450" flood-opacity="0.45"/>
+    </filter>
+  </defs>
+
+  <rect width="1500" height="500" fill="url(#bg)"/>
+  <rect width="1500" height="500" fill="url(#sheen)"/>
+  <g stroke="#ffffff" stroke-opacity="0.055" stroke-width="2">
+    <path d="M0 125H1500M0 250H1500M0 375H1500M250 0V500M500 0V500M750 0V500M1000 0V500M1250 0V500"/>
+  </g>
+  <ellipse cx="750" cy="200" rx="760" ry="360" fill="url(#glow)"/>
+
+  <!-- lightning bolt (left) -->
+  <g transform="translate(150,118) scale(0.6)" filter="url(#boltShadow)">
+    <path d="M300 60 L150 296 H238 L206 452 L378 206 H284 L300 60 Z" fill="url(#bolt)"
+          stroke="#ffffff" stroke-opacity="0.6" stroke-width="3" stroke-linejoin="round"/>
+  </g>
+
+  <!-- wordmark -->
+  <g filter="url(#textShadow)">
+    <text x="430" y="262" font-family="Arial, Helvetica, sans-serif" font-size="118"
+          font-weight="900" fill="#ffffff" letter-spacing="1">FORGE<tspan fill="url(#gold)">MARKET</tspan></text>
+  </g>
+  <text x="436" y="332" font-family="Arial, Helvetica, sans-serif" font-size="33"
+        font-weight="700" fill="#ffffff" fill-opacity="0.92" letter-spacing="7">PREMIUM GAMING MARKETPLACE</text>
+</svg>

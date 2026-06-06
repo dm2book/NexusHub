@@ -33,7 +33,7 @@ export default function Nav() {
           {LINKS.map((l) => <a key={l.href} href={l.href} className="text-slate-300 hover:text-white transition">{l.label}</a>)}
         </div>
         <div className="flex items-center gap-3">
-          <a href="https://discord.gg" target="_blank" rel="noreferrer" className="hidden sm:inline-flex btn-discord text-sm py-2"><MessageCircle size={16} /> Discord</a>
+          <a href="https://discord.gg/vNcfgDbVd" target="_blank" rel="noreferrer" className="hidden sm:inline-flex btn-discord text-sm py-2"><MessageCircle size={16} /> Discord</a>
           <Link href="/shop" className="btn-primary text-sm py-2">Shop now</Link>
           <button className="md:hidden p-2.5 rounded-xl hover:bg-white/5" onClick={() => setOpen((v) => !v)} aria-label="Menu">
             {open ? <X size={20} /> : <Menu size={20} />}
@@ -43,7 +43,7 @@ export default function Nav() {
       {open && (
         <div className="md:hidden border-t border-white/[0.06] bg-ink/95 px-5 py-4 space-y-1">
           {LINKS.map((l) => <a key={l.href} href={l.href} onClick={() => setOpen(false)} className="block px-3 py-2.5 rounded-lg text-slate-300 hover:bg-white/5">{l.label}</a>)}
-          <a href="https://discord.gg" target="_blank" rel="noreferrer" className="block px-3 py-2.5 rounded-lg text-indigo-300 hover:bg-white/5">Join Discord</a>
+          <a href="https://discord.gg/vNcfgDbVd" target="_blank" rel="noreferrer" className="block px-3 py-2.5 rounded-lg text-indigo-300 hover:bg-white/5">Join Discord</a>
         </div>
       )}
     </header>
