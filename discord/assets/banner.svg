@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1500 500" width="1500" height="500">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#4f46e5"/><stop offset="0.5" stop-color="#a855f7"/><stop offset="1" stop-color="#ec4899"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.4" r="0.7">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.35"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="soft" x="-40%" y="-40%" width="180%" height="180%">
+      <feDropShadow dx="0" dy="0" stdDeviation="14" flood-color="#ffffff" flood-opacity="0.55"/>
+    </filter>
+  </defs>
+  <rect width="1500" height="500" fill="url(#bg)"/>
+  <g stroke="#ffffff" stroke-opacity="0.06" stroke-width="2">
+    <path d="M0 125H1500M0 250H1500M0 375H1500M250 0V500M500 0V500M750 0V500M1000 0V500M1250 0V500"/>
+  </g>
+  <ellipse cx="750" cy="180" rx="700" ry="320" fill="url(#glow)"/>
+  <!-- lightning bolt (left) -->
+  <g transform="translate(150,110) scale(0.62)" filter="url(#soft)">
+    <path d="M300 70 L150 290 H236 L208 442 L372 210 H280 L300 70 Z" fill="#ffffff"/>
+  </g>
+  <!-- wordmark -->
+  <text x="430" y="262" font-family="Arial, Helvetica, sans-serif" font-size="118"
+        font-weight="900" fill="#ffffff" letter-spacing="1">FORGE<tspan fill="#ffe27a">MARKET</tspan></text>
+  <text x="434" y="330" font-family="Arial, Helvetica, sans-serif" font-size="34"
+        font-weight="600" fill="#ffffff" fill-opacity="0.92" letter-spacing="6">PREMIUM GAMING MARKETPLACE</text>
+</svg>
