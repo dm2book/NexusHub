@@ -19,6 +19,7 @@ import { notify } from './notificationService.js';
 import { scoreOrder } from './fraudService.js';
 import { getProduct } from './productService.js';
 import { postOrderEvent } from './discordService.js';
+import { grantTierForOrder } from './discordRolesService.js';
 
 export const STATUSES = [
   'pending', 'payment_received', 'processing', 'awaiting_fulfillment',
@@ -141,6 +142,8 @@ export async function transitionOrder(orderId, to, ctx = {}) {
   }
   if (to === 'completed') await postOrderEvent(updated, 'completed').catch(() => {});
   if (to === 'refunded') await postOrderEvent(updated, 'refunded').catch(() => {});
+  // Grant the buyer's Discord tier (Verified vs VIP) once the order is paid.
+  if (to === 'payment_received' || to === 'completed') await grantTierForOrder(updated);
   if (updated.userId) {
     await notify(updated.userId, {
       type: 'order_update',

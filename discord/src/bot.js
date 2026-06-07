@@ -147,11 +147,41 @@ client.on(Events.InteractionCreate, async (i) => {
 
 async function handleButton(i) {
   if (i.customId === 'verify') {
+    // Step 1: show the rules + a green "I agree" button (ephemeral, only to them).
     const role = findRole(i.guild, 'Verified Customer');
-    if (!role) return i.reply({ content: 'Verification role missing — run setup.', ephemeral: true });
-    if (i.member.roles.cache.has(role.id)) return i.reply({ content: 'You’re already verified ✅', ephemeral: true });
+    if (role && i.member.roles.cache.has(role.id)) {
+      return i.reply({ content: 'You’re already verified ✅', ephemeral: true });
+    }
+    const rules = new EmbedBuilder().setColor(0x6366f1)
+      .setTitle('📜 Read & accept the rules')
+      .setDescription(
+        '**1. Be respectful.** No harassment, hate or NSFW.\n' +
+        '**2. No scams.** Trade only via official channels. Staff will **never** DM you first.\n' +
+        '**3. No spam / self-promo** without permission.\n' +
+        '**4. English in main channels** so staff can moderate.\n' +
+        '**5. One account per person.** No ban evasion.\n' +
+        '**6. Use tickets for order issues** — never share private info publicly.\n' +
+        '**7. Staff decisions are final.** Appeals via ticket.\n\n' +
+        'Press the green button below to accept the rules and unlock the server.')
+      .setFooter({ text: 'ForgeMarket • verification' });
+    const agree = new ButtonBuilder().setCustomId('verify:agree').setLabel('I agree — verify me')
+      .setEmoji('✅').setStyle(ButtonStyle.Success);
+    return i.reply({ embeds: [rules], components: [new ActionRowBuilder().addComponents(agree)], ephemeral: true });
+  }
+
+  if (i.customId === 'verify:agree') {
+    // Step 2: they accepted → grant the Verified Customer role.
+    const role = findRole(i.guild, 'Verified Customer');
+    if (!role) return i.reply({ content: 'Verification role missing — ask an admin to run setup.', ephemeral: true });
+    if (i.member.roles.cache.has(role.id)) {
+      return i.update({ content: 'You’re already verified ✅', embeds: [], components: [] }).catch(() => {});
+    }
     await i.member.roles.add(role).catch(() => {});
-    return i.reply({ content: '✅ Verified! Welcome in — check out #products and #ask-the-bot. 🎮', ephemeral: true });
+    leadLog(i.guild, `✅ Verified: <@${i.user.id}>`);
+    return i.update({
+      content: '✅ **Verified!** Welcome in — the full server is now unlocked. Start at <#products> and <#ask-the-bot>. 🎮',
+      embeds: [], components: [],
+    }).catch(() => {});
   }
 
   if (i.customId.startsWith('role:')) return toggleRole(i, i.customId.split(':')[1]);

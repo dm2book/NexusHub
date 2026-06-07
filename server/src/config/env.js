@@ -75,6 +75,11 @@ export const config = {
     guildId: env.DISCORD_GUILD_ID || '',
     // Invite link for the Join button. Falls back to the official server invite.
     inviteUrl: env.DISCORD_INVITE_URL || 'https://discord.gg/vNcfgDbVd',
+    // Bot token — lets the API grant Discord roles (Verified vs VIP) to buyers who
+    // signed in with Discord. Optional; role automation is skipped without it.
+    botToken: env.DISCORD_BOT_TOKEN || '',
+    // Spend (in minor units) at/above which a buyer becomes a VIP Customer.
+    vipThreshold: Number(env.DISCORD_VIP_THRESHOLD_CENTS || 2000),
     // Optional webhook to post order events into an ops/sales channel.
     orderWebhookUrl: env.DISCORD_ORDER_WEBHOOK_URL || '',
   },

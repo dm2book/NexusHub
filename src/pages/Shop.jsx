@@ -7,6 +7,7 @@ import { useToast } from '../context/ToastContext.jsx';
 import { categoryVisual } from '../lib/catalog.js';
 import { withFallback } from '../lib/sampleCatalog.js';
 import ProductCard from '../components/ProductCard.jsx';
+import Reveal from '../components/Reveal.jsx';
 import { Skeleton, EmptyState } from '../components/ui.jsx';
 import { usePageMeta } from '../lib/useMeta.js';
 
@@ -107,7 +108,11 @@ export default function Shop() {
         <>
           <div className="text-slate-500 text-sm mb-4">{visible.length} product{visible.length !== 1 ? 's' : ''}</div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-            {visible.map((p) => <ProductCard key={p.id} product={p} onAdd={onAdd} />)}
+            {visible.map((p, i) => (
+              <Reveal key={p.id} delay={Math.min(i, 8) * 60}>
+                <ProductCard product={p} onAdd={onAdd} />
+              </Reveal>
+            ))}
           </div>
         </>
       )}
