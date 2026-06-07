@@ -10,10 +10,10 @@ export default function ProductCard({ product, onAdd }) {
   const showImg = product.image && imgOk;
 
   return (
-    <div className="group relative card overflow-hidden hover:border-primary/40 transition-all duration-300 hover:-translate-y-1">
+    <div className={`group relative card overflow-hidden transition-all duration-300 hover:-translate-y-1.5 hover:border-primary/40 ${product.featured ? 'ring-featured' : ''}`}>
       {/* visual header */}
       <Link to={`/product/${product.id}`} className="block">
-        <div className={`relative h-36 bg-gradient-to-br ${grad} overflow-hidden`}>
+        <div className={`shine-host relative h-36 bg-gradient-to-br ${grad} overflow-hidden`}>
           {showImg ? (
             <img src={product.image} alt={product.name}
               onError={() => setImgOk(false)}
