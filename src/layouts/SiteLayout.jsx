@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Outlet, Link, NavLink, useNavigate } from 'react-router-dom';
+import { Outlet, Link, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   Zap, LayoutDashboard, LogOut, Shield, ShoppingCart, Menu, X, MessageCircle,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useCart } from '../context/CartContext.jsx';
 import ChatWidget from '../components/ChatWidget.jsx';
+import ScrollProgress from '../components/ScrollProgress.jsx';
 
 const NAV = [
   { to: '/shop', label: 'Shop' },
@@ -17,10 +18,12 @@ export default function SiteLayout() {
   const { user, isStaff, logout } = useAuth();
   const { count } = useCart();
   const navigate = useNavigate();
+  const location = useLocation();
   const [open, setOpen] = useState(false);
 
   return (
     <div className="min-h-screen flex flex-col">
+      <ScrollProgress />
       <header className="sticky top-0 z-40 backdrop-blur-xl bg-space-black/70 border-b border-white/[0.06]">
         <nav className="section h-16 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2.5 shrink-0">
@@ -82,7 +85,7 @@ export default function SiteLayout() {
         )}
       </header>
 
-      <main className="flex-1"><Outlet /></main>
+      <main className="flex-1"><div key={location.pathname} className="page-enter"><Outlet /></div></main>
 
       <ChatWidget />
 

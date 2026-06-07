@@ -12,6 +12,7 @@ import { withFallback } from '../lib/sampleCatalog.js';
 import ProductCard from '../components/ProductCard.jsx';
 import { SectionHeading, Skeleton } from '../components/ui.jsx';
 import Reveal from '../components/Reveal.jsx';
+import CountUp from '../components/CountUp.jsx';
 import { usePageMeta } from '../lib/useMeta.js';
 
 const FEATURES = [
@@ -70,6 +71,7 @@ export default function Home() {
       {/* ── Hero ───────────────────────────────────────────── */}
       <section className="relative">
         <div className="absolute inset-0 bg-grid opacity-40" />
+        <div className="starfield" />
         <div className="aurora absolute w-[680px] h-[680px] -top-72 left-1/2 -translate-x-1/2" />
         <div className="orb w-[520px] h-[520px] bg-primary/30 -top-40 -left-20 animate-float-slow" />
         <div className="orb w-[480px] h-[480px] bg-accent-purple/25 top-10 right-0 animate-float" />
@@ -91,8 +93,10 @@ export default function Home() {
           {/* stats strip */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-16 max-w-3xl mx-auto">
             {STATS.map((s) => (
-              <div key={s.label} className="glass rounded-2xl py-5">
-                <div className="text-2xl sm:text-3xl font-display gradient-text">{s.value}</div>
+              <div key={s.label} className="glass rounded-2xl py-5 lift">
+                <div className="text-2xl sm:text-3xl font-display gradient-text">
+                  <CountUp value={s.value} />
+                </div>
                 <div className="text-slate-400 text-xs sm:text-sm mt-1">{s.label}</div>
               </div>
             ))}
