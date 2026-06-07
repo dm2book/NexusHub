@@ -41,10 +41,14 @@ const client = new Client({
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMembers,
     GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.GuildMessageReactions,
     GatewayIntentBits.MessageContent,
   ],
-  partials: [Partials.Channel],
+  partials: [Partials.Channel, Partials.Message, Partials.Reaction],
 });
+
+const STAR_THRESHOLD = 3;            // ⭐ reactions needed to hit the starboard
+const starred = new Set();           // message ids already posted to #starboard
 
 // ── helpers ──────────────────────────────────────────────────────────────
 const findRole = (g, name) => g.roles.cache.find((r) => r.name === name);
@@ -266,12 +270,30 @@ async function handleCommand(i) {
   if (i.commandName === 'help') {
     return i.reply({ ephemeral: true, content:
       "**Forge — your assistant**\n`/ask` — ask anything\n`/recommend` — product recommendation\n" +
-      "`/order` — check an order status\n`/vouch` — leave a vouch\n`/giveaway` — staff: start a giveaway\n" +
+      "`/order` — check an order status\n`/vouch` — leave a vouch\n`/suggest` — suggest an idea\n" +
+      "`/shop` — open the shop\n`/invite` — get the invite link\n`/stats` — server stats\n`/giveaway` — staff: start a giveaway\n" +
       "Buttons: verify in #verify, pick roles in #roles, open a ticket in #open-a-ticket." });
   }
   if (i.commandName === 'order') return lookupOrder(i);
   if (i.commandName === 'vouch') return postVouch(i);
   if (i.commandName === 'giveaway') return startGiveaway(i);
+  if (i.commandName === 'suggest') return postSuggestion(i);
+  if (i.commandName === 'shop') {
+    return i.reply({ ephemeral: true, content: `🛍️ Browse the shop: ${STORE_URL}/shop` });
+  }
+  if (i.commandName === 'invite') {
+    return i.reply({ ephemeral: true, content: '📨 Invite friends with this link: https://discord.gg/vNcfgDbVd' });
+  }
+  if (i.commandName === 'stats') {
+    const g = i.guild;
+    const e = new EmbedBuilder().setColor(0x6366f1).setTitle(`📊 ${g.name}`)
+      .addFields(
+        { name: '👥 Members', value: `${g.memberCount}`, inline: true },
+        { name: '💬 Channels', value: `${g.channels.cache.size}`, inline: true },
+        { name: '🎭 Roles', value: `${g.roles.cache.size}`, inline: true })
+      .setThumbnail(g.iconURL() || null).setFooter({ text: 'ForgeMarket' });
+    return i.reply({ embeds: [e] });
+  }
   if (i.commandName === 'ask' || i.commandName === 'recommend') {
     await i.deferReply();
     const products = await getProducts();
@@ -283,6 +305,43 @@ async function handleCommand(i) {
     return i.editReply(answer.slice(0, 1900));
   }
 }
+
+// ── Suggestions (/suggest → #suggestions with ✅/❌ voting) ───────────────────
+async function postSuggestion(i) {
+  const text = i.options.getString('idea');
+  const ch = findChannel(i.guild, 'suggestions');
+  if (!ch) return i.reply({ content: 'No #suggestions channel — ask an admin to run setup.', ephemeral: true });
+  const e = new EmbedBuilder().setColor(0x6366f1).setTitle('💡 New suggestion')
+    .setDescription(text).setAuthor({ name: i.user.username, iconURL: i.user.displayAvatarURL() })
+    .setFooter({ text: 'Vote with the reactions below' }).setTimestamp();
+  const msg = await ch.send({ embeds: [e] });
+  await msg.react('✅').catch(() => {});
+  await msg.react('❌').catch(() => {});
+  leadLog(i.guild, `💡 Suggestion from <@${i.user.id}>: "${text.slice(0, 120)}"`);
+  return i.reply({ content: `✅ Posted your suggestion in <#${ch.id}>!`, ephemeral: true });
+}
+
+// ── Starboard (⭐ reactions repost the best messages) ─────────────────────────
+client.on(Events.MessageReactionAdd, async (reaction) => {
+  try {
+    if (reaction.partial) await reaction.fetch();
+    if (reaction.emoji.name !== '⭐') return;
+    const msg = reaction.message.partial ? await reaction.message.fetch() : reaction.message;
+    if (!msg.guild || msg.author?.bot) return;
+    if (reaction.count < STAR_THRESHOLD || starred.has(msg.id)) return;
+    const board = findChannel(msg.guild, 'starboard');
+    if (!board || board.id === msg.channel.id) return;
+    starred.add(msg.id);
+    const e = new EmbedBuilder().setColor(0xf5b324)
+      .setAuthor({ name: msg.author.username, iconURL: msg.author.displayAvatarURL() })
+      .setDescription(msg.content || '*(no text)*')
+      .addFields({ name: '​', value: `[Jump to message](${msg.url}) · in <#${msg.channel.id}>` })
+      .setFooter({ text: `⭐ ${reaction.count}` }).setTimestamp(msg.createdTimestamp);
+    const img = msg.attachments.find((a) => a.contentType?.startsWith('image/'));
+    if (img) e.setImage(img.url);
+    await board.send({ content: `⭐ **${reaction.count}**`, embeds: [e] });
+  } catch (e) { console.error('[starboard]', e.message); }
+});
 
 // ── AI in #ask-the-bot ──────────────────────────────────────────────────────
 client.on(Events.MessageCreate, async (m) => {

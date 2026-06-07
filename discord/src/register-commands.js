@@ -22,6 +22,11 @@ const commands = [
   new SlashCommandBuilder().setName('giveaway').setDescription('Staff: start a giveaway')
     .addStringOption((o) => o.setName('prize').setDescription('What are you giving away?').setRequired(true))
     .addIntegerOption((o) => o.setName('minutes').setDescription('Duration in minutes (default 10)')),
+  new SlashCommandBuilder().setName('suggest').setDescription('Suggest an idea for ForgeMarket')
+    .addStringOption((o) => o.setName('idea').setDescription('Your suggestion').setRequired(true)),
+  new SlashCommandBuilder().setName('shop').setDescription('Get a link to the ForgeMarket shop'),
+  new SlashCommandBuilder().setName('invite').setDescription('Get the server invite link'),
+  new SlashCommandBuilder().setName('stats').setDescription('Show live server stats'),
 ].map((c) => c.toJSON());
 
 const rest = new REST({ version: '10' }).setToken(DISCORD_TOKEN);
