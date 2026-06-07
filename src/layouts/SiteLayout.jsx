@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { useCart } from '../context/CartContext.jsx';
 import ChatWidget from '../components/ChatWidget.jsx';
 import ScrollProgress from '../components/ScrollProgress.jsx';
+import Ambience from '../components/Ambience.jsx';
 
 const NAV = [
   { to: '/shop', label: 'Shop' },
@@ -23,6 +24,7 @@ export default function SiteLayout() {
 
   return (
     <div className="min-h-screen flex flex-col">
+      <Ambience />
       <ScrollProgress />
       <header className="sticky top-0 z-40 backdrop-blur-xl bg-space-black/70 border-b border-white/[0.06]">
         <nav className="section h-16 flex items-center justify-between">

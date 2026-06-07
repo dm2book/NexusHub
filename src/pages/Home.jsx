@@ -13,6 +13,7 @@ import ProductCard from '../components/ProductCard.jsx';
 import { SectionHeading, Skeleton } from '../components/ui.jsx';
 import Reveal from '../components/Reveal.jsx';
 import CountUp from '../components/CountUp.jsx';
+import Magnetic from '../components/Magnetic.jsx';
 import { usePageMeta } from '../lib/useMeta.js';
 
 const FEATURES = [
@@ -86,8 +87,8 @@ export default function Home() {
             tracked in real time, backed by a full account dashboard.
           </p>
           <div className="flex flex-wrap items-center justify-center gap-4 mt-10 animate-fade-up">
-            <Link to="/shop" className="btn-primary px-7 py-3.5 text-base">Browse Shop <ArrowRight size={18} /></Link>
-            <Link to="/discord" className="btn-ghost px-7 py-3.5 text-base"><MessageCircle size={18} /> Join Discord</Link>
+            <Magnetic><Link to="/shop" className="btn-primary px-7 py-3.5 text-base">Browse Shop <ArrowRight size={18} /></Link></Magnetic>
+            <Magnetic><Link to="/discord" className="btn-ghost px-7 py-3.5 text-base"><MessageCircle size={18} /> Join Discord</Link></Magnetic>
           </div>
 
           {/* stats strip */}
