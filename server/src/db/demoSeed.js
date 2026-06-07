@@ -113,6 +113,44 @@ const CATALOG = [
     image: '/products/playstation.svg', description: 'PSN gift card for games, DLC and PS Plus.' },
   { sku: 'XBOX-25', name: 'Xbox Gift Card €25', category: 'xbox', price: 2699,
     image: '/products/xbox.svg', description: 'Spend on games and add-ons across Xbox & PC.' },
+
+  // ── More games (no per-pack art yet → storefront shows a category tile) ───
+  { sku: 'LOL-1380', name: '1,380 RP — League of Legends', category: 'league', price: 999, description: 'Riot Points for champions, skins and the Battle Pass.' },
+  { sku: 'LOL-3500', name: '3,500 RP — League of Legends', category: 'league', price: 2499, featured: true, description: 'Best-value RP bundle, instant delivery.' },
+  { sku: 'LOL-8000', name: '8,000 RP — League of Legends', category: 'league', price: 4999, description: 'Large Riot Points top-up.' },
+  { sku: 'FF-530', name: '530 Diamonds — Free Fire', category: 'freefire', price: 599, description: 'Free Fire Diamonds for skins, characters and the Pass.' },
+  { sku: 'FF-1080', name: '1,080 Diamonds — Free Fire', category: 'freefire', price: 1099, featured: true, description: 'Popular Free Fire diamond bundle.' },
+  { sku: 'FF-2200', name: '2,200 Diamonds — Free Fire', category: 'freefire', price: 2199, description: 'Big Free Fire diamond stack.' },
+  { sku: 'PUBG-660', name: '660 UC — PUBG Mobile', category: 'pubg', price: 999, description: 'Unknown Cash for crates, skins and the Royale Pass.' },
+  { sku: 'PUBG-1800', name: '1,800 UC — PUBG Mobile', category: 'pubg', price: 2599, featured: true, description: 'Great-value PUBG Mobile UC bundle.' },
+  { sku: 'PUBG-3850', name: '3,850 UC — PUBG Mobile', category: 'pubg', price: 4999, description: 'Large PUBG Mobile UC top-up.' },
+  { sku: 'MLBB-275', name: '275 Diamonds — Mobile Legends', category: 'mlbb', price: 699, description: 'MLBB Diamonds for heroes, skins and the Pass.' },
+  { sku: 'MLBB-565', name: '565 Diamonds — Mobile Legends', category: 'mlbb', price: 1399, featured: true, description: 'Popular Mobile Legends diamond bundle.' },
+  { sku: 'MLBB-1155', name: '1,155 Diamonds — Mobile Legends', category: 'mlbb', price: 2799, description: 'Big Mobile Legends diamond stack.' },
+  { sku: 'EAFC-1600', name: '1,600 FC Points — EA FC', category: 'eafc', price: 1499, description: 'FC Points for Ultimate Team packs and drafts.' },
+  { sku: 'EAFC-4600', name: '4,600 FC Points — EA FC', category: 'eafc', price: 3999, featured: true, description: 'Best-value FC Points bundle.' },
+  { sku: 'EAFC-12000', name: '12,000 FC Points — EA FC', category: 'eafc', price: 9999, description: 'Maximum FC Points stack.' },
+  { sku: 'GTA-GREAT', name: 'Great White Shark Card — GTA', category: 'gta', price: 1599, description: '$1,250,000 in-game cash for GTA Online.' },
+  { sku: 'GTA-WHALE', name: 'Whale Shark Card — GTA', category: 'gta', price: 3499, featured: true, description: '$3,500,000 in-game cash for GTA Online.' },
+  { sku: 'GTA-MEGALODON', name: 'Megalodon Shark Card — GTA', category: 'gta', price: 6999, description: '$8,000,000 in-game cash for GTA Online.' },
+  { sku: 'MC-1720', name: '1,720 Minecoins — Minecraft', category: 'minecraft', price: 999, description: 'Minecoins for skins, worlds and texture packs.' },
+  { sku: 'MC-3500', name: '3,500 Minecoins — Minecraft', category: 'minecraft', price: 1899, featured: true, description: 'Popular Minecoins bundle.' },
+  { sku: 'CR-500', name: '500 Gems — Clash Royale', category: 'clashroyale', price: 499, description: 'Clash Royale gems for chests and the Pass Royale.' },
+  { sku: 'CR-1200', name: '1,200 Gems — Clash Royale', category: 'clashroyale', price: 999, featured: true, description: 'Popular Clash Royale gem bundle.' },
+  { sku: 'CR-2500', name: '2,500 Gems — Clash Royale', category: 'clashroyale', price: 1999, description: 'Big Clash Royale gem stack.' },
+  { sku: 'PGO-550', name: '550 PokéCoins — Pokémon GO', category: 'pokemongo', price: 599, description: 'PokéCoins for items, storage and raids.' },
+  { sku: 'PGO-1200', name: '1,200 PokéCoins — Pokémon GO', category: 'pokemongo', price: 1199, featured: true, description: 'Popular PokéCoins bundle.' },
+
+  // ── Subscriptions ────────────────────────────────────────────────────────
+  { sku: 'SPOTIFY-3M', name: 'Spotify Premium — 3 Months', category: 'spotify', price: 2999, description: 'Ad-free music, offline listening and better quality.' },
+  { sku: 'NETFLIX-25', name: 'Netflix Gift Card €25', category: 'netflix', price: 2599, featured: true, description: 'Redeemable towards any Netflix plan.' },
+  { sku: 'GAMEPASS-3M', name: 'Xbox Game Pass Ultimate — 3 Months', category: 'gamepass', price: 3899, featured: true, description: '100+ games, EA Play and online multiplayer.' },
+
+  // ── More gift cards ──────────────────────────────────────────────────────
+  { sku: 'NINTENDO-25', name: 'Nintendo eShop €25', category: 'nintendo', price: 2699, description: 'Switch games, DLC and Nintendo Switch Online.' },
+  { sku: 'AMAZON-25', name: 'Amazon Gift Card €25', category: 'amazon', price: 2599, description: 'Spend on millions of products on Amazon.' },
+  { sku: 'GPLAY-25', name: 'Google Play €25', category: 'googleplay', price: 2599, description: 'Apps, games and in-app purchases on Android.' },
+  { sku: 'ITUNES-25', name: 'App Store & iTunes €25', category: 'itunes', price: 2599, description: 'Apps, games, music and iCloud storage on Apple.' },
 ];
 
 const parse = (s) => { try { return JSON.parse(s || '{}'); } catch { return {}; } };
