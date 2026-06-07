@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="theme-color" content="#0a0908" />
+<title>Aurelia — Private Wealth, Quietly Engineered</title>
+<meta name="description" content="Aurelia is a private wealth office for founders, families and institutions. Discreet, deliberate, and built to endure across generations." />
+<meta property="og:title" content="Aurelia — Private Wealth, Quietly Engineered" />
+<meta property="og:description" content="A private wealth office built to endure across generations." />
+<meta property="og:type" content="website" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..600;1,9..144,300..500&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230a0908'/%3E%3Ctext x='16' y='23' font-family='Georgia,serif' font-size='20' fill='%23d8b97f' text-anchor='middle'%3EA%3C/text%3E%3C/svg%3E" />
+<style>
+  :root{
+    --bg:#0a0908;
+    --bg-2:#100e0c;
+    --surface:#14110e;
+    --surface-2:#1b1713;
+    --line:rgba(216,185,127,.14);
+    --line-soft:rgba(245,240,232,.07);
+    --gold:#d8b97f;
+    --gold-bright:#ecd4a3;
+    --gold-deep:#a9854f;
+    --ink:#f4efe7;
+    --muted:#a39b8d;
+    --muted-2:#6f675c;
+    --maxw:1240px;
+    --ease:cubic-bezier(.22,.61,.36,1);
+  }
+
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:'Inter',system-ui,sans-serif;
+    font-weight:400;
+    line-height:1.6;
+    overflow-x:hidden;
+    position:relative;
+  }
+  ::selection{background:rgba(216,185,127,.28);color:#fff}
+  a{color:inherit;text-decoration:none}
+  img{max-width:100%;display:block}
+
+  /* ---------- ambient texture ---------- */
+  .grain{
+    position:fixed;inset:0;z-index:1;pointer-events:none;opacity:.04;mix-blend-mode:overlay;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  .glow-field{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+  .orb{position:absolute;border-radius:50%;filter:blur(80px);opacity:.5}
+  .orb.a{width:620px;height:620px;top:-220px;left:-160px;background:radial-gradient(circle,rgba(168,133,79,.42),transparent 65%)}
+  .orb.b{width:540px;height:540px;top:38%;right:-200px;background:radial-gradient(circle,rgba(120,98,150,.20),transparent 65%)}
+  .orb.c{width:680px;height:680px;bottom:-280px;left:30%;background:radial-gradient(circle,rgba(168,133,79,.16),transparent 65%)}
+
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 32px;position:relative;z-index:2}
+
+  /* ---------- typography ---------- */
+  h1,h2,h3{font-family:'Fraunces',Georgia,serif;font-weight:380;letter-spacing:-.01em;line-height:1.04}
+  .serif-i{font-style:italic;font-weight:340}
+  .eyebrow{
+    font-size:11.5px;letter-spacing:.32em;text-transform:uppercase;color:var(--gold);
+    font-weight:500;display:inline-flex;align-items:center;gap:12px;
+  }
+  .eyebrow::before{content:"";width:26px;height:1px;background:linear-gradient(90deg,transparent,var(--gold))}
+
+  /* ---------- nav ---------- */
+  header{
+    position:fixed;top:0;left:0;right:0;z-index:50;
+    transition:background .5s var(--ease),border-color .5s var(--ease),padding .4s var(--ease);
+    border-bottom:1px solid transparent;
+  }
+  header.scrolled{
+    background:rgba(10,9,8,.72);backdrop-filter:blur(18px) saturate(140%);
+    -webkit-backdrop-filter:blur(18px) saturate(140%);
+    border-bottom:1px solid var(--line-soft);
+  }
+  .nav{display:flex;align-items:center;justify-content:space-between;height:78px;transition:height .4s var(--ease)}
+  header.scrolled .nav{height:66px}
+  .brand{display:flex;align-items:center;gap:11px;font-family:'Fraunces',serif;font-size:21px;letter-spacing:.02em}
+  .brand .mark{
+    width:30px;height:30px;border-radius:8px;display:grid;place-items:center;
+    background:linear-gradient(150deg,var(--gold-bright),var(--gold-deep));
+    color:#1a1409;font-weight:600;font-size:17px;box-shadow:0 6px 22px -8px rgba(216,185,127,.6);
+  }
+  .brand b{font-weight:380}
+  .nav-links{display:flex;align-items:center;gap:38px}
+  .nav-links a{
+    font-size:13.5px;color:var(--muted);letter-spacing:.01em;position:relative;transition:color .3s var(--ease);
+  }
+  .nav-links a::after{
+    content:"";position:absolute;left:0;bottom:-6px;width:0;height:1px;background:var(--gold);transition:width .35s var(--ease);
+  }
+  .nav-links a:hover{color:var(--ink)}
+  .nav-links a:hover::after{width:100%}
+  .nav-cta{display:flex;align-items:center;gap:18px}
+  .btn{
+    --pad:13px 24px;
+    display:inline-flex;align-items:center;justify-content:center;gap:9px;
+    font-size:13.5px;font-weight:500;letter-spacing:.01em;padding:var(--pad);border-radius:100px;
+    cursor:pointer;border:1px solid transparent;transition:all .35s var(--ease);position:relative;overflow:hidden;
+    font-family:'Inter',sans-serif;white-space:nowrap;
+  }
+  .btn-primary{
+    background:linear-gradient(135deg,var(--gold-bright),var(--gold) 55%,var(--gold-deep));
+    color:#1a1409;font-weight:600;box-shadow:0 10px 30px -12px rgba(216,185,127,.55);
+  }
+  .btn-primary:hover{transform:translateY(-2px);box-shadow:0 18px 40px -14px rgba(216,185,127,.7)}
+  .btn-primary::after{
+    content:"";position:absolute;top:0;left:-120%;width:60%;height:100%;
+    background:linear-gradient(100deg,transparent,rgba(255,255,255,.55),transparent);
+    transition:left .7s var(--ease);
+  }
+  .btn-primary:hover::after{left:140%}
+  .btn-ghost{background:transparent;border-color:var(--line);color:var(--ink)}
+  .btn-ghost:hover{border-color:var(--gold);background:rgba(216,185,127,.06);transform:translateY(-2px)}
+  .btn .arrow{transition:transform .35s var(--ease)}
+  .btn:hover .arrow{transform:translateX(4px)}
+  .menu-toggle{display:none}
+
+  /* ---------- hero ---------- */
+  .hero{position:relative;padding:188px 0 130px;text-align:center}
+  .hero .eyebrow{margin-bottom:30px}
+  .hero h1{font-size:clamp(44px,7.4vw,104px);letter-spacing:-.022em;margin-bottom:30px}
+  .hero h1 .grad{
+    background:linear-gradient(105deg,var(--gold-bright),var(--gold) 40%,#fff 70%,var(--gold-bright));
+    -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+  }
+  .hero p.lead{
+    font-size:clamp(16px,1.5vw,19px);color:var(--muted);max-width:580px;margin:0 auto 44px;font-weight:300;line-height:1.7;
+  }
+  .hero-actions{display:flex;gap:16px;justify-content:center;flex-wrap:wrap}
+  .hero-actions .btn{--pad:16px 30px;font-size:14.5px}
+  .scroll-hint{
+    margin-top:78px;display:inline-flex;flex-direction:column;align-items:center;gap:14px;
+    font-size:11px;letter-spacing:.26em;text-transform:uppercase;color:var(--muted-2);
+  }
+  .scroll-hint .line{width:1px;height:48px;background:linear-gradient(var(--gold),transparent);position:relative;overflow:hidden}
+  .scroll-hint .line::after{content:"";position:absolute;top:-50%;left:0;width:100%;height:50%;background:var(--gold-bright);animation:drop 2.4s var(--ease) infinite}
+  @keyframes drop{0%{top:-50%}60%,100%{top:100%}}
+
+  /* floating ledger card in hero */
+  .hero-stage{position:relative;max-width:880px;margin:78px auto 0}
+  .ledger{
+    position:relative;border:1px solid var(--line);border-radius:20px;overflow:hidden;
+    background:linear-gradient(180deg,rgba(27,23,19,.9),rgba(16,14,12,.92));
+    box-shadow:0 50px 120px -40px rgba(0,0,0,.9),inset 0 1px 0 rgba(245,240,232,.05);
+    backdrop-filter:blur(8px);
+  }
+  .ledger-top{display:flex;align-items:center;gap:8px;padding:16px 22px;border-bottom:1px solid var(--line-soft)}
+  .dot{width:11px;height:11px;border-radius:50%;background:var(--surface-2);border:1px solid var(--line-soft)}
+  .ledger-top .title{margin-left:14px;font-size:12.5px;color:var(--muted);letter-spacing:.04em}
+  .ledger-top .badge{margin-left:auto;font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);border:1px solid var(--line);padding:5px 12px;border-radius:100px}
+  .ledger-body{display:grid;grid-template-columns:1.4fr 1fr;gap:0}
+  .ledger-left{padding:34px 32px;border-right:1px solid var(--line-soft)}
+  .ledger-left .nav-aum{font-size:12.5px;color:var(--muted-2);letter-spacing:.16em;text-transform:uppercase}
+  .ledger-left .big{font-family:'Fraunces',serif;font-size:clamp(34px,5vw,52px);margin:10px 0 4px;letter-spacing:-.02em}
+  .ledger-left .delta{color:var(--gold);font-size:13px;display:inline-flex;align-items:center;gap:7px}
+  .ledger-left .delta::before{content:"▲";font-size:9px}
+  /* sparkline */
+  .spark{margin-top:30px}
+  .spark svg{width:100%;height:88px;overflow:visible}
+  .spark path.area{fill:url(#sparkgrad)}
+  .spark path.stroke{fill:none;stroke:var(--gold);stroke-width:2;stroke-linecap:round;
+    stroke-dasharray:1000;stroke-dashoffset:1000;animation:draw 2.6s var(--ease) .4s forwards}
+  @keyframes draw{to{stroke-dashoffset:0}}
+  .ledger-right{padding:26px 28px;display:flex;flex-direction:column;gap:18px}
+  .alloc{display:flex;flex-direction:column;gap:13px}
+  .alloc-row{display:flex;flex-direction:column;gap:7px}
+  .alloc-row .r-top{display:flex;justify-content:space-between;font-size:12.5px}
+  .alloc-row .r-top span:last-child{color:var(--muted)}
+  .bar{height:5px;border-radius:100px;background:var(--surface-2);overflow:hidden}
+  .bar i{display:block;height:100%;border-radius:100px;background:linear-gradient(90deg,var(--gold-deep),var(--gold-bright));width:0;transition:width 1.4s var(--ease)}
+
+  /* ---------- marquee trust ---------- */
+  .trust{padding:50px 0;border-top:1px solid var(--line-soft);border-bottom:1px solid var(--line-soft);margin-top:120px;position:relative}
+  .trust .label{text-align:center;font-size:11.5px;letter-spacing:.26em;text-transform:uppercase;color:var(--muted-2);margin-bottom:32px}
+  .marquee{display:flex;gap:72px;width:max-content;animation:scrollx 34s linear infinite;align-items:center;opacity:.62}
+  .marquee:hover{animation-play-state:paused}
+  .marquee span{font-family:'Fraunces',serif;font-size:23px;letter-spacing:.02em;color:var(--ink);white-space:nowrap;font-style:italic;opacity:.8}
+  .marquee-mask{overflow:hidden;-webkit-mask-image:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent);mask-image:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent)}
+  @keyframes scrollx{to{transform:translateX(-50%)}}
+
+  /* ---------- section base ---------- */
+  section{position:relative;z-index:2}
+  .sec{padding:130px 0}
+  .sec-head{max-width:680px;margin-bottom:62px}
+  .sec-head.center{margin:0 auto 62px;text-align:center}
+  .sec-head h2{font-size:clamp(32px,4.6vw,56px);margin:22px 0 0;letter-spacing:-.02em}
+  .sec-head p{color:var(--muted);font-size:17px;margin-top:22px;font-weight:300;line-height:1.7}
+
+  /* ---------- stats ---------- */
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border:1px solid var(--line-soft);border-radius:18px;overflow:hidden;background:linear-gradient(180deg,var(--surface),var(--bg-2))}
+  .stat{padding:46px 36px;border-right:1px solid var(--line-soft);position:relative}
+  .stat:last-child{border-right:none}
+  .stat .num{font-family:'Fraunces',serif;font-size:clamp(38px,4.6vw,58px);letter-spacing:-.02em;line-height:1}
+  .stat .num .u{color:var(--gold)}
+  .stat .cap{margin-top:14px;font-size:13.5px;color:var(--muted);letter-spacing:.02em}
+
+  /* ---------- bento services ---------- */
+  .bento{display:grid;grid-template-columns:repeat(6,1fr);grid-auto-rows:minmax(190px,auto);gap:18px}
+  .card{
+    border:1px solid var(--line-soft);border-radius:18px;padding:32px;position:relative;overflow:hidden;
+    background:linear-gradient(180deg,var(--surface),rgba(16,14,12,.6));
+    transition:transform .5s var(--ease),border-color .5s var(--ease),box-shadow .5s var(--ease);
+    display:flex;flex-direction:column;
+  }
+  .card::before{
+    content:"";position:absolute;inset:0;border-radius:18px;padding:1px;opacity:0;transition:opacity .5s var(--ease);
+    background:linear-gradient(140deg,var(--gold),transparent 40%);
+    -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+    -webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none;
+  }
+  .card:hover{transform:translateY(-5px);box-shadow:0 36px 80px -40px rgba(0,0,0,.9)}
+  .card:hover::before{opacity:1}
+  .card .ico{
+    width:48px;height:48px;border-radius:12px;display:grid;place-items:center;margin-bottom:auto;
+    background:radial-gradient(circle at 30% 25%,rgba(216,185,127,.22),rgba(216,185,127,.04));
+    border:1px solid var(--line);color:var(--gold);
+  }
+  .card h3{font-size:23px;margin:26px 0 12px;letter-spacing:-.01em}
+  .card p{color:var(--muted);font-size:14.5px;font-weight:300;line-height:1.65}
+  .card.span-3{grid-column:span 3}
+  .card.span-2{grid-column:span 2}
+  .card.span-4{grid-column:span 4}
+  .card.tall{grid-row:span 2}
+  .card.feature{justify-content:flex-end;min-height:400px}
+  .card.feature .ico{margin-bottom:0}
+  .card.feature h3{font-size:30px}
+  .card-figure{position:absolute;inset:0;opacity:.5;pointer-events:none}
+  .rings{position:absolute;top:-40px;right:-40px;width:260px;height:260px;border-radius:50%;border:1px solid var(--line);box-shadow:0 0 0 32px rgba(216,185,127,.03),0 0 0 70px rgba(216,185,127,.02)}
+  .rings::after{content:"";position:absolute;inset:46px;border-radius:50%;border:1px solid var(--line-soft)}
+
+  /* ---------- philosophy split ---------- */
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:80px;align-items:center}
+  .split-visual{position:relative;aspect-ratio:4/5;border-radius:20px;overflow:hidden;border:1px solid var(--line);
+    background:
+      radial-gradient(120% 80% at 70% 10%,rgba(216,185,127,.18),transparent 55%),
+      linear-gradient(160deg,#1d1813,#0c0a08);
+    box-shadow:0 60px 120px -50px rgba(0,0,0,.9);
+  }
+  .split-visual .vmark{position:absolute;inset:0;display:grid;place-items:center}
+  .split-visual .monogram{font-family:'Fraunces',serif;font-size:200px;color:transparent;-webkit-text-stroke:1px rgba(216,185,127,.35);font-style:italic;line-height:1}
+  .split-visual .vquote{position:absolute;left:34px;right:34px;bottom:34px;font-family:'Fraunces',serif;font-style:italic;font-size:20px;color:var(--ink);line-height:1.45}
+  .split-visual .vquote small{display:block;font-family:'Inter',sans-serif;font-style:normal;font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);margin-top:14px}
+  .gridlines{position:absolute;inset:0;background-image:linear-gradient(var(--line-soft) 1px,transparent 1px),linear-gradient(90deg,var(--line-soft) 1px,transparent 1px);background-size:46px 46px;opacity:.5;-webkit-mask-image:radial-gradient(120% 90% at 70% 20%,#000,transparent 70%)}
+  .principles{list-style:none;margin-top:36px;display:flex;flex-direction:column;gap:2px}
+  .principles li{display:flex;gap:20px;padding:22px 0;border-top:1px solid var(--line-soft)}
+  .principles li:last-child{border-bottom:1px solid var(--line-soft)}
+  .principles .pn{font-family:'Fraunces',serif;color:var(--gold);font-size:15px;min-width:34px}
+  .principles .pt b{font-weight:500;font-size:16px;display:block;margin-bottom:5px;font-family:'Inter',sans-serif}
+  .principles .pt span{color:var(--muted);font-size:14px;font-weight:300}
+
+  /* ---------- quote ---------- */
+  .pull{padding:140px 0;text-align:center}
+  .pull blockquote{font-family:'Fraunces',serif;font-size:clamp(28px,4vw,48px);line-height:1.28;letter-spacing:-.015em;max-width:1000px;margin:0 auto;font-weight:340}
+  .pull blockquote .grad{background:linear-gradient(100deg,var(--gold-bright),#fff,var(--gold));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+  .pull .by{margin-top:42px;display:inline-flex;align-items:center;gap:16px}
+  .pull .by .av{width:48px;height:48px;border-radius:50%;background:linear-gradient(150deg,var(--gold-bright),var(--gold-deep));display:grid;place-items:center;color:#1a1409;font-family:'Fraunces',serif;font-size:19px}
+  .pull .by .who{text-align:left}
+  .pull .by .who b{font-weight:500;font-size:15px}
+  .pull .by .who span{display:block;color:var(--muted);font-size:13px}
+
+  /* ---------- insights ---------- */
+  .insights{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+  .post{border:1px solid var(--line-soft);border-radius:16px;overflow:hidden;transition:transform .5s var(--ease),border-color .5s var(--ease);background:var(--surface)}
+  .post:hover{transform:translateY(-5px);border-color:var(--line)}
+  .post .ph{height:172px;position:relative;overflow:hidden}
+  .post .ph .g1{position:absolute;inset:0;background:linear-gradient(150deg,#241d14,#0c0a08)}
+  .post .ph .g2{position:absolute;inset:0;opacity:.6}
+  .post:nth-child(1) .g2{background:radial-gradient(70% 90% at 20% 0%,rgba(216,185,127,.4),transparent 60%)}
+  .post:nth-child(2) .g2{background:radial-gradient(70% 90% at 80% 10%,rgba(120,98,150,.4),transparent 60%)}
+  .post:nth-child(3) .g2{background:radial-gradient(80% 90% at 50% 0%,rgba(95,140,120,.35),transparent 60%)}
+  .post .ph .gl{position:absolute;inset:0;background-image:linear-gradient(var(--line-soft) 1px,transparent 1px),linear-gradient(90deg,var(--line-soft) 1px,transparent 1px);background-size:30px 30px;opacity:.4}
+  .post .body{padding:26px 26px 30px}
+  .post .meta{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--gold);margin-bottom:14px}
+  .post h3{font-size:21px;line-height:1.22;letter-spacing:-.01em}
+  .post p{color:var(--muted);font-size:14px;margin-top:12px;font-weight:300}
+  .post .more{margin-top:18px;font-size:13px;color:var(--ink);display:inline-flex;align-items:center;gap:8px}
+  .post .more .arrow{color:var(--gold);transition:transform .35s var(--ease)}
+  .post:hover .more .arrow{transform:translateX(5px)}
+
+  /* ---------- CTA ---------- */
+  .cta-band{position:relative;border-radius:28px;overflow:hidden;border:1px solid var(--line);
+    background:
+      radial-gradient(100% 140% at 50% 0%,rgba(216,185,127,.16),transparent 60%),
+      linear-gradient(180deg,var(--surface-2),var(--bg-2));
+    padding:96px 48px;text-align:center;box-shadow:0 60px 140px -60px rgba(0,0,0,.9)}
+  .cta-band .gl{position:absolute;inset:0;background-image:linear-gradient(var(--line-soft) 1px,transparent 1px),linear-gradient(90deg,var(--line-soft) 1px,transparent 1px);background-size:54px 54px;opacity:.4;-webkit-mask-image:radial-gradient(80% 80% at 50% 0%,#000,transparent)}
+  .cta-band h2{font-size:clamp(34px,4.8vw,58px);letter-spacing:-.02em;position:relative}
+  .cta-band p{color:var(--muted);font-size:17px;max-width:520px;margin:22px auto 40px;font-weight:300;position:relative}
+  .cta-band .hero-actions{position:relative}
+  .cta-band .fine{margin-top:26px;font-size:12.5px;color:var(--muted-2);letter-spacing:.04em;position:relative}
+
+  /* ---------- footer ---------- */
+  footer{border-top:1px solid var(--line-soft);margin-top:140px;padding:80px 0 44px;position:relative;z-index:2}
+  .foot-grid{display:grid;grid-template-columns:1.8fr 1fr 1fr 1fr;gap:48px;margin-bottom:64px}
+  .foot-brand .brand{margin-bottom:20px}
+  .foot-brand p{color:var(--muted);font-size:14px;font-weight:300;max-width:300px;line-height:1.7}
+  .foot-col h4{font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted-2);margin-bottom:22px;font-family:'Inter',sans-serif;font-weight:500}
+  .foot-col a{display:block;color:var(--muted);font-size:14px;margin-bottom:14px;transition:color .3s var(--ease)}
+  .foot-col a:hover{color:var(--gold)}
+  .foot-bottom{display:flex;justify-content:space-between;align-items:center;padding-top:32px;border-top:1px solid var(--line-soft);flex-wrap:wrap;gap:18px}
+  .foot-bottom p{font-size:12.5px;color:var(--muted-2)}
+  .foot-social{display:flex;gap:12px}
+  .foot-social a{width:38px;height:38px;border-radius:10px;border:1px solid var(--line-soft);display:grid;place-items:center;color:var(--muted);transition:all .3s var(--ease)}
+  .foot-social a:hover{border-color:var(--gold);color:var(--gold);transform:translateY(-2px)}
+
+  /* ---------- reveal ---------- */
+  .reveal{opacity:0;transform:translateY(28px);transition:opacity .9s var(--ease),transform .9s var(--ease)}
+  .reveal.in{opacity:1;transform:none}
+  .reveal[data-d="1"]{transition-delay:.08s}
+  .reveal[data-d="2"]{transition-delay:.16s}
+  .reveal[data-d="3"]{transition-delay:.24s}
+  .reveal[data-d="4"]{transition-delay:.32s}
+
+  /* ---------- responsive ---------- */
+  @media(max-width:1024px){
+    .split{grid-template-columns:1fr;gap:48px}
+    .bento{grid-template-columns:repeat(2,1fr)}
+    .card.span-3,.card.span-2,.card.span-4{grid-column:span 1}
+    .card.feature{grid-column:span 2;min-height:340px}
+    .card.tall{grid-row:auto}
+    .insights{grid-template-columns:1fr 1fr}
+  }
+  @media(max-width:760px){
+    .wrap{padding:0 22px}
+    .nav-links{display:none}
+    .nav-cta .btn-ghost{display:none}
+    .stats{grid-template-columns:1fr 1fr}
+    .stat:nth-child(2n){border-right:none}
+    .stat:nth-child(-n+2){border-bottom:1px solid var(--line-soft)}
+    .ledger-body{grid-template-columns:1fr}
+    .ledger-left{border-right:none;border-bottom:1px solid var(--line-soft)}
+    .bento,.insights{grid-template-columns:1fr}
+    .card.feature{grid-column:span 1}
+    .foot-grid{grid-template-columns:1fr 1fr;gap:36px}
+    .foot-brand{grid-column:span 2}
+    .sec{padding:90px 0}
+    .pull{padding:90px 0}
+    .cta-band{padding:64px 26px}
+    .hero{padding:150px 0 90px}
+  }
+  @media(prefers-reduced-motion:reduce){
+    *{animation:none!important;transition:none!important}
+    .reveal{opacity:1;transform:none}
+  }
+</style>
+</head>
+<body>
+
+<div class="grain" aria-hidden="true"></div>
+<div class="glow-field" aria-hidden="true">
+  <div class="orb a"></div><div class="orb b"></div><div class="orb c"></div>
+</div>
+
+<!-- ===== NAV ===== -->
+<header id="hdr">
+  <div class="wrap nav">
+    <a class="brand" href="#top"><span class="mark">A</span><b>Aurelia</b></a>
+    <nav class="nav-links">
+      <a href="#philosophy">Philosophy</a>
+      <a href="#services">Services</a>
+      <a href="#insights">Insights</a>
+      <a href="#contact">Contact</a>
+    </nav>
+    <div class="nav-cta">
+      <a href="#" class="btn btn-ghost">Client Login</a>
+      <a href="#contact" class="btn btn-primary">Request Access <span class="arrow">→</span></a>
+    </div>
+  </div>
+</header>
+
+<main id="top">
+
+  <!-- ===== HERO ===== -->
+  <section class="hero">
+    <div class="wrap">
+      <span class="eyebrow reveal">Private Wealth Office · Est. 1998</span>
+      <h1 class="reveal" data-d="1">Wealth, <span class="serif-i grad">quietly</span><br>engineered to endure.</h1>
+      <p class="lead reveal" data-d="2">Aurelia is a discreet multi-family office for founders, families and institutions who measure success in generations — not quarters. Deliberate strategy, absolute confidentiality.</p>
+      <div class="hero-actions reveal" data-d="3">
+        <a href="#contact" class="btn btn-primary">Request a private consultation <span class="arrow">→</span></a>
+        <a href="#philosophy" class="btn btn-ghost">Our philosophy</a>
+      </div>
+
+      <!-- floating ledger -->
+      <div class="hero-stage reveal" data-d="4">
+        <div class="ledger" id="ledger">
+          <div class="ledger-top">
+            <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+            <span class="title">Aurelia · Private Portfolio Overview</span>
+            <span class="badge">Confidential</span>
+          </div>
+          <div class="ledger-body">
+            <div class="ledger-left">
+              <div class="nav-aum">Net Asset Value</div>
+              <div class="big" data-count="284.6" data-prefix="$" data-suffix="M">$0M</div>
+              <div class="delta">+12.4% trailing twelve months</div>
+              <div class="spark">
+                <svg viewBox="0 0 460 100" preserveAspectRatio="none">
+                  <defs>
+                    <linearGradient id="sparkgrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0" stop-color="rgba(216,185,127,.28)"/>
+                      <stop offset="1" stop-color="rgba(216,185,127,0)"/>
+                    </linearGradient>
+                  </defs>
+                  <path class="area" d="M0,78 L40,72 L80,76 L120,58 L160,62 L200,44 L240,50 L280,32 L320,38 L360,22 L400,26 L460,10 L460,100 L0,100 Z"/>
+                  <path class="stroke" d="M0,78 L40,72 L80,76 L120,58 L160,62 L200,44 L240,50 L280,32 L320,38 L360,22 L400,26 L460,10"/>
+                </svg>
+              </div>
+            </div>
+            <div class="ledger-right">
+              <div class="nav-aum" style="font-size:12.5px;color:var(--muted-2);letter-spacing:.16em;text-transform:uppercase">Allocation</div>
+              <div class="alloc">
+                <div class="alloc-row"><div class="r-top"><span>Private Equity</span><span>38%</span></div><div class="bar"><i data-w="38"></i></div></div>
+                <div class="alloc-row"><div class="r-top"><span>Global Equities</span><span>26%</span></div><div class="bar"><i data-w="26"></i></div></div>
+                <div class="alloc-row"><div class="r-top"><span>Real Assets</span><span>21%</span></div><div class="bar"><i data-w="21"></i></div></div>
+                <div class="alloc-row"><div class="r-top"><span>Fixed Income</span><span>15%</span></div><div class="bar"><i data-w="15"></i></div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="scroll-hint reveal">Scroll<div class="line"></div></div>
+    </div>
+  </section>
+
+  <!-- ===== TRUST MARQUEE ===== -->
+  <div class="trust">
+    <div class="wrap">
+      <div class="label">Trusted by families, founders & institutions across 30 countries</div>
+    </div>
+    <div class="marquee-mask">
+      <div class="marquee">
+        <span>Meridian Capital</span><span>Halcyon Trust</span><span>Stonebridge</span><span>Vermillion Group</span><span>Aldgate Partners</span><span>Lighthouse Family Office</span><span>Northwind Holdings</span>
+        <span>Meridian Capital</span><span>Halcyon Trust</span><span>Stonebridge</span><span>Vermillion Group</span><span>Aldgate Partners</span><span>Lighthouse Family Office</span><span>Northwind Holdings</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== STATS ===== -->
+  <section class="sec" style="padding-top:120px">
+    <div class="wrap">
+      <div class="stats reveal">
+        <div class="stat"><div class="num" data-count="42" data-prefix="$" data-suffix="B">$0B</div><div class="cap">Assets under stewardship</div></div>
+        <div class="stat"><div class="num" data-count="27" data-suffix=" yrs">0 yrs</div><div class="cap">Average client tenure</div></div>
+        <div class="stat"><div class="num" data-count="30" data-suffix="+">0+</div><div class="cap">Countries served</div></div>
+        <div class="stat"><div class="num" data-count="99.2" data-suffix="%">0%</div><div class="cap">Client retention rate</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== SERVICES BENTO ===== -->
+  <section class="sec" id="services" style="padding-top:30px">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <span class="eyebrow">What we do</span>
+        <h2>A single office for the <span class="serif-i">whole</span> of your wealth.</h2>
+        <p>We bring every dimension of your financial life under one roof — coordinated, conflict-free, and accountable to you alone.</p>
+      </div>
+
+      <div class="bento">
+        <div class="card feature span-3 tall reveal">
+          <div class="card-figure"><div class="rings"></div></div>
+          <div class="ico">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 21h18M5 21V8l7-5 7 5v13M9 21v-6h6v6"/></svg>
+          </div>
+          <h3>Investment Stewardship</h3>
+          <p>A bespoke portfolio built around your mandate — private markets, public equities and real assets — managed with patience and absolute alignment.</p>
+        </div>
+
+        <div class="card span-3 reveal" data-d="1">
+          <div class="ico">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 2v20M5 7l7-5 7 5M4 12h16M6 17h12"/></svg>
+          </div>
+          <h3>Estate &amp; Succession</h3>
+          <p>Multi-generational structuring that protects what you've built and passes it on with intention and clarity.</p>
+        </div>
+
+        <div class="card span-3 reveal" data-d="2">
+          <div class="ico">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+          </div>
+          <h3>Tax &amp; Structuring</h3>
+          <p>Cross-border planning that is efficient, fully compliant, and built to withstand scrutiny in every jurisdiction you touch.</p>
+        </div>
+
+        <div class="card span-2 reveal">
+          <div class="ico">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6l8-4Z"/></svg>
+          </div>
+          <h3>Risk &amp; Custody</h3>
+          <p>Institutional-grade safeguarding and independent oversight of every asset.</p>
+        </div>
+
+        <div class="card span-2 reveal" data-d="1">
+          <div class="ico">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg>
+          </div>
+          <h3>Philanthropy</h3>
+          <p>Foundations and giving strategies that turn capital into lasting purpose.</p>
+        </div>
+
+        <div class="card span-2 reveal" data-d="2">
+          <div class="ico">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>
+          </div>
+          <h3>Private Concierge</h3>
+          <p>Discreet support for the affairs that surround significant wealth.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== PHILOSOPHY SPLIT ===== -->
+  <section class="sec" id="philosophy">
+    <div class="wrap">
+      <div class="split">
+        <div class="split-visual reveal">
+          <div class="gridlines"></div>
+          <div class="vmark"><div class="monogram">Æ</div></div>
+          <div class="vquote">“The first duty of capital is to survive. The second is to compound.”
+            <small>The Aurelia Principle</small>
+          </div>
+        </div>
+        <div class="reveal" data-d="1">
+          <span class="eyebrow">Our philosophy</span>
+          <h2 style="font-size:clamp(30px,4.2vw,50px);margin:22px 0 0">Conviction over noise. <span class="serif-i">Always.</span></h2>
+          <p style="color:var(--muted);font-size:17px;margin-top:22px;font-weight:300;line-height:1.7">We don't chase markets, headlines, or fashion. We build resilient portfolios on a foundation of research, discipline and a time horizon measured in decades.</p>
+          <ul class="principles">
+            <li><span class="pn">01</span><span class="pt"><b>Aligned, never conflicted</b><span>We are fee-only and independent. Our only incentive is your long-term outcome.</span></span></li>
+            <li><span class="pn">02</span><span class="pt"><b>Patient by design</b><span>We invest where time, not timing, is the source of return.</span></span></li>
+            <li><span class="pn">03</span><span class="pt"><b>Absolute discretion</b><span>Your affairs remain entirely private — that is the foundation of trust.</span></span></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== PULL QUOTE ===== -->
+  <section class="pull">
+    <div class="wrap">
+      <blockquote class="reveal">“In two decades, Aurelia has never once made us feel like a portfolio. <span class="grad">They steward our family the way we would — if we had the time, the team, and the temperament.</span>”</blockquote>
+      <div class="by reveal" data-d="1">
+        <span class="av">E</span>
+        <span class="who"><b>Eleanor Voss</b><span>Principal, Voss Family Holdings</span></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== INSIGHTS ===== -->
+  <section class="sec" id="insights">
+    <div class="wrap">
+      <div class="sec-head center reveal">
+        <span class="eyebrow">Insights</span>
+        <h2>Perspective, written for the long view.</h2>
+      </div>
+      <div class="insights">
+        <a class="post reveal" href="#">
+          <div class="ph"><div class="g1"></div><div class="g2"></div><div class="gl"></div></div>
+          <div class="body">
+            <div class="meta">Markets · 6 min</div>
+            <h3>Why patient capital still wins the decade</h3>
+            <p>The case for holding through volatility when everyone else is selling the future short.</p>
+            <span class="more">Read essay <span class="arrow">→</span></span>
+          </div>
+        </a>
+        <a class="post reveal" data-d="1" href="#">
+          <div class="ph"><div class="g1"></div><div class="g2"></div><div class="gl"></div></div>
+          <div class="body">
+            <div class="meta">Succession · 8 min</div>
+            <h3>The quiet architecture of generational wealth</h3>
+            <p>How the most enduring families structure for the heirs they'll never meet.</p>
+            <span class="more">Read essay <span class="arrow">→</span></span>
+          </div>
+        </a>
+        <a class="post reveal" data-d="2" href="#">
+          <div class="ph"><div class="g1"></div><div class="g2"></div><div class="gl"></div></div>
+          <div class="body">
+            <div class="meta">Private Markets · 5 min</div>
+            <h3>Real assets in an age of fragile money</h3>
+            <p>Allocating to what holds value when currencies and certainties wobble.</p>
+            <span class="more">Read essay <span class="arrow">→</span></span>
+          </div>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== CTA ===== -->
+  <section class="sec" id="contact" style="padding-top:0">
+    <div class="wrap">
+      <div class="cta-band reveal">
+        <div class="gl"></div>
+        <span class="eyebrow" style="position:relative">By introduction &amp; application</span>
+        <h2 style="margin-top:22px">Begin a private conversation.</h2>
+        <p>We work with a deliberately small number of clients. If our approach resonates, we'd welcome the opportunity to understand your ambitions.</p>
+        <div class="hero-actions">
+          <a href="mailto:office@aurelia.example" class="btn btn-primary">Request a consultation <span class="arrow">→</span></a>
+          <a href="#philosophy" class="btn btn-ghost">Download our brochure</a>
+        </div>
+        <div class="fine">Confidential · No obligation · Typical response within two business days</div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- ===== FOOTER ===== -->
+<footer>
+  <div class="wrap">
+    <div class="foot-grid">
+      <div class="foot-brand">
+        <a class="brand" href="#top"><span class="mark">A</span><b>Aurelia</b></a>
+        <p>A private wealth office for those who think in generations. Independent, fee-only, and accountable to you alone.</p>
+      </div>
+      <div class="foot-col">
+        <h4>Firm</h4>
+        <a href="#philosophy">Philosophy</a><a href="#services">Services</a><a href="#insights">Insights</a><a href="#">Leadership</a>
+      </div>
+      <div class="foot-col">
+        <h4>Services</h4>
+        <a href="#services">Investment</a><a href="#services">Estate &amp; Succession</a><a href="#services">Tax &amp; Structuring</a><a href="#services">Philanthropy</a>
+      </div>
+      <div class="foot-col">
+        <h4>Contact</h4>
+        <a href="mailto:office@aurelia.example">office@aurelia.example</a><a href="#">London · Geneva · Singapore</a><a href="#contact">Request access</a>
+      </div>
+    </div>
+    <div class="foot-bottom">
+      <p>© 2026 Aurelia Private Office. Authorised &amp; regulated. Capital at risk.</p>
+      <div class="foot-social">
+        <a href="#" aria-label="LinkedIn"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M4.98 3.5A2.5 2.5 0 1 1 0 3.5a2.5 2.5 0 0 1 4.98 0ZM0 8h5v16H0V8Zm7.5 0H12v2.2h.07c.63-1.2 2.17-2.46 4.46-2.46C21.3 7.74 24 10 24 14.8V24h-5v-8.2c0-2-.7-3.36-2.46-3.36-1.34 0-2.14.9-2.49 1.78-.13.31-.16.74-.16 1.18V24h-5V8Z"/></svg></a>
+        <a href="#" aria-label="X"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M18.9 1.5h3.6l-7.9 9 9.3 12.3h-7.3l-5.7-7.5-6.5 7.5H.8l8.4-9.6L.3 1.5h7.5l5.2 6.9 5.9-6.9Zm-1.3 19.6h2L6.5 3.6H4.4l13.2 17.5Z"/></svg></a>
+        <a href="#" aria-label="Email"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 6 10 7L22 6"/></svg></a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // header elevate on scroll
+  const hdr = document.getElementById('hdr');
+  const onScroll = () => hdr.classList.toggle('scrolled', window.scrollY > 24);
+  onScroll(); window.addEventListener('scroll', onScroll, {passive:true});
+
+  // scroll reveal
+  const io = new IntersectionObserver((entries)=>{
+    entries.forEach(e=>{ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); }});
+  }, {threshold:.16, rootMargin:'0px 0px -8% 0px'});
+  document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+
+  // count-up + allocation bars when ledger / stats enter view
+  const animateCount = (el)=>{
+    const target = parseFloat(el.dataset.count);
+    const prefix = el.dataset.prefix||'';
+    const suffix = el.dataset.suffix||'';
+    const decimals = (el.dataset.count.split('.')[1]||'').length;
+    const dur = 1600; const start = performance.now();
+    const ease = t => 1 - Math.pow(1-t, 3);
+    const tick = (now)=>{
+      const p = Math.min((now-start)/dur, 1);
+      const v = (target*ease(p)).toFixed(decimals);
+      el.textContent = prefix + Number(v).toLocaleString('en-US',{minimumFractionDigits:decimals,maximumFractionDigits:decimals}) + suffix;
+      if(p<1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  };
+  const countIO = new IntersectionObserver((entries)=>{
+    entries.forEach(e=>{ if(e.isIntersecting){ animateCount(e.target); countIO.unobserve(e.target);}});
+  },{threshold:.6});
+  document.querySelectorAll('[data-count]').forEach(el=>countIO.observe(el));
+
+  const barIO = new IntersectionObserver((entries)=>{
+    entries.forEach(e=>{ if(e.isIntersecting){ e.target.style.width = e.target.dataset.w+'%'; barIO.unobserve(e.target);}});
+  },{threshold:.5});
+  document.querySelectorAll('.bar i').forEach(el=>barIO.observe(el));
+
+  // subtle pointer parallax on ambient orbs
+  const orbs = document.querySelectorAll('.orb');
+  let raf;
+  window.addEventListener('pointermove', (e)=>{
+    if(raf) return;
+    raf = requestAnimationFrame(()=>{
+      const x = (e.clientX/window.innerWidth - .5);
+      const y = (e.clientY/window.innerHeight - .5);
+      orbs.forEach((o,i)=>{ const d=(i+1)*14; o.style.transform=`translate(${x*d}px,${y*d}px)`; });
+      raf = null;
+    });
+  });
+</script>
+</body>
+</html>
