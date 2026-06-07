@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ShoppingCart, Zap } from 'lucide-react';
 import { categoryVisual, money } from '../lib/catalog.js';
@@ -5,14 +6,17 @@ import { categoryVisual, money } from '../lib/catalog.js';
 export default function ProductCard({ product, onAdd }) {
   const { icon: Icon, grad, label } = categoryVisual(product.category);
   const out = product.stock != null && product.stock <= 0;
+  const [imgOk, setImgOk] = useState(true);
+  const showImg = product.image && imgOk;
 
   return (
-    <div className="group relative card overflow-hidden hover:border-primary/40 transition-all duration-300 hover:-translate-y-1">
+    <div className={`group relative card overflow-hidden transition-all duration-300 hover:-translate-y-1.5 hover:border-primary/40 ${product.featured ? 'ring-featured' : ''}`}>
       {/* visual header */}
       <Link to={`/product/${product.id}`} className="block">
-        <div className={`relative h-36 bg-gradient-to-br ${grad} overflow-hidden`}>
-          {product.image ? (
+        <div className={`shine-host relative h-36 bg-gradient-to-br ${grad} overflow-hidden`}>
+          {showImg ? (
             <img src={product.image} alt={product.name}
+              onError={() => setImgOk(false)}
               className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
               loading="lazy" />
           ) : (

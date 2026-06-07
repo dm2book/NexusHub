@@ -11,6 +11,16 @@ import process from 'node:process';
 const bool = (v, def = false) =>
   v === undefined ? def : ['1', 'true', 'yes', 'on'].includes(String(v).toLowerCase());
 
+/** Pull a Resend API key out of a Resend SMTP URL, e.g.
+ *  smtps://resend:re_xxx@smtp.resend.com:465 → re_xxx. Returns '' otherwise. */
+function extractResendKey(smtpUrl) {
+  if (!smtpUrl || !/resend/i.test(smtpUrl)) return '';
+  try {
+    const pw = decodeURIComponent(new URL(smtpUrl).password || '');
+    return /^re_/.test(pw) ? pw : '';
+  } catch { return ''; }
+}
+
 const env = process.env;
 export const isProd = env.NODE_ENV === 'production';
 
@@ -65,6 +75,11 @@ export const config = {
     guildId: env.DISCORD_GUILD_ID || '',
     // Invite link for the Join button. Falls back to the official server invite.
     inviteUrl: env.DISCORD_INVITE_URL || 'https://discord.gg/vNcfgDbVd',
+    // Bot token — lets the API grant Discord roles (Verified vs VIP) to buyers who
+    // signed in with Discord. Optional; role automation is skipped without it.
+    botToken: env.DISCORD_BOT_TOKEN || '',
+    // Spend (in minor units) at/above which a buyer becomes a VIP Customer.
+    vipThreshold: Number(env.DISCORD_VIP_THRESHOLD_CENTS || 2000),
     // Optional webhook to post order events into an ops/sales channel.
     orderWebhookUrl: env.DISCORD_ORDER_WEBHOOK_URL || '',
   },
@@ -74,6 +89,10 @@ export const config = {
     // transport that records messages in the email_log table (never silently
     // dropping them). This keeps non-production environments fully functional.
     smtpUrl: env.SMTP_URL || '',
+    // Resend HTTP API key — the most reliable path on serverless (Vercel), where
+    // raw SMTP connections are often slow or blocked. If only SMTP_URL is set and
+    // it points at Resend, we extract the key from it automatically.
+    resendApiKey: env.RESEND_API_KEY || extractResendKey(env.SMTP_URL) || '',
     fromName: env.EMAIL_FROM_NAME || 'ForgeMarket',
     // Default to Resend's shared sender, which delivers WITHOUT verifying a
     // custom domain — so login codes work the moment SMTP_URL is set. Switch to

@@ -76,3 +76,27 @@ h1, h2, h3, .font-display { font-family: 'Orbitron', sans-serif; letter-spacing:
 /* Card lift on hover for product/feature tiles */
 .lift { transition: transform .25s ease, box-shadow .25s ease, border-color .25s ease; }
 .lift:hover { transform: translateY(-4px); box-shadow: 0 18px 40px -18px rgba(139,92,246,.55); }
+
+/* Diagonal shine sweep on hover (product cards, CTAs) */
+.shine-host { position: relative; overflow: hidden; }
+.shine-host::after {
+  content: ''; position: absolute; top: 0; left: -160%; width: 70%; height: 100%;
+  background: linear-gradient(100deg, transparent, rgba(255,255,255,.22), transparent);
+  transform: skewX(-18deg); transition: left .75s ease; pointer-events: none; z-index: 5;
+}
+.group:hover .shine-host::after, .shine-host:hover::after { left: 160%; }
+
+/* Animated gradient text/border (uses the tailwind gradient keyframes) */
+.gradient-anim { background-size: 200% auto; animation: gradientShift 6s ease infinite; }
+
+/* Soft animated conic glow behind hero */
+.aurora {
+  background: conic-gradient(from 0deg, #6366f1, #a855f7, #ec4899, #22d3ee, #6366f1);
+  filter: blur(90px); opacity: .35; border-radius: 9999px; animation: spin 22s linear infinite;
+}
+
+/* Fancy gradient ring for featured items */
+.ring-featured { box-shadow: 0 0 0 1px rgba(251,191,36,.35), 0 0 30px -8px rgba(251,191,36,.35); }
+
+@keyframes gradientShift { 0%,100%{background-position:0% 50%} 50%{background-position:100% 50%} }
+@keyframes spin { to { transform: rotate(360deg); } }

@@ -77,6 +77,15 @@ client.once('ready', async () => {
     const viewers = (access) => access === 'staff' ? STAFF
       : access === 'vip' ? ['vip', ...STAFF] : MEMBERS;
 
+    // Desired category-level overwrites for an access tier. Public = everyone can
+    // view; otherwise everyone is denied and only the listed roles + bot can view.
+    // This is the verification gate: only 'public' categories are visible before a
+    // member gets the Verified role.
+    const categoryOverwrites = (access) => access === 'public'
+      ? [{ id: everyone, allow: [P.ViewChannel] }, botOW]
+      : [{ id: everyone, deny: [P.ViewChannel] }, botOW,
+         ...viewers(access).filter((k) => roleIds[k]).map((k) => ({ id: roleIds[k], allow: [P.ViewChannel] }))];
+
     // 2) Categories + channels ────────────────────────────────────────────────
     const channelByName = {};
     for (const cat of CATEGORIES) {
@@ -85,25 +94,24 @@ client.once('ready', async () => {
         category = guild.channels.cache.find(
           (c) => c.type === ChannelType.GuildCategory && c.name === cat.name);
         if (!category) {
-          const ow = cat.access === 'public'
-            ? [{ id: everyone, allow: [P.ViewChannel] }, botOW]
-            : [{ id: everyone, deny: [P.ViewChannel] }, botOW,
-               ...viewers(cat.access).filter((k) => roleIds[k]).map((k) => ({ id: roleIds[k], allow: [P.ViewChannel] }))];
           category = await guild.channels.create({
-            name: cat.name, type: ChannelType.GuildCategory, permissionOverwrites: ow, reason: 'ForgeMarket setup',
+            name: cat.name, type: ChannelType.GuildCategory,
+            permissionOverwrites: categoryOverwrites(cat.access), reason: 'ForgeMarket setup',
           });
           console.log(`  + category ${cat.name}`);
+        } else {
+          // Re-apply the full access policy so re-running setup fixes existing
+          // servers (e.g. enforces the verification gate on already-public cats).
+          await category.permissionOverwrites.set(categoryOverwrites(cat.access)).catch(() => {});
+          console.log(`  · category ${cat.name}: perms synced (${cat.access})`);
         }
-        // Ensure the bot can always view+post here (also fixes pre-existing categories).
-        await category.permissionOverwrites.edit(client.user.id,
-          { ViewChannel: true, SendMessages: true, ManageMessages: true }).catch(() => {});
       } catch (e) { console.log(`  ! category ${cat.name} failed: ${e.message}`); continue; }
 
       for (const ch of cat.channels) {
         try {
           let channel = guild.channels.cache.find((c) => c.name === ch.name && c.parentId === category.id);
           if (!channel) {
-            const overwrites = [];
+            const overwrites = [botOW];
             if (ch.readOnly) {
               overwrites.push({ id: everyone, deny: [P.SendMessages, P.SendMessagesInThreads, P.CreatePublicThreads] });
               for (const k of STAFF) if (roleIds[k]) overwrites.push({ id: roleIds[k], allow: [P.SendMessages] });
@@ -112,10 +120,25 @@ client.once('ready', async () => {
               name: ch.name, type: TYPE[ch.type] ?? ChannelType.GuildText, parent: category.id,
               topic: ch.type === 'voice' ? undefined : (ch.topic || '').replace('{STORE_URL}', STORE_URL),
               rateLimitPerUser: ch.slowmode || 0,
-              permissionOverwrites: overwrites.length ? overwrites : undefined,
+              permissionOverwrites: overwrites,
               reason: 'ForgeMarket setup',
             });
             console.log(`    + #${ch.name}`);
+          } else {
+            // Enforce policy on existing channels: clear any channel-level view
+            // override so it INHERITS the (gated) category, re-apply read-only,
+            // and make sure the bot can still post.
+            await channel.permissionOverwrites.edit(everyone,
+              ch.readOnly
+                ? { ViewChannel: null, SendMessages: false, SendMessagesInThreads: false, CreatePublicThreads: false }
+                : { ViewChannel: null, SendMessages: null }).catch(() => {});
+            if (ch.readOnly) {
+              for (const k of STAFF) if (roleIds[k]) {
+                await channel.permissionOverwrites.edit(roleIds[k], { SendMessages: true }).catch(() => {});
+              }
+            }
+            await channel.permissionOverwrites.edit(client.user.id,
+              { ViewChannel: true, SendMessages: true, ManageMessages: true }).catch(() => {});
           }
           channelByName[ch.name] = channel;
         } catch (e) { console.log(`    ! #${ch.name} failed: ${e.message}`); }

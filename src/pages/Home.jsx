@@ -70,13 +70,14 @@ export default function Home() {
       {/* ── Hero ───────────────────────────────────────────── */}
       <section className="relative">
         <div className="absolute inset-0 bg-grid opacity-40" />
+        <div className="aurora absolute w-[680px] h-[680px] -top-72 left-1/2 -translate-x-1/2" />
         <div className="orb w-[520px] h-[520px] bg-primary/30 -top-40 -left-20 animate-float-slow" />
         <div className="orb w-[480px] h-[480px] bg-accent-purple/25 top-10 right-0 animate-float" />
         <div className="section relative pt-24 pb-24 text-center">
           <span className="eyebrow animate-fade-in">⚡ Digital goods · delivered instantly</span>
           <h1 className="text-4xl sm:text-6xl lg:text-7xl text-white mt-6 leading-[1.05] animate-fade-up">
             Your marketplace for<br />
-            <span className="gradient-text">digital goods</span>
+            <span className="gradient-text gradient-anim">digital goods</span>
           </h1>
           <p className="text-slate-400 text-lg sm:text-xl mt-6 max-w-2xl mx-auto animate-fade-up">
             Game currency, gift cards, subscriptions and more — automatically fulfilled,
@@ -96,6 +97,19 @@ export default function Home() {
               </div>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* ── Marquee trust strip ────────────────────────────── */}
+      <section className="relative border-y border-white/[0.06] py-4 overflow-hidden">
+        <div className="flex w-max animate-marquee gap-10 whitespace-nowrap text-sm text-slate-300">
+          {Array.from({ length: 2 }).map((_, k) => (
+            <div key={k} className="flex gap-10">
+              {['⚡ Instant delivery', '🔒 Buyer protection', '💬 24/7 support', '⭐ 4.9/5 rated',
+                '🎁 Weekly giveaways', '🔁 Money-back guarantee', '🛡️ Verified reviews', '💳 Secure checkout']
+                .map((t) => <span key={t} className="text-slate-300/90">{t}</span>)}
+            </div>
+          ))}
         </div>
       </section>
 

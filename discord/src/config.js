@@ -75,7 +75,7 @@ export const CATEGORIES = [
     ],
   },
   {
-    name: '📢 ANNOUNCEMENTS', access: 'public',
+    name: '📢 ANNOUNCEMENTS', access: 'verified',
     channels: [
       { name: 'announcements', type: 'announcement', readOnly: true, topic: 'Official ForgeMarket news. Follow this channel to never miss a drop.' },
       { name: 'updates', type: 'text', readOnly: true, topic: 'Product, pricing and feature updates.' },
@@ -110,7 +110,7 @@ export const CATEGORIES = [
     ],
   },
   {
-    name: '⭐ REVIEWS & TRUST', access: 'public',
+    name: '⭐ REVIEWS & TRUST', access: 'verified',
     channels: [
       { name: 'reviews', type: 'text', readOnly: true, topic: 'Verified customer reviews. Posted automatically after real orders.' },
       { name: 'vouchers', type: 'text', slowmode: 30, topic: 'Bought from us? Leave a quick voucher/vouch for the community 💚' },
@@ -119,7 +119,7 @@ export const CATEGORIES = [
     ],
   },
   {
-    name: '🎫 SUPPORT', access: 'public',
+    name: '🎫 SUPPORT', access: 'verified',
     channels: [
       { name: 'open-a-ticket', type: 'text', readOnly: true, topic: 'Need help? Tap the button to open a private ticket with our team.' },
       { name: 'faq', type: 'text', readOnly: true, topic: 'Answers to the most common questions.' },
@@ -144,7 +144,7 @@ export const CATEGORIES = [
     ],
   },
   {
-    name: '🤝 PARTNERS', access: 'public',
+    name: '🤝 PARTNERS', access: 'verified',
     channels: [
       { name: 'partnerships', type: 'text', readOnly: true, topic: 'Want to partner or become an affiliate? Open a ticket to apply.' },
       { name: 'partner-perks', type: 'text', readOnly: true, topic: 'Perks & benefits for approved partners.' },
