@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>ICD 3 GALLERY — Virtual Tour</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  html, body, #root { height: 100%; margin: 0; background: #0b0b0d; overflow: hidden; }
+  * { -webkit-tap-highlight-color: transparent; }
+  canvas { display: block; touch-action: none; }
+  .font-display { font-family: 'Georgia', 'Times New Roman', serif; letter-spacing: 0.35em; }
+  .glass { background: rgba(18,18,20,0.55); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px);} to { opacity: 1; transform: translateY(0);} }
+  .anim-in { animation: fadeIn .6s ease both; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" data-presets="env,react">
+const { useRef, useEffect, useState, useCallback } = React;
+
+/* ------------------------------------------------------------------ *
+ *  ROOM METADATA (UI side)
+ * ------------------------------------------------------------------ */
+const ROOMS = [
+  { key: 'kitchen',  name: 'Luxury Kitchen',     blurb: 'Dark wood panelling, a sculptural island and warm ambient glow.', accent: '#c79a5b' },
+  { key: 'living',   name: 'Chic Living Room',   blurb: 'Designer armchairs, a light sofa, lush greenery and a built-in fireplace.', accent: '#d7a06b' },
+  { key: 'gallery',  name: 'Gallery / Pool Room',blurb: 'Minimalist art frames surrounding a central pool table.', accent: '#8fa9b8' },
+  { key: 'bedroom',  name: 'Minimalist Bedroom', blurb: 'A premium king bed beneath bold abstract canvas art.', accent: '#b98c74' },
+  { key: 'bathroom', name: 'High-End Bathroom',  blurb: 'Marble surfaces, a freestanding tub and a walk-in shower.', accent: '#9fb4b0' },
+];
+
+/* room centers along X so scenes never overlap visually */
+const SPACING = 120;
+const EYE_Y = 5.2;
+
+/* ================================================================== *
+ *  THREE.JS SCENE BUILDER
+ * ================================================================== */
+function buildWorld(scene) {
+  const rooms = [];
+
+  /* ---- material helpers ---- */
+  const M = (c, o={}) => new THREE.MeshStandardMaterial({ color: c, roughness: o.r ?? 0.85, metalness: o.m ?? 0.0, ...o });
+  const box = (w,h,d,mat) => new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat);
+  const cyl = (rt,rb,h,mat,seg=24) => new THREE.Mesh(new THREE.CylinderGeometry(rt,rb,h,seg), mat);
+  const sph = (r,mat,seg=20) => new THREE.Mesh(new THREE.SphereGeometry(r,seg,seg), mat);
+
+  /* generic enclosed shell -------------------------------------------------- */
+  function shell(cx, opts) {
+    const g = new THREE.Group();
+    g.position.x = cx;
+    const W = 34, D = 34, H = 13, t = 0.6;
+    const floor = box(W, t, D, M(opts.floor, { r: opts.floorR ?? 0.7, m: opts.floorM ?? 0 }));
+    floor.position.y = -t/2; floor.receiveShadow = true; g.add(floor);
+    const ceil = box(W, t, D, M(opts.ceil ?? 0x1b1b1d, { r: 0.95 }));
+    ceil.position.y = H; g.add(ceil);
+    const wallMat = M(opts.wall, { r: opts.wallR ?? 0.92 });
+    const back = box(W, H, t, wallMat); back.position.set(0, H/2, -D/2); back.receiveShadow = true; g.add(back);
+    const front = box(W, H, t, wallMat); front.position.set(0, H/2, D/2); front.receiveShadow = true; g.add(front);
+    const left = box(t, H, D, wallMat); left.position.set(-W/2, H/2, 0); left.receiveShadow = true; g.add(left);
+    const right = box(t, H, D, wallMat); right.position.set(W/2, H/2, 0); right.receiveShadow = true; g.add(right);
+    // soft baseboard accent
+    const skirt = box(W, 0.5, D, M(opts.skirt ?? 0x111113, { r: 0.6 }));
+    skirt.position.y = 0.25; g.add(skirt);
+    scene.add(g);
+    return { group: g, cx, W, D, H };
+  }
+
+  function frame(w, h, art) {
+    const grp = new THREE.Group();
+    const fr = box(w + 0.5, h + 0.5, 0.25, M(0x141414, { r: 0.5 }));
+    grp.add(fr);
+    const canvas = box(w, h, 0.05, new THREE.MeshStandardMaterial({ color: art, roughness: 0.9, emissive: art, emissiveIntensity: 0.06 }));
+    canvas.position.z = 0.16; grp.add(canvas);
+    return grp;
+  }
+
+  function plant(scale=1) {
+    const g = new THREE.Group();
+    const pot = cyl(1.1, 0.8, 1.6, M(0x2b2b2e, { r: 0.6 }));
+    pot.position.y = 0.8; g.add(pot);
+    const soil = cyl(1.0, 1.0, 0.2, M(0x20160f)); soil.position.y = 1.6; g.add(soil);
+    const foliage = M(0x3d6b43, { r: 1 });
+    for (let i=0;i<5;i++){
+      const leaf = sph(1.4 - i*0.12, foliage, 12);
+      leaf.position.set((Math.random()-0.5)*1.2, 2.6 + i*0.9, (Math.random()-0.5)*1.2);
+      leaf.scale.y = 1.5; g.add(leaf);
+    }
+    g.scale.setScalar(scale);
+    return g;
+  }
+
+  /* ------------------------------------------------------------------ *
+   * 1. LUXURY KITCHEN
+   * ------------------------------------------------------------------ */
+  (function(){
+    const cx = 0 * SPACING;
+    const s = shell(cx, { floor: 0x3a2a1d, floorR: 0.5, wall: 0x484440, ceil: 0x201d1a });
+    const g = s.group;
+    const woodDark = M(0x2c2017, { r: 0.45, m: 0.05 });
+    const marble = M(0xe9e6df, { r: 0.25, m: 0.1 });
+
+    // island
+    const island = box(12, 3.4, 6, woodDark); island.position.set(0, 1.7, 1); island.castShadow = true; g.add(island);
+    const top = box(12.6, 0.4, 6.6, marble); top.position.set(0, 3.6, 1); top.castShadow = true; g.add(top);
+    // stools
+    for (const x of [-3.5, 0, 3.5]) {
+      const st = cyl(0.7, 0.7, 0.4, M(0x6b5240)); st.position.set(x, 2.4, 5); g.add(st);
+      const leg = cyl(0.12,0.12,2.4, M(0x111)); leg.position.set(x, 1.2, 5); g.add(leg);
+    }
+    // back cabinets + wall units (dark wood)
+    const cabinet = box(28, 3.2, 2.4, woodDark); cabinet.position.set(0, 1.6, -15); cabinet.castShadow = true; g.add(cabinet);
+    const counter = box(28, 0.3, 2.6, marble); counter.position.set(0, 3.3, -15); g.add(counter);
+    const upper = box(28, 3, 1.6, woodDark); upper.position.set(0, 8.5, -15.4); g.add(upper);
+    // range hood
+    const hood = box(5, 2.2, 3, M(0x14110d, { m: 0.4, r: 0.5 })); hood.position.set(0, 9, -14.6); g.add(hood);
+    // warm pendant lights over island
+    for (const x of [-3.5, 3.5]) {
+      const shade = cyl(0.9, 0.5, 1.2, new THREE.MeshStandardMaterial({ color: 0x3a2c1f, emissive: 0xffb15a, emissiveIntensity: 0.9, roughness: 0.5 }));
+      shade.position.set(x, 7.6, 1); g.add(shade);
+      const cord = cyl(0.04,0.04,3.6, M(0x111)); cord.position.set(x, 9.6, 1); g.add(cord);
+      const pl = new THREE.PointLight(0xffb968, 0.9, 28, 2); pl.position.set(x, 6.6, 1); g.add(pl);
+    }
+    s.eye = { x: cx + 9, z: 11, yaw: -2.5 };
+    rooms.push(s);
+  })();
+
+  /* ------------------------------------------------------------------ *
+   * 2. CHIC LIVING ROOM
+   * ------------------------------------------------------------------ */
+  (function(){
+    const cx = 1 * SPACING;
+    const s = shell(cx, { floor: 0xb7895a, floorR: 0.55, wall: 0xe7e2da, ceil: 0xf3efe8, skirt: 0xd8d2c8 });
+    const g = s.group;
+    // sofa (light)
+    const sofaMat = M(0xe9e4da, { r: 0.95 });
+    const sofa = box(13, 1.6, 5, sofaMat); sofa.position.set(-2, 1.6, -12); sofa.castShadow = true; g.add(sofa);
+    const sback = box(13, 3, 1.4, sofaMat); sback.position.set(-2, 2.6, -14); g.add(sback);
+    for (const x of [-7.5, 3.5]) { const arm = box(1.6, 2.4, 5, sofaMat); arm.position.set(x, 2, -12); g.add(arm);}
+    for (const x of [-5,-1,2.5]) { const cush = box(3.6,0.8,4, M(0xddd6cb)); cush.position.set(x,2.6,-11.6); g.add(cush);}
+    // two designer armchairs
+    const chairMat = M(0xa9764e, { r: 0.7 });
+    for (const x of [6, 11]) {
+      const seat = box(3.6, 1.4, 3.6, chairMat); seat.position.set(x, 1.5, 4); seat.castShadow = true; g.add(seat);
+      const cb = box(3.6, 3, 1, chairMat); cb.position.set(x, 3, 5.3); g.add(cb);
+      const leg = cyl(0.15,0.15,1.4, M(0x222)); leg.position.set(x, 0.7, 4); g.add(leg);
+    }
+    // coffee table
+    const ct = box(6, 0.4, 3, M(0x241a12, { r: 0.4 })); ct.position.set(0, 1.4, -4); g.add(ct);
+    const ctl = box(5.6,1.4,2.6, M(0x1c140d)); ctl.position.set(0,0.7,-4); g.add(ctl);
+    // rug
+    const rug = box(16, 0.08, 12, M(0xc9bca8, { r: 1 })); rug.position.set(0, 0.12, -5); g.add(rug);
+    // plants
+    const p1 = plant(1.2); p1.position.set(-14, 0, 12); g.add(p1);
+    const p2 = plant(1.0); p2.position.set(13, 0, -13); g.add(p2);
+    // built-in modern fireplace
+    const fwall = box(16, 13, 1.4, M(0x2a2724, { r: 0.6 })); fwall.position.set(0, 6.5, 16.4); g.add(fwall);
+    const recess = box(7, 3, 1, new THREE.MeshStandardMaterial({ color: 0x0a0705, emissive: 0xff5a1e, emissiveIntensity: 1.4, roughness: 0.6 }));
+    recess.position.set(0, 4.2, 15.7); g.add(recess);
+    const mantle = box(10, 0.4, 2, M(0x15110d)); mantle.position.set(0, 6.2, 15.6); g.add(mantle);
+    const fire = new THREE.PointLight(0xff6a2a, 1.4, 34, 2); fire.position.set(0, 4.4, 13.5); g.add(fire);
+    s.fire = fire;
+    // soft ceiling glow
+    const amb = new THREE.PointLight(0xfff0d8, 0.5, 50, 2); amb.position.set(0, 11, 0); g.add(amb);
+    s.eye = { x: cx - 6, z: 6, yaw: 0.4 };
+    rooms.push(s);
+  })();
+
+  /* ------------------------------------------------------------------ *
+   * 3. GALLERY / POOL ROOM
+   * ------------------------------------------------------------------ */
+  (function(){
+    const cx = 2 * SPACING;
+    const s = shell(cx, { floor: 0x67676a, floorR: 0.6, floorM: 0.1, wall: 0x2a2a2d, ceil: 0x161618, skirt: 0x191919 });
+    const g = s.group;
+    // pool table
+    const felt = M(0x1f6b3c, { r: 0.85 });
+    const railMat = M(0x2a1a10, { r: 0.4 });
+    const bed = box(11, 0.6, 6, felt); bed.position.set(0, 3, 0); bed.castShadow = true; g.add(bed);
+    const frameTop = box(12.4, 1, 7.4, railMat); frameTop.position.set(0, 2.9, 0); g.add(frameTop);
+    const railTop = box(11.2, 0.7, 6.2, felt); railTop.position.set(0, 3.35, 0); g.add(railTop);
+    for (const [x,z] of [[-5,-3],[5,-3],[-5,3],[5,3]]) { const leg = box(1.1, 3, 1.1, railMat); leg.position.set(x, 1.5, z); g.add(leg);}
+    // balls
+    const ballCols = [0xe8e2d0,0xd6b53a,0x2952b0,0xb02929,0x6a2fa0,0xdc7a25,0x208a4a,0x111111];
+    let bi=0;
+    for (let r=0;r<4;r++){ for(let c=0;c<=r;c++){ const ball = sph(0.42, M(ballCols[bi%ballCols.length], { r: 0.3, m: 0.05 }), 16); ball.position.set(-3 + r*0.9, 3.7, -2 + c*0.9 - r*0.45); g.add(ball); bi++; }}
+    const cueBall = sph(0.42, M(0xf3efe6, { r: 0.25 })); cueBall.position.set(4, 3.7, 0); g.add(cueBall);
+    // hanging lamp over table
+    const lampShade = box(8, 0.8, 2.4, new THREE.MeshStandardMaterial({ color: 0x111, emissive: 0xffe9c0, emissiveIntensity: 0.6 }));
+    lampShade.position.set(0, 8.2, 0); g.add(lampShade);
+    const tl = new THREE.PointLight(0xfff1d6, 1.1, 30, 2); tl.position.set(0, 7.4, 0); g.add(tl);
+    // minimalist art frames on walls
+    const arts = [0xc24b3a, 0x2f6fb0, 0xddb24a, 0x8a8f96, 0x3f9b6d, 0xcf7d3c];
+    arts.forEach((a, i) => {
+      const f = frame(4.5, 6, a);
+      if (i < 3) { f.position.set(cx - 10 + i*10, 7, -16.6); }
+      else { f.position.set(cx - 10 + (i-3)*10, 7, 16.6); f.rotation.y = Math.PI; }
+      // place relative to group: subtract cx because added to group
+      f.position.x -= cx;
+      g.add(f);
+    });
+    // spotlights on side art
+    const sp = new THREE.PointLight(0xffffff, 0.4, 40, 2); sp.position.set(0, 10, 0); g.add(sp);
+    s.eye = { x: cx, z: 12, yaw: Math.PI };
+    rooms.push(s);
+  })();
+
+  /* ------------------------------------------------------------------ *
+   * 4. MINIMALIST BEDROOM
+   * ------------------------------------------------------------------ */
+  (function(){
+    const cx = 3 * SPACING;
+    const s = shell(cx, { floor: 0x9c7144, floorR: 0.55, wall: 0xcfc6ba, ceil: 0xe6ddd0, skirt: 0xbcb1a2 });
+    const g = s.group;
+    // bed
+    const baseMat = M(0x2a2017, { r: 0.5 });
+    const sheetMat = M(0xeae4d8, { r: 0.95 });
+    const base = box(13, 1.8, 16, baseMat); base.position.set(0, 0.9, -4); base.castShadow = true; g.add(base);
+    const mattress = box(12.4, 1.6, 15.4, sheetMat); mattress.position.set(0, 2.4, -4); g.add(mattress);
+    const duvet = box(12.6, 0.6, 9, M(0xd9d0c2, { r: 1 })); duvet.position.set(0, 3.1, -1.5); g.add(duvet);
+    for (const x of [-3.2, 3.2]) { const pil = box(4.6, 1, 2.4, M(0xf2ede4)); pil.position.set(x, 3.4, -10); g.add(pil);}
+    const head = box(14, 5, 1, M(0x6a5135, { r: 0.6 })); head.position.set(0, 4, -12); head.castShadow = true; g.add(head);
+    // bedside tables + warm lamps
+    for (const x of [-8.5, 8.5]) {
+      const nt = box(2.6, 2.4, 2.6, baseMat); nt.position.set(x, 1.2, -11); g.add(nt);
+      const lamp = cyl(0.8, 0.5, 1.6, new THREE.MeshStandardMaterial({ color: 0x2a2018, emissive: 0xffce82, emissiveIntensity: 1.0 }));
+      lamp.position.set(x, 3.4, -11); g.add(lamp);
+      const ll = new THREE.PointLight(0xffce82, 0.7, 22, 2); ll.position.set(x, 4, -11); g.add(ll);
+    }
+    // abstract canvas art above bed
+    const canvas = new THREE.Group();
+    const cbg = box(12, 6, 0.2, M(0xf4f0e8, { r: 0.9 })); canvas.add(cbg);
+    const blocks = [[0xc7553f,-3.5,1,3,3],[0x2c5c8f,1.5,-0.5,4,4],[0xe0b44a,4,2,2,2],[0x33363b,-1,-2,2.5,1.5]];
+    blocks.forEach(([c,x,y,w,h])=>{ const b=box(w,h,0.1,M(c,{r:0.8})); b.position.set(x,y,0.16); canvas.add(b);});
+    canvas.position.set(0, 8, -12.2); g.add(canvas);
+    // rug + plant
+    const rug = box(18,0.08,8,M(0xb9ab94,{r:1})); rug.position.set(0,0.12,6); g.add(rug);
+    const p = plant(1.0); p.position.set(13,0,12); g.add(p);
+    s.eye = { x: cx, z: 13, yaw: Math.PI };
+    rooms.push(s);
+  })();
+
+  /* ------------------------------------------------------------------ *
+   * 5. HIGH-END BATHROOM
+   * ------------------------------------------------------------------ */
+  (function(){
+    const cx = 4 * SPACING;
+    const s = shell(cx, { floor: 0xd9d5cc, floorR: 0.2, floorM: 0.15, wall: 0xcdc9c0, wallR: 0.25, ceil: 0xe9e6df, skirt: 0xbdb9b0 });
+    const g = s.group;
+    const marble = M(0xe9e6df, { r: 0.18, m: 0.12 });
+    const veinWall = box(34, 13, 0.4, new THREE.MeshStandardMaterial({ color: 0xcfcabf, roughness: 0.2, metalness: 0.1 }));
+    veinWall.position.set(0, 6.5, -16.7); g.add(veinWall);
+    // freestanding bathtub (oval) – cylinder shell + inner
+    const tub = new THREE.Group();
+    const outer = cyl(3.2, 2.6, 3.2, M(0xf6f4ef, { r: 0.2 }), 32); outer.scale.z = 0.6; tub.add(outer);
+    const inner = cyl(2.6, 2.2, 3.0, M(0xdfeaec, { r: 0.1 }), 32); inner.scale.z = 0.6; inner.position.y = 0.4; tub.add(inner);
+    tub.position.set(-9, 1.8, 4); g.add(tub);
+    const tap = cyl(0.12, 0.12, 3, M(0xb7b0a2, { m: 0.8, r: 0.3 })); tap.position.set(-9, 3, 6.6); tap.rotation.x = -0.3; g.add(tap);
+    // walk-in shower: glass panel + tray + shower head
+    const tray = box(10, 0.4, 10, M(0xcbc7be, { r: 0.3 })); tray.position.set(9, 0.2, -8); g.add(tray);
+    const glassMat = new THREE.MeshPhysicalMaterial({ color: 0xbfe2e6, roughness: 0.05, metalness: 0, transparent: true, opacity: 0.18, transmission: 0.6 });
+    const glass1 = box(0.2, 9, 10, glassMat); glass1.position.set(4, 4.5, -8); g.add(glass1);
+    const glass2 = box(10, 9, 0.2, glassMat); glass2.position.set(9, 4.5, -3); g.add(glass2);
+    const arm = cyl(0.1,0.1,2.5, M(0xb7b0a2,{m:0.8,r:0.3})); arm.position.set(12, 9, -10); arm.rotation.z = 0.5; g.add(arm);
+    const head = cyl(1.1,1.1,0.3, M(0xc8c2b4,{m:0.7,r:0.3})); head.position.set(11, 8.2, -10); g.add(head);
+    // vanity
+    const vanity = box(10, 2.6, 3, M(0x2c2118, { r: 0.45 })); vanity.position.set(0, 1.3, 16); g.add(vanity);
+    const vtop = box(10.6, 0.4, 3.4, marble); vtop.position.set(0, 2.7, 16); g.add(vtop);
+    const mirror = box(8, 5, 0.2, new THREE.MeshStandardMaterial({ color: 0x9fb3b6, metalness: 0.9, roughness: 0.1 })); mirror.position.set(0, 7, 16.7); g.add(mirror);
+    const towel = box(3, 0.3, 0.3, M(0xf2efe8)); towel.position.set(-9, 4, 16.6); g.add(towel);
+    // cool-warm fill light
+    const fill = new THREE.PointLight(0xfdf6ea, 0.7, 50, 2); fill.position.set(0, 11, 0); g.add(fill);
+    const sgl = new THREE.PointLight(0xdaf0ff, 0.5, 26, 2); sgl.position.set(9, 8, -8); g.add(sgl);
+    s.eye = { x: cx + 4, z: 11, yaw: -2.7 };
+    rooms.push(s);
+  })();
+
+  return rooms;
+}
+
+/* ================================================================== *
+ *  REACT COMPONENT
+ * ================================================================== */
+function App() {
+  const mountRef = useRef(null);
+  const ctrl = useRef({});         // imperative three controller
+  const [current, setCurrent] = useState(0);
+  const [fading, setFading] = useState(false);
+  const [ready, setReady] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  /* ---------------- THREE SETUP ---------------- */
+  useEffect(() => {
+    const mount = mountRef.current;
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x0b0b0d, 0.012);
+
+    const camera = new THREE.PerspectiveCamera(72, mount.clientWidth / mount.clientHeight, 0.1, 1000);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(mount.clientWidth, mount.clientHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.outputEncoding = THREE.sRGBEncoding;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.05;
+    mount.appendChild(renderer.domElement);
+
+    // global soft lighting
+    scene.add(new THREE.HemisphereLight(0xfff3e2, 0x1a1614, 0.55));
+    const key = new THREE.DirectionalLight(0xffe9c9, 0.35);
+    key.position.set(40, 60, 30);
+    scene.add(key);
+    scene.add(new THREE.AmbientLight(0x404048, 0.5));
+
+    const rooms = buildWorld(scene);
+
+    // camera state
+    const state = {
+      pos: new THREE.Vector3(rooms[0].eye.x, EYE_Y, rooms[0].eye.z),
+      target: new THREE.Vector3(rooms[0].eye.x, EYE_Y, rooms[0].eye.z),
+      yaw: rooms[0].eye.yaw, pitch: -0.05,
+      roomIndex: 0,
+    };
+
+    function clampToRoom(idx) {
+      const r = rooms[idx]; const cx = r.cx; const half = 14;
+      state.pos.x = Math.max(cx - half, Math.min(cx + half, state.pos.x));
+      state.pos.z = Math.max(-half, Math.min(half, state.pos.z));
+      state.pos.y = EYE_Y;
+    }
+
+    /* imperative API for React */
+    ctrl.current = {
+      teleport(idx) {
+        const r = rooms[idx];
+        state.roomIndex = idx;
+        state.yaw = r.eye.yaw; state.pitch = -0.05;
+        // start a touch back for a gentle dolly-in reveal
+        const fx = Math.sin(r.eye.yaw), fz = Math.cos(r.eye.yaw);
+        state.pos.set(r.eye.x - fx * 3, EYE_Y, r.eye.z - fz * 3);
+        state.target.set(r.eye.x, EYE_Y, r.eye.z);
+      },
+      move(dir) {
+        // dir: 1 forward, -1 back  (horizontal only)
+        const fx = Math.sin(state.yaw), fz = Math.cos(state.yaw);
+        state.target.x = state.pos.x + fx * 4 * dir;
+        state.target.z = state.pos.z + fz * 4 * dir;
+        clampToRoom(state.roomIndex);
+        state.target.x = Math.max(rooms[state.roomIndex].cx - 14, Math.min(rooms[state.roomIndex].cx + 14, state.target.x));
+        state.target.z = Math.max(-14, Math.min(14, state.target.z));
+      },
+      strafe(dir) {
+        const fx = Math.cos(state.yaw), fz = -Math.sin(state.yaw);
+        state.target.x = state.pos.x + fx * 4 * dir;
+        state.target.z = state.pos.z + fz * 4 * dir;
+        state.target.x = Math.max(rooms[state.roomIndex].cx - 14, Math.min(rooms[state.roomIndex].cx + 14, state.target.x));
+        state.target.z = Math.max(-14, Math.min(14, state.target.z));
+      }
+    };
+
+    /* ---------------- LOOK CONTROLS (drag / swipe) ---------------- */
+    let dragging = false, px = 0, py = 0;
+    const sens = 0.0042;
+    const onDown = (e) => { dragging = true; const p = e.touches ? e.touches[0] : e; px = p.clientX; py = p.clientY; };
+    const onUp = () => { dragging = false; };
+    const onMove = (e) => {
+      if (!dragging) return;
+      const p = e.touches ? e.touches[0] : e;
+      const dx = p.clientX - px, dy = p.clientY - py;
+      px = p.clientX; py = p.clientY;
+      state.yaw -= dx * sens;
+      state.pitch = Math.max(-1.1, Math.min(0.9, state.pitch - dy * sens));
+      if (e.cancelable) e.preventDefault();
+    };
+    const el = renderer.domElement;
+    el.addEventListener('mousedown', onDown);
+    window.addEventListener('mouseup', onUp);
+    window.addEventListener('mousemove', onMove);
+    el.addEventListener('touchstart', onDown, { passive: false });
+    window.addEventListener('touchend', onUp);
+    el.addEventListener('touchmove', onMove, { passive: false });
+
+    /* keyboard movement */
+    const keys = {};
+    const kd = (e) => { keys[e.key.toLowerCase()] = true; };
+    const ku = (e) => { keys[e.key.toLowerCase()] = false; };
+    window.addEventListener('keydown', kd);
+    window.addEventListener('keyup', ku);
+
+    /* resize */
+    const onResize = () => {
+      camera.aspect = mount.clientWidth / mount.clientHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(mount.clientWidth, mount.clientHeight);
+    };
+    window.addEventListener('resize', onResize);
+
+    /* ---------------- RENDER LOOP ---------------- */
+    const clock = new THREE.Clock();
+    let raf;
+    const tick = () => {
+      raf = requestAnimationFrame(tick);
+      const dt = Math.min(clock.getDelta(), 0.05);
+      const t = clock.elapsedTime;
+
+      // keyboard continuous movement
+      const speed = 11 * dt;
+      const fx = Math.sin(state.yaw), fz = Math.cos(state.yaw);
+      const rx = Math.cos(state.yaw), rz = -Math.sin(state.yaw);
+      if (keys['w'] || keys['arrowup'])    { state.target.x += fx*speed; state.target.z += fz*speed; }
+      if (keys['s'] || keys['arrowdown'])  { state.target.x -= fx*speed; state.target.z -= fz*speed; }
+      if (keys['a'] || keys['arrowleft'])  { state.target.x += rx*speed; state.target.z += rz*speed; }
+      if (keys['d'] || keys['arrowright']) { state.target.x -= rx*speed; state.target.z -= rz*speed; }
+      // clamp target to current room
+      const cx = rooms[state.roomIndex].cx;
+      state.target.x = Math.max(cx-14, Math.min(cx+14, state.target.x));
+      state.target.z = Math.max(-14, Math.min(14, state.target.z));
+
+      // smooth position follow
+      state.pos.lerp(state.target, 1 - Math.pow(0.0001, dt));
+
+      camera.position.copy(state.pos);
+      const dir = new THREE.Vector3(
+        Math.cos(state.pitch) * Math.sin(state.yaw),
+        Math.sin(state.pitch),
+        Math.cos(state.pitch) * Math.cos(state.yaw)
+      );
+      camera.lookAt(state.pos.clone().add(dir));
+
+      // fireplace flicker
+      const lr = rooms[1];
+      if (lr && lr.fire) lr.fire.intensity = 1.2 + Math.sin(t*9)*0.25 + Math.sin(t*23)*0.12;
+
+      renderer.render(scene, camera);
+    };
+    tick();
+    setReady(true);
+
+    return () => {
+      cancelAnimationFrame(raf);
+      el.removeEventListener('mousedown', onDown);
+      window.removeEventListener('mouseup', onUp);
+      window.removeEventListener('mousemove', onMove);
+      el.removeEventListener('touchstart', onDown);
+      window.removeEventListener('touchend', onUp);
+      el.removeEventListener('touchmove', onMove);
+      window.removeEventListener('keydown', kd);
+      window.removeEventListener('keyup', ku);
+      window.removeEventListener('resize', onResize);
+      renderer.dispose();
+      if (renderer.domElement.parentNode) renderer.domElement.parentNode.removeChild(renderer.domElement);
+    };
+  }, []);
+
+  /* ---------------- ROOM NAVIGATION (crossfade) ---------------- */
+  const goToRoom = useCallback((idx) => {
+    if (idx === current && ready) return;
+    setFading(true);
+    setTimeout(() => {
+      ctrl.current.teleport && ctrl.current.teleport(idx);
+      setCurrent(idx);
+    }, 320);
+    setTimeout(() => setFading(false), 680);
+  }, [current, ready]);
+
+  const next = () => goToRoom((current + 1) % ROOMS.length);
+  const prev = () => goToRoom((current - 1 + ROOMS.length) % ROOMS.length);
+
+  const room = ROOMS[current];
+
+  /* ---------------- UI ---------------- */
+  return (
+    <div className="relative w-full h-full select-none text-white">
+      <div ref={mountRef} className="absolute inset-0" />
+
+      {/* crossfade veil */}
+      <div className="absolute inset-0 pointer-events-none transition-opacity duration-300 ease-in-out"
+           style={{ opacity: fading ? 1 : 0, background: 'radial-gradient(circle at 50% 45%, #14110d 0%, #050505 100%)' }} />
+
+      {/* vignette */}
+      <div className="absolute inset-0 pointer-events-none"
+           style={{ boxShadow: 'inset 0 0 220px 40px rgba(0,0,0,0.65)' }} />
+
+      {/* ---------- TOP NAV ---------- */}
+      <header className="absolute top-0 left-0 right-0 z-20">
+        <div className="glass border-b border-white/10">
+          <div className="max-w-7xl mx-auto px-5 sm:px-8 h-16 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-7 h-7 rounded-sm border border-white/40 flex items-center justify-center text-[10px] tracking-widest">3</div>
+              <h1 className="font-display text-base sm:text-xl text-white/95">ICD&nbsp;3&nbsp;GALLERY</h1>
+            </div>
+            <nav className="hidden md:flex items-center gap-9 text-[13px] tracking-[0.18em] text-white/75">
+              {['Galleries','Basis','Location','Contact'].map((m,i) => (
+                <a key={m} href="#" onClick={(e)=>e.preventDefault()}
+                   className={`uppercase hover:text-white transition-colors ${i===0?'text-white':''}`}>{m}</a>
+              ))}
+            </nav>
+            <button onClick={()=>setMenuOpen(o=>!o)} className="md:hidden text-white/80 text-2xl leading-none">≡</button>
+          </div>
+          {menuOpen && (
+            <div className="md:hidden glass border-t border-white/10 px-8 py-4 flex flex-col gap-3 text-sm tracking-widest uppercase text-white/80">
+              {['Galleries','Basis','Location','Contact'].map(m => <a key={m} href="#" onClick={(e)=>e.preventDefault()}>{m}</a>)}
+            </div>
+          )}
+        </div>
+      </header>
+
+      {/* ---------- ROOM TITLE (top-center) ---------- */}
+      <div key={current} className="anim-in absolute top-24 left-1/2 -translate-x-1/2 z-10 text-center px-4 pointer-events-none">
+        <p className="text-[11px] tracking-[0.4em] uppercase mb-2" style={{ color: room.accent }}>
+          Scene {String(current+1).padStart(2,'0')} / {String(ROOMS.length).padStart(2,'0')}
+        </p>
+        <h2 className="font-display text-2xl sm:text-4xl text-white/95 drop-shadow-lg">{room.name}</h2>
+        <p className="mt-2 text-xs sm:text-sm text-white/60 max-w-md mx-auto">{room.blurb}</p>
+      </div>
+
+      {/* ---------- CENTER DRAG HINT ---------- */}
+      {ready && (
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-0 pointer-events-none">
+          <div className="w-9 h-9 rounded-full border border-white/25" />
+        </div>
+      )}
+
+      {/* ---------- SIDE ARROWS ---------- */}
+      <button onClick={prev} className="absolute left-3 sm:left-6 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full glass border border-white/15 flex items-center justify-center text-xl hover:bg-white/15 transition">‹</button>
+      <button onClick={next} className="absolute right-3 sm:right-6 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full glass border border-white/15 flex items-center justify-center text-xl hover:bg-white/15 transition">›</button>
+
+      {/* ---------- MOVE HOTSPOTS (bottom-center) ---------- */}
+      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2">
+        <MoveBtn label="Strafe left" onClick={()=>ctrl.current.strafe && ctrl.current.strafe(1)}>↶</MoveBtn>
+        <MoveBtn label="Back" onClick={()=>ctrl.current.move && ctrl.current.move(-1)}>↓</MoveBtn>
+        <MoveBtn label="Forward" big onClick={()=>ctrl.current.move && ctrl.current.move(1)}>↑</MoveBtn>
+        <MoveBtn label="Strafe right" onClick={()=>ctrl.current.strafe && ctrl.current.strafe(-1)}>↷</MoveBtn>
+      </div>
+
+      {/* ---------- MINI-MAP / ROOM INDICATOR (bottom-left) ---------- */}
+      <div className="absolute bottom-6 left-4 sm:left-6 z-20 glass rounded-xl border border-white/10 p-3 w-52">
+        <p className="text-[10px] tracking-[0.3em] uppercase text-white/45 mb-3 px-1">Floor Plan</p>
+        <div className="grid grid-cols-5 gap-1.5 mb-3">
+          {ROOMS.map((r,i)=>(
+            <button key={r.key} onClick={()=>goToRoom(i)} title={r.name}
+              className="h-9 rounded-md border transition-all flex items-end justify-center pb-1 relative"
+              style={{
+                borderColor: i===current ? r.accent : 'rgba(255,255,255,0.12)',
+                background: i===current ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.02)'
+              }}>
+              <span className="text-[9px] text-white/60">{i+1}</span>
+              {i===current && <span className="absolute -top-1 w-1.5 h-1.5 rounded-full" style={{ background: r.accent }} />}
+            </button>
+          ))}
+        </div>
+        <div className="px-1">
+          <p className="text-xs text-white/85 leading-tight">{room.name}</p>
+        </div>
+      </div>
+
+      {/* ---------- CONTROLS HINT (bottom-right) ---------- */}
+      <div className="absolute bottom-6 right-4 sm:right-6 z-20 glass rounded-lg border border-white/10 px-3 py-2 text-[10px] tracking-wide text-white/55 hidden sm:block">
+        <span className="text-white/75">Drag</span> to look · <span className="text-white/75">WASD</span> to move
+      </div>
+    </div>
+  );
+}
+
+function MoveBtn({ children, onClick, label, big }) {
+  return (
+    <button aria-label={label} onClick={onClick}
+      className={`glass border border-white/15 rounded-full flex items-center justify-center hover:bg-white/15 active:scale-95 transition ${big ? 'w-14 h-14 text-2xl' : 'w-11 h-11 text-lg'}`}>
+      {children}
+    </button>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
