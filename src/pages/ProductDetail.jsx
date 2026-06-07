@@ -59,9 +59,9 @@ export default function ProductDetail() {
 
       <div className="grid lg:grid-cols-2 gap-10">
         {/* visual */}
-        <div className={`relative rounded-3xl bg-gradient-to-br ${grad} h-80 lg:h-[420px] overflow-hidden`}>
+        <div className={`shine-host group relative rounded-3xl bg-gradient-to-br ${grad} h-80 lg:h-[420px] overflow-hidden animate-fade-in ${product.featured ? 'ring-featured' : ''}`}>
           {product.image ? (
-            <img src={product.image} alt={product.name} className="absolute inset-0 w-full h-full object-cover" />
+            <img src={product.image} alt={product.name} className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
           ) : (
             <>
               <div className="absolute inset-0 bg-grid opacity-30" />
@@ -77,10 +77,10 @@ export default function ProductDetail() {
         </div>
 
         {/* details */}
-        <div>
+        <div className="animate-fade-up">
           <span className="text-xs uppercase tracking-wider text-indigo-400 font-rajdhani">{label}</span>
           <h1 className="text-3xl sm:text-4xl text-white mt-2">{product.name}</h1>
-          <div className="text-3xl text-white font-semibold mt-4">{money(product.price, product.currency)}</div>
+          <div className="text-3xl font-semibold mt-4 gradient-text gradient-anim">{money(product.price, product.currency)}</div>
           {product.description && <p className="text-slate-400 mt-5 leading-relaxed">{product.description}</p>}
 
           <div className="mt-8 space-y-3">

@@ -10,6 +10,7 @@ import express from 'express';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import { config } from './config/env.js';
+import { get } from './db/index.js';
 import { migrate } from './db/migrate.js';
 import { seed, isSeeded } from './db/seed.js';
 import { seedDemoCatalog } from './db/demoSeed.js';
@@ -31,8 +32,10 @@ export function ensureReady() {
     readyPromise = (async () => {
       await migrate();
       if (!(await isSeeded())) await seed();
-      // Optionally populate a demo catalog so a fresh deploy isn't an empty shop.
-      if (config.seedDemo) await seedDemoCatalog();
+      // Zero-config: auto-fill the catalog whenever the shop is empty, so a fresh
+      // deploy is never an empty store. (SEED_DEMO=true also forces a re-sync.)
+      const { n } = await get('SELECT COUNT(*) AS n FROM products WHERE active = 1').catch(() => ({ n: 1 }));
+      if (config.seedDemo || Number(n) === 0) await seedDemoCatalog();
     })().catch((err) => {
       readyPromise = null; // allow retry on next request
       throw err;
