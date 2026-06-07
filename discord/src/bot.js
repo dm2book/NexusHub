@@ -144,9 +144,19 @@ client.on(Events.GuildMemberAdd, async (member) => {
 // ── interactions: buttons + slash ──────────────────────────────────────────
 client.on(Events.InteractionCreate, async (i) => {
   try {
-    if (i.isButton()) return handleButton(i);
-    if (i.isChatInputCommand()) return handleCommand(i);
-  } catch (e) { console.error('[interaction]', e.message); }
+    if (i.isButton()) return await handleButton(i);
+    if (i.isChatInputCommand()) return await handleCommand(i);
+  } catch (e) {
+    console.error('[interaction]', e?.stack || e?.message || e);
+    // Never leave the user staring at "interaction failed".
+    const msg = { content: '⚠️ Something went wrong — please try again in a moment.', ephemeral: true };
+    try {
+      if (i.isRepliable?.()) {
+        if (i.deferred || i.replied) await i.followUp(msg).catch(() => {});
+        else await i.reply(msg).catch(() => {});
+      }
+    } catch { /* ignore */ }
+  }
 });
 
 async function handleButton(i) {
@@ -206,8 +216,25 @@ async function toggleRole(i, key) {
 }
 
 async function claimTicket(i) {
+  if (!i.channel?.topic?.startsWith('ticket-owner:')) {
+    return i.reply({ content: 'This isn’t a ticket channel.', ephemeral: true });
+  }
   if (!isStaff(i.member)) return i.reply({ content: 'Only staff can claim tickets.', ephemeral: true });
-  await i.reply(`🛠️ Ticket claimed by <@${i.user.id}> — they’ll help you from here.`);
+  if (i.channel.topic.includes('claimed:')) {
+    return i.reply({ content: 'This ticket is already claimed.', ephemeral: true });
+  }
+  await i.deferUpdate().catch(() => {});
+  // Record the claimer in the topic, rename the channel, and disable the button.
+  await i.channel.setTopic(`${i.channel.topic} · claimed:${i.user.id}`).catch(() => {});
+  await i.channel.setName(`✋-${i.channel.name}`.slice(0, 95)).catch(() => {});
+  const rows = i.message.components.map((row) => {
+    const r = ActionRowBuilder.from(row);
+    r.components.forEach((c) => { if (c.data?.custom_id === 'ticket:claim') c.setDisabled(true).setLabel('Claimed'); });
+    return r;
+  });
+  await i.message.edit({ components: rows }).catch(() => {});
+  await i.channel.send({ embeds: [new EmbedBuilder().setColor(0x10b981)
+    .setDescription(`🛠️ Ticket claimed by <@${i.user.id}> — they’ll help you from here.`)] }).catch(() => {});
 }
 
 async function enterGiveaway(i, messageId) {
@@ -222,48 +249,91 @@ async function openTicket(i, type) {
   await i.deferReply({ ephemeral: true });
   const support = findChannel(i.guild, 'open-a-ticket');
   const category = support?.parent;
+
+  // One open ticket per member.
   const existing = i.guild.channels.cache.find((c) => c.topic?.includes(`ticket-owner:${i.user.id}`));
   if (existing) return i.editReply(`You already have an open ticket: <#${existing.id}>`);
 
   const staffRoles = ['Support', 'Admin', 'Moderator'].map((n) => findRole(i.guild, n)).filter(Boolean);
-  const channel = await i.guild.channels.create({
-    name: `ticket-${i.user.username}`.slice(0, 90),
-    type: ChannelType.GuildText, parent: category?.id,
-    topic: `ticket-owner:${i.user.id} · type:${type}`,
-    permissionOverwrites: [
-      { id: i.guild.roles.everyone.id, deny: [P.ViewChannel] },
-      { id: i.user.id, allow: [P.ViewChannel, P.SendMessages, P.AttachFiles, P.ReadMessageHistory] },
-      ...staffRoles.map((r) => ({ id: r.id, allow: [P.ViewChannel, P.SendMessages, P.ManageMessages, P.ReadMessageHistory] })),
-    ],
-  });
+  // Member tiers can view the SUPPORT category, so explicitly hide each ticket
+  // from them — only the owner, staff and bot should ever see it.
+  const memberRoles = ['Verified Customer', 'VIP Customer', 'Partner'].map((n) => findRole(i.guild, n)).filter(Boolean);
+  let channel;
+  try {
+    channel = await i.guild.channels.create({
+      name: `ticket-${i.user.username}`.toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 90) || `ticket-${i.user.id}`,
+      type: ChannelType.GuildText, parent: category?.id,
+      topic: `ticket-owner:${i.user.id} · type:${type} · opened:${Date.now()}`,
+      permissionOverwrites: [
+        { id: i.guild.roles.everyone.id, deny: [P.ViewChannel] },
+        ...memberRoles.map((r) => ({ id: r.id, deny: [P.ViewChannel] })),
+        // The bot itself — guarantees it can manage/close the ticket without Admin.
+        { id: client.user.id, allow: [P.ViewChannel, P.SendMessages, P.ManageChannels, P.ManageMessages, P.ReadMessageHistory] },
+        { id: i.user.id, allow: [P.ViewChannel, P.SendMessages, P.AttachFiles, P.ReadMessageHistory] },
+        ...staffRoles.map((r) => ({ id: r.id, allow: [P.ViewChannel, P.SendMessages, P.ManageMessages, P.ReadMessageHistory] })),
+      ],
+    });
+  } catch (e) {
+    console.error('[ticket] create failed:', e.message);
+    return i.editReply('⚠️ I couldn’t create your ticket — make sure my role has **Manage Channels** and is high in the list. Ask an admin.');
+  }
 
-  const label = { order: '🛒 Order issue', payment: '💳 Payment', partner: '🤝 Partnership', other: '❓ Other' }[type] || 'Support';
+  const label = { order: '🛒 Order issue', payment: '💳 Payment', partner: '🤝 Partnership', other: '❓ Other' }[type] || '🎫 Support';
   const embed = new EmbedBuilder().setColor(0x6366f1)
-    .setTitle(`${label} — ticket`)
+    .setTitle(`${label}`)
     .setDescription(
-      `Hi <@${i.user.id}>, thanks for reaching out. A team member will be with you shortly.\n\n` +
-      "To speed things up, please share:\n• Your **order number** (if any)\n• A short description\n• Screenshots if relevant");
-  const close = new ActionRowBuilder().addComponents(
+      `Hi <@${i.user.id}>, thanks for reaching out! A team member will be with you shortly. ⚡\n\n` +
+      '**To speed things up, please share:**\n' +
+      '• Your **order number** (if any)\n• A short description of the issue\n• Screenshots if relevant')
+    .setFooter({ text: 'ForgeMarket Support • use the buttons below' }).setTimestamp();
+  const controls = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('ticket:claim').setLabel('Claim').setEmoji('🛠️').setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId('ticket:close').setLabel('Close ticket').setEmoji('🔒').setStyle(ButtonStyle.Danger));
   const supportPing = findRole(i.guild, 'Support');
-  await channel.send({ content: supportPing ? `<@&${supportPing.id}>` : '', embeds: [embed], components: [close] });
+  await channel.send({ content: supportPing ? `<@&${supportPing.id}> — new ticket` : '', embeds: [embed], components: [controls] }).catch(() => {});
   leadLog(i.guild, `🎫 Ticket opened by <@${i.user.id}> — **${label}** → <#${channel.id}>`);
-  return i.editReply(`Your ticket is ready: <#${channel.id}>`);
+  return i.editReply(`✅ Your ticket is ready: <#${channel.id}>`);
 }
 
 async function closeTicket(i) {
   const ch = i.channel;
-  if (!ch?.topic?.startsWith('ticket-owner:')) return i.reply({ content: 'Not a ticket channel.', ephemeral: true });
-  await i.reply({ content: '🔒 Closing ticket and saving transcript…' });
+  if (!ch?.topic?.startsWith('ticket-owner:')) {
+    return i.reply({ content: 'This isn’t a ticket channel.', ephemeral: true });
+  }
+  await i.reply({ embeds: [new EmbedBuilder().setColor(0xef4444)
+    .setDescription('🔒 Closing this ticket and saving a transcript… (channel deletes in a few seconds)')] });
 
+  // Build a readable transcript including attachments.
   const msgs = await ch.messages.fetch({ limit: 100 }).catch(() => null);
-  const lines = msgs ? [...msgs.values()].reverse().map(
-    (m) => `[${new Date(m.createdTimestamp).toISOString()}] ${m.author.tag}: ${m.content}`).join('\n') : 'No messages.';
+  const lines = msgs ? [...msgs.values()].reverse().map((m) => {
+    const when = new Date(m.createdTimestamp).toISOString();
+    const atts = m.attachments.size ? ` [attachments: ${[...m.attachments.values()].map((a) => a.url).join(', ')}]` : '';
+    const emb = m.embeds.length ? ` [embed: ${m.embeds[0].title || ''} ${m.embeds[0].description || ''}]` : '';
+    return `[${when}] ${m.author.tag}: ${m.content}${emb}${atts}`;
+  }).join('\n') : 'No messages.';
+
+  const ownerId = ch.topic.match(/ticket-owner:(\d+)/)?.[1];
+  const openedAt = Number(ch.topic.match(/opened:(\d+)/)?.[1]) || null;
+  const mins = openedAt ? Math.max(1, Math.round((Date.now() - openedAt) / 60000)) : null;
   const file = new AttachmentBuilder(Buffer.from(lines, 'utf8'), { name: `${ch.name}.txt` });
+
   const logs = findChannel(i.guild, 'ticket-logs');
-  if (logs) await logs.send({ content: `📄 Transcript for **${ch.name}** (closed by ${i.user.tag})`, files: [file] }).catch(() => {});
-  setTimeout(() => ch.delete().catch(() => {}), 4000);
+  if (logs) {
+    const logEmbed = new EmbedBuilder().setColor(0x6366f1).setTitle('📄 Ticket closed')
+      .addFields(
+        { name: 'Channel', value: `#${ch.name}`, inline: true },
+        { name: 'Owner', value: ownerId ? `<@${ownerId}>` : 'unknown', inline: true },
+        { name: 'Closed by', value: `<@${i.user.id}>`, inline: true },
+        ...(mins ? [{ name: 'Open for', value: `${mins} min`, inline: true }] : []))
+      .setTimestamp();
+    await logs.send({ embeds: [logEmbed], files: [file] }).catch(() => {});
+  }
+  // DM the owner their transcript.
+  if (ownerId) {
+    const owner = await i.guild.members.fetch(ownerId).catch(() => null);
+    if (owner) await owner.send({ content: `Here’s the transcript of your ForgeMarket ticket (closed by ${i.user.tag}).`, files: [file] }).catch(() => {});
+  }
+  setTimeout(() => ch.delete().catch(() => {}), 5000);
 }
 
 async function handleCommand(i) {
