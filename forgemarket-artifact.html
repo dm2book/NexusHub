@@ -58,30 +58,50 @@
   @keyframes spark{0%{opacity:1;transform:translate(0,0) scale(1)}100%{opacity:0;transform:translate(var(--tx),var(--ty)) scale(.2)}}
 
   /* Cart bob then poof into truck */
-  .cart{transition:opacity .2s}
+  .cart{transition:opacity .35s}
   .p1 .cart{animation:bob .6s ease 1s both}
   .p2 .cart{animation:poof .45s ease forwards}
-  @keyframes bob{0%,100%{transform:translateY(0)}30%{transform:translateY(-9px) scale(1.06)}60%{transform:translateY(0)}}
+  @keyframes bob{0%,100%{transform:translateY(0)}30%{transform:translateY(-9px) scale(1.12)}60%{transform:translateY(0) scale(1)}}
   @keyframes poof{0%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(1.5) translateY(-10px)}}
 
   /* Road draws as a neon path */
   .road{stroke-dasharray:640;stroke-dashoffset:640}
-  .p2 .road{animation:draw 1.1s ease forwards}
+  .p2 .road{animation:draw 1s ease forwards}
   @keyframes draw{to{stroke-dashoffset:0}}
 
-  /* Truck pops in, then drives the road */
-  .truck{offset-path:path("M166 256 C 300 338, 430 150, 590 222");offset-rotate:auto;offset-anchor:50% 50%;opacity:0;transform:scale(.5)}
-  .p2 .truck{opacity:1;transform:scale(1);transition:opacity .5s,transform .5s cubic-bezier(.34,1.56,.64,1)}
-  .p3 .truck{animation:drive 2.1s cubic-bezier(.45,.05,.4,1) forwards}
-  @keyframes drive{0%{offset-distance:0%;opacity:1}100%{offset-distance:100%;opacity:1}}
+  /* Truck drives the road (Phase 2) with a live wobble, then vanishes (Phase 3) */
+  .truck{offset-path:path("M166 256 C 300 338, 430 150, 590 222");offset-rotate:auto;offset-anchor:50% 50%;opacity:0;transition:opacity .3s}
+  .p2 .truck{opacity:1;animation:drive 2.3s cubic-bezier(.4,.05,.4,1) .15s forwards}
+  .p3 .truck{opacity:0}
+  @keyframes drive{0%{offset-distance:0%}8%{offset-distance:2%}100%{offset-distance:100%}}
+  .truck-wobble{display:inline-block}
+  .p2 .truck-wobble{animation:wobble .22s linear infinite}
+  @keyframes wobble{0%,100%{transform:translateY(0) rotate(0deg)}25%{transform:translateY(-1.6px) rotate(-2.5deg)}75%{transform:translateY(1.6px) rotate(2.5deg)}}
 
-  /* House glow + checkmark at the end */
-  .house-core{transition:filter .4s}
-  .p4 .house-core{animation:houseGlow 1.6s ease-in-out infinite}
-  @keyframes houseGlow{0%,100%{filter:drop-shadow(0 0 6px rgba(16,185,129,.45))}50%{filter:drop-shadow(0 0 26px rgba(52,211,153,.95))}}
+  /* House: brief green flash on arrival */
+  .house-core{transition:filter .45s}
+  .p3 .house-core{animation:houseFlash 1.5s ease forwards}
+  @keyframes houseFlash{
+    0%{filter:drop-shadow(0 0 4px rgba(16,185,129,.4))}
+    14%{filter:drop-shadow(0 0 34px rgba(52,211,153,1))}
+    30%{filter:drop-shadow(0 0 8px rgba(16,185,129,.5))}
+    46%{filter:drop-shadow(0 0 30px rgba(52,211,153,1))}
+    100%{filter:drop-shadow(0 0 16px rgba(52,211,153,.85))}
+  }
+
+  /* Checkmark pop */
   .check{opacity:0;transform:scale(0)}
-  .p4 .check{animation:pop .5s cubic-bezier(.34,1.56,.64,1) .2s forwards}
+  .p3 .check{animation:pop .5s cubic-bezier(.34,1.56,.64,1) .15s forwards}
   @keyframes pop{0%{opacity:0;transform:scale(0)}60%{transform:scale(1.3)}100%{opacity:1;transform:scale(1)}}
+
+  /* Green star burst around the house */
+  .star{position:absolute;font-size:16px;line-height:1;color:#34d399;opacity:0;text-shadow:0 0 10px #34d399;will-change:transform,opacity}
+  .p3 .star{animation:starOut 1s ease-out forwards}
+  @keyframes starOut{0%{opacity:0;transform:translate(0,0) scale(0) rotate(0deg)}25%{opacity:1}100%{opacity:0;transform:translate(var(--tx),var(--ty)) scale(1.1) rotate(200deg)}}
+
+  /* Blinking DELIVERED status */
+  .blink{animation:blink 1s steps(1,end) infinite}
+  @keyframes blink{50%{opacity:.2}}
 
   /* Delivery toast */
   .toast{transform:translateY(14px);opacity:0;transition:all .5s cubic-bezier(.34,1.56,.64,1)}
@@ -138,7 +158,7 @@ const Truck = ({ size = 56 }) => (
 );
 
 /* ── The Delivery Journey ───────────────────────────────── */
-const PHASES = ['Idle', 'Purchasing item…', 'Packing your order…', 'Out for delivery…', 'Delivered in-game!'];
+const PHASES = ['Idle', 'Processing Purchase…', 'In Transit…', 'DELIVERED'];
 
 function DeliveryJourney({ onDelivered }) {
   const [phase, setPhase] = useState(0);
@@ -168,23 +188,27 @@ function DeliveryJourney({ onDelivered }) {
     setPlaying(true);
     setRunId((r) => r + 1);   // remount stage → animations reset
     setPhase(0);
-    at(() => setPhase(1), 60);
-    at(() => setPhase(2), 1650);
-    at(() => setPhase(3), 2600);
-    at(() => setPhase(4), 4600);
-    at(() => { setToast(true); onDelivered && onDelivered(); }, 5100);
-    at(() => setPlaying(false), 5600);
+    at(() => setPhase(1), 60);                                   // Phase 1: Processing Purchase
+    at(() => setPhase(2), 1550);                                 // Phase 2: In Transit (truck drives)
+    at(() => { setPhase(3); setToast(true); onDelivered && onDelivered(); }, 3950); // Phase 3: Delivered
+    at(() => { setPhase(0); setToast(false); setPlaying(false); }, 7950); // Reset to Idle after 4s
   }, [playing, onDelivered]);
 
   useEffect(() => () => clearTimers(), []);
 
   // cumulative phase classes so finished animations hold their end state
-  const cls = ['stage', phase >= 1 && 'p1', phase >= 2 && 'p2', phase >= 3 && 'p3', phase >= 4 && 'p4']
+  const cls = ['stage', phase >= 1 && 'p1', phase >= 2 && 'p2', phase >= 3 && 'p3']
     .filter(Boolean).join(' ');
 
   const sparks = Array.from({ length: 16 }, (_, i) => {
     const a = (i / 16) * Math.PI * 2, d = 34 + Math.random() * 26;
     return { x: Math.cos(a) * d, y: Math.sin(a) * d };
+  });
+  // Green star burst around the house (Phase 3)
+  const STARS = ['✦', '✧', '★', '✦', '✸', '✺'];
+  const stars = Array.from({ length: 14 }, (_, i) => {
+    const a = (i / 14) * Math.PI * 2, d = 26 + Math.random() * 40;
+    return { x: Math.cos(a) * d, y: Math.sin(a) * d, c: STARS[i % STARS.length], delay: (i % 6) * 0.04 };
   });
 
   return (
@@ -198,7 +222,11 @@ function DeliveryJourney({ onDelivered }) {
           <div className="inline-flex items-center gap-2 text-xs font-semibold tracking-widest uppercase text-neon-bright">
             <span className="w-2 h-2 rounded-full bg-neon-bright animate-pulse" /> Live Delivery Engine
           </div>
-          <div className="text-xs font-mono text-slate-400">{PHASES[phase]}</div>
+          <div className="text-xs font-mono">
+            {phase === 3
+              ? <span className="blink text-neon-bright font-bold tracking-[0.25em]">● DELIVERED</span>
+              : <span className="text-slate-400">{PHASES[phase]}</span>}
+          </div>
         </div>
 
         {/* Stage */}
@@ -244,8 +272,16 @@ function DeliveryJourney({ onDelivered }) {
                 <Icon.cart width="22" height="22" />
               </div>
             </div>
-            {/* Truck */}
-            <div className="actor truck" style={{ marginLeft: -28, marginTop: -18 }}><Truck size={56} /></div>
+            {/* Truck (drives the path with a live wobble) */}
+            <div className="actor truck" style={{ marginLeft: -28, marginTop: -18 }}>
+              <div className="truck-wobble"><Truck size={56} /></div>
+            </div>
+            {/* Star burst around the house */}
+            <div className="actor" style={{ left: 648, top: 150 }}>
+              {stars.map((s, i) => (
+                <span key={i} className="star" style={{ '--tx': s.x + 'px', '--ty': s.y + 'px', animationDelay: s.delay + 's' }}>{s.c}</span>
+              ))}
+            </div>
             {/* Checkmark over house */}
             <div className="actor check" style={{ left: 648, top: 96, marginLeft: -16, marginTop: -16 }}>
               <div className="w-9 h-9 rounded-full bg-neon flex items-center justify-center" style={{ boxShadow: '0 0 22px rgba(52,211,153,.95)' }}>
@@ -266,7 +302,7 @@ function DeliveryJourney({ onDelivered }) {
           <div className={`toast ${toast ? 'show' : ''} flex items-center gap-3 px-4 py-3 rounded-xl bg-neon/10 border border-neon/40`}>
             <div className="w-7 h-7 rounded-full bg-neon flex items-center justify-center"><Icon.check width="15" height="15" className="text-ink"/></div>
             <div>
-              <div className="text-sm font-semibold text-white">Item Successfully Delivered In-Game!</div>
+              <div className="text-sm font-semibold text-white">Item succesvol in-game bezorgd!</div>
               <div className="text-xs text-neon-bright">Automated · arrived in &lt; 30 seconds</div>
             </div>
           </div>
