@@ -6,20 +6,15 @@
 <title>FORGEMARKET — Premium In-Game Asset Shop</title>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <script src="https://cdn.tailwindcss.com"></script>
 <script>
   tailwind.config = {
-    theme: {
-      extend: {
-        colors: {
-          neon: { DEFAULT: '#10b981', bright: '#34d399', soft: '#059669' },
-          cyber: '#ff3b5c',
-          ink: '#05060a',
-        },
-        fontFamily: { display: ['Orbitron', 'system-ui', 'sans-serif'], body: ['Inter', 'system-ui', 'sans-serif'] },
-      },
-    },
+    theme: { extend: {
+      colors: { neon: { DEFAULT:'#10b981', bright:'#34d399', soft:'#059669' }, cyber:'#ff3b5c', ink:'#05060a' },
+      fontFamily: { display:['Orbitron','system-ui','sans-serif'], body:['Inter','system-ui','sans-serif'] },
+    } },
   };
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -31,86 +26,24 @@
   ::-webkit-scrollbar{width:10px}::-webkit-scrollbar-track{background:#05060a}
   ::-webkit-scrollbar-thumb{background:#1d2230;border-radius:6px}
 
-  /* ── Ambient ─────────────────────────────────────────── */
   .grid-bg{background-image:linear-gradient(rgba(16,185,129,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(16,185,129,.05) 1px,transparent 1px);background-size:42px 42px}
   .glow-ring{box-shadow:0 0 0 1px rgba(16,185,129,.45),0 0 26px rgba(16,185,129,.35)}
   .text-glow{text-shadow:0 0 18px rgba(52,211,153,.55)}
   @keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
   .floaty{animation:floaty 6s ease-in-out infinite}
 
-  /* ── Stage scaling ───────────────────────────────────── */
-  .stage{position:absolute;top:0;left:50%;width:720px;height:380px;transform-origin:top center}
-  .actor{position:absolute;top:0;left:0;will-change:transform,offset-distance,opacity}
+  /* 3D viewport */
+  .viewport3d{position:relative;height:390px;border-radius:16px;overflow:hidden;
+    background:radial-gradient(120% 90% at 50% 20%,#0a1322 0%,#05060a 70%);box-shadow:inset 0 0 60px rgba(0,0,0,.6)}
+  .viewport3d canvas{display:block;width:100%!important;height:100%!important}
+  .vignette{position:absolute;inset:0;pointer-events:none;box-shadow:inset 0 0 90px rgba(0,0,0,.8)}
 
-  /* Crystal flies on an arc into the cart */
-  .crystal{offset-path:path("M120 92 Q 150 220 166 250");offset-rotate:0deg;offset-anchor:50% 50%;opacity:0}
-  .p1 .crystal{animation:crystalArc 1.25s cubic-bezier(.45,.05,.5,1) forwards}
-  @keyframes crystalArc{
-    0%{offset-distance:0%;opacity:0;transform:scale(.3) rotate(0deg)}
-    18%{opacity:1;transform:scale(1.15) rotate(40deg)}
-    72%{opacity:1;transform:scale(1) rotate(180deg)}
-    100%{offset-distance:100%;opacity:0;transform:scale(.35) rotate(260deg)}
-  }
-
-  /* Particle burst at spawn */
-  .spark{position:absolute;width:7px;height:7px;border-radius:9999px;background:#34d399;box-shadow:0 0 10px #34d399;opacity:0}
-  .p1 .spark{animation:spark .9s ease-out forwards}
-  @keyframes spark{0%{opacity:1;transform:translate(0,0) scale(1)}100%{opacity:0;transform:translate(var(--tx),var(--ty)) scale(.2)}}
-
-  /* Cart bob then poof into truck */
-  .cart{transition:opacity .35s}
-  .p1 .cart{animation:bob .6s ease 1s both}
-  .p2 .cart{animation:poof .45s ease forwards}
-  @keyframes bob{0%,100%{transform:translateY(0)}30%{transform:translateY(-9px) scale(1.12)}60%{transform:translateY(0) scale(1)}}
-  @keyframes poof{0%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(1.5) translateY(-10px)}}
-
-  /* Road draws as a neon path */
-  .road{stroke-dasharray:640;stroke-dashoffset:640}
-  .p2 .road{animation:draw 1s ease forwards}
-  @keyframes draw{to{stroke-dashoffset:0}}
-
-  /* Truck drives the road (Phase 2) with a live wobble, then vanishes (Phase 3) */
-  .truck{offset-path:path("M166 256 C 300 338, 430 150, 590 222");offset-rotate:auto;offset-anchor:50% 50%;opacity:0;transition:opacity .3s}
-  .p2 .truck{opacity:1;animation:drive 2.3s cubic-bezier(.4,.05,.4,1) .15s forwards}
-  .p3 .truck{opacity:0}
-  @keyframes drive{0%{offset-distance:0%}8%{offset-distance:2%}100%{offset-distance:100%}}
-  .truck-wobble{display:inline-block}
-  .p2 .truck-wobble{animation:wobble .22s linear infinite}
-  @keyframes wobble{0%,100%{transform:translateY(0) rotate(0deg)}25%{transform:translateY(-1.6px) rotate(-2.5deg)}75%{transform:translateY(1.6px) rotate(2.5deg)}}
-
-  /* House: brief green flash on arrival */
-  .house-core{transition:filter .45s}
-  .p3 .house-core{animation:houseFlash 1.5s ease forwards}
-  @keyframes houseFlash{
-    0%{filter:drop-shadow(0 0 4px rgba(16,185,129,.4))}
-    14%{filter:drop-shadow(0 0 34px rgba(52,211,153,1))}
-    30%{filter:drop-shadow(0 0 8px rgba(16,185,129,.5))}
-    46%{filter:drop-shadow(0 0 30px rgba(52,211,153,1))}
-    100%{filter:drop-shadow(0 0 16px rgba(52,211,153,.85))}
-  }
-
-  /* Checkmark pop */
-  .check{opacity:0;transform:scale(0)}
-  .p3 .check{animation:pop .5s cubic-bezier(.34,1.56,.64,1) .15s forwards}
-  @keyframes pop{0%{opacity:0;transform:scale(0)}60%{transform:scale(1.3)}100%{opacity:1;transform:scale(1)}}
-
-  /* Green star burst around the house */
-  .star{position:absolute;font-size:16px;line-height:1;color:#34d399;opacity:0;text-shadow:0 0 10px #34d399;will-change:transform,opacity}
-  .p3 .star{animation:starOut 1s ease-out forwards}
-  @keyframes starOut{0%{opacity:0;transform:translate(0,0) scale(0) rotate(0deg)}25%{opacity:1}100%{opacity:0;transform:translate(var(--tx),var(--ty)) scale(1.1) rotate(200deg)}}
-
-  /* Blinking DELIVERED status */
-  .blink{animation:blink 1s steps(1,end) infinite}
-  @keyframes blink{50%{opacity:.2}}
-
-  /* Delivery toast */
+  /* Blinking DELIVERED + toast */
+  .blink{animation:blink 1s steps(1,end) infinite}@keyframes blink{50%{opacity:.2}}
   .toast{transform:translateY(14px);opacity:0;transition:all .5s cubic-bezier(.34,1.56,.64,1)}
   .toast.show{transform:translateY(0);opacity:1}
-
-  /* Floating +1 */
   @keyframes rise{0%{opacity:0;transform:translateY(0) scale(.8)}20%{opacity:1}100%{opacity:0;transform:translateY(-34px) scale(1)}}
   .rise{animation:rise 1s ease-out forwards}
-
   @media (prefers-reduced-motion: reduce){*{animation-duration:.001ms!important}}
 </style>
 </head>
@@ -120,7 +53,6 @@
 <script type="text/babel">
 const { useState, useEffect, useRef, useCallback } = React;
 
-/* ── Inline icons ───────────────────────────────────────── */
 const Icon = {
   cart: (p) => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.7 13.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 6H6"/></svg>),
   bolt: (p) => (<svg viewBox="0 0 24 24" fill="currentColor" {...p}><path d="M13 2 4 14h6l-1 8 9-12h-6z"/></svg>),
@@ -128,99 +60,242 @@ const Icon = {
   menu: (p) => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" {...p}><path d="M3 12h18M3 6h18M3 18h18"/></svg>),
 };
 
-/* Crystal asset */
-const Crystal = ({ size = 40 }) => (
-  <svg width={size} height={size} viewBox="0 0 64 64">
-    <defs>
-      <linearGradient id="cg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#6ee7b7"/><stop offset="1" stopColor="#10b981"/></linearGradient>
-    </defs>
-    <g filter="drop-shadow(0 0 10px rgba(52,211,153,.9))">
-      <path d="M32 4 54 24 32 60 10 24z" fill="url(#cg)"/>
-      <path d="M32 4 54 24 32 32 10 24z" fill="#a7f3d0" opacity=".8"/>
-      <path d="M10 24 32 32 32 60z" fill="#059669"/>
-      <path d="M54 24 32 32 32 60z" fill="#047857"/>
-    </g>
-  </svg>
-);
+/* ── Three.js isometric city + delivery scene ───────────── */
+const easeOutBounce = (x) => {
+  const n1 = 7.5625, d1 = 2.75;
+  if (x < 1/d1) return n1*x*x;
+  if (x < 2/d1) return n1*(x-=1.5/d1)*x+0.75;
+  if (x < 2.5/d1) return n1*(x-=2.25/d1)*x+0.9375;
+  return n1*(x-=2.625/d1)*x+0.984375;
+};
 
-/* Truck asset */
-const Truck = ({ size = 56 }) => (
-  <svg width={size} height={size * 0.62} viewBox="0 0 100 62">
-    <g filter="drop-shadow(0 4px 10px rgba(0,0,0,.5))">
-      <rect x="4" y="14" width="52" height="30" rx="4" fill="#0f172a" stroke="#34d399" strokeWidth="2"/>
-      <path d="M56 22h20l14 14v8H56z" fill="#111827" stroke="#34d399" strokeWidth="2"/>
-      <rect x="60" y="25" width="12" height="9" rx="2" fill="#34d399" opacity=".8"/>
-      <path d="M12 22h30v14H12z" fill="#10b981" opacity=".25"/>
-      <circle cx="24" cy="48" r="8" fill="#0b0f17" stroke="#34d399" strokeWidth="3"/>
-      <circle cx="74" cy="48" r="8" fill="#0b0f17" stroke="#34d399" strokeWidth="3"/>
-    </g>
-  </svg>
-);
+function initThree(mount) {
+  const THREE = window.THREE;
+  if (!THREE) { mount.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#34d399;font-family:Orbitron">Loading 3D engine…</div>'; return { purchase(){}, transit(){}, arrive(){}, reset(){}, dispose(){} }; }
 
-/* ── The Delivery Journey ───────────────────────────────── */
+  let w = mount.clientWidth || 720, h = mount.clientHeight || 390;
+  let renderer;
+  try { renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true }); }
+  catch (e) { mount.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#34d399">WebGL unavailable</div>'; return { purchase(){}, transit(){}, arrive(){}, reset(){}, dispose(){} }; }
+  renderer.setPixelRatio(Math.min(2, window.devicePixelRatio));
+  renderer.setSize(w, h);
+  renderer.setClearColor(0x000000, 0);
+  mount.appendChild(renderer.domElement);
+
+  const scene = new THREE.Scene();
+  scene.fog = new THREE.Fog(0x05080f, 20, 46);
+
+  // Isometric orthographic camera
+  const viewSize = 16;
+  const cam = new THREE.OrthographicCamera(-viewSize, viewSize, viewSize, -viewSize, -60, 120);
+  const baseCam = new THREE.Vector3(15, 13, 15);
+  cam.position.copy(baseCam);
+  cam.lookAt(0, 0.5, 0);
+  const setFrustum = () => { const a = w/h; cam.left=-viewSize*a/2; cam.right=viewSize*a/2; cam.top=viewSize/2; cam.bottom=-viewSize/2; cam.updateProjectionMatrix(); };
+  setFrustum();
+
+  // Lights
+  scene.add(new THREE.AmbientLight(0x2b3656, 0.8));
+  const dir = new THREE.DirectionalLight(0x9fb4ff, 0.55); dir.position.set(8, 14, 5); scene.add(dir);
+  const pv = new THREE.PointLight(0x10b981, 1.3, 20); pv.position.set(-6, 3.5, 0); scene.add(pv);
+  const ph = new THREE.PointLight(0x34d399, 1.0, 20); ph.position.set(6, 3.5, 0); scene.add(ph);
+
+  // Ground + neon grid
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(64, 44), new THREE.MeshStandardMaterial({ color: 0x070b13, roughness: 1 }));
+  ground.rotation.x = -Math.PI/2; scene.add(ground);
+  const grid = new THREE.GridHelper(64, 64, 0x10b981, 0x123a30);
+  grid.position.y = 0.02; grid.material.transparent = true; grid.material.opacity = 0.3; scene.add(grid);
+
+  const disposables = [];
+  const edgeMat = (c) => { const m = new THREE.LineBasicMaterial({ color: c }); disposables.push(m); return m; };
+  function building(x, z, wd, ht, dp, color) {
+    const g = new THREE.Group();
+    const geo = new THREE.BoxGeometry(wd, ht, dp); disposables.push(geo);
+    const box = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0x0a0f17, roughness: .7, metalness: .25, emissive: color, emissiveIntensity: .07 }));
+    box.position.y = ht/2; g.add(box);
+    const eg = new THREE.EdgesGeometry(geo); disposables.push(eg);
+    const edges = new THREE.LineSegments(eg, edgeMat(color)); edges.position.copy(box.position); g.add(edges);
+    g.position.set(x, 0, z); scene.add(g);
+  }
+  [[-11,-6,2,4,2,0x10b981],[-10,5,2.4,2.6,2,0x10b981],[-4,-7.5,2,3.2,2,0x34d399],[-2.5,7,2.4,2,2,0x10b981],
+   [2,-7.5,2.6,3.6,2,0x10b981],[3.5,7,2,2.4,2,0xff3b5c],[8.5,-6,2.2,3,2,0x10b981],[10,6,2.4,4.2,2,0x10b981],
+   [13,-2,2,2.8,2,0x34d399],[-13,1,1.8,2.2,1.8,0x10b981],[6.5,-9,2,2.4,2,0x10b981],[0,9,2.2,3,2,0x10b981],
+   [-7,-9,1.8,2,1.8,0x34d399],[12,3,2,3.4,2,0x10b981]].forEach(b => building(...b));
+
+  function addEdges(group, mesh, color) {
+    const eg = new THREE.EdgesGeometry(mesh.geometry); disposables.push(eg);
+    const e = new THREE.LineSegments(eg, edgeMat(color)); e.position.copy(mesh.position); e.rotation.copy(mesh.rotation); group.add(e);
+  }
+
+  // Vault (left)
+  const vault = new THREE.Group(); vault.position.set(-6, 0, 0);
+  const vGeo = new THREE.BoxGeometry(2.6, 2.6, 2.6); disposables.push(vGeo);
+  const vBox = new THREE.Mesh(vGeo, new THREE.MeshStandardMaterial({ color: 0x0c1320, emissive: 0x10b981, emissiveIntensity: .28, metalness: .5, roughness: .35 }));
+  vBox.position.y = 1.3; vault.add(vBox); addEdges(vault, vBox, 0x34d399);
+  const door = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 1.4), new THREE.MeshBasicMaterial({ color: 0x34d399, transparent: true, opacity: .55 }));
+  door.position.set(0, 1.1, 1.31); vault.add(door);
+  const pad = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.18, 1.5), new THREE.MeshStandardMaterial({ color: 0x0b1018, emissive: 0x34d399, emissiveIntensity: .5 }));
+  pad.position.y = 2.7; vault.add(pad);
+  scene.add(vault);
+
+  // House (right)
+  const house = new THREE.Group(); house.position.set(6, 0, 0);
+  const hMat = new THREE.MeshStandardMaterial({ color: 0x0d1626, emissive: 0x10b981, emissiveIntensity: .25, metalness: .3, roughness: .5 });
+  const hGeo = new THREE.BoxGeometry(2.4, 1.9, 2.4); disposables.push(hGeo);
+  const hBase = new THREE.Mesh(hGeo, hMat); hBase.position.y = 0.95; house.add(hBase); addEdges(house, hBase, 0x34d399);
+  const roofMat = new THREE.MeshStandardMaterial({ color: 0x0b1018, emissive: 0x34d399, emissiveIntensity: .22 });
+  const roof = new THREE.Mesh(new THREE.ConeGeometry(2, 1.3, 4), roofMat); roof.position.y = 2.55; roof.rotation.y = Math.PI/4; house.add(roof);
+  const hwin = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 0.9), new THREE.MeshBasicMaterial({ color: 0x34d399, transparent: true, opacity: .5 }));
+  hwin.position.set(0, 0.95, 1.21); house.add(hwin);
+  scene.add(house);
+
+  // Neon road (twisting tube from vault to house)
+  const curve = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(-6, 0.18, 0), new THREE.Vector3(-3.5, 0.18, 2.2), new THREE.Vector3(-1, 0.18, -1.2),
+    new THREE.Vector3(1.5, 0.18, 1.8), new THREE.Vector3(3.8, 0.18, -1.4), new THREE.Vector3(6, 0.18, 0),
+  ]);
+  const roadGeo = new THREE.TubeGeometry(curve, 160, 0.34, 10, false); disposables.push(roadGeo);
+  const road = new THREE.Mesh(roadGeo, new THREE.MeshStandardMaterial({ color: 0x0a2a22, emissive: 0x10b981, emissiveIntensity: .8, metalness: .3, roughness: .4 }));
+  scene.add(road);
+  const roadCoreGeo = new THREE.TubeGeometry(curve, 160, 0.08, 8, false); disposables.push(roadCoreGeo);
+  const roadCore = new THREE.Mesh(roadCoreGeo, new THREE.MeshBasicMaterial({ color: 0xbbf7d0 }));
+  roadCore.position.y = 0.06; scene.add(roadCore);
+
+  // Crystal (purchase item)
+  const crystal = new THREE.Mesh(new THREE.OctahedronGeometry(0.6), new THREE.MeshStandardMaterial({ color: 0x6ee7b7, emissive: 0x10b981, emissiveIntensity: .9, metalness: .3, roughness: .15 }));
+  crystal.position.set(-6, 4.4, 0); crystal.visible = false; scene.add(crystal);
+
+  // Low-poly truck (combined boxes) on a positioner + wobble inner group
+  const truckPos = new THREE.Group();
+  const truck = new THREE.Group();
+  (function makeTruck() {
+    const acc = new THREE.MeshStandardMaterial({ color: 0x0f172a, emissive: 0x10b981, emissiveIntensity: .18, metalness: .5, roughness: .4 });
+    const cabM = new THREE.MeshStandardMaterial({ color: 0x0b1018, emissive: 0x34d399, emissiveIntensity: .3 });
+    const cargo = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.7, 0.8), acc); cargo.position.set(-0.15, 0.55, 0); truck.add(cargo); addEdges(truck, cargo, 0x34d399);
+    const cab = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.55, 0.74), cabM); cab.position.set(0.7, 0.5, 0); truck.add(cab); addEdges(truck, cab, 0x6ee7b7);
+    const strip = new THREE.Mesh(new THREE.BoxGeometry(1.26, 0.09, 0.84), new THREE.MeshBasicMaterial({ color: 0x6ef7c0 })); strip.position.set(-0.15, 0.2, 0); truck.add(strip);
+    const beam = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.18, 0.5), new THREE.MeshBasicMaterial({ color: 0xbbf7d0 })); beam.position.set(1.02, 0.5, 0); truck.add(beam);
+    const wMat = new THREE.MeshStandardMaterial({ color: 0x05070b, emissive: 0x10b981, emissiveIntensity: .3 });
+    [[0.5,0.42],[0.5,-0.42],[-0.5,0.42],[-0.5,-0.42]].forEach(([x,z]) => { const wm = new THREE.Mesh(new THREE.CylinderGeometry(0.2,0.2,0.14,14), wMat); wm.rotation.x = Math.PI/2; wm.position.set(x, 0.2, z); truck.add(wm); });
+    truck.scale.setScalar(1.05);
+  })();
+  truckPos.add(truck); truckPos.visible = false; scene.add(truckPos);
+
+  // Particle burst (Points) at the house
+  const PC = 150;
+  const pgeo = new THREE.BufferGeometry();
+  const ppos = new Float32Array(PC*3), pvel = new Float32Array(PC*3);
+  pgeo.setAttribute('position', new THREE.BufferAttribute(ppos, 3));
+  const pmat = new THREE.PointsMaterial({ color: 0x6ee7b7, size: 0.26, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false });
+  const points = new THREE.Points(pgeo, pmat); scene.add(points);
+
+  // ── State machine ──
+  let mode = 'idle', t = 0, truckProg = 0, flash = 0, pLife = 0, panX = 0;
+  const tmp = new THREE.Vector3(), tan = new THREE.Vector3();
+
+  function burst() {
+    for (let i = 0; i < PC; i++) {
+      ppos[i*3] = 6 + (Math.random()-.5)*1.4;
+      ppos[i*3+1] = 1.2 + Math.random()*0.8;
+      ppos[i*3+2] = (Math.random()-.5)*1.4;
+      const a = Math.random()*Math.PI*2, s = 1.5 + Math.random()*3;
+      pvel[i*3] = Math.cos(a)*s*0.5; pvel[i*3+1] = 4.5 + Math.random()*4.5; pvel[i*3+2] = Math.sin(a)*s*0.5;
+    }
+    pmat.opacity = 1; pLife = 1.7; pgeo.attributes.position.needsUpdate = true;
+  }
+
+  const api = {
+    purchase() { mode = 'purchase'; t = 0; crystal.visible = true; crystal.position.set(-6, 4.4, 0); truckPos.visible = false; },
+    transit() { mode = 'transit'; t = 0; truckProg = 0; truckPos.visible = true; crystal.visible = false; },
+    arrive() { mode = 'arrive'; truckPos.visible = false; flash = 1; burst(); },
+    reset() { mode = 'idle'; crystal.visible = false; truckPos.visible = false; flash = 0; pLife = 0; pmat.opacity = 0; truckProg = 0; },
+    dispose() {
+      cancelAnimationFrame(raf); ro.disconnect();
+      scene.traverse(o => { if (o.geometry) o.geometry.dispose && o.geometry.dispose(); if (o.material) { (Array.isArray(o.material)?o.material:[o.material]).forEach(m=>m.dispose&&m.dispose()); } });
+      disposables.forEach(d => d.dispose && d.dispose());
+      renderer.dispose(); if (renderer.domElement.parentNode) renderer.domElement.parentNode.removeChild(renderer.domElement);
+    },
+  };
+
+  const clock = new THREE.Clock();
+  let raf;
+  function loop() {
+    raf = requestAnimationFrame(loop);
+    const dt = Math.min(0.05, clock.getDelta()), time = clock.elapsedTime;
+
+    crystal.rotation.y += dt*1.8; crystal.rotation.x += dt*0.8;
+    if (mode === 'purchase') { t += dt; const k = Math.min(1, t/1.2); crystal.position.y = 4.4 + (3.15 - 4.4) * easeOutBounce(k); }
+
+    if (mode === 'transit') {
+      t += dt; truckProg = Math.min(1, t/2.6);
+      curve.getPointAt(truckProg, tmp); curve.getTangentAt(truckProg, tan);
+      truckPos.position.copy(tmp); truckPos.position.y = 0;
+      truckPos.rotation.y = Math.atan2(-tan.z, tan.x);
+      truck.position.y = Math.sin(time*22)*0.04;            // bob
+      truck.rotation.z = Math.sin(time*16)*0.06;            // wobble roll
+      truck.rotation.x = Math.sin(time*12)*0.03;            // pitch jitter
+    }
+
+    if (pLife > 0) {
+      pLife -= dt;
+      for (let i = 0; i < PC; i++) { ppos[i*3]+=pvel[i*3]*dt; ppos[i*3+1]+=pvel[i*3+1]*dt; ppos[i*3+2]+=pvel[i*3+2]*dt; pvel[i*3+1]-=7*dt; }
+      pmat.opacity = Math.max(0, pLife/1.7); pgeo.attributes.position.needsUpdate = true;
+    }
+
+    flash = Math.max(0, flash - dt*0.55);
+    const glow = 0.25 + flash*2.1 + (mode==='arrive' ? Math.sin(time*8)*0.15 : 0);
+    hMat.emissiveIntensity = glow; roofMat.emissiveIntensity = 0.2 + flash*1.6;
+    ph.intensity = 1.0 + flash*3;
+
+    const targetPan = mode === 'transit' ? truckPos.position.x*0.5 : 0;
+    panX += (targetPan - panX) * Math.min(1, dt*2.4);
+    cam.position.set(baseCam.x + panX, baseCam.y, baseCam.z + panX*0.25);
+    cam.lookAt(panX, 0.6, 0);
+
+    renderer.render(scene, cam);
+  }
+  loop();
+
+  const ro = new ResizeObserver(() => { w = mount.clientWidth; h = mount.clientHeight; renderer.setSize(w, h); setFrustum(); });
+  ro.observe(mount);
+
+  return api;
+}
+
+/* ── Delivery Engine (React shell around the 3D scene) ───── */
 const PHASES = ['Idle', 'Processing Purchase…', 'In Transit…', 'DELIVERED'];
 
 function DeliveryJourney({ onDelivered }) {
+  const mountRef = useRef(null);
+  const apiRef = useRef(null);
+  const timers = useRef([]);
   const [phase, setPhase] = useState(0);
   const [playing, setPlaying] = useState(false);
-  const [runId, setRunId] = useState(0);
   const [toast, setToast] = useState(false);
-  const wrapRef = useRef(null);
-  const [scale, setScale] = useState(1);
-  const timers = useRef([]);
 
-  // Responsive scale of the fixed 720×380 stage.
-  useEffect(() => {
-    const el = wrapRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver(() => setScale(Math.min(1, el.clientWidth / 720)));
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-
-  const clearTimers = () => { timers.current.forEach(clearTimeout); timers.current = []; };
+  useEffect(() => { apiRef.current = initThree(mountRef.current); return () => apiRef.current && apiRef.current.dispose(); }, []);
   const at = (fn, ms) => timers.current.push(setTimeout(fn, ms));
-
-  const play = useCallback(() => {
-    if (playing) return;
-    clearTimers();
-    setToast(false);
-    setPlaying(true);
-    setRunId((r) => r + 1);   // remount stage → animations reset
-    setPhase(0);
-    at(() => setPhase(1), 60);                                   // Phase 1: Processing Purchase
-    at(() => setPhase(2), 1550);                                 // Phase 2: In Transit (truck drives)
-    at(() => { setPhase(3); setToast(true); onDelivered && onDelivered(); }, 3950); // Phase 3: Delivered
-    at(() => { setPhase(0); setToast(false); setPlaying(false); }, 7950); // Reset to Idle after 4s
-  }, [playing, onDelivered]);
-
+  const clearTimers = () => { timers.current.forEach(clearTimeout); timers.current = []; };
   useEffect(() => () => clearTimers(), []);
 
-  // cumulative phase classes so finished animations hold their end state
-  const cls = ['stage', phase >= 1 && 'p1', phase >= 2 && 'p2', phase >= 3 && 'p3']
-    .filter(Boolean).join(' ');
-
-  const sparks = Array.from({ length: 16 }, (_, i) => {
-    const a = (i / 16) * Math.PI * 2, d = 34 + Math.random() * 26;
-    return { x: Math.cos(a) * d, y: Math.sin(a) * d };
-  });
-  // Green star burst around the house (Phase 3)
-  const STARS = ['✦', '✧', '★', '✦', '✸', '✺'];
-  const stars = Array.from({ length: 14 }, (_, i) => {
-    const a = (i / 14) * Math.PI * 2, d = 26 + Math.random() * 40;
-    return { x: Math.cos(a) * d, y: Math.sin(a) * d, c: STARS[i % STARS.length], delay: (i % 6) * 0.04 };
-  });
+  const play = useCallback(() => {
+    const api = apiRef.current;
+    if (playing || !api) return;
+    clearTimers(); setToast(false); setPlaying(true);
+    setPhase(1); api.purchase();                                    // Phase 1
+    at(() => { setPhase(2); api.transit(); }, 1550);                // Phase 2
+    at(() => { setPhase(3); api.arrive(); setToast(true); onDelivered && onDelivered(); }, 4150); // Phase 3
+    at(() => { setPhase(0); setToast(false); setPlaying(false); api.reset(); }, 8150);            // Reset
+  }, [playing, onDelivered]);
 
   return (
     <div className="relative rounded-3xl border border-white/10 bg-gradient-to-b from-white/[0.04] to-transparent overflow-hidden glow-ring">
-      <div className="absolute inset-0 grid-bg opacity-60" />
-      <div className="absolute -top-24 -left-20 w-80 h-80 rounded-full bg-neon/20 blur-3xl" />
+      <div className="absolute -top-24 -left-20 w-80 h-80 rounded-full bg-neon/15 blur-3xl" />
       <div className="absolute -bottom-24 -right-10 w-80 h-80 rounded-full bg-cyber/10 blur-3xl" />
-
       <div className="relative p-5 sm:p-7">
         <div className="flex items-center justify-between mb-4">
           <div className="inline-flex items-center gap-2 text-xs font-semibold tracking-widest uppercase text-neon-bright">
-            <span className="w-2 h-2 rounded-full bg-neon-bright animate-pulse" /> Live Delivery Engine
+            <span className="w-2 h-2 rounded-full bg-neon-bright animate-pulse" /> Live Delivery Engine · 3D
           </div>
           <div className="text-xs font-mono">
             {phase === 3
@@ -229,66 +304,10 @@ function DeliveryJourney({ onDelivered }) {
           </div>
         </div>
 
-        {/* Stage */}
-        <div ref={wrapRef} className="relative w-full" style={{ height: 380 * scale }}>
-          <div key={runId} className={cls} style={{ transform: `translateX(-50%) scale(${scale})` }}>
-            {/* Static scene */}
-            <svg width="720" height="380" viewBox="0 0 720 380" className="absolute inset-0">
-              {/* iso floor */}
-              <g opacity="0.5" stroke="#10b981" strokeOpacity="0.18">
-                {Array.from({ length: 9 }).map((_, i) => <line key={'h'+i} x1="0" y1={150 + i * 28} x2="720" y2={120 + i * 28} />)}
-                {Array.from({ length: 14 }).map((_, i) => <line key={'v'+i} x1={i * 55} y1="150" x2={i * 55 - 40} y2="380" />)}
-              </g>
-              {/* vault / shop on the left */}
-              <g filter="drop-shadow(0 0 14px rgba(16,185,129,.4))">
-                <rect x="60" y="120" width="96" height="118" rx="14" fill="#0c1118" stroke="#10b981" strokeWidth="2"/>
-                <rect x="74" y="134" width="68" height="78" rx="8" fill="#0a0f16" stroke="#34d399" strokeOpacity=".5"/>
-                <circle cx="108" cy="173" r="20" fill="none" stroke="#34d399" strokeWidth="3" strokeOpacity=".7"/>
-                <circle cx="108" cy="173" r="6" fill="#34d399"/>
-                <text x="108" y="232" textAnchor="middle" fill="#5eead4" fontSize="11" fontFamily="Orbitron">VAULT</text>
-              </g>
-              {/* neon road */}
-              <path className="road" d="M166 256 C 300 338, 430 150, 590 222" fill="none" stroke="#10b981" strokeWidth="5" strokeLinecap="round" filter="drop-shadow(0 0 8px rgba(16,185,129,.8))"/>
-              <path d="M166 256 C 300 338, 430 150, 590 222" fill="none" stroke="#a7f3d0" strokeWidth="1.5" strokeDasharray="2 12" strokeLinecap="round" opacity=".7"/>
-              {/* house on the right */}
-              <g className="house-core">
-                <path d="M590 150 L648 116 L706 150 Z" fill="#0f172a" stroke="#34d399" strokeWidth="2"/>
-                <rect x="602" y="150" width="92" height="78" rx="6" fill="#0c1118" stroke="#34d399" strokeWidth="2"/>
-                <rect x="636" y="186" width="24" height="42" rx="3" fill="#10b981" opacity=".35"/>
-                <rect x="614" y="162" width="16" height="16" rx="3" fill="#34d399" opacity=".5"/>
-                <rect x="666" y="162" width="16" height="16" rx="3" fill="#34d399" opacity=".5"/>
-              </g>
-            </svg>
-
-            {/* Sparks */}
-            <div className="actor" style={{ left: 120, top: 92 }}>
-              {sparks.map((s, i) => <span key={i} className="spark" style={{ '--tx': s.x + 'px', '--ty': s.y + 'px', animationDelay: (i % 5) * 0.03 + 's' }} />)}
-            </div>
-            {/* Crystal */}
-            <div className="actor crystal" style={{ marginLeft: -20, marginTop: -20 }}><Crystal size={40} /></div>
-            {/* Cart */}
-            <div className="actor cart text-neon-bright" style={{ left: 166, top: 250, marginLeft: -18, marginTop: -18 }}>
-              <div className="w-10 h-10 rounded-xl bg-ink/80 border border-neon/50 flex items-center justify-center glow-ring">
-                <Icon.cart width="22" height="22" />
-              </div>
-            </div>
-            {/* Truck (drives the path with a live wobble) */}
-            <div className="actor truck" style={{ marginLeft: -28, marginTop: -18 }}>
-              <div className="truck-wobble"><Truck size={56} /></div>
-            </div>
-            {/* Star burst around the house */}
-            <div className="actor" style={{ left: 648, top: 150 }}>
-              {stars.map((s, i) => (
-                <span key={i} className="star" style={{ '--tx': s.x + 'px', '--ty': s.y + 'px', animationDelay: s.delay + 's' }}>{s.c}</span>
-              ))}
-            </div>
-            {/* Checkmark over house */}
-            <div className="actor check" style={{ left: 648, top: 96, marginLeft: -16, marginTop: -16 }}>
-              <div className="w-9 h-9 rounded-full bg-neon flex items-center justify-center" style={{ boxShadow: '0 0 22px rgba(52,211,153,.95)' }}>
-                <Icon.check width="18" height="18" className="text-ink" />
-              </div>
-            </div>
-          </div>
+        {/* 3D viewport */}
+        <div className="viewport3d">
+          <div ref={mountRef} className="absolute inset-0" />
+          <div className="vignette" />
         </div>
 
         {/* Controls + toast */}
@@ -296,7 +315,7 @@ function DeliveryJourney({ onDelivered }) {
           <button onClick={play} disabled={playing}
             className={`group relative inline-flex items-center gap-2 px-7 py-3.5 rounded-xl font-semibold transition-all ${playing ? 'bg-white/5 text-slate-400 cursor-wait' : 'bg-neon text-ink hover:bg-neon-bright glow-ring hover:scale-[1.03]'}`}>
             <Icon.bolt width="18" height="18" />
-            {playing ? 'Delivering…' : (runId ? 'Replay Live Delivery' : 'Test Live Delivery')}
+            {playing ? 'Delivering…' : 'Replay Live Delivery'}
           </button>
 
           <div className={`toast ${toast ? 'show' : ''} flex items-center gap-3 px-4 py-3 rounded-xl bg-neon/10 border border-neon/40`}>
@@ -314,10 +333,10 @@ function DeliveryJourney({ onDelivered }) {
 
 /* ── Marketplace ────────────────────────────────────────── */
 const ITEMS = [
-  { name: 'Inferno Greatsword', rarity: 'Legendary', color: 'from-rose-500/30 to-orange-500/10', ring: 'group-hover:shadow-[0_0_40px_-8px_rgba(244,63,94,.6)]', tag: 'text-rose-300 bg-rose-500/10 border-rose-500/30', icon: '⚔️', stats: [['Damage', '320'], ['Speed', '78%']], price: 24.99 },
-  { name: 'Celestial Loot Chest', rarity: 'Mythic', color: 'from-violet-500/30 to-fuchsia-500/10', ring: 'group-hover:shadow-[0_0_40px_-8px_rgba(168,85,247,.6)]', tag: 'text-fuchsia-300 bg-fuchsia-500/10 border-fuchsia-500/30', icon: '🎁', stats: [['Drops', '5★ Gear'], ['Bonus', '+15%']], price: 39.99 },
-  { name: 'Void Crystal ×100', rarity: 'Rare', color: 'from-emerald-500/30 to-teal-500/10', ring: 'group-hover:shadow-[0_0_40px_-8px_rgba(16,185,129,.6)]', tag: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/30', icon: '💎', stats: [['Type', 'Currency'], ['Stack', '×100']], price: 12.99 },
-  { name: 'Shadow Dragon Mount', rarity: 'Exotic', color: 'from-sky-500/30 to-indigo-500/10', ring: 'group-hover:shadow-[0_0_40px_-8px_rgba(56,189,248,.6)]', tag: 'text-sky-300 bg-sky-500/10 border-sky-500/30', icon: '🐉', stats: [['Speed', '240'], ['Flight', '✓']], price: 59.99 },
+  { name: 'Inferno Greatsword', rarity: 'Legendary', color: 'from-rose-500/30 to-orange-500/10', ring: 'group-hover:shadow-[0_0_40px_-8px_rgba(244,63,94,.6)]', tag: 'text-rose-300 bg-rose-500/10 border-rose-500/30', icon: '⚔️', stats: [['Damage','320'],['Speed','78%']], price: 24.99 },
+  { name: 'Celestial Loot Chest', rarity: 'Mythic', color: 'from-violet-500/30 to-fuchsia-500/10', ring: 'group-hover:shadow-[0_0_40px_-8px_rgba(168,85,247,.6)]', tag: 'text-fuchsia-300 bg-fuchsia-500/10 border-fuchsia-500/30', icon: '🎁', stats: [['Drops','5★ Gear'],['Bonus','+15%']], price: 39.99 },
+  { name: 'Void Crystal ×100', rarity: 'Rare', color: 'from-emerald-500/30 to-teal-500/10', ring: 'group-hover:shadow-[0_0_40px_-8px_rgba(16,185,129,.6)]', tag: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/30', icon: '💎', stats: [['Type','Currency'],['Stack','×100']], price: 12.99 },
+  { name: 'Shadow Dragon Mount', rarity: 'Exotic', color: 'from-sky-500/30 to-indigo-500/10', ring: 'group-hover:shadow-[0_0_40px_-8px_rgba(56,189,248,.6)]', tag: 'text-sky-300 bg-sky-500/10 border-sky-500/30', icon: '🐉', stats: [['Speed','240'],['Flight','✓']], price: 59.99 },
 ];
 
 function ProductCard({ item, onBuy }) {
@@ -340,8 +359,7 @@ function ProductCard({ item, onBuy }) {
         </div>
         <div className="flex items-center justify-between mt-4">
           <div className="text-xl font-display text-white">€{item.price.toFixed(2)}</div>
-          <button onClick={onBuy}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-semibold bg-neon/15 text-neon-bright border border-neon/40 hover:bg-neon hover:text-ink transition-all">
+          <button onClick={onBuy} className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-semibold bg-neon/15 text-neon-bright border border-neon/40 hover:bg-neon hover:text-ink transition-all">
             <Icon.bolt width="14" height="14" /> Instant Buy
           </button>
         </div>
@@ -360,10 +378,8 @@ function App() {
     setBumps((b) => [...b, id]);
     setTimeout(() => setBumps((b) => b.filter((x) => x !== id)), 1000);
   };
-
   return (
     <div className="min-h-screen relative">
-      {/* Header */}
       <header className="sticky top-0 z-50 backdrop-blur-xl bg-ink/70 border-b border-white/10">
         <nav className="max-w-6xl mx-auto px-5 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
@@ -386,19 +402,15 @@ function App() {
         </nav>
       </header>
 
-      {/* Hero */}
       <section className="relative max-w-6xl mx-auto px-5 pt-12 pb-8">
         <div className="text-center mb-8">
           <span className="inline-block text-xs tracking-[0.3em] uppercase text-neon-bright/90 mb-4">Premium In-Game Assets · Instant Delivery</span>
-          <h1 className="text-4xl sm:text-6xl font-extrabold text-white leading-tight">
-            Gear up. <span className="text-neon-bright text-glow">Delivered instantly.</span>
-          </h1>
-          <p className="text-slate-400 max-w-xl mx-auto mt-4">Watch exactly how every purchase travels from our vault straight into your game — automated, tracked and secure.</p>
+          <h1 className="text-4xl sm:text-6xl font-extrabold text-white leading-tight">Gear up. <span className="text-neon-bright text-glow">Delivered instantly.</span></h1>
+          <p className="text-slate-400 max-w-xl mx-auto mt-4">Watch your purchase travel across a live 3D city — from our vault, down the neon circuit, straight to your door.</p>
         </div>
         <DeliveryJourney onDelivered={addToCart} />
       </section>
 
-      {/* Marketplace */}
       <section id="market" className="max-w-6xl mx-auto px-5 py-14">
         <div className="flex items-end justify-between mb-8">
           <div>
