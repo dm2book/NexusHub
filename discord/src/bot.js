@@ -202,6 +202,7 @@ async function handleButton(i) {
   if (i.customId === 'ticket:close') return closeTicket(i);
   if (i.customId === 'ticket:claim') return claimTicket(i);
   if (i.customId.startsWith('ticket:')) return openTicket(i, i.customId.split(':')[1]);
+  if (i.customId.startsWith('rate:')) return rateSupport(i, Number(i.customId.split(':')[1]));
   if (i.customId.startsWith('gw:enter:')) return enterGiveaway(i, i.customId.split(':')[2]);
 }
 
@@ -328,12 +329,32 @@ async function closeTicket(i) {
       .setTimestamp();
     await logs.send({ embeds: [logEmbed], files: [file] }).catch(() => {});
   }
-  // DM the owner their transcript.
+  // DM the owner their transcript + a quick rating prompt.
   if (ownerId) {
     const owner = await i.guild.members.fetch(ownerId).catch(() => null);
-    if (owner) await owner.send({ content: `Here’s the transcript of your ForgeMarket ticket (closed by ${i.user.tag}).`, files: [file] }).catch(() => {});
+    if (owner) {
+      const stars = new ActionRowBuilder().addComponents(
+        ...[1, 2, 3, 4, 5].map((n) => new ButtonBuilder()
+          .setCustomId(`rate:${n}`).setLabel('⭐'.repeat(n)).setStyle(n >= 4 ? ButtonStyle.Success : ButtonStyle.Secondary)));
+      await owner.send({
+        content: `Here’s the transcript of your ForgeMarket ticket (closed by ${i.user.tag}).\n\n**How was our support?** Tap a rating below 👇`,
+        files: [file], components: [stars],
+      }).catch(() => {});
+    }
   }
   setTimeout(() => ch.delete().catch(() => {}), 5000);
+}
+
+async function rateSupport(i, stars) {
+  // Runs from a DM, so search the bot's guilds for the log channel.
+  let logs = null;
+  for (const g of i.client.guilds.cache.values()) {
+    const c = g.channels.cache.find((ch) => ch.name === 'ticket-logs');
+    if (c) { logs = c; break; }
+  }
+  await i.update({ content: `Thanks for your feedback — you rated us ${'⭐'.repeat(stars)} (${stars}/5)! 💜`, components: [] }).catch(() => {});
+  if (logs) await logs.send({ embeds: [new EmbedBuilder().setColor(stars >= 4 ? 0x10b981 : 0xf5b324)
+    .setDescription(`⭐ Support rated **${stars}/5** by <@${i.user.id}>`)] }).catch(() => {});
 }
 
 async function handleCommand(i) {
@@ -341,13 +362,21 @@ async function handleCommand(i) {
     return i.reply({ ephemeral: true, content:
       "**Forge — your assistant**\n`/ask` — ask anything\n`/recommend` — product recommendation\n" +
       "`/order` — check an order status\n`/vouch` — leave a vouch\n`/suggest` — suggest an idea\n" +
-      "`/shop` — open the shop\n`/invite` — get the invite link\n`/stats` — server stats\n`/giveaway` — staff: start a giveaway\n" +
+      "`/shop` — open the shop\n`/invite` — get the invite link\n`/stats` — server stats\n" +
+      "`/close` — staff: close a ticket\n`/giveaway` — staff: start a giveaway\n" +
       "Buttons: verify in #verify, pick roles in #roles, open a ticket in #open-a-ticket." });
   }
   if (i.commandName === 'order') return lookupOrder(i);
   if (i.commandName === 'vouch') return postVouch(i);
   if (i.commandName === 'giveaway') return startGiveaway(i);
   if (i.commandName === 'suggest') return postSuggestion(i);
+  if (i.commandName === 'close') {
+    if (!i.channel?.topic?.startsWith('ticket-owner:')) {
+      return i.reply({ content: 'Use this inside a ticket channel.', ephemeral: true });
+    }
+    if (!isStaff(i.member)) return i.reply({ content: 'Only staff can close tickets.', ephemeral: true });
+    return closeTicket(i);
+  }
   if (i.commandName === 'shop') {
     return i.reply({ ephemeral: true, content: `🛍️ Browse the shop: ${STORE_URL}/shop` });
   }

@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /account
+Disallow: /admin
+
+Sitemap: https://forgemarket-store.vercel.app/sitemap.xml

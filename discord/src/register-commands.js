@@ -27,6 +27,7 @@ const commands = [
   new SlashCommandBuilder().setName('shop').setDescription('Get a link to the ForgeMarket shop'),
   new SlashCommandBuilder().setName('invite').setDescription('Get the server invite link'),
   new SlashCommandBuilder().setName('stats').setDescription('Show live server stats'),
+  new SlashCommandBuilder().setName('close').setDescription('Staff: close the current ticket'),
 ].map((c) => c.toJSON());
 
 const rest = new REST({ version: '10' }).setToken(DISCORD_TOKEN);
