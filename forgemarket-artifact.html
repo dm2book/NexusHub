@@ -7,6 +7,7 @@
 <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://unpkg.com/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <script src="https://cdn.tailwindcss.com"></script>
 <script>
@@ -94,6 +95,18 @@ function initThree(mount) {
   const setFrustum = () => { const a = w/h; cam.left=-viewSize*a/2; cam.right=viewSize*a/2; cam.top=viewSize/2; cam.bottom=-viewSize/2; cam.updateProjectionMatrix(); };
   setFrustum();
 
+  // Interactive camera — drag to orbit/tilt, swipe to pan, scroll to zoom.
+  let controls = null;
+  if (THREE.OrbitControls) {
+    controls = new THREE.OrbitControls(cam, renderer.domElement);
+    controls.enableDamping = true; controls.dampingFactor = 0.09;
+    controls.enablePan = true; controls.screenSpacePanning = false;
+    controls.minPolarAngle = 0.5; controls.maxPolarAngle = 1.2;
+    controls.minZoom = 0.7; controls.maxZoom = 2.4;
+    controls.rotateSpeed = 0.55; controls.panSpeed = 0.6;
+    controls.target.set(0, 0.6, 0); controls.update();
+  }
+
   // Lights
   scene.add(new THREE.AmbientLight(0x2b3656, 0.8));
   const dir = new THREE.DirectionalLight(0x9fb4ff, 0.55); dir.position.set(8, 14, 5); scene.add(dir);
@@ -155,7 +168,8 @@ function initThree(mount) {
     new THREE.Vector3(1.5, 0.18, 1.8), new THREE.Vector3(3.8, 0.18, -1.4), new THREE.Vector3(6, 0.18, 0),
   ]);
   const roadGeo = new THREE.TubeGeometry(curve, 160, 0.34, 10, false); disposables.push(roadGeo);
-  const road = new THREE.Mesh(roadGeo, new THREE.MeshStandardMaterial({ color: 0x0a2a22, emissive: 0x10b981, emissiveIntensity: .8, metalness: .3, roughness: .4 }));
+  const roadMat = new THREE.MeshStandardMaterial({ color: 0x0a2a22, emissive: 0x10b981, emissiveIntensity: .8, metalness: .3, roughness: .4 });
+  const road = new THREE.Mesh(roadGeo, roadMat);
   scene.add(road);
   const roadCoreGeo = new THREE.TubeGeometry(curve, 160, 0.08, 8, false); disposables.push(roadCoreGeo);
   const roadCore = new THREE.Mesh(roadCoreGeo, new THREE.MeshBasicMaterial({ color: 0xbbf7d0 }));
@@ -190,8 +204,8 @@ function initThree(mount) {
   const points = new THREE.Points(pgeo, pmat); scene.add(points);
 
   // ── State machine ──
-  let mode = 'idle', t = 0, truckProg = 0, flash = 0, pLife = 0, panX = 0;
-  const tmp = new THREE.Vector3(), tan = new THREE.Vector3();
+  let mode = 'idle', t = 0, truckProg = 0, flash = 0, pLife = 0, panX = 0, houseVel = 0;
+  const tmp = new THREE.Vector3(), tan = new THREE.Vector3(), _v = new THREE.Vector3(), _d = new THREE.Vector3();
 
   function burst() {
     for (let i = 0; i < PC; i++) {
@@ -207,10 +221,10 @@ function initThree(mount) {
   const api = {
     purchase() { mode = 'purchase'; t = 0; crystal.visible = true; crystal.position.set(-6, 4.4, 0); truckPos.visible = false; },
     transit() { mode = 'transit'; t = 0; truckProg = 0; truckPos.visible = true; crystal.visible = false; },
-    arrive() { mode = 'arrive'; truckPos.visible = false; flash = 1; burst(); },
+    arrive() { mode = 'arrive'; truckPos.visible = false; flash = 1; burst(); house.scale.setScalar(1.28); houseVel = 0; }, // spring-bounce
     reset() { mode = 'idle'; crystal.visible = false; truckPos.visible = false; flash = 0; pLife = 0; pmat.opacity = 0; truckProg = 0; },
     dispose() {
-      cancelAnimationFrame(raf); ro.disconnect();
+      cancelAnimationFrame(raf); ro.disconnect(); if (controls) controls.dispose();
       scene.traverse(o => { if (o.geometry) o.geometry.dispose && o.geometry.dispose(); if (o.material) { (Array.isArray(o.material)?o.material:[o.material]).forEach(m=>m.dispose&&m.dispose()); } });
       disposables.forEach(d => d.dispose && d.dispose());
       renderer.dispose(); if (renderer.domElement.parentNode) renderer.domElement.parentNode.removeChild(renderer.domElement);
@@ -242,15 +256,27 @@ function initThree(mount) {
       pmat.opacity = Math.max(0, pLife/1.7); pgeo.attributes.position.needsUpdate = true;
     }
 
+    // Neon road: active glowing pulse (brighter while a truck is in transit)
+    roadMat.emissiveIntensity = 0.5 + Math.sin(time*3.2)*0.35 + (mode === 'transit' ? 0.45 : 0);
+
     flash = Math.max(0, flash - dt*0.55);
     const glow = 0.25 + flash*2.1 + (mode==='arrive' ? Math.sin(time*8)*0.15 : 0);
     hMat.emissiveIntensity = glow; roofMat.emissiveIntensity = 0.2 + flash*1.6;
     ph.intensity = 1.0 + flash*3;
 
-    const targetPan = mode === 'transit' ? truckPos.position.x*0.5 : 0;
-    panX += (targetPan - panX) * Math.min(1, dt*2.4);
-    cam.position.set(baseCam.x + panX, baseCam.y, baseCam.z + panX*0.25);
-    cam.lookAt(panX, 0.6, 0);
+    // House spring-bounce back to scale 1 (under-damped → overshoot/settle)
+    const sAcc = -150*(house.scale.x - 1) - 12*houseVel;
+    houseVel += sAcc*dt; house.scale.setScalar(Math.max(0.5, house.scale.x + houseVel*dt));
+
+    // Camera smoothly follows the truck while staying user-controllable.
+    const targetPanX = mode === 'transit' ? truckPos.position.x*0.5 : 0;
+    panX += (targetPanX - panX) * Math.min(1, dt*2.2);
+    if (controls) {
+      _v.set(panX, 0.6, 0); _d.copy(_v).sub(controls.target);
+      cam.position.add(_d); controls.target.copy(_v); controls.update();
+    } else {
+      cam.position.set(baseCam.x + panX, baseCam.y, baseCam.z + panX*0.25); cam.lookAt(panX, 0.6, 0);
+    }
 
     renderer.render(scene, cam);
   }
@@ -308,6 +334,9 @@ function DeliveryJourney({ onDelivered }) {
         <div className="viewport3d">
           <div ref={mountRef} className="absolute inset-0" />
           <div className="vignette" />
+          <div className="absolute bottom-3 left-3 text-[10px] font-mono uppercase tracking-wider text-neon-bright/70 bg-ink/40 px-2 py-1 rounded-md border border-neon/20 pointer-events-none">
+            ✦ drag to orbit · scroll to zoom
+          </div>
         </div>
 
         {/* Controls + toast */}
