@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FORGEMARKET — Premium In-Game Asset Shop</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          neon: { DEFAULT: '#10b981', bright: '#34d399', soft: '#059669' },
+          cyber: '#ff3b5c',
+          ink: '#05060a',
+        },
+        fontFamily: { display: ['Orbitron', 'system-ui', 'sans-serif'], body: ['Inter', 'system-ui', 'sans-serif'] },
+      },
+    },
+  };
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Orbitron:wght@500;700;800;900&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;background:#05060a;color:#e7eaf0;font-family:Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+  h1,h2,h3,.font-display{font-family:Orbitron,system-ui,sans-serif}
+  ::selection{background:rgba(16,185,129,.35);color:#fff}
+  ::-webkit-scrollbar{width:10px}::-webkit-scrollbar-track{background:#05060a}
+  ::-webkit-scrollbar-thumb{background:#1d2230;border-radius:6px}
+
+  /* ── Ambient ─────────────────────────────────────────── */
+  .grid-bg{background-image:linear-gradient(rgba(16,185,129,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(16,185,129,.05) 1px,transparent 1px);background-size:42px 42px}
+  .glow-ring{box-shadow:0 0 0 1px rgba(16,185,129,.45),0 0 26px rgba(16,185,129,.35)}
+  .text-glow{text-shadow:0 0 18px rgba(52,211,153,.55)}
+  @keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+  .floaty{animation:floaty 6s ease-in-out infinite}
+
+  /* ── Stage scaling ───────────────────────────────────── */
+  .stage{position:absolute;top:0;left:50%;width:720px;height:380px;transform-origin:top center}
+  .actor{position:absolute;top:0;left:0;will-change:transform,offset-distance,opacity}
+
+  /* Crystal flies on an arc into the cart */
+  .crystal{offset-path:path("M120 92 Q 150 220 166 250");offset-rotate:0deg;offset-anchor:50% 50%;opacity:0}
+  .p1 .crystal{animation:crystalArc 1.25s cubic-bezier(.45,.05,.5,1) forwards}
+  @keyframes crystalArc{
+    0%{offset-distance:0%;opacity:0;transform:scale(.3) rotate(0deg)}
+    18%{opacity:1;transform:scale(1.15) rotate(40deg)}
+    72%{opacity:1;transform:scale(1) rotate(180deg)}
+    100%{offset-distance:100%;opacity:0;transform:scale(.35) rotate(260deg)}
+  }
+
+  /* Particle burst at spawn */
+  .spark{position:absolute;width:7px;height:7px;border-radius:9999px;background:#34d399;box-shadow:0 0 10px #34d399;opacity:0}
+  .p1 .spark{animation:spark .9s ease-out forwards}
+  @keyframes spark{0%{opacity:1;transform:translate(0,0) scale(1)}100%{opacity:0;transform:translate(var(--tx),var(--ty)) scale(.2)}}
+
+  /* Cart bob then poof into truck */
+  .cart{transition:opacity .2s}
+  .p1 .cart{animation:bob .6s ease 1s both}
+  .p2 .cart{animation:poof .45s ease forwards}
+  @keyframes bob{0%,100%{transform:translateY(0)}30%{transform:translateY(-9px) scale(1.06)}60%{transform:translateY(0)}}
+  @keyframes poof{0%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(1.5) translateY(-10px)}}
+
+  /* Road draws as a neon path */
+  .road{stroke-dasharray:640;stroke-dashoffset:640}
+  .p2 .road{animation:draw 1.1s ease forwards}
+  @keyframes draw{to{stroke-dashoffset:0}}
+
+  /* Truck pops in, then drives the road */
+  .truck{offset-path:path("M166 256 C 300 338, 430 150, 590 222");offset-rotate:auto;offset-anchor:50% 50%;opacity:0;transform:scale(.5)}
+  .p2 .truck{opacity:1;transform:scale(1);transition:opacity .5s,transform .5s cubic-bezier(.34,1.56,.64,1)}
+  .p3 .truck{animation:drive 2.1s cubic-bezier(.45,.05,.4,1) forwards}
+  @keyframes drive{0%{offset-distance:0%;opacity:1}100%{offset-distance:100%;opacity:1}}
+
+  /* House glow + checkmark at the end */
+  .house-core{transition:filter .4s}
+  .p4 .house-core{animation:houseGlow 1.6s ease-in-out infinite}
+  @keyframes houseGlow{0%,100%{filter:drop-shadow(0 0 6px rgba(16,185,129,.45))}50%{filter:drop-shadow(0 0 26px rgba(52,211,153,.95))}}
+  .check{opacity:0;transform:scale(0)}
+  .p4 .check{animation:pop .5s cubic-bezier(.34,1.56,.64,1) .2s forwards}
+  @keyframes pop{0%{opacity:0;transform:scale(0)}60%{transform:scale(1.3)}100%{opacity:1;transform:scale(1)}}
+
+  /* Delivery toast */
+  .toast{transform:translateY(14px);opacity:0;transition:all .5s cubic-bezier(.34,1.56,.64,1)}
+  .toast.show{transform:translateY(0);opacity:1}
+
+  /* Floating +1 */
+  @keyframes rise{0%{opacity:0;transform:translateY(0) scale(.8)}20%{opacity:1}100%{opacity:0;transform:translateY(-34px) scale(1)}}
+  .rise{animation:rise 1s ease-out forwards}
+
+  @media (prefers-reduced-motion: reduce){*{animation-duration:.001ms!important}}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
+
+/* ── Inline icons ───────────────────────────────────────── */
+const Icon = {
+  cart: (p) => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.7 13.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 6H6"/></svg>),
+  bolt: (p) => (<svg viewBox="0 0 24 24" fill="currentColor" {...p}><path d="M13 2 4 14h6l-1 8 9-12h-6z"/></svg>),
+  check: (p) => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M20 6 9 17l-5-5"/></svg>),
+  menu: (p) => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" {...p}><path d="M3 12h18M3 6h18M3 18h18"/></svg>),
+};
+
+/* Crystal asset */
+const Crystal = ({ size = 40 }) => (
+  <svg width={size} height={size} viewBox="0 0 64 64">
+    <defs>
+      <linearGradient id="cg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#6ee7b7"/><stop offset="1" stopColor="#10b981"/></linearGradient>
+    </defs>
+    <g filter="drop-shadow(0 0 10px rgba(52,211,153,.9))">
+      <path d="M32 4 54 24 32 60 10 24z" fill="url(#cg)"/>
+      <path d="M32 4 54 24 32 32 10 24z" fill="#a7f3d0" opacity=".8"/>
+      <path d="M10 24 32 32 32 60z" fill="#059669"/>
+      <path d="M54 24 32 32 32 60z" fill="#047857"/>
+    </g>
+  </svg>
+);
+
+/* Truck asset */
+const Truck = ({ size = 56 }) => (
+  <svg width={size} height={size * 0.62} viewBox="0 0 100 62">
+    <g filter="drop-shadow(0 4px 10px rgba(0,0,0,.5))">
+      <rect x="4" y="14" width="52" height="30" rx="4" fill="#0f172a" stroke="#34d399" strokeWidth="2"/>
+      <path d="M56 22h20l14 14v8H56z" fill="#111827" stroke="#34d399" strokeWidth="2"/>
+      <rect x="60" y="25" width="12" height="9" rx="2" fill="#34d399" opacity=".8"/>
+      <path d="M12 22h30v14H12z" fill="#10b981" opacity=".25"/>
+      <circle cx="24" cy="48" r="8" fill="#0b0f17" stroke="#34d399" strokeWidth="3"/>
+      <circle cx="74" cy="48" r="8" fill="#0b0f17" stroke="#34d399" strokeWidth="3"/>
+    </g>
+  </svg>
+);
+
+/* ── The Delivery Journey ───────────────────────────────── */
+const PHASES = ['Idle', 'Purchasing item…', 'Packing your order…', 'Out for delivery…', 'Delivered in-game!'];
+
+function DeliveryJourney({ onDelivered }) {
+  const [phase, setPhase] = useState(0);
+  const [playing, setPlaying] = useState(false);
+  const [runId, setRunId] = useState(0);
+  const [toast, setToast] = useState(false);
+  const wrapRef = useRef(null);
+  const [scale, setScale] = useState(1);
+  const timers = useRef([]);
+
+  // Responsive scale of the fixed 720×380 stage.
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setScale(Math.min(1, el.clientWidth / 720)));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const clearTimers = () => { timers.current.forEach(clearTimeout); timers.current = []; };
+  const at = (fn, ms) => timers.current.push(setTimeout(fn, ms));
+
+  const play = useCallback(() => {
+    if (playing) return;
+    clearTimers();
+    setToast(false);
+    setPlaying(true);
+    setRunId((r) => r + 1);   // remount stage → animations reset
+    setPhase(0);
+    at(() => setPhase(1), 60);
+    at(() => setPhase(2), 1650);
+    at(() => setPhase(3), 2600);
+    at(() => setPhase(4), 4600);
+    at(() => { setToast(true); onDelivered && onDelivered(); }, 5100);
+    at(() => setPlaying(false), 5600);
+  }, [playing, onDelivered]);
+
+  useEffect(() => () => clearTimers(), []);
+
+  // cumulative phase classes so finished animations hold their end state
+  const cls = ['stage', phase >= 1 && 'p1', phase >= 2 && 'p2', phase >= 3 && 'p3', phase >= 4 && 'p4']
+    .filter(Boolean).join(' ');
+
+  const sparks = Array.from({ length: 16 }, (_, i) => {
+    const a = (i / 16) * Math.PI * 2, d = 34 + Math.random() * 26;
+    return { x: Math.cos(a) * d, y: Math.sin(a) * d };
+  });
+
+  return (
+    <div className="relative rounded-3xl border border-white/10 bg-gradient-to-b from-white/[0.04] to-transparent overflow-hidden glow-ring">
+      <div className="absolute inset-0 grid-bg opacity-60" />
+      <div className="absolute -top-24 -left-20 w-80 h-80 rounded-full bg-neon/20 blur-3xl" />
+      <div className="absolute -bottom-24 -right-10 w-80 h-80 rounded-full bg-cyber/10 blur-3xl" />
+
+      <div className="relative p-5 sm:p-7">
+        <div className="flex items-center justify-between mb-4">
+          <div className="inline-flex items-center gap-2 text-xs font-semibold tracking-widest uppercase text-neon-bright">
+            <span className="w-2 h-2 rounded-full bg-neon-bright animate-pulse" /> Live Delivery Engine
+          </div>
+          <div className="text-xs font-mono text-slate-400">{PHASES[phase]}</div>
+        </div>
+
+        {/* Stage */}
+        <div ref={wrapRef} className="relative w-full" style={{ height: 380 * scale }}>
+          <div key={runId} className={cls} style={{ transform: `translateX(-50%) scale(${scale})` }}>
+            {/* Static scene */}
+            <svg width="720" height="380" viewBox="0 0 720 380" className="absolute inset-0">
+              {/* iso floor */}
+              <g opacity="0.5" stroke="#10b981" strokeOpacity="0.18">
+                {Array.from({ length: 9 }).map((_, i) => <line key={'h'+i} x1="0" y1={150 + i * 28} x2="720" y2={120 + i * 28} />)}
+                {Array.from({ length: 14 }).map((_, i) => <line key={'v'+i} x1={i * 55} y1="150" x2={i * 55 - 40} y2="380" />)}
+              </g>
+              {/* vault / shop on the left */}
+              <g filter="drop-shadow(0 0 14px rgba(16,185,129,.4))">
+                <rect x="60" y="120" width="96" height="118" rx="14" fill="#0c1118" stroke="#10b981" strokeWidth="2"/>
+                <rect x="74" y="134" width="68" height="78" rx="8" fill="#0a0f16" stroke="#34d399" strokeOpacity=".5"/>
+                <circle cx="108" cy="173" r="20" fill="none" stroke="#34d399" strokeWidth="3" strokeOpacity=".7"/>
+                <circle cx="108" cy="173" r="6" fill="#34d399"/>
+                <text x="108" y="232" textAnchor="middle" fill="#5eead4" fontSize="11" fontFamily="Orbitron">VAULT</text>
+              </g>
+              {/* neon road */}
+              <path className="road" d="M166 256 C 300 338, 430 150, 590 222" fill="none" stroke="#10b981" strokeWidth="5" strokeLinecap="round" filter="drop-shadow(0 0 8px rgba(16,185,129,.8))"/>
+              <path d="M166 256 C 300 338, 430 150, 590 222" fill="none" stroke="#a7f3d0" strokeWidth="1.5" strokeDasharray="2 12" strokeLinecap="round" opacity=".7"/>
+              {/* house on the right */}
+              <g className="house-core">
+                <path d="M590 150 L648 116 L706 150 Z" fill="#0f172a" stroke="#34d399" strokeWidth="2"/>
+                <rect x="602" y="150" width="92" height="78" rx="6" fill="#0c1118" stroke="#34d399" strokeWidth="2"/>
+                <rect x="636" y="186" width="24" height="42" rx="3" fill="#10b981" opacity=".35"/>
+                <rect x="614" y="162" width="16" height="16" rx="3" fill="#34d399" opacity=".5"/>
+                <rect x="666" y="162" width="16" height="16" rx="3" fill="#34d399" opacity=".5"/>
+              </g>
+            </svg>
+
+            {/* Sparks */}
+            <div className="actor" style={{ left: 120, top: 92 }}>
+              {sparks.map((s, i) => <span key={i} className="spark" style={{ '--tx': s.x + 'px', '--ty': s.y + 'px', animationDelay: (i % 5) * 0.03 + 's' }} />)}
+            </div>
+            {/* Crystal */}
+            <div className="actor crystal" style={{ marginLeft: -20, marginTop: -20 }}><Crystal size={40} /></div>
+            {/* Cart */}
+            <div className="actor cart text-neon-bright" style={{ left: 166, top: 250, marginLeft: -18, marginTop: -18 }}>
+              <div className="w-10 h-10 rounded-xl bg-ink/80 border border-neon/50 flex items-center justify-center glow-ring">
+                <Icon.cart width="22" height="22" />
+              </div>
+            </div>
+            {/* Truck */}
+            <div className="actor truck" style={{ marginLeft: -28, marginTop: -18 }}><Truck size={56} /></div>
+            {/* Checkmark over house */}
+            <div className="actor check" style={{ left: 648, top: 96, marginLeft: -16, marginTop: -16 }}>
+              <div className="w-9 h-9 rounded-full bg-neon flex items-center justify-center" style={{ boxShadow: '0 0 22px rgba(52,211,153,.95)' }}>
+                <Icon.check width="18" height="18" className="text-ink" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Controls + toast */}
+        <div className="relative mt-5 flex flex-col sm:flex-row items-center gap-4 justify-between">
+          <button onClick={play} disabled={playing}
+            className={`group relative inline-flex items-center gap-2 px-7 py-3.5 rounded-xl font-semibold transition-all ${playing ? 'bg-white/5 text-slate-400 cursor-wait' : 'bg-neon text-ink hover:bg-neon-bright glow-ring hover:scale-[1.03]'}`}>
+            <Icon.bolt width="18" height="18" />
+            {playing ? 'Delivering…' : (runId ? 'Replay Live Delivery' : 'Test Live Delivery')}
+          </button>
+
+          <div className={`toast ${toast ? 'show' : ''} flex items-center gap-3 px-4 py-3 rounded-xl bg-neon/10 border border-neon/40`}>
+            <div className="w-7 h-7 rounded-full bg-neon flex items-center justify-center"><Icon.check width="15" height="15" className="text-ink"/></div>
+            <div>
+              <div className="text-sm font-semibold text-white">Item Successfully Delivered In-Game!</div>
+              <div className="text-xs text-neon-bright">Automated · arrived in &lt; 30 seconds</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Marketplace ────────────────────────────────────────── */
+const ITEMS = [
+  { name: 'Inferno Greatsword', rarity: 'Legendary', color: 'from-rose-500/30 to-orange-500/10', ring: 'group-hover:shadow-[0_0_40px_-8px_rgba(244,63,94,.6)]', tag: 'text-rose-300 bg-rose-500/10 border-rose-500/30', icon: '⚔️', stats: [['Damage', '320'], ['Speed', '78%']], price: 24.99 },
+  { name: 'Celestial Loot Chest', rarity: 'Mythic', color: 'from-violet-500/30 to-fuchsia-500/10', ring: 'group-hover:shadow-[0_0_40px_-8px_rgba(168,85,247,.6)]', tag: 'text-fuchsia-300 bg-fuchsia-500/10 border-fuchsia-500/30', icon: '🎁', stats: [['Drops', '5★ Gear'], ['Bonus', '+15%']], price: 39.99 },
+  { name: 'Void Crystal ×100', rarity: 'Rare', color: 'from-emerald-500/30 to-teal-500/10', ring: 'group-hover:shadow-[0_0_40px_-8px_rgba(16,185,129,.6)]', tag: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/30', icon: '💎', stats: [['Type', 'Currency'], ['Stack', '×100']], price: 12.99 },
+  { name: 'Shadow Dragon Mount', rarity: 'Exotic', color: 'from-sky-500/30 to-indigo-500/10', ring: 'group-hover:shadow-[0_0_40px_-8px_rgba(56,189,248,.6)]', tag: 'text-sky-300 bg-sky-500/10 border-sky-500/30', icon: '🐉', stats: [['Speed', '240'], ['Flight', '✓']], price: 59.99 },
+];
+
+function ProductCard({ item, onBuy }) {
+  return (
+    <div className="group relative rounded-2xl border border-white/10 bg-white/[0.03] overflow-hidden transition-all duration-300 hover:-translate-y-1.5 hover:border-neon/40">
+      <div className={`relative h-40 bg-gradient-to-br ${item.color} flex items-center justify-center text-6xl transition-shadow duration-300 ${item.ring}`}>
+        <div className="absolute inset-0 grid-bg opacity-40" />
+        <span className="relative floaty drop-shadow-[0_8px_20px_rgba(0,0,0,.6)]">{item.icon}</span>
+        <span className={`absolute left-3 top-3 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full border ${item.tag}`}>{item.rarity}</span>
+      </div>
+      <div className="p-4">
+        <h3 className="text-white font-semibold leading-tight">{item.name}</h3>
+        <div className="grid grid-cols-2 gap-2 mt-3">
+          {item.stats.map(([k, v]) => (
+            <div key={k} className="rounded-lg bg-black/30 border border-white/5 px-2.5 py-1.5">
+              <div className="text-[10px] uppercase tracking-wide text-slate-500">{k}</div>
+              <div className="text-sm text-white font-medium">{v}</div>
+            </div>
+          ))}
+        </div>
+        <div className="flex items-center justify-between mt-4">
+          <div className="text-xl font-display text-white">€{item.price.toFixed(2)}</div>
+          <button onClick={onBuy}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-semibold bg-neon/15 text-neon-bright border border-neon/40 hover:bg-neon hover:text-ink transition-all">
+            <Icon.bolt width="14" height="14" /> Instant Buy
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── App ────────────────────────────────────────────────── */
+function App() {
+  const [cart, setCart] = useState(0);
+  const [bumps, setBumps] = useState([]);
+  const addToCart = () => {
+    setCart((c) => c + 1);
+    const id = Date.now() + Math.random();
+    setBumps((b) => [...b, id]);
+    setTimeout(() => setBumps((b) => b.filter((x) => x !== id)), 1000);
+  };
+
+  return (
+    <div className="min-h-screen relative">
+      {/* Header */}
+      <header className="sticky top-0 z-50 backdrop-blur-xl bg-ink/70 border-b border-white/10">
+        <nav className="max-w-6xl mx-auto px-5 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-neon flex items-center justify-center glow-ring"><Icon.bolt width="18" height="18" className="text-ink"/></div>
+            <span className="font-display font-extrabold tracking-wider text-white">FORGE<span className="text-neon-bright">MARKET</span></span>
+          </div>
+          <div className="hidden md:flex items-center gap-8 text-sm text-slate-300">
+            <a className="hover:text-white transition" href="#market">Marketplace</a>
+            <a className="hover:text-white transition" href="#">Live Tracker</a>
+            <a className="hover:text-white transition" href="#">Support</a>
+          </div>
+          <div className="flex items-center gap-3">
+            <button className="relative w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-200 hover:border-neon/50 transition">
+              <Icon.cart width="18" height="18" />
+              {cart > 0 && <span className="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1 rounded-full bg-neon text-ink text-xs font-bold flex items-center justify-center">{cart}</span>}
+              {bumps.map((id) => <span key={id} className="rise absolute -top-2 right-0 text-neon-bright text-xs font-bold">+1</span>)}
+            </button>
+            <button className="md:hidden text-slate-200"><Icon.menu width="22" height="22"/></button>
+          </div>
+        </nav>
+      </header>
+
+      {/* Hero */}
+      <section className="relative max-w-6xl mx-auto px-5 pt-12 pb-8">
+        <div className="text-center mb-8">
+          <span className="inline-block text-xs tracking-[0.3em] uppercase text-neon-bright/90 mb-4">Premium In-Game Assets · Instant Delivery</span>
+          <h1 className="text-4xl sm:text-6xl font-extrabold text-white leading-tight">
+            Gear up. <span className="text-neon-bright text-glow">Delivered instantly.</span>
+          </h1>
+          <p className="text-slate-400 max-w-xl mx-auto mt-4">Watch exactly how every purchase travels from our vault straight into your game — automated, tracked and secure.</p>
+        </div>
+        <DeliveryJourney onDelivered={addToCart} />
+      </section>
+
+      {/* Marketplace */}
+      <section id="market" className="max-w-6xl mx-auto px-5 py-14">
+        <div className="flex items-end justify-between mb-8">
+          <div>
+            <h2 className="text-2xl sm:text-3xl font-bold text-white">Featured Marketplace</h2>
+            <p className="text-slate-400 text-sm mt-1">Hand-picked legendary gear — buy once, delivered in seconds.</p>
+          </div>
+          <a href="#" className="hidden sm:inline-flex text-sm text-neon-bright hover:underline">View all →</a>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          {ITEMS.map((it) => <ProductCard key={it.name} item={it} onBuy={addToCart} />)}
+        </div>
+      </section>
+
+      <footer className="border-t border-white/10 py-8 text-center text-slate-500 text-sm">
+        FORGEMARKET — premium in-game assets · automated delivery · 24/7 support
+      </footer>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
