@@ -1,8 +1,18 @@
 # AETHER — Walk The Drop
 
-A standalone, dependency-free **cinematic fashion experience** (sneakers + clothes).
-Built as a single self-contained HTML file — no build step, no npm, runs anywhere.
+A standalone, dependency-free **cinematic fashion experience** (sneakers + clothes),
+rendered in the **Dala** design system — a particle cosmos on a pure-black void with a
+single violet pulse (`#8052ff`) as the only color authority, ultra-thin etched type
+(Inter weight 200), hairline borders, and **no shadows / gradients / glows** (depth
+comes from contrast and the void). Built as a single self-contained HTML file — no
+build step, no npm, runs anywhere.
 **Completely separate from ForgeMarket** — nothing in the existing app is touched.
+
+## Design system (Dala)
+- **Void** `#000000` canvas · **Bone** `#ffffff` type · **Ash/Smoke** muted text
+- **Plum Voltage** `#8052ff` — the only filled action color · **Amber Spark** outlines · **Lichen** decorative marks
+- Particle constellation owns ≥50% of the hero and **assembles into the hero sneaker**
+- Pill geometry (24px radius) everywhere · hairline 1px borders · 60px section rhythm
 
 ## View it
 - Just open `showcase/index.html` in any modern browser, **or**
