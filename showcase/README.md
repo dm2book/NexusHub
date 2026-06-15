@@ -8,17 +8,28 @@ Built as a single self-contained HTML file — no build step, no npm, runs anywh
 - Just open `showcase/index.html` in any modern browser, **or**
 - Serve the folder: `npx serve showcase` (or `python3 -m http.server` inside it)
 
-## What's in it
+## The cinematic (the hero moment)
+`The Walk` is one continuous scroll-driven sequence inside a single pinned viewport:
+1. **Dolly** — the camera glides forward through a neon 3D corridor (CSS perspective),
+   past glowing arches, side posters, and a receding grid floor.
+2. **Lock-on** — the corridor fades and the **hero sneaker rises on a lit podium**,
+   centered in frame with spinning rings.
+3. **Pan** — the camera pans off the podium and the **clothing display slides in**.
+
+Captions update per phase. All three beats are driven by one normalized scroll value.
+
+## Everything else
 - **Loader** with live progress + brand reveal
 - **Custom magnetic cursor** with contextual labels (difference blend)
 - **Hero** with animated canvas particle field, drifting aurora, split-letter reveals
-- **The Walk** — a scroll-pinned 3D neon corridor you fly through (CSS 3D + perspective),
-  with passing arches, side posters, a receding grid floor, fog, and stage captions
-- **Sneaker Lab** — floating CSS-drawn sneaker on a rotating-ring podium with **live colorway swatches**
-- **Atelier** — generated garment rack with drape/parallax hover
-- **Infinite marquee**, **3D tilt cards** with pointer-tracked glow
-- **Cart** with animated bag counter + slide-in toasts
+- **Sneaker Lab** — CSS-drawn sneaker you can **drag to rotate** (with inertia + idle auto-spin)
+  and **recolor live** via swatches (recolors the whole room, podium, and lab)
+- **Atelier grid** — generated garment cards with **3D tilt hover** + pointer-tracked glow
+- **Infinite marquee**, **3D tilt feature cards**
+- **Animated add-to-cart** — bag counter pop + slide-in toasts
+- **Parallax** hero tags tracking the pointer
 - **Optional ambient sound** synthesized live via WebAudio (no audio asset needed)
-- Respects `prefers-reduced-motion`; degrades to touch cursor on mobile
+- Respects `prefers-reduced-motion` (unpins the walk into stacked sections);
+  full touch support (drag-rotate, tap-recolor) and mobile layout
 
 No external JS/CSS libraries — only Google Fonts.

@@ -2,45 +2,31 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <meta name="theme-color" content="#05040a" />
 <title>AETHER — Walk The Drop</title>
-<meta name="description" content="AETHER — an immersive cinematic fashion experience. Walk through the store, stop at the sneakers, get lost in the atelier." />
+<meta name="description" content="AETHER — a 4K cinematic streetwear experience. Dolly through the store, lock onto the hero sneaker, glide into the atelier." />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Space+Grotesk:wght@300;400;500;600;700&family=Bebas+Neue&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg:#05040a;
-    --ink:#f6f4ff;
-    --muted:#9a93b8;
-    --neon:#ff2d77;
-    --neon2:#3df0ff;
-    --neon3:#b56bff;
-    --gold:#ffd166;
-    --ease:cubic-bezier(.16,1,.3,1);
-    --maxw:1240px;
+    --bg:#05040a; --ink:#f6f4ff; --muted:#9a93b8;
+    --neon:#ff2d77; --neon2:#3df0ff; --neon3:#b56bff; --gold:#ffd166;
+    --ease:cubic-bezier(.16,1,.3,1); --maxw:1240px;
   }
   *{margin:0;padding:0;box-sizing:border-box}
-  html{scroll-behavior:auto}
-  body{
-    background:var(--bg);
-    color:var(--ink);
-    font-family:"Space Grotesk",system-ui,sans-serif;
-    overflow-x:hidden;
-    -webkit-font-smoothing:antialiased;
-    cursor:none;
-  }
-  @media (pointer:coarse){ body{cursor:auto} .cursor,.cursor-dot{display:none!important} }
+  body{background:var(--bg);color:var(--ink);font-family:"Space Grotesk",system-ui,sans-serif;
+    overflow-x:hidden;-webkit-font-smoothing:antialiased;cursor:none}
+  @media (pointer:coarse){body{cursor:auto}.cursor,.cursor-dot{display:none!important}}
   a{color:inherit;text-decoration:none}
   ::selection{background:var(--neon);color:#fff}
+  ::-webkit-scrollbar{width:0}
   h1,h2,h3,.display{font-family:"Syne",sans-serif;letter-spacing:-.02em;line-height:.95}
   .bebas{font-family:"Bebas Neue",sans-serif;letter-spacing:.04em}
+  img{max-width:100%}
 
-  /* ---------- scrollbar ---------- */
-  ::-webkit-scrollbar{width:0}
-
-  /* ---------- grain + vignette overlays ---------- */
+  /* overlays */
   .grain{position:fixed;inset:0;z-index:9000;pointer-events:none;opacity:.05;mix-blend-mode:overlay;
     background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
     animation:grain .5s steps(3) infinite}
@@ -48,25 +34,29 @@
   .vignette{position:fixed;inset:0;z-index:8990;pointer-events:none;
     background:radial-gradient(120% 100% at 50% 40%,transparent 55%,rgba(0,0,0,.65) 100%)}
 
-  /* ---------- custom cursor ---------- */
+  /* cursor */
   .cursor{position:fixed;top:0;left:0;width:46px;height:46px;border:1px solid rgba(246,244,255,.55);border-radius:50%;
-    transform:translate(-50%,-50%);z-index:10000;pointer-events:none;transition:width .3s var(--ease),height .3s var(--ease),border-color .3s,background .3s;mix-blend-mode:difference}
-  .cursor-dot{position:fixed;top:0;left:0;width:6px;height:6px;background:var(--ink);border-radius:50%;transform:translate(-50%,-50%);z-index:10001;pointer-events:none}
-  .cursor.hover{width:80px;height:80px;background:rgba(255,45,119,.18);border-color:transparent}
-  .cursor.hover::after{content:attr(data-label);position:absolute;inset:0;display:grid;place-items:center;font-size:10px;letter-spacing:.18em;text-transform:uppercase;font-family:"Space Grotesk"}
+    transform:translate(-50%,-50%);z-index:10000;pointer-events:none;mix-blend-mode:difference;
+    transition:width .3s var(--ease),height .3s var(--ease),border-color .3s,background .3s}
+  .cursor-dot{position:fixed;top:0;left:0;width:6px;height:6px;background:var(--ink);border-radius:50%;
+    transform:translate(-50%,-50%);z-index:10001;pointer-events:none}
+  .cursor.hover{width:84px;height:84px;background:rgba(255,45,119,.18);border-color:transparent}
+  .cursor.hover::after{content:attr(data-label);position:absolute;inset:0;display:grid;place-items:center;
+    font-size:10px;letter-spacing:.18em;text-transform:uppercase;font-family:"Space Grotesk"}
+  .cursor.drag{width:84px;height:84px;background:rgba(61,240,255,.16);border-color:transparent}
 
-  /* ---------- loader ---------- */
+  /* loader */
   .loader{position:fixed;inset:0;z-index:11000;background:#05040a;display:grid;place-items:center;transition:opacity .8s,visibility .8s}
   .loader.done{opacity:0;visibility:hidden}
-  .loader .l-wrap{text-align:center;width:min(80vw,520px)}
-  .loader .l-word{font-family:"Syne";font-weight:800;font-size:clamp(40px,9vw,92px);letter-spacing:-.03em;
+  .l-wrap{text-align:center;width:min(80vw,520px)}
+  .l-word{font-family:"Syne";font-weight:800;font-size:clamp(40px,9vw,92px);letter-spacing:-.03em;
     background:linear-gradient(90deg,var(--neon),var(--neon3),var(--neon2));-webkit-background-clip:text;background-clip:text;color:transparent}
-  .loader .l-sub{margin-top:14px;color:var(--muted);font-size:12px;letter-spacing:.4em;text-transform:uppercase}
+  .l-sub{margin-top:14px;color:var(--muted);font-size:12px;letter-spacing:.4em;text-transform:uppercase}
   .l-bar{margin-top:26px;height:2px;width:100%;background:rgba(255,255,255,.1);overflow:hidden;border-radius:99px}
   .l-bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--neon2),var(--neon));box-shadow:0 0 18px var(--neon)}
   .l-pct{margin-top:10px;font-size:11px;color:var(--muted);letter-spacing:.3em}
 
-  /* ---------- top progress + nav ---------- */
+  /* progress + nav */
   .progress{position:fixed;top:0;left:0;height:3px;width:0;z-index:9500;
     background:linear-gradient(90deg,var(--neon2),var(--neon3),var(--neon));box-shadow:0 0 14px var(--neon)}
   nav{position:fixed;top:0;left:0;right:0;z-index:9400;display:flex;align-items:center;justify-content:space-between;
@@ -82,10 +72,10 @@
   nav .bag .count{display:grid;place-items:center;min-width:22px;height:22px;padding:0 6px;border-radius:99px;background:var(--neon);color:#fff;font-size:12px;font-weight:700}
   @media(max-width:780px){nav .links{display:none}}
 
-  /* ---------- buttons ---------- */
+  /* buttons */
   .btn{position:relative;display:inline-flex;align-items:center;gap:10px;padding:16px 30px;border-radius:99px;
-    font-size:13px;letter-spacing:.16em;text-transform:uppercase;font-weight:600;overflow:hidden;border:1px solid rgba(246,244,255,.25);
-    transition:transform .4s var(--ease),border-color .3s}
+    font-size:13px;letter-spacing:.16em;text-transform:uppercase;font-weight:600;overflow:hidden;
+    border:1px solid rgba(246,244,255,.25);transition:transform .4s var(--ease),border-color .3s}
   .btn.solid{background:var(--ink);color:#05040a;border-color:transparent}
   .btn .fill{position:absolute;inset:0;background:linear-gradient(90deg,var(--neon),var(--neon3));transform:translateY(101%);transition:transform .45s var(--ease);z-index:0}
   .btn:hover .fill{transform:translateY(0)}
@@ -94,7 +84,7 @@
   .btn.solid:hover span{color:#fff}
 
   /* ============ HERO ============ */
-  .hero{position:relative;height:100vh;min-height:680px;display:grid;place-items:center;overflow:hidden}
+  .hero{position:relative;height:100svh;min-height:660px;display:grid;place-items:center;overflow:hidden}
   #fx{position:absolute;inset:0;z-index:0}
   .aurora{position:absolute;inset:-20%;z-index:0;filter:blur(70px);opacity:.55;
     background:
@@ -109,93 +99,110 @@
   .hero h1 .row{display:block;overflow:hidden}
   .hero h1 .row span{display:inline-block;transform:translateY(110%);animation:slideUp 1s var(--ease) forwards}
   .hero h1 .r2 span{animation-delay:.12s}
-  .hero h1 .stroke{color:transparent;-webkit-text-stroke:2px var(--ink)}
   .hero .grad{background:linear-gradient(90deg,var(--neon),var(--neon3) 50%,var(--neon2));-webkit-background-clip:text;background-clip:text;color:transparent}
   .hero p.lead{margin:28px auto 0;max-width:540px;color:var(--muted);font-size:clamp(15px,1.6vw,18px);line-height:1.6;opacity:0;animation:fadeUp .9s var(--ease) .9s forwards}
   .hero .cta{margin-top:38px;display:flex;gap:16px;justify-content:center;flex-wrap:wrap;opacity:0;animation:fadeUp .9s var(--ease) 1.1s forwards}
   @keyframes slideUp{to{transform:translateY(0)}}
   @keyframes fadeUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
-  .scroll-hint{position:absolute;bottom:30px;left:50%;transform:translateX(-50%);z-index:4;display:flex;flex-direction:column;align-items:center;gap:8px;color:var(--muted);font-size:11px;letter-spacing:.3em;text-transform:uppercase;opacity:0;animation:fadeUp 1s var(--ease) 1.6s forwards}
+  .scroll-hint{position:absolute;bottom:28px;left:50%;transform:translateX(-50%);z-index:4;display:flex;flex-direction:column;align-items:center;gap:8px;color:var(--muted);font-size:11px;letter-spacing:.3em;text-transform:uppercase;opacity:0;animation:fadeUp 1s var(--ease) 1.6s forwards}
   .scroll-hint .mouse{width:24px;height:38px;border:1px solid var(--muted);border-radius:14px;position:relative}
   .scroll-hint .mouse::after{content:"";position:absolute;top:7px;left:50%;width:3px;height:7px;border-radius:3px;background:var(--ink);transform:translateX(-50%);animation:wheel 1.6s infinite}
   @keyframes wheel{0%{opacity:0;top:7px}40%{opacity:1}80%{opacity:0;top:18px}}
   .float-tag{position:absolute;z-index:3;font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);
-    border:1px solid rgba(255,255,255,.12);padding:8px 14px;border-radius:99px;backdrop-filter:blur(6px);background:rgba(255,255,255,.03)}
+    border:1px solid rgba(255,255,255,.12);padding:8px 14px;border-radius:99px;backdrop-filter:blur(6px);background:rgba(255,255,255,.03);will-change:transform}
 
-  /* ============ THE WALK (pinned 3D corridor) ============ */
-  .walk{position:relative;height:600vh;background:#05040a}
-  .walk .pin{position:sticky;top:0;height:100vh;overflow:hidden;
-    background:radial-gradient(120% 90% at 50% 50%,#0d0a1a 0%,#05040a 70%)}
+  /* ============ THE WALK (pinned cinematic) ============ */
+  .walk{position:relative;height:760vh;background:#05040a}
+  .walk .pin{position:sticky;top:0;height:100svh;overflow:hidden;background:radial-gradient(120% 90% at 50% 50%,#0d0a1a 0%,#05040a 70%)}
   .scene{position:absolute;inset:0;perspective:760px;perspective-origin:50% 46%}
-  .world{position:absolute;top:50%;left:50%;width:0;height:0;transform-style:preserve-3d;
-    transform:translateZ(var(--cam,0px))}
-  /* neon arches you fly through */
+  .corridor{position:absolute;inset:0;transform-style:preserve-3d;will-change:opacity,transform}
+  .world{position:absolute;top:50%;left:50%;width:0;height:0;transform-style:preserve-3d;transform:translateZ(var(--cam,0px))}
   .arch{position:absolute;left:0;top:0;width:520px;height:620px;margin-left:-260px;margin-top:-340px;
     border:2px solid rgba(255,255,255,.18);border-radius:18px;transform:translateZ(var(--z));
     box-shadow:0 0 30px rgba(61,240,255,.12),inset 0 0 40px rgba(181,107,255,.1)}
-  .arch i{position:absolute;inset:-2px;border-radius:18px;border:2px solid transparent}
   .arch.n1{border-color:rgba(255,45,119,.55);box-shadow:0 0 40px rgba(255,45,119,.4),inset 0 0 50px rgba(255,45,119,.15)}
   .arch.n2{border-color:rgba(61,240,255,.55);box-shadow:0 0 40px rgba(61,240,255,.4),inset 0 0 50px rgba(61,240,255,.15)}
   .arch.n3{border-color:rgba(181,107,255,.55);box-shadow:0 0 40px rgba(181,107,255,.4),inset 0 0 50px rgba(181,107,255,.15)}
   .arch .sign{position:absolute;top:-2px;left:50%;transform:translate(-50%,-130%);white-space:nowrap;
     font-family:"Bebas Neue";font-size:30px;letter-spacing:.18em;color:#fff;text-shadow:0 0 18px currentColor;opacity:.9}
-  .arch .floor{position:absolute;left:50%;bottom:-2px;width:300px;height:80px;margin-left:-150px;transform:translateY(100%) rotateX(78deg);
-    background:linear-gradient(180deg,rgba(255,255,255,.12),transparent);filter:blur(2px)}
-  /* side posters */
+  .arch .floor{position:absolute;left:50%;bottom:-2px;width:300px;height:80px;margin-left:-150px;transform:translateY(100%) rotateX(78deg);background:linear-gradient(180deg,rgba(255,255,255,.12),transparent);filter:blur(2px)}
   .poster{position:absolute;width:300px;height:420px;margin-top:-210px;border-radius:8px;overflow:hidden;
     transform:translateX(var(--x)) translateZ(var(--z)) rotateY(var(--ry));border:1px solid rgba(255,255,255,.12);
     background:linear-gradient(160deg,#19132e,#0a0815);box-shadow:0 30px 60px rgba(0,0,0,.6)}
-  .poster .pl{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:flex-end;padding:20px;
-    background:linear-gradient(180deg,transparent 40%,rgba(0,0,0,.7))}
+  .poster .pl{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:flex-end;padding:20px;background:linear-gradient(180deg,transparent 40%,rgba(0,0,0,.7))}
   .poster .pl b{font-family:"Syne";font-weight:800;font-size:26px;line-height:1}
   .poster .pl small{color:var(--neon2);letter-spacing:.2em;font-size:10px;text-transform:uppercase;margin-top:6px}
-  .poster .blob{position:absolute;inset:0;opacity:.9;mix-blend-mode:screen;
-    background:radial-gradient(60% 60% at 50% 35%,var(--c1),transparent 70%),radial-gradient(50% 50% at 70% 80%,var(--c2),transparent 70%)}
-  /* floor grid that recedes */
+  .poster .blob{position:absolute;inset:0;opacity:.9;mix-blend-mode:screen}
   .gridfloor{position:absolute;left:50%;top:50%;width:2600px;height:3000px;margin-left:-1300px;
-    transform:rotateX(85deg) translateZ(-260px) translateY(var(--cam,0px));transform-style:preserve-3d;
-    background:
-      linear-gradient(90deg,rgba(61,240,255,.16) 1px,transparent 1px) 0 0/130px 130px,
-      linear-gradient(0deg,rgba(181,107,255,.16) 1px,transparent 1px) 0 0/130px 130px;
-    -webkit-mask:radial-gradient(60% 50% at 50% 50%,#000 30%,transparent 75%);
-    mask:radial-gradient(60% 50% at 50% 50%,#000 30%,transparent 75%)}
-  .fog{position:absolute;inset:0;z-index:5;pointer-events:none;
-    background:radial-gradient(60% 60% at 50% 46%,transparent 35%,rgba(5,4,10,.92) 80%)}
-  /* walk captions */
-  .walk-cap{position:absolute;z-index:6;left:50%;top:50%;transform:translate(-50%,-50%);text-align:center;width:min(92vw,820px);pointer-events:none}
-  .walk-cap .step{opacity:0;transform:translateY(20px);transition:opacity .5s var(--ease),transform .5s var(--ease);position:absolute;left:50%;top:0;transform:translate(-50%,20px)}
-  .walk-cap .step.on{opacity:1;transform:translate(-50%,0)}
-  .walk-cap .step .lbl{font-size:12px;letter-spacing:.5em;text-transform:uppercase;color:var(--neon2);margin-bottom:14px}
-  .walk-cap .step h2{font-size:clamp(34px,7vw,84px);font-weight:800}
-  .walk-cap .step p{margin-top:14px;color:var(--muted);font-size:15px;letter-spacing:.02em}
+    transform:rotateX(85deg) translateZ(-260px) translateY(var(--cam,0px));
+    background:linear-gradient(90deg,rgba(61,240,255,.16) 1px,transparent 1px) 0 0/130px 130px,
+               linear-gradient(0deg,rgba(181,107,255,.16) 1px,transparent 1px) 0 0/130px 130px;
+    -webkit-mask:radial-gradient(60% 50% at 50% 50%,#000 30%,transparent 75%);mask:radial-gradient(60% 50% at 50% 50%,#000 30%,transparent 75%)}
+  .fog{position:absolute;inset:0;z-index:5;pointer-events:none;background:radial-gradient(60% 60% at 50% 46%,transparent 35%,rgba(5,4,10,.92) 80%)}
 
-  /* ============ SECTION SHELL ============ */
+  /* podium reveal (locks onto hero sneaker) */
+  .podium{position:absolute;inset:0;z-index:6;display:grid;place-items:center;opacity:0;pointer-events:none;will-change:opacity,transform}
+  .podium .glowdisc{position:absolute;width:min(56vw,520px);aspect-ratio:1;border-radius:50%;filter:blur(60px);
+    background:radial-gradient(var(--neon),transparent 70%);opacity:.6}
+  .podium .base{position:absolute;bottom:22%;width:min(46vw,440px);height:60px;border-radius:50%;
+    background:radial-gradient(closest-side,rgba(255,255,255,.18),transparent);transform:translateY(40px)}
+  .podium .ring{position:absolute;width:min(50vw,480px);aspect-ratio:1;border-radius:50%;border:1px dashed rgba(255,255,255,.18);animation:spin 26s linear infinite}
+  .podium .ring.r2{width:min(38vw,360px);border-style:solid;border-color:rgba(61,240,255,.18);animation-duration:18s;animation-direction:reverse}
+  .podium .hero-shoe{position:relative;width:min(52vw,560px);filter:drop-shadow(0 50px 40px rgba(0,0,0,.6))}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .podium .ptitle{position:absolute;bottom:12%;text-align:center}
+  .podium .ptitle b{font-family:"Syne";font-weight:800;font-size:clamp(26px,4vw,48px)}
+  .podium .ptitle small{display:block;color:var(--neon2);letter-spacing:.3em;text-transform:uppercase;font-size:11px;margin-top:6px}
+
+  /* clothing pan reveal */
+  .clothpan{position:absolute;inset:0;z-index:6;display:flex;align-items:center;justify-content:flex-end;
+    gap:18px;padding:0 clamp(18px,5vw,80px);opacity:0;pointer-events:none;will-change:opacity,transform}
+  .clothpan .col{display:flex;flex-direction:column;gap:18px}
+  .mannequin{width:min(24vw,220px);aspect-ratio:3/4.4;border-radius:14px;position:relative;overflow:hidden;
+    border:1px solid rgba(255,255,255,.1);background:linear-gradient(160deg,#15102a,#0a0716);box-shadow:0 30px 60px rgba(0,0,0,.5)}
+  .mannequin .b1,.mannequin .b2{position:absolute;inset:0;mix-blend-mode:screen}
+  .mannequin .glyph{position:absolute;left:50%;top:46%;transform:translate(-50%,-50%);font-family:"Bebas Neue";font-size:120px;opacity:.1}
+  .mannequin .lab{position:absolute;left:14px;bottom:14px;font-family:"Syne";font-weight:700;font-size:15px}
+  .clothpan .headline{position:absolute;left:clamp(18px,5vw,80px);top:50%;transform:translateY(-50%);max-width:380px}
+  .clothpan .headline h2{font-size:clamp(34px,6vw,76px);font-weight:800}
+  .clothpan .headline p{color:var(--muted);margin-top:14px;line-height:1.6}
+  @media(max-width:760px){.clothpan .headline{position:static;transform:none;margin-right:auto}.mannequin{width:38vw}}
+
+  /* walk captions */
+  .walk-cap{position:absolute;z-index:7;left:50%;top:22%;transform:translate(-50%,-50%);text-align:center;width:min(92vw,820px);pointer-events:none}
+  .walk-cap .step{opacity:0;position:absolute;left:50%;top:0;transform:translate(-50%,20px);transition:opacity .5s var(--ease),transform .5s var(--ease)}
+  .walk-cap .step.on{opacity:1;transform:translate(-50%,0)}
+  .walk-cap .step .lbl{font-size:12px;letter-spacing:.5em;text-transform:uppercase;color:var(--neon2);margin-bottom:12px}
+  .walk-cap .step h2{font-size:clamp(30px,6vw,72px);font-weight:800}
+  .walk-cap .step p{margin-top:12px;color:var(--muted);font-size:15px}
+
+  /* section shell */
   section.block{position:relative;padding:clamp(80px,12vh,150px) clamp(18px,4vw,46px);max-width:var(--maxw);margin:0 auto}
   .eyebrow{font-size:12px;letter-spacing:.4em;text-transform:uppercase;color:var(--neon2);margin-bottom:18px}
   .reveal{opacity:0;transform:translateY(40px);transition:opacity .9s var(--ease),transform .9s var(--ease)}
   .reveal.in{opacity:1;transform:none}
   .reveal[data-d="1"]{transition-delay:.1s}.reveal[data-d="2"]{transition-delay:.2s}.reveal[data-d="3"]{transition-delay:.3s}.reveal[data-d="4"]{transition-delay:.4s}
 
-  /* ============ SNEAKER LAB ============ */
+  /* sneaker lab */
   .lab{background:linear-gradient(180deg,#05040a,#0a0716 40%,#05040a)}
   .lab-grid{display:grid;grid-template-columns:1.1fr 1fr;gap:40px;align-items:center}
   @media(max-width:900px){.lab-grid{grid-template-columns:1fr}}
   .stage{position:relative;aspect-ratio:1;border-radius:26px;overflow:hidden;
-    background:radial-gradient(70% 70% at 50% 35%,#1a1430,#070512);border:1px solid rgba(255,255,255,.08);display:grid;place-items:center}
-  .stage .ring{position:absolute;width:78%;aspect-ratio:1;border-radius:50%;border:1px dashed rgba(255,255,255,.12);animation:spin 30s linear infinite}
-  .stage .ring.r2{width:60%;border-style:solid;border-color:rgba(61,240,255,.18);animation-duration:22s;animation-direction:reverse}
-  .stage .ring.r3{width:42%;border-color:rgba(255,45,119,.22);animation-duration:14s}
-  @keyframes spin{to{transform:rotate(360deg)}}
+    background:radial-gradient(70% 70% at 50% 35%,#1a1430,#070512);border:1px solid rgba(255,255,255,.08);display:grid;place-items:center;touch-action:pan-y}
+  .stage .sring{position:absolute;width:78%;aspect-ratio:1;border-radius:50%;border:1px dashed rgba(255,255,255,.12);animation:spin 30s linear infinite}
+  .stage .sring.r2{width:60%;border-style:solid;border-color:rgba(61,240,255,.18);animation-duration:22s;animation-direction:reverse}
+  .stage .sring.r3{width:42%;border-color:rgba(255,45,119,.22);animation-duration:14s}
   .stage .halo{position:absolute;width:60%;aspect-ratio:1;border-radius:50%;filter:blur(50px);background:radial-gradient(var(--neon),transparent 70%);opacity:.5}
-  /* CSS sneaker */
-  .shoe{position:relative;width:62%;filter:drop-shadow(0 40px 30px rgba(0,0,0,.6));animation:floaty 5s ease-in-out infinite}
-  @keyframes floaty{0%,100%{transform:translateY(0) rotate(-4deg)}50%{transform:translateY(-18px) rotate(-2deg)}}
-  .shoe svg{width:100%;height:auto;display:block}
+  .shoe-rot{position:relative;width:64%;transform-style:preserve-3d;transition:transform .1s linear}
+  .shoe{position:relative;animation:floaty 5s ease-in-out infinite}
+  @keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-18px)}}
+  .shoe svg{width:100%;height:auto;display:block;filter:drop-shadow(0 40px 30px rgba(0,0,0,.6))}
   .stage .shadow{position:absolute;bottom:14%;width:46%;height:5%;border-radius:50%;background:#000;filter:blur(14px);opacity:.55;animation:sh 5s ease-in-out infinite}
   @keyframes sh{0%,100%{transform:scale(1);opacity:.5}50%{transform:scale(.82);opacity:.32}}
   .swatches{position:absolute;right:18px;top:18px;display:flex;flex-direction:column;gap:10px;z-index:4}
   .swatches button{width:26px;height:26px;border-radius:50%;border:2px solid rgba(255,255,255,.35);cursor:none;transition:transform .3s var(--ease)}
   .swatches button:hover{transform:scale(1.25)}
+  .drag-hint{position:absolute;left:18px;bottom:18px;font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);z-index:4}
   .lab-copy h2{font-size:clamp(40px,6vw,76px);font-weight:800;margin-bottom:18px}
   .lab-copy h2 em{font-style:normal;color:transparent;-webkit-text-stroke:1.5px var(--neon)}
   .lab-copy p{color:var(--muted);font-size:16px;line-height:1.7;max-width:460px}
@@ -206,32 +213,7 @@
   .price-row{display:flex;align-items:center;gap:20px;flex-wrap:wrap}
   .price-row .p{font-family:"Syne";font-size:34px;font-weight:800}
 
-  /* ============ ATELIER (clothes) ============ */
-  .atelier{background:#070510}
-  .at-head{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;flex-wrap:wrap;margin-bottom:50px}
-  .at-head h2{font-size:clamp(40px,7vw,96px);font-weight:800}
-  .rack{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
-  @media(max-width:900px){.rack{grid-template-columns:repeat(2,1fr)}}
-  @media(max-width:560px){.rack{grid-template-columns:1fr}}
-  .garment{position:relative;border-radius:18px;overflow:hidden;aspect-ratio:3/4;border:1px solid rgba(255,255,255,.08);
-    background:linear-gradient(160deg,#15102a,#0a0716);transition:transform .6s var(--ease)}
-  .garment .art{position:absolute;inset:0;transition:transform .8s var(--ease)}
-  .garment .art .b1{position:absolute;inset:0;background:radial-gradient(60% 60% at 50% 30%,var(--c1),transparent 70%);mix-blend-mode:screen;opacity:.85}
-  .garment .art .b2{position:absolute;inset:0;background:radial-gradient(50% 50% at 70% 80%,var(--c2),transparent 70%);mix-blend-mode:screen;opacity:.8}
-  .garment .silh{position:absolute;left:50%;top:48%;transform:translate(-50%,-50%);font-family:"Bebas Neue";font-size:120px;opacity:.08;letter-spacing:.05em}
-  .garment .meta{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:flex-end;padding:18px;
-    background:linear-gradient(180deg,transparent 45%,rgba(0,0,0,.78))}
-  .garment .meta .t{font-family:"Syne";font-weight:700;font-size:18px}
-  .garment .meta .c{display:flex;justify-content:space-between;align-items:center;margin-top:6px}
-  .garment .meta small{color:var(--neon2);font-size:11px;letter-spacing:.18em;text-transform:uppercase}
-  .garment .meta .pr{font-weight:700}
-  .garment .add{position:absolute;top:14px;right:14px;width:40px;height:40px;border-radius:50%;display:grid;place-items:center;
-    background:rgba(255,255,255,.1);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.18);transform:scale(0) rotate(-90deg);transition:transform .4s var(--ease);cursor:none;font-size:20px}
-  .garment:hover{transform:translateY(-8px)}
-  .garment:hover .art{transform:scale(1.08)}
-  .garment:hover .add{transform:scale(1) rotate(0)}
-
-  /* ============ MARQUEE ============ */
+  /* marquee */
   .marquee{position:relative;padding:34px 0;border-top:1px solid rgba(255,255,255,.08);border-bottom:1px solid rgba(255,255,255,.08);overflow:hidden;white-space:nowrap}
   .marquee .track{display:inline-flex;gap:40px;animation:marq 24s linear infinite;will-change:transform}
   .marquee:hover .track{animation-play-state:paused}
@@ -240,7 +222,30 @@
   .marquee .star{color:var(--neon)}
   @keyframes marq{to{transform:translateX(-50%)}}
 
-  /* ============ TILT FEATURE ============ */
+  /* product grid (tilt) */
+  .atelier{background:#070510}
+  .at-head{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;flex-wrap:wrap;margin-bottom:50px}
+  .at-head h2{font-size:clamp(40px,7vw,96px);font-weight:800}
+  .rack{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
+  @media(max-width:900px){.rack{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:560px){.rack{grid-template-columns:1fr}}
+  .garment{position:relative;border-radius:18px;overflow:hidden;aspect-ratio:3/4;border:1px solid rgba(255,255,255,.08);
+    background:linear-gradient(160deg,#15102a,#0a0716);transform-style:preserve-3d;transition:transform .2s var(--ease),box-shadow .4s}
+  .garment .art{position:absolute;inset:0;transition:transform .8s var(--ease)}
+  .garment .silh{position:absolute;left:50%;top:48%;transform:translate(-50%,-50%) translateZ(20px);font-family:"Bebas Neue";font-size:120px;opacity:.08}
+  .garment .meta{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:flex-end;padding:18px;background:linear-gradient(180deg,transparent 45%,rgba(0,0,0,.78));transform:translateZ(30px)}
+  .garment .meta .t{font-family:"Syne";font-weight:700;font-size:18px}
+  .garment .meta .c{display:flex;justify-content:space-between;align-items:center;margin-top:6px}
+  .garment .meta small{color:var(--neon2);font-size:11px;letter-spacing:.18em;text-transform:uppercase}
+  .garment .meta .pr{font-weight:700}
+  .garment .add{position:absolute;top:14px;right:14px;width:40px;height:40px;border-radius:50%;display:grid;place-items:center;
+    background:rgba(255,255,255,.1);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.18);transform:scale(0) rotate(-90deg) translateZ(40px);transition:transform .4s var(--ease);cursor:none;font-size:20px}
+  .garment:hover .art{transform:scale(1.08)}
+  .garment:hover .add{transform:scale(1) rotate(0) translateZ(40px)}
+  .garment .glow{position:absolute;inset:0;opacity:0;transition:opacity .4s;background:radial-gradient(220px 220px at var(--mx,50%) var(--my,50%),rgba(255,45,119,.22),transparent 70%)}
+  .garment:hover .glow{opacity:1}
+
+  /* tilt feature */
   .tilt-wrap{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
   @media(max-width:900px){.tilt-wrap{grid-template-columns:1fr}}
   .tcard{position:relative;border-radius:20px;padding:30px;min-height:320px;display:flex;flex-direction:column;justify-content:space-between;
@@ -250,11 +255,10 @@
   .tcard .num{font-family:"Syne";font-weight:800;font-size:60px;color:transparent;-webkit-text-stroke:1.5px rgba(255,255,255,.25);transform:translateZ(40px)}
   .tcard h3{font-size:26px;transform:translateZ(30px)}
   .tcard p{color:var(--muted);margin-top:10px;line-height:1.6;transform:translateZ(20px)}
-  .tcard .glow{position:absolute;inset:0;border-radius:20px;opacity:0;transition:opacity .4s;
-    background:radial-gradient(300px 300px at var(--mx,50%) var(--my,50%),rgba(255,45,119,.18),transparent 70%)}
+  .tcard .glow{position:absolute;inset:0;border-radius:20px;opacity:0;transition:opacity .4s;background:radial-gradient(300px 300px at var(--mx,50%) var(--my,50%),rgba(255,45,119,.18),transparent 70%)}
   .tcard:hover .glow{opacity:1}
 
-  /* ============ CTA / FOOTER ============ */
+  /* cta / footer */
   .cta-final{position:relative;text-align:center;padding:clamp(100px,18vh,200px) 20px;overflow:hidden}
   .cta-final .big{font-family:"Syne";font-weight:800;font-size:clamp(48px,12vw,180px);line-height:.9;
     background:linear-gradient(90deg,var(--neon),var(--neon3),var(--neon2));-webkit-background-clip:text;background-clip:text;color:transparent}
@@ -263,15 +267,13 @@
   footer .brand{font-family:"Syne";font-weight:800;font-size:20px;color:var(--ink)}
   footer a:hover{color:var(--ink)}
 
-  /* ---------- cart toast ---------- */
+  /* toast + audio */
   .toast-wrap{position:fixed;right:20px;bottom:20px;z-index:9600;display:flex;flex-direction:column;gap:10px}
   .toast{display:flex;align-items:center;gap:12px;padding:14px 18px;border-radius:14px;background:rgba(20,16,36,.92);
     border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(10px);transform:translateX(140%);transition:transform .5s var(--ease);min-width:220px}
   .toast.show{transform:translateX(0)}
   .toast .dot{width:8px;height:8px;border-radius:50%;background:var(--neon2);box-shadow:0 0 10px var(--neon2)}
   .toast b{font-size:14px}.toast small{display:block;color:var(--muted);font-size:12px}
-
-  /* audio toggle */
   .audio{position:fixed;bottom:20px;left:20px;z-index:9600;display:flex;align-items:center;gap:8px;font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);cursor:none}
   .audio .eq{display:flex;align-items:flex-end;gap:2px;height:16px}
   .audio .eq i{width:2px;background:var(--neon2);height:4px;border-radius:2px}
@@ -279,19 +281,22 @@
   .audio .eq i:nth-child(2){animation-delay:.2s}.audio .eq i:nth-child(3){animation-delay:.4s}.audio .eq i:nth-child(4){animation-delay:.1s}
   @keyframes eq{0%,100%{height:4px}50%{height:16px}}
 
-  @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+  @media(prefers-reduced-motion:reduce){
+    *{animation:none!important;transition:none!important}
+    .walk{height:auto}.walk .pin{position:relative;height:auto;padding:80px 0}
+    .corridor,.gridfloor,.fog{display:none}.podium,.clothpan{opacity:1!important;position:relative;transform:none!important;height:auto;padding:40px 0}
+    .walk-cap{position:relative;transform:none;top:0}.walk-cap .step{position:relative;opacity:1;transform:none;margin-bottom:30px}
+  }
 </style>
 </head>
 <body>
 
-<!-- overlays -->
 <div class="grain"></div>
 <div class="vignette"></div>
 <div class="cursor" id="cursor"></div>
 <div class="cursor-dot" id="cursorDot"></div>
 <div class="progress" id="progress"></div>
 
-<!-- loader -->
 <div class="loader" id="loader">
   <div class="l-wrap">
     <div class="l-word">AETHER</div>
@@ -301,31 +306,27 @@
   </div>
 </div>
 
-<!-- nav -->
 <nav id="nav">
   <div class="brand">AE<b>·</b>THER</div>
   <div class="links">
-    <a href="#walk" data-link>The Walk</a>
-    <a href="#sneakers" data-link>Sneakers</a>
-    <a href="#atelier" data-link>Atelier</a>
-    <a href="#drop" data-link>The Drop</a>
+    <a href="#walk">The Walk</a><a href="#sneakers">Sneakers</a><a href="#atelier">Atelier</a><a href="#drop">The Drop</a>
   </div>
   <div class="bag" data-cursor data-label="open">BAG <span class="count" id="bagCount">0</span></div>
 </nav>
 
-<!-- ============ HERO ============ -->
+<!-- HERO -->
 <header class="hero">
   <canvas id="fx"></canvas>
   <div class="aurora"></div>
-  <div class="float-tag" style="top:22%;left:8%">FW/26 ◦ ICON SERIES</div>
-  <div class="float-tag" style="bottom:26%;right:9%">DROP 001 ◦ SOLD IN 4 MIN</div>
+  <div class="float-tag" data-par="0.12" style="top:22%;left:8%">FW/26 ◦ ICON SERIES</div>
+  <div class="float-tag" data-par="0.18" style="bottom:26%;right:9%">DROP 001 ◦ SOLD IN 4 MIN</div>
   <div class="hero-inner">
-    <div class="kicker">An immersive fashion experience</div>
+    <div class="kicker">A 4K cinematic streetwear experience</div>
     <h1>
       <span class="row r1"><span>WALK</span></span>
       <span class="row r2"><span class="grad">THE&nbsp;DROP</span></span>
     </h1>
-    <p class="lead">Sneakers and garments staged like a film. Scroll to step inside the store, glide past the neon, and stop where the heat lives.</p>
+    <p class="lead">Scroll to dolly through the store, lock onto the hero pair on its podium, then glide into the atelier. Sneakers and garments, staged like a film.</p>
     <div class="cta">
       <a class="btn solid" href="#walk" data-cursor data-label="enter"><div class="fill"></div><span>Enter the store</span></a>
       <a class="btn" href="#sneakers" data-cursor data-label="shop"><div class="fill"></div><span>Skip to sneakers</span></a>
@@ -334,29 +335,49 @@
   <div class="scroll-hint"><div class="mouse"></div><span>Scroll</span></div>
 </header>
 
-<!-- ============ THE WALK ============ -->
+<!-- THE WALK -->
 <section class="walk" id="walk">
   <div class="pin">
     <div class="scene">
-      <div class="gridfloor"></div>
-      <div class="world" id="world"></div>
+      <div class="corridor" id="corridor">
+        <div class="gridfloor"></div>
+        <div class="world" id="world"></div>
+      </div>
+      <!-- podium lock-on -->
+      <div class="podium" id="podium">
+        <div class="glowdisc" id="podiumGlow"></div>
+        <div class="ring"></div><div class="ring r2"></div>
+        <div class="base"></div>
+        <div class="hero-shoe" id="heroShoe"></div>
+        <div class="ptitle"><b>AETHER RUNNER X</b><small>Drop 001 · Now in store</small></div>
+      </div>
+      <!-- clothing pan -->
+      <div class="clothpan" id="clothpan">
+        <div class="headline"><h2>Into the<br>Atelier.</h2><p>The camera pans left — garments engineered to move, hung in light.</p></div>
+        <div class="col">
+          <div class="mannequin"><span class="b1" style="background:radial-gradient(60% 60% at 50% 30%,var(--neon),transparent 70%)"></span><span class="b2" style="background:radial-gradient(50% 50% at 70% 80%,var(--neon3),transparent 70%)"></span><span class="glyph">H</span><span class="lab">Nebula Hoodie</span></div>
+        </div>
+        <div class="col">
+          <div class="mannequin"><span class="b1" style="background:radial-gradient(60% 60% at 50% 30%,var(--neon2),transparent 70%)"></span><span class="b2" style="background:radial-gradient(50% 50% at 70% 80%,var(--neon),transparent 70%)"></span><span class="glyph">J</span><span class="lab">Halo Jacket</span></div>
+        </div>
+      </div>
     </div>
     <div class="fog"></div>
     <div class="walk-cap" id="walkCap">
-      <div class="step" data-step="0"><div class="lbl">Step inside</div><h2>The Entrance</h2><p>Doors open. The bass hits. Keep scrolling.</p></div>
-      <div class="step" data-step="1"><div class="lbl">Aisle 01</div><h2>Past the Neon</h2><p>Posters of the season blur by on both sides.</p></div>
-      <div class="step" data-step="2"><div class="lbl">Aisle 02</div><h2>Deeper In</h2><p>The light shifts from pink to cyan to violet.</p></div>
-      <div class="step" data-step="3"><div class="lbl">You've arrived</div><h2>The Heat Room</h2><p>Where the sneakers live. Slow down.</p></div>
+      <div class="step" data-step="0"><div class="lbl">Step inside</div><h2>The Entrance</h2><p>Doors open. Keep scrolling.</p></div>
+      <div class="step" data-step="1"><div class="lbl">Aisle 01 — 02</div><h2>Past the Neon</h2><p>Season posters blur by on both sides.</p></div>
+      <div class="step" data-step="2"><div class="lbl">You've arrived</div><h2>The Heat Room</h2><p>The hero pair locks into frame.</p></div>
+      <div class="step" data-step="3"><div class="lbl">Pan left</div><h2>The Atelier</h2><p>Garments enter the shot.</p></div>
     </div>
   </div>
 </section>
 
-<!-- ============ SNEAKER LAB ============ -->
+<!-- SNEAKER LAB -->
 <section class="block lab" id="sneakers">
   <div class="lab-grid">
     <div class="stage reveal" id="shoeStage">
       <div class="halo" id="halo"></div>
-      <div class="ring"></div><div class="ring r2"></div><div class="ring r3"></div>
+      <div class="sring"></div><div class="sring r2"></div><div class="sring r3"></div>
       <div class="swatches">
         <button style="background:#ff2d77" data-shoe="#ff2d77" data-cursor data-label="pink"></button>
         <button style="background:#3df0ff" data-shoe="#3df0ff" data-cursor data-label="ice"></button>
@@ -364,44 +385,14 @@
         <button style="background:#ffd166" data-shoe="#ffd166" data-cursor data-label="gold"></button>
         <button style="background:#f6f4ff" data-shoe="#f6f4ff" data-cursor data-label="bone"></button>
       </div>
-      <div class="shoe" id="shoe">
-        <svg viewBox="0 0 420 220" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <linearGradient id="g1" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0" stop-color="var(--sc,#ff2d77)"/>
-              <stop offset="1" stop-color="#1a1430"/>
-            </linearGradient>
-            <linearGradient id="g2" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0" stop-color="#fff" stop-opacity=".6"/>
-              <stop offset="1" stop-color="#fff" stop-opacity="0"/>
-            </linearGradient>
-          </defs>
-          <!-- sole -->
-          <path d="M18 168 Q10 196 46 198 L372 198 Q406 198 404 172 L398 150 Q300 168 200 162 Q90 156 40 150 Z" fill="#0c0a17" stroke="var(--sc,#ff2d77)" stroke-width="2"/>
-          <path d="M20 178 L402 178" stroke="var(--sc,#ff2d77)" stroke-width="2" stroke-opacity=".5"/>
-          <!-- upper -->
-          <path d="M40 150 Q70 70 150 64 Q210 60 250 96 Q300 140 360 138 Q392 137 398 150 Q300 168 200 162 Q90 156 40 150 Z" fill="url(#g1)" stroke="#fff" stroke-opacity=".25" stroke-width="1.5"/>
-          <!-- toe cap -->
-          <path d="M40 150 Q56 110 96 104 Q120 138 110 156 Q70 154 40 150 Z" fill="#fff" fill-opacity=".08"/>
-          <!-- swoosh -->
-          <path d="M120 138 Q210 96 330 110 Q250 132 150 150 Q132 146 120 138 Z" fill="#fff" fill-opacity=".9"/>
-          <!-- laces -->
-          <g stroke="#fff" stroke-opacity=".7" stroke-width="4" stroke-linecap="round">
-            <path d="M178 96 L210 110"/><path d="M186 84 L222 100"/><path d="M196 74 L234 92"/>
-          </g>
-          <!-- collar -->
-          <path d="M236 96 Q256 70 286 84 Q300 110 282 130 Q258 116 236 96 Z" fill="#0c0a17" stroke="var(--sc,#ff2d77)" stroke-width="2"/>
-          <!-- highlight -->
-          <path d="M60 120 Q120 92 180 96" stroke="url(#g2)" stroke-width="6" fill="none" stroke-linecap="round"/>
-        </svg>
-      </div>
+      <div class="shoe-rot" id="shoeRot" data-cursor data-label="drag"><div class="shoe" id="shoe"></div></div>
       <div class="shadow"></div>
+      <div class="drag-hint">◦ drag to rotate ◦ tap swatch to recolor</div>
     </div>
-
     <div class="lab-copy">
       <div class="eyebrow reveal">Sneaker Lab — Drop 001</div>
       <h2 class="reveal" data-d="1">AETHER <em>RUNNER</em> X</h2>
-      <p class="reveal" data-d="2">An engineered silhouette with a sculpted carbon midsole, knit-flex upper and a reactive cushioning core. Pick your colorway — the lab updates live.</p>
+      <p class="reveal" data-d="2">A sculpted carbon midsole, knit-flex upper and a reactive cushioning core. Drag the shoe to spin it, tap a swatch and the whole room recolors live.</p>
       <div class="specs reveal" data-d="3">
         <div class="s"><b>−38%</b><small>Weight</small></div>
         <div class="s"><b>4.2k</b><small>Reviews</small></div>
@@ -415,55 +406,47 @@
   </div>
 </section>
 
-<!-- ============ MARQUEE ============ -->
+<!-- MARQUEE -->
 <div class="marquee">
   <div class="track" id="marqTrack">
     <span>LIMITED&nbsp;</span><span class="star">✦</span><span class="o">HAND&nbsp;NUMBERED&nbsp;</span><span class="star">✦</span><span>FAST&nbsp;DELIVERY&nbsp;</span><span class="star">✦</span><span class="o">WORN&nbsp;BY&nbsp;ICONS&nbsp;</span><span class="star">✦</span>
   </div>
 </div>
 
-<!-- ============ ATELIER ============ -->
+<!-- ATELIER GRID -->
 <section class="block atelier" id="atelier">
   <div class="at-head">
-    <div>
-      <div class="eyebrow reveal">The Atelier — Garments</div>
-      <h2 class="reveal" data-d="1">Wear the<br>future.</h2>
-    </div>
-    <p class="reveal" data-d="2" style="max-width:340px;color:var(--muted);line-height:1.6">Cut-and-sew pieces engineered to move. Hover to feel the drape — every card breathes.</p>
+    <div><div class="eyebrow reveal">The Atelier — Garments</div><h2 class="reveal" data-d="1">Wear the<br>future.</h2></div>
+    <p class="reveal" data-d="2" style="max-width:340px;color:var(--muted);line-height:1.6">Cut-and-sew pieces engineered to move. Hover for the 3D tilt — every card breathes.</p>
   </div>
   <div class="rack" id="rack"></div>
 </section>
 
-<!-- ============ TILT FEATURE ============ -->
+<!-- WHY -->
 <section class="block">
   <div class="eyebrow reveal">Why AETHER</div>
   <h2 class="reveal" data-d="1" style="font-size:clamp(34px,5vw,64px);font-weight:800;margin-bottom:40px">Built different.</h2>
   <div class="tilt-wrap">
     <div class="tcard reveal" data-tilt><div class="glow"></div><div class="num">01</div><div><h3>Instant Drops</h3><p>New heat every Friday at 6pm. Set the alert, beat the bots.</p></div></div>
     <div class="tcard reveal" data-tilt data-d="1"><div class="glow"></div><div class="num">02</div><div><h3>Try-On AR</h3><p>Point your camera, see it on your feet before you cop.</p></div></div>
-    <div class="tcard reveal" data-tilt data-d="2"><div class="glow"></div><div class="num">03</div><div><h3>Verified Authentic</h3><p>Every pair laser-tagged and blockchain-stamped. No fakes, ever.</p></div></div>
+    <div class="tcard reveal" data-tilt data-d="2"><div class="glow"></div><div class="num">03</div><div><h3>Verified Authentic</h3><p>Every pair laser-tagged. No fakes, ever.</p></div></div>
   </div>
 </section>
 
-<!-- ============ CTA / FOOTER ============ -->
+<!-- CTA -->
 <section class="cta-final" id="drop">
   <div class="aurora" style="opacity:.3"></div>
   <div style="position:relative;z-index:2">
     <div class="eyebrow reveal" style="display:inline-block">Drop 002 loading</div>
     <div class="big reveal" data-d="1">JOIN THE<br>DROP LIST</div>
-    <p class="reveal" data-d="2">Be first in line. Early access, hidden colorways, and the link before it goes public.</p>
+    <p class="reveal" data-d="2">Early access, hidden colorways, and the link before it goes public.</p>
     <div class="reveal" data-d="3"><a class="btn solid" href="#" data-cursor data-label="join"><div class="fill"></div><span>Get early access</span></a></div>
   </div>
 </section>
 
 <footer>
-  <div>
-    <div class="brand">AE·THER</div>
-    <div style="margin-top:8px">An immersive fashion experience.</div>
-  </div>
-  <div style="display:flex;gap:30px;flex-wrap:wrap">
-    <a href="#" data-cursor>Instagram</a><a href="#" data-cursor>TikTok</a><a href="#" data-cursor>Discord</a><a href="#" data-cursor>Stockists</a>
-  </div>
+  <div><div class="brand">AE·THER</div><div style="margin-top:8px">A 4K cinematic streetwear experience.</div></div>
+  <div style="display:flex;gap:30px;flex-wrap:wrap"><a href="#" data-cursor>Instagram</a><a href="#" data-cursor>TikTok</a><a href="#" data-cursor>Discord</a><a href="#" data-cursor>Stockists</a></div>
   <div style="align-self:flex-end">© 2026 AETHER — demo experience</div>
 </footer>
 
@@ -473,208 +456,192 @@
 <script>
 (function(){
   const reduce = matchMedia('(prefers-reduced-motion:reduce)').matches;
+  const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
+  const map=(v,a,b)=>clamp((v-a)/(b-a),0,1); // normalize v in [a,b] -> [0,1]
 
-  /* ---------------- LOADER ---------------- */
-  const loader=document.getElementById('loader'), lbar=document.getElementById('lbar'), lpct=document.getElementById('lpct');
-  let p=0;
-  const li=setInterval(()=>{
-    p+=Math.random()*16+4; if(p>=100){p=100;clearInterval(li);
-      lbar.style.width='100%';lpct.textContent='100%';
-      setTimeout(()=>{loader.classList.add('done');document.body.style.overflow='';},650);}
-    lbar.style.width=p+'%';lpct.textContent=Math.floor(p)+'%';
-  },160);
-  document.body.style.overflow='hidden';
+  /* shared sneaker SVG */
+  const SHOE_SVG=`<svg viewBox="0 0 420 220" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="GID" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="var(--sc,#ff2d77)"/><stop offset="1" stop-color="#1a1430"/></linearGradient>
+      <linearGradient id="GH" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".6"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+    </defs>
+    <path d="M18 168 Q10 196 46 198 L372 198 Q406 198 404 172 L398 150 Q300 168 200 162 Q90 156 40 150 Z" fill="#0c0a17" stroke="var(--sc,#ff2d77)" stroke-width="2"/>
+    <path d="M20 178 L402 178" stroke="var(--sc,#ff2d77)" stroke-width="2" stroke-opacity=".5"/>
+    <path d="M40 150 Q70 70 150 64 Q210 60 250 96 Q300 140 360 138 Q392 137 398 150 Q300 168 200 162 Q90 156 40 150 Z" fill="url(#GID)" stroke="#fff" stroke-opacity=".25" stroke-width="1.5"/>
+    <path d="M40 150 Q56 110 96 104 Q120 138 110 156 Q70 154 40 150 Z" fill="#fff" fill-opacity=".08"/>
+    <path d="M120 138 Q210 96 330 110 Q250 132 150 150 Q132 146 120 138 Z" fill="#fff" fill-opacity=".9"/>
+    <g stroke="#fff" stroke-opacity=".7" stroke-width="4" stroke-linecap="round"><path d="M178 96 L210 110"/><path d="M186 84 L222 100"/><path d="M196 74 L234 92"/></g>
+    <path d="M236 96 Q256 70 286 84 Q300 110 282 130 Q258 116 236 96 Z" fill="#0c0a17" stroke="var(--sc,#ff2d77)" stroke-width="2"/>
+    <path d="M60 120 Q120 92 180 96" stroke="url(#GH)" stroke-width="6" fill="none" stroke-linecap="round"/>
+  </svg>`;
+  function injectShoe(host,gidSuffix){host.innerHTML=SHOE_SVG.replace(/GID/g,'GID'+gidSuffix).replace(/GH/g,'GH'+gidSuffix);host.querySelector('svg').style.setProperty('--sc','#ff2d77');}
+  injectShoe(document.getElementById('shoe'),'a');
+  injectShoe(document.getElementById('heroShoe'),'b');
 
-  /* ---------------- CUSTOM CURSOR ---------------- */
-  const cur=document.getElementById('cursor'), dot=document.getElementById('cursorDot');
-  let mx=innerWidth/2,my=innerHeight/2,cx=mx,cy=my;
-  addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;dot.style.left=mx+'px';dot.style.top=my+'px';});
-  (function loop(){cx+=(mx-cx)*.18;cy+=(my-cy)*.18;cur.style.left=cx+'px';cur.style.top=cy+'px';requestAnimationFrame(loop);})();
-  function bindCursor(){document.querySelectorAll('[data-cursor]').forEach(el=>{
-    if(el._cb)return;el._cb=1;
+  /* loader */
+  const loader=document.getElementById('loader'),lbar=document.getElementById('lbar'),lpct=document.getElementById('lpct');
+  document.body.style.overflow='hidden';let p=0;
+  const li=setInterval(()=>{p+=Math.random()*16+4;if(p>=100){p=100;clearInterval(li);
+    setTimeout(()=>{loader.classList.add('done');document.body.style.overflow='';},650);}
+    lbar.style.width=p+'%';lpct.textContent=Math.floor(p)+'%';},150);
+
+  /* cursor */
+  const cur=document.getElementById('cursor'),dot=document.getElementById('cursorDot');
+  let mxp=innerWidth/2,myp=innerHeight/2,cx=mxp,cy=myp;
+  addEventListener('mousemove',e=>{mxp=e.clientX;myp=e.clientY;dot.style.left=mxp+'px';dot.style.top=myp+'px';});
+  (function cl(){cx+=(mxp-cx)*.18;cy+=(myp-cy)*.18;cur.style.left=cx+'px';cur.style.top=cy+'px';requestAnimationFrame(cl);})();
+  function bindCursor(){document.querySelectorAll('[data-cursor]').forEach(el=>{if(el._cb)return;el._cb=1;
     el.addEventListener('mouseenter',()=>{cur.classList.add('hover');cur.dataset.label=el.dataset.label||'';});
     el.addEventListener('mouseleave',()=>cur.classList.remove('hover'));});}
 
-  /* ---------------- HERO PARTICLES ---------------- */
-  const cv=document.getElementById('fx'), ctx=cv.getContext('2d');
-  let W,H,parts=[];
+  /* hero particles */
+  const cv=document.getElementById('fx'),ctx=cv.getContext('2d');let W,H,parts=[];
   function size(){W=cv.width=innerWidth;H=cv.height=innerHeight;}
   size();addEventListener('resize',size);
   const COLORS=['#ff2d77','#3df0ff','#b56bff'];
-  for(let i=0;i<90;i++)parts.push({x:Math.random()*W,y:Math.random()*H,r:Math.random()*2+.4,
-    vx:(Math.random()-.5)*.3,vy:(Math.random()-.5)*.3,c:COLORS[i%3],a:Math.random()*.6+.2});
-  function draw(){
-    ctx.clearRect(0,0,W,H);
-    for(const q of parts){
-      q.x+=q.vx;q.y+=q.vy;
-      if(q.x<0)q.x=W;if(q.x>W)q.x=0;if(q.y<0)q.y=H;if(q.y>H)q.y=0;
-      ctx.beginPath();ctx.arc(q.x,q.y,q.r,0,7);ctx.fillStyle=q.c;ctx.globalAlpha=q.a;ctx.fill();
-    }
-    // link nearby
+  for(let i=0;i<90;i++)parts.push({x:Math.random()*innerWidth,y:Math.random()*innerHeight,r:Math.random()*2+.4,vx:(Math.random()-.5)*.3,vy:(Math.random()-.5)*.3,c:COLORS[i%3],a:Math.random()*.6+.2});
+  function draw(){ctx.clearRect(0,0,W,H);
+    for(const q of parts){q.x+=q.vx;q.y+=q.vy;if(q.x<0)q.x=W;if(q.x>W)q.x=0;if(q.y<0)q.y=H;if(q.y>H)q.y=0;
+      ctx.beginPath();ctx.arc(q.x,q.y,q.r,0,7);ctx.fillStyle=q.c;ctx.globalAlpha=q.a;ctx.fill();}
     ctx.globalAlpha=.12;
-    for(let i=0;i<parts.length;i++)for(let j=i+1;j<parts.length;j++){
-      const a=parts[i],b=parts[j],dx=a.x-b.x,dy=a.y-b.y,d=dx*dx+dy*dy;
-      if(d<9000){ctx.strokeStyle=a.c;ctx.lineWidth=.5;ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();}
-    }
-    ctx.globalAlpha=1;requestAnimationFrame(draw);
-  }
+    for(let i=0;i<parts.length;i++)for(let j=i+1;j<parts.length;j++){const a=parts[i],b=parts[j],dx=a.x-b.x,dy=a.y-b.y;
+      if(dx*dx+dy*dy<9000){ctx.strokeStyle=a.c;ctx.lineWidth=.5;ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();}}
+    ctx.globalAlpha=1;requestAnimationFrame(draw);}
   if(!reduce)draw();
 
-  /* ---------------- BUILD CORRIDOR ---------------- */
+  /* build corridor */
   const world=document.getElementById('world');
   const signs=['AETHER','★ DROP 001 ★','FW / 26','ICON SERIES','THE HEAT','RUNNER X'];
-  const nclass=['n1','n2','n3'];
-  const DEPTH=420; // px between arches
-  const N=10;
+  const nclass=['n1','n2','n3'];const DEPTH=420,N=8;
+  const pnames=[['VELOCITY','knitwear'],['NOCTURNE','outerwear'],['MIRAGE','denim'],['PULSE','tees'],['HALO','accessories']];
   for(let i=0;i<N;i++){
-    const z=-(i+1)*DEPTH;
-    const a=document.createElement('div');
-    a.className='arch '+nclass[i%3];
-    a.style.setProperty('--z',z+'px');
-    const sc=1+(i%2?.06:0);
-    a.innerHTML=`<div class="sign">${signs[i%signs.length]}</div><div class="floor"></div>`;
-    world.appendChild(a);
-    // posters alternating sides
-    const pc1=COLORS[i%3],pc2=COLORS[(i+1)%3];
-    const names=[['VELOCITY','knitwear'],['NOCTURNE','outerwear'],['MIRAGE','denim'],['PULSE','tees'],['HALO','accessories']];
-    const nm=names[i%names.length];
-    for(const side of [-1,1]){
-      const po=document.createElement('div');
-      po.className='poster';
-      po.style.setProperty('--x',(side*620)+'px');
-      po.style.setProperty('--z',(z+DEPTH/2)+'px');
-      po.style.setProperty('--ry',(side<0?38:-38)+'deg');
-      po.style.setProperty('--c1',pc1);po.style.setProperty('--c2',pc2);
-      po.innerHTML=`<div class="blob"></div><div class="pl"><b>${nm[0]}</b><small>${nm[1]}</small></div>`;
-      world.appendChild(po);
-    }
+    const z=-(i+1)*DEPTH;const a=document.createElement('div');a.className='arch '+nclass[i%3];a.style.setProperty('--z',z+'px');
+    a.innerHTML=`<div class="sign">${signs[i%signs.length]}</div><div class="floor"></div>`;world.appendChild(a);
+    const pc1=COLORS[i%3],pc2=COLORS[(i+1)%3],nm=pnames[i%pnames.length];
+    for(const side of[-1,1]){const po=document.createElement('div');po.className='poster';
+      po.style.setProperty('--x',(side*620)+'px');po.style.setProperty('--z',(z+DEPTH/2)+'px');po.style.setProperty('--ry',(side<0?38:-38)+'deg');
+      po.innerHTML=`<div class="blob" style="background:radial-gradient(60% 60% at 50% 35%,${pc1},transparent 70%),radial-gradient(50% 50% at 70% 80%,${pc2},transparent 70%)"></div><div class="pl"><b>${nm[0]}</b><small>${nm[1]}</small></div>`;
+      world.appendChild(po);}
   }
 
-  /* ---------------- WALK SCROLL ENGINE ---------------- */
-  const walk=document.getElementById('walk');
-  const steps=[...document.querySelectorAll('#walkCap .step')];
-  function onScroll(){
-    const r=walk.getBoundingClientRect();
-    const total=walk.offsetHeight-innerHeight;
-    let prog=Math.min(1,Math.max(0,(-r.top)/total));
-    if(r.top>0)prog=0;if(r.bottom<innerHeight)prog=1;
-    const cam=prog*(N*DEPTH+200);
-    document.documentElement.style.setProperty('--cam',cam.toFixed(1)+'px');
+  /* WALK cinematic engine: dolly -> lock sneaker -> pan clothes */
+  const walk=document.getElementById('walk'),corridor=document.getElementById('corridor'),
+    podium=document.getElementById('podium'),clothpan=document.getElementById('clothpan'),
+    steps=[...document.querySelectorAll('#walkCap .step')],progressBar=document.getElementById('progress'),nav=document.getElementById('nav');
+  const root=document.documentElement;
+  function walkFrame(){
+    const r=walk.getBoundingClientRect(),total=walk.offsetHeight-innerHeight;
+    let prog=clamp((-r.top)/total,0,1);if(r.top>0)prog=0;if(r.bottom<innerHeight)prog=1;
+    // phase A 0..0.55 dolly | B 0.5..0.75 lock sneaker | C 0.75..1 pan clothes
+    const dolly=map(prog,0,0.62);
+    root.style.setProperty('--cam',(dolly*(N*DEPTH+260)).toFixed(1)+'px');
+    const corrFade=1-map(prog,0.5,0.66);
+    corridor.style.opacity=corrFade.toFixed(3);
+    corridor.style.transform=`scale(${1+map(prog,0.5,0.7)*0.25})`;
+    // podium lock-on
+    const podIn=map(prog,0.5,0.64),podOut=1-map(prog,0.74,0.86);
+    podium.style.opacity=(podIn*podOut).toFixed(3);
+    podium.style.transform=`scale(${0.86+podIn*0.14}) translateX(${-map(prog,0.74,0.92)*40}vw)`;
+    // clothing pan
+    const clIn=map(prog,0.76,0.9);
+    clothpan.style.opacity=clIn.toFixed(3);
+    clothpan.style.transform=`translateX(${(1-clIn)*40}vw)`;
     // captions
-    const si=Math.min(steps.length-1,Math.floor(prog*steps.length*0.999));
+    let si=0;if(prog>=0.18)si=1;if(prog>=0.5)si=2;if(prog>=0.78)si=3;
     steps.forEach((s,i)=>s.classList.toggle('on',i===si));
-    // top progress bar (whole page)
-    const sc=scrollY/(document.body.scrollHeight-innerHeight);
-    document.getElementById('progress').style.width=(sc*100)+'%';
-    // nav hide on scroll down
   }
-  let lastY=0;const nav=document.getElementById('nav');
-  addEventListener('scroll',()=>{
-    onScroll();
-    if(scrollY>lastY&&scrollY>400)nav.classList.add('hide');else nav.classList.remove('hide');
-    lastY=scrollY;
-  },{passive:true});
-  onScroll();
+  function pageFrame(){
+    progressBar.style.width=(scrollY/(document.body.scrollHeight-innerHeight)*100)+'%';
+  }
+  let lastY=0;
+  function onScroll(){walkFrame();pageFrame();
+    if(scrollY>lastY&&scrollY>400)nav.classList.add('hide');else nav.classList.remove('hide');lastY=scrollY;}
+  addEventListener('scroll',onScroll,{passive:true});onScroll();
 
-  /* ---------------- REVEAL ON SCROLL ---------------- */
-  const io=new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target);}})},{threshold:.18});
+  /* parallax on hero tags (mouse) + scroll */
+  const pars=[...document.querySelectorAll('[data-par]')];
+  addEventListener('mousemove',e=>{const dx=(e.clientX/innerWidth-.5),dy=(e.clientY/innerHeight-.5);
+    pars.forEach(el=>{const f=parseFloat(el.dataset.par)*60;el.style.transform=`translate(${dx*f}px,${dy*f}px)`;});});
+
+  /* reveals */
+  const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target);}}),{threshold:.18});
   document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
 
-  /* ---------------- SHOE COLOR SWAP ---------------- */
-  const shoe=document.getElementById('shoe'), halo=document.getElementById('halo');
-  document.querySelectorAll('[data-shoe]').forEach(b=>{
-    b.addEventListener('click',()=>{
-      const c=b.dataset.shoe;
-      shoe.style.setProperty('--sc',c);
-      shoe.querySelector('svg').style.setProperty('--sc',c);
-      document.documentElement.style.setProperty('--neon',c);
-      halo.style.background=`radial-gradient(${c},transparent 70%)`;
-    });
-  });
-  shoe.querySelector('svg').style.setProperty('--sc','#ff2d77');
+  /* recolor (lab + podium + room) */
+  const shoe=document.getElementById('shoe'),heroShoe=document.getElementById('heroShoe'),halo=document.getElementById('halo'),podiumGlow=document.getElementById('podiumGlow');
+  document.querySelectorAll('[data-shoe]').forEach(b=>b.addEventListener('click',()=>{
+    const c=b.dataset.shoe;
+    shoe.querySelector('svg').style.setProperty('--sc',c);
+    heroShoe.querySelector('svg').style.setProperty('--sc',c);
+    root.style.setProperty('--neon',c);
+    halo.style.background=`radial-gradient(${c},transparent 70%)`;
+    podiumGlow.style.background=`radial-gradient(${c},transparent 70%)`;
+  }));
 
-  /* ---------------- 3D TILT CARDS ---------------- */
-  document.querySelectorAll('[data-tilt]').forEach(card=>{
-    card.addEventListener('mousemove',e=>{
-      const b=card.getBoundingClientRect();
-      const px=(e.clientX-b.left)/b.width, py=(e.clientY-b.top)/b.height;
+  /* drag-to-rotate hero sneaker */
+  const shoeRot=document.getElementById('shoeRot');let ry=-12,rx=4,dragging=false,lastX=0,lastY2=0,vel=0;
+  function applyRot(){shoeRot.style.transform=`perspective(1000px) rotateX(${rx}deg) rotateY(${ry}deg)`;}
+  applyRot();
+  function down(x,y){dragging=true;lastX=x;lastY2=y;cur.classList.add('drag');}
+  function move(x,y){if(!dragging)return;vel=(x-lastX)*.5;ry+=vel;rx=clamp(rx-(y-lastY2)*.2,-30,30);lastX=x;lastY2=y;applyRot();}
+  function up(){dragging=false;cur.classList.remove('drag');}
+  shoeRot.addEventListener('mousedown',e=>{e.preventDefault();down(e.clientX,e.clientY);});
+  addEventListener('mousemove',e=>move(e.clientX,e.clientY));
+  addEventListener('mouseup',up);
+  shoeRot.addEventListener('touchstart',e=>down(e.touches[0].clientX,e.touches[0].clientY),{passive:true});
+  shoeRot.addEventListener('touchmove',e=>{move(e.touches[0].clientX,e.touches[0].clientY);},{passive:true});
+  addEventListener('touchend',up);
+  // gentle inertia + idle auto-spin
+  (function spin(){if(!dragging){if(Math.abs(vel)>.05){ry+=vel;vel*=.95;}else{ry+=.12;vel=0;}applyRot();}requestAnimationFrame(spin);})();
+
+  /* tilt cards */
+  function bindTilt(card){
+    card.addEventListener('mousemove',e=>{const b=card.getBoundingClientRect();const px=(e.clientX-b.left)/b.width,py=(e.clientY-b.top)/b.height;
       card.style.transform=`perspective(800px) rotateY(${(px-.5)*16}deg) rotateX(${(.5-py)*16}deg) translateY(-6px)`;
-      card.style.setProperty('--mx',px*100+'%');card.style.setProperty('--my',py*100+'%');
-    });
+      card.style.setProperty('--mx',px*100+'%');card.style.setProperty('--my',py*100+'%');});
     card.addEventListener('mouseleave',()=>card.style.transform='');
-  });
+  }
+  document.querySelectorAll('[data-tilt]').forEach(bindTilt);
 
-  /* ---------------- BUILD GARMENT RACK ---------------- */
+  /* garment grid */
   const rack=document.getElementById('rack');
-  const garments=[
-    ['Nebula Hoodie','outerwear','$180','#ff2d77','#b56bff','H'],
-    ['Vapor Tee','essentials','$65','#3df0ff','#b56bff','T'],
-    ['Cargo Flux','denim','$140','#b56bff','#ff2d77','C'],
-    ['Halo Jacket','outerwear','$320','#ffd166','#ff2d77','J'],
-    ['Strata Pant','bottoms','$120','#3df0ff','#ff2d77','P'],
-    ['Eclipse Knit','knitwear','$155','#b56bff','#3df0ff','K'],
-    ['Solar Vest','layering','$95','#ffd166','#3df0ff','V'],
-    ['Mono Cap','accessories','$45','#ff2d77','#3df0ff','M'],
-  ];
-  garments.forEach((g,i)=>{
-    const el=document.createElement('div');
-    el.className='garment reveal';el.dataset.d=(i%4);
-    el.innerHTML=`<div class="art"><span class="b1" style="background:radial-gradient(60% 60% at 50% 30%,${g[3]},transparent 70%)"></span>
-      <span class="b2" style="background:radial-gradient(50% 50% at 70% 80%,${g[4]},transparent 70%)"></span></div>
-      <div class="silh">${g[5]}</div>
+  const garments=[['Nebula Hoodie','outerwear','$180','#ff2d77','#b56bff','H'],['Vapor Tee','essentials','$65','#3df0ff','#b56bff','T'],
+    ['Cargo Flux','denim','$140','#b56bff','#ff2d77','C'],['Halo Jacket','outerwear','$320','#ffd166','#ff2d77','J'],
+    ['Strata Pant','bottoms','$120','#3df0ff','#ff2d77','P'],['Eclipse Knit','knitwear','$155','#b56bff','#3df0ff','K'],
+    ['Solar Vest','layering','$95','#ffd166','#3df0ff','V'],['Mono Cap','accessories','$45','#ff2d77','#3df0ff','M']];
+  garments.forEach((g,i)=>{const el=document.createElement('div');el.className='garment reveal';el.dataset.d=(i%4);
+    el.innerHTML=`<div class="art"><span style="position:absolute;inset:0;mix-blend-mode:screen;opacity:.85;background:radial-gradient(60% 60% at 50% 30%,${g[3]},transparent 70%)"></span>
+      <span style="position:absolute;inset:0;mix-blend-mode:screen;opacity:.8;background:radial-gradient(50% 50% at 70% 80%,${g[4]},transparent 70%)"></span></div>
+      <div class="glow"></div><div class="silh">${g[5]}</div>
       <div class="add" data-add="${g[0]}" data-cursor data-label="cop">＋</div>
       <div class="meta"><div class="t">${g[0]}</div><div class="c"><small>${g[1]}</small><span class="pr">${g[2]}</span></div></div>`;
-    rack.appendChild(el);
-    io.observe(el);
-  });
+    rack.appendChild(el);io.observe(el);bindTilt(el);bindCursor();});
 
-  /* ---------------- CART + TOASTS ---------------- */
+  /* cart + toasts */
   let bag=0;const bagCount=document.getElementById('bagCount'),toasts=document.getElementById('toasts');
-  function toast(name){
-    bag++;bagCount.textContent=bag;
+  function toast(name){bag++;bagCount.textContent=bag;
     bagCount.animate([{transform:'scale(1.6)'},{transform:'scale(1)'}],{duration:400,easing:'cubic-bezier(.16,1,.3,1)'});
-    const t=document.createElement('div');t.className='toast';
-    t.innerHTML=`<span class="dot"></span><div><b>Added to bag</b><small>${name}</small></div>`;
+    const t=document.createElement('div');t.className='toast';t.innerHTML=`<span class="dot"></span><div><b>Added to bag</b><small>${name}</small></div>`;
     toasts.appendChild(t);requestAnimationFrame(()=>t.classList.add('show'));
-    setTimeout(()=>{t.classList.remove('show');setTimeout(()=>t.remove(),500);},2600);
-  }
-  document.body.addEventListener('click',e=>{
-    const a=e.target.closest('[data-add]');if(a){toast(a.dataset.add);}
-  });
+    setTimeout(()=>{t.classList.remove('show');setTimeout(()=>t.remove(),500);},2600);}
+  document.body.addEventListener('click',e=>{const a=e.target.closest('[data-add]');if(a)toast(a.dataset.add);});
 
-  /* ---------------- SMOOTH ANCHOR ---------------- */
-  document.querySelectorAll('[data-link],a[href^="#"]').forEach(a=>{
-    a.addEventListener('click',e=>{
-      const id=a.getAttribute('href');if(id&&id.startsWith('#')&&id.length>1){
-        const t=document.querySelector(id);if(t){e.preventDefault();t.scrollIntoView({behavior:'smooth'});}}
-    });
-  });
+  /* smooth anchors */
+  document.querySelectorAll('a[href^="#"]').forEach(a=>a.addEventListener('click',e=>{
+    const id=a.getAttribute('href');if(id&&id.length>1){const t=document.querySelector(id);if(t){e.preventDefault();t.scrollIntoView({behavior:'smooth'});}}}));
 
-  /* ---------------- AUDIO (ambient via WebAudio, no asset) ---------------- */
-  const audioBtn=document.getElementById('audio'),audioTxt=document.getElementById('audioTxt');
-  let actx,playing=false,nodes=[];
+  /* ambient audio (WebAudio, no asset) */
+  const audioBtn=document.getElementById('audio'),audioTxt=document.getElementById('audioTxt');let actx,playing=false,anodes=[];
   audioBtn.addEventListener('click',()=>{
-    if(!actx)actx=new (window.AudioContext||window.webkitAudioContext)();
-    if(!playing){
-      const master=actx.createGain();master.gain.value=.0;master.connect(actx.destination);
-      master.gain.linearRampToValueAtTime(.12,actx.currentTime+1.2);
-      [110,164.81,220].forEach((f,i)=>{
-        const o=actx.createOscillator(),g=actx.createGain();
-        o.type=i==2?'sine':'triangle';o.frequency.value=f;
-        g.gain.value=i==2?.25:.5;
-        const lfo=actx.createOscillator(),lg=actx.createGain();
-        lfo.frequency.value=.1+i*.05;lg.gain.value=4;lfo.connect(lg);lg.connect(o.frequency);
-        o.connect(g);g.connect(master);o.start();lfo.start();nodes.push(o,lfo,master);
-      });
-      playing=true;audioBtn.classList.add('on');audioTxt.textContent='Sound on';
-    }else{
-      nodes.forEach(n=>{try{n.stop&&n.stop();}catch(e){}});nodes=[];playing=false;
-      audioBtn.classList.remove('on');audioTxt.textContent='Sound off';
-    }
-  });
+    if(!actx)actx=new(window.AudioContext||window.webkitAudioContext)();
+    if(!playing){const master=actx.createGain();master.gain.value=0;master.connect(actx.destination);master.gain.linearRampToValueAtTime(.12,actx.currentTime+1.2);
+      [110,164.81,220].forEach((f,i)=>{const o=actx.createOscillator(),g=actx.createGain();o.type=i==2?'sine':'triangle';o.frequency.value=f;g.gain.value=i==2?.25:.5;
+        const lfo=actx.createOscillator(),lg=actx.createGain();lfo.frequency.value=.1+i*.05;lg.gain.value=4;lfo.connect(lg);lg.connect(o.frequency);
+        o.connect(g);g.connect(master);o.start();lfo.start();anodes.push(o,lfo);});
+      playing=true;audioBtn.classList.add('on');audioTxt.textContent='Sound on';}
+    else{anodes.forEach(n=>{try{n.stop();}catch(e){}});anodes=[];playing=false;audioBtn.classList.remove('on');audioTxt.textContent='Sound off';}});
 
   bindCursor();
-  new MutationObserver(bindCursor).observe(document.body,{childList:true,subtree:true});
 })();
 </script>
 </body>
