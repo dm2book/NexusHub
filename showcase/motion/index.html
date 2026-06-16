@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="theme-color" content="#000000" />
+<title>NOVA — Motion Lab</title>
+<meta name="description" content="NOVA Motion Lab — a self-contained showcase of animations and transitions: a morphing 3D particle constellation, live transition switcher, FLIP card expansion, scroll-drawn vectors, and kinetic typography." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --void:#000000; --bone:#ffffff; --ash:#bdbdbd; --smoke:#9a9a9a;
+    --plum:#8052ff; --amber:#ffb829; --lichen:#15846e;
+    --font:'Inter',ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --r:24px; --ease:cubic-bezier(.22,1,.36,1); --max:1200px;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:var(--void);color:var(--bone);font-family:var(--font);font-weight:400;
+    -webkit-font-smoothing:antialiased;overflow-x:hidden;cursor:none}
+  @media(pointer:coarse){body{cursor:auto}.cursor,.cursor-dot{display:none!important}}
+  a{color:inherit;text-decoration:none}
+  ::selection{background:var(--plum);color:var(--bone)}
+  ::-webkit-scrollbar{width:0}
+  .eyebrow{font-weight:600;font-size:12px;letter-spacing:.05em;text-transform:uppercase;color:var(--plum)}
+  .display{font-weight:200;letter-spacing:-.04em;line-height:.9}
+  .body{font-weight:400;font-size:15px;line-height:1.5;letter-spacing:.025em;color:var(--ash);max-width:60ch}
+  .caption{font-size:12px;letter-spacing:.05em;color:var(--smoke)}
+
+  /* cursor (magnetic) */
+  .cursor{position:fixed;top:0;left:0;width:36px;height:36px;border:1px solid var(--bone);border-radius:50%;
+    transform:translate(-50%,-50%);z-index:10000;pointer-events:none;mix-blend-mode:difference;
+    transition:width .3s var(--ease),height .3s var(--ease),background .3s,border-color .3s}
+  .cursor-dot{position:fixed;top:0;left:0;width:5px;height:5px;background:var(--bone);border-radius:50%;transform:translate(-50%,-50%);z-index:10001;pointer-events:none}
+  .cursor.hover{width:76px;height:76px;background:var(--plum);border-color:transparent;mix-blend-mode:normal}
+  .cursor.hover::after{content:attr(data-label);position:absolute;inset:0;display:grid;place-items:center;font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase}
+
+  /* loader */
+  .loader{position:fixed;inset:0;z-index:11000;background:var(--void);display:grid;place-items:center;transition:opacity .8s,visibility .8s}
+  .loader.done{opacity:0;visibility:hidden}
+  .loader .w{text-align:center;width:min(80vw,420px)}
+  .loader .word{font-weight:200;font-size:clamp(40px,9vw,78px);letter-spacing:-.04em}
+  .loader .sub{margin-top:18px;font-weight:600;font-size:12px;letter-spacing:.05em;text-transform:uppercase;color:var(--smoke)}
+  .loader .bar{margin-top:24px;height:1px;background:rgba(255,255,255,.14);overflow:hidden}
+  .loader .bar i{display:block;height:100%;width:0;background:var(--plum)}
+
+  .progress{position:fixed;top:0;left:0;height:2px;width:0;z-index:9500;background:var(--plum)}
+
+  nav{position:fixed;top:0;left:0;right:0;z-index:9400;display:flex;align-items:center;justify-content:space-between;
+    gap:24px;padding:18px clamp(18px,4vw,40px);transition:transform .5s var(--ease)}
+  nav.hide{transform:translateY(-130%)}
+  nav .logo{display:flex;align-items:center;gap:10px;font-weight:600;font-size:18px;letter-spacing:.02em}
+  nav .mid{display:flex;gap:30px;margin-left:auto}
+  nav .mid a{font-size:14px;letter-spacing:.02em;color:var(--smoke);transition:color .3s}
+  nav .mid a:hover{color:var(--bone)}
+  @media(max-width:820px){nav .mid{display:none}}
+
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:var(--r);
+    font-weight:600;font-size:12px;letter-spacing:.05em;text-transform:uppercase;padding:14px 22px;border:1px solid transparent;
+    transition:transform .25s var(--ease),background .3s,color .3s,border-color .3s;will-change:transform}
+  .btn.primary{background:var(--plum);color:var(--bone)}
+  .btn.ghost{background:transparent;color:var(--bone);border-color:rgba(255,255,255,.22)}
+  .btn.ghost:hover{border-color:var(--bone)}
+  .btn.amber{background:transparent;color:var(--amber);border-color:var(--amber)}
+
+  section.block{position:relative;max-width:var(--max);margin:0 auto;padding:clamp(80px,14vh,140px) clamp(18px,4vw,40px)}
+  .sec-head{margin-bottom:48px}
+  .sec-head .eyebrow{margin-bottom:16px;display:block}
+  .sec-head h2{font-size:clamp(36px,6vw,78px);font-weight:200;letter-spacing:-.04em;line-height:.92}
+  .sec-head p{margin-top:18px}
+
+  .reveal{opacity:0;transform:translateY(34px);transition:opacity 1s var(--ease),transform 1s var(--ease)}
+  .reveal.in{opacity:1;transform:none}
+  .reveal[data-d="1"]{transition-delay:.08s}.reveal[data-d="2"]{transition-delay:.16s}.reveal[data-d="3"]{transition-delay:.24s}
+
+  /* ===== HERO — morphing constellation ===== */
+  .hero{position:relative;min-height:100svh;display:grid;place-items:center;overflow:hidden;text-align:center}
+  #stage{position:absolute;inset:0;z-index:0}
+  .hero-inner{position:relative;z-index:2;padding:0 20px;pointer-events:none}
+  .hero .eyebrow{margin-bottom:24px}
+  .hero h1{font-size:clamp(54px,12vw,150px);font-weight:200;letter-spacing:-.04em;line-height:.85}
+  .hero h1 .line{display:block;overflow:hidden}
+  .hero h1 .line span{display:inline-block;transform:translateY(110%)}
+  .hero h1 .line span.up{transition:transform 1s var(--ease)}
+  .hero p{margin:28px auto 0;max-width:46ch}
+  .morph-ctl{position:absolute;bottom:34px;left:50%;transform:translateX(-50%);z-index:3;display:flex;gap:8px;flex-wrap:wrap;justify-content:center;pointer-events:auto}
+  .morph-ctl button{cursor:none;border:1px solid rgba(255,255,255,.18);background:transparent;color:var(--smoke);
+    border-radius:var(--r);padding:9px 16px;font-family:var(--font);font-size:12px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;transition:.3s var(--ease)}
+  .morph-ctl button:hover{color:var(--bone);border-color:var(--bone)}
+  .morph-ctl button.on{background:var(--plum);border-color:transparent;color:var(--bone)}
+
+  /* ===== TRANSITION SWITCHER ===== */
+  .switch-grid{display:grid;grid-template-columns:300px 1fr;gap:40px;align-items:stretch}
+  @media(max-width:820px){.switch-grid{grid-template-columns:1fr}}
+  .switch-list{display:flex;flex-direction:column;gap:10px}
+  .switch-list button{cursor:none;text-align:left;border:1px solid rgba(255,255,255,.12);background:transparent;color:var(--ash);
+    border-radius:var(--r);padding:16px 18px;font-family:var(--font);transition:.3s var(--ease)}
+  .switch-list button .t{font-weight:600;font-size:15px;letter-spacing:.02em;color:var(--bone)}
+  .switch-list button .d{font-size:12px;color:var(--smoke);margin-top:3px}
+  .switch-list button:hover{border-color:rgba(255,255,255,.4)}
+  .switch-list button.on{border-color:var(--plum);background:rgba(128,82,255,.08)}
+  .switch-stage{position:relative;border:1px solid rgba(255,255,255,.12);border-radius:var(--r);min-height:420px;overflow:hidden;display:grid;place-items:center}
+  .switch-panel{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:40px}
+  .switch-panel .big{font-weight:200;font-size:clamp(40px,7vw,92px);letter-spacing:-.04em;line-height:.9}
+  .switch-panel .sm{color:var(--smoke);margin-top:14px;font-size:14px;letter-spacing:.04em;text-transform:uppercase}
+  .switch-stage .replay{position:absolute;bottom:18px;right:18px;z-index:5}
+
+  /* ===== SCROLL-DRAW ===== */
+  .draw{position:relative;height:300vh}
+  .draw .pin{position:sticky;top:0;height:100svh;display:grid;place-items:center;overflow:hidden}
+  .draw svg{width:min(80vw,720px);height:auto;overflow:visible}
+  .draw .label{position:absolute;top:14%;left:50%;transform:translateX(-50%);text-align:center;width:90vw}
+  .draw .label h2{font-weight:200;font-size:clamp(30px,5vw,64px);letter-spacing:-.04em}
+  .draw .label p{color:var(--smoke);margin-top:10px;font-size:14px}
+  .draw .pct{position:absolute;bottom:12%;left:50%;transform:translateX(-50%);font-weight:200;font-size:clamp(60px,12vw,140px);letter-spacing:-.04em;color:rgba(255,255,255,.06)}
+
+  /* ===== KINETIC TYPE / MARQUEE ===== */
+  .scramble{font-weight:200;font-size:clamp(40px,8vw,110px);letter-spacing:-.04em;line-height:.9;cursor:none}
+  .scramble b{font-weight:200;color:var(--plum)}
+  .marquee{position:relative;padding:30px 0;border-top:1px solid rgba(255,255,255,.12);border-bottom:1px solid rgba(255,255,255,.12);overflow:hidden;white-space:nowrap;margin-top:60px}
+  .marquee .track{display:inline-flex;gap:36px;align-items:center;animation:marq 24s linear infinite;will-change:transform}
+  .marquee:hover .track{animation-play-state:paused}
+  .marquee span{font-weight:200;font-size:clamp(28px,5vw,56px);letter-spacing:-.04em}
+  .marquee .star{color:var(--plum);font-size:.55em}
+  @keyframes marq{to{transform:translateX(-50%)}}
+
+  /* ===== FLIP GALLERY ===== */
+  .gal{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+  @media(max-width:860px){.gal{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:560px){.gal{grid-template-columns:1fr}}
+  .gcard{position:relative;border:1px solid rgba(255,255,255,.12);border-radius:var(--r);aspect-ratio:4/5;overflow:hidden;cursor:none;
+    background:var(--void);transition:transform .25s var(--ease),border-color .4s}
+  .gcard:hover{border-color:var(--plum);transform:translateY(-4px)}
+  .gcard canvas{position:absolute;inset:0;width:100%;height:100%}
+  .gcard .cap{position:absolute;left:0;right:0;bottom:0;padding:18px;z-index:2}
+  .gcard .cap .t{font-weight:600;font-size:18px;letter-spacing:.02em}
+  .gcard .cap .s{font-size:12px;color:var(--smoke);text-transform:uppercase;letter-spacing:.05em;margin-top:4px}
+  .gcard .idx{position:absolute;top:16px;left:18px;z-index:2;font-weight:200;font-size:40px;letter-spacing:-.04em;color:rgba(255,255,255,.25)}
+
+  /* FLIP overlay */
+  .flip-backdrop{position:fixed;inset:0;z-index:9700;background:rgba(0,0,0,.7);opacity:0;visibility:hidden;transition:opacity .5s var(--ease),visibility .5s}
+  .flip-backdrop.on{opacity:1;visibility:visible}
+  .flip-surface{position:fixed;z-index:9710;border:1px solid var(--plum);border-radius:var(--r);overflow:hidden;background:var(--void);will-change:transform;transform-origin:top left;pointer-events:none}
+  .flip-surface canvas{position:absolute;inset:0;width:100%;height:100%}
+  .flip-detail{position:fixed;z-index:9720;display:flex;flex-direction:column;justify-content:flex-end;padding:36px;opacity:0;transition:opacity .4s var(--ease) .15s;pointer-events:none}
+  .flip-detail.on{opacity:1;pointer-events:auto}
+  .flip-detail h3{font-weight:200;font-size:clamp(34px,5vw,64px);letter-spacing:-.04em;line-height:.95}
+  .flip-detail p{color:var(--ash);margin-top:16px;max-width:54ch;font-size:15px;line-height:1.6}
+  .flip-detail .close{position:absolute;top:24px;right:24px;width:46px;height:46px;border-radius:50%;border:1px solid rgba(255,255,255,.3);
+    background:transparent;color:var(--bone);cursor:none;display:grid;place-items:center;font-size:20px;pointer-events:auto;transition:.3s var(--ease)}
+  .flip-detail .close:hover{background:var(--plum);border-color:transparent;transform:rotate(90deg)}
+
+  /* ===== MICRO row ===== */
+  .micro{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+  @media(max-width:860px){.micro{grid-template-columns:1fr}}
+  .mcell{border:1px solid rgba(255,255,255,.12);border-radius:var(--r);padding:30px;min-height:220px;display:flex;flex-direction:column;justify-content:space-between}
+  .mcell .lbl{font-size:12px;letter-spacing:.05em;text-transform:uppercase;color:var(--smoke)}
+  .mag-btn{align-self:flex-start}
+  .toggle{width:64px;height:34px;border-radius:var(--r);border:1px solid rgba(255,255,255,.25);position:relative;cursor:none;transition:background .4s var(--ease),border-color .4s}
+  .toggle i{position:absolute;top:3px;left:3px;width:26px;height:26px;border-radius:50%;background:var(--bone);transition:transform .4s var(--ease),background .4s}
+  .toggle.on{background:var(--plum);border-color:transparent}
+  .toggle.on i{transform:translateX(30px)}
+  .liquid{position:relative;align-self:flex-start;border-radius:var(--r);overflow:hidden;border:1px solid rgba(255,255,255,.25);padding:14px 22px;cursor:none;font-weight:600;font-size:12px;letter-spacing:.05em;text-transform:uppercase}
+  .liquid .fill{position:absolute;left:50%;top:50%;width:0;height:0;border-radius:50%;background:var(--plum);transform:translate(-50%,-50%);transition:width .5s var(--ease),height .5s var(--ease)}
+  .liquid:hover .fill{width:320px;height:320px}
+  .liquid span{position:relative;z-index:1}
+
+  /* CTA / footer */
+  .cta{position:relative;text-align:center;padding:clamp(90px,16vh,180px) 20px;overflow:hidden}
+  .cta .big{font-weight:200;font-size:clamp(48px,12vw,150px);letter-spacing:-.04em;line-height:.85}
+  .cta p{color:var(--ash);max-width:46ch;margin:24px auto 36px}
+  footer{border-top:1px solid rgba(255,255,255,.12);padding:50px clamp(18px,4vw,40px);display:flex;justify-content:space-between;gap:24px;flex-wrap:wrap;color:var(--smoke);font-size:14px}
+  footer .b{font-weight:600;font-size:18px;color:var(--bone)}
+  footer a:hover{color:var(--bone)}
+
+  @media(prefers-reduced-motion:reduce){
+    *{animation:none!important;transition:none!important}
+    .draw{height:auto}.draw .pin{position:relative;height:auto;padding:60px 0}
+    .hero h1 .line span{transform:none!important}
+  }
+</style>
+</head>
+<body>
+
+<div class="cursor" id="cursor"></div>
+<div class="cursor-dot" id="cursorDot"></div>
+<div class="progress" id="progress"></div>
+
+<div class="loader" id="loader">
+  <div class="w">
+    <div class="word">NOVA</div>
+    <div class="sub">Motion Lab — booting transitions</div>
+    <div class="bar"><i id="lbar"></i></div>
+  </div>
+</div>
+
+<nav id="nav">
+  <a class="logo" href="#top"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#8052ff" stroke-width="1.5"/><path d="M12 3 V21 M3 12 H21" stroke="#8052ff" stroke-width="1.5" opacity=".5"/></svg> NOVA</a>
+  <div class="mid">
+    <a href="#transitions">Transitions</a><a href="#draw">Scroll-draw</a><a href="#gallery">FLIP</a><a href="#micro">Micro</a>
+  </div>
+  <a class="btn primary mag" href="#cta" data-cursor data-label="go">Get in motion</a>
+</nav>
+
+<!-- HERO -->
+<header class="hero" id="top">
+  <canvas id="stage"></canvas>
+  <div class="hero-inner">
+    <span class="eyebrow">A showcase of motion & transitions</span>
+    <h1>
+      <span class="line"><span class="up">Motion</span></span>
+      <span class="line"><span class="up">in the void.</span></span>
+    </h1>
+    <p class="body">No products. No noise. Just a particle constellation that morphs on command, transitions you can switch live, FLIP expansions, and vectors that draw themselves as you scroll.</p>
+  </div>
+  <div class="morph-ctl" id="morphCtl">
+    <button class="on" data-shape="sphere" data-cursor data-label="morph">Sphere</button>
+    <button data-shape="torus" data-cursor data-label="morph">Torus</button>
+    <button data-shape="helix" data-cursor data-label="morph">Helix</button>
+    <button data-shape="wave" data-cursor data-label="morph">Wave</button>
+    <button data-shape="galaxy" data-cursor data-label="morph">Galaxy</button>
+  </div>
+</header>
+
+<!-- TRANSITIONS -->
+<section class="block" id="transitions">
+  <div class="sec-head reveal">
+    <span class="eyebrow">01 — Live transition switcher</span>
+    <h2>Pick a transition.<br>Watch it run.</h2>
+    <p class="body">Choose a technique on the left; the panel re-enters using exactly that transition. Hit replay to run it again.</p>
+  </div>
+  <div class="switch-grid reveal" data-d="1">
+    <div class="switch-list" id="switchList">
+      <button class="on" data-tr="fade" data-cursor data-label="run"><div class="t">Fade & rise</div><div class="d">opacity + translateY, eased</div></button>
+      <button data-tr="slide" data-cursor data-label="run"><div class="t">Slide</div><div class="d">enters from the edge</div></button>
+      <button data-tr="clip" data-cursor data-label="run"><div class="t">Clip wipe</div><div class="d">inset() clip-path reveal</div></button>
+      <button data-tr="blur" data-cursor data-label="run"><div class="t">Blur focus</div><div class="d">blur + scale settle</div></button>
+      <button data-tr="flip3d" data-cursor data-label="run"><div class="t">3D flip</div><div class="d">rotateX in perspective</div></button>
+      <button data-tr="scramble" data-cursor data-label="run"><div class="t">Scramble</div><div class="d">glyph shuffle resolve</div></button>
+    </div>
+    <div class="switch-stage" id="switchStage">
+      <div class="switch-panel" id="switchPanel">
+        <div>
+          <div class="big" id="switchBig">FADE</div>
+          <div class="sm" id="switchSm">opacity + translateY</div>
+        </div>
+      </div>
+      <button class="btn ghost replay" id="replayBtn" data-cursor data-label="replay">Replay</button>
+    </div>
+  </div>
+</section>
+
+<!-- SCROLL DRAW -->
+<section class="draw" id="draw">
+  <div class="pin">
+    <div class="label"><h2 class="display">02 — Vectors that draw on scroll</h2><p>stroke-dashoffset mapped to scroll progress</p></div>
+    <svg viewBox="0 0 600 360" fill="none">
+      <path id="drawPath" d="M40 300 C 120 60, 200 60, 260 200 S 380 360, 440 180 S 540 40, 560 120"
+        stroke="#8052ff" stroke-width="2.5" stroke-linecap="round"/>
+      <path id="drawPath2" d="M40 320 C 160 200, 240 320, 320 240 S 480 120, 560 220"
+        stroke="#ffb829" stroke-width="1.5" stroke-linecap="round" opacity=".7"/>
+      <circle id="drawDot" r="6" fill="#ffffff"/>
+    </svg>
+    <div class="pct" id="drawPct">0%</div>
+  </div>
+</section>
+
+<!-- KINETIC TYPE -->
+<section class="block">
+  <div class="sec-head reveal"><span class="eyebrow">03 — Kinetic typography</span></div>
+  <div class="scramble reveal" id="scramble" data-text="Hover to scramble — then watch it resolve back into &lt;b&gt;meaning&lt;/b&gt;." data-cursor data-label="hover">Hover to scramble — then watch it resolve back into <b>meaning</b>.</div>
+  <div class="marquee">
+    <div class="track" id="marqTrack">
+      <span>Animate</span><span class="star">◆</span><span>Transition</span><span class="star">◆</span><span>Morph</span><span class="star">◆</span><span>Reveal</span><span class="star">◆</span><span>Easing</span><span class="star">◆</span>
+    </div>
+  </div>
+</section>
+
+<!-- FLIP GALLERY -->
+<section class="block" id="gallery">
+  <div class="sec-head reveal">
+    <span class="eyebrow">04 — Shared-element FLIP</span>
+    <h2>Click to expand.</h2>
+    <p class="body">Each tile morphs into a full panel using the FLIP technique — first/last rect measured, inverted, then played. Click anywhere to close.</p>
+  </div>
+  <div class="gal" id="gal"></div>
+</section>
+
+<!-- MICRO -->
+<section class="block" id="micro">
+  <div class="sec-head reveal">
+    <span class="eyebrow">05 — Micro-interactions</span>
+    <h2>Small moves, big feel.</h2>
+  </div>
+  <div class="micro reveal" data-d="1">
+    <div class="mcell"><span class="lbl">Magnetic button</span><button class="btn primary mag mag-btn" data-cursor data-label="pull">Pull me</button></div>
+    <div class="mcell"><span class="lbl">Spring toggle</span><div class="toggle" id="toggle" data-cursor data-label="flip"><i></i></div></div>
+    <div class="mcell"><span class="lbl">Liquid fill</span><button class="liquid" id="liquid" data-cursor data-label="fill"><span class="fill"></span><span>Hover</span></button></div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta" id="cta">
+  <canvas id="ctaFx"></canvas>
+  <div style="position:relative;z-index:2">
+    <span class="eyebrow reveal">That's the lab</span>
+    <h2 class="big reveal" data-d="1" style="margin-top:18px">Everything<br>moves.</h2>
+    <p class="body reveal" data-d="2">One file. No frameworks. Pure CSS + Canvas + the Web Animations API.</p>
+    <div class="reveal" data-d="3"><button class="btn primary mag" id="topBtn" data-cursor data-label="up">Back to top</button></div>
+  </div>
+</section>
+
+<footer>
+  <div><div class="b">NOVA</div><div style="margin-top:8px">Motion Lab — a self-contained animation & transition showcase.</div></div>
+  <div style="align-self:flex-end">© 2026 — demo experience</div>
+</footer>
+
+<!-- FLIP overlay scaffolding -->
+<div class="flip-backdrop" id="flipBackdrop"></div>
+<div class="flip-surface" id="flipSurface" style="display:none"><canvas id="flipCanvas"></canvas></div>
+<div class="flip-detail" id="flipDetail" style="display:none">
+  <button class="close" id="flipClose" data-cursor data-label="close">✕</button>
+  <h3 id="flipTitle"></h3>
+  <p id="flipBody"></p>
+</div>
+
+<script>
+(function(){
+  const reduce=matchMedia('(prefers-reduced-motion:reduce)').matches;
+  const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
+  const map=(v,a,b)=>clamp((v-a)/(b-a),0,1);
+  const PAL=['#ffffff','#8052ff','#ffb829','#15846e'];
+  const SHAPES=['tri','dot','dia','sq'];
+  function prim(ctx,type,x,y,s,rot){ctx.save();ctx.translate(x,y);ctx.rotate(rot);ctx.beginPath();
+    if(type==='dot')ctx.arc(0,0,s/2,0,7);
+    else if(type==='sq')ctx.rect(-s/2,-s/2,s,s);
+    else if(type==='dia'){ctx.moveTo(0,-s/2);ctx.lineTo(s/2,0);ctx.lineTo(0,s/2);ctx.lineTo(-s/2,0);ctx.closePath();}
+    else{ctx.moveTo(0,-s/2);ctx.lineTo(s/2,s/2);ctx.lineTo(-s/2,s/2);ctx.closePath();}
+    ctx.fill();ctx.restore();}
+
+  /* loader */
+  const loader=document.getElementById('loader'),lbar=document.getElementById('lbar');
+  document.body.style.overflow='hidden';let lp=0;
+  const li=setInterval(()=>{lp+=Math.random()*16+6;if(lp>=100){lp=100;clearInterval(li);
+    setTimeout(()=>{loader.classList.add('done');document.body.style.overflow='';heroIntro();},500);}
+    lbar.style.width=lp+'%';},140);
+
+  /* cursor + magnetic */
+  const cur=document.getElementById('cursor'),cdot=document.getElementById('cursorDot');
+  let mx=innerWidth/2,my=innerHeight/2,cx=mx,cy=my;
+  addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;cdot.style.left=mx+'px';cdot.style.top=my+'px';});
+  (function cl(){cx+=(mx-cx)*.2;cy+=(my-cy)*.2;cur.style.left=cx+'px';cur.style.top=cy+'px';requestAnimationFrame(cl);})();
+  function bindCursor(){document.querySelectorAll('[data-cursor]').forEach(el=>{if(el._cb)return;el._cb=1;
+    el.addEventListener('mouseenter',()=>{cur.classList.add('hover');cur.dataset.label=el.dataset.label||'';});
+    el.addEventListener('mouseleave',()=>cur.classList.remove('hover'));});}
+  document.querySelectorAll('.mag').forEach(el=>{
+    el.addEventListener('mousemove',e=>{const b=el.getBoundingClientRect();
+      el.style.transform=`translate(${(e.clientX-(b.left+b.width/2))*.4}px,${(e.clientY-(b.top+b.height/2))*.5}px)`;});
+    el.addEventListener('mouseleave',()=>el.style.transform='');});
+
+  /* hero intro */
+  function heroIntro(){document.querySelectorAll('.hero h1 .up').forEach((s,i)=>{s.style.transitionDelay=(i*.1)+'s';s.style.transform='translateY(0)';});}
+
+  /* ===== MORPHING 3D CONSTELLATION ===== */
+  const cv=document.getElementById('stage'),ctx=cv.getContext('2d');
+  let W,H,N=1100,P=[],angleY=0,angleX=0,dragV=0,dragging=false,lastX=0,curShape='sphere',lastInteract=0;
+  function resize(){W=cv.width=innerWidth;H=cv.height=innerHeight;}
+  resize();addEventListener('resize',resize);
+  function shapePoints(name){
+    const pts=[];
+    for(let i=0;i<N;i++){
+      let x,y,z;
+      if(name==='sphere'){const t=i/N,phi=Math.acos(1-2*t),th=Math.PI*(1+Math.sqrt(5))*i;
+        x=Math.sin(phi)*Math.cos(th);y=Math.cos(phi);z=Math.sin(phi)*Math.sin(th);}
+      else if(name==='torus'){const u=i/N*Math.PI*2*7,v=i/N*Math.PI*2;const R=.72,r=.32;
+        x=(R+r*Math.cos(v))*Math.cos(u);y=r*Math.sin(v);z=(R+r*Math.cos(v))*Math.sin(u);}
+      else if(name==='helix'){const t=i/N;const a=t*Math.PI*2*6;const arm=i%2?1:-1;
+        x=Math.cos(a)*.5*arm;y=(t-.5)*1.8;z=Math.sin(a)*.5*arm;}
+      else if(name==='wave'){const g=Math.ceil(Math.sqrt(N));const gx=i%g,gy=(i/g)|0;
+        x=(gx/g-.5)*1.7;z=(gy/g-.5)*1.7;y=Math.sin(gx/g*7)*Math.cos(gy/g*7)*.35;}
+      else{const t=i/N;const arm=i%3;const a=t*Math.PI*2*2.2+arm*2.1;const rad=t*0.95;
+        x=Math.cos(a)*rad;z=Math.sin(a)*rad;y=(Math.random()-.5)*.12*(1-t);}
+      pts.push({x,y,z});
+    }
+    return pts;
+  }
+  for(let i=0;i<N;i++){const s=shapePoints('sphere')[i];
+    P.push({x:(Math.random()-.5)*3,y:(Math.random()-.5)*3,z:(Math.random()-.5)*3,
+      tx:s.x,ty:s.y,tz:s.z,c:PAL[(Math.random()*PAL.length*1.6|0)%PAL.length],
+      shp:SHAPES[i%4],sz:Math.random()*2+1.6,rot:Math.random()*7});}
+  function setShape(name){curShape=name;const sp=shapePoints(name);P.forEach((p,i)=>{p.tx=sp[i].x;p.ty=sp[i].y;p.tz=sp[i].z;});
+    document.querySelectorAll('#morphCtl button').forEach(b=>b.classList.toggle('on',b.dataset.shape===name));}
+  document.querySelectorAll('#morphCtl button').forEach(b=>b.addEventListener('click',()=>{setShape(b.dataset.shape);lastInteract=Date.now();}));
+  // drag to rotate
+  cv.addEventListener('mousedown',e=>{dragging=true;lastX=e.clientX;lastInteract=Date.now();});
+  addEventListener('mousemove',e=>{if(dragging){dragV=(e.clientX-lastX)*.005;angleY+=dragV;lastX=e.clientX;}});
+  addEventListener('mouseup',()=>dragging=false);
+  const ORDER=['sphere','torus','helix','wave','galaxy'];
+  function stageFrame(){
+    ctx.clearRect(0,0,W,H);
+    if(!dragging){angleY+=0.0026+dragV;dragV*=0.93;}
+    angleX=Math.sin(Date.now()*0.0002)*0.25;
+    const scale=Math.min(W,H)*0.34,cxs=W/2,cys=H/2;
+    const cosY=Math.cos(angleY),sinY=Math.sin(angleY),cosX=Math.cos(angleX),sinX=Math.sin(angleX);
+    for(const p of P){
+      p.x+=(p.tx-p.x)*0.06;p.y+=(p.ty-p.y)*0.06;p.z+=(p.tz-p.z)*0.06;
+      let x=p.x*cosY - p.z*sinY, z=p.x*sinY + p.z*cosY, y=p.y*cosX - z*sinX; z=p.y*sinX + z*cosX;
+      const persp=2.4/(2.4 - z);
+      const sx=x*scale*persp+cxs, sy=y*scale*persp+cys;
+      const a=clamp((z+1.4)/2.8,.12,1);
+      ctx.globalAlpha=a;ctx.fillStyle=p.c;
+      prim(ctx,p.shp,sx,sy,p.sz*persp,p.rot+=0.003);
+    }
+    ctx.globalAlpha=1;
+    // auto-cycle if idle
+    if(Date.now()-lastInteract>6500){lastInteract=Date.now();setShape(ORDER[(ORDER.indexOf(curShape)+1)%ORDER.length]);}
+    requestAnimationFrame(stageFrame);
+  }
+  if(!reduce)requestAnimationFrame(stageFrame);
+
+  /* progress + nav */
+  const progress=document.getElementById('progress'),nav=document.getElementById('nav');let lastY=0;
+  addEventListener('scroll',()=>{progress.style.width=(scrollY/(document.body.scrollHeight-innerHeight)*100)+'%';
+    if(scrollY>lastY&&scrollY>400)nav.classList.add('hide');else nav.classList.remove('hide');lastY=scrollY;
+    drawScroll();},{passive:true});
+
+  /* reveals */
+  const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target);}}),{threshold:.16});
+  document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+
+  /* ===== TRANSITION SWITCHER ===== */
+  const TR={fade:'opacity + translateY',slide:'enters from the edge',clip:'inset() clip-path reveal',
+    blur:'blur + scale settle',flip3d:'rotateX in perspective',scramble:'glyph shuffle resolve'};
+  const panel=document.getElementById('switchPanel'),big=document.getElementById('switchBig'),sm=document.getElementById('switchSm');
+  let curTr='fade';
+  function runTransition(tr){
+    curTr=tr;big.textContent=tr.toUpperCase();sm.textContent=TR[tr];
+    panel.getAnimations().forEach(a=>a.cancel());
+    const E=[[ {opacity:0,transform:'translateY(40px)'},{opacity:1,transform:'none'} ],
+      'slide','clip','blur','flip3d','scramble'];
+    let kf,opt={duration:900,easing:'cubic-bezier(.22,1,.36,1)',fill:'both'};
+    if(tr==='fade')kf=[{opacity:0,transform:'translateY(40px)'},{opacity:1,transform:'none'}];
+    else if(tr==='slide')kf=[{opacity:0,transform:'translateX(-60%)'},{opacity:1,transform:'none'}];
+    else if(tr==='clip')kf=[{clipPath:'inset(0 100% 0 0)'},{clipPath:'inset(0 0 0 0)'}];
+    else if(tr==='blur')kf=[{opacity:0,filter:'blur(18px)',transform:'scale(1.15)'},{opacity:1,filter:'blur(0)',transform:'none'}];
+    else if(tr==='flip3d'){panel.style.transformStyle='preserve-3d';kf=[{opacity:0,transform:'perspective(900px) rotateX(80deg)'},{opacity:1,transform:'perspective(900px) rotateX(0)'}];}
+    else if(tr==='scramble'){scrambleEl(big,tr.toUpperCase());kf=[{opacity:.3},{opacity:1}];opt.duration=600;}
+    panel.animate(kf,opt);
+  }
+  document.querySelectorAll('#switchList button').forEach(b=>b.addEventListener('click',()=>{
+    document.querySelectorAll('#switchList button').forEach(x=>x.classList.toggle('on',x===b));runTransition(b.dataset.tr);}));
+  document.getElementById('replayBtn').addEventListener('click',()=>runTransition(curTr));
+  // run first one when scrolled into view
+  const trIo=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){runTransition('fade');trIo.disconnect();}}),{threshold:.4});
+  trIo.observe(document.getElementById('switchStage'));
+
+  /* scramble helper */
+  const GLY='ABCDEFGHIJKLMNOPQRSTUVWXYZ#%&@*<>/';
+  function scrambleEl(el,finalText){
+    const txt=finalText||el.dataset.final||el.textContent;el.dataset.final=txt;
+    let frame=0;const len=txt.length;clearInterval(el._si);
+    el._si=setInterval(()=>{frame++;let out='';
+      for(let i=0;i<len;i++){if(i<frame/2)out+=txt[i];else out+= txt[i]===' '?' ':GLY[(Math.random()*GLY.length)|0];}
+      el.textContent=out;if(frame/2>=len){clearInterval(el._si);el.textContent=txt;}},26);
+  }
+  // kinetic headline scramble on hover (keeps the <b> styling by storing html)
+  const scr=document.getElementById('scramble');const scrHTML=scr.innerHTML;const scrText=scr.textContent;
+  scr.addEventListener('mouseenter',()=>{
+    let frame=0;const txt=scrText,len=txt.length;clearInterval(scr._si);
+    scr._si=setInterval(()=>{frame++;let out='';
+      for(let i=0;i<len;i++){out+= i<frame/2?txt[i]:(txt[i]===' '?' ':GLY[(Math.random()*GLY.length)|0]);}
+      scr.textContent=out;if(frame/2>=len){clearInterval(scr._si);scr.innerHTML=scrHTML;}},24);
+  });
+
+  /* ===== SCROLL DRAW ===== */
+  const path=document.getElementById('drawPath'),path2=document.getElementById('drawPath2'),dot=document.getElementById('drawDot'),pct=document.getElementById('drawPct'),drawSec=document.getElementById('draw');
+  const L=path.getTotalLength(),L2=path2.getTotalLength();
+  path.style.strokeDasharray=L;path.style.strokeDashoffset=L;
+  path2.style.strokeDasharray=L2;path2.style.strokeDashoffset=L2;
+  function drawScroll(){
+    const r=drawSec.getBoundingClientRect(),total=drawSec.offsetHeight-innerHeight;
+    let p=clamp((-r.top)/total,0,1);if(r.top>0)p=0;if(r.bottom<innerHeight)p=1;
+    path.style.strokeDashoffset=L*(1-p);
+    path2.style.strokeDashoffset=L2*(1-clamp(p*1.1,0,1));
+    const pt=path.getPointAtLength(L*p);dot.setAttribute('cx',pt.x);dot.setAttribute('cy',pt.y);
+    dot.setAttribute('opacity',p>0&&p<1?1:0);
+    pct.textContent=Math.round(p*100)+'%';
+  }
+  drawScroll();
+
+  /* ===== card canvas fields (gallery + ctas) ===== */
+  function fieldCanvas(canvas,c1,c2){
+    const r=canvas.getBoundingClientRect();const w=canvas.width=Math.max(80,r.width|0),h=canvas.height=Math.max(80,r.height|0);
+    const x=canvas.getContext('2d');const n=Math.round(w*h/300);
+    for(let i=0;i<n;i++){const a=Math.random()*7,rad=Math.pow(Math.random(),.55)*Math.min(w,h)*.5;
+      const px=w/2+Math.cos(a)*rad,py=h/2+Math.sin(a)*rad;
+      x.fillStyle=Math.random()<.7?c1:c2;x.globalAlpha=Math.random()*.6+.25;
+      prim(x,SHAPES[(Math.random()*4)|0],px,py,Math.random()*3+1.5,Math.random()*7);}
+  }
+
+  /* ===== FLIP GALLERY ===== */
+  const galData=[
+    ['Aurora','easing study','#8052ff','#ffffff','A spring-driven gradient field. Notice how the FLIP keeps the surface continuous from tile to panel — first and last rectangles measured, the delta inverted, then the browser plays it back as one motion.'],
+    ['Lattice','grid morph','#ffb829','#8052ff','Points snap between a grid and a sphere. The same lerp that powers the hero constellation runs here, just sampled to two states.'],
+    ['Nimbus','blur transitions','#15846e','#ffffff','A focus-pull transition: blur and scale resolve together so the eye lands exactly where the motion settles.'],
+    ['Pulse','timing curves','#8052ff','#ffb829','cubic-bezier(.22,1,.36,1) — the overshoot-free ease that makes everything here feel expensive.'],
+    ['Drift','parallax','#ffffff','#8052ff','Layers move at different rates against the void. Depth without a single shadow.'],
+    ['Vector','path drawing','#ffb829','#15846e','stroke-dashoffset animated against scroll. The line writes itself as you move.'],
+  ];
+  const gal=document.getElementById('gal');
+  galData.forEach((g,i)=>{const c=document.createElement('div');c.className='gcard reveal';c.dataset.d=(i%3);
+    c.innerHTML=`<canvas></canvas><div class="idx">0${i+1}</div><div class="cap"><div class="t">${g[0]}</div><div class="s">${g[1]}</div></div>`;
+    gal.appendChild(c);io.observe(c);bindCursor();c._data=g;
+    c.setAttribute('data-cursor','');c.setAttribute('data-label','open');
+    c.addEventListener('click',()=>openFlip(c));});
+  // fill canvases once visible
+  function fillGalleryCanvases(){gal.querySelectorAll('canvas').forEach((cn,i)=>{if(cn._done)return;const r=cn.getBoundingClientRect();
+    if(r.top<innerHeight*1.4&&r.bottom>0&&r.width>0){fieldCanvas(cn,galData[i][2],galData[i][3]);cn._done=1;}});}
+  setTimeout(fillGalleryCanvases,900);addEventListener('scroll',()=>{clearTimeout(window._gc);window._gc=setTimeout(fillGalleryCanvases,120);},{passive:true});
+
+  const fb=document.getElementById('flipBackdrop'),fs=document.getElementById('flipSurface'),fcanvas=document.getElementById('flipCanvas'),
+    fd=document.getElementById('flipDetail'),ft=document.getElementById('flipTitle'),fbody=document.getElementById('flipBody'),fclose=document.getElementById('flipClose');
+  let flipOpen=false,activeCard=null;
+  function targetRect(){const w=Math.min(900,innerWidth*0.92),h=Math.min(620,innerHeight*0.82);
+    return{left:(innerWidth-w)/2,top:(innerHeight-h)/2,width:w,height:h};}
+  function openFlip(card){
+    if(flipOpen)return;flipOpen=true;activeCard=card;
+    const r=card.getBoundingClientRect(),T=targetRect();const g=card._data;
+    // surface starts at card rect, animate to target via transform (FLIP)
+    fs.style.display='block';fs.style.left=T.left+'px';fs.style.top=T.top+'px';fs.style.width=T.width+'px';fs.style.height=T.height+'px';
+    fcanvas.width=T.width;fcanvas.height=T.height;fieldCanvas(fcanvas,g[2],g[3]);
+    const sx=r.width/T.width, sy=r.height/T.height, dx=r.left-T.left, dy=r.top-T.top;
+    fb.classList.add('on');
+    fs.animate([{transform:`translate(${dx}px,${dy}px) scale(${sx},${sy})`},{transform:'none'}],
+      {duration:560,easing:'cubic-bezier(.22,1,.36,1)',fill:'both'});
+    ft.textContent=g[0];fbody.textContent=g[4];
+    fd.style.display='flex';fd.style.left=T.left+'px';fd.style.top=T.top+'px';fd.style.width=T.width+'px';fd.style.height=T.height+'px';
+    requestAnimationFrame(()=>fd.classList.add('on'));
+    card.style.visibility='hidden';
+  }
+  function closeFlip(){
+    if(!flipOpen)return;flipOpen=false;const card=activeCard;const r=card.getBoundingClientRect(),T=targetRect();
+    const sx=r.width/T.width, sy=r.height/T.height, dx=r.left-T.left, dy=r.top-T.top;
+    fd.classList.remove('on');fb.classList.remove('on');
+    const an=fs.animate([{transform:'none'},{transform:`translate(${dx}px,${dy}px) scale(${sx},${sy})`}],
+      {duration:500,easing:'cubic-bezier(.22,1,.36,1)',fill:'both'});
+    an.onfinish=()=>{fs.style.display='none';fd.style.display='none';card.style.visibility='';};
+  }
+  fb.addEventListener('click',closeFlip);fclose.addEventListener('click',e=>{e.stopPropagation();closeFlip();});
+  addEventListener('keydown',e=>{if(e.key==='Escape')closeFlip();});
+  addEventListener('resize',()=>{if(flipOpen)closeFlip();});
+
+  /* ===== MICRO ===== */
+  document.getElementById('toggle').addEventListener('click',function(){this.classList.toggle('on');});
+  const liquid=document.getElementById('liquid'),lfill=liquid.querySelector('.fill');
+  liquid.addEventListener('mousemove',e=>{const b=liquid.getBoundingClientRect();lfill.style.left=(e.clientX-b.left)+'px';lfill.style.top=(e.clientY-b.top)+'px';});
+
+  /* ===== CTA constellation ===== */
+  const ccv=document.getElementById('ctaFx'),cctx=ccv.getContext('2d');let cw,ch,cps=[];
+  function cinit(){const r=ccv.parentElement.getBoundingClientRect();cw=ccv.width=r.width;ch=ccv.height=r.height;cps=[];
+    const n=Math.round(cw*ch/9000);for(let i=0;i<n;i++){const a=Math.random()*7,rad=Math.pow(Math.random(),.5)*Math.min(cw,ch)*.42;
+      cps.push({bx:cw/2+Math.cos(a)*rad,by:ch/2+Math.sin(a)*rad,ph:Math.random()*7,s:Math.random()*3+1.5,shp:SHAPES[(Math.random()*4)|0],c:PAL[(Math.random()*4)|0]});}}
+  function cframe(t){if(!cw)return;cctx.clearRect(0,0,cw,ch);for(const p of cps){const x=p.bx+Math.sin(t*.0006+p.ph)*12,y=p.by+Math.cos(t*.0007+p.ph)*12;
+    cctx.fillStyle=p.c;cctx.globalAlpha=.5;prim(cctx,p.shp,x,y,p.s,t*.0003+p.ph);}cctx.globalAlpha=1;requestAnimationFrame(cframe);}
+  cinit();addEventListener('resize',cinit);if(!reduce)requestAnimationFrame(cframe);
+
+  /* anchors */
+  document.querySelectorAll('a[href^="#"]').forEach(a=>a.addEventListener('click',e=>{const id=a.getAttribute('href');
+    if(id&&id.length>1){const t=document.querySelector(id);if(t){e.preventDefault();t.scrollIntoView({behavior:'smooth'});}}}));
+  document.getElementById('topBtn').addEventListener('click',()=>scrollTo({top:0,behavior:'smooth'}));
+
+  bindCursor();
+})();
+</script>
+</body>
+</html>
