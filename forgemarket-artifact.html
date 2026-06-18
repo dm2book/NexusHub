@@ -11,12 +11,10 @@
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <script src="https://cdn.tailwindcss.com"></script>
 <script>
-  tailwind.config = {
-    theme: { extend: {
-      colors: { neon: { DEFAULT:'#10b981', bright:'#34d399', soft:'#059669' }, cyber:'#ff3b5c', ink:'#05060a' },
-      fontFamily: { display:['Orbitron','system-ui','sans-serif'], body:['Inter','system-ui','sans-serif'] },
-    } },
-  };
+  tailwind.config = { theme: { extend: {
+    colors: { neon: { DEFAULT:'#10b981', bright:'#34d399', soft:'#059669' }, cyber:'#ff3b5c', ink:'#05060a' },
+    fontFamily: { display:['Orbitron','system-ui','sans-serif'], body:['Inter','system-ui','sans-serif'] },
+  } } };
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Orbitron:wght@500;700;800;900&display=swap" rel="stylesheet">
@@ -24,22 +22,15 @@
   html,body{margin:0;background:#05060a;color:#e7eaf0;font-family:Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
   h1,h2,h3,.font-display{font-family:Orbitron,system-ui,sans-serif}
   ::selection{background:rgba(16,185,129,.35);color:#fff}
-  ::-webkit-scrollbar{width:10px}::-webkit-scrollbar-track{background:#05060a}
-  ::-webkit-scrollbar-thumb{background:#1d2230;border-radius:6px}
-
+  ::-webkit-scrollbar{width:10px}::-webkit-scrollbar-track{background:#05060a}::-webkit-scrollbar-thumb{background:#1d2230;border-radius:6px}
   .grid-bg{background-image:linear-gradient(rgba(16,185,129,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(16,185,129,.05) 1px,transparent 1px);background-size:42px 42px}
   .glow-ring{box-shadow:0 0 0 1px rgba(16,185,129,.45),0 0 26px rgba(16,185,129,.35)}
   .text-glow{text-shadow:0 0 18px rgba(52,211,153,.55)}
   @keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
   .floaty{animation:floaty 6s ease-in-out infinite}
-
-  /* 3D viewport */
-  .viewport3d{position:relative;height:390px;border-radius:16px;overflow:hidden;
-    background:radial-gradient(120% 90% at 50% 20%,#0a1322 0%,#05060a 70%);box-shadow:inset 0 0 60px rgba(0,0,0,.6)}
+  .viewport3d{position:relative;height:420px;border-radius:16px;overflow:hidden;background:radial-gradient(120% 90% at 50% 15%,#0a1322 0%,#04050a 70%);box-shadow:inset 0 0 70px rgba(0,0,0,.65)}
   .viewport3d canvas{display:block;width:100%!important;height:100%!important}
-  .vignette{position:absolute;inset:0;pointer-events:none;box-shadow:inset 0 0 90px rgba(0,0,0,.8)}
-
-  /* Blinking DELIVERED + toast */
+  .vignette{position:absolute;inset:0;pointer-events:none;box-shadow:inset 0 0 100px rgba(0,0,0,.85)}
   .blink{animation:blink 1s steps(1,end) infinite}@keyframes blink{50%{opacity:.2}}
   .toast{transform:translateY(14px);opacity:0;transition:all .5s cubic-bezier(.34,1.56,.64,1)}
   .toast.show{transform:translateY(0);opacity:1}
@@ -55,304 +46,338 @@
 const { useState, useEffect, useRef, useCallback } = React;
 
 const Icon = {
-  cart: (p) => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.7 13.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 6H6"/></svg>),
-  bolt: (p) => (<svg viewBox="0 0 24 24" fill="currentColor" {...p}><path d="M13 2 4 14h6l-1 8 9-12h-6z"/></svg>),
-  check: (p) => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M20 6 9 17l-5-5"/></svg>),
-  menu: (p) => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" {...p}><path d="M3 12h18M3 6h18M3 18h18"/></svg>),
+  cart:(p)=>(<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.7 13.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 6H6"/></svg>),
+  bolt:(p)=>(<svg viewBox="0 0 24 24" fill="currentColor" {...p}><path d="M13 2 4 14h6l-1 8 9-12h-6z"/></svg>),
+  check:(p)=>(<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M20 6 9 17l-5-5"/></svg>),
+  menu:(p)=>(<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" {...p}><path d="M3 12h18M3 6h18M3 18h18"/></svg>),
 };
 
-/* ── Three.js isometric city + delivery scene ───────────── */
-const easeOutBounce = (x) => {
-  const n1 = 7.5625, d1 = 2.75;
-  if (x < 1/d1) return n1*x*x;
-  if (x < 2/d1) return n1*(x-=1.5/d1)*x+0.75;
-  if (x < 2.5/d1) return n1*(x-=2.25/d1)*x+0.9375;
-  return n1*(x-=2.625/d1)*x+0.984375;
-};
+const easeOutBounce=(x)=>{const n=7.5625,d=2.75;if(x<1/d)return n*x*x;if(x<2/d)return n*(x-=1.5/d)*x+.75;if(x<2.5/d)return n*(x-=2.25/d)*x+.9375;return n*(x-=2.625/d)*x+.984375;};
+const easeInOut=(x)=>x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2;
+const lerp=(a,b,t)=>a+(b-a)*t;
 
-function initThree(mount) {
+/* ── Three.js cinematic cyberpunk delivery scene ───────────── */
+function initThree(mount){
   const THREE = window.THREE;
-  if (!THREE) { mount.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#34d399;font-family:Orbitron">Loading 3D engine…</div>'; return { purchase(){}, transit(){}, arrive(){}, reset(){}, dispose(){} }; }
+  if(!THREE){ mount.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#34d399;font-family:Orbitron">Loading 3D engine…</div>'; return {purchase(){},transit(){},arrive(){},reset(){},dispose(){}}; }
 
-  let w = mount.clientWidth || 720, h = mount.clientHeight || 390;
+  let w=mount.clientWidth||720, h=mount.clientHeight||420;
   let renderer;
-  try { renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true }); }
-  catch (e) { mount.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#34d399">WebGL unavailable</div>'; return { purchase(){}, transit(){}, arrive(){}, reset(){}, dispose(){} }; }
-  renderer.setPixelRatio(Math.min(2, window.devicePixelRatio));
-  renderer.setSize(w, h);
-  renderer.setClearColor(0x000000, 0);
+  try{ renderer=new THREE.WebGLRenderer({antialias:true,alpha:true}); }
+  catch(e){ mount.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#34d399">WebGL unavailable</div>'; return {purchase(){},transit(){},arrive(){},reset(){},dispose(){}}; }
+  renderer.setPixelRatio(Math.min(2,window.devicePixelRatio));
+  renderer.setSize(w,h); renderer.setClearColor(0x000000,0);
+  if(THREE.sRGBEncoding!==undefined) renderer.outputEncoding=THREE.sRGBEncoding;
+  if(THREE.ACESFilmicToneMapping!==undefined){ renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=1.15; }
   mount.appendChild(renderer.domElement);
 
-  const scene = new THREE.Scene();
-  scene.fog = new THREE.Fog(0x05080f, 20, 46);
+  const scene=new THREE.Scene();
+  scene.fog=new THREE.FogExp2(0x04060c, 0.018);
 
-  // Isometric orthographic camera
-  const viewSize = 16;
-  const cam = new THREE.OrthographicCamera(-viewSize, viewSize, viewSize, -viewSize, -60, 120);
-  const baseCam = new THREE.Vector3(15, 13, 15);
-  cam.position.copy(baseCam);
-  cam.lookAt(0, 0.5, 0);
-  const setFrustum = () => { const a = w/h; cam.left=-viewSize*a/2; cam.right=viewSize*a/2; cam.top=viewSize/2; cam.bottom=-viewSize/2; cam.updateProjectionMatrix(); };
-  setFrustum();
+  const cam=new THREE.PerspectiveCamera(44, w/h, 0.1, 300);
+  cam.position.set(17,14,17); cam.lookAt(0,1,0);
 
-  // Interactive camera — drag to orbit/tilt, swipe to pan, scroll to zoom.
-  let controls = null;
-  if (THREE.OrbitControls) {
-    controls = new THREE.OrbitControls(cam, renderer.domElement);
-    controls.enableDamping = true; controls.dampingFactor = 0.09;
-    controls.enablePan = true; controls.screenSpacePanning = false;
-    controls.minPolarAngle = 0.5; controls.maxPolarAngle = 1.2;
-    controls.minZoom = 0.7; controls.maxZoom = 2.4;
-    controls.rotateSpeed = 0.55; controls.panSpeed = 0.6;
-    controls.target.set(0, 0.6, 0); controls.update();
+  let controls=null;
+  if(THREE.OrbitControls){
+    controls=new THREE.OrbitControls(cam, renderer.domElement);
+    controls.enableDamping=true; controls.dampingFactor=0.08;
+    controls.minPolarAngle=0.45; controls.maxPolarAngle=1.25;
+    controls.minDistance=10; controls.maxDistance=46; controls.rotateSpeed=0.6;
+    controls.target.set(0,1,0); controls.update();
   }
 
-  // Lights
-  scene.add(new THREE.AmbientLight(0x2b3656, 0.8));
-  const dir = new THREE.DirectionalLight(0x9fb4ff, 0.55); dir.position.set(8, 14, 5); scene.add(dir);
-  const pv = new THREE.PointLight(0x10b981, 1.3, 20); pv.position.set(-6, 3.5, 0); scene.add(pv);
-  const ph = new THREE.PointLight(0x34d399, 1.0, 20); ph.position.set(6, 3.5, 0); scene.add(ph);
+  // ── Lighting (dark base + intense neon point lights) ──
+  scene.add(new THREE.AmbientLight(0x182238, 0.55));
+  const key=new THREE.DirectionalLight(0x9fb4ff,0.5); key.position.set(10,18,6); scene.add(key);
+  const neonLights=[
+    [0x10b981,-8,6,-4],[0x22d3ee,9,7,5],[0xff3b5c,4,5,-9],[0x34d399,-6,5,7],[0x8b5cf6,12,6,-2],
+  ].map(([c,x,y,z])=>{ const l=new THREE.PointLight(c,1.1,26); l.position.set(x,y,z); scene.add(l); return l; });
+  const vaultLight=new THREE.PointLight(0x10b981,1.4,20); vaultLight.position.set(-9,4,0); scene.add(vaultLight);
+  const houseLight=new THREE.PointLight(0x34d399,1.0,20); houseLight.position.set(9,4,0); scene.add(houseLight);
 
-  // Ground + neon grid
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(64, 44), new THREE.MeshStandardMaterial({ color: 0x070b13, roughness: 1 }));
-  ground.rotation.x = -Math.PI/2; scene.add(ground);
-  const grid = new THREE.GridHelper(64, 64, 0x10b981, 0x123a30);
-  grid.position.y = 0.02; grid.material.transparent = true; grid.material.opacity = 0.3; scene.add(grid);
+  const disp=[];
+  const keep=(x)=>{disp.push(x);return x;};
 
-  const disposables = [];
-  const edgeMat = (c) => { const m = new THREE.LineBasicMaterial({ color: c }); disposables.push(m); return m; };
-  function building(x, z, wd, ht, dp, color) {
-    const g = new THREE.Group();
-    const geo = new THREE.BoxGeometry(wd, ht, dp); disposables.push(geo);
-    const box = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0x0a0f17, roughness: .7, metalness: .25, emissive: color, emissiveIntensity: .07 }));
-    box.position.y = ht/2; g.add(box);
-    const eg = new THREE.EdgesGeometry(geo); disposables.push(eg);
-    const edges = new THREE.LineSegments(eg, edgeMat(color)); edges.position.copy(box.position); g.add(edges);
-    g.position.set(x, 0, z); scene.add(g);
+  // ── Procedural textures ──
+  function windowTex(rgb){
+    const c=document.createElement('canvas'); c.width=64; c.height=128; const x=c.getContext('2d');
+    x.fillStyle='#05070d'; x.fillRect(0,0,64,128);
+    for(let r=0;r<14;r++) for(let col=0;col<6;col++){
+      if(Math.random()<0.55){ x.fillStyle=`rgba(${rgb},${0.35+Math.random()*0.6})`; x.fillRect(6+col*9,6+r*8.6,5,5); }
+    }
+    const t=new THREE.CanvasTexture(c); t.wrapS=t.wrapT=THREE.RepeatWrapping; return keep(t);
   }
-  [[-11,-6,2,4,2,0x10b981],[-10,5,2.4,2.6,2,0x10b981],[-4,-7.5,2,3.2,2,0x34d399],[-2.5,7,2.4,2,2,0x10b981],
-   [2,-7.5,2.6,3.6,2,0x10b981],[3.5,7,2,2.4,2,0xff3b5c],[8.5,-6,2.2,3,2,0x10b981],[10,6,2.4,4.2,2,0x10b981],
-   [13,-2,2,2.8,2,0x34d399],[-13,1,1.8,2.2,1.8,0x10b981],[6.5,-9,2,2.4,2,0x10b981],[0,9,2.2,3,2,0x10b981],
-   [-7,-9,1.8,2,1.8,0x34d399],[12,3,2,3.4,2,0x10b981]].forEach(b => building(...b));
+  const winTexes=[windowTex('52,211,153'),windowTex('34,211,238'),windowTex('255,90,120')];
+  const winColors=[0x10b981,0x22d3ee,0xff3b5c];
 
-  function addEdges(group, mesh, color) {
-    const eg = new THREE.EdgesGeometry(mesh.geometry); disposables.push(eg);
-    const e = new THREE.LineSegments(eg, edgeMat(color)); e.position.copy(mesh.position); e.rotation.copy(mesh.rotation); group.add(e);
+  function starTex(){
+    const c=document.createElement('canvas'); c.width=c.height=64; const x=c.getContext('2d');
+    const g=x.createRadialGradient(32,32,0,32,32,30); g.addColorStop(0,'rgba(255,255,255,1)'); g.addColorStop(.35,'rgba(110,231,183,.9)'); g.addColorStop(1,'rgba(16,185,129,0)');
+    x.fillStyle=g; x.beginPath(); x.moveTo(32,3); x.lineTo(40,32); x.lineTo(32,61); x.lineTo(24,32); x.closePath(); x.fill();
+    x.beginPath(); x.moveTo(3,32); x.lineTo(32,24); x.lineTo(61,32); x.lineTo(32,40); x.closePath(); x.fill();
+    return keep(new THREE.CanvasTexture(c));
   }
 
-  // Vault (left)
-  const vault = new THREE.Group(); vault.position.set(-6, 0, 0);
-  const vGeo = new THREE.BoxGeometry(2.6, 2.6, 2.6); disposables.push(vGeo);
-  const vBox = new THREE.Mesh(vGeo, new THREE.MeshStandardMaterial({ color: 0x0c1320, emissive: 0x10b981, emissiveIntensity: .28, metalness: .5, roughness: .35 }));
-  vBox.position.y = 1.3; vault.add(vBox); addEdges(vault, vBox, 0x34d399);
-  const door = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 1.4), new THREE.MeshBasicMaterial({ color: 0x34d399, transparent: true, opacity: .55 }));
-  door.position.set(0, 1.1, 1.31); vault.add(door);
-  const pad = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.18, 1.5), new THREE.MeshStandardMaterial({ color: 0x0b1018, emissive: 0x34d399, emissiveIntensity: .5 }));
-  pad.position.y = 2.7; vault.add(pad);
+  // ── Ground + neon grid ──
+  const ground=new THREE.Mesh(keep(new THREE.PlaneGeometry(120,120)), new THREE.MeshStandardMaterial({color:0x05080f,roughness:.9,metalness:.3}));
+  ground.rotation.x=-Math.PI/2; scene.add(ground);
+  const grid=new THREE.GridHelper(120,120,0x10b981,0x0f2e26); grid.position.y=0.02; grid.material.transparent=true; grid.material.opacity=0.26; scene.add(grid);
+
+  // ── City: diverse skyscrapers ──
+  const edgeMat=(c)=>new THREE.LineBasicMaterial({color:c});
+  const mkEdges=(geo,color,p)=>{ const e=new THREE.LineSegments(keep(new THREE.EdgesGeometry(geo)), edgeMat(color)); if(p) e.position.copy(p); return e; };
+  const cityGroup=new THREE.Group(); scene.add(cityGroup);
+  function tower(x,z,seed){
+    const g=new THREE.Group(); g.position.set(x,0,z);
+    const ci=Math.floor(Math.random()*3); const col=winColors[ci];
+    const type=Math.random();
+    const baseW=1.4+Math.random()*1.4, baseD=1.4+Math.random()*1.4;
+    const totalH=2.2+Math.random()*5.5;
+    if(type<0.25){ // hollow frame tower
+      const geo=keep(new THREE.BoxGeometry(baseW,totalH,baseD));
+      const frame=new THREE.LineSegments(keep(new THREE.EdgesGeometry(geo)), edgeMat(col)); frame.position.y=totalH/2; g.add(frame);
+      // a few floor rings
+      for(let fy=0.6; fy<totalH; fy+=0.8){ const ring=new THREE.LineSegments(keep(new THREE.EdgesGeometry(keep(new THREE.BoxGeometry(baseW,0.02,baseD)))), edgeMat(col)); ring.position.y=fy; g.add(ring); }
+    } else if(type<0.55){ // tiered tower (stacked shrinking boxes)
+      let y=0, tw=baseW, td=baseD, tiers=2+Math.floor(Math.random()*3);
+      for(let ti=0;ti<tiers;ti++){ const th=totalH/tiers*(1-ti*0.12); const geo=keep(new THREE.BoxGeometry(tw,th,td));
+        const tex=winTexes[ci].clone(); tex.repeat.set(Math.max(1,tw|0),Math.max(1,th|0)); keep(tex);
+        const m=new THREE.Mesh(geo, new THREE.MeshStandardMaterial({color:0x0a0f17,roughness:.65,metalness:.35,emissive:col,emissiveIntensity:.5,emissiveMap:tex}));
+        m.position.y=y+th/2; g.add(m);
+        g.add(mkEdges(geo,col,m.position));
+        y+=th; tw*=0.78; td*=0.78;
+      }
+    } else { // solid tower with window emissive map
+      const geo=keep(new THREE.BoxGeometry(baseW,totalH,baseD));
+      const tex=winTexes[ci].clone(); tex.repeat.set(Math.max(1,baseW|0),Math.max(2,totalH|0)); keep(tex);
+      const m=new THREE.Mesh(geo, new THREE.MeshStandardMaterial({color:0x090e16,roughness:.6,metalness:.4,emissive:col,emissiveIntensity:.55,emissiveMap:tex}));
+      m.position.y=totalH/2; g.add(m);
+      const ed=new THREE.LineSegments(keep(new THREE.EdgesGeometry(geo)), edgeMat(col)); ed.position.copy(m.position); g.add(ed);
+    }
+    // random neon billboard panels on a side
+    if(Math.random()<0.7){ const bc=winColors[Math.floor(Math.random()*3)];
+      const bw=0.5+Math.random()*0.8, bh=0.5+Math.random()*1.2;
+      const bb=new THREE.Mesh(keep(new THREE.PlaneGeometry(bw,bh)), new THREE.MeshBasicMaterial({color:bc,transparent:true,opacity:0.92,side:THREE.DoubleSide}));
+      const side=Math.random()<.5?1:-1, axis=Math.random()<.5;
+      const yy=0.8+Math.random()*(totalH-1);
+      if(axis){ bb.position.set(side*(baseW/2+0.03), yy, (Math.random()-.5)*baseD*0.6); bb.rotation.y=Math.PI/2; }
+      else { bb.position.set((Math.random()-.5)*baseW*0.6, yy, side*(baseD/2+0.03)); }
+      bb.userData.flicker=Math.random()<.4; bb.userData.base=0.92; g.add(bb);
+      if(bb.userData.flicker) billboards.push(bb);
+    }
+    cityGroup.add(g);
+  }
+  const billboards=[];
+  // layout towers on a grid, leaving a clear corridor along the road (|z|<2 near center kept lower/empty)
+  const slots=[];
+  for(let gx=-18; gx<=18; gx+=3.2){ for(let gz=-14; gz<=14; gz+=3.2){
+    if(Math.abs(gz)<2.4 && gx>-7 && gx<7) continue;            // keep delivery corridor clear
+    if(gx>-8 && gx<8 && Math.abs(gz)<1.6) continue;
+    if(Math.random()<0.62) slots.push([gx+(Math.random()-.5)*1.2, gz+(Math.random()-.5)*1.2]);
+  }}
+  slots.forEach(([x,z])=>tower(x,z));
+
+  // ── Vault (left) ──
+  const vault=new THREE.Group(); vault.position.set(-6,0,0);
+  const vGeo=keep(new THREE.BoxGeometry(2.6,2.6,2.6));
+  const vBox=new THREE.Mesh(vGeo, new THREE.MeshStandardMaterial({color:0x0c1320,emissive:0x10b981,emissiveIntensity:.3,metalness:.55,roughness:.3}));
+  vBox.position.y=1.3; vault.add(vBox);
+  vault.add(mkEdges(vGeo,0x34d399,vBox.position));
+  const door=new THREE.Mesh(keep(new THREE.PlaneGeometry(1.1,1.5)), new THREE.MeshBasicMaterial({color:0x6ef7c0,transparent:true,opacity:.6})); door.position.set(0,1.05,1.31); vault.add(door);
+  const pad=new THREE.Mesh(keep(new THREE.BoxGeometry(1.5,0.18,1.5)), new THREE.MeshStandardMaterial({color:0x0b1018,emissive:0x34d399,emissiveIntensity:.6})); pad.position.y=2.7; vault.add(pad);
   scene.add(vault);
 
-  // House (right)
-  const house = new THREE.Group(); house.position.set(6, 0, 0);
-  const hMat = new THREE.MeshStandardMaterial({ color: 0x0d1626, emissive: 0x10b981, emissiveIntensity: .25, metalness: .3, roughness: .5 });
-  const hGeo = new THREE.BoxGeometry(2.4, 1.9, 2.4); disposables.push(hGeo);
-  const hBase = new THREE.Mesh(hGeo, hMat); hBase.position.y = 0.95; house.add(hBase); addEdges(house, hBase, 0x34d399);
-  const roofMat = new THREE.MeshStandardMaterial({ color: 0x0b1018, emissive: 0x34d399, emissiveIntensity: .22 });
-  const roof = new THREE.Mesh(new THREE.ConeGeometry(2, 1.3, 4), roofMat); roof.position.y = 2.55; roof.rotation.y = Math.PI/4; house.add(roof);
-  const hwin = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 0.9), new THREE.MeshBasicMaterial({ color: 0x34d399, transparent: true, opacity: .5 }));
-  hwin.position.set(0, 0.95, 1.21); house.add(hwin);
+  // ── House (right) ──
+  const house=new THREE.Group(); house.position.set(6,0,0);
+  const hMat=new THREE.MeshStandardMaterial({color:0x0d1626,emissive:0x10b981,emissiveIntensity:.3,metalness:.35,roughness:.45});
+  const hGeo=keep(new THREE.BoxGeometry(2.5,2,2.5));
+  const hBase=new THREE.Mesh(hGeo,hMat); hBase.position.y=1; house.add(hBase);
+  house.add(mkEdges(hGeo,0x6ef7c0,hBase.position));
+  const roofMat=new THREE.MeshStandardMaterial({color:0x0b1018,emissive:0x34d399,emissiveIntensity:.28});
+  const roof=new THREE.Mesh(keep(new THREE.ConeGeometry(2.05,1.4,4)),roofMat); roof.position.y=2.7; roof.rotation.y=Math.PI/4; house.add(roof);
+  const hwin=new THREE.Mesh(keep(new THREE.PlaneGeometry(0.8,1)), new THREE.MeshBasicMaterial({color:0x6ef7c0,transparent:true,opacity:.55})); hwin.position.set(0,1,1.26); house.add(hwin);
+  // bloom-ish halo behind house
+  const halo=new THREE.Sprite(new THREE.SpriteMaterial({map:starTex(),color:0x34d399,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false}));
+  halo.scale.set(10,10,1); halo.position.set(6,2,0); scene.add(halo);
   scene.add(house);
 
-  // Neon road (twisting tube from vault to house)
-  const curve = new THREE.CatmullRomCurve3([
-    new THREE.Vector3(-6, 0.18, 0), new THREE.Vector3(-3.5, 0.18, 2.2), new THREE.Vector3(-1, 0.18, -1.2),
-    new THREE.Vector3(1.5, 0.18, 1.8), new THREE.Vector3(3.8, 0.18, -1.4), new THREE.Vector3(6, 0.18, 0),
+  // ── Road: flat wide curved highway + dashed glowing center line ──
+  const curve=new THREE.CatmullRomCurve3([
+    new THREE.Vector3(-6,0.08,0), new THREE.Vector3(-3.5,0.08,2.4), new THREE.Vector3(-1,0.08,-1.4),
+    new THREE.Vector3(1.6,0.08,2), new THREE.Vector3(3.9,0.08,-1.5), new THREE.Vector3(6,0.08,0),
   ]);
-  const roadGeo = new THREE.TubeGeometry(curve, 160, 0.34, 10, false); disposables.push(roadGeo);
-  const roadMat = new THREE.MeshStandardMaterial({ color: 0x0a2a22, emissive: 0x10b981, emissiveIntensity: .8, metalness: .3, roughness: .4 });
-  const road = new THREE.Mesh(roadGeo, roadMat);
-  scene.add(road);
-  const roadCoreGeo = new THREE.TubeGeometry(curve, 160, 0.08, 8, false); disposables.push(roadCoreGeo);
-  const roadCore = new THREE.Mesh(roadCoreGeo, new THREE.MeshBasicMaterial({ color: 0xbbf7d0 }));
-  roadCore.position.y = 0.06; scene.add(roadCore);
+  const RN=200, halfW=0.95;
+  const rp=curve.getSpacedPoints(RN), pos=[], idx=[], up=new THREE.Vector3(0,1,0), nrm=new THREE.Vector3(), tg=new THREE.Vector3();
+  for(let i=0;i<=RN;i++){ const t=i/RN; curve.getTangentAt(t,tg); nrm.copy(tg).cross(up).normalize();
+    pos.push(rp[i].x+nrm.x*halfW, 0.07, rp[i].z+nrm.z*halfW); pos.push(rp[i].x-nrm.x*halfW, 0.07, rp[i].z-nrm.z*halfW); }
+  for(let i=0;i<RN;i++){ const a=i*2,b=a+1,c=a+2,d=a+3; idx.push(a,b,c, b,d,c); }
+  const roadGeo=new THREE.BufferGeometry(); roadGeo.setAttribute('position', new THREE.Float32BufferAttribute(pos,3)); roadGeo.setIndex(idx); roadGeo.computeVertexNormals(); keep(roadGeo);
+  const roadMat=new THREE.MeshStandardMaterial({color:0x0a121d,emissive:0x0c3326,emissiveIntensity:.5,metalness:.5,roughness:.45,side:THREE.DoubleSide});
+  scene.add(new THREE.Mesh(roadGeo,roadMat));
+  // glowing edges
+  [halfW,-halfW].forEach(off=>{ const ep=[]; for(let i=0;i<=RN;i++){ const t=i/RN; curve.getTangentAt(t,tg); nrm.copy(tg).cross(up).normalize(); ep.push(rp[i].x+nrm.x*off, 0.1, rp[i].z+nrm.z*off);} const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.Float32BufferAttribute(ep,3)); keep(g); scene.add(new THREE.Line(g, new THREE.LineBasicMaterial({color:0x34d399}))); });
+  // dashed center line
+  const cl=[]; for(let i=0;i<=RN;i++) cl.push(rp[i].x,0.12,rp[i].z);
+  const clGeo=new THREE.BufferGeometry(); clGeo.setAttribute('position',new THREE.Float32BufferAttribute(cl,3)); keep(clGeo);
+  const centerLine=new THREE.Line(clGeo, new THREE.LineDashedMaterial({color:0xbbf7d0,dashSize:0.45,gapSize:0.35})); centerLine.computeLineDistances(); scene.add(centerLine);
 
-  // Crystal (purchase item)
-  const crystal = new THREE.Mesh(new THREE.OctahedronGeometry(0.6), new THREE.MeshStandardMaterial({ color: 0x6ee7b7, emissive: 0x10b981, emissiveIntensity: .9, metalness: .3, roughness: .15 }));
-  crystal.position.set(-6, 4.4, 0); crystal.visible = false; scene.add(crystal);
+  // ── Crystal (purchase item) ──
+  const crystal=new THREE.Mesh(keep(new THREE.OctahedronGeometry(0.6)), new THREE.MeshStandardMaterial({color:0x6ee7b7,emissive:0x10b981,emissiveIntensity:.95,metalness:.3,roughness:.12}));
+  crystal.position.set(-6,4.4,0); crystal.visible=false; scene.add(crystal);
 
-  // Low-poly truck (combined boxes) on a positioner + wobble inner group
-  const truckPos = new THREE.Group();
-  const truck = new THREE.Group();
-  (function makeTruck() {
-    const acc = new THREE.MeshStandardMaterial({ color: 0x0f172a, emissive: 0x10b981, emissiveIntensity: .18, metalness: .5, roughness: .4 });
-    const cabM = new THREE.MeshStandardMaterial({ color: 0x0b1018, emissive: 0x34d399, emissiveIntensity: .3 });
-    const cargo = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.7, 0.8), acc); cargo.position.set(-0.15, 0.55, 0); truck.add(cargo); addEdges(truck, cargo, 0x34d399);
-    const cab = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.55, 0.74), cabM); cab.position.set(0.7, 0.5, 0); truck.add(cab); addEdges(truck, cab, 0x6ee7b7);
-    const strip = new THREE.Mesh(new THREE.BoxGeometry(1.26, 0.09, 0.84), new THREE.MeshBasicMaterial({ color: 0x6ef7c0 })); strip.position.set(-0.15, 0.2, 0); truck.add(strip);
-    const beam = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.18, 0.5), new THREE.MeshBasicMaterial({ color: 0xbbf7d0 })); beam.position.set(1.02, 0.5, 0); truck.add(beam);
-    const wMat = new THREE.MeshStandardMaterial({ color: 0x05070b, emissive: 0x10b981, emissiveIntensity: .3 });
-    [[0.5,0.42],[0.5,-0.42],[-0.5,0.42],[-0.5,-0.42]].forEach(([x,z]) => { const wm = new THREE.Mesh(new THREE.CylinderGeometry(0.2,0.2,0.14,14), wMat); wm.rotation.x = Math.PI/2; wm.position.set(x, 0.2, z); truck.add(wm); });
+  // ── Detailed low-poly truck (cabin + container + 4 rotating wheels) ──
+  const truckPos=new THREE.Group(); const truck=new THREE.Group(); const wheels=[];
+  (function(){
+    const body=new THREE.MeshStandardMaterial({color:0x0f1f2e,emissive:0x10b981,emissiveIntensity:.22,metalness:.6,roughness:.35});
+    const cabMat=new THREE.MeshStandardMaterial({color:0x0b1018,emissive:0x34d399,emissiveIntensity:.35,metalness:.6,roughness:.3});
+    const container=new THREE.Mesh(keep(new THREE.BoxGeometry(1.35,0.85,0.92)),body); container.position.set(-0.25,0.62,0); truck.add(container);
+    truck.add(mkEdges(container.geometry,0x34d399,container.position));
+    const cab=new THREE.Mesh(keep(new THREE.BoxGeometry(0.62,0.62,0.86)),cabMat); cab.position.set(0.72,0.5,0); truck.add(cab);
+    truck.add(mkEdges(cab.geometry,0x6ef7c0,cab.position));
+    const wsh=new THREE.Mesh(keep(new THREE.PlaneGeometry(0.5,0.34)), new THREE.MeshBasicMaterial({color:0xbbf7d0,transparent:true,opacity:.8})); wsh.position.set(1.04,0.55,0); wsh.rotation.y=Math.PI/2; truck.add(wsh);
+    const strip=new THREE.Mesh(keep(new THREE.BoxGeometry(1.4,0.08,0.94)), new THREE.MeshBasicMaterial({color:0x34d399})); strip.position.set(-0.2,0.2,0); truck.add(strip);
+    const headlight=new THREE.Mesh(keep(new THREE.BoxGeometry(0.1,0.16,0.5)), new THREE.MeshBasicMaterial({color:0xeafff5})); headlight.position.set(1.06,0.42,0); truck.add(headlight);
+    const wMat=new THREE.MeshStandardMaterial({color:0x05070b,emissive:0x10b981,emissiveIntensity:.3,metalness:.4,roughness:.5});
+    const wGeo=keep(new THREE.CylinderGeometry(0.22,0.22,0.16,16));
+    [[0.55,0.46],[0.55,-0.46],[-0.55,0.46],[-0.55,-0.46]].forEach(([x,z])=>{ const wm=new THREE.Mesh(wGeo,wMat); wm.position.set(x,0.22,z); wm.rotation.x=Math.PI/2; truck.add(wm); wheels.push(wm); });
     truck.scale.setScalar(1.05);
   })();
-  truckPos.add(truck); truckPos.visible = false; scene.add(truckPos);
+  truckPos.add(truck); truckPos.visible=false; scene.add(truckPos);
 
-  // Particle burst (Points) at the house
-  const PC = 150;
-  const pgeo = new THREE.BufferGeometry();
-  const ppos = new Float32Array(PC*3), pvel = new Float32Array(PC*3);
-  pgeo.setAttribute('position', new THREE.BufferAttribute(ppos, 3));
-  const pmat = new THREE.PointsMaterial({ color: 0x6ee7b7, size: 0.26, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false });
-  const points = new THREE.Points(pgeo, pmat); scene.add(points);
+  // ── Particle explosion (240 star shards, fountain physics) ──
+  const PC=240; const pgeo=new THREE.BufferGeometry();
+  const ppos=new Float32Array(PC*3), pvel=new Float32Array(PC*3);
+  pgeo.setAttribute('position', new THREE.BufferAttribute(ppos,3)); keep(pgeo);
+  const pmat=new THREE.PointsMaterial({size:0.5,map:starTex(),color:0x9bffd6,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false,sizeAttenuation:true});
+  const points=new THREE.Points(pgeo,pmat); scene.add(points);
+  function burst(){ for(let i=0;i<PC;i++){ ppos[i*3]=6+(Math.random()-.5)*1.4; ppos[i*3+1]=1.4+Math.random()*0.6; ppos[i*3+2]=(Math.random()-.5)*1.4;
+    const a=Math.random()*Math.PI*2, sp=1.2+Math.random()*3.2, upv=6+Math.random()*6.5; pvel[i*3]=Math.cos(a)*sp; pvel[i*3+1]=upv; pvel[i*3+2]=Math.sin(a)*sp; }
+    pmat.opacity=1; pLife=2.2; pgeo.attributes.position.needsUpdate=true; }
 
-  // ── State machine ──
-  let mode = 'idle', t = 0, truckProg = 0, flash = 0, pLife = 0, panX = 0, houseVel = 0;
-  const tmp = new THREE.Vector3(), tan = new THREE.Vector3(), _v = new THREE.Vector3(), _d = new THREE.Vector3();
+  // ── State + cinematic camera ──
+  let mode='idle', t=0, truckProg=0, flash=0, pLife=0, houseVel=0;
+  let lastSpeed=0, lastHeading=0; const lastPos=new THREE.Vector3(-6,0,0);
+  const tan=new THREE.Vector3(), pp=new THREE.Vector3(), camGoal=new THREE.Vector3(), camLook=new THREE.Vector3(0,1,0), lookGoal=new THREE.Vector3(0,1,0), _t=new THREE.Vector3();
+  let cineActive=false, cineClock=0;
 
-  function burst() {
-    for (let i = 0; i < PC; i++) {
-      ppos[i*3] = 6 + (Math.random()-.5)*1.4;
-      ppos[i*3+1] = 1.2 + Math.random()*0.8;
-      ppos[i*3+2] = (Math.random()-.5)*1.4;
-      const a = Math.random()*Math.PI*2, s = 1.5 + Math.random()*3;
-      pvel[i*3] = Math.cos(a)*s*0.5; pvel[i*3+1] = 4.5 + Math.random()*4.5; pvel[i*3+2] = Math.sin(a)*s*0.5;
-    }
-    pmat.opacity = 1; pLife = 1.7; pgeo.attributes.position.needsUpdate = true;
-  }
-
-  const api = {
-    purchase() { mode = 'purchase'; t = 0; crystal.visible = true; crystal.position.set(-6, 4.4, 0); truckPos.visible = false; },
-    transit() { mode = 'transit'; t = 0; truckProg = 0; truckPos.visible = true; crystal.visible = false; },
-    arrive() { mode = 'arrive'; truckPos.visible = false; flash = 1; burst(); house.scale.setScalar(1.28); houseVel = 0; }, // spring-bounce
-    reset() { mode = 'idle'; crystal.visible = false; truckPos.visible = false; flash = 0; pLife = 0; pmat.opacity = 0; truckProg = 0; },
-    dispose() {
-      cancelAnimationFrame(raf); ro.disconnect(); if (controls) controls.dispose();
-      scene.traverse(o => { if (o.geometry) o.geometry.dispose && o.geometry.dispose(); if (o.material) { (Array.isArray(o.material)?o.material:[o.material]).forEach(m=>m.dispose&&m.dispose()); } });
-      disposables.forEach(d => d.dispose && d.dispose());
-      renderer.dispose(); if (renderer.domElement.parentNode) renderer.domElement.parentNode.removeChild(renderer.domElement);
-    },
+  const api={
+    purchase(){ mode='purchase'; t=0; crystal.visible=true; crystal.position.set(-6,4.4,0); truckPos.visible=false;
+      cineActive=true; cineClock=0; if(controls)controls.enabled=false; cam.position.set(22,17,20); },
+    transit(){ mode='transit'; t=0; truckProg=0; truckPos.visible=true; crystal.visible=false; lastSpeed=0; lastPos.copy(curve.getPointAt(0)); },
+    arrive(){ mode='arrive'; cineClock=0; truckPos.visible=false; flash=1; burst(); house.scale.setScalar(1.3); houseVel=0; },
+    reset(){ mode='idle'; crystal.visible=false; truckPos.visible=false; flash=0; pLife=0; pmat.opacity=0; truckProg=0;
+      cineActive=false; if(controls){ controls.target.copy(camLook); controls.object.position.copy(cam.position); controls.enabled=true; controls.update(); } },
+    dispose(){ cancelAnimationFrame(raf); ro.disconnect(); if(controls)controls.dispose();
+      scene.traverse(o=>{ if(o.geometry&&o.geometry.dispose)o.geometry.dispose(); if(o.material){(Array.isArray(o.material)?o.material:[o.material]).forEach(m=>{if(m.map&&m.map.dispose)m.map.dispose(); m.dispose&&m.dispose();});} });
+      disp.forEach(d=>d.dispose&&d.dispose()); renderer.dispose(); if(renderer.domElement.parentNode)renderer.domElement.parentNode.removeChild(renderer.domElement); },
   };
 
-  const clock = new THREE.Clock();
-  let raf;
-  function loop() {
-    raf = requestAnimationFrame(loop);
-    const dt = Math.min(0.05, clock.getDelta()), time = clock.elapsedTime;
+  const clock=new THREE.Clock(); let raf;
+  function frame(){
+    raf=requestAnimationFrame(frame);
+    const dt=Math.min(0.05,clock.getDelta()), time=clock.elapsedTime; cineClock+=dt;
 
-    crystal.rotation.y += dt*1.8; crystal.rotation.x += dt*0.8;
-    if (mode === 'purchase') { t += dt; const k = Math.min(1, t/1.2); crystal.position.y = 4.4 + (3.15 - 4.4) * easeOutBounce(k); }
+    crystal.rotation.y+=dt*1.9; crystal.rotation.x+=dt*0.8;
+    if(mode==='purchase'){ t+=dt; const k=Math.min(1,t/1.2); crystal.position.y=4.4+(3.15-4.4)*easeOutBounce(k); }
 
-    if (mode === 'transit') {
-      t += dt; truckProg = Math.min(1, t/2.6);
-      curve.getPointAt(truckProg, tmp); curve.getTangentAt(truckProg, tan);
-      truckPos.position.copy(tmp); truckPos.position.y = 0;
-      truckPos.rotation.y = Math.atan2(-tan.z, tan.x);
-      truck.position.y = Math.sin(time*22)*0.04;            // bob
-      truck.rotation.z = Math.sin(time*16)*0.06;            // wobble roll
-      truck.rotation.x = Math.sin(time*12)*0.03;            // pitch jitter
+    if(mode==='transit'){
+      t+=dt; const lin=Math.min(1,t/2.8); truckProg=easeInOut(lin);
+      curve.getPointAt(truckProg,pp); curve.getTangentAt(truckProg,tan);
+      truckPos.position.set(pp.x,0,pp.z);
+      const heading=Math.atan2(-tan.z,tan.x); truckPos.rotation.y=heading;
+      const speed=lastPos.distanceTo(pp)/Math.max(dt,1e-3);
+      let dh=heading-lastHeading; while(dh>Math.PI)dh-=2*Math.PI; while(dh<-Math.PI)dh+=2*Math.PI;
+      // lean into turn (roll about local X) + accel pitch (about local Z) + wobble
+      truck.rotation.x = lerp(truck.rotation.x, THREE.MathUtils.clamp(-dh/Math.max(dt,1e-3)*0.12,-0.4,0.4), 0.12) + Math.sin(time*18)*0.02;
+      const accel=(speed-lastSpeed)/Math.max(dt,1e-3);
+      truck.rotation.z = lerp(truck.rotation.z, THREE.MathUtils.clamp(accel*0.015,-0.18,0.18), 0.1);
+      truck.position.y=Math.sin(time*22)*0.03;
+      wheels.forEach(wm=>wm.rotateZ(speed*dt*4.5));
+      lastSpeed=speed; lastHeading=heading; lastPos.copy(pp);
     }
 
-    if (pLife > 0) {
-      pLife -= dt;
-      for (let i = 0; i < PC; i++) { ppos[i*3]+=pvel[i*3]*dt; ppos[i*3+1]+=pvel[i*3+1]*dt; ppos[i*3+2]+=pvel[i*3+2]*dt; pvel[i*3+1]-=7*dt; }
-      pmat.opacity = Math.max(0, pLife/1.7); pgeo.attributes.position.needsUpdate = true;
-    }
+    if(pLife>0){ pLife-=dt; for(let i=0;i<PC;i++){ ppos[i*3]+=pvel[i*3]*dt; ppos[i*3+1]+=pvel[i*3+1]*dt; ppos[i*3+2]+=pvel[i*3+2]*dt; pvel[i*3+1]-=9.5*dt; } pmat.opacity=Math.max(0,pLife/2.2); pgeo.attributes.position.needsUpdate=true; }
 
-    // Neon road: active glowing pulse (brighter while a truck is in transit)
-    roadMat.emissiveIntensity = 0.5 + Math.sin(time*3.2)*0.35 + (mode === 'transit' ? 0.45 : 0);
+    // road pulse
+    roadMat.emissiveIntensity=0.4+Math.sin(time*3)*0.25+(mode==='transit'?0.4:0);
+    centerLine.material.color.setHSL(0.42,0.8,0.6+Math.sin(time*5)*0.18);
 
-    flash = Math.max(0, flash - dt*0.55);
-    const glow = 0.25 + flash*2.1 + (mode==='arrive' ? Math.sin(time*8)*0.15 : 0);
-    hMat.emissiveIntensity = glow; roofMat.emissiveIntensity = 0.2 + flash*1.6;
-    ph.intensity = 1.0 + flash*3;
+    // house flash + spring + halo
+    flash=Math.max(0,flash-dt*0.5);
+    hMat.emissiveIntensity=0.3+flash*2.6+(mode==='arrive'?Math.sin(time*9)*0.2:0);
+    roofMat.emissiveIntensity=0.25+flash*2; houseLight.intensity=1.0+flash*5;
+    halo.material.opacity=flash*0.8; halo.scale.setScalar(8+flash*5);
+    const sAcc=-150*(house.scale.x-1)-12*houseVel; houseVel+=sAcc*dt; house.scale.setScalar(Math.max(0.5,house.scale.x+houseVel*dt));
 
-    // House spring-bounce back to scale 1 (under-damped → overshoot/settle)
-    const sAcc = -150*(house.scale.x - 1) - 12*houseVel;
-    houseVel += sAcc*dt; house.scale.setScalar(Math.max(0.5, house.scale.x + houseVel*dt));
+    // neon light shimmer
+    neonLights.forEach((l,i)=>{ l.intensity=0.9+Math.sin(time*1.5+i*1.3)*0.4; });
 
-    // Camera smoothly follows the truck while staying user-controllable.
-    const targetPanX = mode === 'transit' ? truckPos.position.x*0.5 : 0;
-    panX += (targetPanX - panX) * Math.min(1, dt*2.2);
-    if (controls) {
-      _v.set(panX, 0.6, 0); _d.copy(_v).sub(controls.target);
-      cam.position.add(_d); controls.target.copy(_v); controls.update();
-    } else {
-      cam.position.set(baseCam.x + panX, baseCam.y, baseCam.z + panX*0.25); cam.lookAt(panX, 0.6, 0);
-    }
+    // ── Cinematic camera ──
+    if(cineActive){
+      if(mode==='purchase' || (mode==='transit'&&truckProg<0.04)){
+        // wide establishing sweep of the city
+        const a=0.6+cineClock*0.06; camGoal.set(Math.cos(a)*26, 16, Math.sin(a)*22); lookGoal.set(0,2,0);
+        cam.position.lerp(camGoal,0.05);
+      } else if(mode==='transit'){
+        // tight chase cam behind + above the truck
+        _t.copy(tan).setY(0).normalize();
+        camGoal.set(truckPos.position.x - _t.x*6 + 1.5, 4.6, truckPos.position.z - _t.z*6 + 4);
+        lookGoal.set(truckPos.position.x + _t.x*2, 1.1, truckPos.position.z + _t.z*2);
+        cam.position.lerp(camGoal,0.08);
+      } else { // arrive: dramatic pan-up into orbital rotation around the house
+        const a=cineClock*0.7; const rad=9-Math.min(3,cineClock*0.8); const hgt=4+Math.min(6,cineClock*2);
+        camGoal.set(6+Math.cos(a)*rad, hgt, Math.sin(a)*rad); lookGoal.set(6,1.6,0);
+        cam.position.lerp(camGoal,0.06);
+      }
+      camLook.lerp(lookGoal,0.08); cam.lookAt(camLook);
+    } else if(controls){ controls.update(); }
 
-    renderer.render(scene, cam);
+    renderer.render(scene,cam);
   }
-  loop();
+  frame();
 
-  const ro = new ResizeObserver(() => { w = mount.clientWidth; h = mount.clientHeight; renderer.setSize(w, h); setFrustum(); });
+  const ro=new ResizeObserver(()=>{ w=mount.clientWidth; h=mount.clientHeight; cam.aspect=w/h; cam.updateProjectionMatrix(); renderer.setSize(w,h); });
   ro.observe(mount);
-
   return api;
 }
 
-/* ── Delivery Engine (React shell around the 3D scene) ───── */
-const PHASES = ['Idle', 'Processing Purchase…', 'In Transit…', 'DELIVERED'];
-
-function DeliveryJourney({ onDelivered }) {
-  const mountRef = useRef(null);
-  const apiRef = useRef(null);
-  const timers = useRef([]);
-  const [phase, setPhase] = useState(0);
-  const [playing, setPlaying] = useState(false);
-  const [toast, setToast] = useState(false);
-
-  useEffect(() => { apiRef.current = initThree(mountRef.current); return () => apiRef.current && apiRef.current.dispose(); }, []);
-  const at = (fn, ms) => timers.current.push(setTimeout(fn, ms));
-  const clearTimers = () => { timers.current.forEach(clearTimeout); timers.current = []; };
-  useEffect(() => () => clearTimers(), []);
-
-  const play = useCallback(() => {
-    const api = apiRef.current;
-    if (playing || !api) return;
+/* ── Delivery Engine (React shell) ──────────────────────── */
+const PHASES=['Idle','Processing Purchase…','In Transit…','DELIVERED'];
+function DeliveryJourney({ onDelivered }){
+  const mountRef=useRef(null), apiRef=useRef(null), timers=useRef([]);
+  const [phase,setPhase]=useState(0), [playing,setPlaying]=useState(false), [toast,setToast]=useState(false);
+  useEffect(()=>{ apiRef.current=initThree(mountRef.current); return ()=>apiRef.current&&apiRef.current.dispose(); },[]);
+  const at=(fn,ms)=>timers.current.push(setTimeout(fn,ms));
+  const clearTimers=()=>{ timers.current.forEach(clearTimeout); timers.current=[]; };
+  useEffect(()=>()=>clearTimers(),[]);
+  const play=useCallback(()=>{ const api=apiRef.current; if(playing||!api)return;
     clearTimers(); setToast(false); setPlaying(true);
-    setPhase(1); api.purchase();                                    // Phase 1
-    at(() => { setPhase(2); api.transit(); }, 1550);                // Phase 2
-    at(() => { setPhase(3); api.arrive(); setToast(true); onDelivered && onDelivered(); }, 4150); // Phase 3
-    at(() => { setPhase(0); setToast(false); setPlaying(false); api.reset(); }, 8150);            // Reset
-  }, [playing, onDelivered]);
-
+    setPhase(1); api.purchase();
+    at(()=>{ setPhase(2); api.transit(); },1550);
+    at(()=>{ setPhase(3); api.arrive(); setToast(true); onDelivered&&onDelivered(); },4150);
+    at(()=>{ setPhase(0); setToast(false); setPlaying(false); api.reset(); },8400);
+  },[playing,onDelivered]);
   return (
     <div className="relative rounded-3xl border border-white/10 bg-gradient-to-b from-white/[0.04] to-transparent overflow-hidden glow-ring">
-      <div className="absolute -top-24 -left-20 w-80 h-80 rounded-full bg-neon/15 blur-3xl" />
-      <div className="absolute -bottom-24 -right-10 w-80 h-80 rounded-full bg-cyber/10 blur-3xl" />
+      <div className="absolute -top-24 -left-20 w-80 h-80 rounded-full bg-neon/15 blur-3xl"/>
+      <div className="absolute -bottom-24 -right-10 w-80 h-80 rounded-full bg-cyber/10 blur-3xl"/>
       <div className="relative p-5 sm:p-7">
         <div className="flex items-center justify-between mb-4">
-          <div className="inline-flex items-center gap-2 text-xs font-semibold tracking-widest uppercase text-neon-bright">
-            <span className="w-2 h-2 rounded-full bg-neon-bright animate-pulse" /> Live Delivery Engine · 3D
-          </div>
-          <div className="text-xs font-mono">
-            {phase === 3
-              ? <span className="blink text-neon-bright font-bold tracking-[0.25em]">● DELIVERED</span>
-              : <span className="text-slate-400">{PHASES[phase]}</span>}
-          </div>
+          <div className="inline-flex items-center gap-2 text-xs font-semibold tracking-widest uppercase text-neon-bright"><span className="w-2 h-2 rounded-full bg-neon-bright animate-pulse"/> Live Delivery Engine · 3D</div>
+          <div className="text-xs font-mono">{phase===3? <span className="blink text-neon-bright font-bold tracking-[0.25em]">● DELIVERED</span> : <span className="text-slate-400">{PHASES[phase]}</span>}</div>
         </div>
-
-        {/* 3D viewport */}
         <div className="viewport3d">
-          <div ref={mountRef} className="absolute inset-0" />
-          <div className="vignette" />
-          <div className="absolute bottom-3 left-3 text-[10px] font-mono uppercase tracking-wider text-neon-bright/70 bg-ink/40 px-2 py-1 rounded-md border border-neon/20 pointer-events-none">
-            ✦ drag to orbit · scroll to zoom
-          </div>
+          <div ref={mountRef} className="absolute inset-0"/>
+          <div className="vignette"/>
+          <div className="absolute bottom-3 left-3 text-[10px] font-mono uppercase tracking-wider text-neon-bright/70 bg-ink/40 px-2 py-1 rounded-md border border-neon/20 pointer-events-none">✦ drag to orbit · scroll to zoom</div>
         </div>
-
-        {/* Controls + toast */}
         <div className="relative mt-5 flex flex-col sm:flex-row items-center gap-4 justify-between">
-          <button onClick={play} disabled={playing}
-            className={`group relative inline-flex items-center gap-2 px-7 py-3.5 rounded-xl font-semibold transition-all ${playing ? 'bg-white/5 text-slate-400 cursor-wait' : 'bg-neon text-ink hover:bg-neon-bright glow-ring hover:scale-[1.03]'}`}>
-            <Icon.bolt width="18" height="18" />
-            {playing ? 'Delivering…' : 'Replay Live Delivery'}
+          <button onClick={play} disabled={playing} className={`group relative inline-flex items-center gap-2 px-7 py-3.5 rounded-xl font-semibold transition-all ${playing?'bg-white/5 text-slate-400 cursor-wait':'bg-neon text-ink hover:bg-neon-bright glow-ring hover:scale-[1.03]'}`}>
+            <Icon.bolt width="18" height="18"/>{playing?'Delivering…':'Replay Live Delivery'}
           </button>
-
-          <div className={`toast ${toast ? 'show' : ''} flex items-center gap-3 px-4 py-3 rounded-xl bg-neon/10 border border-neon/40`}>
+          <div className={`toast ${toast?'show':''} flex items-center gap-3 px-4 py-3 rounded-xl bg-neon/10 border border-neon/40`}>
             <div className="w-7 h-7 rounded-full bg-neon flex items-center justify-center"><Icon.check width="15" height="15" className="text-ink"/></div>
-            <div>
-              <div className="text-sm font-semibold text-white">Item succesvol in-game bezorgd!</div>
-              <div className="text-xs text-neon-bright">Automated · arrived in &lt; 30 seconds</div>
-            </div>
+            <div><div className="text-sm font-semibold text-white">Item succesvol in-game bezorgd!</div><div className="text-xs text-neon-bright">Automated · arrived in &lt; 30 seconds</div></div>
           </div>
         </div>
       </div>
@@ -361,106 +386,64 @@ function DeliveryJourney({ onDelivered }) {
 }
 
 /* ── Marketplace ────────────────────────────────────────── */
-const ITEMS = [
-  { name: 'Inferno Greatsword', rarity: 'Legendary', color: 'from-rose-500/30 to-orange-500/10', ring: 'group-hover:shadow-[0_0_40px_-8px_rgba(244,63,94,.6)]', tag: 'text-rose-300 bg-rose-500/10 border-rose-500/30', icon: '⚔️', stats: [['Damage','320'],['Speed','78%']], price: 24.99 },
-  { name: 'Celestial Loot Chest', rarity: 'Mythic', color: 'from-violet-500/30 to-fuchsia-500/10', ring: 'group-hover:shadow-[0_0_40px_-8px_rgba(168,85,247,.6)]', tag: 'text-fuchsia-300 bg-fuchsia-500/10 border-fuchsia-500/30', icon: '🎁', stats: [['Drops','5★ Gear'],['Bonus','+15%']], price: 39.99 },
-  { name: 'Void Crystal ×100', rarity: 'Rare', color: 'from-emerald-500/30 to-teal-500/10', ring: 'group-hover:shadow-[0_0_40px_-8px_rgba(16,185,129,.6)]', tag: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/30', icon: '💎', stats: [['Type','Currency'],['Stack','×100']], price: 12.99 },
-  { name: 'Shadow Dragon Mount', rarity: 'Exotic', color: 'from-sky-500/30 to-indigo-500/10', ring: 'group-hover:shadow-[0_0_40px_-8px_rgba(56,189,248,.6)]', tag: 'text-sky-300 bg-sky-500/10 border-sky-500/30', icon: '🐉', stats: [['Speed','240'],['Flight','✓']], price: 59.99 },
+const ITEMS=[
+  { name:'Inferno Greatsword', rarity:'Legendary', color:'from-rose-500/30 to-orange-500/10', ring:'group-hover:shadow-[0_0_40px_-8px_rgba(244,63,94,.6)]', tag:'text-rose-300 bg-rose-500/10 border-rose-500/30', icon:'⚔️', stats:[['Damage','320'],['Speed','78%']], price:24.99 },
+  { name:'Celestial Loot Chest', rarity:'Mythic', color:'from-violet-500/30 to-fuchsia-500/10', ring:'group-hover:shadow-[0_0_40px_-8px_rgba(168,85,247,.6)]', tag:'text-fuchsia-300 bg-fuchsia-500/10 border-fuchsia-500/30', icon:'🎁', stats:[['Drops','5★ Gear'],['Bonus','+15%']], price:39.99 },
+  { name:'Void Crystal ×100', rarity:'Rare', color:'from-emerald-500/30 to-teal-500/10', ring:'group-hover:shadow-[0_0_40px_-8px_rgba(16,185,129,.6)]', tag:'text-emerald-300 bg-emerald-500/10 border-emerald-500/30', icon:'💎', stats:[['Type','Currency'],['Stack','×100']], price:12.99 },
+  { name:'Shadow Dragon Mount', rarity:'Exotic', color:'from-sky-500/30 to-indigo-500/10', ring:'group-hover:shadow-[0_0_40px_-8px_rgba(56,189,248,.6)]', tag:'text-sky-300 bg-sky-500/10 border-sky-500/30', icon:'🐉', stats:[['Speed','240'],['Flight','✓']], price:59.99 },
 ];
-
-function ProductCard({ item, onBuy }) {
+function ProductCard({ item, onBuy }){
   return (
     <div className="group relative rounded-2xl border border-white/10 bg-white/[0.03] overflow-hidden transition-all duration-300 hover:-translate-y-1.5 hover:border-neon/40">
       <div className={`relative h-40 bg-gradient-to-br ${item.color} flex items-center justify-center text-6xl transition-shadow duration-300 ${item.ring}`}>
-        <div className="absolute inset-0 grid-bg opacity-40" />
+        <div className="absolute inset-0 grid-bg opacity-40"/>
         <span className="relative floaty drop-shadow-[0_8px_20px_rgba(0,0,0,.6)]">{item.icon}</span>
         <span className={`absolute left-3 top-3 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full border ${item.tag}`}>{item.rarity}</span>
       </div>
       <div className="p-4">
         <h3 className="text-white font-semibold leading-tight">{item.name}</h3>
-        <div className="grid grid-cols-2 gap-2 mt-3">
-          {item.stats.map(([k, v]) => (
-            <div key={k} className="rounded-lg bg-black/30 border border-white/5 px-2.5 py-1.5">
-              <div className="text-[10px] uppercase tracking-wide text-slate-500">{k}</div>
-              <div className="text-sm text-white font-medium">{v}</div>
-            </div>
-          ))}
-        </div>
+        <div className="grid grid-cols-2 gap-2 mt-3">{item.stats.map(([k,v])=>(<div key={k} className="rounded-lg bg-black/30 border border-white/5 px-2.5 py-1.5"><div className="text-[10px] uppercase tracking-wide text-slate-500">{k}</div><div className="text-sm text-white font-medium">{v}</div></div>))}</div>
         <div className="flex items-center justify-between mt-4">
           <div className="text-xl font-display text-white">€{item.price.toFixed(2)}</div>
-          <button onClick={onBuy} className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-semibold bg-neon/15 text-neon-bright border border-neon/40 hover:bg-neon hover:text-ink transition-all">
-            <Icon.bolt width="14" height="14" /> Instant Buy
-          </button>
+          <button onClick={onBuy} className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-semibold bg-neon/15 text-neon-bright border border-neon/40 hover:bg-neon hover:text-ink transition-all"><Icon.bolt width="14" height="14"/> Instant Buy</button>
         </div>
       </div>
     </div>
   );
 }
 
-/* ── App ────────────────────────────────────────────────── */
-function App() {
-  const [cart, setCart] = useState(0);
-  const [bumps, setBumps] = useState([]);
-  const addToCart = () => {
-    setCart((c) => c + 1);
-    const id = Date.now() + Math.random();
-    setBumps((b) => [...b, id]);
-    setTimeout(() => setBumps((b) => b.filter((x) => x !== id)), 1000);
-  };
+function App(){
+  const [cart,setCart]=useState(0), [bumps,setBumps]=useState([]);
+  const addToCart=()=>{ setCart(c=>c+1); const id=Date.now()+Math.random(); setBumps(b=>[...b,id]); setTimeout(()=>setBumps(b=>b.filter(x=>x!==id)),1000); };
   return (
     <div className="min-h-screen relative">
       <header className="sticky top-0 z-50 backdrop-blur-xl bg-ink/70 border-b border-white/10">
         <nav className="max-w-6xl mx-auto px-5 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-neon flex items-center justify-center glow-ring"><Icon.bolt width="18" height="18" className="text-ink"/></div>
-            <span className="font-display font-extrabold tracking-wider text-white">FORGE<span className="text-neon-bright">MARKET</span></span>
-          </div>
-          <div className="hidden md:flex items-center gap-8 text-sm text-slate-300">
-            <a className="hover:text-white transition" href="#market">Marketplace</a>
-            <a className="hover:text-white transition" href="#">Live Tracker</a>
-            <a className="hover:text-white transition" href="#">Support</a>
-          </div>
+          <div className="flex items-center gap-2.5"><div className="w-9 h-9 rounded-xl bg-neon flex items-center justify-center glow-ring"><Icon.bolt width="18" height="18" className="text-ink"/></div><span className="font-display font-extrabold tracking-wider text-white">FORGE<span className="text-neon-bright">MARKET</span></span></div>
+          <div className="hidden md:flex items-center gap-8 text-sm text-slate-300"><a className="hover:text-white transition" href="#market">Marketplace</a><a className="hover:text-white transition" href="#">Live Tracker</a><a className="hover:text-white transition" href="#">Support</a></div>
           <div className="flex items-center gap-3">
-            <button className="relative w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-200 hover:border-neon/50 transition">
-              <Icon.cart width="18" height="18" />
-              {cart > 0 && <span className="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1 rounded-full bg-neon text-ink text-xs font-bold flex items-center justify-center">{cart}</span>}
-              {bumps.map((id) => <span key={id} className="rise absolute -top-2 right-0 text-neon-bright text-xs font-bold">+1</span>)}
-            </button>
+            <button className="relative w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-200 hover:border-neon/50 transition"><Icon.cart width="18" height="18"/>{cart>0&&<span className="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1 rounded-full bg-neon text-ink text-xs font-bold flex items-center justify-center">{cart}</span>}{bumps.map(id=><span key={id} className="rise absolute -top-2 right-0 text-neon-bright text-xs font-bold">+1</span>)}</button>
             <button className="md:hidden text-slate-200"><Icon.menu width="22" height="22"/></button>
           </div>
         </nav>
       </header>
-
       <section className="relative max-w-6xl mx-auto px-5 pt-12 pb-8">
         <div className="text-center mb-8">
           <span className="inline-block text-xs tracking-[0.3em] uppercase text-neon-bright/90 mb-4">Premium In-Game Assets · Instant Delivery</span>
           <h1 className="text-4xl sm:text-6xl font-extrabold text-white leading-tight">Gear up. <span className="text-neon-bright text-glow">Delivered instantly.</span></h1>
-          <p className="text-slate-400 max-w-xl mx-auto mt-4">Watch your purchase travel across a live 3D city — from our vault, down the neon circuit, straight to your door.</p>
+          <p className="text-slate-400 max-w-xl mx-auto mt-4">Watch your purchase race across a living 3D cyber-city — from our vault, down the neon highway, straight to your door.</p>
         </div>
-        <DeliveryJourney onDelivered={addToCart} />
+        <DeliveryJourney onDelivered={addToCart}/>
       </section>
-
       <section id="market" className="max-w-6xl mx-auto px-5 py-14">
-        <div className="flex items-end justify-between mb-8">
-          <div>
-            <h2 className="text-2xl sm:text-3xl font-bold text-white">Featured Marketplace</h2>
-            <p className="text-slate-400 text-sm mt-1">Hand-picked legendary gear — buy once, delivered in seconds.</p>
-          </div>
-          <a href="#" className="hidden sm:inline-flex text-sm text-neon-bright hover:underline">View all →</a>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          {ITEMS.map((it) => <ProductCard key={it.name} item={it} onBuy={addToCart} />)}
-        </div>
+        <div className="flex items-end justify-between mb-8"><div><h2 className="text-2xl sm:text-3xl font-bold text-white">Featured Marketplace</h2><p className="text-slate-400 text-sm mt-1">Hand-picked legendary gear — buy once, delivered in seconds.</p></div><a href="#" className="hidden sm:inline-flex text-sm text-neon-bright hover:underline">View all →</a></div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">{ITEMS.map(it=><ProductCard key={it.name} item={it} onBuy={addToCart}/>)}</div>
       </section>
-
-      <footer className="border-t border-white/10 py-8 text-center text-slate-500 text-sm">
-        FORGEMARKET — premium in-game assets · automated delivery · 24/7 support
-      </footer>
+      <footer className="border-t border-white/10 py-8 text-center text-slate-500 text-sm">FORGEMARKET — premium in-game assets · automated delivery · 24/7 support</footer>
     </div>
   );
 }
-
-ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
 </script>
 </body>
 </html>
