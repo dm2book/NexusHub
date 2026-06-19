@@ -16,6 +16,8 @@ import CountUp from '../components/CountUp.jsx';
 import Magnetic from '../components/Magnetic.jsx';
 import { usePageMeta } from '../lib/useMeta.js';
 
+const HERO_IMG = 'https://media.pixverse.ai/pixverse%2Ft2i%2Fori%2F0a931871-b916-4c87-b1eb-6653382ac2e7.jpg?x-oss-process=style/cover-webp';
+
 const FEATURES = [
   { icon: Zap, title: 'Instant Delivery', text: 'Automated fulfillment delivers your codes in seconds, 24/7.' },
   { icon: ShieldCheck, title: 'Secure & Trusted', text: 'Fraud screening, encrypted sessions and audited operations.' },
@@ -70,10 +72,11 @@ export default function Home() {
   return (
     <div className="overflow-hidden">
       {/* ── Hero ───────────────────────────────────────────── */}
-      <section className="relative">
-        <div className="absolute inset-0 bg-grid opacity-40" />
-        <div className="starfield" />
-        <div className="aurora absolute w-[680px] h-[680px] -top-72 left-1/2 -translate-x-1/2" />
+      <section className="relative overflow-hidden">
+        <div className="hero-img" style={{ backgroundImage: `url(${HERO_IMG})` }} />
+        <div className="hero-overlay" />
+        <div className="absolute inset-0 bg-grid opacity-25" />
+        <div className="aurora absolute w-[680px] h-[680px] -top-72 left-1/2 -translate-x-1/2 opacity-60" />
         <div className="orb w-[520px] h-[520px] bg-primary/30 -top-40 -left-20 animate-float-slow" />
         <div className="orb w-[480px] h-[480px] bg-accent-purple/25 top-10 right-0 animate-float" />
         <div className="section relative pt-24 pb-24 text-center">

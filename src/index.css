@@ -55,6 +55,12 @@ h1, h2, h3, .font-display { font-family: 'Orbitron', sans-serif; letter-spacing:
              font-rajdhani tracking-[0.2em] uppercase; }
 }
 
+/* Cinematic hero image (Ken-Burns) */
+.hero-img { position: absolute; inset: 0; background-size: cover; background-position: center; animation: kenburns 24s ease-in-out infinite; will-change: transform; }
+@keyframes kenburns { 0%{transform:scale(1.06) translate(0,0)} 50%{transform:scale(1.18) translate(-1.5%,-1.2%)} 100%{transform:scale(1.06) translate(0,0)} }
+.hero-overlay { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(7,7,16,.45) 0%, rgba(7,7,16,.72) 55%, #070710 100%); }
+@media (prefers-reduced-motion: reduce){ .hero-img{ animation:none } }
+
 /* Decorative background helpers */
 .bg-grid { background-image: theme('backgroundImage.grid-pattern'); background-size: 44px 44px; }
 .orb { position: absolute; border-radius: 9999px; filter: blur(80px); pointer-events: none; }
