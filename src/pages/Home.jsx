@@ -16,7 +16,7 @@ import CountUp from '../components/CountUp.jsx';
 import Magnetic from '../components/Magnetic.jsx';
 import { usePageMeta } from '../lib/useMeta.js';
 
-const HERO_IMG = 'https://media.pixverse.ai/pixverse%2Ft2i%2Fori%2F0a931871-b916-4c87-b1eb-6653382ac2e7.jpg?x-oss-process=style/cover-webp';
+const HERO_IMG = 'https://media.pixverse.ai/pixverse%2Ft2i%2Fori%2F00b68877-28d6-414c-aa99-b3de08caa345.jpg?x-oss-process=style/cover-webp';
 
 const FEATURES = [
   { icon: Zap, title: 'Instant Delivery', text: 'Automated fulfillment delivers your codes in seconds, 24/7.' },
