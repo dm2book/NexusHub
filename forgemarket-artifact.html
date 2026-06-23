@@ -44,6 +44,23 @@
   .hero-overlay{position:absolute;inset:0;background:linear-gradient(180deg,rgba(5,6,10,.45) 0%,rgba(5,6,10,.72) 55%,#05060a 100%)}
   .hero-sheen{position:absolute;inset:0;background:radial-gradient(120% 80% at 50% 10%,rgba(16,185,129,.18),transparent 60%);mix-blend-mode:screen;pointer-events:none}
   @media (prefers-reduced-motion: reduce){*{animation-duration:.001ms!important}}
+
+  /* ── Theme system (light/dark toggle) ── */
+  .app{--bg:#07060d;--panel:#121019;--panel2:#1a1726;--text:#f2efff;--muted:#9aa0b8;--border:rgba(255,255,255,.09);--accent:#8b5cf6;--accent-h:#7c3aed;--green:#10b981;background:var(--bg);color:var(--text);transition:background .35s,color .35s}
+  .app.light{--bg:#f1eefb;--panel:#ffffff;--panel2:#f6f3ff;--text:#1b1533;--muted:#6b6880;--border:rgba(24,12,48,.10);--accent:#7c3aed;--accent-h:#6d28d9;--green:#059669}
+  .panel{background:var(--panel);border:1px solid var(--border)}
+  .panel2{background:var(--panel2);border:1px solid var(--border)}
+  .t-muted{color:var(--muted)}
+  .bd{border:1px solid var(--border)}
+  .btn-accent{background:var(--accent);color:#fff;transition:.2s}.btn-accent:hover{background:var(--accent-h);transform:translateY(-1px)}
+  .btn-soft{background:var(--panel2);color:var(--text);border:1px solid var(--border)}.btn-soft:hover{border-color:var(--accent)}
+  .cat{color:var(--muted);transition:.18s;border:1px solid transparent}
+  .cat:hover{color:var(--text);background:var(--panel2)}
+  .cat.active{background:var(--accent);color:#fff}
+  .accent{color:var(--accent)}
+  .ring-accent{box-shadow:0 0 0 1px var(--accent),0 0 26px -6px var(--accent)}
+  .pcard{background:var(--panel);border:1px solid var(--border);transition:transform .25s,box-shadow .25s,border-color .25s}
+  .pcard:hover{transform:translateY(-6px);border-color:var(--accent);box-shadow:0 18px 50px -20px var(--accent)}
 </style>
 </head>
 <body>
@@ -67,13 +84,17 @@ function HeroBanner(){
         <div className="hero-img" style={{backgroundImage:`url(${HERO_IMG})`}}/>
       </div>
       <div className="hero-overlay"/><div className="hero-sheen"/>
-      <div ref={txt} className="relative text-center px-5 py-20 sm:py-28" style={{transition:'transform .35s ease-out'}}>
-        <span className="inline-block text-xs tracking-[0.3em] uppercase text-neon-bright mb-4 px-3 py-1 rounded-full bg-ink/40 border border-neon/30">Premium In-Game Assets · Instant Delivery</span>
-        <h1 className="text-4xl sm:text-6xl lg:text-7xl font-extrabold text-white leading-tight drop-shadow-[0_4px_24px_rgba(0,0,0,.75)]">Gear up. <span className="text-neon-bright text-glow">Delivered instantly.</span></h1>
-        <p className="text-slate-200/90 max-w-xl mx-auto mt-5 drop-shadow-[0_2px_10px_rgba(0,0,0,.85)]">Coins, gems, gift cards &amp; loot — from our vault straight into your game in seconds. Buyer-protected, 24/7.</p>
-        <div className="flex items-center justify-center gap-3 mt-8">
-          <a href="#market" className="inline-flex items-center gap-2 px-7 py-3.5 rounded-xl font-semibold bg-neon text-ink hover:bg-neon-bright glow-ring hover:scale-[1.03] transition-all"><Icon.bolt width="18" height="18"/> Shop now</a>
-          <a href="#engine" className="inline-flex items-center gap-2 px-7 py-3.5 rounded-xl font-semibold bg-white/5 text-slate-100 border border-white/10 hover:border-neon/40 transition-all">See live delivery</a>
+      <div ref={txt} className="relative px-6 sm:px-12 py-16 sm:py-24 max-w-2xl" style={{transition:'transform .35s ease-out'}}>
+        <span className="inline-block text-xs tracking-[0.3em] uppercase text-neon-bright mb-4 px-3 py-1 rounded-full bg-ink/40 border border-neon/30">⚡ Instant · Secure · 24/7</span>
+        <h1 className="text-4xl sm:text-6xl font-extrabold text-white leading-[1.05] drop-shadow-[0_4px_24px_rgba(0,0,0,.8)]">Everything you need,<br/><span className="text-neon-bright text-glow">all in one place.</span></h1>
+        <p className="text-slate-200/90 mt-5 max-w-lg drop-shadow-[0_2px_10px_rgba(0,0,0,.85)]">Robux, V-Bucks, game currency, gift cards & more — delivered to your account in seconds. Fast delivery, secure payments, 24/7 support.</p>
+        <div className="flex flex-wrap items-center gap-3 mt-8">
+          <a href="#market" className="inline-flex items-center gap-2 px-7 py-3.5 rounded-xl font-semibold bg-neon text-ink hover:bg-neon-bright glow-ring hover:scale-[1.03] transition-all"><Icon.bolt width="18" height="18"/> View all products</a>
+          <a href="#engine" className="inline-flex items-center gap-2 px-7 py-3.5 rounded-xl font-semibold bg-white/10 text-white border border-white/20 hover:border-neon/50 transition-all backdrop-blur">See live delivery</a>
+        </div>
+        <div className="flex items-center gap-3 mt-7">
+          <div className="flex -space-x-2">{['🦊','🐼','🐯','🐲'].map((e,i)=>(<span key={i} className="w-8 h-8 rounded-full bg-ink/70 border border-white/20 flex items-center justify-center text-sm">{e}</span>))}</div>
+          <div className="text-sm text-slate-200"><span className="text-amber-300">★★★★★</span> Trusted by <span className="font-semibold text-white">10,000+</span> gamers</div>
         </div>
       </div>
     </div>
@@ -420,32 +441,35 @@ function DeliveryJourney({ onDelivered }){
   );
 }
 
-/* ── Marketplace ────────────────────────────────────────── */
+/* ── Marketplace data (game top-ups, like the reference) ── */
 const ITEMS=[
-  { name:'Inferno Greatsword', rarity:'Legendary', color:'from-rose-500/30 to-orange-500/10', ring:'group-hover:shadow-[0_0_40px_-8px_rgba(244,63,94,.6)]', tag:'text-rose-300 bg-rose-500/10 border-rose-500/30', icon:'⚔️', stats:[['Damage','320'],['Speed','78%']], price:24.99, delivery:'Instant · < 30s', stock:48, desc:'A molten two-handed blade forged in the Ashen Depths. Cleaves through armor and ignites enemies on critical hits. Bound to your account on first use.' },
-  { name:'Celestial Loot Chest', rarity:'Mythic', color:'from-violet-500/30 to-fuchsia-500/10', ring:'group-hover:shadow-[0_0_40px_-8px_rgba(168,85,247,.6)]', tag:'text-fuchsia-300 bg-fuchsia-500/10 border-fuchsia-500/30', icon:'🎁', stats:[['Drops','5★ Gear'],['Bonus','+15%']], price:39.99, delivery:'Instant · < 1 min', stock:12, desc:'Guaranteed 5-star drop plus a 15% luck bonus on your next 10 openings. A premium mystery cache with cosmetics, mounts and currency.' },
-  { name:'Void Crystal ×100', rarity:'Rare', color:'from-emerald-500/30 to-teal-500/10', ring:'group-hover:shadow-[0_0_40px_-8px_rgba(16,185,129,.6)]', tag:'text-emerald-300 bg-emerald-500/10 border-emerald-500/30', icon:'💎', stats:[['Type','Currency'],['Stack','×100']], price:12.99, delivery:'Instant · < 30s', stock:240, desc:'A stack of 100 premium Void Crystals, the hard currency used for the Battle Pass, exclusive skins and trades. Delivered straight to your in-game wallet.' },
-  { name:'Shadow Dragon Mount', rarity:'Exotic', color:'from-sky-500/30 to-indigo-500/10', ring:'group-hover:shadow-[0_0_40px_-8px_rgba(56,189,248,.6)]', tag:'text-sky-300 bg-sky-500/10 border-sky-500/30', icon:'🐉', stats:[['Speed','240'],['Flight','✓']], price:59.99, delivery:'1–3 min', stock:5, desc:'A rare flying mount with a 240% movement bonus and a trailing shadow aura. Account-wide unlock across all characters. Extremely limited stock.' },
+  { name:'Robux', cat:'Robux', icon:'🪙', grad:'from-emerald-400 to-teal-500', price:4.99, delivery:'Instant · < 30s', stock:320, desc:'Official Robux top-up for your Roblox account. Pick your pack at checkout; delivered automatically to your in-game wallet within seconds.', stats:[['From','800 R$'],['Region','Global']] },
+  { name:'V-Bucks', cat:'V-Bucks', icon:'💠', grad:'from-sky-400 to-indigo-500', price:6.99, delivery:'Instant · < 1 min', stock:210, desc:'Fortnite V-Bucks for skins, the Battle Pass and more. Fast, safe delivery straight to your Epic account.', stats:[['From','1000 VB'],['Region','Global']] },
+  { name:'Valorant Points', cat:'Valorant', icon:'🔫', grad:'from-rose-400 to-red-500', price:9.99, delivery:'Instant · < 1 min', stock:140, desc:'Valorant Points for weapon skins and the Battle Pass. Delivered via secure top-up.', stats:[['From','1000 VP'],['Region','EU/NA']] },
+  { name:'CoD Points', cat:'Call of Duty', icon:'🎯', grad:'from-orange-400 to-amber-600', price:9.99, delivery:'Instant · < 2 min', stock:90, desc:'Call of Duty Points for bundles, the Battle Pass and store items. Works across MW & Warzone.', stats:[['From','2400 CP'],['Region','Global']] },
+  { name:'Genshin Crystals', cat:'Genshin', icon:'✨', grad:'from-cyan-300 to-blue-500', price:15.99, delivery:'Instant · < 2 min', stock:75, desc:'Genesis Crystals for wishes and the Battle Pass. Top-up delivered to your Genshin Impact UID.', stats:[['From','980 GC'],['Region','Global']] },
+  { name:'Brawl Stars Gems', cat:'Brawl Stars', icon:'💎', grad:'from-amber-300 to-yellow-500', price:6.99, delivery:'Instant · < 1 min', stock:160, desc:'Brawl Stars gems for brawlers, skins and the Brawl Pass. Fast supercell-id top-up.', stats:[['From','360 Gems'],['Region','Global']] },
+  { name:'Steam Wallet', cat:'Steam', icon:'🎮', grad:'from-slate-400 to-blue-600', price:11.99, delivery:'Instant · code', stock:280, desc:'Steam Wallet redeem code to fund games, DLC and in-game purchases. Region-locked — pick yours at checkout.', stats:[['From','€10'],['Type','Code']] },
+  { name:'PlayStation Card', cat:'PlayStation', icon:'🕹️', grad:'from-indigo-400 to-blue-700', price:26.99, delivery:'Instant · code', stock:50, desc:'PlayStation Store gift card for games, DLC and PS Plus. Delivered as a redeem code instantly.', stats:[['From','€25'],['Type','Code']] },
 ];
-const stockTone=(s)=> s<=8 ? ['text-rose-300','bg-rose-400','In high demand'] : s<=40 ? ['text-amber-300','bg-amber-400','Selling fast'] : ['text-emerald-300','bg-emerald-400','In stock'];
+const CATS=['All Products', ...Array.from(new Set(ITEMS.map(i=>i.cat)))];
+const stockTone=(s)=> s<=60 ? ['text-rose-400','bg-rose-400','In high demand'] : s<=150 ? ['text-amber-400','bg-amber-400','Selling fast'] : ['text-emerald-400','bg-emerald-400','In stock'];
 
 function ProductCard({ item, onBuy, onSelect }){
   const [c1,bar,label]=stockTone(item.stock);
   return (
-    <div onClick={onSelect} className="group relative rounded-2xl border border-white/10 bg-white/[0.03] overflow-hidden transition-all duration-300 hover:-translate-y-1.5 hover:border-neon/40 cursor-pointer">
-      <div className={`relative h-40 bg-gradient-to-br ${item.color} flex items-center justify-center text-6xl transition-shadow duration-300 ${item.ring}`}>
-        <div className="absolute inset-0 grid-bg opacity-40"/>
-        <span className="relative floaty drop-shadow-[0_8px_20px_rgba(0,0,0,.6)]">{item.icon}</span>
-        <span className={`absolute left-3 top-3 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full border ${item.tag}`}>{item.rarity}</span>
-        <span className="absolute right-3 top-3 text-[10px] font-semibold px-2 py-1 rounded-full bg-ink/60 border border-neon/30 text-neon-bright">⚡ {item.delivery.split('·')[0].trim()}</span>
+    <div onClick={onSelect} className="pcard group relative rounded-2xl overflow-hidden cursor-pointer">
+      <div className={`relative h-32 bg-gradient-to-br ${item.grad} flex items-center justify-center text-5xl`}>
+        <span className="relative floaty drop-shadow-[0_8px_20px_rgba(0,0,0,.45)]">{item.icon}</span>
+        <span className="absolute right-3 top-3 text-[10px] font-semibold px-2 py-1 rounded-full bg-black/35 text-white backdrop-blur">⚡ {item.delivery.split('·')[0].trim()}</span>
       </div>
       <div className="p-4">
-        <h3 className="text-white font-semibold leading-tight">{item.name}</h3>
+        <div className="text-[11px] uppercase tracking-wide t-muted">{item.cat}</div>
+        <h3 className="font-semibold leading-tight mt-0.5" style={{color:'var(--text)'}}>{item.name}</h3>
         <div className={`flex items-center gap-1.5 mt-1.5 text-[11px] ${c1}`}><span className={`w-1.5 h-1.5 rounded-full ${bar} animate-pulse`}/> {label} · {item.stock} left</div>
-        <div className="grid grid-cols-2 gap-2 mt-3">{item.stats.map(([k,v])=>(<div key={k} className="rounded-lg bg-black/30 border border-white/5 px-2.5 py-1.5"><div className="text-[10px] uppercase tracking-wide text-slate-500">{k}</div><div className="text-sm text-white font-medium">{v}</div></div>))}</div>
-        <div className="flex items-center justify-between mt-4">
-          <div className="text-xl font-display text-white">€{item.price.toFixed(2)}</div>
-          <button onClick={(e)=>{e.stopPropagation();onBuy();}} className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-semibold bg-neon/15 text-neon-bright border border-neon/40 hover:bg-neon hover:text-ink transition-all"><Icon.bolt width="14" height="14"/> Instant Buy</button>
+        <div className="flex items-center justify-between mt-3">
+          <div><div className="text-[10px] t-muted">from</div><div className="text-lg font-bold" style={{color:'var(--text)'}}>€{item.price.toFixed(2)}</div></div>
+          <button onClick={(e)=>{e.stopPropagation();onBuy();}} className="btn-accent inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-semibold"><Icon.bolt width="14" height="14"/> Buy</button>
         </div>
       </div>
     </div>
@@ -455,91 +479,116 @@ function ProductCard({ item, onBuy, onSelect }){
 function ProductModal({ item, onClose, onBuy }){
   if(!item) return null;
   const [c1,bar,label]=stockTone(item.stock);
-  const pct=Math.min(100,Math.max(6,Math.round(item.stock/2.6)));
+  const pct=Math.min(100,Math.max(8,Math.round(item.stock/3.4)));
   return (
     <div className="modal-back fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={onClose}>
-      <div className="modal-card relative w-full max-w-lg rounded-3xl border border-white/10 bg-elevated overflow-hidden glow-ring" onClick={(e)=>e.stopPropagation()} style={{background:'#0b0e16'}}>
-        <button onClick={onClose} className="absolute right-3 top-3 z-10 w-9 h-9 rounded-full bg-ink/70 border border-white/10 text-slate-300 hover:text-white hover:border-neon/40 transition flex items-center justify-center">✕</button>
-        <div className={`relative h-44 bg-gradient-to-br ${item.color} flex items-center justify-center text-7xl`}>
-          <div className="absolute inset-0 grid-bg opacity-40"/>
-          <span className="relative floaty drop-shadow-[0_10px_24px_rgba(0,0,0,.6)]">{item.icon}</span>
-          <span className={`absolute left-4 top-4 text-[11px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border ${item.tag}`}>{item.rarity}</span>
+      <div className="modal-card panel relative w-full max-w-lg rounded-3xl overflow-hidden ring-accent" onClick={(e)=>e.stopPropagation()}>
+        <button onClick={onClose} className="absolute right-3 top-3 z-10 w-9 h-9 rounded-full bg-black/40 text-white border border-white/15 hover:border-white/40 transition flex items-center justify-center">✕</button>
+        <div className={`relative h-40 bg-gradient-to-br ${item.grad} flex items-center justify-center text-7xl`}>
+          <span className="relative floaty drop-shadow-[0_10px_24px_rgba(0,0,0,.5)]">{item.icon}</span>
+          <span className="absolute left-4 top-4 text-[11px] font-semibold uppercase tracking-wider px-2.5 py-1 rounded-full bg-black/40 text-white">{item.cat}</span>
         </div>
         <div className="p-6">
-          <h3 className="text-2xl font-bold text-white">{item.name}</h3>
-          <p className="text-slate-400 text-sm mt-2 leading-relaxed">{item.desc}</p>
-
+          <h3 className="text-2xl font-bold" style={{color:'var(--text)'}}>{item.name}</h3>
+          <p className="t-muted text-sm mt-2 leading-relaxed">{item.desc}</p>
           <div className="grid grid-cols-3 gap-3 mt-5">
-            <div className="rounded-xl bg-white/[0.03] border border-white/10 p-3 text-center">
-              <div className="text-[10px] uppercase tracking-wide text-slate-500">Delivery</div>
-              <div className="text-sm text-neon-bright font-semibold mt-0.5">⚡ {item.delivery}</div>
-            </div>
-            {item.stats.map(([k,v])=>(
-              <div key={k} className="rounded-xl bg-white/[0.03] border border-white/10 p-3 text-center">
-                <div className="text-[10px] uppercase tracking-wide text-slate-500">{k}</div>
-                <div className="text-sm text-white font-semibold mt-0.5">{v}</div>
-              </div>
-            ))}
+            <div className="panel2 rounded-xl p-3 text-center"><div className="text-[10px] uppercase tracking-wide t-muted">Delivery</div><div className="text-sm font-semibold mt-0.5 accent">⚡ {item.delivery}</div></div>
+            {item.stats.map(([k,v])=>(<div key={k} className="panel2 rounded-xl p-3 text-center"><div className="text-[10px] uppercase tracking-wide t-muted">{k}</div><div className="text-sm font-semibold mt-0.5" style={{color:'var(--text)'}}>{v}</div></div>))}
           </div>
-
-          {/* Quantity available */}
           <div className="mt-5">
-            <div className="flex items-center justify-between text-xs mb-1.5">
-              <span className={`font-semibold ${c1}`}>● {label}</span>
-              <span className="text-slate-400"><span className="text-white font-semibold">{item.stock}</span> available</span>
-            </div>
-            <div className="h-2 rounded-full bg-white/10 overflow-hidden"><div className={`h-full ${bar} rounded-full transition-all`} style={{width:pct+'%'}}/></div>
+            <div className="flex items-center justify-between text-xs mb-1.5"><span className={`font-semibold ${c1}`}>● {label}</span><span className="t-muted"><span className="font-semibold" style={{color:'var(--text)'}}>{item.stock}</span> available</span></div>
+            <div className="h-2 rounded-full panel2 overflow-hidden"><div className={`h-full ${bar} rounded-full`} style={{width:pct+'%'}}/></div>
           </div>
-
           <div className="flex items-center justify-between mt-6">
-            <div><div className="text-[10px] uppercase tracking-wide text-slate-500">Price</div><div className="text-3xl font-display text-white">€{item.price.toFixed(2)}</div></div>
-            <button onClick={()=>{onBuy();onClose();}} className="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl font-semibold bg-neon text-ink hover:bg-neon-bright glow-ring hover:scale-[1.03] transition-all"><Icon.bolt width="18" height="18"/> Instant Buy</button>
+            <div><div className="text-[10px] uppercase tracking-wide t-muted">From</div><div className="text-3xl font-bold" style={{color:'var(--text)'}}>€{item.price.toFixed(2)}</div></div>
+            <button onClick={()=>{onBuy();onClose();}} className="btn-accent inline-flex items-center gap-2 px-6 py-3.5 rounded-xl font-semibold"><Icon.bolt width="18" height="18"/> Instant Buy</button>
           </div>
-          <div className="mt-3 text-center text-[11px] text-slate-500">🔒 Buyer-protected · automated delivery · 24/7 support</div>
+          <div className="mt-3 text-center text-[11px] t-muted">🔒 Buyer-protected · automated delivery · 24/7 support</div>
         </div>
       </div>
     </div>
   );
 }
 
-function App(){
-  const [cart,setCart]=useState(0), [bumps,setBumps]=useState([]), [selected,setSelected]=useState(null);
-  const addToCart=()=>{ setCart(c=>c+1); const id=Date.now()+Math.random(); setBumps(b=>[...b,id]); setTimeout(()=>setBumps(b=>b.filter(x=>x!==id)),1000); };
+const TRUST=[['⚡','Instant Delivery','Codes & top-ups in seconds'],['🔒','100% Secure','Encrypted, fraud-screened checkout'],['🏷️','Best Price','Fair pricing, frequent deals'],['💬','24/7 Support','Real humans, any time']];
+function TrustBar(){
   return (
-    <div className="min-h-screen relative">
-      <header className="sticky top-0 z-50 backdrop-blur-xl bg-ink/70 border-b border-white/10">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      {TRUST.map(([e,t,s])=>(
+        <div key={t} className="panel rounded-2xl p-4 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg" style={{background:'var(--panel2)'}}>{e}</div>
+          <div><div className="text-sm font-semibold" style={{color:'var(--text)'}}>{t}</div><div className="text-xs t-muted">{s}</div></div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+const REVIEWS=[['Liam','★★★★★','Robux arrived in 20 seconds. Cleanest shop I’ve used.'],['Noa','★★★★★','Tracked my order live and got instant V-Bucks. 10/10.'],['Sam','★★★★★','Support replied in minutes. Will definitely buy again.']];
+
+function App(){
+  const [theme,setTheme]=useState('dark');
+  const [cart,setCart]=useState(0), [bumps,setBumps]=useState([]), [selected,setSelected]=useState(null), [activeCat,setActiveCat]=useState('All Products');
+  const addToCart=()=>{ setCart(c=>c+1); const id=Date.now()+Math.random(); setBumps(b=>[...b,id]); setTimeout(()=>setBumps(b=>b.filter(x=>x!==id)),1000); };
+  const shown=activeCat==='All Products'?ITEMS:ITEMS.filter(i=>i.cat===activeCat);
+  return (
+    <div className={`app ${theme} min-h-screen`}>
+      <header className="sticky top-0 z-50 panel" style={{backdropFilter:'blur(14px)'}}>
         <nav className="max-w-6xl mx-auto px-5 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2.5"><div className="w-9 h-9 rounded-xl bg-neon flex items-center justify-center glow-ring"><Icon.bolt width="18" height="18" className="text-ink"/></div><span className="font-display font-extrabold tracking-wider text-white">FORGE<span className="text-neon-bright">MARKET</span></span></div>
-          <div className="hidden md:flex items-center gap-8 text-sm text-slate-300"><a className="hover:text-white transition" href="#market">Marketplace</a><a className="hover:text-white transition" href="#">Live Tracker</a><a className="hover:text-white transition" href="#">Support</a></div>
-          <div className="flex items-center gap-3">
-            <button className="relative w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-200 hover:border-neon/50 transition"><Icon.cart width="18" height="18"/>{cart>0&&<span className="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1 rounded-full bg-neon text-ink text-xs font-bold flex items-center justify-center">{cart}</span>}{bumps.map(id=><span key={id} className="rise absolute -top-2 right-0 text-neon-bright text-xs font-bold">+1</span>)}</button>
-            <button className="md:hidden text-slate-200"><Icon.menu width="22" height="22"/></button>
+          <div className="flex items-center gap-2.5"><div className="w-9 h-9 rounded-xl btn-accent flex items-center justify-center"><Icon.bolt width="18" height="18"/></div><span className="font-display font-extrabold tracking-wider" style={{color:'var(--text)'}}>FORGE<span className="accent">MARKET</span></span></div>
+          <div className="hidden md:flex items-center gap-7 text-sm t-muted"><a className="hover:opacity-80" href="#market">Marketplace</a><a className="hover:opacity-80" href="#engine">Live Tracker</a><a className="hover:opacity-80" href="#reviews">Reviews</a><a className="hover:opacity-80" href="#discord">Support</a></div>
+          <div className="flex items-center gap-2.5">
+            <button onClick={()=>setTheme(t=>t==='dark'?'light':'dark')} title="Toggle theme" className="w-10 h-10 rounded-xl btn-soft flex items-center justify-center">{theme==='dark'?'☀️':'🌙'}</button>
+            <button className="relative w-10 h-10 rounded-xl btn-soft flex items-center justify-center"><Icon.cart width="18" height="18"/>{cart>0&&<span className="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1 rounded-full btn-accent text-xs font-bold flex items-center justify-center">{cart}</span>}{bumps.map(id=><span key={id} className="rise absolute -top-2 right-0 accent text-xs font-bold">+1</span>)}</button>
           </div>
         </nav>
       </header>
-      <section className="relative max-w-6xl mx-auto px-5 pt-8 pb-8">
-        <HeroBanner/>
-        <div id="engine"><DeliveryJourney onDelivered={addToCart}/></div>
+
+      <section className="max-w-6xl mx-auto px-5 pt-8 pb-6"><HeroBanner/></section>
+      <section className="max-w-6xl mx-auto px-5 pb-8"><TrustBar/></section>
+
+      {/* Sidebar + product grid */}
+      <section id="market" className="max-w-6xl mx-auto px-5 py-6 grid lg:grid-cols-[220px_1fr] gap-6">
+        <aside className="panel rounded-2xl p-3 h-max lg:sticky lg:top-20">
+          <div className="text-[11px] uppercase tracking-wider t-muted px-3 py-2">Categories</div>
+          <div className="flex lg:flex-col gap-1 overflow-x-auto">
+            {CATS.map(c=>(<button key={c} onClick={()=>setActiveCat(c)} className={`cat text-left text-sm px-3 py-2 rounded-lg whitespace-nowrap font-medium ${activeCat===c?'active':''}`}>{c}</button>))}
+          </div>
+        </aside>
+        <div>
+          <div className="flex items-end justify-between mb-4"><div><h2 className="text-2xl font-bold" style={{color:'var(--text)'}}>Popular Products</h2><p className="text-sm t-muted mt-1">{shown.length} item{shown.length!==1?'s':''} · instant delivery</p></div></div>
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">{shown.map(it=><ProductCard key={it.name} item={it} onBuy={addToCart} onSelect={()=>setSelected(it)}/>)}</div>
+        </div>
       </section>
-      {/* Showcase band (mystery chest) */}
-      <section className="max-w-6xl mx-auto px-5 py-6">
-        <div className="relative rounded-3xl overflow-hidden border border-white/10 min-h-[260px] flex items-center">
-          <div className="hero-img" style={{backgroundImage:`url(${SHOWCASE_IMG})`}}/>
-          <div className="absolute inset-0" style={{background:'linear-gradient(90deg, rgba(5,6,10,.88) 0%, rgba(5,6,10,.55) 45%, rgba(5,6,10,.1) 100%)'}}/>
-          <div className="relative p-8 sm:p-12 max-w-lg">
-            <span className="text-xs uppercase tracking-[0.3em] text-neon-bright">Limited drop</span>
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-white mt-3">Mystery Loot Chests</h2>
-            <p className="text-slate-300 mt-3">Guaranteed rare+ rewards — coins, gems and exclusive cosmetics. Opened & delivered to your account instantly.</p>
-            <a href="#market" className="inline-flex items-center gap-2 mt-6 px-6 py-3 rounded-xl font-semibold bg-neon text-ink hover:bg-neon-bright glow-ring hover:scale-[1.03] transition-all"><Icon.bolt width="16" height="16"/> Open a chest</a>
+
+      {/* 3D Live Delivery Engine (kept) */}
+      <section id="engine" className="max-w-6xl mx-auto px-5 py-10">
+        <div className="text-center mb-6"><h2 className="text-2xl sm:text-3xl font-bold" style={{color:'var(--text)'}}>See it in action</h2><p className="t-muted text-sm mt-1">Watch your order race across our live 3D delivery city.</p></div>
+        <DeliveryJourney onDelivered={addToCart}/>
+      </section>
+
+      {/* Reviews */}
+      <section id="reviews" className="max-w-6xl mx-auto px-5 py-10">
+        <h2 className="text-2xl sm:text-3xl font-bold mb-6" style={{color:'var(--text)'}}>What our customers say</h2>
+        <div className="grid md:grid-cols-3 gap-4">
+          {REVIEWS.map(([n,st,tx])=>(<div key={n} className="panel rounded-2xl p-5"><div className="text-amber-400 mb-2">{st}</div><p style={{color:'var(--text)'}}>“{tx}”</p><div className="flex items-center gap-2.5 mt-4"><div className="w-8 h-8 rounded-full btn-accent flex items-center justify-center text-white text-sm font-semibold">{n[0]}</div><div className="text-sm font-medium" style={{color:'var(--text)'}}>{n}</div></div></div>))}
+        </div>
+      </section>
+
+      {/* Discord band */}
+      <section id="discord" className="max-w-6xl mx-auto px-5 py-10">
+        <div className="rounded-3xl p-8 sm:p-12 text-center text-white relative overflow-hidden" style={{background:'linear-gradient(120deg,#5865F2,#7c3aed,#a855f7)'}}>
+          <div className="absolute inset-0 grid-bg opacity-20"/>
+          <div className="relative">
+            <div className="text-4xl mb-2">💬</div>
+            <h2 className="text-2xl sm:text-3xl font-extrabold">Join our Discord community</h2>
+            <p className="text-white/85 mt-2 max-w-xl mx-auto">Drops, giveaways, instant support and verified vouches — all in one place.</p>
+            <a href="https://discord.gg/vNcfgDbVd" target="_blank" className="inline-flex items-center gap-2 mt-6 px-7 py-3.5 rounded-xl font-semibold bg-white text-indigo-700 hover:scale-[1.03] transition-all">Join the server</a>
           </div>
         </div>
       </section>
 
-      <section id="market" className="max-w-6xl mx-auto px-5 py-14">
-        <div className="flex items-end justify-between mb-8"><div><h2 className="text-2xl sm:text-3xl font-bold text-white">Featured Marketplace</h2><p className="text-slate-400 text-sm mt-1">Hand-picked legendary gear — buy once, delivered in seconds.</p></div><a href="#" className="hidden sm:inline-flex text-sm text-neon-bright hover:underline">View all →</a></div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">{ITEMS.map(it=><ProductCard key={it.name} item={it} onBuy={addToCart} onSelect={()=>setSelected(it)}/>)}</div>
-      </section>
-      <footer className="border-t border-white/10 py-8 text-center text-slate-500 text-sm">FORGEMARKET — premium in-game assets · automated delivery · 24/7 support</footer>
+      <footer className="py-8 text-center text-sm t-muted bd" style={{borderTop:'1px solid var(--border)'}}>FORGEMARKET — premium in-game assets · automated delivery · 24/7 support</footer>
       <ProductModal item={selected} onClose={()=>setSelected(null)} onBuy={addToCart}/>
     </div>
   );
