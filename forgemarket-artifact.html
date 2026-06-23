@@ -61,6 +61,24 @@
   .ring-accent{box-shadow:0 0 0 1px var(--accent),0 0 26px -6px var(--accent)}
   .pcard{background:var(--panel);border:1px solid var(--border);transition:transform .25s,box-shadow .25s,border-color .25s}
   .pcard:hover{transform:translateY(-6px);border-color:var(--accent);box-shadow:0 18px 50px -20px var(--accent)}
+  /* 100x polish */
+  .reveal{opacity:0;transform:translateY(22px);transition:opacity .7s cubic-bezier(.2,.7,.2,1),transform .7s cubic-bezier(.2,.7,.2,1)}
+  .reveal.in{opacity:1;transform:none}
+  .gradanim{background-size:220% auto;animation:grad 5s ease infinite}
+  @keyframes grad{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
+  .shine{position:relative;overflow:hidden}
+  .shine::after{content:'';position:absolute;top:0;left:-150%;width:60%;height:100%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.35),transparent);transform:skewX(-18deg);transition:left .7s}
+  .shine:hover::after{left:160%}
+  .floatcard{animation:floaty 5s ease-in-out infinite}
+  .floatcard:nth-child(odd){animation-duration:6.5s}
+  .scrollbar{position:fixed;top:0;left:0;height:3px;z-index:90;background:linear-gradient(90deg,#7c3aed,#a855f7,#ec4899);box-shadow:0 0 12px rgba(168,85,247,.7);width:var(--p,0%);transition:width .1s linear}
+  .bgglow{position:fixed;inset:0;z-index:-1;overflow:hidden;pointer-events:none}
+  .bgglow span{position:absolute;border-radius:9999px;filter:blur(90px);opacity:.5;mix-blend-mode:screen}
+  .app.light .bgglow span{opacity:.35}
+  .bgglow .g1{width:40vw;height:40vw;left:-8vw;top:-6vw;background:#8b5cf6;animation:floaty 14s ease-in-out infinite}
+  .bgglow .g2{width:34vw;height:34vw;right:-6vw;top:30vw;background:#22d3ee;animation:floaty 18s ease-in-out infinite}
+  .bgglow .g3{width:30vw;height:30vw;left:30vw;bottom:-8vw;background:#ec4899;animation:floaty 16s ease-in-out infinite}
+  .tiltw{transition:transform .15s ease}
 </style>
 </head>
 <body>
@@ -441,6 +459,37 @@ function DeliveryJourney({ onDelivered }){
   );
 }
 
+/* ── helpers ── */
+function Reveal({children,delay=0,className='',style={},as:Tag='div'}){
+  const ref=useRef(null),[s,setS]=useState(false);
+  useEffect(()=>{const el=ref.current;if(!el)return;const io=new IntersectionObserver(([e])=>{if(e.isIntersecting){setS(true);io.disconnect();}},{threshold:.1,rootMargin:'0px 0px -6% 0px'});io.observe(el);const fb=setTimeout(()=>setS(true),2200);return()=>{io.disconnect();clearTimeout(fb);};},[]);
+  return <Tag ref={ref} className={`reveal ${s?'in':''} ${className}`} style={{transitionDelay:delay+'ms',...style}}>{children}</Tag>;
+}
+function CountUp({value,className=''}){
+  const ref=useRef(null),[d,setD]=useState(null);
+  const m=String(value).match(/^(\D*)([\d.,]+)(.*)$/), isN=!!m;
+  useEffect(()=>{ if(!isN){setD(value);return;} const el=ref.current;if(!el)return; let raf;
+    const io=new IntersectionObserver(([e])=>{ if(!e.isIntersecting)return; io.disconnect();
+      const num=parseFloat(m[2].replace(/,/g,'')), dec=m[2].includes('.')?1:0, start=performance.now();
+      const tick=(t)=>{ const k=Math.min(1,(t-start)/1300), val=num*(1-Math.pow(1-k,3));
+        setD(m[1]+(dec?val.toFixed(1):Math.round(val).toLocaleString())+m[3]); if(k<1)raf=requestAnimationFrame(tick); };
+      raf=requestAnimationFrame(tick);
+    },{threshold:.4}); io.observe(el); return()=>{io.disconnect();cancelAnimationFrame(raf);};
+  },[value]);
+  return <span ref={ref} className={className}>{d??(isN?m[1]+'0'+m[3]:value)}</span>;
+}
+function Tilt({children,className=''}){
+  const ref=useRef(null);
+  const mv=(e)=>{const el=ref.current;if(!el)return;const r=el.getBoundingClientRect();const x=(e.clientX-r.left)/r.width-.5,y=(e.clientY-r.top)/r.height-.5;el.style.transform=`perspective(700px) rotateX(${-y*7}deg) rotateY(${x*7}deg) translateY(-5px)`;};
+  const rs=()=>{if(ref.current)ref.current.style.transform='';};
+  return <div ref={ref} onMouseMove={mv} onMouseLeave={rs} className={`tiltw ${className}`}>{children}</div>;
+}
+function useCountdown(initial){
+  const [t,setT]=useState(initial);
+  useEffect(()=>{ const id=setInterval(()=>setT(x=>x>0?x-1:48*3600),1000); return()=>clearInterval(id); },[]);
+  return [Math.floor(t/3600)%100, Math.floor(t/60)%60, t%60];
+}
+
 /* ── Marketplace data (matches the reference exactly) ── */
 const ITEMS=[
   { name:'Robux', cat:'Robux', glyph:'R', grad:'linear-gradient(135deg,#22c55e,#15803d)', range:'100 - 10,000 Robux', price:1.99, delivery:'Instant · < 30s', stock:320, desc:'Official Robux top-up for your Roblox account. Choose your amount at checkout — delivered automatically within seconds.', stats:[['Range','100–10k'],['Region','Global']] },
@@ -452,13 +501,13 @@ const ITEMS=[
 ];
 const SIDE_CATS=[['🟪','All Products'],['🟩','Robux'],['🔵','V-Bucks'],['🔻','Valorant Points'],['🟣','Fortnite Accounts'],['🎁','Gift Cards'],['🎮','Steam Wallet'],['🕹️','PlayStation Store'],['🟢','Xbox Gift Card'],['💬','Discord Nitro'],['🎵','iTunes'],['➕','More Categories']];
 const stockTone=(s)=> s<=60 ? ['text-rose-500','bg-rose-500','In high demand'] : s<=150 ? ['text-amber-500','bg-amber-500','Selling fast'] : ['text-emerald-500','bg-emerald-500','In stock'];
-
-function Tile({glyph,grad,size=44,r=12,fs=18}){ return (<div style={{width:size,height:size,borderRadius:r,background:grad,display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontWeight:800,fontSize:fs,boxShadow:'0 6px 16px -6px rgba(0,0,0,.4)'}}>{glyph}</div>); }
+function Tile({glyph,grad,size=44,r=12,fs=18}){ return (<div style={{width:size,height:size,borderRadius:r,background:grad,display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontWeight:800,fontSize:fs,boxShadow:'0 8px 20px -8px rgba(0,0,0,.5)'}}>{glyph}</div>); }
 
 function ProductCard({ item, onBuy, onSelect }){
   return (
-    <div onClick={onSelect} className="pcard rounded-2xl p-4 cursor-pointer relative">
-      {item.popular && <span className="absolute right-3 top-3 text-[10px] font-bold px-2 py-0.5 rounded-full" style={{background:'var(--accent)',color:'#fff'}}>Popular</span>}
+    <Tilt>
+    <div onClick={onSelect} className="pcard shine rounded-2xl p-4 cursor-pointer relative h-full">
+      {item.popular && <span className="absolute right-3 top-3 z-10 text-[10px] font-bold px-2 py-0.5 rounded-full" style={{background:'var(--accent)',color:'#fff'}}>Popular</span>}
       <div className="flex items-center justify-center py-3"><Tile glyph={item.glyph} grad={item.grad} size={64} r={18} fs={26}/></div>
       <h3 className="font-semibold text-center" style={{color:'var(--text)'}}>{item.name}</h3>
       <div className="text-[11px] text-center t-muted mt-0.5">{item.range}</div>
@@ -468,6 +517,7 @@ function ProductCard({ item, onBuy, onSelect }){
         <button onClick={(e)=>{e.stopPropagation();onBuy();}} className="btn-soft w-9 h-9 rounded-lg flex items-center justify-center"><Icon.cart width="16" height="16"/></button>
       </div>
     </div>
+    </Tilt>
   );
 }
 
@@ -503,35 +553,39 @@ function ProductModal({ item, onClose, onBuy }){
   );
 }
 
-const FEAT=[['⚡','#7c3aed','Instant Delivery','Get your items instantly'],['🔒','#10b981','Secure Payments','100% secure & trusted'],['🎧','#3b82f6','24/7 Support','We’re here for you'],['🏷️','#f43f5e','Best Prices','Competitive prices daily']];
+const FEAT=[['⚡','#7c3aed','Instant Delivery','Get your items instantly','left-3 top-3'],['🔒','#10b981','Secure Payments','100% secure & trusted','right-3 bottom-3'],['🎧','#3b82f6','24/7 Support','We’re here for you','right-3 top-3'],['🏷️','#f43f5e','Best Prices','Competitive prices daily','left-3 bottom-3']];
 const TRUST=[['⚡','Instant Delivery','Fast & reliable delivery'],['🔒','100% Secure','Your data is protected'],['🏷️','Best Prices','Competitive prices daily'],['🎧','24/7 Support','Always here to help']];
 const STATS=[['👥','10,000+','Happy Customers'],['✅','99.9%','Success Rate'],['📦','50,000+','Orders Completed'],['🎧','24/7','Customer Support']];
 
 function ForgeBot(){
-  const [open,setOpen]=useState(true);
+  const [open,setOpen]=useState(true), [typing,setTyping]=useState(false);
   const [msgs,setMsgs]=useState([{b:1,t:'Hi! 👋 How can I help you today?'}]);
-  const [v,setV]=useState('');
-  const send=(text)=>{ const m=text.trim(); if(!m)return; const reply=/price|cost|hoe|how much/i.test(m)?'Prices start from just €1,99 — check the Popular Products grid! 💜':/deliver|long|fast|hoe lang/i.test(m)?'Delivery is instant — most orders arrive in under 30 seconds ⚡':/refund|problem|issue/i.test(m)?'No worries! Open a ticket in our Discord and we’ll sort it fast. 🔒':'I can help with products, delivery, payments and orders! Tell me a game and I’ll recommend a top-up. 🎮';
-    setMsgs(x=>[...x,{b:0,t:m},{b:1,t:reply}]); setV(''); };
+  const [v,setV]=useState(''); const body=useRef(null);
+  useEffect(()=>{ if(body.current) body.current.scrollTop=body.current.scrollHeight; },[msgs,typing,open]);
+  const answer=(m)=>/price|cost|hoeveel|how much/i.test(m)?'Prices start from just €1,99 — check the Popular Products grid! 💜':/deliver|long|fast|hoe lang|snel/i.test(m)?'Delivery is instant — most orders arrive in under 30 seconds ⚡':/refund|problem|issue|terug/i.test(m)?'No worries! Open a ticket in our Discord and we’ll sort it fast. 🔒':/robux|v-?bucks|valorant|steam|playstation/i.test(m)?'Great choice! Tap that product in the grid to see amounts, price and instant delivery. 🎮':'I can help with products, delivery, payments and orders! Tell me a game and I’ll recommend a top-up. 🎮';
+  const send=(text)=>{ const m=text.trim(); if(!m)return; setMsgs(x=>[...x,{b:0,t:m}]); setV(''); setTyping(true);
+    setTimeout(()=>{ setTyping(false); setMsgs(x=>[...x,{b:1,t:answer(m)}]); }, 700); };
   return (
     <div className="fixed bottom-4 right-4 z-[80]">
       {open ? (
-        <div className="panel rounded-2xl w-[300px] overflow-hidden shadow-2xl ring-accent">
+        <div className="panel rounded-2xl w-[310px] overflow-hidden shadow-2xl ring-accent modal-card">
           <div className="flex items-center gap-2.5 px-4 py-3" style={{background:'linear-gradient(120deg,#7c3aed,#a855f7)'}}>
             <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center text-lg">🤖</div>
-            <div className="flex-1"><div className="text-white font-semibold text-sm leading-none">ForgeBot</div><div className="text-[11px] text-emerald-200 flex items-center gap-1 mt-0.5"><span className="w-1.5 h-1.5 rounded-full bg-emerald-300"/> Online</div></div>
-            <button onClick={()=>setOpen(false)} className="text-white/80 hover:text-white">▾</button>
+            <div className="flex-1"><div className="text-white font-semibold text-sm leading-none">ForgeBot</div><div className="text-[11px] text-emerald-200 flex items-center gap-1 mt-0.5"><span className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse"/> Online</div></div>
+            <button onClick={()=>setOpen(false)} className="text-white/80 hover:text-white text-lg leading-none">▾</button>
           </div>
-          <div className="p-3 space-y-2 max-h-56 overflow-y-auto">
+          <div ref={body} className="p-3 space-y-2 max-h-60 overflow-y-auto">
             {msgs.map((m,i)=>(<div key={i} className={`text-sm px-3 py-2 rounded-2xl max-w-[85%] ${m.b?'panel2':'text-white ml-auto'}`} style={!m.b?{background:'var(--accent)'}:{color:'var(--text)'}}>{m.t}</div>))}
+            {typing && <div className="panel2 px-3 py-2.5 rounded-2xl w-fit flex gap-1">{[0,1,2].map(d=><span key={d} className="w-1.5 h-1.5 rounded-full bg-current opacity-50 animate-bounce" style={{animationDelay:d*.15+'s',color:'var(--muted)'}}/>)}</div>}
+            {msgs.length<=1 && <div className="flex flex-wrap gap-1.5 pt-1">{['Prices?','How fast?','Refunds?'].map(q=><button key={q} onClick={()=>send(q)} className="text-[11px] px-2.5 py-1 rounded-full panel2" style={{color:'var(--text)'}}>{q}</button>)}</div>}
           </div>
-          <form onSubmit={(e)=>{e.preventDefault();send(v);}} className="p-2 flex gap-2 bd" style={{borderTop:'1px solid var(--border)'}}>
+          <form onSubmit={(e)=>{e.preventDefault();send(v);}} className="p-2 flex gap-2" style={{borderTop:'1px solid var(--border)'}}>
             <input value={v} onChange={e=>setV(e.target.value)} placeholder="Chat with us…" className="flex-1 px-3 py-2 rounded-lg text-sm panel2" style={{color:'var(--text)',outline:'none'}}/>
             <button className="btn-accent px-3 rounded-lg text-sm font-semibold">Send</button>
           </form>
         </div>
       ) : (
-        <button onClick={()=>setOpen(true)} className="w-14 h-14 rounded-full flex items-center justify-center text-2xl text-white shadow-2xl ring-accent" style={{background:'linear-gradient(135deg,#7c3aed,#a855f7)'}}>🤖</button>
+        <button onClick={()=>setOpen(true)} className="relative w-14 h-14 rounded-full flex items-center justify-center text-2xl text-white shadow-2xl" style={{background:'linear-gradient(135deg,#7c3aed,#a855f7)'}}>🤖<span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-emerald-400 border-2 border-white animate-pulse"/></button>
       )}
     </div>
   );
@@ -539,86 +593,93 @@ function ForgeBot(){
 
 function App(){
   const [theme,setTheme]=useState('light');
-  const [cart,setCart]=useState(3), [bumps,setBumps]=useState([]), [selected,setSelected]=useState(null), [activeCat,setActiveCat]=useState('All Products');
+  const [cart,setCart]=useState(3), [bumps,setBumps]=useState([]), [selected,setSelected]=useState(null), [activeCat,setActiveCat]=useState('All Products'), [q,setQ]=useState('');
   const addToCart=()=>{ setCart(c=>c+1); const id=Date.now()+Math.random(); setBumps(b=>[...b,id]); setTimeout(()=>setBumps(b=>b.filter(x=>x!==id)),1000); };
+  const [hh,mm,ss]=useCountdown(19*3600+58*60+12);
   const NAV=['Home','All Products','Categories ▾','Reviews','How it works','Support'];
+  // scroll progress
+  const [prog,setProg]=useState(0);
+  useEffect(()=>{ const f=()=>{const h=document.documentElement;const mx=h.scrollHeight-h.clientHeight;setProg(mx>0?h.scrollTop/mx*100:0);}; f(); window.addEventListener('scroll',f,{passive:true}); return()=>window.removeEventListener('scroll',f); },[]);
+  const shown=ITEMS.filter(i=>(activeCat==='All Products'||i.cat===activeCat||i.name===activeCat)&&(i.name+i.cat+i.range).toLowerCase().includes(q.toLowerCase()));
   return (
     <div className={`app ${theme} min-h-screen`}>
+      <div className="scrollbar" style={{'--p':prog+'%'}}/>
+      <div className="bgglow"><span className="g1"/><span className="g2"/><span className="g3"/></div>
       {/* Header */}
       <header className="sticky top-0 z-50 panel" style={{backdropFilter:'blur(14px)'}}>
         <nav className="max-w-7xl mx-auto px-5 h-16 flex items-center gap-4">
-          <div className="flex items-center gap-2.5 shrink-0"><div className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-display font-extrabold" style={{background:'linear-gradient(135deg,#7c3aed,#a855f7)'}}>F</div><span className="font-display font-extrabold tracking-wide" style={{color:'var(--text)'}}>Forge<span className="accent">Market</span></span></div>
+          <div className="flex items-center gap-2.5 shrink-0"><div className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-display font-extrabold shine" style={{background:'linear-gradient(135deg,#7c3aed,#a855f7)'}}>F</div><span className="font-display font-extrabold tracking-wide" style={{color:'var(--text)'}}>Forge<span className="accent">Market</span></span></div>
           <div className="hidden lg:flex items-center gap-6 text-sm ml-4">{NAV.map((n,i)=>(<a key={n} href="#" className={i===0?'font-semibold accent':'t-muted hover:opacity-80'}>{n}</a>))}</div>
-          <div className="hidden md:flex items-center gap-2 ml-auto px-3 h-10 rounded-xl panel2 w-64"><Icon.cart width="0" height="0"/><span className="t-muted">🔍</span><input placeholder="Search for products…" className="bg-transparent text-sm flex-1" style={{color:'var(--text)',outline:'none'}}/><span className="text-[10px] t-muted panel rounded px-1.5 py-0.5">⌘K</span></div>
+          <div className="hidden md:flex items-center gap-2 ml-auto px-3 h-10 rounded-xl panel2 w-64"><span className="t-muted">🔍</span><input value={q} onChange={e=>setQ(e.target.value)} placeholder="Search for products…" className="bg-transparent text-sm flex-1" style={{color:'var(--text)',outline:'none'}}/><span className="text-[10px] t-muted panel rounded px-1.5 py-0.5">⌘K</span></div>
           <button className="relative w-10 h-10 rounded-xl btn-soft flex items-center justify-center ml-auto md:ml-0"><Icon.cart width="18" height="18"/>{cart>0&&<span className="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1 rounded-full text-white text-xs font-bold flex items-center justify-center" style={{background:'var(--accent)'}}>{cart}</span>}{bumps.map(id=><span key={id} className="rise absolute -top-2 right-0 accent text-xs font-bold">+1</span>)}</button>
           <button onClick={()=>setTheme(t=>t==='light'?'dark':'light')} title="Toggle theme" className="w-10 h-10 rounded-xl btn-soft flex items-center justify-center">{theme==='light'?'🌙':'☀️'}</button>
           <button className="hidden sm:inline-flex btn-soft px-4 h-10 rounded-xl text-sm font-medium items-center">Log in</button>
-          <button className="btn-accent px-4 h-10 rounded-xl text-sm font-semibold inline-flex items-center gap-1">Sign Up →</button>
+          <button className="btn-accent shine px-4 h-10 rounded-xl text-sm font-semibold inline-flex items-center gap-1">Sign Up →</button>
         </nav>
       </header>
 
       {/* Hero with sidebar */}
       <section className="max-w-7xl mx-auto px-5 pt-8 grid lg:grid-cols-[230px_1fr] gap-6">
         <aside className="hidden lg:block">
-          <div className="panel rounded-2xl p-2.5">
+          <Reveal className="panel rounded-2xl p-2.5">
             <div className="text-[11px] uppercase tracking-wider t-muted px-3 py-2">Browse Categories</div>
             {SIDE_CATS.map(([ic,c])=>(<button key={c} onClick={()=>setActiveCat(c)} className={`cat w-full text-left text-sm px-3 py-2 rounded-lg flex items-center gap-2.5 font-medium ${activeCat===c?'active':''}`}><span className="text-base">{ic}</span> {c}</button>))}
-          </div>
-          <div className="panel rounded-2xl p-4 mt-4">
-            <div className="font-bold text-sm" style={{color:'var(--text)'}}>Limited Time Offer! 🔥</div>
-            <div className="flex gap-2 mt-3">{['19','58','12'].map((n,i)=>(<div key={i} className="flex-1 text-center panel2 rounded-lg py-2"><div className="font-bold" style={{color:'var(--text)'}}>{n}</div><div className="text-[9px] t-muted">{['Hrs','Min','Sec'][i]}</div></div>))}</div>
-            <button className="btn-accent w-full mt-3 py-2 rounded-lg text-sm font-semibold">Claim Discount</button>
-          </div>
+          </Reveal>
+          <Reveal delay={120} className="rounded-2xl p-4 mt-4 text-white" style={{background:'linear-gradient(135deg,#7c3aed,#db2777)'}}>
+            <div className="font-bold text-sm">Limited Time Offer! 🔥</div>
+            <div className="flex gap-2 mt-3">{[[hh,'Hrs'],[mm,'Min'],[ss,'Sec']].map(([n,l],i)=>(<div key={i} className="flex-1 text-center bg-white/15 rounded-lg py-2"><div className="font-bold tabular-nums">{String(n).padStart(2,'0')}</div><div className="text-[9px] opacity-80">{l}</div></div>))}</div>
+            <button className="w-full mt-3 py-2 rounded-lg text-sm font-semibold bg-white text-purple-700">Claim Discount</button>
+          </Reveal>
         </aside>
 
         <div className="grid md:grid-cols-2 gap-6 items-center">
-          <div>
+          <Reveal>
             <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full panel2 accent">● #1 Trusted Marketplace</span>
-            <h1 className="text-4xl sm:text-5xl font-extrabold mt-4 leading-[1.05]" style={{color:'var(--text)'}}>Everything You Need,<br/><span className="accent">All in One Place.</span></h1>
+            <h1 className="text-4xl sm:text-5xl font-extrabold mt-4 leading-[1.05]" style={{color:'var(--text)'}}>Everything You Need,<br/><span className="gradanim bg-clip-text text-transparent" style={{backgroundImage:'linear-gradient(120deg,#7c3aed,#a855f7,#ec4899)'}}>All in One Place.</span></h1>
             <p className="t-muted mt-4 max-w-md">Get Robux, V-Bucks, Valorant Points and more instantly. Fast delivery, secure payments, 24/7 support.</p>
             <div className="flex flex-wrap gap-3 mt-6">
-              <a href="#market" className="btn-accent inline-flex items-center gap-2 px-6 py-3 rounded-xl font-semibold">Shop Now →</a>
+              <a href="#market" className="btn-accent shine inline-flex items-center gap-2 px-6 py-3 rounded-xl font-semibold">Shop Now →</a>
               <a href="#market" className="btn-soft inline-flex items-center gap-2 px-6 py-3 rounded-xl font-semibold">View All Products</a>
             </div>
             <div className="flex items-center gap-3 mt-6">
               <div className="flex -space-x-2">{['🦊','🐼','🐯','🐲'].map((e,i)=>(<span key={i} className="w-8 h-8 rounded-full panel2 flex items-center justify-center text-sm bd">{e}</span>))}</div>
-              <div className="text-sm"><span className="font-bold" style={{color:'var(--text)'}}>10,000+</span> <span className="t-muted">Happy Customers</span></div>
+              <div className="text-sm"><span className="font-bold" style={{color:'var(--text)'}}><CountUp value="10,000+"/></span> <span className="t-muted">Happy Customers</span></div>
             </div>
-          </div>
-          <div className="relative rounded-3xl overflow-hidden min-h-[300px] border" style={{borderColor:'var(--border)'}}>
+          </Reveal>
+          <Reveal delay={150} className="relative rounded-3xl overflow-hidden min-h-[320px] border" style={{borderColor:'var(--border)'}}>
             <div className="hero-img" style={{backgroundImage:`url(${HERO_IMG})`}}/>
-            <div className="absolute inset-0" style={{background:'linear-gradient(180deg,rgba(10,7,20,.15),rgba(10,7,20,.45))'}}/>
-            <div className="absolute left-3 top-3 panel rounded-xl p-2.5 flex items-center gap-2 shadow-lg"><div className="w-8 h-8 rounded-lg flex items-center justify-center text-white" style={{background:'#7c3aed'}}>⚡</div><div><div className="text-[11px] font-semibold" style={{color:'var(--text)'}}>Instant Delivery</div><div className="text-[10px] t-muted">Get your items instantly</div></div></div>
-            <div className="absolute right-3 bottom-3 panel rounded-xl p-2.5 flex items-center gap-2 shadow-lg"><div className="w-8 h-8 rounded-lg flex items-center justify-center text-white" style={{background:'#10b981'}}>🔒</div><div><div className="text-[11px] font-semibold" style={{color:'var(--text)'}}>Secure Payments</div><div className="text-[10px] t-muted">100% secure & trusted</div></div></div>
-          </div>
+            <div className="absolute inset-0" style={{background:'linear-gradient(180deg,rgba(10,7,20,.15),rgba(10,7,20,.4))'}}/>
+            {FEAT.map(([e,col,t,s,pos])=>(<div key={t} className={`floatcard absolute ${pos} panel rounded-xl p-2.5 flex items-center gap-2 shadow-lg`}><div className="w-8 h-8 rounded-lg flex items-center justify-center text-white" style={{background:col}}>{e}</div><div><div className="text-[11px] font-semibold" style={{color:'var(--text)'}}>{t}</div><div className="text-[10px] t-muted">{s}</div></div></div>))}
+          </Reveal>
         </div>
       </section>
 
       {/* Trust bar */}
       <section className="max-w-7xl mx-auto px-5 mt-8">
-        <div className="panel rounded-2xl grid grid-cols-2 lg:grid-cols-4 divide-x" style={{borderColor:'var(--border)'}}>
+        <Reveal className="panel rounded-2xl grid grid-cols-2 lg:grid-cols-4 divide-x" style={{borderColor:'var(--border)'}}>
           {TRUST.map(([e,t,s])=>(<div key={t} className="flex items-center gap-3 p-4"><div className="w-10 h-10 rounded-xl panel2 flex items-center justify-center text-lg">{e}</div><div><div className="text-sm font-semibold" style={{color:'var(--text)'}}>{t}</div><div className="text-xs t-muted">{s}</div></div></div>))}
-        </div>
+        </Reveal>
       </section>
 
       {/* Popular products */}
       <section id="market" className="max-w-7xl mx-auto px-5 py-10">
         <div className="flex items-center justify-between mb-5"><h2 className="text-2xl font-extrabold" style={{color:'var(--text)'}}>Popular Products 🔥</h2><a href="#" className="text-sm font-semibold accent">View All Products →</a></div>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">{(activeCat==='All Products'?ITEMS:ITEMS.filter(i=>i.cat===activeCat||i.name===activeCat)).map(it=><ProductCard key={it.name} item={it} onBuy={addToCart} onSelect={()=>setSelected(it)}/>)}</div>
+        {shown.length? <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">{shown.map((it,i)=><Reveal key={it.name} delay={i*70}><ProductCard item={it} onBuy={addToCart} onSelect={()=>setSelected(it)}/></Reveal>)}</div>
+          : <div className="panel rounded-2xl p-10 text-center t-muted">No products match “{q}”.</div>}
       </section>
 
-      {/* See it in action (kept 3D engine + animations) */}
+      {/* See it in action */}
       <section id="engine" className="max-w-6xl mx-auto px-5 pb-4">
-        <div className="text-center mb-5"><h2 className="text-2xl font-extrabold" style={{color:'var(--text)'}}>See it in action</h2><p className="t-muted text-sm mt-1">Watch your order race across our live 3D delivery city.</p></div>
+        <Reveal className="text-center mb-5"><h2 className="text-2xl font-extrabold" style={{color:'var(--text)'}}>See it in action</h2><p className="t-muted text-sm mt-1">Watch your order race across our live 3D delivery city.</p></Reveal>
         <DeliveryJourney onDelivered={addToCart}/>
       </section>
 
       {/* Stats + reviews + discord */}
       <section className="max-w-7xl mx-auto px-5 py-10 grid lg:grid-cols-3 gap-5">
         <div className="grid grid-cols-2 gap-3">
-          {STATS.map(([e,n,l])=>(<div key={l} className="panel rounded-2xl p-4"><div className="text-xl">{e}</div><div className="text-2xl font-extrabold mt-1" style={{color:'var(--text)'}}>{n}</div><div className="text-xs t-muted">{l}</div></div>))}
+          {STATS.map(([e,n,l],i)=>(<Reveal key={l} delay={i*80} className="panel rounded-2xl p-4"><div className="text-xl">{e}</div><div className="text-2xl font-extrabold mt-1" style={{color:'var(--text)'}}><CountUp value={n}/></div><div className="text-xs t-muted">{l}</div></Reveal>))}
         </div>
-        <div className="panel rounded-2xl p-5">
+        <Reveal className="panel rounded-2xl p-5">
           <h3 className="font-bold" style={{color:'var(--text)'}}>What Our Customers Say</h3>
           <div className="flex items-center gap-2 mt-2"><span className="text-amber-400 text-lg">★★★★★</span><span className="font-bold" style={{color:'var(--text)'}}>4.9 out of 5</span></div>
           <div className="text-xs t-muted">Based on 2,345 reviews</div>
@@ -626,13 +687,14 @@ function App(){
             <div className="panel2 rounded-xl p-3"><div className="text-amber-400 text-xs">★★★★★</div><div className="text-sm" style={{color:'var(--text)'}}>“Fast delivery and best prices!”</div><div className="text-[11px] t-muted">— Alex M.</div></div>
             <div className="panel2 rounded-xl p-3"><div className="text-amber-400 text-xs">★★★★★</div><div className="text-sm" style={{color:'var(--text)'}}>“Super reliable and fast”</div><div className="text-[11px] t-muted">— Sarah K.</div></div>
           </div>
-        </div>
-        <div className="rounded-2xl p-6 text-white flex flex-col justify-center text-center" style={{background:'linear-gradient(135deg,#5865F2,#7c3aed)'}}>
-          <div className="text-4xl">💬</div>
+        </Reveal>
+        <Reveal delay={120} className="rounded-2xl p-6 text-white flex flex-col justify-center text-center relative overflow-hidden" style={{background:'linear-gradient(135deg,#5865F2,#7c3aed)'}}>
+          <div className="absolute inset-0 grid-bg opacity-20"/>
+          <div className="relative"><div className="text-4xl">💬</div>
           <h3 className="text-xl font-extrabold mt-2">Join Our Discord</h3>
           <p className="text-white/85 text-sm mt-1">Get support, updates and exclusive giveaways!</p>
-          <a href="https://discord.gg/vNcfgDbVd" target="_blank" className="inline-flex items-center justify-center gap-2 mt-4 px-5 py-3 rounded-xl font-semibold bg-white text-indigo-700 hover:scale-[1.03] transition-all">Join Discord →</a>
-        </div>
+          <a href="https://discord.gg/vNcfgDbVd" target="_blank" className="inline-flex items-center justify-center gap-2 mt-4 px-5 py-3 rounded-xl font-semibold bg-white text-indigo-700 hover:scale-[1.03] transition-all">Join Discord →</a></div>
+        </Reveal>
       </section>
 
       <footer className="py-8 text-center text-sm t-muted" style={{borderTop:'1px solid var(--border)'}}>FORGEMARKET — premium in-game assets · automated delivery · 24/7 support</footer>
