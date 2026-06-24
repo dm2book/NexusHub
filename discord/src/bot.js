@@ -397,6 +397,7 @@ async function handleCommand(i) {
       "`/shop` — open the shop\n`/invite` — get the invite link\n`/stats` — server stats\n" +
       "`/rank` — your level & XP\n`/leaderboard` — top members\n" +
       "`/close` — staff: close a ticket\n`/giveaway` — staff: start a giveaway\n`/reroll` — staff: reroll a winner\n" +
+      "`/coupon` — staff: post a discount code\n`/announce` — staff: post an announcement\n" +
       "Buttons: verify in #verify, pick roles in #roles, open a ticket in #open-a-ticket." });
   }
   if (i.commandName === 'order') return lookupOrder(i);
@@ -406,6 +407,8 @@ async function handleCommand(i) {
   if (i.commandName === 'rank') return rankCmd(i);
   if (i.commandName === 'leaderboard') return leaderboardCmd(i);
   if (i.commandName === 'suggest') return postSuggestion(i);
+  if (i.commandName === 'coupon') return postCoupon(i);
+  if (i.commandName === 'announce') return postAnnounce(i);
   if (i.commandName === 'close') {
     if (!i.channel?.topic?.startsWith('ticket-owner:')) {
       return i.reply({ content: 'Use this inside a ticket channel.', ephemeral: true });
@@ -573,6 +576,33 @@ async function postVouch(i) {
     .setFooter({ text: 'Community vouch' }).setTimestamp();
   if (ch) await ch.send({ embeds: [e] }).catch(() => {});
   return i.reply({ content: 'Thanks for the vouch! 💚 Posted in #vouchers.', ephemeral: true });
+}
+
+// ── /coupon (staff) → posts a discount code to #discount-codes ────────────────
+async function postCoupon(i) {
+  if (!isStaff(i.member)) return i.reply({ content: 'Only staff can post coupons.', ephemeral: true });
+  const code = i.options.getString('code').toUpperCase();
+  const percent = Math.min(90, Math.max(1, i.options.getInteger('percent') || 10));
+  const note = i.options.getString('note') || 'Redeem at checkout on the website.';
+  const ch = findChannel(i.guild, 'discount-codes') || i.channel;
+  const e = new EmbedBuilder().setColor(0xec4899).setTitle('🏷️ New discount code!')
+    .setDescription(`Use code **\`${code}\`** for **${percent}% OFF** your order.\n\n${note}`)
+    .addFields({ name: 'Code', value: `\`${code}\``, inline: true }, { name: 'Discount', value: `${percent}%`, inline: true })
+    .setFooter({ text: 'ForgeMarket • limited time' }).setTimestamp();
+  const dealRole = i.guild.roles.cache.find((r) => r.name === 'Deals');
+  await ch.send({ content: dealRole ? `<@&${dealRole.id}>` : '', embeds: [e] }).catch(() => {});
+  return i.reply({ content: `Posted code **${code}** in <#${ch.id}>. (Add it to the site's COUPONS env to make it work at checkout.)`, ephemeral: true });
+}
+
+// ── /announce (staff) → posts to #announcements ───────────────────────────────
+async function postAnnounce(i) {
+  if (!isStaff(i.member)) return i.reply({ content: 'Only staff can announce.', ephemeral: true });
+  const message = i.options.getString('message');
+  const ch = findChannel(i.guild, 'announcements') || i.channel;
+  const e = new EmbedBuilder().setColor(0x6366f1).setTitle('📢 Announcement')
+    .setDescription(message).setFooter({ text: `Posted by ${i.user.username}` }).setTimestamp();
+  await ch.send({ content: '@everyone', embeds: [e], allowedMentions: { parse: ['everyone'] } }).catch(() => {});
+  return i.reply({ content: `Announcement posted in <#${ch.id}>.`, ephemeral: true });
 }
 
 // ── /giveaway (staff) ─────────────────────────────────────────────────────────

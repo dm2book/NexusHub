@@ -1,7 +1,7 @@
 /** Public storefront routes: browse catalog, place an order, track by number. */
 import { Router } from 'express';
 import { z } from 'zod';
-import { config, manualPayMethods } from '../config/env.js';
+import { config, manualPayMethods, couponFor } from '../config/env.js';
 import { asyncHandler } from '../middleware/error.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 import { listProducts, getProduct } from '../services/productService.js';
@@ -25,6 +25,7 @@ router.get('/config', (_req, res) => {
     demoPayments: config.payments.demoMode,
     paymentMethods: manual,                 // [{id,label,target,kind}]
     paymentNote: config.payments.manual.note,
+    announcement: config.shop.announcement,  // optional promo bar text
     oauthProviders: listEnabledProviders(),
     discordEnabled: !!config.discord.inviteUrl || !!config.discord.guildId,
     brand: config.email.fromName,
@@ -48,6 +49,13 @@ router.get('/products/:id', asyncHandler(async (req, res) => {
   res.json({ product: p });
 }));
 
+// Validate a discount code (checkout preview).
+router.get('/coupons/:code', (req, res) => {
+  const c = couponFor(req.params.code);
+  if (!c) throw new ApiError(404, 'Invalid or expired code');
+  res.json(c);
+});
+
 // Place an order. Authenticated users get it linked to their account; guests
 // may order by email. Checkout/payment capture would call markPaymentReceived.
 router.post('/orders', rateLimit({ bucket: 'checkout', windowMs: 60_000, max: 20 }),
@@ -61,6 +69,8 @@ router.post('/orders', rateLimit({ bucket: 'checkout', windowMs: 60_000, max: 20
       })).min(1),
       billing: z.record(z.any()).optional(),
       currency: z.string().length(3).optional(),
+      coupon: z.string().max(40).optional(),
+      paymentMethod: z.string().max(20).optional(),
     }).parse(req.body);
 
     const order = await createOrder(

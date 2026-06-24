@@ -8,6 +8,7 @@ import { useCart } from '../context/CartContext.jsx';
 import ChatWidget from '../components/ChatWidget.jsx';
 import ScrollProgress from '../components/ScrollProgress.jsx';
 import Ambience from '../components/Ambience.jsx';
+import { AnnouncementBar, CookieConsent } from '../components/SiteExtras.jsx';
 
 const NAV = [
   { to: '/shop', label: 'Shop' },
@@ -26,6 +27,7 @@ export default function SiteLayout() {
     <div className="min-h-screen flex flex-col">
       <Ambience />
       <ScrollProgress />
+      <AnnouncementBar />
       <header className="sticky top-0 z-40 backdrop-blur-xl bg-space-black/70 border-b border-white/[0.06]">
         <nav className="section h-16 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2.5 shrink-0">
@@ -90,6 +92,7 @@ export default function SiteLayout() {
       <main className="flex-1"><div key={location.pathname} className="page-enter"><Outlet /></div></main>
 
       <ChatWidget />
+      <CookieConsent />
 
       <footer className="relative border-t border-white/[0.06] mt-20 overflow-hidden">
         <div className="orb w-72 h-72 bg-primary/20 -bottom-32 left-1/4" />

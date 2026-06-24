@@ -12,7 +12,7 @@
 import { run, get, all, nowIso, tx } from '../db/index.js';
 import { newId, newOrderNumber } from '../utils/ids.js';
 import { formatMoney } from '../utils/money.js';
-import { config, manualPayMethods } from '../config/env.js';
+import { config, manualPayMethods, couponFor } from '../config/env.js';
 import { badRequest, notFound, conflict } from '../utils/errors.js';
 import { sendEmailAsync } from './emailService.js';
 import { notify } from './notificationService.js';
@@ -77,7 +77,12 @@ export async function createOrder(input, ctx = {}) {
       quantity: qty, unit_price: unit, metadata: li.metadata || {},
     });
   }
-  const total = subtotal; // taxes/shipping would be added here
+  // Apply a discount coupon if one was supplied and is valid.
+  const coupon = couponFor(input.coupon);
+  const discount = coupon ? Math.round(subtotal * coupon.percent / 100) : 0;
+  const total = Math.max(0, subtotal - discount);
+  const billing = { ...(input.billing || {}) };
+  if (coupon) { billing.coupon = coupon.code; billing.discount = discount; }
 
   await tx(async () => {
     await run(`INSERT INTO orders
@@ -85,7 +90,7 @@ export async function createOrder(input, ctx = {}) {
          VALUES (@id, @num, @uid, @email, 'pending', @cur, @sub, @tot, @bill, @at, @at)`,
         { id: orderId, num: number, uid: input.userId || null, email,
           cur: currency, sub: subtotal, tot: total,
-          bill: JSON.stringify(input.billing || {}), at });
+          bill: JSON.stringify(billing), at });
     for (const it of lineItems) {
       await run(`INSERT INTO order_items (id, order_id, product_id, name, quantity, unit_price, metadata)
            VALUES (@id, @oid, @pid, @name, @qty, @price, @meta)`,

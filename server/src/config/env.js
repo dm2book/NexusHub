@@ -137,6 +137,26 @@ export const config = {
   },
 };
 
+/** Parse "FORGE10:10,WELCOME5:5" → { FORGE10: 10, WELCOME5: 5 } (percent off). */
+function parseCoupons(s) {
+  const out = {};
+  (s || '').split(',').forEach((p) => {
+    const [c, v] = p.split(':');
+    const code = (c || '').trim().toUpperCase();
+    const pct = Math.max(0, Math.min(90, parseInt(v, 10) || 0));
+    if (code && pct) out[code] = pct;
+  });
+  return out;
+}
+config.shop = { coupons: parseCoupons(env.COUPONS), announcement: env.SITE_ANNOUNCEMENT || '' };
+
+/** Validate a coupon code → { code, percent } or null. */
+export function couponFor(code) {
+  if (!code) return null;
+  const pct = config.shop.coupons[String(code).trim().toUpperCase()];
+  return pct ? { code: String(code).trim().toUpperCase(), percent: pct } : null;
+}
+
 /** Enabled manual payment methods as [{id,label,target,kind}]. */
 export function manualPayMethods() {
   const m = config.payments.manual, out = [];

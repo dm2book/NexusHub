@@ -33,6 +33,12 @@ const commands = [
   new SlashCommandBuilder().setName('invite').setDescription('Get the server invite link'),
   new SlashCommandBuilder().setName('stats').setDescription('Show live server stats'),
   new SlashCommandBuilder().setName('close').setDescription('Staff: close the current ticket'),
+  new SlashCommandBuilder().setName('coupon').setDescription('Staff: post a discount code')
+    .addStringOption((o) => o.setName('code').setDescription('e.g. FORGE10').setRequired(true))
+    .addIntegerOption((o) => o.setName('percent').setDescription('% off (1–90)').setRequired(true))
+    .addStringOption((o) => o.setName('note').setDescription('Optional note')),
+  new SlashCommandBuilder().setName('announce').setDescription('Staff: post an announcement')
+    .addStringOption((o) => o.setName('message').setDescription('What to announce').setRequired(true)),
 ].map((c) => c.toJSON());
 
 const rest = new REST({ version: '10' }).setToken(DISCORD_TOKEN);

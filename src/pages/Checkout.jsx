@@ -32,6 +32,18 @@ export default function Checkout() {
   const [note, setNote] = useState('');
   const [methodId, setMethodId] = useState('');
   const [placed, setPlaced] = useState(null);           // created order (manual flow)
+  const [couponInput, setCouponInput] = useState('');
+  const [coupon, setCoupon] = useState(null);           // { code, percent }
+
+  const discount = coupon ? Math.round(subtotal * coupon.percent / 100) : 0;
+  const grandTotal = Math.max(0, subtotal - discount);
+
+  const applyCoupon = async () => {
+    const code = couponInput.trim();
+    if (!code) return;
+    try { const c = await api.get(`/api/coupons/${encodeURIComponent(code)}`); setCoupon(c); toast.success(`Code applied — ${c.percent}% off!`); }
+    catch { setCoupon(null); toast.error('Invalid or expired code'); }
+  };
 
   useEffect(() => { if (user?.email) setEmail(user.email); }, [user]);
   useEffect(() => {
@@ -43,7 +55,7 @@ export default function Checkout() {
     }).catch(() => {});
   }, []);
 
-  const amountEur = (subtotal / 100).toFixed(2);
+  const amountEur = (grandTotal / 100).toFixed(2);
 
   if (items.length === 0 && !placed) {
     return (
@@ -64,6 +76,7 @@ export default function Checkout() {
         items: items.map((i) => ({ productId: i.id, quantity: i.qty })),
         billing: { full_name: fullName, email },
         currency,
+        coupon: coupon?.code,
         paymentMethod: methodId || undefined,
       });
 
@@ -197,9 +210,16 @@ export default function Checkout() {
               </div>
             ))}
           </div>
-          <div className="flex justify-between text-lg border-t border-white/5 pt-4 mb-6">
-            <span className="text-slate-300">Total</span>
-            <span className="text-white font-semibold">{money(subtotal, currency)}</span>
+          {/* Coupon */}
+          <div className="flex gap-2 mb-4">
+            <input value={couponInput} onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+              placeholder="Discount code" className="input py-2 text-sm" />
+            <button type="button" onClick={applyCoupon} className="btn-ghost px-4 text-sm">Apply</button>
+          </div>
+          <div className="border-t border-white/5 pt-4 mb-6 space-y-1.5">
+            <div className="flex justify-between text-sm text-slate-400"><span>Subtotal</span><span>{money(subtotal, currency)}</span></div>
+            {coupon && <div className="flex justify-between text-sm text-emerald-300"><span>Discount ({coupon.code} · {coupon.percent}%)</span><span>−{money(discount, currency)}</span></div>}
+            <div className="flex justify-between text-lg pt-1"><span className="text-slate-300">Total</span><span className="text-white font-semibold">{money(grandTotal, currency)}</span></div>
           </div>
           <button disabled={busy} className="btn-primary w-full py-3">
             {busy ? <Loader2 size={18} className="animate-spin" />
