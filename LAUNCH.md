@@ -19,23 +19,27 @@ The shop, login and orders need Postgres connected to the **forgemarket** projec
   existing **Neon** DB → Connect. This injects `DATABASE_URL` / `POSTGRES_*`.
 - The catalog auto‑seeds on first boot (no `SEED_DEMO` needed).
 
-## 2. Payments — REQUIRED to sell  **(only you)**
-> Right now `paymentMode` resolves to **none** in production (no Stripe key), so
-> customers can't check out. Pick ONE:
+## 2. Payments — Tikkie / Revolut / PayPal  **(only you)**
+You chose manual methods — easiest to start. Set any of these env vars (project
+forgemarket → Environment Variables); the storefront auto-switches to "manual" pay:
+| Variable | Value |
+|---|---|
+| `PAY_TIKKIE` | your Tikkie payment-request link |
+| `PAY_REVOLUT` | `revolut.me/yourname` |
+| `PAY_PAYPAL` | `paypal.me/yourname` **or** your PayPal email |
+| `PAY_NOTE` | (optional) note shown on the payment screen |
 
-**A) Real money (Stripe) — recommended**
-1. Create a [Stripe](https://stripe.com) account → get your **Secret key** (`sk_live_…`).
-2. Vercel env vars (project forgemarket):
-   - `STRIPE_SECRET_KEY=sk_live_…`
-   - `STRIPE_WEBHOOK_SECRET=whsec_…`
-3. Stripe Dashboard → Developers → **Webhooks** → add endpoint
-   `https://forgemarket-store.vercel.app/api/payments/stripe/webhook`
-   → events: `checkout.session.completed`, `checkout.session.expired` → copy the
-   signing secret into `STRIPE_WEBHOOK_SECRET`.
+**How it works:** customer places the order → sees the amount + a **Pay** button
+(your Tikkie/Revolut/PayPal link) + their **order number as reference** → pays →
+you see the order in **/admin → Orders** and click **Mark as paid / Complete** to
+fulfil it. (PayPal.me auto-fills the amount; for Tikkie/Revolut the customer enters
+the shown amount.)
 
-**B) Test the full flow without real money**
-- Set `DEMO_PAYMENTS=true` (marks orders paid without a PSP). **Turn this OFF before
-  taking real customers** — anyone could "buy" for free.
+> Tip: use **PayPal Goods & Services** if you want buyer/seller protection. Friends
+> & Family has no fees but no protection.
+
+_(Alternative — automatic card payments: set `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET`
+instead. Or `DEMO_PAYMENTS=true` to test without money — never leave demo on for real sales.)_
 
 ## 3. Email — REQUIRED for login codes + order emails  **(only you)**
 Customers sign in with a one‑time code and get order confirmations by email.

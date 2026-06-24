@@ -126,8 +126,25 @@ export const config = {
       secretKey: env.STRIPE_SECRET_KEY || '',
       webhookSecret: env.STRIPE_WEBHOOK_SECRET || '',
     },
+    // Manual payment methods (Tikkie / Revolut / PayPal). The customer pays via the
+    // link with their order number as reference; an admin confirms in the dashboard.
+    manual: {
+      tikkie: env.PAY_TIKKIE || '',     // a Tikkie payment-request link
+      revolut: env.PAY_REVOLUT || '',   // revolut.me/yourname
+      paypal: env.PAY_PAYPAL || '',     // paypal.me/yourname or your PayPal email
+      note: env.PAY_NOTE || 'After paying, your order is confirmed within minutes during open hours.',
+    },
   },
 };
+
+/** Enabled manual payment methods as [{id,label,target,kind}]. */
+export function manualPayMethods() {
+  const m = config.payments.manual, out = [];
+  if (m.tikkie) out.push({ id: 'tikkie', label: 'Tikkie', target: m.tikkie, kind: 'link' });
+  if (m.revolut) out.push({ id: 'revolut', label: 'Revolut', target: m.revolut, kind: 'link' });
+  if (m.paypal) out.push({ id: 'paypal', label: 'PayPal', target: m.paypal.includes('@') ? m.paypal : m.paypal, kind: m.paypal.includes('@') ? 'email' : 'link' });
+  return out;
+}
 
 /** Throws on startup if production is missing critical secrets. */
 export function assertProductionConfig() {

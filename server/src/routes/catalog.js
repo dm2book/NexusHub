@@ -1,7 +1,7 @@
 /** Public storefront routes: browse catalog, place an order, track by number. */
 import { Router } from 'express';
 import { z } from 'zod';
-import { config } from '../config/env.js';
+import { config, manualPayMethods } from '../config/env.js';
 import { asyncHandler } from '../middleware/error.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 import { listProducts, getProduct } from '../services/productService.js';
@@ -12,15 +12,19 @@ import { ApiError, forbidden } from '../utils/errors.js';
 
 const router = Router();
 
-// Which payment path the storefront should use.
+// Which payment path the storefront should use. Manual methods (Tikkie/Revolut/
+// PayPal) take priority when configured, then Stripe, then demo.
+const manual = manualPayMethods();
 const paymentProvider = () =>
-  stripeEnabled() ? 'stripe' : config.payments.demoMode ? 'demo' : 'none';
+  manual.length ? 'manual' : stripeEnabled() ? 'stripe' : config.payments.demoMode ? 'demo' : 'none';
 
 // Public runtime config the SPA can read (feature flags, enabled providers).
 router.get('/config', (_req, res) => {
   res.json({
     paymentProvider: paymentProvider(),
     demoPayments: config.payments.demoMode,
+    paymentMethods: manual,                 // [{id,label,target,kind}]
+    paymentNote: config.payments.manual.note,
     oauthProviders: listEnabledProviders(),
     discordEnabled: !!config.discord.inviteUrl || !!config.discord.guildId,
     brand: config.email.fromName,
