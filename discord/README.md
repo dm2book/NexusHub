@@ -37,7 +37,7 @@ for live product recommendations + order context. Without them the bot still wor
 
 ---
 
-## 2. Server structure (9 categories · 36 channels)
+## 2. Server structure (10 categories · 49 channels)
 
 Access tiers: **public** (everyone) · **verified** (after onboarding) · **vip** ·
 **staff**. Read-only = members read, staff post.
@@ -218,28 +218,44 @@ verified reviews from the store webhook into `#reviews`, and a leveling/XP syste
 
 ## 11. Full feature list (what the bot does)
 
-- **Builds the whole server** (10 categories, 47 channels) with topics, least-
+- **Builds the whole server** (10 categories, 49 channels) with topics, least-
   privilege permissions and **rich panels/text in every key channel** — idempotent,
   resilient (one failure never aborts the run), and re-postable with `REPOST=1`.
+- **Verification gate:** before verifying, members see **only the WELCOME area**.
+  Verify → read & **accept the rules** (green button) → granted *Verified Customer*
+  → the whole server unlocks (everything except staff). Re-running setup re-applies
+  the gate to an existing server.
 - **Always-can-post fix:** the bot gets its own permission overwrite in every
-  category, so panels post even in read-only channels **without needing
-  Administrator**.
-- **Onboarding:** welcome DM + Verify button → grants *Verified Customer*.
+  category, so panels post even in read-only channels **without needing Administrator**.
+- **Onboarding:** warm welcome DM that points new members to `#verify`.
 - **Self-roles** (`#roles`): one-tap game roles (Roblox, Fortnite, Valorant, CoD,
   Apex, Genshin, Brawl, Clash) + alert roles (Drops, Deals, Giveaways).
-- **Tickets:** topic buttons → private channel, **Claim** + **Close**, staff
-  routing, transcript saved to `#ticket-logs`.
+- **Tickets:** topic buttons → private channel (hidden from other members),
+  **Claim** (locks + disables the button) + **Close**, staff routing, full transcript
+  to `#ticket-logs`, transcript **DM'd to the owner** with a ⭐ **rating** prompt.
+  Also `/close`.
+- **Giveaways 2.0:** `/giveaway prize minutes winners` → Enter button with a **live
+  entry counter**, **multiple winners**, **verified-only** entry, tap-to-leave,
+  winner **DMs**, auto-post to `#winners`, and `/reroll` to pick a new winner.
+- **Leveling / XP:** earn XP per message (cooldown), **level-up announcements**,
+  `/rank` (level, XP bar, rank) and `/leaderboard`. Persisted to `xp.json`.
+- **Suggestions:** `/suggest` → embed in `#suggestions` with ✅/❌ voting.
+- **Starboard:** ⭐-react any message → at 3 stars it's reposted to `#starboard`.
 - **AI assistant "Forge"** (`#ask-the-bot`, `/ask`, `/recommend`): FAQ + live
   product recommendations (Claude + prompt caching, rule-based fallback).
-- **Giveaways:** `/giveaway prize minutes` → Enter button, auto winner to
-  `#winners`.
+- **VIP automation** (store side): a paid order auto-grants *Verified Customer*
+  (< €20) or *VIP Customer* (≥ €20) to buyers who signed in with Discord.
+- **Promos:** `/coupon code percent` → posts to `#discount-codes` (pings Deals);
+  `/announce message` → posts to `#announcements`.
+- **Live server stats:** auto-managed voice channels (👥 Members, 💎 Boosts).
 - **Order lookup:** `/order <number>` via the store's public tracking API.
 - **Vouches:** `/vouch` posts a formatted, starred vouch to `#vouchers`.
 - **Auto-moderation:** removes Discord invites / "free nitro"-style scams from
   non-staff (outside tickets) and logs to `#mod-log`.
-- **Logging + leads:** joins, leaves, tickets and buying-intent posted to staff
-  channels.
-- **Slash commands:** `/help /ask /recommend /order /vouch /giveaway`.
+- **Logging + leads:** joins, leaves, tickets and buying-intent posted to staff channels.
+- **Slash commands:** `/help /ask /recommend /order /vouch /suggest /shop /invite
+  /stats /serverinfo /rank /leaderboard` and staff: `/giveaway /reroll /coupon
+  /announce /close`.
 
 ## 12. Brand assets
 
