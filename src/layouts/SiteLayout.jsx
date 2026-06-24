@@ -1,14 +1,15 @@
 import { useState } from 'react';
 import { Outlet, Link, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
-  Zap, LayoutDashboard, LogOut, Shield, ShoppingCart, Menu, X, MessageCircle,
+  Zap, LayoutDashboard, LogOut, Shield, ShoppingCart, Menu, X, MessageCircle, Heart,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useCart } from '../context/CartContext.jsx';
+import { useWishlist } from '../lib/wishlist.js';
 import ChatWidget from '../components/ChatWidget.jsx';
 import ScrollProgress from '../components/ScrollProgress.jsx';
 import Ambience from '../components/Ambience.jsx';
-import { AnnouncementBar, CookieConsent } from '../components/SiteExtras.jsx';
+import { AnnouncementBar, CookieConsent, SocialProof, BackToTop } from '../components/SiteExtras.jsx';
 
 const NAV = [
   { to: '/shop', label: 'Shop' },
@@ -19,6 +20,7 @@ const NAV = [
 export default function SiteLayout() {
   const { user, isStaff, logout } = useAuth();
   const { count } = useCart();
+  const { count: wishCount } = useWishlist();
   const navigate = useNavigate();
   const location = useLocation();
   const [open, setOpen] = useState(false);
@@ -48,6 +50,14 @@ export default function SiteLayout() {
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3">
+            <Link to="/wishlist" className="relative p-2.5 rounded-xl hover:bg-white/5 text-slate-300" title="Wishlist">
+              <Heart size={19} />
+              {wishCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-white text-[11px] font-bold flex items-center justify-center">
+                  {wishCount}
+                </span>
+              )}
+            </Link>
             <Link to="/cart" className="relative p-2.5 rounded-xl hover:bg-white/5 text-slate-300" title="Cart">
               <ShoppingCart size={19} />
               {count > 0 && (
@@ -92,6 +102,8 @@ export default function SiteLayout() {
       <main className="flex-1"><div key={location.pathname} className="page-enter"><Outlet /></div></main>
 
       <ChatWidget />
+      <SocialProof />
+      <BackToTop />
       <CookieConsent />
 
       <footer className="relative border-t border-white/[0.06] mt-20 overflow-hidden">

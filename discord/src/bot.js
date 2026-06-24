@@ -134,10 +134,42 @@ function ruleBasedAnswer(q, products) {
 
 const BUY_INTENT = /\b(buy|price|cheap|how much|robux|v-?bucks|vp|cp|gems|crystals|apex|order|top.?up)\b/i;
 
+// ── Live server-stats voice channels (auto-managed by the bot) ───────────────
+async function ensureStat(guild, cat, emoji, label, value) {
+  const name = `${emoji} ${label}: ${value}`;
+  let ch = guild.channels.cache.find((c) => c.parentId === cat.id && c.type === ChannelType.GuildVoice && c.name.startsWith(emoji));
+  try {
+    if (!ch) {
+      await guild.channels.create({
+        name, type: ChannelType.GuildVoice, parent: cat.id,
+        permissionOverwrites: [{ id: guild.roles.everyone.id, deny: [P.Connect] }],
+      });
+    } else if (ch.name !== name) {
+      await ch.setName(name); // Discord rate-limits to ~2 renames / 10 min per channel
+    }
+  } catch (e) { /* rate-limited or perms — ignore */ }
+}
+async function updateServerStats(guild) {
+  try {
+    let cat = guild.channels.cache.find((c) => c.type === ChannelType.GuildCategory && c.name === '📊 SERVER STATS');
+    if (!cat) {
+      cat = await guild.channels.create({
+        name: '📊 SERVER STATS', type: ChannelType.GuildCategory, position: 0,
+        permissionOverwrites: [{ id: guild.roles.everyone.id, allow: [P.ViewChannel], deny: [P.Connect] }],
+      });
+    }
+    await ensureStat(guild, cat, '👥', 'Members', guild.memberCount);
+    await ensureStat(guild, cat, '💎', 'Boosts', guild.premiumSubscriptionCount || 0);
+  } catch (e) { console.error('[stats]', e.message); }
+}
+
 // ── ready ────────────────────────────────────────────────────────────────
 client.once(Events.ClientReady, (c) => {
   console.log(`✅ ${c.user.tag} online — AI: ${anthropic ? 'on' : 'rule-based'} · API: ${FORGEMARKET_API_URL || 'sample'}`);
   c.user.setPresence({ activities: [{ name: '/ask · instant top-ups' }], status: 'online' });
+  const refresh = () => c.guilds.cache.forEach((g) => updateServerStats(g));
+  refresh();
+  setInterval(refresh, 6 * 60_000); // respect channel-rename rate limits
 });
 
 // ── greet new members ──────────────────────────────────────────────────────
@@ -397,7 +429,7 @@ async function handleCommand(i) {
       "`/shop` — open the shop\n`/invite` — get the invite link\n`/stats` — server stats\n" +
       "`/rank` — your level & XP\n`/leaderboard` — top members\n" +
       "`/close` — staff: close a ticket\n`/giveaway` — staff: start a giveaway\n`/reroll` — staff: reroll a winner\n" +
-      "`/coupon` — staff: post a discount code\n`/announce` — staff: post an announcement\n" +
+      "`/coupon` — staff: post a discount code\n`/announce` — staff: post an announcement\n`/serverinfo` — server stats\n" +
       "Buttons: verify in #verify, pick roles in #roles, open a ticket in #open-a-ticket." });
   }
   if (i.commandName === 'order') return lookupOrder(i);
@@ -409,6 +441,20 @@ async function handleCommand(i) {
   if (i.commandName === 'suggest') return postSuggestion(i);
   if (i.commandName === 'coupon') return postCoupon(i);
   if (i.commandName === 'announce') return postAnnounce(i);
+  if (i.commandName === 'serverinfo') {
+    const g = i.guild;
+    const e = new EmbedBuilder().setColor(0x6366f1).setTitle(`📊 ${g.name}`)
+      .setThumbnail(g.iconURL() || null)
+      .addFields(
+        { name: '👥 Members', value: `${g.memberCount}`, inline: true },
+        { name: '💎 Boosts', value: `${g.premiumSubscriptionCount || 0}`, inline: true },
+        { name: '😀 Emojis', value: `${g.emojis.cache.size}`, inline: true },
+        { name: '💬 Channels', value: `${g.channels.cache.size}`, inline: true },
+        { name: '🎭 Roles', value: `${g.roles.cache.size}`, inline: true },
+        { name: '📅 Created', value: `<t:${Math.floor(g.createdTimestamp / 1000)}:D>`, inline: true })
+      .setFooter({ text: 'ForgeMarket Community' });
+    return i.reply({ embeds: [e] });
+  }
   if (i.commandName === 'close') {
     if (!i.channel?.topic?.startsWith('ticket-owner:')) {
       return i.reply({ content: 'Use this inside a ticket channel.', ephemeral: true });

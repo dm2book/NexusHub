@@ -39,6 +39,7 @@ const commands = [
     .addStringOption((o) => o.setName('note').setDescription('Optional note')),
   new SlashCommandBuilder().setName('announce').setDescription('Staff: post an announcement')
     .addStringOption((o) => o.setName('message').setDescription('What to announce').setRequired(true)),
+  new SlashCommandBuilder().setName('serverinfo').setDescription('Show server statistics'),
 ].map((c) => c.toJSON());
 
 const rest = new REST({ version: '10' }).setToken(DISCORD_TOKEN);

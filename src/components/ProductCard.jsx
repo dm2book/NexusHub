@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ShoppingCart, Zap } from 'lucide-react';
+import { ShoppingCart, Zap, Heart } from 'lucide-react';
 import { categoryVisual, money } from '../lib/catalog.js';
+import { useWishlist } from '../lib/wishlist.js';
 import Tilt from './Tilt.jsx';
 
 export default function ProductCard({ product, onAdd }) {
@@ -9,6 +10,8 @@ export default function ProductCard({ product, onAdd }) {
   const out = product.stock != null && product.stock <= 0;
   const [imgOk, setImgOk] = useState(true);
   const showImg = product.image && imgOk;
+  const wl = useWishlist();
+  const liked = wl.has(product.id);
 
   return (
     <Tilt max={8} className="h-full">
@@ -33,6 +36,11 @@ export default function ProductCard({ product, onAdd }) {
               <Zap size={11} /> Featured
             </span>
           )}
+          <button onClick={(e) => { e.preventDefault(); wl.toggle(product.id); }}
+            aria-label="Save to wishlist"
+            className={`absolute right-3 top-3 w-8 h-8 rounded-full backdrop-blur flex items-center justify-center transition ${liked ? 'bg-rose-500/90 text-white' : 'bg-black/40 text-white/80 hover:text-white'}`}>
+            <Heart size={15} fill={liked ? 'currentColor' : 'none'} />
+          </button>
         </div>
       </Link>
 
