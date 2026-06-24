@@ -155,19 +155,33 @@ const CATALOG = [
 
 const parse = (s) => { try { return JSON.parse(s || '{}'); } catch { return {}; } };
 
+// Premium 3D icon tiles per category (public/products/icons). Aliases map the long
+// tail to the closest icon; unmapped categories keep their existing art.
+const CATEGORY_ICON = {
+  robux: 'robux', 'v-bucks': 'v-bucks', valorant: 'valorant', cod: 'cod',
+  genshin: 'genshin', brawl: 'brawl', apex: 'apex', clash: 'clash',
+  steam: 'steam', playstation: 'playstation', xbox: 'xbox', 'discord-nitro': 'discord-nitro',
+  clashroyale: 'clash', gamepass: 'xbox', league: 'valorant', freefire: 'cod',
+  pubg: 'cod', mlbb: 'clash', minecraft: 'chest', pokemongo: 'brawl',
+  netflix: 'giftcard', spotify: 'giftcard', nintendo: 'giftcard', amazon: 'giftcard',
+  googleplay: 'giftcard', itunes: 'giftcard', eafc: 'giftcard', gta: 'giftcard',
+};
+const iconFor = (cat) => CATEGORY_ICON[cat] ? `/products/icons/${CATEGORY_ICON[cat]}.png` : null;
+
 export async function seedDemoCatalog() {
   await migrate();
   let created = 0;
   let updated = 0;
   for (const p of CATALOG) {
+    const img = iconFor(p.category) || p.image || null;
     const existing = await get('SELECT id, metadata FROM products WHERE sku = @sku', { sku: p.sku });
     const at = nowIso();
 
     if (existing) {
-      // Backfill the cover image if the product doesn't have one yet.
+      // Keep the premium 3D icon in sync (also backfills missing covers).
       const meta = parse(existing.metadata);
-      if (p.image && !meta.image) {
-        meta.image = p.image;
+      if (img && meta.image !== img) {
+        meta.image = img;
         await run('UPDATE products SET metadata = @m, updated_at = @at WHERE id = @id',
           { m: JSON.stringify(meta), at, id: existing.id });
         updated++;
@@ -179,7 +193,7 @@ export async function seedDemoCatalog() {
         (id, sku, name, category, description, price, currency, kind, active, metadata, created_at, updated_at)
        VALUES (@id, @sku, @name, @cat, @desc, @price, 'EUR', 'digital', 1, @meta, @at, @at)`, {
       id: newId('prd'), sku: p.sku, name: p.name, cat: p.category, desc: p.description,
-      price: p.price, meta: JSON.stringify({ featured: !!p.featured, image: p.image }), at,
+      price: p.price, meta: JSON.stringify({ featured: !!p.featured, image: img }), at,
     });
     created++;
   }

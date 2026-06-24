@@ -100,8 +100,20 @@ const P = [
   ['ITUNES-25', 'App Store & iTunes €25', 'itunes', 2599, false, null, 'Apps, games, music and iCloud storage on Apple.'],
 ];
 
-// Categories that ship a real cover image under /public/products.
-const CATEGORY_IMG = { steam: 'steam', playstation: 'playstation', xbox: 'xbox', 'discord-nitro': 'nitro' };
+// Premium 3D icon tiles (public/products/icons). Categories without a dedicated
+// icon are aliased to the closest one; the rest fall back to a gradient tile.
+export const CATEGORY_ICON = {
+  robux: 'robux', 'v-bucks': 'v-bucks', valorant: 'valorant', cod: 'cod',
+  genshin: 'genshin', brawl: 'brawl', apex: 'apex', clash: 'clash',
+  steam: 'steam', playstation: 'playstation', xbox: 'xbox', 'discord-nitro': 'discord-nitro',
+  giftcard: 'giftcard',
+  // sensible aliases
+  clashroyale: 'clash', gamepass: 'xbox', league: 'valorant', freefire: 'cod',
+  pubg: 'cod', mlbb: 'clash', minecraft: 'chest', pokemongo: 'brawl',
+  netflix: 'giftcard', spotify: 'giftcard', nintendo: 'giftcard', amazon: 'giftcard',
+  googleplay: 'giftcard', itunes: 'giftcard', eafc: 'giftcard', gta: 'giftcard',
+};
+export const iconFor = (category) => CATEGORY_ICON[category] ? `/products/icons/${CATEGORY_ICON[category]}.png` : null;
 
 export const SAMPLE_PRODUCTS = P.map(([sku, name, category, price, featured, pack, description]) => ({
   id: sku.toLowerCase(),
@@ -112,9 +124,8 @@ export const SAMPLE_PRODUCTS = P.map(([sku, name, category, price, featured, pac
   currency: 'EUR',
   description,
   featured,
-  // Pack art when we have it, else a known category image, else null → the card
-  // renders a clean category gradient + icon (never a broken image).
-  image: pack ? `/products/packs/${pack}.svg` : (CATEGORY_IMG[category] ? `/products/${CATEGORY_IMG[category]}.svg` : null),
+  // Premium 3D icon for the category; null → card renders a gradient + lucide icon.
+  image: iconFor(category),
   sample: true,
 }));
 
