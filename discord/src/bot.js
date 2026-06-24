@@ -11,6 +11,7 @@
  *   npm run start
  */
 import 'dotenv/config';
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import {
   Client, GatewayIntentBits, Partials, Events, PermissionFlagsBits, ChannelType,
   EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, AttachmentBuilder,
@@ -24,7 +25,19 @@ const isStaff = (member) => member?.permissions?.has?.(PermissionFlagsBits.Manag
   || member?.roles?.cache?.some((r) => STAFF_ROLE_NAMES.includes(r.name));
 
 // Simple in-memory giveaway store (one bot instance).
-const GIVEAWAYS = new Map(); // messageId -> { prize, entries:Set<string>, endsAt, channelId }
+const GIVEAWAYS = new Map(); // messageId -> { prize, entries:Set, endsAt, channelId, msgId, winnersCount, hostId }
+const ENDED = new Map();     // messageId -> { prize, entries:[], channelId }  (kept ~1h for /reroll)
+
+// ── Leveling / XP (persisted to xp.json so it survives restarts) ─────────────
+const XP_FILE = new URL('../xp.json', import.meta.url);
+let XP = {};
+try { if (existsSync(XP_FILE)) XP = JSON.parse(readFileSync(XP_FILE, 'utf8')); } catch { XP = {}; }
+let xpSaveTimer = null;
+function saveXP() { clearTimeout(xpSaveTimer); xpSaveTimer = setTimeout(() => { try { writeFileSync(XP_FILE, JSON.stringify(XP)); } catch { /* ignore */ } }, 4000); }
+const levelFor = (xp) => Math.floor(0.18 * Math.sqrt(xp));
+const xpForLevel = (lvl) => Math.ceil((lvl / 0.18) ** 2);
+const xpCooldown = new Map();
+
 // Anti-scam: invite links + common scam phrases.
 const SCAM = /(discord\.(gg|com\/invite)\/|free\s*nitro|steamcommunity\.com\/(gift|trade)|t\.me\/|claim\s+your\s+(reward|prize|nitro)|airdrop|nitro\s+giveaway\s+http)/i;
 
@@ -241,9 +254,28 @@ async function claimTicket(i) {
 async function enterGiveaway(i, messageId) {
   const gw = GIVEAWAYS.get(messageId);
   if (!gw) return i.reply({ content: 'This giveaway has ended.', ephemeral: true });
-  if (gw.entries.has(i.user.id)) return i.reply({ content: 'You’re already entered ✅ Good luck! 🍀', ephemeral: true });
+  // Verified-only entry (ties into the verification gate).
+  const verified = findRole(i.guild, 'Verified Customer');
+  if (verified && !i.member.roles.cache.has(verified.id)) {
+    return i.reply({ content: 'Please verify in #verify first to enter giveaways. ✅', ephemeral: true });
+  }
+  if (gw.entries.has(i.user.id)) {
+    gw.entries.delete(i.user.id);
+    updateGwCount(i.guild, gw);
+    return i.reply({ content: 'You left the giveaway. 👋', ephemeral: true });
+  }
   gw.entries.add(i.user.id);
-  return i.reply({ content: `🎉 You’re in! **${gw.entries.size}** entries so far.`, ephemeral: true });
+  updateGwCount(i.guild, gw);
+  return i.reply({ content: `🎉 You’re in! **${gw.entries.size}** entries. (Tap again to leave.)`, ephemeral: true });
+}
+
+// Live-update the "Entries" field on the giveaway message.
+function updateGwCount(guild, gw) {
+  const ch = guild.channels.cache.get(gw.channelId);
+  ch?.messages?.fetch(gw.msgId).then((msg) => {
+    const emb = EmbedBuilder.from(msg.embeds[0]).setFields({ name: 'Entries', value: `🎟️ ${gw.entries.size}`, inline: true });
+    msg.edit({ embeds: [emb] }).catch(() => {});
+  }).catch(() => {});
 }
 
 async function openTicket(i, type) {
@@ -363,12 +395,16 @@ async function handleCommand(i) {
       "**Forge — your assistant**\n`/ask` — ask anything\n`/recommend` — product recommendation\n" +
       "`/order` — check an order status\n`/vouch` — leave a vouch\n`/suggest` — suggest an idea\n" +
       "`/shop` — open the shop\n`/invite` — get the invite link\n`/stats` — server stats\n" +
-      "`/close` — staff: close a ticket\n`/giveaway` — staff: start a giveaway\n" +
+      "`/rank` — your level & XP\n`/leaderboard` — top members\n" +
+      "`/close` — staff: close a ticket\n`/giveaway` — staff: start a giveaway\n`/reroll` — staff: reroll a winner\n" +
       "Buttons: verify in #verify, pick roles in #roles, open a ticket in #open-a-ticket." });
   }
   if (i.commandName === 'order') return lookupOrder(i);
   if (i.commandName === 'vouch') return postVouch(i);
   if (i.commandName === 'giveaway') return startGiveaway(i);
+  if (i.commandName === 'reroll') return rerollGiveaway(i);
+  if (i.commandName === 'rank') return rankCmd(i);
+  if (i.commandName === 'leaderboard') return leaderboardCmd(i);
   if (i.commandName === 'suggest') return postSuggestion(i);
   if (i.commandName === 'close') {
     if (!i.channel?.topic?.startsWith('ticket-owner:')) {
@@ -472,6 +508,44 @@ client.on(Events.GuildMemberRemove, (member) => {
   if (log) log.send(`🔴 ${member.user?.tag || member.id} left the server.`).catch(() => {});
 });
 
+// ── Leveling: award XP per message (60s cooldown), announce level-ups ─────────
+client.on(Events.MessageCreate, (m) => {
+  if (m.author.bot || !m.guild) return;
+  if (m.channel.name?.startsWith('ticket-')) return;
+  const now = Date.now();
+  if (now - (xpCooldown.get(m.author.id) || 0) < 60_000) return;
+  xpCooldown.set(m.author.id, now);
+  const rec = XP[m.author.id] || (XP[m.author.id] = { xp: 0, lvl: 0 });
+  const before = rec.lvl;
+  rec.xp += 15 + Math.floor(Math.random() * 11);
+  rec.lvl = levelFor(rec.xp);
+  saveXP();
+  if (rec.lvl > before && rec.lvl > 0) {
+    const ch = findChannel(m.guild, 'general') || m.channel;
+    ch.send(`🎉 GG <@${m.author.id}> — you reached **Level ${rec.lvl}**! Keep chatting to level up. ⚡`).catch(() => {});
+  }
+});
+
+function rankCmd(i) {
+  const rec = XP[i.user.id] || { xp: 0, lvl: 0 };
+  const cur = xpForLevel(rec.lvl), next = xpForLevel(rec.lvl + 1);
+  const prog = Math.max(0, Math.min(1, (rec.xp - cur) / Math.max(1, next - cur)));
+  const bar = '█'.repeat(Math.round(prog * 14)).padEnd(14, '░');
+  const sorted = Object.entries(XP).sort((a, b) => b[1].xp - a[1].xp);
+  const rankN = sorted.findIndex(([id]) => id === i.user.id) + 1;
+  const e = new EmbedBuilder().setColor(0xa855f7)
+    .setAuthor({ name: i.user.username, iconURL: i.user.displayAvatarURL() })
+    .setTitle(`Level ${rec.lvl}`)
+    .setDescription(`**Rank:** #${rankN || '—'}\n**XP:** ${rec.xp} / ${next}\n\`${bar}\` ${Math.round(prog * 100)}%`);
+  return i.reply({ embeds: [e] });
+}
+function leaderboardCmd(i) {
+  const top = Object.entries(XP).sort((a, b) => b[1].xp - a[1].xp).slice(0, 10);
+  const lines = top.map(([id, r], n) => `**${['🥇', '🥈', '🥉'][n] || `${n + 1}.`}** <@${id}> — Level ${r.lvl} · ${r.xp} XP`).join('\n') || 'No one has chatted yet — be the first!';
+  const e = new EmbedBuilder().setColor(0xa855f7).setTitle('🏆 XP Leaderboard').setDescription(lines).setFooter({ text: 'Chat to earn XP' });
+  return i.reply({ embeds: [e] });
+}
+
 // ── /order lookup (uses the store's public tracking endpoint) ─────────────────
 async function lookupOrder(i) {
   await i.deferReply({ ephemeral: true });
@@ -506,18 +580,20 @@ async function startGiveaway(i) {
   if (!isStaff(i.member)) return i.reply({ content: 'Only staff can start giveaways.', ephemeral: true });
   const prize = i.options.getString('prize');
   const minutes = i.options.getInteger('minutes') || 10;
-  await i.reply({ content: `Starting a giveaway for **${prize}** (${minutes} min)…`, ephemeral: true });
+  const winnersCount = Math.max(1, i.options.getInteger('winners') || 1);
+  await i.reply({ content: `Starting a giveaway for **${prize}** (${minutes} min, ${winnersCount} winner${winnersCount > 1 ? 's' : ''})…`, ephemeral: true });
   const endsAt = Date.now() + minutes * 60_000;
   const ch = findChannel(i.guild, 'giveaways') || i.channel;
   const gwRole = i.guild.roles.cache.find((r) => r.name === 'Giveaways');
   const e = new EmbedBuilder().setColor(0xa855f7).setTitle('🎉 GIVEAWAY')
-    .setDescription(`**Prize:** ${prize}\n**Ends:** <t:${Math.floor(endsAt / 1000)}:R>\n\nTap **Enter** below to join!\nHosted by <@${i.user.id}>`)
-    .setFooter({ text: 'ForgeMarket giveaway' });
+    .setDescription(`**Prize:** ${prize}\n**Winners:** ${winnersCount}\n**Ends:** <t:${Math.floor(endsAt / 1000)}:R>\n\nTap **Enter** below to join!\nHosted by <@${i.user.id}>`)
+    .addFields({ name: 'Entries', value: '🎟️ 0', inline: true })
+    .setFooter({ text: 'ForgeMarket giveaway · verified members only' });
   const msg = await ch.send({ content: gwRole ? `<@&${gwRole.id}>` : '', embeds: [e] });
   const btn = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId(`gw:enter:${msg.id}`).setLabel('Enter').setEmoji('🎉').setStyle(ButtonStyle.Success));
   await msg.edit({ components: [btn] });
-  GIVEAWAYS.set(msg.id, { prize, entries: new Set(), endsAt, channelId: ch.id });
+  GIVEAWAYS.set(msg.id, { prize, entries: new Set(), endsAt, channelId: ch.id, msgId: msg.id, winnersCount, hostId: i.user.id });
   setTimeout(() => endGiveaway(i.guild, msg.id, msg), minutes * 60_000);
 }
 
@@ -526,15 +602,38 @@ async function endGiveaway(guild, id, msg) {
   if (!gw) return;
   GIVEAWAYS.delete(id);
   const ids = [...gw.entries];
-  const winner = ids.length ? ids[Math.floor(Math.random() * ids.length)] : null;
-  const text = winner
-    ? `🏆 The **${gw.prize}** giveaway winner is <@${winner}>! Congrats 🎉 (${ids.length} entries)\nOpen a ticket in #open-a-ticket to claim.`
+  const pool = [...ids];
+  const picks = [];
+  while (picks.length < (gw.winnersCount || 1) && pool.length) {
+    picks.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+  }
+  ENDED.set(id, { prize: gw.prize, entries: ids, channelId: gw.channelId });
+  setTimeout(() => ENDED.delete(id), 3_600_000); // keep 1h for /reroll
+  const text = picks.length
+    ? `🏆 The **${gw.prize}** giveaway ${picks.length > 1 ? 'winners are' : 'winner is'} ${picks.map((w) => `<@${w}>`).join(', ')}! Congrats 🎉 (${ids.length} entries)\nOpen a ticket in #open-a-ticket to claim.`
     : `The **${gw.prize}** giveaway ended with no entries 😢`;
   const winners = findChannel(guild, 'winners');
   if (winners) winners.send(text).catch(() => {});
   const chan = guild.channels.cache.get(gw.channelId);
-  if (chan) chan.send(text).catch(() => {});
+  if (chan && chan.id !== winners?.id) chan.send(text).catch(() => {});
+  // DM each winner.
+  for (const w of picks) {
+    guild.members.fetch(w)
+      .then((mm) => mm.send(`🎉 You won the **${gw.prize}** giveaway on **${guild.name}**! Open a ticket in #open-a-ticket to claim your prize.`).catch(() => {}))
+      .catch(() => {});
+  }
   await msg?.edit?.({ components: [] }).catch(() => {});
+}
+
+async function rerollGiveaway(i) {
+  if (!isStaff(i.member)) return i.reply({ content: 'Only staff can reroll giveaways.', ephemeral: true });
+  const id = i.options.getString('message_id').trim();
+  const g = ENDED.get(id);
+  if (!g || !g.entries.length) return i.reply({ content: 'No recent giveaway with entries found for that message id (rerolls expire after 1 hour).', ephemeral: true });
+  const w = g.entries[Math.floor(Math.random() * g.entries.length)];
+  const winners = findChannel(i.guild, 'winners') || i.channel;
+  winners.send(`🔁 **Reroll!** The new **${g.prize}** winner is <@${w}>! Congrats 🎉`).catch(() => {});
+  return i.reply({ content: `Rerolled — new winner <@${w}>.`, ephemeral: true });
 }
 
 client.login(DISCORD_TOKEN);

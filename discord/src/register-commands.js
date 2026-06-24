@@ -21,7 +21,12 @@ const commands = [
     .addIntegerOption((o) => o.setName('stars').setDescription('1–5 stars').setMinValue(1).setMaxValue(5)),
   new SlashCommandBuilder().setName('giveaway').setDescription('Staff: start a giveaway')
     .addStringOption((o) => o.setName('prize').setDescription('What are you giving away?').setRequired(true))
-    .addIntegerOption((o) => o.setName('minutes').setDescription('Duration in minutes (default 10)')),
+    .addIntegerOption((o) => o.setName('minutes').setDescription('Duration in minutes (default 10)'))
+    .addIntegerOption((o) => o.setName('winners').setDescription('Number of winners (default 1)')),
+  new SlashCommandBuilder().setName('reroll').setDescription('Staff: reroll a giveaway winner')
+    .addStringOption((o) => o.setName('message_id').setDescription('The giveaway message ID').setRequired(true)),
+  new SlashCommandBuilder().setName('rank').setDescription('Show your level & XP'),
+  new SlashCommandBuilder().setName('leaderboard').setDescription('Show the top members by XP'),
   new SlashCommandBuilder().setName('suggest').setDescription('Suggest an idea for ForgeMarket')
     .addStringOption((o) => o.setName('idea').setDescription('Your suggestion').setRequired(true)),
   new SlashCommandBuilder().setName('shop').setDescription('Get a link to the ForgeMarket shop'),
