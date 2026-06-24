@@ -57,6 +57,8 @@ export const config = {
     otpTtlMinutes: Number(env.OTP_TTL_MINUTES || 10),
     otpMaxAttempts: Number(env.OTP_MAX_ATTEMPTS || 5),
     cookieName: env.SESSION_COOKIE || 'fm_session',
+    // Emails that are auto-granted the "owner" role on login (bootstrap admin).
+    adminEmails: (env.ADMIN_EMAILS || '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean),
   },
 
   oauth: {

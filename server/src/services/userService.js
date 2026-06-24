@@ -1,6 +1,14 @@
 /** User CRUD + RBAC resolution helpers. */
 import { run, get, all, nowIso, tx } from '../db/index.js';
 import { newId } from '../utils/ids.js';
+import { config } from '../config/env.js';
+
+/** Auto-grant the "owner" role to bootstrap admins listed in ADMIN_EMAILS. */
+async function ensureAdmin(userId, email) {
+  if (!config.auth.adminEmails.includes(String(email).toLowerCase())) return;
+  await run(`INSERT INTO user_roles (user_id, role_id, granted_at) VALUES (@u, 'owner', @at)
+             ON CONFLICT (user_id, role_id) DO NOTHING`, { u: userId, at: nowIso() }).catch(() => {});
+}
 
 export function getUserById(id) {
   return get('SELECT * FROM users WHERE id = @id', { id });
@@ -20,6 +28,7 @@ export async function upsertUserByEmail(email, profile = {}) {
             avatar_url = COALESCE(@av, avatar_url), updated_at = @at WHERE id = @id`,
           { dn: profile.display_name || null, av: profile.avatar_url || null, at, id: existing.id });
     }
+    await ensureAdmin(existing.id, e);
     return { user: await getUserById(existing.id), created: false };
   }
   const id = newId('usr');
@@ -31,6 +40,7 @@ export async function upsertUserByEmail(email, profile = {}) {
   // Everyone starts as a customer.
   await run(`INSERT INTO user_roles (user_id, role_id, granted_at) VALUES (@u, 'customer', @at)`,
       { u: id, at });
+  await ensureAdmin(id, e);
   return { user: await getUserById(id), created: true };
 }
 
