@@ -21,12 +21,17 @@ export const DEFAULT_TEMPLATES = [
   {
     id: 'order_received',
     name: 'Order Received',
-    subject: 'We received your order {{order.number}}',
+    subject: 'Thanks for your order {{order.number}} 🎮',
     body_html: `
-      <h1>Thanks for your order!</h1>
-      <p>Hi {{user.name}}, we've received order <strong>{{order.number}}</strong>.</p>
+      <h1>Thank you for your order! 🎉</h1>
+      <p>Hi {{user.name}}, thanks for shopping with {{brand.name}}! We've received
+      order <strong>{{order.number}}</strong> (total <strong>{{order.total}}</strong>).</p>
       {{order.itemsHtml}}
-      <p><a class="btn" href="{{order.url}}">Track your order</a></p>`,
+      {{order.paymentHtml}}
+      <p>Once your payment is confirmed we deliver instantly to your account & email.
+      You can follow the status any time:</p>
+      <p><a class="btn" href="{{order.url}}">Track your order</a></p>
+      <p>Need help? Just reply to this email or open a ticket in our Discord.</p>`,
   },
   {
     id: 'payment_confirmed',

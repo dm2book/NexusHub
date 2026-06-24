@@ -12,7 +12,7 @@
 import { run, get, all, nowIso, tx } from '../db/index.js';
 import { newId, newOrderNumber } from '../utils/ids.js';
 import { formatMoney } from '../utils/money.js';
-import { config } from '../config/env.js';
+import { config, manualPayMethods } from '../config/env.js';
 import { badRequest, notFound, conflict } from '../utils/errors.js';
 import { sendEmailAsync } from './emailService.js';
 import { notify } from './notificationService.js';
@@ -265,6 +265,26 @@ function statusBlurb(status) {
 }
 
 /** Build an email-safe HTML summary table of the order's line items + total. */
+/** Manual-payment instructions block for the order-received email (Tikkie/Revolut/PayPal). */
+function paymentInstructionsHtml(order) {
+  const methods = manualPayMethods();
+  if (!methods.length || ['completed', 'refunded', 'cancelled', 'payment_received'].includes(order.status)) return '';
+  const amt = formatMoney(order.total, order.currency);
+  const eur = (order.total / 100).toFixed(2);
+  const rows = methods.map((m) => {
+    if (m.kind === 'email') {
+      return `<tr><td><strong>${m.label}</strong></td><td class="r">Send ${amt} to ${escapeHtml(m.target)} (Friends &amp; Family)</td></tr>`;
+    }
+    let url = /^https?:\/\//.test(m.target) ? m.target : `https://${m.target}`;
+    if (m.id === 'paypal' && /paypal\.me/i.test(url)) url = `${url.replace(/\/$/, '')}/${eur}EUR`;
+    return `<tr><td><strong>${m.label}</strong></td><td class="r"><a href="${url}">${escapeHtml(url.replace(/^https?:\/\//, ''))}</a></td></tr>`;
+  }).join('');
+  return `<div class="quote"><strong>Complete your payment — ${amt}</strong><br>` +
+    `Pay using one of the methods below and put your order number <strong>${order.number}</strong> as the reference. ` +
+    `Your order is confirmed as soon as we receive it.</div>` +
+    `<table class="summary"><tbody>${rows}</tbody></table>`;
+}
+
 function itemsHtml(order) {
   if (!order.items?.length) return '';
   const rows = order.items.map((i) =>
@@ -301,6 +321,7 @@ function emailContext(order, ctx = {}) {
       status: order.statusLabel,
       itemsHtml: itemsHtml(order),
       deliveriesHtml: deliveriesHtml(order),
+      paymentHtml: paymentInstructionsHtml(order),
       url: `${config.appUrl}/account/orders/${order.id}`,
     },
     refund: ctx.refundAmount != null

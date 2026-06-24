@@ -102,6 +102,7 @@ router.get('/track/:number', asyncHandler(async (req, res) => {
   if (!order) throw new ApiError(404, 'Order not found');
   res.json({
     number: order.number, status: order.status, statusLabel: order.statusLabel,
+    total: order.total, totalFormatted: order.totalFormatted, currency: order.currency,
     history: order.history.map((h) => ({ to: h.to_status, at: h.created_at })),
     updatedAt: order.updatedAt,
   });
