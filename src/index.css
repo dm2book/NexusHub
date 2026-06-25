@@ -192,3 +192,34 @@ h1, h2, h3, .font-display { font-family: 'Orbitron', sans-serif; letter-spacing:
   .grain, .cursor-glow { display: none; }
 }
 @media (hover: none) { .cursor-glow { display: none; } }
+
+/* ───────────────────────────────────────────────────────────────────────────
+   Light storefront theme — scoped to page content wrapped in `.theme-light`.
+   The shared nav/footer live OUTSIDE this wrapper and keep their own colors,
+   and `.btn-primary` (purple→white) is left untouched so it pops on both.
+   ─────────────────────────────────────────────────────────────────────────── */
+.theme-light { color: #334155; }
+.theme-light h1, .theme-light h2, .theme-light h3, .theme-light .font-display { color: #0f172a; }
+.theme-light .card { background:#fff; border-color:#e7e9ee; box-shadow:0 1px 3px rgba(15,23,42,.05); backdrop-filter:none; }
+.theme-light .glass { background:#f8fafc; border-color:#e7e9ee; backdrop-filter:none; }
+.theme-light .input { background:#f1f5f9; border-color:#e2e8f0; color:#0f172a; }
+.theme-light .input::placeholder { color:#94a3b8; }
+.theme-light .label { color:#64748b; }
+.theme-light .chip { background:#f1f5f9; border-color:#e2e8f0; color:#475569; }
+.theme-light .chip:hover { background:#ede9fe; color:#6d28d9; }
+.theme-light .chip-active { background:#7c5cff; color:#fff; border-color:#7c5cff; box-shadow:none; }
+.theme-light .btn-ghost { background:#fff; border-color:#e2e8f0; color:#334155; }
+.theme-light .btn-ghost:hover { background:#f8fafc; }
+.theme-light .eyebrow { background:#f1f5f9; border:1px solid #e2e8f0; color:#7c3aed; }
+.theme-light .prose, .theme-light .prose p, .theme-light .prose li { color:#475569; }
+.theme-light .prose h1, .theme-light .prose h2, .theme-light .prose h3 { color:#0f172a; }
+.theme-light .prose a { color:#7c3aed; }
+.theme-light .text-white { color:#0f172a; }
+.theme-light .text-slate-200 { color:#334155; }
+.theme-light .text-slate-300 { color:#475569; }
+.theme-light .text-slate-400 { color:#64748b; }
+.theme-light .text-slate-500 { color:#94a3b8; }
+.theme-light .border-white\/5 { border-color:#eef0f4; }
+.theme-light .border-white\/10 { border-color:#e7e9ee; }
+.theme-light .divide-white\/5 > :not([hidden]) ~ :not([hidden]) { border-color:#eef0f4; }
+.theme-light .bg-space-black, .theme-light .bg-elevated { background:#f8fafc; }

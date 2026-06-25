@@ -9,7 +9,7 @@ import { useToast } from '../context/ToastContext.jsx';
 import { categoryVisual, money } from '../lib/catalog.js';
 import { SAMPLE_PRODUCTS, withFallback } from '../lib/sampleCatalog.js';
 import { PageLoader } from '../components/ui.jsx';
-import ProductCard from '../components/ProductCard.jsx';
+import LightProductCard from '../components/store/LightProductCard.jsx';
 import { usePageMeta } from '../lib/useMeta.js';
 
 export default function ProductDetail() {
@@ -115,9 +115,9 @@ export default function ProductDetail() {
 
       {related.length > 0 && (
         <div className="mt-20">
-          <h2 className="text-2xl text-white mb-6">You might also like</h2>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
-            {related.map((p) => <ProductCard key={p.id} product={p} onAdd={(x) => { add(x); toast.success(`${x.name} added`); }} />)}
+          <h2 className="text-2xl font-extrabold text-slate-900 mb-6">You might also like</h2>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {related.map((p) => <LightProductCard key={p.id} product={p} onAdd={(x) => { add(x); toast.success(`${x.name} added`); }} />)}
           </div>
         </div>
       )}
