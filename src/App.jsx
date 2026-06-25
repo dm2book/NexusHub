@@ -1,6 +1,6 @@
 import { Routes, Route } from 'react-router-dom';
 import { lazy, Suspense } from 'react';
-import SiteLayout from './layouts/SiteLayout.jsx';
+import StoreLayout from './layouts/StoreLayout.jsx';
 import AdminLayout from './layouts/AdminLayout.jsx';
 import AccountLayout from './layouts/AccountLayout.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
@@ -58,8 +58,8 @@ export default function App() {
         {/* Storefront home — self-contained light theme (own nav + sidebar) */}
         <Route path="/" element={<HomeStore />} />
 
-        {/* Public + storefront */}
-        <Route element={<SiteLayout />}>
+        {/* Public + storefront (light theme) */}
+        <Route element={<StoreLayout />}>
           <Route path="/shop" element={<Shop />} />
           <Route path="/wishlist" element={<Wishlist />} />
           <Route path="/product/:id" element={<ProductDetail />} />
