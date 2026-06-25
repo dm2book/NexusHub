@@ -122,8 +122,8 @@ export default function SiteLayout() {
             </a>
           </div>
           <FooterCol title="Shop" links={[['All products', '/shop'], ['Wishlist', '/wishlist'], ['Track order', '/track'], ['Payment methods', '/payment-methods']]} />
-          <FooterCol title="Company" links={[['About us', '/about'], ['Contact', '/contact'], ['FAQ', '/faq'], ['Discord', '/discord']]} />
-          <FooterCol title="Legal" links={[['Terms', '/terms'], ['Privacy', '/privacy'], ['Sign in', '/login']]} />
+          <FooterCol title="Company" links={[['About us', '/about'], ['How it works', '/how-it-works'], ['Reviews', '/reviews'], ['Contact', '/contact'], ['Discord', '/discord']]} />
+          <FooterCol title="Help & legal" links={[['FAQ', '/faq'], ['Refund policy', '/refunds'], ['Terms', '/terms'], ['Privacy', '/privacy']]} />
         </div>
         <div className="section border-t border-white/[0.06] py-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-slate-500 text-sm">
           <span>© {new Date().getFullYear()} ForgeMarket. All rights reserved.</span>
