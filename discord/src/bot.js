@@ -712,4 +712,44 @@ async function rerollGiveaway(i) {
   return i.reply({ content: `Rerolled — new winner <@${w}>.`, ephemeral: true });
 }
 
-client.login(DISCORD_TOKEN);
+// ── Resilient startup ───────────────────────────────────────────────────────
+// A Discord bot must keep a long-lived gateway connection: if the process dies,
+// every button/command shows "This interaction failed". These guards make sure
+// a stray error never takes the bot offline, and that login problems print an
+// actionable message instead of a silent crash.
+process.on('unhandledRejection', (err) => {
+  console.error('[unhandledRejection]', err?.stack || err?.message || err);
+});
+process.on('uncaughtException', (err) => {
+  console.error('[uncaughtException]', err?.stack || err?.message || err);
+  // Stay alive — a single bad event must not knock the whole bot offline.
+});
+
+client.on('error', (e) => console.error('[client error]', e?.message || e));
+client.on('shardError', (e) => console.error('[shard error]', e?.message || e));
+client.on(Events.ShardDisconnect, () => console.warn('⚠️  Gateway disconnected — discord.js will auto-reconnect…'));
+client.on(Events.ShardReconnecting, () => console.log('🔄 Reconnecting to Discord…'));
+
+if (!DISCORD_TOKEN) {
+  console.error('\n❌ DISCORD_TOKEN is missing. Create a .env file in discord/ with:\n' +
+    '   DISCORD_TOKEN=your-bot-token\n   DISCORD_CLIENT_ID=...\n   DISCORD_GUILD_ID=...\n');
+  process.exit(1);
+}
+
+console.log('⏳ Connecting to Discord…');
+client.login(DISCORD_TOKEN).catch((err) => {
+  const msg = String(err?.message || err);
+  if (/disallowed intents/i.test(msg)) {
+    console.error('\n❌ Login failed: privileged intents are not enabled.\n' +
+      '   Open https://discord.com/developers/applications → your app → Bot, and turn ON:\n' +
+      '     • SERVER MEMBERS INTENT\n     • MESSAGE CONTENT INTENT\n   Then run the bot again.\n');
+  } else if (/token/i.test(msg)) {
+    console.error('\n❌ Login failed: the DISCORD_TOKEN is invalid.\n' +
+      '   Reset it in the Developer Portal (Bot → Reset Token) and update discord/.env.\n');
+  } else {
+    console.error('\n❌ Login failed:', msg);
+    console.error('   Most common causes: wrong DISCORD_TOKEN, or the privileged intents\n' +
+      '   (Server Members + Message Content) are not enabled in the Developer Portal.\n');
+  }
+  process.exit(1);
+});
