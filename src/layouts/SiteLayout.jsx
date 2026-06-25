@@ -121,8 +121,8 @@ export default function SiteLayout() {
               <MessageCircle size={16} /> Join our Discord
             </a>
           </div>
-          <FooterCol title="Shop" links={[['All products', '/shop'], ['Track order', '/track'], ['Cart', '/cart']]} />
-          <FooterCol title="Company" links={[['About', '/about'], ['Contact', '/contact'], ['FAQ', '/faq'], ['Discord', '/discord']]} />
+          <FooterCol title="Shop" links={[['All products', '/shop'], ['Wishlist', '/wishlist'], ['Track order', '/track'], ['Payment methods', '/payment-methods']]} />
+          <FooterCol title="Company" links={[['About us', '/about'], ['Contact', '/contact'], ['FAQ', '/faq'], ['Discord', '/discord']]} />
           <FooterCol title="Legal" links={[['Terms', '/terms'], ['Privacy', '/privacy'], ['Sign in', '/login']]} />
         </div>
         <div className="section border-t border-white/[0.06] py-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-slate-500 text-sm">

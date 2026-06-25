@@ -23,6 +23,7 @@ const AuthCallback = lazy(() => import('./pages/AuthCallback.jsx'));
 const About = lazy(() => import('./pages/info/About.jsx'));
 const Contact = lazy(() => import('./pages/info/Contact.jsx'));
 const Faq = lazy(() => import('./pages/info/Faq.jsx'));
+const PaymentMethods = lazy(() => import('./pages/info/PaymentMethods.jsx'));
 const Legal = lazy(() => import('./pages/info/Legal.jsx'));
 const NotFound = lazy(() => import('./pages/NotFound.jsx'));
 const Wishlist = lazy(() => import('./pages/Wishlist.jsx'));
@@ -65,6 +66,7 @@ export default function App() {
           <Route path="/about" element={<About />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/faq" element={<Faq />} />
+          <Route path="/payment-methods" element={<PaymentMethods />} />
           <Route path="/terms" element={<Legal kind="terms" />} />
           <Route path="/privacy" element={<Legal kind="privacy" />} />
           <Route path="/login" element={<Login />} />

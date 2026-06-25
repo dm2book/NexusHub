@@ -14,8 +14,8 @@ const GROUPS = [
   {
     title: 'Payments & refunds',
     items: [
-      ['Which payment methods are supported?', 'Connect a provider like Stripe for live payments. In demo mode an order is marked paid instantly so you can see the full flow.'],
-      ['How do refunds work?', 'Request a refund from your order page. Our team reviews it and, once approved, the order is refunded.'],
+      ['Which payment methods are supported?', 'You can pay with Tikkie, Revolut or PayPal. At checkout you pick a method and pay using your order number as the reference — see our Payment Methods page for details.'],
+      ['How do refunds work?', 'Request a refund from your order page or open a ticket in our Discord. Once approved, eligible orders are refunded to your original method.'],
     ],
   },
   {
