@@ -4,11 +4,11 @@
 
 :root { color-scheme: dark; }
 
-html { scroll-behavior: smooth; }
+html { scroll-behavior: smooth; background: #070710; }
 
 body {
   margin: 0;
-  background: #070710;
+  background: transparent;
   color: #e5e7eb;
   font-family: 'Inter', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -55,6 +55,12 @@ h1, h2, h3, .font-display { font-family: 'Orbitron', sans-serif; letter-spacing:
              font-rajdhani tracking-[0.2em] uppercase; }
 }
 
+/* Cinematic hero image (Ken-Burns) */
+.hero-img { position: absolute; inset: 0; background-size: cover; background-position: center; animation: kenburns 24s ease-in-out infinite; will-change: transform; }
+@keyframes kenburns { 0%{transform:scale(1.06) translate(0,0)} 50%{transform:scale(1.18) translate(-1.5%,-1.2%)} 100%{transform:scale(1.06) translate(0,0)} }
+.hero-overlay { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(7,7,16,.45) 0%, rgba(7,7,16,.72) 55%, #070710 100%); }
+@media (prefers-reduced-motion: reduce){ .hero-img{ animation:none } }
+
 /* Decorative background helpers */
 .bg-grid { background-image: theme('backgroundImage.grid-pattern'); background-size: 44px 44px; }
 .orb { position: absolute; border-radius: 9999px; filter: blur(80px); pointer-events: none; }
@@ -100,3 +106,89 @@ h1, h2, h3, .font-display { font-family: 'Orbitron', sans-serif; letter-spacing:
 
 @keyframes gradientShift { 0%,100%{background-position:0% 50%} 50%{background-position:100% 50%} }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* 3D tilt cards (pointer-driven, set via CSS vars from JS) */
+.tilt { perspective: 900px; }
+.tilt-inner {
+  transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) scale(var(--s, 1));
+  transition: transform .18s ease;
+  transform-style: preserve-3d; will-change: transform;
+}
+.tilt-glare {
+  position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0;
+  background: radial-gradient(circle at var(--mx,50%) var(--my,50%), rgba(255,255,255,.28), transparent 45%);
+  transition: opacity .2s ease; mix-blend-mode: overlay;
+}
+.tilt:hover .tilt-glare { opacity: 1; }
+
+/* Twinkling starfield layer for hero backgrounds */
+.starfield { position:absolute; inset:0; overflow:hidden; pointer-events:none; }
+.starfield::before, .starfield::after {
+  content:''; position:absolute; inset:-50%;
+  background-image:
+    radial-gradient(1.5px 1.5px at 20% 30%, rgba(255,255,255,.7), transparent),
+    radial-gradient(1.5px 1.5px at 70% 60%, rgba(255,255,255,.5), transparent),
+    radial-gradient(2px 2px at 40% 80%, rgba(168,85,247,.7), transparent),
+    radial-gradient(1.5px 1.5px at 85% 20%, rgba(99,102,241,.7), transparent),
+    radial-gradient(1px 1px at 55% 45%, rgba(255,255,255,.6), transparent),
+    radial-gradient(2px 2px at 10% 70%, rgba(236,72,153,.6), transparent);
+  background-repeat: repeat; background-size: 50% 50%;
+  animation: drift 60s linear infinite;
+}
+.starfield::after { animation-duration: 90s; animation-direction: reverse; opacity:.6; }
+@keyframes drift { from{transform:translate3d(0,0,0)} to{transform:translate3d(-25%,-25%,0)} }
+
+/* Top scroll-progress bar */
+.scroll-progress {
+  position: fixed; top:0; left:0; height:3px; z-index:60; width:var(--p,0%);
+  background: linear-gradient(90deg,#6366f1,#a855f7,#ec4899);
+  box-shadow: 0 0 12px rgba(168,85,247,.7); transition: width .1s linear;
+}
+
+/* Route fade-in */
+.page-enter { animation: pageIn .45s ease both; }
+@keyframes pageIn { from{opacity:0; transform:translateY(8px)} to{opacity:1; transform:none} }
+
+@media (prefers-reduced-motion: reduce) {
+  .tilt-inner, .starfield::before, .starfield::after, .page-enter { animation: none !important; transition: none !important; transform: none !important; }
+}
+
+/* ── Global ambience ──────────────────────────────────────────── */
+/* Animated mesh-gradient background (sits behind all content) */
+.mesh-bg { position: fixed; inset: 0; z-index: -10; overflow: hidden; pointer-events: none; }
+.mesh-bg span {
+  position: absolute; border-radius: 9999px; filter: blur(110px); opacity: .5;
+  mix-blend-mode: screen; will-change: transform;
+}
+.mesh-bg .b1 { width: 46vw; height: 46vw; left: -8vw; top: -6vw; background: #6366f1; animation: meshA 26s ease-in-out infinite; }
+.mesh-bg .b2 { width: 42vw; height: 42vw; right: -6vw; top: 8vw; background: #a855f7; animation: meshB 32s ease-in-out infinite; }
+.mesh-bg .b3 { width: 40vw; height: 40vw; left: 20vw; bottom: -12vw; background: #ec4899; animation: meshC 30s ease-in-out infinite; }
+.mesh-bg .b4 { width: 34vw; height: 34vw; right: 12vw; bottom: -8vw; background: #22d3ee; animation: meshA 36s ease-in-out infinite reverse; }
+@keyframes meshA { 0%,100%{transform:translate(0,0) scale(1)} 50%{transform:translate(8vw,6vw) scale(1.15)} }
+@keyframes meshB { 0%,100%{transform:translate(0,0) scale(1)} 50%{transform:translate(-7vw,5vw) scale(1.1)} }
+@keyframes meshC { 0%,100%{transform:translate(0,0) scale(1)} 50%{transform:translate(5vw,-7vw) scale(1.2)} }
+
+/* Fine film grain for texture */
+.grain { position: fixed; inset: 0; z-index: -9; pointer-events: none; opacity: .04;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+
+/* Cursor spotlight (desktop) */
+.cursor-glow { position: fixed; inset: 0; z-index: 45; pointer-events: none; mix-blend-mode: screen;
+  background: radial-gradient(220px circle at var(--cx,-100px) var(--cy,-100px), rgba(139,92,246,.16), transparent 70%);
+  transition: background .08s linear; }
+
+/* Magnetic elements (translate set from JS) */
+.magnetic { transition: transform .25s cubic-bezier(.2,.8,.2,1); will-change: transform; }
+
+/* Crazier page transition: blur + scale + rise */
+.page-enter { animation: pageReveal .55s cubic-bezier(.2,.8,.2,1) both; }
+@keyframes pageReveal {
+  from { opacity: 0; transform: translateY(18px) scale(.985); filter: blur(8px); }
+  to   { opacity: 1; transform: none; filter: blur(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mesh-bg span, .cursor-glow, .magnetic { animation: none !important; transition: none !important; transform: none !important; }
+  .grain, .cursor-glow { display: none; }
+}
+@media (hover: none) { .cursor-glow { display: none; } }

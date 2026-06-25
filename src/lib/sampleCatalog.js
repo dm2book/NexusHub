@@ -100,8 +100,13 @@ const P = [
   ['ITUNES-25', 'App Store & iTunes €25', 'itunes', 2599, false, null, 'Apps, games, music and iCloud storage on Apple.'],
 ];
 
-// Categories that ship a real cover image under /public/products.
-const CATEGORY_IMG = { steam: 'steam', playstation: 'playstation', xbox: 'xbox', 'discord-nitro': 'nitro' };
+// Premium 3D icon tiles (public/products/icons) — one unique icon per category.
+const CATS_WITH_ICON = ['robux', 'v-bucks', 'valorant', 'cod', 'genshin', 'brawl', 'apex',
+  'clash', 'clashroyale', 'league', 'freefire', 'pubg', 'mlbb', 'eafc', 'gta', 'minecraft',
+  'pokemongo', 'discord-nitro', 'spotify', 'netflix', 'gamepass', 'steam', 'playstation',
+  'xbox', 'nintendo', 'amazon', 'googleplay', 'itunes', 'giftcard', 'chest', 'wildrift', 'wow'];
+export const CATEGORY_ICON = Object.fromEntries(CATS_WITH_ICON.map((c) => [c, c]));
+export const iconFor = (category) => CATEGORY_ICON[category] ? `/products/icons/${CATEGORY_ICON[category]}.png` : null;
 
 export const SAMPLE_PRODUCTS = P.map(([sku, name, category, price, featured, pack, description]) => ({
   id: sku.toLowerCase(),
@@ -112,9 +117,8 @@ export const SAMPLE_PRODUCTS = P.map(([sku, name, category, price, featured, pac
   currency: 'EUR',
   description,
   featured,
-  // Pack art when we have it, else a known category image, else null → the card
-  // renders a clean category gradient + icon (never a broken image).
-  image: pack ? `/products/packs/${pack}.svg` : (CATEGORY_IMG[category] ? `/products/${CATEGORY_IMG[category]}.svg` : null),
+  // Premium 3D icon for the category; null → card renders a gradient + lucide icon.
+  image: iconFor(category),
   sample: true,
 }));
 

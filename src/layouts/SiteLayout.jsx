@@ -1,11 +1,15 @@
 import { useState } from 'react';
-import { Outlet, Link, NavLink, useNavigate } from 'react-router-dom';
+import { Outlet, Link, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
-  Zap, LayoutDashboard, LogOut, Shield, ShoppingCart, Menu, X, MessageCircle,
+  Zap, LayoutDashboard, LogOut, Shield, ShoppingCart, Menu, X, MessageCircle, Heart,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useCart } from '../context/CartContext.jsx';
+import { useWishlist } from '../lib/wishlist.js';
 import ChatWidget from '../components/ChatWidget.jsx';
+import ScrollProgress from '../components/ScrollProgress.jsx';
+import Ambience from '../components/Ambience.jsx';
+import { AnnouncementBar, CookieConsent, SocialProof, BackToTop } from '../components/SiteExtras.jsx';
 
 const NAV = [
   { to: '/shop', label: 'Shop' },
@@ -16,11 +20,16 @@ const NAV = [
 export default function SiteLayout() {
   const { user, isStaff, logout } = useAuth();
   const { count } = useCart();
+  const { count: wishCount } = useWishlist();
   const navigate = useNavigate();
+  const location = useLocation();
   const [open, setOpen] = useState(false);
 
   return (
     <div className="min-h-screen flex flex-col">
+      <Ambience />
+      <ScrollProgress />
+      <AnnouncementBar />
       <header className="sticky top-0 z-40 backdrop-blur-xl bg-space-black/70 border-b border-white/[0.06]">
         <nav className="section h-16 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2.5 shrink-0">
@@ -41,6 +50,14 @@ export default function SiteLayout() {
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3">
+            <Link to="/wishlist" className="relative p-2.5 rounded-xl hover:bg-white/5 text-slate-300" title="Wishlist">
+              <Heart size={19} />
+              {wishCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-white text-[11px] font-bold flex items-center justify-center">
+                  {wishCount}
+                </span>
+              )}
+            </Link>
             <Link to="/cart" className="relative p-2.5 rounded-xl hover:bg-white/5 text-slate-300" title="Cart">
               <ShoppingCart size={19} />
               {count > 0 && (
@@ -82,9 +99,12 @@ export default function SiteLayout() {
         )}
       </header>
 
-      <main className="flex-1"><Outlet /></main>
+      <main className="flex-1"><div key={location.pathname} className="page-enter"><Outlet /></div></main>
 
       <ChatWidget />
+      <SocialProof />
+      <BackToTop />
+      <CookieConsent />
 
       <footer className="relative border-t border-white/[0.06] mt-20 overflow-hidden">
         <div className="orb w-72 h-72 bg-primary/20 -bottom-32 left-1/4" />
@@ -101,9 +121,9 @@ export default function SiteLayout() {
               <MessageCircle size={16} /> Join our Discord
             </a>
           </div>
-          <FooterCol title="Shop" links={[['All products', '/shop'], ['Track order', '/track'], ['Cart', '/cart']]} />
-          <FooterCol title="Company" links={[['About', '/about'], ['Contact', '/contact'], ['FAQ', '/faq'], ['Discord', '/discord']]} />
-          <FooterCol title="Legal" links={[['Terms', '/terms'], ['Privacy', '/privacy'], ['Sign in', '/login']]} />
+          <FooterCol title="Shop" links={[['All products', '/shop'], ['Wishlist', '/wishlist'], ['Track order', '/track'], ['Payment methods', '/payment-methods']]} />
+          <FooterCol title="Company" links={[['About us', '/about'], ['How it works', '/how-it-works'], ['Reviews', '/reviews'], ['Contact', '/contact'], ['Discord', '/discord']]} />
+          <FooterCol title="Help & legal" links={[['FAQ', '/faq'], ['Refund policy', '/refunds'], ['Terms', '/terms'], ['Privacy', '/privacy']]} />
         </div>
         <div className="section border-t border-white/[0.06] py-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-slate-500 text-sm">
           <span>© {new Date().getFullYear()} ForgeMarket. All rights reserved.</span>

@@ -29,9 +29,13 @@ export const config = {
   isProd,
   port: Number(env.PORT || 4000),
 
-  // Public origin of the storefront SPA, used for CORS + email links + OAuth redirects.
-  appUrl: env.APP_URL || 'http://localhost:3000',
-  apiUrl: env.API_URL || 'http://localhost:4000',
+  // Public origin of the storefront SPA, used for CORS + email links + OAuth
+  // redirects. In production we fall back to the live URL so emails/links work
+  // with zero extra config (override with APP_URL if you use another domain).
+  appUrl: env.APP_URL
+    || (isProd ? 'https://forgemarket-store.vercel.app' : 'http://localhost:3000'),
+  apiUrl: env.API_URL
+    || (isProd ? 'https://forgemarket-store.vercel.app' : 'http://localhost:4000'),
 
   db: {
     // Postgres connection string. Different hosts/integrations expose it under
@@ -53,6 +57,8 @@ export const config = {
     otpTtlMinutes: Number(env.OTP_TTL_MINUTES || 10),
     otpMaxAttempts: Number(env.OTP_MAX_ATTEMPTS || 5),
     cookieName: env.SESSION_COOKIE || 'fm_session',
+    // Emails that are auto-granted the "owner" role on login (bootstrap admin).
+    adminEmails: (env.ADMIN_EMAILS || '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean),
   },
 
   oauth: {
@@ -120,8 +126,45 @@ export const config = {
       secretKey: env.STRIPE_SECRET_KEY || '',
       webhookSecret: env.STRIPE_WEBHOOK_SECRET || '',
     },
+    // Manual payment methods (Tikkie / Revolut / PayPal). The customer pays via the
+    // link with their order number as reference; an admin confirms in the dashboard.
+    manual: {
+      tikkie: env.PAY_TIKKIE || '',     // a Tikkie payment-request link
+      revolut: env.PAY_REVOLUT || '',   // revolut.me/yourname
+      paypal: env.PAY_PAYPAL || '',     // paypal.me/yourname or your PayPal email
+      note: env.PAY_NOTE || 'After paying, your order is confirmed within minutes during open hours.',
+    },
   },
 };
+
+/** Parse "FORGE10:10,WELCOME5:5" → { FORGE10: 10, WELCOME5: 5 } (percent off). */
+function parseCoupons(s) {
+  const out = {};
+  (s || '').split(',').forEach((p) => {
+    const [c, v] = p.split(':');
+    const code = (c || '').trim().toUpperCase();
+    const pct = Math.max(0, Math.min(90, parseInt(v, 10) || 0));
+    if (code && pct) out[code] = pct;
+  });
+  return out;
+}
+config.shop = { coupons: parseCoupons(env.COUPONS), announcement: env.SITE_ANNOUNCEMENT || '' };
+
+/** Validate a coupon code → { code, percent } or null. */
+export function couponFor(code) {
+  if (!code) return null;
+  const pct = config.shop.coupons[String(code).trim().toUpperCase()];
+  return pct ? { code: String(code).trim().toUpperCase(), percent: pct } : null;
+}
+
+/** Enabled manual payment methods as [{id,label,target,kind}]. */
+export function manualPayMethods() {
+  const m = config.payments.manual, out = [];
+  if (m.tikkie) out.push({ id: 'tikkie', label: 'Tikkie', target: m.tikkie, kind: 'link' });
+  if (m.revolut) out.push({ id: 'revolut', label: 'Revolut', target: m.revolut, kind: 'link' });
+  if (m.paypal) out.push({ id: 'paypal', label: 'PayPal', target: m.paypal.includes('@') ? m.paypal : m.paypal, kind: m.paypal.includes('@') ? 'email' : 'link' });
+  return out;
+}
 
 /** Throws on startup if production is missing critical secrets. */
 export function assertProductionConfig() {

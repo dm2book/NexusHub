@@ -1,7 +1,7 @@
 /** Public storefront routes: browse catalog, place an order, track by number. */
 import { Router } from 'express';
 import { z } from 'zod';
-import { config } from '../config/env.js';
+import { config, manualPayMethods, couponFor } from '../config/env.js';
 import { asyncHandler } from '../middleware/error.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 import { listProducts, getProduct } from '../services/productService.js';
@@ -12,15 +12,20 @@ import { ApiError, forbidden } from '../utils/errors.js';
 
 const router = Router();
 
-// Which payment path the storefront should use.
+// Which payment path the storefront should use. Manual methods (Tikkie/Revolut/
+// PayPal) take priority when configured, then Stripe, then demo.
+const manual = manualPayMethods();
 const paymentProvider = () =>
-  stripeEnabled() ? 'stripe' : config.payments.demoMode ? 'demo' : 'none';
+  manual.length ? 'manual' : stripeEnabled() ? 'stripe' : config.payments.demoMode ? 'demo' : 'none';
 
 // Public runtime config the SPA can read (feature flags, enabled providers).
 router.get('/config', (_req, res) => {
   res.json({
     paymentProvider: paymentProvider(),
     demoPayments: config.payments.demoMode,
+    paymentMethods: manual,                 // [{id,label,target,kind}]
+    paymentNote: config.payments.manual.note,
+    announcement: config.shop.announcement,  // optional promo bar text
     oauthProviders: listEnabledProviders(),
     discordEnabled: !!config.discord.inviteUrl || !!config.discord.guildId,
     brand: config.email.fromName,
@@ -44,6 +49,13 @@ router.get('/products/:id', asyncHandler(async (req, res) => {
   res.json({ product: p });
 }));
 
+// Validate a discount code (checkout preview).
+router.get('/coupons/:code', (req, res) => {
+  const c = couponFor(req.params.code);
+  if (!c) throw new ApiError(404, 'Invalid or expired code');
+  res.json(c);
+});
+
 // Place an order. Authenticated users get it linked to their account; guests
 // may order by email. Checkout/payment capture would call markPaymentReceived.
 router.post('/orders', rateLimit({ bucket: 'checkout', windowMs: 60_000, max: 20 }),
@@ -57,6 +69,8 @@ router.post('/orders', rateLimit({ bucket: 'checkout', windowMs: 60_000, max: 20
       })).min(1),
       billing: z.record(z.any()).optional(),
       currency: z.string().length(3).optional(),
+      coupon: z.string().max(40).optional(),
+      paymentMethod: z.string().max(20).optional(),
     }).parse(req.body);
 
     const order = await createOrder(
@@ -98,6 +112,7 @@ router.get('/track/:number', asyncHandler(async (req, res) => {
   if (!order) throw new ApiError(404, 'Order not found');
   res.json({
     number: order.number, status: order.status, statusLabel: order.statusLabel,
+    total: order.total, totalFormatted: order.totalFormatted, currency: order.currency,
     history: order.history.map((h) => ({ to: h.to_status, at: h.created_at })),
     updatedAt: order.updatedAt,
   });

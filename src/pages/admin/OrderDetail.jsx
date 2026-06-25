@@ -14,6 +14,7 @@ export default function AdminOrderDetail() {
   const [data, setData] = useState(null);
   const [confirm, setConfirm] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [codes, setCodes] = useState({});
 
   const load = useCallback(() => {
     api.get(`/api/admin/orders/${id}`).then(setData).catch((e) => toast.error(e.message));
@@ -28,6 +29,16 @@ export default function AdminOrderDetail() {
       toast.success('Done.'); setConfirm(false); load(); }
     catch (err) { toast.error(err.message); }
     finally { setBusy(false); }
+  };
+
+  const deliverCodes = () => {
+    const deliveries = [];
+    (data?.order.items || []).forEach((it) => {
+      (codes[it.id] || '').split(/[\r\n,]+/).map((s) => s.trim()).filter(Boolean)
+        .forEach((content) => deliveries.push({ orderItemId: it.id, content, type: 'code' }));
+    });
+    if (!deliveries.length) { toast.error('Enter at least one code first.'); return; }
+    act('deliver', { deliveries });
   };
 
   return (
@@ -78,6 +89,25 @@ export default function AdminOrderDetail() {
               <span className="text-white font-semibold">{money(order.total, order.currency)}</span>
             </div>
           </div>
+
+          {hasPermission('orders.complete') && !['completed', 'refunded', 'cancelled'].includes(order.status) && (
+            <div className="card p-5 border border-emerald-500/20">
+              <h3 className="text-white mb-1">Deliver code(s)</h3>
+              <p className="text-slate-500 text-sm mb-4">Enter the code/key for each item. It's e-mailed to the customer and the order is marked <span className="text-emerald-300">completed</span>.</p>
+              <div className="space-y-3">
+                {order.items.map((it) => (
+                  <div key={it.id}>
+                    <label className="label">{it.name} × {it.quantity} {it.quantity > 1 && <span className="text-slate-500">— one code per line</span>}</label>
+                    <textarea rows={it.quantity > 1 ? 3 : 1} className="input font-mono" placeholder="e.g. ABCD-1234-EFGH-5678"
+                      value={codes[it.id] || ''} onChange={(e) => setCodes((c) => ({ ...c, [it.id]: e.target.value }))} />
+                  </div>
+                ))}
+              </div>
+              <button disabled={busy} onClick={deliverCodes} className="btn-primary w-full mt-4 py-3">
+                Deliver code(s) &amp; complete → e-mail customer
+              </button>
+            </div>
+          )}
 
           <div className="card p-5">
             <h3 className="text-white mb-4">Fulfillment</h3>

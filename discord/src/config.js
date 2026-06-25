@@ -104,6 +104,8 @@ export const CATEGORIES = [
       { name: 'clips', type: 'text', topic: 'Drop your best plays and clips.' },
       { name: 'screenshots-media', type: 'text', topic: 'Share your best gaming moments.' },
       { name: 'memes', type: 'text', topic: 'Gaming memes & fun.' },
+      { name: 'suggestions', type: 'text', topic: 'Got an idea? Use /suggest — the community votes ✅/❌.' },
+      { name: 'starboard', type: 'text', readOnly: true, topic: 'The best messages, starred by the community ⭐ (react with ⭐).' },
       { name: 'off-topic', type: 'text', topic: 'Anything goes (within the rules).' },
       { name: 'lounge', type: 'voice', topic: 'Hang out in voice.' },
       { name: 'game-night', type: 'voice', topic: 'Community game nights.' },
@@ -373,6 +375,19 @@ export const MESSAGES = {
       "Tap the games you play and the alerts you want — get pinged only for what you care about.\n\n" +
       "**Games** give you a colour + access to LFG pings.\n**Alerts** notify you about drops, deals & giveaways.\n\n" +
       "Tap again to remove a role.",
+  },
+  suggestionsIntro: {
+    title: '💡 Suggestions',
+    description:
+      "Help shape ForgeMarket! Use **/suggest** `your idea` and it gets posted here with " +
+      "✅/❌ voting buttons so the community can weigh in.\n\n" +
+      "Good ideas get built — the best ones earn you a shout-out. 🚀",
+  },
+  starboardIntro: {
+    title: '⭐ Starboard',
+    description:
+      "React to any message with ⭐ and once it hits **3 stars** it lands here — a hall of fame " +
+      "for the funniest, most helpful and best community moments. 🏆",
   },
 };
 

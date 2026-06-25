@@ -12,7 +12,11 @@ import { withFallback } from '../lib/sampleCatalog.js';
 import ProductCard from '../components/ProductCard.jsx';
 import { SectionHeading, Skeleton } from '../components/ui.jsx';
 import Reveal from '../components/Reveal.jsx';
+import CountUp from '../components/CountUp.jsx';
+import Magnetic from '../components/Magnetic.jsx';
 import { usePageMeta } from '../lib/useMeta.js';
+
+const HERO_IMG = 'https://media.pixverse.ai/pixverse%2Ft2i%2Fori%2F00b68877-28d6-414c-aa99-b3de08caa345.jpg?x-oss-process=style/cover-webp';
 
 const FEATURES = [
   { icon: Zap, title: 'Instant Delivery', text: 'Automated fulfillment delivers your codes in seconds, 24/7.' },
@@ -68,9 +72,11 @@ export default function Home() {
   return (
     <div className="overflow-hidden">
       {/* ── Hero ───────────────────────────────────────────── */}
-      <section className="relative">
-        <div className="absolute inset-0 bg-grid opacity-40" />
-        <div className="aurora absolute w-[680px] h-[680px] -top-72 left-1/2 -translate-x-1/2" />
+      <section className="relative overflow-hidden">
+        <div className="hero-img" style={{ backgroundImage: `url(${HERO_IMG})` }} />
+        <div className="hero-overlay" />
+        <div className="absolute inset-0 bg-grid opacity-25" />
+        <div className="aurora absolute w-[680px] h-[680px] -top-72 left-1/2 -translate-x-1/2 opacity-60" />
         <div className="orb w-[520px] h-[520px] bg-primary/30 -top-40 -left-20 animate-float-slow" />
         <div className="orb w-[480px] h-[480px] bg-accent-purple/25 top-10 right-0 animate-float" />
         <div className="section relative pt-24 pb-24 text-center">
@@ -84,15 +90,17 @@ export default function Home() {
             tracked in real time, backed by a full account dashboard.
           </p>
           <div className="flex flex-wrap items-center justify-center gap-4 mt-10 animate-fade-up">
-            <Link to="/shop" className="btn-primary px-7 py-3.5 text-base">Browse Shop <ArrowRight size={18} /></Link>
-            <Link to="/discord" className="btn-ghost px-7 py-3.5 text-base"><MessageCircle size={18} /> Join Discord</Link>
+            <Magnetic><Link to="/shop" className="btn-primary px-7 py-3.5 text-base">Browse Shop <ArrowRight size={18} /></Link></Magnetic>
+            <Magnetic><Link to="/discord" className="btn-ghost px-7 py-3.5 text-base"><MessageCircle size={18} /> Join Discord</Link></Magnetic>
           </div>
 
           {/* stats strip */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-16 max-w-3xl mx-auto">
             {STATS.map((s) => (
-              <div key={s.label} className="glass rounded-2xl py-5">
-                <div className="text-2xl sm:text-3xl font-display gradient-text">{s.value}</div>
+              <div key={s.label} className="glass rounded-2xl py-5 lift">
+                <div className="text-2xl sm:text-3xl font-display gradient-text">
+                  <CountUp value={s.value} />
+                </div>
                 <div className="text-slate-400 text-xs sm:text-sm mt-1">{s.label}</div>
               </div>
             ))}

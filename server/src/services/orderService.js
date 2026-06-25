@@ -12,7 +12,7 @@
 import { run, get, all, nowIso, tx } from '../db/index.js';
 import { newId, newOrderNumber } from '../utils/ids.js';
 import { formatMoney } from '../utils/money.js';
-import { config } from '../config/env.js';
+import { config, manualPayMethods, couponFor } from '../config/env.js';
 import { badRequest, notFound, conflict } from '../utils/errors.js';
 import { sendEmailAsync } from './emailService.js';
 import { notify } from './notificationService.js';
@@ -20,6 +20,7 @@ import { scoreOrder } from './fraudService.js';
 import { getProduct } from './productService.js';
 import { postOrderEvent } from './discordService.js';
 import { grantTierForOrder } from './discordRolesService.js';
+import { availableCount, claimCodes } from './codeStockService.js';
 
 export const STATUSES = [
   'pending', 'payment_received', 'processing', 'awaiting_fulfillment',
@@ -77,7 +78,12 @@ export async function createOrder(input, ctx = {}) {
       quantity: qty, unit_price: unit, metadata: li.metadata || {},
     });
   }
-  const total = subtotal; // taxes/shipping would be added here
+  // Apply a discount coupon if one was supplied and is valid.
+  const coupon = couponFor(input.coupon);
+  const discount = coupon ? Math.round(subtotal * coupon.percent / 100) : 0;
+  const total = Math.max(0, subtotal - discount);
+  const billing = { ...(input.billing || {}) };
+  if (coupon) { billing.coupon = coupon.code; billing.discount = discount; }
 
   await tx(async () => {
     await run(`INSERT INTO orders
@@ -85,7 +91,7 @@ export async function createOrder(input, ctx = {}) {
          VALUES (@id, @num, @uid, @email, 'pending', @cur, @sub, @tot, @bill, @at, @at)`,
         { id: orderId, num: number, uid: input.userId || null, email,
           cur: currency, sub: subtotal, tot: total,
-          bill: JSON.stringify(input.billing || {}), at });
+          bill: JSON.stringify(billing), at });
     for (const it of lineItems) {
       await run(`INSERT INTO order_items (id, order_id, product_id, name, quantity, unit_price, metadata)
            VALUES (@id, @oid, @pid, @name, @qty, @price, @meta)`,
@@ -117,11 +123,27 @@ export async function createOrder(input, ctx = {}) {
 
 // ── State machine ────────────────────────────────────────────────────────
 
+/** Staff: attach delivery code(s) to an order and complete it — the codes are
+ *  e-mailed to the customer via the order_completed template (deliveriesHtml). */
+export async function deliverOrder(orderId, deliveries = [], ctx = {}) {
+  const order = await getOrderRow(orderId);
+  if (!order) throw notFound('Order not found');
+  for (const d of deliveries) {
+    const content = String(d.content || '').trim();
+    if (!content) continue;
+    await run(`INSERT INTO deliveries (id, order_id, order_item_id, type, content, created_at)
+         VALUES (@id, @oid, @iid, @type, @c, @at)`,
+        { id: newId('dlv'), oid: orderId, iid: d.orderItemId || null, type: d.type || 'code', c: content, at: nowIso() });
+  }
+  // Force-complete from any state — staff is explicitly fulfilling the order.
+  return transitionOrder(orderId, 'completed', { ...ctx, force: true, reason: ctx.reason || 'Delivered by staff' });
+}
+
 export async function transitionOrder(orderId, to, ctx = {}) {
   const order = await getOrderRow(orderId);
   if (!order) throw notFound('Order not found');
   if (order.status === to) return getOrder(orderId);
-  if (!canTransition(order.status, to)) {
+  if (!ctx.force && !canTransition(order.status, to)) {
     throw conflict(`Cannot move order from "${order.status}" to "${to}"`);
   }
 
@@ -152,7 +174,28 @@ export async function transitionOrder(orderId, to, ctx = {}) {
       link: `/account/orders/${orderId}`,
     });
   }
+  // Once paid, auto-deliver from code stock if every item is in stock (best-effort).
+  if (to === 'payment_received') {
+    autoDispenseFromStock(orderId, ctx).catch((e) => console.error('[autodispense]', e.message));
+  }
   return updated;
+}
+
+/** If every item has enough pre-loaded stock, claim codes and complete the order. */
+export async function autoDispenseFromStock(orderId, ctx = {}) {
+  const order = await getOrder(orderId);
+  if (!order || ['completed', 'refunded', 'cancelled'].includes(order.status)) return false;
+  for (const it of order.items) {
+    if (await availableCount(it.product_id) < it.quantity) return false; // not enough stock → leave for manual
+  }
+  const deliveries = [];
+  for (const it of order.items) {
+    const codes = await claimCodes(it.product_id, it.quantity, orderId);
+    for (const c of codes) deliveries.push({ orderItemId: it.id, content: c, type: 'code' });
+  }
+  if (!deliveries.length) return false;
+  await deliverOrder(orderId, deliveries, { ...ctx, reason: 'Auto-delivered from stock' });
+  return true;
 }
 
 export async function appendHistory(orderId, from, to, changedBy, reason) {
@@ -265,6 +308,26 @@ function statusBlurb(status) {
 }
 
 /** Build an email-safe HTML summary table of the order's line items + total. */
+/** Manual-payment instructions block for the order-received email (Tikkie/Revolut/PayPal). */
+function paymentInstructionsHtml(order) {
+  const methods = manualPayMethods();
+  if (!methods.length || ['completed', 'refunded', 'cancelled', 'payment_received'].includes(order.status)) return '';
+  const amt = formatMoney(order.total, order.currency);
+  const eur = (order.total / 100).toFixed(2);
+  const rows = methods.map((m) => {
+    if (m.kind === 'email') {
+      return `<tr><td><strong>${m.label}</strong></td><td class="r">Send ${amt} to ${escapeHtml(m.target)} (Friends &amp; Family)</td></tr>`;
+    }
+    let url = /^https?:\/\//.test(m.target) ? m.target : `https://${m.target}`;
+    if (m.id === 'paypal' && /paypal\.me/i.test(url)) url = `${url.replace(/\/$/, '')}/${eur}EUR`;
+    return `<tr><td><strong>${m.label}</strong></td><td class="r"><a href="${url}">${escapeHtml(url.replace(/^https?:\/\//, ''))}</a></td></tr>`;
+  }).join('');
+  return `<div class="quote"><strong>Complete your payment — ${amt}</strong><br>` +
+    `Pay using one of the methods below and put your order number <strong>${order.number}</strong> as the reference. ` +
+    `Your order is confirmed as soon as we receive it.</div>` +
+    `<table class="summary"><tbody>${rows}</tbody></table>`;
+}
+
 function itemsHtml(order) {
   if (!order.items?.length) return '';
   const rows = order.items.map((i) =>
@@ -301,6 +364,7 @@ function emailContext(order, ctx = {}) {
       status: order.statusLabel,
       itemsHtml: itemsHtml(order),
       deliveriesHtml: deliveriesHtml(order),
+      paymentHtml: paymentInstructionsHtml(order),
       url: `${config.appUrl}/account/orders/${order.id}`,
     },
     refund: ctx.refundAmount != null

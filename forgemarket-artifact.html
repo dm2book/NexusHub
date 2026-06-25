@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FORGEMARKET — Premium In-Game Asset Shop</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://unpkg.com/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = { theme: { extend: {
+    colors: { neon: { DEFAULT:'#10b981', bright:'#34d399', soft:'#059669' }, cyber:'#ff3b5c', ink:'#05060a' },
+    fontFamily: { display:['Orbitron','system-ui','sans-serif'], body:['Inter','system-ui','sans-serif'] },
+  } } };
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Orbitron:wght@500;700;800;900&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;background:#05060a;color:#e7eaf0;font-family:Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+  h1,h2,h3,.font-display{font-family:Orbitron,system-ui,sans-serif}
+  ::selection{background:rgba(16,185,129,.35);color:#fff}
+  ::-webkit-scrollbar{width:10px}::-webkit-scrollbar-track{background:#05060a}::-webkit-scrollbar-thumb{background:#1d2230;border-radius:6px}
+  .grid-bg{background-image:linear-gradient(rgba(16,185,129,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(16,185,129,.05) 1px,transparent 1px);background-size:42px 42px}
+  .glow-ring{box-shadow:0 0 0 1px rgba(16,185,129,.45),0 0 26px rgba(16,185,129,.35)}
+  .text-glow{text-shadow:0 0 18px rgba(52,211,153,.55)}
+  @keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+  .floaty{animation:floaty 6s ease-in-out infinite}
+  .viewport3d{position:relative;height:420px;border-radius:16px;overflow:hidden;background:radial-gradient(120% 90% at 50% 15%,#0a1322 0%,#04050a 70%);box-shadow:inset 0 0 70px rgba(0,0,0,.65)}
+  .viewport3d canvas{display:block;width:100%!important;height:100%!important}
+  .vignette{position:absolute;inset:0;pointer-events:none;box-shadow:inset 0 0 100px rgba(0,0,0,.85)}
+  .blink{animation:blink 1s steps(1,end) infinite}@keyframes blink{50%{opacity:.2}}
+  .toast{transform:translateY(14px);opacity:0;transition:all .5s cubic-bezier(.34,1.56,.64,1)}
+  .toast.show{transform:translateY(0);opacity:1}
+  @keyframes rise{0%{opacity:0;transform:translateY(0) scale(.8)}20%{opacity:1}100%{opacity:0;transform:translateY(-34px) scale(1)}}
+  .rise{animation:rise 1s ease-out forwards}
+  .modal-back{animation:fadeIn .25s ease}@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+  .modal-card{animation:modalIn .38s cubic-bezier(.34,1.56,.64,1)}@keyframes modalIn{from{opacity:0;transform:translateY(26px) scale(.95)}to{opacity:1;transform:none}}
+  /* Cinematic hero image (Ken-Burns) */
+  .hero-img{position:absolute;inset:0;background-size:cover;background-position:center;animation:kenburns 24s ease-in-out infinite;will-change:transform}
+  @keyframes kenburns{0%{transform:scale(1.06) translate(0,0)}50%{transform:scale(1.18) translate(-1.5%,-1.2%)}100%{transform:scale(1.06) translate(0,0)}}
+  .hero-overlay{position:absolute;inset:0;background:linear-gradient(180deg,rgba(5,6,10,.45) 0%,rgba(5,6,10,.72) 55%,#05060a 100%)}
+  .hero-sheen{position:absolute;inset:0;background:radial-gradient(120% 80% at 50% 10%,rgba(16,185,129,.18),transparent 60%);mix-blend-mode:screen;pointer-events:none}
+  @media (prefers-reduced-motion: reduce){*{animation-duration:.001ms!important}}
+
+  /* ── Theme system (light/dark toggle) ── */
+  .app{--bg:#07060d;--panel:#121019;--panel2:#1a1726;--text:#f2efff;--muted:#9aa0b8;--border:rgba(255,255,255,.09);--accent:#8b5cf6;--accent-h:#7c3aed;--green:#10b981;background:var(--bg);color:var(--text);transition:background .35s,color .35s}
+  .app.light{--bg:#f1eefb;--panel:#ffffff;--panel2:#f6f3ff;--text:#1b1533;--muted:#6b6880;--border:rgba(24,12,48,.10);--accent:#7c3aed;--accent-h:#6d28d9;--green:#059669}
+  .panel{background:var(--panel);border:1px solid var(--border)}
+  .panel2{background:var(--panel2);border:1px solid var(--border)}
+  .t-muted{color:var(--muted)}
+  .bd{border:1px solid var(--border)}
+  .btn-accent{background:var(--accent);color:#fff;transition:.2s}.btn-accent:hover{background:var(--accent-h);transform:translateY(-1px)}
+  .btn-soft{background:var(--panel2);color:var(--text);border:1px solid var(--border)}.btn-soft:hover{border-color:var(--accent)}
+  .cat{color:var(--muted);transition:.18s;border:1px solid transparent}
+  .cat:hover{color:var(--text);background:var(--panel2)}
+  .cat.active{background:var(--accent);color:#fff}
+  .accent{color:var(--accent)}
+  .ring-accent{box-shadow:0 0 0 1px var(--accent),0 0 26px -6px var(--accent)}
+  .pcard{background:var(--panel);border:1px solid var(--border);transition:transform .25s,box-shadow .25s,border-color .25s}
+  .pcard:hover{transform:translateY(-6px);border-color:var(--accent);box-shadow:0 18px 50px -20px var(--accent)}
+  /* 100x polish */
+  .reveal{opacity:0;transform:translateY(22px);transition:opacity .7s cubic-bezier(.2,.7,.2,1),transform .7s cubic-bezier(.2,.7,.2,1)}
+  .reveal.in{opacity:1;transform:none}
+  .gradanim{background-size:220% auto;animation:grad 5s ease infinite}
+  @keyframes grad{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
+  .shine{position:relative;overflow:hidden}
+  .shine::after{content:'';position:absolute;top:0;left:-150%;width:60%;height:100%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.35),transparent);transform:skewX(-18deg);transition:left .7s}
+  .shine:hover::after{left:160%}
+  .floatcard{animation:floaty 5s ease-in-out infinite}
+  .floatcard:nth-child(odd){animation-duration:6.5s}
+  .scrollbar{position:fixed;top:0;left:0;height:3px;z-index:90;background:linear-gradient(90deg,#7c3aed,#a855f7,#ec4899);box-shadow:0 0 12px rgba(168,85,247,.7);width:var(--p,0%);transition:width .1s linear}
+  .bgglow{position:fixed;inset:0;z-index:-1;overflow:hidden;pointer-events:none}
+  .bgglow span{position:absolute;border-radius:9999px;filter:blur(90px);opacity:.5;mix-blend-mode:screen}
+  .app.light .bgglow span{opacity:.35}
+  .bgglow .g1{width:40vw;height:40vw;left:-8vw;top:-6vw;background:#8b5cf6;animation:floaty 14s ease-in-out infinite}
+  .bgglow .g2{width:34vw;height:34vw;right:-6vw;top:30vw;background:#22d3ee;animation:floaty 18s ease-in-out infinite}
+  .bgglow .g3{width:30vw;height:30vw;left:30vw;bottom:-8vw;background:#ec4899;animation:floaty 16s ease-in-out infinite}
+  .tiltw{transition:transform .15s ease}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
+
+const HERO_IMG='https://media.pixverse.ai/pixverse%2Ft2i%2Fori%2F00b68877-28d6-414c-aa99-b3de08caa345.jpg?x-oss-process=style/cover-webp';
+const SHOWCASE_IMG='https://media.pixverse.ai/pixverse%2Ft2i%2Fori%2F0a931871-b916-4c87-b1eb-6653382ac2e7.jpg?x-oss-process=style/cover-webp';
+
+function HeroBanner(){
+  const wrap=useRef(null), par=useRef(null), txt=useRef(null);
+  const onMove=(e)=>{ const r=wrap.current.getBoundingClientRect(); const px=(e.clientX-r.left)/r.width-0.5, py=(e.clientY-r.top)/r.height-0.5;
+    if(par.current) par.current.style.transform=`translate(${-px*2.4}%, ${-py*2.4}%)`;
+    if(txt.current) txt.current.style.transform=`translate(${px*12}px, ${py*9}px)`; };
+  const reset=()=>{ if(par.current) par.current.style.transform=''; if(txt.current) txt.current.style.transform=''; };
+  return (
+    <div ref={wrap} onMouseMove={onMove} onMouseLeave={reset} className="relative rounded-3xl overflow-hidden mb-8 border border-white/10 glow-ring">
+      <div ref={par} className="absolute inset-0" style={{transition:'transform .25s ease-out'}}>
+        <div className="hero-img" style={{backgroundImage:`url(${HERO_IMG})`}}/>
+      </div>
+      <div className="hero-overlay"/><div className="hero-sheen"/>
+      <div ref={txt} className="relative px-6 sm:px-12 py-16 sm:py-24 max-w-2xl" style={{transition:'transform .35s ease-out'}}>
+        <span className="inline-block text-xs tracking-[0.3em] uppercase text-neon-bright mb-4 px-3 py-1 rounded-full bg-ink/40 border border-neon/30">⚡ Instant · Secure · 24/7</span>
+        <h1 className="text-4xl sm:text-6xl font-extrabold text-white leading-[1.05] drop-shadow-[0_4px_24px_rgba(0,0,0,.8)]">Everything you need,<br/><span className="text-neon-bright text-glow">all in one place.</span></h1>
+        <p className="text-slate-200/90 mt-5 max-w-lg drop-shadow-[0_2px_10px_rgba(0,0,0,.85)]">Robux, V-Bucks, game currency, gift cards & more — delivered to your account in seconds. Fast delivery, secure payments, 24/7 support.</p>
+        <div className="flex flex-wrap items-center gap-3 mt-8">
+          <a href="#market" className="inline-flex items-center gap-2 px-7 py-3.5 rounded-xl font-semibold bg-neon text-ink hover:bg-neon-bright glow-ring hover:scale-[1.03] transition-all"><Icon.bolt width="18" height="18"/> View all products</a>
+          <a href="#engine" className="inline-flex items-center gap-2 px-7 py-3.5 rounded-xl font-semibold bg-white/10 text-white border border-white/20 hover:border-neon/50 transition-all backdrop-blur">See live delivery</a>
+        </div>
+        <div className="flex items-center gap-3 mt-7">
+          <div className="flex -space-x-2">{['🦊','🐼','🐯','🐲'].map((e,i)=>(<span key={i} className="w-8 h-8 rounded-full bg-ink/70 border border-white/20 flex items-center justify-center text-sm">{e}</span>))}</div>
+          <div className="text-sm text-slate-200"><span className="text-amber-300">★★★★★</span> Trusted by <span className="font-semibold text-white">10,000+</span> gamers</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const Icon = {
+  cart:(p)=>(<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.7 13.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 6H6"/></svg>),
+  bolt:(p)=>(<svg viewBox="0 0 24 24" fill="currentColor" {...p}><path d="M13 2 4 14h6l-1 8 9-12h-6z"/></svg>),
+  check:(p)=>(<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M20 6 9 17l-5-5"/></svg>),
+  menu:(p)=>(<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" {...p}><path d="M3 12h18M3 6h18M3 18h18"/></svg>),
+};
+
+const easeOutBounce=(x)=>{const n=7.5625,d=2.75;if(x<1/d)return n*x*x;if(x<2/d)return n*(x-=1.5/d)*x+.75;if(x<2.5/d)return n*(x-=2.25/d)*x+.9375;return n*(x-=2.625/d)*x+.984375;};
+const easeInOut=(x)=>x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2;
+const lerp=(a,b,t)=>a+(b-a)*t;
+
+/* ── Three.js cinematic cyberpunk delivery scene ───────────── */
+function initThree(mount){
+  const THREE = window.THREE;
+  if(!THREE){ mount.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#34d399;font-family:Orbitron">Loading 3D engine…</div>'; return {purchase(){},transit(){},arrive(){},reset(){},dispose(){}}; }
+
+  let w=mount.clientWidth||720, h=mount.clientHeight||420;
+  let renderer;
+  try{ renderer=new THREE.WebGLRenderer({antialias:true,alpha:true}); }
+  catch(e){ mount.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#34d399">WebGL unavailable</div>'; return {purchase(){},transit(){},arrive(){},reset(){},dispose(){}}; }
+  renderer.setPixelRatio(Math.min(2,window.devicePixelRatio));
+  renderer.setSize(w,h); renderer.setClearColor(0x000000,0);
+  if(THREE.sRGBEncoding!==undefined) renderer.outputEncoding=THREE.sRGBEncoding;
+  if(THREE.ACESFilmicToneMapping!==undefined){ renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=1.15; }
+  mount.appendChild(renderer.domElement);
+
+  const scene=new THREE.Scene();
+  scene.fog=new THREE.FogExp2(0x04060c, 0.018);
+
+  const cam=new THREE.PerspectiveCamera(44, w/h, 0.1, 300);
+  cam.position.set(17,14,17); cam.lookAt(0,1,0);
+
+  let controls=null;
+  if(THREE.OrbitControls){
+    controls=new THREE.OrbitControls(cam, renderer.domElement);
+    controls.enableDamping=true; controls.dampingFactor=0.08;
+    controls.minPolarAngle=0.45; controls.maxPolarAngle=1.25;
+    controls.minDistance=10; controls.maxDistance=46; controls.rotateSpeed=0.6;
+    controls.target.set(0,1,0); controls.update();
+  }
+
+  // ── Lighting (dark base + intense neon point lights) ──
+  scene.add(new THREE.AmbientLight(0x182238, 0.55));
+  const key=new THREE.DirectionalLight(0x9fb4ff,0.5); key.position.set(10,18,6); scene.add(key);
+  const neonLights=[
+    [0x10b981,-8,6,-4],[0x22d3ee,9,7,5],[0xff3b5c,4,5,-9],[0x34d399,-6,5,7],[0x8b5cf6,12,6,-2],
+  ].map(([c,x,y,z])=>{ const l=new THREE.PointLight(c,1.1,26); l.position.set(x,y,z); scene.add(l); return l; });
+  const vaultLight=new THREE.PointLight(0x10b981,1.4,20); vaultLight.position.set(-9,4,0); scene.add(vaultLight);
+  const houseLight=new THREE.PointLight(0x34d399,1.0,20); houseLight.position.set(9,4,0); scene.add(houseLight);
+
+  const disp=[];
+  const keep=(x)=>{disp.push(x);return x;};
+
+  // ── Procedural textures ──
+  function windowTex(rgb){
+    const c=document.createElement('canvas'); c.width=64; c.height=128; const x=c.getContext('2d');
+    x.fillStyle='#05070d'; x.fillRect(0,0,64,128);
+    for(let r=0;r<14;r++) for(let col=0;col<6;col++){
+      if(Math.random()<0.55){ x.fillStyle=`rgba(${rgb},${0.35+Math.random()*0.6})`; x.fillRect(6+col*9,6+r*8.6,5,5); }
+    }
+    const t=new THREE.CanvasTexture(c); t.wrapS=t.wrapT=THREE.RepeatWrapping; return keep(t);
+  }
+  const winTexes=[windowTex('52,211,153'),windowTex('34,211,238'),windowTex('255,90,120')];
+  const winColors=[0x10b981,0x22d3ee,0xff3b5c];
+
+  function starTex(){
+    const c=document.createElement('canvas'); c.width=c.height=64; const x=c.getContext('2d');
+    const g=x.createRadialGradient(32,32,0,32,32,30); g.addColorStop(0,'rgba(255,255,255,1)'); g.addColorStop(.35,'rgba(110,231,183,.9)'); g.addColorStop(1,'rgba(16,185,129,0)');
+    x.fillStyle=g; x.beginPath(); x.moveTo(32,3); x.lineTo(40,32); x.lineTo(32,61); x.lineTo(24,32); x.closePath(); x.fill();
+    x.beginPath(); x.moveTo(3,32); x.lineTo(32,24); x.lineTo(61,32); x.lineTo(32,40); x.closePath(); x.fill();
+    return keep(new THREE.CanvasTexture(c));
+  }
+
+  // ── Ground + neon grid ──
+  const ground=new THREE.Mesh(keep(new THREE.PlaneGeometry(120,120)), new THREE.MeshStandardMaterial({color:0x05080f,roughness:.9,metalness:.3}));
+  ground.rotation.x=-Math.PI/2; scene.add(ground);
+  const grid=new THREE.GridHelper(120,120,0x10b981,0x0f2e26); grid.position.y=0.02; grid.material.transparent=true; grid.material.opacity=0.26; scene.add(grid);
+
+  // ── City: diverse skyscrapers ──
+  const edgeMat=(c)=>new THREE.LineBasicMaterial({color:c});
+  const mkEdges=(geo,color,p)=>{ const e=new THREE.LineSegments(keep(new THREE.EdgesGeometry(geo)), edgeMat(color)); if(p) e.position.copy(p); return e; };
+  const cityGroup=new THREE.Group(); scene.add(cityGroup);
+  function tower(x,z,seed){
+    const g=new THREE.Group(); g.position.set(x,0,z);
+    const ci=Math.floor(Math.random()*3); const col=winColors[ci];
+    const type=Math.random();
+    const baseW=1.4+Math.random()*1.4, baseD=1.4+Math.random()*1.4;
+    const totalH=2.2+Math.random()*5.5;
+    if(type<0.25){ // hollow frame tower
+      const geo=keep(new THREE.BoxGeometry(baseW,totalH,baseD));
+      const frame=new THREE.LineSegments(keep(new THREE.EdgesGeometry(geo)), edgeMat(col)); frame.position.y=totalH/2; g.add(frame);
+      // a few floor rings
+      for(let fy=0.6; fy<totalH; fy+=0.8){ const ring=new THREE.LineSegments(keep(new THREE.EdgesGeometry(keep(new THREE.BoxGeometry(baseW,0.02,baseD)))), edgeMat(col)); ring.position.y=fy; g.add(ring); }
+    } else if(type<0.55){ // tiered tower (stacked shrinking boxes)
+      let y=0, tw=baseW, td=baseD, tiers=2+Math.floor(Math.random()*3);
+      for(let ti=0;ti<tiers;ti++){ const th=totalH/tiers*(1-ti*0.12); const geo=keep(new THREE.BoxGeometry(tw,th,td));
+        const tex=winTexes[ci].clone(); tex.repeat.set(Math.max(1,tw|0),Math.max(1,th|0)); keep(tex);
+        const m=new THREE.Mesh(geo, new THREE.MeshStandardMaterial({color:0x0a0f17,roughness:.65,metalness:.35,emissive:col,emissiveIntensity:.5,emissiveMap:tex}));
+        m.position.y=y+th/2; g.add(m);
+        g.add(mkEdges(geo,col,m.position));
+        y+=th; tw*=0.78; td*=0.78;
+      }
+    } else { // solid tower with window emissive map
+      const geo=keep(new THREE.BoxGeometry(baseW,totalH,baseD));
+      const tex=winTexes[ci].clone(); tex.repeat.set(Math.max(1,baseW|0),Math.max(2,totalH|0)); keep(tex);
+      const m=new THREE.Mesh(geo, new THREE.MeshStandardMaterial({color:0x090e16,roughness:.6,metalness:.4,emissive:col,emissiveIntensity:.55,emissiveMap:tex}));
+      m.position.y=totalH/2; g.add(m);
+      const ed=new THREE.LineSegments(keep(new THREE.EdgesGeometry(geo)), edgeMat(col)); ed.position.copy(m.position); g.add(ed);
+    }
+    // random neon billboard panels on a side
+    if(Math.random()<0.7){ const bc=winColors[Math.floor(Math.random()*3)];
+      const bw=0.5+Math.random()*0.8, bh=0.5+Math.random()*1.2;
+      const bb=new THREE.Mesh(keep(new THREE.PlaneGeometry(bw,bh)), new THREE.MeshBasicMaterial({color:bc,transparent:true,opacity:0.92,side:THREE.DoubleSide}));
+      const side=Math.random()<.5?1:-1, axis=Math.random()<.5;
+      const yy=0.8+Math.random()*(totalH-1);
+      if(axis){ bb.position.set(side*(baseW/2+0.03), yy, (Math.random()-.5)*baseD*0.6); bb.rotation.y=Math.PI/2; }
+      else { bb.position.set((Math.random()-.5)*baseW*0.6, yy, side*(baseD/2+0.03)); }
+      bb.userData.flicker=Math.random()<.4; bb.userData.base=0.92; g.add(bb);
+      if(bb.userData.flicker) billboards.push(bb);
+    }
+    cityGroup.add(g);
+  }
+  const billboards=[];
+  // layout towers on a grid, leaving a clear corridor along the road (|z|<2 near center kept lower/empty)
+  const slots=[];
+  for(let gx=-18; gx<=18; gx+=3.2){ for(let gz=-14; gz<=14; gz+=3.2){
+    if(Math.abs(gz)<2.4 && gx>-7 && gx<7) continue;            // keep delivery corridor clear
+    if(gx>-8 && gx<8 && Math.abs(gz)<1.6) continue;
+    if(Math.random()<0.62) slots.push([gx+(Math.random()-.5)*1.2, gz+(Math.random()-.5)*1.2]);
+  }}
+  slots.forEach(([x,z])=>tower(x,z));
+
+  // ── Vault (left) ──
+  const vault=new THREE.Group(); vault.position.set(-6,0,0);
+  const vGeo=keep(new THREE.BoxGeometry(2.6,2.6,2.6));
+  const vBox=new THREE.Mesh(vGeo, new THREE.MeshStandardMaterial({color:0x0c1320,emissive:0x10b981,emissiveIntensity:.3,metalness:.55,roughness:.3}));
+  vBox.position.y=1.3; vault.add(vBox);
+  vault.add(mkEdges(vGeo,0x34d399,vBox.position));
+  const door=new THREE.Mesh(keep(new THREE.PlaneGeometry(1.1,1.5)), new THREE.MeshBasicMaterial({color:0x6ef7c0,transparent:true,opacity:.6})); door.position.set(0,1.05,1.31); vault.add(door);
+  const pad=new THREE.Mesh(keep(new THREE.BoxGeometry(1.5,0.18,1.5)), new THREE.MeshStandardMaterial({color:0x0b1018,emissive:0x34d399,emissiveIntensity:.6})); pad.position.y=2.7; vault.add(pad);
+  scene.add(vault);
+
+  // ── House (right) ──
+  const house=new THREE.Group(); house.position.set(6,0,0);
+  const hMat=new THREE.MeshStandardMaterial({color:0x0d1626,emissive:0x10b981,emissiveIntensity:.3,metalness:.35,roughness:.45});
+  const hGeo=keep(new THREE.BoxGeometry(2.5,2,2.5));
+  const hBase=new THREE.Mesh(hGeo,hMat); hBase.position.y=1; house.add(hBase);
+  house.add(mkEdges(hGeo,0x6ef7c0,hBase.position));
+  const roofMat=new THREE.MeshStandardMaterial({color:0x0b1018,emissive:0x34d399,emissiveIntensity:.28});
+  const roof=new THREE.Mesh(keep(new THREE.ConeGeometry(2.05,1.4,4)),roofMat); roof.position.y=2.7; roof.rotation.y=Math.PI/4; house.add(roof);
+  const hwin=new THREE.Mesh(keep(new THREE.PlaneGeometry(0.8,1)), new THREE.MeshBasicMaterial({color:0x6ef7c0,transparent:true,opacity:.55})); hwin.position.set(0,1,1.26); house.add(hwin);
+  // bloom-ish halo behind house
+  const halo=new THREE.Sprite(new THREE.SpriteMaterial({map:starTex(),color:0x34d399,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false}));
+  halo.scale.set(10,10,1); halo.position.set(6,2,0); scene.add(halo);
+  scene.add(house);
+
+  // ── Road: flat wide curved highway + dashed glowing center line ──
+  const curve=new THREE.CatmullRomCurve3([
+    new THREE.Vector3(-6,0.08,0), new THREE.Vector3(-3.5,0.08,2.4), new THREE.Vector3(-1,0.08,-1.4),
+    new THREE.Vector3(1.6,0.08,2), new THREE.Vector3(3.9,0.08,-1.5), new THREE.Vector3(6,0.08,0),
+  ]);
+  const RN=200, halfW=0.95;
+  const rp=curve.getSpacedPoints(RN), pos=[], idx=[], up=new THREE.Vector3(0,1,0), nrm=new THREE.Vector3(), tg=new THREE.Vector3();
+  for(let i=0;i<=RN;i++){ const t=i/RN; curve.getTangentAt(t,tg); nrm.copy(tg).cross(up).normalize();
+    pos.push(rp[i].x+nrm.x*halfW, 0.07, rp[i].z+nrm.z*halfW); pos.push(rp[i].x-nrm.x*halfW, 0.07, rp[i].z-nrm.z*halfW); }
+  for(let i=0;i<RN;i++){ const a=i*2,b=a+1,c=a+2,d=a+3; idx.push(a,b,c, b,d,c); }
+  const roadGeo=new THREE.BufferGeometry(); roadGeo.setAttribute('position', new THREE.Float32BufferAttribute(pos,3)); roadGeo.setIndex(idx); roadGeo.computeVertexNormals(); keep(roadGeo);
+  const roadMat=new THREE.MeshStandardMaterial({color:0x0a121d,emissive:0x0c3326,emissiveIntensity:.5,metalness:.5,roughness:.45,side:THREE.DoubleSide});
+  scene.add(new THREE.Mesh(roadGeo,roadMat));
+  // glowing edges
+  [halfW,-halfW].forEach(off=>{ const ep=[]; for(let i=0;i<=RN;i++){ const t=i/RN; curve.getTangentAt(t,tg); nrm.copy(tg).cross(up).normalize(); ep.push(rp[i].x+nrm.x*off, 0.1, rp[i].z+nrm.z*off);} const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.Float32BufferAttribute(ep,3)); keep(g); scene.add(new THREE.Line(g, new THREE.LineBasicMaterial({color:0x34d399}))); });
+  // dashed center line
+  const cl=[]; for(let i=0;i<=RN;i++) cl.push(rp[i].x,0.12,rp[i].z);
+  const clGeo=new THREE.BufferGeometry(); clGeo.setAttribute('position',new THREE.Float32BufferAttribute(cl,3)); keep(clGeo);
+  const centerLine=new THREE.Line(clGeo, new THREE.LineDashedMaterial({color:0xbbf7d0,dashSize:0.45,gapSize:0.35})); centerLine.computeLineDistances(); scene.add(centerLine);
+
+  // ── Crystal (purchase item) ──
+  const crystal=new THREE.Mesh(keep(new THREE.OctahedronGeometry(0.6)), new THREE.MeshStandardMaterial({color:0x6ee7b7,emissive:0x10b981,emissiveIntensity:.95,metalness:.3,roughness:.12}));
+  crystal.position.set(-6,4.4,0); crystal.visible=false; scene.add(crystal);
+
+  // ── Detailed low-poly truck (cabin + container + 4 rotating wheels) ──
+  const truckPos=new THREE.Group(); const truck=new THREE.Group(); const wheels=[];
+  (function(){
+    const body=new THREE.MeshStandardMaterial({color:0x0f1f2e,emissive:0x10b981,emissiveIntensity:.22,metalness:.6,roughness:.35});
+    const cabMat=new THREE.MeshStandardMaterial({color:0x0b1018,emissive:0x34d399,emissiveIntensity:.35,metalness:.6,roughness:.3});
+    const container=new THREE.Mesh(keep(new THREE.BoxGeometry(1.35,0.85,0.92)),body); container.position.set(-0.25,0.62,0); truck.add(container);
+    truck.add(mkEdges(container.geometry,0x34d399,container.position));
+    const cab=new THREE.Mesh(keep(new THREE.BoxGeometry(0.62,0.62,0.86)),cabMat); cab.position.set(0.72,0.5,0); truck.add(cab);
+    truck.add(mkEdges(cab.geometry,0x6ef7c0,cab.position));
+    const wsh=new THREE.Mesh(keep(new THREE.PlaneGeometry(0.5,0.34)), new THREE.MeshBasicMaterial({color:0xbbf7d0,transparent:true,opacity:.8})); wsh.position.set(1.04,0.55,0); wsh.rotation.y=Math.PI/2; truck.add(wsh);
+    const strip=new THREE.Mesh(keep(new THREE.BoxGeometry(1.4,0.08,0.94)), new THREE.MeshBasicMaterial({color:0x34d399})); strip.position.set(-0.2,0.2,0); truck.add(strip);
+    const headlight=new THREE.Mesh(keep(new THREE.BoxGeometry(0.1,0.16,0.5)), new THREE.MeshBasicMaterial({color:0xeafff5})); headlight.position.set(1.06,0.42,0); truck.add(headlight);
+    const wMat=new THREE.MeshStandardMaterial({color:0x05070b,emissive:0x10b981,emissiveIntensity:.3,metalness:.4,roughness:.5});
+    const wGeo=keep(new THREE.CylinderGeometry(0.22,0.22,0.16,16));
+    [[0.55,0.46],[0.55,-0.46],[-0.55,0.46],[-0.55,-0.46]].forEach(([x,z])=>{ const wm=new THREE.Mesh(wGeo,wMat); wm.position.set(x,0.22,z); wm.rotation.x=Math.PI/2; truck.add(wm); wheels.push(wm); });
+    truck.scale.setScalar(1.05);
+  })();
+  truckPos.add(truck); truckPos.visible=false; scene.add(truckPos);
+
+  // ── Particle explosion (240 star shards, fountain physics) ──
+  const PC=240; const pgeo=new THREE.BufferGeometry();
+  const ppos=new Float32Array(PC*3), pvel=new Float32Array(PC*3);
+  pgeo.setAttribute('position', new THREE.BufferAttribute(ppos,3)); keep(pgeo);
+  const pmat=new THREE.PointsMaterial({size:0.5,map:starTex(),color:0x9bffd6,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false,sizeAttenuation:true});
+  const points=new THREE.Points(pgeo,pmat); scene.add(points);
+  function burst(){ for(let i=0;i<PC;i++){ ppos[i*3]=6+(Math.random()-.5)*1.4; ppos[i*3+1]=1.4+Math.random()*0.6; ppos[i*3+2]=(Math.random()-.5)*1.4;
+    const a=Math.random()*Math.PI*2, sp=1.2+Math.random()*3.2, upv=6+Math.random()*6.5; pvel[i*3]=Math.cos(a)*sp; pvel[i*3+1]=upv; pvel[i*3+2]=Math.sin(a)*sp; }
+    pmat.opacity=1; pLife=2.2; pgeo.attributes.position.needsUpdate=true; }
+
+  // ── State + cinematic camera ──
+  let mode='idle', t=0, truckProg=0, flash=0, pLife=0, houseVel=0;
+  let lastSpeed=0, lastHeading=0; const lastPos=new THREE.Vector3(-6,0,0);
+  const tan=new THREE.Vector3(), pp=new THREE.Vector3(), camGoal=new THREE.Vector3(), camLook=new THREE.Vector3(0,1,0), lookGoal=new THREE.Vector3(0,1,0), _t=new THREE.Vector3();
+  let cineActive=false, cineClock=0;
+
+  const api={
+    purchase(){ mode='purchase'; t=0; crystal.visible=true; crystal.position.set(-6,4.4,0); truckPos.visible=false;
+      cineActive=true; cineClock=0; if(controls)controls.enabled=false; cam.position.set(22,17,20); },
+    transit(){ mode='transit'; t=0; truckProg=0; truckPos.visible=true; crystal.visible=false; lastSpeed=0; lastPos.copy(curve.getPointAt(0)); },
+    arrive(){ mode='arrive'; cineClock=0; truckPos.visible=false; flash=1; burst(); house.scale.setScalar(1.3); houseVel=0; },
+    reset(){ mode='idle'; crystal.visible=false; truckPos.visible=false; flash=0; pLife=0; pmat.opacity=0; truckProg=0;
+      cineActive=false; if(controls){ controls.target.copy(camLook); controls.object.position.copy(cam.position); controls.enabled=true; controls.update(); } },
+    dispose(){ cancelAnimationFrame(raf); ro.disconnect(); if(controls)controls.dispose();
+      scene.traverse(o=>{ if(o.geometry&&o.geometry.dispose)o.geometry.dispose(); if(o.material){(Array.isArray(o.material)?o.material:[o.material]).forEach(m=>{if(m.map&&m.map.dispose)m.map.dispose(); m.dispose&&m.dispose();});} });
+      disp.forEach(d=>d.dispose&&d.dispose()); renderer.dispose(); if(renderer.domElement.parentNode)renderer.domElement.parentNode.removeChild(renderer.domElement); },
+  };
+
+  const clock=new THREE.Clock(); let raf;
+  function frame(){
+    raf=requestAnimationFrame(frame);
+    const dt=Math.min(0.05,clock.getDelta()), time=clock.elapsedTime; cineClock+=dt;
+
+    crystal.rotation.y+=dt*1.9; crystal.rotation.x+=dt*0.8;
+    if(mode==='purchase'){ t+=dt; const k=Math.min(1,t/1.2); crystal.position.y=4.4+(3.15-4.4)*easeOutBounce(k); }
+
+    if(mode==='transit'){
+      t+=dt; const lin=Math.min(1,t/2.8); truckProg=easeInOut(lin);
+      curve.getPointAt(truckProg,pp); curve.getTangentAt(truckProg,tan);
+      truckPos.position.set(pp.x,0,pp.z);
+      const heading=Math.atan2(-tan.z,tan.x); truckPos.rotation.y=heading;
+      const speed=lastPos.distanceTo(pp)/Math.max(dt,1e-3);
+      let dh=heading-lastHeading; while(dh>Math.PI)dh-=2*Math.PI; while(dh<-Math.PI)dh+=2*Math.PI;
+      // lean into turn (roll about local X) + accel pitch (about local Z) + wobble
+      truck.rotation.x = lerp(truck.rotation.x, THREE.MathUtils.clamp(-dh/Math.max(dt,1e-3)*0.12,-0.4,0.4), 0.12) + Math.sin(time*18)*0.02;
+      const accel=(speed-lastSpeed)/Math.max(dt,1e-3);
+      truck.rotation.z = lerp(truck.rotation.z, THREE.MathUtils.clamp(accel*0.015,-0.18,0.18), 0.1);
+      truck.position.y=Math.sin(time*22)*0.03;
+      wheels.forEach(wm=>wm.rotateZ(speed*dt*4.5));
+      lastSpeed=speed; lastHeading=heading; lastPos.copy(pp);
+    }
+
+    if(pLife>0){ pLife-=dt; for(let i=0;i<PC;i++){ ppos[i*3]+=pvel[i*3]*dt; ppos[i*3+1]+=pvel[i*3+1]*dt; ppos[i*3+2]+=pvel[i*3+2]*dt; pvel[i*3+1]-=9.5*dt; } pmat.opacity=Math.max(0,pLife/2.2); pgeo.attributes.position.needsUpdate=true; }
+
+    // road pulse
+    roadMat.emissiveIntensity=0.4+Math.sin(time*3)*0.25+(mode==='transit'?0.4:0);
+    centerLine.material.color.setHSL(0.42,0.8,0.6+Math.sin(time*5)*0.18);
+
+    // house flash + spring + halo
+    flash=Math.max(0,flash-dt*0.5);
+    hMat.emissiveIntensity=0.3+flash*2.6+(mode==='arrive'?Math.sin(time*9)*0.2:0);
+    roofMat.emissiveIntensity=0.25+flash*2; houseLight.intensity=1.0+flash*5;
+    halo.material.opacity=flash*0.8; halo.scale.setScalar(8+flash*5);
+    const sAcc=-150*(house.scale.x-1)-12*houseVel; houseVel+=sAcc*dt; house.scale.setScalar(Math.max(0.5,house.scale.x+houseVel*dt));
+
+    // neon light shimmer
+    neonLights.forEach((l,i)=>{ l.intensity=0.9+Math.sin(time*1.5+i*1.3)*0.4; });
+
+    // ── Cinematic camera ──
+    if(cineActive){
+      if(mode==='purchase' || (mode==='transit'&&truckProg<0.04)){
+        // wide establishing sweep of the city
+        const a=0.6+cineClock*0.06; camGoal.set(Math.cos(a)*26, 16, Math.sin(a)*22); lookGoal.set(0,2,0);
+        cam.position.lerp(camGoal,0.05);
+      } else if(mode==='transit'){
+        // tight chase cam behind + above the truck
+        _t.copy(tan).setY(0).normalize();
+        camGoal.set(truckPos.position.x - _t.x*6 + 1.5, 4.6, truckPos.position.z - _t.z*6 + 4);
+        lookGoal.set(truckPos.position.x + _t.x*2, 1.1, truckPos.position.z + _t.z*2);
+        cam.position.lerp(camGoal,0.08);
+      } else { // arrive: dramatic pan-up into orbital rotation around the house
+        const a=cineClock*0.7; const rad=9-Math.min(3,cineClock*0.8); const hgt=4+Math.min(6,cineClock*2);
+        camGoal.set(6+Math.cos(a)*rad, hgt, Math.sin(a)*rad); lookGoal.set(6,1.6,0);
+        cam.position.lerp(camGoal,0.06);
+      }
+      camLook.lerp(lookGoal,0.08); cam.lookAt(camLook);
+    } else if(controls){ controls.update(); }
+
+    renderer.render(scene,cam);
+  }
+  frame();
+
+  const ro=new ResizeObserver(()=>{ w=mount.clientWidth; h=mount.clientHeight; cam.aspect=w/h; cam.updateProjectionMatrix(); renderer.setSize(w,h); });
+  ro.observe(mount);
+  return api;
+}
+
+/* ── Delivery Engine (React shell) ──────────────────────── */
+const PHASES=['Idle','Processing Purchase…','In Transit…','DELIVERED'];
+function DeliveryJourney({ onDelivered }){
+  const mountRef=useRef(null), apiRef=useRef(null), timers=useRef([]);
+  const [phase,setPhase]=useState(0), [playing,setPlaying]=useState(false), [toast,setToast]=useState(false);
+  useEffect(()=>{ apiRef.current=initThree(mountRef.current); return ()=>apiRef.current&&apiRef.current.dispose(); },[]);
+  const at=(fn,ms)=>timers.current.push(setTimeout(fn,ms));
+  const clearTimers=()=>{ timers.current.forEach(clearTimeout); timers.current=[]; };
+  useEffect(()=>()=>clearTimers(),[]);
+  const play=useCallback(()=>{ const api=apiRef.current; if(playing||!api)return;
+    clearTimers(); setToast(false); setPlaying(true);
+    setPhase(1); api.purchase();
+    at(()=>{ setPhase(2); api.transit(); },1550);
+    at(()=>{ setPhase(3); api.arrive(); setToast(true); onDelivered&&onDelivered(); },4150);
+    at(()=>{ setPhase(0); setToast(false); setPlaying(false); api.reset(); },8400);
+  },[playing,onDelivered]);
+  return (
+    <div className="relative rounded-3xl border border-white/10 bg-gradient-to-b from-white/[0.04] to-transparent overflow-hidden glow-ring">
+      <div className="absolute -top-24 -left-20 w-80 h-80 rounded-full bg-neon/15 blur-3xl"/>
+      <div className="absolute -bottom-24 -right-10 w-80 h-80 rounded-full bg-cyber/10 blur-3xl"/>
+      <div className="relative p-5 sm:p-7">
+        <div className="flex items-center justify-between mb-4">
+          <div className="inline-flex items-center gap-2 text-xs font-semibold tracking-widest uppercase text-neon-bright"><span className="w-2 h-2 rounded-full bg-neon-bright animate-pulse"/> Live Delivery Engine · 3D</div>
+          <div className="text-xs font-mono">{phase===3? <span className="blink text-neon-bright font-bold tracking-[0.25em]">● DELIVERED</span> : <span className="text-slate-400">{PHASES[phase]}</span>}</div>
+        </div>
+        <div className="viewport3d">
+          <div ref={mountRef} className="absolute inset-0"/>
+          <div className="vignette"/>
+          <div className="absolute bottom-3 left-3 text-[10px] font-mono uppercase tracking-wider text-neon-bright/70 bg-ink/40 px-2 py-1 rounded-md border border-neon/20 pointer-events-none">✦ drag to orbit · scroll to zoom</div>
+        </div>
+        <div className="relative mt-5 flex flex-col sm:flex-row items-center gap-4 justify-between">
+          <button onClick={play} disabled={playing} className={`group relative inline-flex items-center gap-2 px-7 py-3.5 rounded-xl font-semibold transition-all ${playing?'bg-white/5 text-slate-400 cursor-wait':'bg-neon text-ink hover:bg-neon-bright glow-ring hover:scale-[1.03]'}`}>
+            <Icon.bolt width="18" height="18"/>{playing?'Delivering…':'Replay Live Delivery'}
+          </button>
+          <div className={`toast ${toast?'show':''} flex items-center gap-3 px-4 py-3 rounded-xl bg-neon/10 border border-neon/40`}>
+            <div className="w-7 h-7 rounded-full bg-neon flex items-center justify-center"><Icon.check width="15" height="15" className="text-ink"/></div>
+            <div><div className="text-sm font-semibold text-white">Item succesvol in-game bezorgd!</div><div className="text-xs text-neon-bright">Automated · arrived in &lt; 30 seconds</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── helpers ── */
+function Reveal({children,delay=0,className='',style={},as:Tag='div'}){
+  const ref=useRef(null),[s,setS]=useState(false);
+  useEffect(()=>{const el=ref.current;if(!el)return;const io=new IntersectionObserver(([e])=>{if(e.isIntersecting){setS(true);io.disconnect();}},{threshold:.1,rootMargin:'0px 0px -6% 0px'});io.observe(el);const fb=setTimeout(()=>setS(true),2200);return()=>{io.disconnect();clearTimeout(fb);};},[]);
+  return <Tag ref={ref} className={`reveal ${s?'in':''} ${className}`} style={{transitionDelay:delay+'ms',...style}}>{children}</Tag>;
+}
+function CountUp({value,className=''}){
+  const ref=useRef(null),[d,setD]=useState(null);
+  const m=String(value).match(/^(\D*)([\d.,]+)(.*)$/), isN=!!m;
+  useEffect(()=>{ if(!isN){setD(value);return;} const el=ref.current;if(!el)return; let raf;
+    const io=new IntersectionObserver(([e])=>{ if(!e.isIntersecting)return; io.disconnect();
+      const num=parseFloat(m[2].replace(/,/g,'')), dec=m[2].includes('.')?1:0, start=performance.now();
+      const tick=(t)=>{ const k=Math.min(1,(t-start)/1300), val=num*(1-Math.pow(1-k,3));
+        setD(m[1]+(dec?val.toFixed(1):Math.round(val).toLocaleString())+m[3]); if(k<1)raf=requestAnimationFrame(tick); };
+      raf=requestAnimationFrame(tick);
+    },{threshold:.4}); io.observe(el); return()=>{io.disconnect();cancelAnimationFrame(raf);};
+  },[value]);
+  return <span ref={ref} className={className}>{d??(isN?m[1]+'0'+m[3]:value)}</span>;
+}
+function Tilt({children,className=''}){
+  const ref=useRef(null);
+  const mv=(e)=>{const el=ref.current;if(!el)return;const r=el.getBoundingClientRect();const x=(e.clientX-r.left)/r.width-.5,y=(e.clientY-r.top)/r.height-.5;el.style.transform=`perspective(700px) rotateX(${-y*7}deg) rotateY(${x*7}deg) translateY(-5px)`;};
+  const rs=()=>{if(ref.current)ref.current.style.transform='';};
+  return <div ref={ref} onMouseMove={mv} onMouseLeave={rs} className={`tiltw ${className}`}>{children}</div>;
+}
+function useCountdown(initial){
+  const [t,setT]=useState(initial);
+  useEffect(()=>{ const id=setInterval(()=>setT(x=>x>0?x-1:48*3600),1000); return()=>clearInterval(id); },[]);
+  return [Math.floor(t/3600)%100, Math.floor(t/60)%60, t%60];
+}
+
+/* ── Marketplace data (matches the reference exactly) ── */
+const ITEMS=[
+  { name:'Robux', cat:'Robux', glyph:'R', grad:'linear-gradient(135deg,#22c55e,#15803d)', range:'100 - 10,000 Robux', price:1.99, delivery:'Instant · < 30s', stock:320, desc:'Official Robux top-up for your Roblox account. Choose your amount at checkout — delivered automatically within seconds.', stats:[['Range','100–10k'],['Region','Global']] },
+  { name:'V-Bucks', cat:'V-Bucks', glyph:'V', grad:'linear-gradient(135deg,#38bdf8,#1d4ed8)', range:'1,000 - 13,500 V-Bucks', price:4.99, delivery:'Instant · < 1 min', stock:210, desc:'Fortnite V-Bucks for skins, the Battle Pass and more. Fast, safe delivery to your Epic account.', stats:[['Range','1k–13.5k'],['Region','Global']] },
+  { name:'Valorant Points', cat:'Valorant', glyph:'▽', grad:'linear-gradient(135deg,#fb7185,#dc2626)', range:'475 - 11,000 VP', price:4.49, popular:true, delivery:'Instant · < 1 min', stock:90, desc:'Valorant Points for weapon skins and the Battle Pass. Delivered via secure top-up.', stats:[['Range','475–11k'],['Region','EU/NA']] },
+  { name:'Fortnite Accounts', cat:'Fortnite', glyph:'F', grad:'linear-gradient(135deg,#a855f7,#6d28d9)', range:'Various Accounts', price:9.99, delivery:'Instant · email', stock:40, desc:'Hand-picked Fortnite accounts with rare skins and V-Bucks. Full email access included.', stats:[['Type','Account'],['Access','Full']] },
+  { name:'Steam Wallet', cat:'Steam', glyph:'🎮', grad:'linear-gradient(135deg,#64748b,#1e3a8a)', range:'€5 - €100 Wallet', price:5.00, delivery:'Instant · code', stock:280, desc:'Steam Wallet redeem code for games, DLC and in-game purchases. Pick your region at checkout.', stats:[['Range','€5–€100'],['Type','Code']] },
+  { name:'PlayStation Store', cat:'PlayStation', glyph:'PS', grad:'linear-gradient(135deg,#3b82f6,#3730a3)', range:'€10 - €100 Wallet', price:10.00, delivery:'Instant · code', stock:60, desc:'PlayStation Store gift card for games, DLC and PS Plus. Delivered as a redeem code instantly.', stats:[['Range','€10–€100'],['Type','Code']] },
+];
+const SIDE_CATS=[['🟪','All Products'],['🟩','Robux'],['🔵','V-Bucks'],['🔻','Valorant Points'],['🟣','Fortnite Accounts'],['🎁','Gift Cards'],['🎮','Steam Wallet'],['🕹️','PlayStation Store'],['🟢','Xbox Gift Card'],['💬','Discord Nitro'],['🎵','iTunes'],['➕','More Categories']];
+const stockTone=(s)=> s<=60 ? ['text-rose-500','bg-rose-500','In high demand'] : s<=150 ? ['text-amber-500','bg-amber-500','Selling fast'] : ['text-emerald-500','bg-emerald-500','In stock'];
+function Tile({glyph,grad,size=44,r=12,fs=18}){ return (<div style={{width:size,height:size,borderRadius:r,background:grad,display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontWeight:800,fontSize:fs,boxShadow:'0 8px 20px -8px rgba(0,0,0,.5)'}}>{glyph}</div>); }
+
+function ProductCard({ item, onBuy, onSelect }){
+  return (
+    <Tilt>
+    <div onClick={onSelect} className="pcard shine rounded-2xl p-4 cursor-pointer relative h-full">
+      {item.popular && <span className="absolute right-3 top-3 z-10 text-[10px] font-bold px-2 py-0.5 rounded-full" style={{background:'var(--accent)',color:'#fff'}}>Popular</span>}
+      <div className="flex items-center justify-center py-3"><Tile glyph={item.glyph} grad={item.grad} size={64} r={18} fs={26}/></div>
+      <h3 className="font-semibold text-center" style={{color:'var(--text)'}}>{item.name}</h3>
+      <div className="text-[11px] text-center t-muted mt-0.5">{item.range}</div>
+      <div className="text-center mt-2"><span className="text-[11px] t-muted">From </span><span className="font-bold" style={{color:'var(--text)'}}>€{item.price.toFixed(2)}</span></div>
+      <div className="flex items-center gap-2 mt-3">
+        <button onClick={(e)=>{e.stopPropagation();onBuy();}} className="btn-accent flex-1 py-2 rounded-lg text-sm font-semibold">Buy Now</button>
+        <button onClick={(e)=>{e.stopPropagation();onBuy();}} className="btn-soft w-9 h-9 rounded-lg flex items-center justify-center"><Icon.cart width="16" height="16"/></button>
+      </div>
+    </div>
+    </Tilt>
+  );
+}
+
+function ProductModal({ item, onClose, onBuy }){
+  if(!item) return null;
+  const [c1,bar,label]=stockTone(item.stock);
+  const pct=Math.min(100,Math.max(8,Math.round(item.stock/3.4)));
+  return (
+    <div className="modal-back fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
+      <div className="modal-card panel relative w-full max-w-lg rounded-3xl overflow-hidden ring-accent" onClick={(e)=>e.stopPropagation()}>
+        <button onClick={onClose} className="absolute right-3 top-3 z-10 w-9 h-9 rounded-full btn-soft flex items-center justify-center">✕</button>
+        <div className="p-6">
+          <div className="flex items-center gap-4">
+            <Tile glyph={item.glyph} grad={item.grad} size={64} r={18} fs={26}/>
+            <div><div className="text-xs t-muted">{item.cat}</div><h3 className="text-2xl font-bold" style={{color:'var(--text)'}}>{item.name}</h3><div className="text-xs t-muted">{item.range}</div></div>
+          </div>
+          <p className="t-muted text-sm mt-4 leading-relaxed">{item.desc}</p>
+          <div className="grid grid-cols-3 gap-3 mt-5">
+            <div className="panel2 rounded-xl p-3 text-center"><div className="text-[10px] uppercase tracking-wide t-muted">Delivery</div><div className="text-sm font-semibold mt-0.5 accent">⚡ {item.delivery}</div></div>
+            {item.stats.map(([k,v])=>(<div key={k} className="panel2 rounded-xl p-3 text-center"><div className="text-[10px] uppercase tracking-wide t-muted">{k}</div><div className="text-sm font-semibold mt-0.5" style={{color:'var(--text)'}}>{v}</div></div>))}
+          </div>
+          <div className="mt-5">
+            <div className="flex items-center justify-between text-xs mb-1.5"><span className={`font-semibold ${c1}`}>● {label}</span><span className="t-muted"><span className="font-semibold" style={{color:'var(--text)'}}>{item.stock}</span> available</span></div>
+            <div className="h-2 rounded-full panel2 overflow-hidden"><div className={`h-full ${bar} rounded-full`} style={{width:pct+'%'}}/></div>
+          </div>
+          <div className="flex items-center justify-between mt-6">
+            <div><div className="text-[10px] uppercase tracking-wide t-muted">From</div><div className="text-3xl font-bold" style={{color:'var(--text)'}}>€{item.price.toFixed(2)}</div></div>
+            <button onClick={()=>{onBuy();onClose();}} className="btn-accent inline-flex items-center gap-2 px-6 py-3.5 rounded-xl font-semibold"><Icon.bolt width="18" height="18"/> Buy Now</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const FEAT=[['⚡','#7c3aed','Instant Delivery','Get your items instantly','left-3 top-3'],['🔒','#10b981','Secure Payments','100% secure & trusted','right-3 bottom-3'],['🎧','#3b82f6','24/7 Support','We’re here for you','right-3 top-3'],['🏷️','#f43f5e','Best Prices','Competitive prices daily','left-3 bottom-3']];
+const TRUST=[['⚡','Instant Delivery','Fast & reliable delivery'],['🔒','100% Secure','Your data is protected'],['🏷️','Best Prices','Competitive prices daily'],['🎧','24/7 Support','Always here to help']];
+const STATS=[['👥','10,000+','Happy Customers'],['✅','99.9%','Success Rate'],['📦','50,000+','Orders Completed'],['🎧','24/7','Customer Support']];
+
+function ForgeBot(){
+  const [open,setOpen]=useState(true), [typing,setTyping]=useState(false);
+  const [msgs,setMsgs]=useState([{b:1,t:'Hi! 👋 How can I help you today?'}]);
+  const [v,setV]=useState(''); const body=useRef(null);
+  useEffect(()=>{ if(body.current) body.current.scrollTop=body.current.scrollHeight; },[msgs,typing,open]);
+  const answer=(m)=>/price|cost|hoeveel|how much/i.test(m)?'Prices start from just €1,99 — check the Popular Products grid! 💜':/deliver|long|fast|hoe lang|snel/i.test(m)?'Delivery is instant — most orders arrive in under 30 seconds ⚡':/refund|problem|issue|terug/i.test(m)?'No worries! Open a ticket in our Discord and we’ll sort it fast. 🔒':/robux|v-?bucks|valorant|steam|playstation/i.test(m)?'Great choice! Tap that product in the grid to see amounts, price and instant delivery. 🎮':'I can help with products, delivery, payments and orders! Tell me a game and I’ll recommend a top-up. 🎮';
+  const send=(text)=>{ const m=text.trim(); if(!m)return; setMsgs(x=>[...x,{b:0,t:m}]); setV(''); setTyping(true);
+    setTimeout(()=>{ setTyping(false); setMsgs(x=>[...x,{b:1,t:answer(m)}]); }, 700); };
+  return (
+    <div className="fixed bottom-4 right-4 z-[80]">
+      {open ? (
+        <div className="panel rounded-2xl w-[310px] overflow-hidden shadow-2xl ring-accent modal-card">
+          <div className="flex items-center gap-2.5 px-4 py-3" style={{background:'linear-gradient(120deg,#7c3aed,#a855f7)'}}>
+            <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center text-lg">🤖</div>
+            <div className="flex-1"><div className="text-white font-semibold text-sm leading-none">ForgeBot</div><div className="text-[11px] text-emerald-200 flex items-center gap-1 mt-0.5"><span className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse"/> Online</div></div>
+            <button onClick={()=>setOpen(false)} className="text-white/80 hover:text-white text-lg leading-none">▾</button>
+          </div>
+          <div ref={body} className="p-3 space-y-2 max-h-60 overflow-y-auto">
+            {msgs.map((m,i)=>(<div key={i} className={`text-sm px-3 py-2 rounded-2xl max-w-[85%] ${m.b?'panel2':'text-white ml-auto'}`} style={!m.b?{background:'var(--accent)'}:{color:'var(--text)'}}>{m.t}</div>))}
+            {typing && <div className="panel2 px-3 py-2.5 rounded-2xl w-fit flex gap-1">{[0,1,2].map(d=><span key={d} className="w-1.5 h-1.5 rounded-full bg-current opacity-50 animate-bounce" style={{animationDelay:d*.15+'s',color:'var(--muted)'}}/>)}</div>}
+            {msgs.length<=1 && <div className="flex flex-wrap gap-1.5 pt-1">{['Prices?','How fast?','Refunds?'].map(q=><button key={q} onClick={()=>send(q)} className="text-[11px] px-2.5 py-1 rounded-full panel2" style={{color:'var(--text)'}}>{q}</button>)}</div>}
+          </div>
+          <form onSubmit={(e)=>{e.preventDefault();send(v);}} className="p-2 flex gap-2" style={{borderTop:'1px solid var(--border)'}}>
+            <input value={v} onChange={e=>setV(e.target.value)} placeholder="Chat with us…" className="flex-1 px-3 py-2 rounded-lg text-sm panel2" style={{color:'var(--text)',outline:'none'}}/>
+            <button className="btn-accent px-3 rounded-lg text-sm font-semibold">Send</button>
+          </form>
+        </div>
+      ) : (
+        <button onClick={()=>setOpen(true)} className="relative w-14 h-14 rounded-full flex items-center justify-center text-2xl text-white shadow-2xl" style={{background:'linear-gradient(135deg,#7c3aed,#a855f7)'}}>🤖<span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-emerald-400 border-2 border-white animate-pulse"/></button>
+      )}
+    </div>
+  );
+}
+
+function App(){
+  const [theme,setTheme]=useState('light');
+  const [cart,setCart]=useState(3), [bumps,setBumps]=useState([]), [selected,setSelected]=useState(null), [activeCat,setActiveCat]=useState('All Products'), [q,setQ]=useState('');
+  const addToCart=()=>{ setCart(c=>c+1); const id=Date.now()+Math.random(); setBumps(b=>[...b,id]); setTimeout(()=>setBumps(b=>b.filter(x=>x!==id)),1000); };
+  const [hh,mm,ss]=useCountdown(19*3600+58*60+12);
+  const NAV=['Home','All Products','Categories ▾','Reviews','How it works','Support'];
+  // scroll progress
+  const [prog,setProg]=useState(0);
+  useEffect(()=>{ const f=()=>{const h=document.documentElement;const mx=h.scrollHeight-h.clientHeight;setProg(mx>0?h.scrollTop/mx*100:0);}; f(); window.addEventListener('scroll',f,{passive:true}); return()=>window.removeEventListener('scroll',f); },[]);
+  const shown=ITEMS.filter(i=>(activeCat==='All Products'||i.cat===activeCat||i.name===activeCat)&&(i.name+i.cat+i.range).toLowerCase().includes(q.toLowerCase()));
+  return (
+    <div className={`app ${theme} min-h-screen`}>
+      <div className="scrollbar" style={{'--p':prog+'%'}}/>
+      <div className="bgglow"><span className="g1"/><span className="g2"/><span className="g3"/></div>
+      {/* Header */}
+      <header className="sticky top-0 z-50 panel" style={{backdropFilter:'blur(14px)'}}>
+        <nav className="max-w-7xl mx-auto px-5 h-16 flex items-center gap-4">
+          <div className="flex items-center gap-2.5 shrink-0"><div className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-display font-extrabold shine" style={{background:'linear-gradient(135deg,#7c3aed,#a855f7)'}}>F</div><span className="font-display font-extrabold tracking-wide" style={{color:'var(--text)'}}>Forge<span className="accent">Market</span></span></div>
+          <div className="hidden lg:flex items-center gap-6 text-sm ml-4">{NAV.map((n,i)=>(<a key={n} href="#" className={i===0?'font-semibold accent':'t-muted hover:opacity-80'}>{n}</a>))}</div>
+          <div className="hidden md:flex items-center gap-2 ml-auto px-3 h-10 rounded-xl panel2 w-64"><span className="t-muted">🔍</span><input value={q} onChange={e=>setQ(e.target.value)} placeholder="Search for products…" className="bg-transparent text-sm flex-1" style={{color:'var(--text)',outline:'none'}}/><span className="text-[10px] t-muted panel rounded px-1.5 py-0.5">⌘K</span></div>
+          <button className="relative w-10 h-10 rounded-xl btn-soft flex items-center justify-center ml-auto md:ml-0"><Icon.cart width="18" height="18"/>{cart>0&&<span className="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1 rounded-full text-white text-xs font-bold flex items-center justify-center" style={{background:'var(--accent)'}}>{cart}</span>}{bumps.map(id=><span key={id} className="rise absolute -top-2 right-0 accent text-xs font-bold">+1</span>)}</button>
+          <button onClick={()=>setTheme(t=>t==='light'?'dark':'light')} title="Toggle theme" className="w-10 h-10 rounded-xl btn-soft flex items-center justify-center">{theme==='light'?'🌙':'☀️'}</button>
+          <button className="hidden sm:inline-flex btn-soft px-4 h-10 rounded-xl text-sm font-medium items-center">Log in</button>
+          <button className="btn-accent shine px-4 h-10 rounded-xl text-sm font-semibold inline-flex items-center gap-1">Sign Up →</button>
+        </nav>
+      </header>
+
+      {/* Hero with sidebar */}
+      <section className="max-w-7xl mx-auto px-5 pt-8 grid lg:grid-cols-[230px_1fr] gap-6">
+        <aside className="hidden lg:block">
+          <Reveal className="panel rounded-2xl p-2.5">
+            <div className="text-[11px] uppercase tracking-wider t-muted px-3 py-2">Browse Categories</div>
+            {SIDE_CATS.map(([ic,c])=>(<button key={c} onClick={()=>setActiveCat(c)} className={`cat w-full text-left text-sm px-3 py-2 rounded-lg flex items-center gap-2.5 font-medium ${activeCat===c?'active':''}`}><span className="text-base">{ic}</span> {c}</button>))}
+          </Reveal>
+          <Reveal delay={120} className="rounded-2xl p-4 mt-4 text-white" style={{background:'linear-gradient(135deg,#7c3aed,#db2777)'}}>
+            <div className="font-bold text-sm">Limited Time Offer! 🔥</div>
+            <div className="flex gap-2 mt-3">{[[hh,'Hrs'],[mm,'Min'],[ss,'Sec']].map(([n,l],i)=>(<div key={i} className="flex-1 text-center bg-white/15 rounded-lg py-2"><div className="font-bold tabular-nums">{String(n).padStart(2,'0')}</div><div className="text-[9px] opacity-80">{l}</div></div>))}</div>
+            <button className="w-full mt-3 py-2 rounded-lg text-sm font-semibold bg-white text-purple-700">Claim Discount</button>
+          </Reveal>
+        </aside>
+
+        <div className="grid md:grid-cols-2 gap-6 items-center">
+          <Reveal>
+            <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full panel2 accent">● #1 Trusted Marketplace</span>
+            <h1 className="text-4xl sm:text-5xl font-extrabold mt-4 leading-[1.05]" style={{color:'var(--text)'}}>Everything You Need,<br/><span className="gradanim bg-clip-text text-transparent" style={{backgroundImage:'linear-gradient(120deg,#7c3aed,#a855f7,#ec4899)'}}>All in One Place.</span></h1>
+            <p className="t-muted mt-4 max-w-md">Get Robux, V-Bucks, Valorant Points and more instantly. Fast delivery, secure payments, 24/7 support.</p>
+            <div className="flex flex-wrap gap-3 mt-6">
+              <a href="#market" className="btn-accent shine inline-flex items-center gap-2 px-6 py-3 rounded-xl font-semibold">Shop Now →</a>
+              <a href="#market" className="btn-soft inline-flex items-center gap-2 px-6 py-3 rounded-xl font-semibold">View All Products</a>
+            </div>
+            <div className="flex items-center gap-3 mt-6">
+              <div className="flex -space-x-2">{['🦊','🐼','🐯','🐲'].map((e,i)=>(<span key={i} className="w-8 h-8 rounded-full panel2 flex items-center justify-center text-sm bd">{e}</span>))}</div>
+              <div className="text-sm"><span className="font-bold" style={{color:'var(--text)'}}><CountUp value="10,000+"/></span> <span className="t-muted">Happy Customers</span></div>
+            </div>
+          </Reveal>
+          <Reveal delay={150} className="relative rounded-3xl overflow-hidden min-h-[320px] border" style={{borderColor:'var(--border)'}}>
+            <div className="hero-img" style={{backgroundImage:`url(${HERO_IMG})`}}/>
+            <div className="absolute inset-0" style={{background:'linear-gradient(180deg,rgba(10,7,20,.15),rgba(10,7,20,.4))'}}/>
+            {FEAT.map(([e,col,t,s,pos])=>(<div key={t} className={`floatcard absolute ${pos} panel rounded-xl p-2.5 flex items-center gap-2 shadow-lg`}><div className="w-8 h-8 rounded-lg flex items-center justify-center text-white" style={{background:col}}>{e}</div><div><div className="text-[11px] font-semibold" style={{color:'var(--text)'}}>{t}</div><div className="text-[10px] t-muted">{s}</div></div></div>))}
+          </Reveal>
+        </div>
+      </section>
+
+      {/* Trust bar */}
+      <section className="max-w-7xl mx-auto px-5 mt-8">
+        <Reveal className="panel rounded-2xl grid grid-cols-2 lg:grid-cols-4 divide-x" style={{borderColor:'var(--border)'}}>
+          {TRUST.map(([e,t,s])=>(<div key={t} className="flex items-center gap-3 p-4"><div className="w-10 h-10 rounded-xl panel2 flex items-center justify-center text-lg">{e}</div><div><div className="text-sm font-semibold" style={{color:'var(--text)'}}>{t}</div><div className="text-xs t-muted">{s}</div></div></div>))}
+        </Reveal>
+      </section>
+
+      {/* Popular products */}
+      <section id="market" className="max-w-7xl mx-auto px-5 py-10">
+        <div className="flex items-center justify-between mb-5"><h2 className="text-2xl font-extrabold" style={{color:'var(--text)'}}>Popular Products 🔥</h2><a href="#" className="text-sm font-semibold accent">View All Products →</a></div>
+        {shown.length? <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">{shown.map((it,i)=><Reveal key={it.name} delay={i*70}><ProductCard item={it} onBuy={addToCart} onSelect={()=>setSelected(it)}/></Reveal>)}</div>
+          : <div className="panel rounded-2xl p-10 text-center t-muted">No products match “{q}”.</div>}
+      </section>
+
+      {/* See it in action */}
+      <section id="engine" className="max-w-6xl mx-auto px-5 pb-4">
+        <Reveal className="text-center mb-5"><h2 className="text-2xl font-extrabold" style={{color:'var(--text)'}}>See it in action</h2><p className="t-muted text-sm mt-1">Watch your order race across our live 3D delivery city.</p></Reveal>
+        <DeliveryJourney onDelivered={addToCart}/>
+      </section>
+
+      {/* Stats + reviews + discord */}
+      <section className="max-w-7xl mx-auto px-5 py-10 grid lg:grid-cols-3 gap-5">
+        <div className="grid grid-cols-2 gap-3">
+          {STATS.map(([e,n,l],i)=>(<Reveal key={l} delay={i*80} className="panel rounded-2xl p-4"><div className="text-xl">{e}</div><div className="text-2xl font-extrabold mt-1" style={{color:'var(--text)'}}><CountUp value={n}/></div><div className="text-xs t-muted">{l}</div></Reveal>))}
+        </div>
+        <Reveal className="panel rounded-2xl p-5">
+          <h3 className="font-bold" style={{color:'var(--text)'}}>What Our Customers Say</h3>
+          <div className="flex items-center gap-2 mt-2"><span className="text-amber-400 text-lg">★★★★★</span><span className="font-bold" style={{color:'var(--text)'}}>4.9 out of 5</span></div>
+          <div className="text-xs t-muted">Based on 2,345 reviews</div>
+          <div className="mt-3 space-y-2">
+            <div className="panel2 rounded-xl p-3"><div className="text-amber-400 text-xs">★★★★★</div><div className="text-sm" style={{color:'var(--text)'}}>“Fast delivery and best prices!”</div><div className="text-[11px] t-muted">— Alex M.</div></div>
+            <div className="panel2 rounded-xl p-3"><div className="text-amber-400 text-xs">★★★★★</div><div className="text-sm" style={{color:'var(--text)'}}>“Super reliable and fast”</div><div className="text-[11px] t-muted">— Sarah K.</div></div>
+          </div>
+        </Reveal>
+        <Reveal delay={120} className="rounded-2xl p-6 text-white flex flex-col justify-center text-center relative overflow-hidden" style={{background:'linear-gradient(135deg,#5865F2,#7c3aed)'}}>
+          <div className="absolute inset-0 grid-bg opacity-20"/>
+          <div className="relative"><div className="text-4xl">💬</div>
+          <h3 className="text-xl font-extrabold mt-2">Join Our Discord</h3>
+          <p className="text-white/85 text-sm mt-1">Get support, updates and exclusive giveaways!</p>
+          <a href="https://discord.gg/vNcfgDbVd" target="_blank" className="inline-flex items-center justify-center gap-2 mt-4 px-5 py-3 rounded-xl font-semibold bg-white text-indigo-700 hover:scale-[1.03] transition-all">Join Discord →</a></div>
+        </Reveal>
+      </section>
+
+      <footer className="py-8 text-center text-sm t-muted" style={{borderTop:'1px solid var(--border)'}}>FORGEMARKET — premium in-game assets · automated delivery · 24/7 support</footer>
+      <ProductModal item={selected} onClose={()=>setSelected(null)} onBuy={addToCart}/>
+      <ForgeBot/>
+    </div>
+  );
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

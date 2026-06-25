@@ -13,20 +13,29 @@ export const DEFAULT_TEMPLATES = [
     name: 'Account Created',
     subject: 'Welcome to {{brand.name}} 🎉',
     body_html: `
-      <h1>Welcome, {{user.name}}!</h1>
+      <h1>Welcome, {{user.name}}! 🎉</h1>
       <p>Your {{brand.name}} account is ready. You can now place orders, track
       deliveries, download invoices and manage everything from your dashboard.</p>
-      <p><a class="btn" href="{{app.url}}/account">Go to your dashboard</a></p>`,
+      <p><strong>No password to remember.</strong> Whenever you sign in we email
+      you a fresh one-time code — and we keep you signed in on this device, so
+      you won't have to do it often.</p>
+      <p><a class="btn" href="{{app.url}}/account">Go to your dashboard</a></p>
+      <p>Questions? Just reply to this email or open a ticket in our Discord. 💜</p>`,
   },
   {
     id: 'order_received',
     name: 'Order Received',
-    subject: 'We received your order {{order.number}}',
+    subject: 'Thanks for your order {{order.number}} 🎮',
     body_html: `
-      <h1>Thanks for your order!</h1>
-      <p>Hi {{user.name}}, we've received order <strong>{{order.number}}</strong>.</p>
+      <h1>Thank you for your order! 🎉</h1>
+      <p>Hi {{user.name}}, thanks for shopping with {{brand.name}}! We've received
+      order <strong>{{order.number}}</strong> (total <strong>{{order.total}}</strong>).</p>
       {{order.itemsHtml}}
-      <p><a class="btn" href="{{order.url}}">Track your order</a></p>`,
+      {{order.paymentHtml}}
+      <p>Once your payment is confirmed we deliver instantly to your account & email.
+      You can follow the status any time:</p>
+      <p><a class="btn" href="{{order.url}}">Track your order</a></p>
+      <p>Need help? Just reply to this email or open a ticket in our Discord.</p>`,
   },
   {
     id: 'payment_confirmed',

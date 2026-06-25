@@ -3,6 +3,7 @@ import { CheckCircle2, LayoutDashboard, Search } from 'lucide-react';
 import { useEffect } from 'react';
 import { useCart } from '../context/CartContext.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
+import Confetti from '../components/Confetti.jsx';
 
 export default function CheckoutSuccess() {
   const [params] = useSearchParams();
@@ -15,6 +16,7 @@ export default function CheckoutSuccess() {
 
   return (
     <div className="section py-28 text-center relative overflow-hidden">
+      <Confetti />
       <div className="orb w-96 h-96 bg-emerald-500/15 -top-20 left-1/3" />
       <div className="relative max-w-lg mx-auto">
         <div className="w-20 h-20 rounded-3xl mx-auto flex items-center justify-center mb-6 bg-emerald-500/15 border border-emerald-500/30">

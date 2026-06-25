@@ -155,19 +155,27 @@ const CATALOG = [
 
 const parse = (s) => { try { return JSON.parse(s || '{}'); } catch { return {}; } };
 
+// Premium 3D icon tiles per category (public/products/icons) — one unique icon each.
+const CATS_WITH_ICON = ['robux', 'v-bucks', 'valorant', 'cod', 'genshin', 'brawl', 'apex',
+  'clash', 'clashroyale', 'league', 'freefire', 'pubg', 'mlbb', 'eafc', 'gta', 'minecraft',
+  'pokemongo', 'discord-nitro', 'spotify', 'netflix', 'gamepass', 'steam', 'playstation',
+  'xbox', 'nintendo', 'amazon', 'googleplay', 'itunes', 'giftcard', 'chest'];
+const iconFor = (cat) => CATS_WITH_ICON.includes(cat) ? `/products/icons/${cat}.png` : null;
+
 export async function seedDemoCatalog() {
   await migrate();
   let created = 0;
   let updated = 0;
   for (const p of CATALOG) {
+    const img = iconFor(p.category) || p.image || null;
     const existing = await get('SELECT id, metadata FROM products WHERE sku = @sku', { sku: p.sku });
     const at = nowIso();
 
     if (existing) {
-      // Backfill the cover image if the product doesn't have one yet.
+      // Keep the premium 3D icon in sync (also backfills missing covers).
       const meta = parse(existing.metadata);
-      if (p.image && !meta.image) {
-        meta.image = p.image;
+      if (img && meta.image !== img) {
+        meta.image = img;
         await run('UPDATE products SET metadata = @m, updated_at = @at WHERE id = @id',
           { m: JSON.stringify(meta), at, id: existing.id });
         updated++;
@@ -179,7 +187,7 @@ export async function seedDemoCatalog() {
         (id, sku, name, category, description, price, currency, kind, active, metadata, created_at, updated_at)
        VALUES (@id, @sku, @name, @cat, @desc, @price, 'EUR', 'digital', 1, @meta, @at, @at)`, {
       id: newId('prd'), sku: p.sku, name: p.name, cat: p.category, desc: p.description,
-      price: p.price, meta: JSON.stringify({ featured: !!p.featured, image: p.image }), at,
+      price: p.price, meta: JSON.stringify({ featured: !!p.featured, image: img }), at,
     });
     created++;
   }

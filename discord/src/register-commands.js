@@ -21,7 +21,25 @@ const commands = [
     .addIntegerOption((o) => o.setName('stars').setDescription('1–5 stars').setMinValue(1).setMaxValue(5)),
   new SlashCommandBuilder().setName('giveaway').setDescription('Staff: start a giveaway')
     .addStringOption((o) => o.setName('prize').setDescription('What are you giving away?').setRequired(true))
-    .addIntegerOption((o) => o.setName('minutes').setDescription('Duration in minutes (default 10)')),
+    .addIntegerOption((o) => o.setName('minutes').setDescription('Duration in minutes (default 10)'))
+    .addIntegerOption((o) => o.setName('winners').setDescription('Number of winners (default 1)')),
+  new SlashCommandBuilder().setName('reroll').setDescription('Staff: reroll a giveaway winner')
+    .addStringOption((o) => o.setName('message_id').setDescription('The giveaway message ID').setRequired(true)),
+  new SlashCommandBuilder().setName('rank').setDescription('Show your level & XP'),
+  new SlashCommandBuilder().setName('leaderboard').setDescription('Show the top members by XP'),
+  new SlashCommandBuilder().setName('suggest').setDescription('Suggest an idea for ForgeMarket')
+    .addStringOption((o) => o.setName('idea').setDescription('Your suggestion').setRequired(true)),
+  new SlashCommandBuilder().setName('shop').setDescription('Get a link to the ForgeMarket shop'),
+  new SlashCommandBuilder().setName('invite').setDescription('Get the server invite link'),
+  new SlashCommandBuilder().setName('stats').setDescription('Show live server stats'),
+  new SlashCommandBuilder().setName('close').setDescription('Staff: close the current ticket'),
+  new SlashCommandBuilder().setName('coupon').setDescription('Staff: post a discount code')
+    .addStringOption((o) => o.setName('code').setDescription('e.g. FORGE10').setRequired(true))
+    .addIntegerOption((o) => o.setName('percent').setDescription('% off (1–90)').setRequired(true))
+    .addStringOption((o) => o.setName('note').setDescription('Optional note')),
+  new SlashCommandBuilder().setName('announce').setDescription('Staff: post an announcement')
+    .addStringOption((o) => o.setName('message').setDescription('What to announce').setRequired(true)),
+  new SlashCommandBuilder().setName('serverinfo').setDescription('Show server statistics'),
 ].map((c) => c.toJSON());
 
 const rest = new REST({ version: '10' }).setToken(DISCORD_TOKEN);

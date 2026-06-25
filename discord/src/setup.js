@@ -179,6 +179,8 @@ client.once('ready', async () => {
       ['vouchers', embed(MESSAGES.vouchersIntro)],
       ['proof-of-delivery', embed(MESSAGES.proofIntro)],
       ['discount-codes', embed(MESSAGES.discountCodes)],
+      ['suggestions', embed(MESSAGES.suggestionsIntro)],
+      ['starboard', embed(MESSAGES.starboardIntro)],
       ['giveaways', embed(MESSAGES.giveawaysIntro)],
       ['events', embed(MESSAGES.eventsIntro)],
       ['partnerships', embed(MESSAGES.partnersIntro)],

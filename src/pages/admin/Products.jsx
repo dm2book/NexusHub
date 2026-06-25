@@ -14,6 +14,17 @@ export default function AdminProducts() {
   const [editing, setEditing] = useState(null); // product or null
   const [form, setForm] = useState(BLANK);
   const [busy, setBusy] = useState(false);
+  const [stock, setStock] = useState(null); // { p, codes } or null
+
+  const addCodes = async () => {
+    if (!stock?.codes.trim()) return;
+    setBusy(true);
+    try {
+      const r = await api.post(`/api/admin/products/${stock.p.id}/codes`, { codes: stock.codes });
+      toast.success(`Added ${r.added} code(s) — ${r.available} in stock.`);
+      setStock(null); load();
+    } catch (err) { toast.error(err.message); } finally { setBusy(false); }
+  };
 
   const load = () => api.get('/api/admin/products').then((r) => setProducts(r.products)).catch(() => setProducts([]));
   useEffect(() => { load(); }, []);
@@ -143,6 +154,10 @@ export default function AdminProducts() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
+                        <button title="Auto-delivery code stock" onClick={() => { setStock({ p, codes: '' }); }}
+                          className="px-2 py-1 rounded-lg hover:bg-white/10 text-xs text-slate-300 inline-flex items-center gap-1">
+                          🔑 {p.codesAvailable ?? 0}
+                        </button>
                         <button title={p.active ? 'Hide' : 'Show'} onClick={() => toggleActive(p)}
                           className="p-2 rounded-lg hover:bg-white/10 text-slate-300">
                           {p.active ? <EyeOff size={15} /> : <Eye size={15} />}
@@ -159,6 +174,20 @@ export default function AdminProducts() {
         </div>
        </>
       )}
+
+      <Modal open={!!stock} onClose={() => setStock(null)} title={`Code stock — ${stock?.p?.name || ''}`}
+        footer={<>
+          <button onClick={() => setStock(null)} className="btn-ghost">Cancel</button>
+          <button onClick={addCodes} disabled={busy || !stock?.codes.trim()} className="btn-primary">Add to stock</button>
+        </>}>
+        <p className="text-slate-400 text-sm mb-3">
+          Currently <span className="text-white font-semibold">{stock?.p?.codesAvailable ?? 0}</span> code(s) in stock.
+          Paste codes below — <strong>one per line</strong> (or comma-separated). When a customer pays, a code is
+          auto-pulled from here, e-mailed, and the order is completed.
+        </p>
+        <textarea rows={8} className="input font-mono text-sm" placeholder={'ABCD-1234-EFGH\nWXYZ-5678-IJKL\n…'}
+          value={stock?.codes || ''} onChange={(e) => setStock((s) => ({ ...s, codes: e.target.value }))} />
+      </Modal>
 
       <Modal open={!!editing} onClose={() => setEditing(null)}
         title={editing === 'new' ? 'New product' : 'Edit product'} size="lg"
