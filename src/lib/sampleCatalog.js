@@ -100,19 +100,12 @@ const P = [
   ['ITUNES-25', 'App Store & iTunes €25', 'itunes', 2599, false, null, 'Apps, games, music and iCloud storage on Apple.'],
 ];
 
-// Premium 3D icon tiles (public/products/icons). Categories without a dedicated
-// icon are aliased to the closest one; the rest fall back to a gradient tile.
-export const CATEGORY_ICON = {
-  robux: 'robux', 'v-bucks': 'v-bucks', valorant: 'valorant', cod: 'cod',
-  genshin: 'genshin', brawl: 'brawl', apex: 'apex', clash: 'clash',
-  steam: 'steam', playstation: 'playstation', xbox: 'xbox', 'discord-nitro': 'discord-nitro',
-  giftcard: 'giftcard',
-  // sensible aliases
-  clashroyale: 'clash', gamepass: 'xbox', league: 'valorant', freefire: 'cod',
-  pubg: 'cod', mlbb: 'clash', minecraft: 'chest', pokemongo: 'brawl',
-  netflix: 'giftcard', spotify: 'giftcard', nintendo: 'giftcard', amazon: 'giftcard',
-  googleplay: 'giftcard', itunes: 'giftcard', eafc: 'giftcard', gta: 'giftcard',
-};
+// Premium 3D icon tiles (public/products/icons) — one unique icon per category.
+const CATS_WITH_ICON = ['robux', 'v-bucks', 'valorant', 'cod', 'genshin', 'brawl', 'apex',
+  'clash', 'clashroyale', 'league', 'freefire', 'pubg', 'mlbb', 'eafc', 'gta', 'minecraft',
+  'pokemongo', 'discord-nitro', 'spotify', 'netflix', 'gamepass', 'steam', 'playstation',
+  'xbox', 'nintendo', 'amazon', 'googleplay', 'itunes', 'giftcard', 'chest', 'wildrift', 'wow'];
+export const CATEGORY_ICON = Object.fromEntries(CATS_WITH_ICON.map((c) => [c, c]));
 export const iconFor = (category) => CATEGORY_ICON[category] ? `/products/icons/${CATEGORY_ICON[category]}.png` : null;
 
 export const SAMPLE_PRODUCTS = P.map(([sku, name, category, price, featured, pack, description]) => ({

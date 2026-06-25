@@ -155,18 +155,12 @@ const CATALOG = [
 
 const parse = (s) => { try { return JSON.parse(s || '{}'); } catch { return {}; } };
 
-// Premium 3D icon tiles per category (public/products/icons). Aliases map the long
-// tail to the closest icon; unmapped categories keep their existing art.
-const CATEGORY_ICON = {
-  robux: 'robux', 'v-bucks': 'v-bucks', valorant: 'valorant', cod: 'cod',
-  genshin: 'genshin', brawl: 'brawl', apex: 'apex', clash: 'clash',
-  steam: 'steam', playstation: 'playstation', xbox: 'xbox', 'discord-nitro': 'discord-nitro',
-  clashroyale: 'clash', gamepass: 'xbox', league: 'valorant', freefire: 'cod',
-  pubg: 'cod', mlbb: 'clash', minecraft: 'chest', pokemongo: 'brawl',
-  netflix: 'giftcard', spotify: 'giftcard', nintendo: 'giftcard', amazon: 'giftcard',
-  googleplay: 'giftcard', itunes: 'giftcard', eafc: 'giftcard', gta: 'giftcard',
-};
-const iconFor = (cat) => CATEGORY_ICON[cat] ? `/products/icons/${CATEGORY_ICON[cat]}.png` : null;
+// Premium 3D icon tiles per category (public/products/icons) — one unique icon each.
+const CATS_WITH_ICON = ['robux', 'v-bucks', 'valorant', 'cod', 'genshin', 'brawl', 'apex',
+  'clash', 'clashroyale', 'league', 'freefire', 'pubg', 'mlbb', 'eafc', 'gta', 'minecraft',
+  'pokemongo', 'discord-nitro', 'spotify', 'netflix', 'gamepass', 'steam', 'playstation',
+  'xbox', 'nintendo', 'amazon', 'googleplay', 'itunes', 'giftcard', 'chest'];
+const iconFor = (cat) => CATS_WITH_ICON.includes(cat) ? `/products/icons/${cat}.png` : null;
 
 export async function seedDemoCatalog() {
   await migrate();
