@@ -122,11 +122,27 @@ export async function createOrder(input, ctx = {}) {
 
 // ── State machine ────────────────────────────────────────────────────────
 
+/** Staff: attach delivery code(s) to an order and complete it — the codes are
+ *  e-mailed to the customer via the order_completed template (deliveriesHtml). */
+export async function deliverOrder(orderId, deliveries = [], ctx = {}) {
+  const order = await getOrderRow(orderId);
+  if (!order) throw notFound('Order not found');
+  for (const d of deliveries) {
+    const content = String(d.content || '').trim();
+    if (!content) continue;
+    await run(`INSERT INTO deliveries (id, order_id, order_item_id, type, content, created_at)
+         VALUES (@id, @oid, @iid, @type, @c, @at)`,
+        { id: newId('dlv'), oid: orderId, iid: d.orderItemId || null, type: d.type || 'code', c: content, at: nowIso() });
+  }
+  // Force-complete from any state — staff is explicitly fulfilling the order.
+  return transitionOrder(orderId, 'completed', { ...ctx, force: true, reason: ctx.reason || 'Delivered by staff' });
+}
+
 export async function transitionOrder(orderId, to, ctx = {}) {
   const order = await getOrderRow(orderId);
   if (!order) throw notFound('Order not found');
   if (order.status === to) return getOrder(orderId);
-  if (!canTransition(order.status, to)) {
+  if (!ctx.force && !canTransition(order.status, to)) {
     throw conflict(`Cannot move order from "${order.status}" to "${to}"`);
   }
 

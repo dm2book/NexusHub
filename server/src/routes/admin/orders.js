@@ -8,7 +8,7 @@ import { z } from 'zod';
 import { asyncHandler } from '../../middleware/error.js';
 import { requirePermission } from '../../middleware/rbac.js';
 import {
-  listOrders, getOrder, transitionOrder, markPaymentReceived, setOrderNotes,
+  listOrders, getOrder, transitionOrder, markPaymentReceived, setOrderNotes, deliverOrder,
 } from '../../services/orderService.js';
 import { fulfillOrder, listFulfillment, listFulfillmentLogs } from '../../services/fulfillmentService.js';
 import { sendEmail } from '../../services/emailService.js';
@@ -56,6 +56,23 @@ router.post('/:id/fulfill', requirePermission('orders.fulfill'),
     await audit({ actor: req.user, action: 'order.fulfill', targetType: 'order',
       targetId: req.params.id, metadata: { auto: summary.auto, manual: summary.manual }, req });
     res.json({ order: await getOrder(req.params.id), summary });
+  }));
+
+// Deliver codes & complete — enter the code(s); they're e-mailed to the customer.
+router.post('/:id/deliver', requirePermission('orders.complete'),
+  asyncHandler(async (req, res) => {
+    const body = z.object({
+      deliveries: z.array(z.object({
+        content: z.string().min(1).max(2000),
+        type: z.string().max(20).optional(),
+        orderItemId: z.string().optional(),
+      })).min(1),
+    }).parse(req.body);
+    const order = await deliverOrder(req.params.id, body.deliveries,
+      { ...actor(req), reason: 'Codes delivered by staff' });
+    await audit({ actor: req.user, action: 'order.deliver', targetType: 'order',
+      targetId: order.id, metadata: { count: body.deliveries.length }, req });
+    res.json({ order });
   }));
 
 // Mark Complete — the big "Complete Order" action (confirmed in UI).
