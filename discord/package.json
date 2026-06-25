@@ -9,6 +9,9 @@
     "start": "node src/bot.js",
     "register": "node src/register-commands.js"
   },
+  "engines": {
+    "node": ">=18"
+  },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",
     "discord.js": "^14.16.3",

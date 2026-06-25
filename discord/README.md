@@ -23,17 +23,32 @@ cd discord
 cp .env.example .env          # fill in DISCORD_TOKEN, DISCORD_CLIENT_ID, DISCORD_GUILD_ID
 npm install
 
-npm run setup                 # builds roles, categories, channels, permissions + panels
-npm run register              # registers /ask /recommend /help slash commands
-npm run start                 # runs the live bot (onboarding, tickets, AI)
+REPOST=1 npm run register     # registers all slash commands to your server
+REPOST=1 npm run setup        # builds roles, categories, channels, permissions + (re)posts panels
+npm start                     # runs the live bot (onboarding, tickets, giveaways, AI…)
 ```
 
+`REPOST=1` re-posts every panel (verify button, ticket buttons, self-role
+buttons). Both scripts are **idempotent** — existing roles/channels are reused,
+never duplicated, so it's safe to re-run after every update.
+
 **Create the bot:** discord.com/developers → New Application → Bot → copy token.
-Enable **Server Members Intent** and **Message Content Intent**. Invite with the
-`bot` + `applications.commands` scopes and **Administrator** permission.
-(Optional) add `ANTHROPIC_API_KEY` for the AI assistant and `FORGEMARKET_API_URL`
-for live product recommendations + order context. Without them the bot still works
-(rule-based FAQ + sample replies).
+Enable **Server Members Intent** and **Message Content Intent** (required for
+verify, leveling and automod). Invite with the `bot` + `applications.commands`
+scopes and **Administrator** permission, and drag the bot's role **above** your
+normal roles so it can manage them. (Optional) add `ANTHROPIC_API_KEY` for the AI
+assistant and `FORGEMARKET_API_URL` for live recommendations + order lookups —
+without them the bot still works (rule-based FAQ + sample replies).
+
+> **Updating an existing server?** `git pull` first, then re-run the three
+> commands above. Nothing is duplicated; new channels/commands are added and
+> panels refreshed.
+
+### Hosting it 24/7
+
+`npm start` only runs while your terminal is open. To keep the bot online, host
+it on any always-on platform — see **§13. Deploy (24/7 hosting)** below for a
+copy-paste Railway / Render / VPS guide. A `Procfile` is included.
 
 ---
 
@@ -261,3 +276,57 @@ verified reviews from the store webhook into `#reviews`, and a leveling/XP syste
 
 - `assets/logo.svg` — the ForgeMarket mark. A ready-to-upload **512×512 PNG** is
   provided for your Discord **server icon / bot avatar** (Server Settings → upload).
+
+---
+
+## 13. Deploy (24/7 hosting)
+
+The bot keeps a long-lived gateway connection, so it must run on an **always-on
+process** (a "worker"/"background" service — *not* a serverless function). This
+folder ships everything a host needs: a `Procfile`, a `Dockerfile`, a
+`railway.json`, and `engines.node >=18`.
+
+**First, one-time setup (run locally once):** register the slash commands and
+build the server. You only need to do this again when commands or the server
+structure change.
+
+```bash
+cd discord && npm install
+REPOST=1 npm run register
+REPOST=1 npm run setup
+```
+
+Then deploy the always-on bot (`npm start`) with one of:
+
+### Option A — Railway (easiest, recommended)
+1. Push this repo to GitHub (already done).
+2. [railway.app](https://railway.app) → **New Project → Deploy from GitHub repo**
+   → pick this repo.
+3. **Settings → Root Directory:** `discord`  (so it builds this folder only).
+4. **Variables** → add: `DISCORD_TOKEN`, `DISCORD_CLIENT_ID`, `DISCORD_GUILD_ID`,
+   `STORE_URL`, and (optional) `ANTHROPIC_API_KEY`, `FORGEMARKET_API_URL`.
+5. Deploy. `railway.json` sets the start command + auto-restart. Watch the
+   **Deploy Logs** for `Logged in as ForgeMarket`. Done — it's online 24/7.
+
+### Option B — Render
+1. [render.com](https://render.com) → **New → Background Worker** → connect repo.
+2. **Root Directory:** `discord` · **Build:** `npm ci` · **Start:** `npm start`.
+3. Add the same environment variables → Create. (Use a paid instance type; the
+   free tier sleeps and the bot would drop offline.)
+
+### Option C — Any VPS / Docker
+```bash
+# On the server, after cloning:
+cd discord
+docker build -t forgemarket-bot .
+docker run -d --name forgemarket-bot --restart unless-stopped \
+  -e DISCORD_TOKEN=... -e DISCORD_CLIENT_ID=... -e DISCORD_GUILD_ID=... \
+  -e STORE_URL=https://forgemarket-store.vercel.app \
+  forgemarket-bot
+```
+Or without Docker, keep it alive with **pm2**: `npm i -g pm2 && pm2 start npm --name forgemarket-bot -- start && pm2 save`.
+
+> **Secrets:** never commit `.env`. Set every secret in the host's dashboard
+> (or `-e` flags). `.env`, `xp.json` and `guild-map.json` are git-ignored.
+> On hosts with an ephemeral filesystem, `xp.json` (leveling) resets on redeploy;
+> attach a small persistent volume mounted at `/app` if you want XP to survive.
