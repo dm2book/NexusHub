@@ -13,10 +13,14 @@ export const DEFAULT_TEMPLATES = [
     name: 'Account Created',
     subject: 'Welcome to {{brand.name}} 🎉',
     body_html: `
-      <h1>Welcome, {{user.name}}!</h1>
+      <h1>Welcome, {{user.name}}! 🎉</h1>
       <p>Your {{brand.name}} account is ready. You can now place orders, track
       deliveries, download invoices and manage everything from your dashboard.</p>
-      <p><a class="btn" href="{{app.url}}/account">Go to your dashboard</a></p>`,
+      <p><strong>No password to remember.</strong> Whenever you sign in we email
+      you a fresh one-time code — and we keep you signed in on this device, so
+      you won't have to do it often.</p>
+      <p><a class="btn" href="{{app.url}}/account">Go to your dashboard</a></p>
+      <p>Questions? Just reply to this email or open a ticket in our Discord. 💜</p>`,
   },
   {
     id: 'order_received',

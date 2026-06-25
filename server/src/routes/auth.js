@@ -25,7 +25,11 @@ function setSessionCookie(res, refreshToken) {
   res.cookie(config.auth.cookieName, refreshToken, {
     httpOnly: true,
     secure: config.isProd,
-    sameSite: 'lax',
+    // In production the SPA and API may live on different domains (e.g. a Vercel
+    // frontend + separate API host). 'none' lets the browser send the session
+    // cookie on those cross-site refresh requests so people stay logged in;
+    // it requires secure:true, which we always set in prod. Dev stays 'lax'.
+    sameSite: config.isProd ? 'none' : 'lax',
     maxAge: config.auth.refreshTtlDays * 86_400_000,
     path: '/api/auth',
   });
