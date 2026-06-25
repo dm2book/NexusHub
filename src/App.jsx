@@ -7,7 +7,7 @@ import ProtectedRoute from './components/ProtectedRoute.jsx';
 import { PageLoader } from './components/ui.jsx';
 
 // Eager: first-paint storefront pages (small, instant).
-import Home from './pages/Home.jsx';
+import HomeStore from './pages/HomeStore.jsx';
 import Shop from './pages/Shop.jsx';
 import ProductDetail from './pages/ProductDetail.jsx';
 import Login from './pages/Login.jsx';
@@ -55,9 +55,11 @@ export default function App() {
   return (
     <Suspense fallback={<PageLoader />}>
       <Routes>
+        {/* Storefront home — self-contained light theme (own nav + sidebar) */}
+        <Route path="/" element={<HomeStore />} />
+
         {/* Public + storefront */}
         <Route element={<SiteLayout />}>
-          <Route path="/" element={<Home />} />
           <Route path="/shop" element={<Shop />} />
           <Route path="/wishlist" element={<Wishlist />} />
           <Route path="/product/:id" element={<ProductDetail />} />

@@ -5,7 +5,7 @@
  */
 import jwt from 'jsonwebtoken';
 import { config } from '../config/env.js';
-import { run, get, nowIso } from '../db/index.js';
+import { run, get, all, nowIso } from '../db/index.js';
 import { newId, newOtp } from '../utils/ids.js';
 import { sha256, safeEqual, randomToken } from '../utils/crypto.js';
 import { badRequest, unauthorized, tooMany } from '../utils/errors.js';
@@ -51,19 +51,30 @@ export async function requestEmailOtp(email) {
 /** Verify an OTP and return an authenticated session. */
 export async function verifyEmailOtp(email, code, ctx = {}) {
   const e = String(email || '').trim().toLowerCase();
-  const row = await get(
+  const supplied = sha256(String(code).trim());
+  // Check against every still-valid (unconsumed, unexpired) code for this
+  // address — not just the newest. People often tap "Send code" more than once,
+  // and any code we actually e-mailed should work, not only the latest one.
+  const rows = await all(
     `SELECT * FROM otp_codes WHERE email = @e AND consumed_at IS NULL
-      ORDER BY created_at DESC LIMIT 1`, { e });
-  if (!row) throw badRequest('No active code. Request a new one.');
-  if (new Date(row.expires_at) < new Date()) throw badRequest('Code expired. Request a new one.');
-  if (row.attempts >= config.auth.otpMaxAttempts) {
-    throw tooMany('Too many attempts. Request a new code.');
-  }
-  if (!safeEqual(row.code_hash, sha256(String(code).trim()))) {
-    await run('UPDATE otp_codes SET attempts = attempts + 1 WHERE id = @id', { id: row.id });
+      ORDER BY created_at DESC LIMIT 10`, { e });
+  if (!rows.length) throw badRequest('No active code. Request a new one.');
+
+  const live = rows.filter((r) => new Date(r.expires_at) >= new Date());
+  if (!live.length) throw badRequest('Code expired. Request a new one.');
+
+  const match = live.find((r) => safeEqual(r.code_hash, supplied));
+  if (!match) {
+    // Wrong code: count the attempt against the newest live code, and lock out
+    // only once that one has burned through its attempts.
+    const newest = live[0];
+    if (newest.attempts >= config.auth.otpMaxAttempts) {
+      throw tooMany('Too many attempts. Request a new code.');
+    }
+    await run('UPDATE otp_codes SET attempts = attempts + 1 WHERE id = @id', { id: newest.id });
     throw badRequest('Incorrect code');
   }
-  await run('UPDATE otp_codes SET consumed_at = @at WHERE id = @id', { at: nowIso(), id: row.id });
+  await run('UPDATE otp_codes SET consumed_at = @at WHERE id = @id', { at: nowIso(), id: match.id });
 
   const { user, created } = await upsertUserByEmail(e, { email_verified: true });
   if (!user.email_verified) {
