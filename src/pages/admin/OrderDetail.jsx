@@ -32,9 +32,11 @@ export default function AdminOrderDetail() {
   };
 
   const deliverCodes = () => {
-    const deliveries = (data?.order.items || [])
-      .filter((it) => (codes[it.id] || '').trim())
-      .map((it) => ({ orderItemId: it.id, content: codes[it.id].trim(), type: 'code' }));
+    const deliveries = [];
+    (data?.order.items || []).forEach((it) => {
+      (codes[it.id] || '').split(/[\r\n,]+/).map((s) => s.trim()).filter(Boolean)
+        .forEach((content) => deliveries.push({ orderItemId: it.id, content, type: 'code' }));
+    });
     if (!deliveries.length) { toast.error('Enter at least one code first.'); return; }
     act('deliver', { deliveries });
   };
@@ -95,8 +97,8 @@ export default function AdminOrderDetail() {
               <div className="space-y-3">
                 {order.items.map((it) => (
                   <div key={it.id}>
-                    <label className="label">{it.name} × {it.quantity}</label>
-                    <input className="input font-mono" placeholder="e.g. ABCD-1234-EFGH-5678"
+                    <label className="label">{it.name} × {it.quantity} {it.quantity > 1 && <span className="text-slate-500">— one code per line</span>}</label>
+                    <textarea rows={it.quantity > 1 ? 3 : 1} className="input font-mono" placeholder="e.g. ABCD-1234-EFGH-5678"
                       value={codes[it.id] || ''} onChange={(e) => setCodes((c) => ({ ...c, [it.id]: e.target.value }))} />
                   </div>
                 ))}

@@ -4,12 +4,25 @@ import { z } from 'zod';
 import { asyncHandler } from '../../middleware/error.js';
 import { requirePermission } from '../../middleware/rbac.js';
 import { listProducts, getProduct, createProduct, updateProduct } from '../../services/productService.js';
+import { addProductCodes, availableCounts, availableCount } from '../../services/codeStockService.js';
 import { audit } from '../../services/auditService.js';
 
 const router = Router();
 
 router.get('/', requirePermission('orders.read'), asyncHandler(async (_req, res) => {
-  res.json({ products: await listProducts() });
+  const products = await listProducts();
+  const stock = await availableCounts(products.map((p) => p.id));
+  res.json({ products: products.map((p) => ({ ...p, codesAvailable: stock[p.id] || 0 })) });
+}));
+
+// Add a batch of codes (newline/comma separated) to a product's auto-delivery stock.
+router.post('/:id/codes', requirePermission('suppliers.manage'), asyncHandler(async (req, res) => {
+  const { codes } = z.object({ codes: z.string().min(1) }).parse(req.body);
+  const list = codes.split(/[\r\n,]+/).map((c) => c.trim()).filter(Boolean);
+  const added = await addProductCodes(req.params.id, list);
+  await audit({ actor: req.user, action: 'product.codes_add', targetType: 'product',
+    targetId: req.params.id, metadata: { added }, req });
+  res.json({ added, available: await availableCount(req.params.id) });
 }));
 
 const productSchema = z.object({

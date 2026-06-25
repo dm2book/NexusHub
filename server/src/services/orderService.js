@@ -20,6 +20,7 @@ import { scoreOrder } from './fraudService.js';
 import { getProduct } from './productService.js';
 import { postOrderEvent } from './discordService.js';
 import { grantTierForOrder } from './discordRolesService.js';
+import { availableCount, claimCodes } from './codeStockService.js';
 
 export const STATUSES = [
   'pending', 'payment_received', 'processing', 'awaiting_fulfillment',
@@ -173,7 +174,28 @@ export async function transitionOrder(orderId, to, ctx = {}) {
       link: `/account/orders/${orderId}`,
     });
   }
+  // Once paid, auto-deliver from code stock if every item is in stock (best-effort).
+  if (to === 'payment_received') {
+    autoDispenseFromStock(orderId, ctx).catch((e) => console.error('[autodispense]', e.message));
+  }
   return updated;
+}
+
+/** If every item has enough pre-loaded stock, claim codes and complete the order. */
+export async function autoDispenseFromStock(orderId, ctx = {}) {
+  const order = await getOrder(orderId);
+  if (!order || ['completed', 'refunded', 'cancelled'].includes(order.status)) return false;
+  for (const it of order.items) {
+    if (await availableCount(it.product_id) < it.quantity) return false; // not enough stock → leave for manual
+  }
+  const deliveries = [];
+  for (const it of order.items) {
+    const codes = await claimCodes(it.product_id, it.quantity, orderId);
+    for (const c of codes) deliveries.push({ orderItemId: it.id, content: c, type: 'code' });
+  }
+  if (!deliveries.length) return false;
+  await deliverOrder(orderId, deliveries, { ...ctx, reason: 'Auto-delivered from stock' });
+  return true;
 }
 
 export async function appendHistory(orderId, from, to, changedBy, reason) {

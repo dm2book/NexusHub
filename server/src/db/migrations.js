@@ -240,6 +240,18 @@ CREATE TABLE IF NOT EXISTS deliveries (
   created_at      TEXT NOT NULL
 );
 
+-- Pre-loaded code stock per product, auto-dispensed when an order is paid.
+CREATE TABLE IF NOT EXISTS product_codes (
+  id              TEXT PRIMARY KEY,
+  product_id      TEXT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  code            TEXT NOT NULL,
+  status          TEXT NOT NULL DEFAULT 'available',
+  order_id        TEXT REFERENCES orders(id) ON DELETE SET NULL,
+  created_at      TEXT NOT NULL,
+  used_at         TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_product_codes_avail ON product_codes (product_id, status);
+
 -- ── EMAIL ──────────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS email_templates (
   id              TEXT PRIMARY KEY,
