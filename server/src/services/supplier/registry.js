@@ -7,6 +7,7 @@
 import { ApiConnector } from './ApiConnector.js';
 import { CsvConnector } from './CsvConnector.js';
 import { ManualConnector } from './ManualConnector.js';
+import { EldoradoConnector } from './EldoradoConnector.js';
 
 const REGISTRY = new Map();
 
@@ -18,6 +19,7 @@ export function registerConnector(ConnectorClass) {
 registerConnector(ApiConnector);
 registerConnector(CsvConnector);
 registerConnector(ManualConnector);
+registerConnector(EldoradoConnector);
 
 export function availableKinds() {
   return [...REGISTRY.keys()];

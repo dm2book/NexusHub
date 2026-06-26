@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { config, manualPayMethods, couponFor } from '../config/env.js';
 import { asyncHandler } from '../middleware/error.js';
 import { rateLimit } from '../middleware/rateLimit.js';
-import { listProducts, getProduct } from '../services/productService.js';
+import { listProducts, getProduct, trendingProducts } from '../services/productService.js';
 import { createOrder, getOrderByNumber, getOrder, markPaymentReceived } from '../services/orderService.js';
 import { listEnabledProviders } from '../services/oauthService.js';
 import { isEnabled as stripeEnabled, createCheckoutSession } from '../services/stripeService.js';
@@ -80,6 +80,15 @@ async function assertOwnsOrder(req, order, email) {
 
 router.get('/products', asyncHandler(async (_req, res) => {
   res.json({ products: await listProducts({ activeOnly: true }) });
+}));
+
+// Trending products (most-sold recently). Registered before /products/:id.
+let trendingCache = { at: 0, data: null };
+router.get('/products/trending', asyncHandler(async (_req, res) => {
+  if (!trendingCache.data || Date.now() - trendingCache.at > 60_000) {
+    trendingCache = { at: Date.now(), data: await trendingProducts({ days: 14, limit: 8 }) };
+  }
+  res.json({ products: trendingCache.data });
 }));
 
 router.get('/products/:id', asyncHandler(async (req, res) => {

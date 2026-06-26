@@ -252,3 +252,7 @@ h1, h2, h3, .font-display { font-family: 'Orbitron', sans-serif; letter-spacing:
 @media (prefers-reduced-motion: reduce) {
   .fm-page, .fm-reveal, .fm-lift, .fm-gradient-text, .fm-marquee, .fm-blob { animation: none !important; transition: none !important; transform: none !important; opacity: 1 !important; }
 }
+
+/* Hidden-scrollbar horizontal rail (trending / popular carousels) */
+.fm-rail::-webkit-scrollbar { height: 0; }
+.fm-rail { scrollbar-width: none; }

@@ -24,6 +24,34 @@ export async function getProduct(id) {
   return hydrate(await get('SELECT * FROM products WHERE id = @id', { id }));
 }
 
+/**
+ * Trending = most-sold active products over the last `days`. Falls back to
+ * featured (then newest) active products so the row is never empty.
+ */
+export async function trendingProducts({ days = 14, limit = 8 } = {}) {
+  const since = new Date(Date.now() - days * 86_400_000).toISOString();
+  const rows = await all(
+    `SELECT oi.product_id AS id, SUM(oi.quantity) AS sold
+       FROM order_items oi JOIN orders o ON o.id = oi.order_id
+      WHERE o.status IN ('payment_received','processing','awaiting_fulfillment','completed')
+        AND o.created_at > @since AND oi.product_id IS NOT NULL
+      GROUP BY oi.product_id ORDER BY sold DESC LIMIT @limit`, { since, limit });
+
+  const out = [];
+  for (const r of rows) {
+    const p = await getProduct(r.id);
+    if (p && p.active) out.push({ ...p, sold: Number(r.sold) });
+  }
+  if (out.length >= Math.min(4, limit)) return out;
+
+  // Fallback: top up with featured, then newest, active products.
+  const all2 = (await listProducts({ activeOnly: true }));
+  const have = new Set(out.map((p) => p.id));
+  const extras = all2.filter((p) => !have.has(p.id))
+    .sort((a, b) => (b.featured === true) - (a.featured === true));
+  return [...out, ...extras].slice(0, limit);
+}
+
 export async function createProduct(p = {}) {
   if (!p.name) throw badRequest('Product name is required');
   const id = newId('prd');
