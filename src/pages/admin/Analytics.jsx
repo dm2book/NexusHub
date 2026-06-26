@@ -8,11 +8,13 @@ export default function Analytics() {
   const [data, setData] = useState(null);
   const [clv, setClv] = useState(null);
   const [top, setTop] = useState(null);
+  const [ret, setRet] = useState(null);
 
   useEffect(() => {
     api.get('/api/admin/analytics/overview?days=30').then(setData).catch(() => {});
     api.get('/api/admin/analytics/clv').then(setClv).catch(() => {});
     api.get('/api/admin/analytics/top-products').then((r) => setTop(r.products)).catch(() => {});
+    api.get('/api/admin/analytics/retention').then(setRet).catch(() => {});
   }, []);
 
   if (!data) return <PageLoader />;
@@ -79,6 +81,56 @@ export default function Analytics() {
         </div>
       </div>
 
+      {/* Retention */}
+      {ret && (
+        <div className="grid lg:grid-cols-3 gap-6 mt-6">
+          <div className="card p-6">
+            <h3 className="text-white mb-4">Retention</h3>
+            <Row label="Repeat-purchase rate" value={`${ret.repeatRate}%`} />
+            <Row label="Repeat customers" value={`${ret.repeatCustomers} / ${ret.customersWithOrders}`} />
+            <Row label="Total customers" value={ret.totalCustomers} />
+            <Row label="Forge+ members" value={ret.activeMembers} accent="text-violet-300" />
+          </div>
+          <div className="card p-6">
+            <h3 className="text-white mb-4">Loyalty tiers</h3>
+            {[['Platinum', ret.tiers.platinum, '#a78bfa'], ['Gold', ret.tiers.gold, '#f59e0b'],
+              ['Silver', ret.tiers.silver, '#9ca3af'], ['Bronze', ret.tiers.bronze, '#cd7f32']].map(([n, c, col]) => {
+              const total = ret.tiers.platinum + ret.tiers.gold + ret.tiers.silver + ret.tiers.bronze || 1;
+              return (
+                <div key={n} className="mb-3">
+                  <div className="flex justify-between text-sm mb-1"><span style={{ color: col }}>{n}</span><span className="text-slate-300">{c}</span></div>
+                  <div className="h-2 rounded-full bg-white/10 overflow-hidden"><div className="h-full rounded-full" style={{ width: `${(c / total) * 100}%`, background: col }} /></div>
+                </div>
+              );
+            })}
+          </div>
+          <div className="card p-6">
+            <h3 className="text-white mb-4">Affiliate program</h3>
+            <Row label="Referred customers" value={ret.affiliate.referrals} />
+            <Row label="Commission earned" value={ret.affiliate.commissionTotalFormatted} />
+            <Row label="Commission owed" value={ret.affiliate.commissionOwedFormatted} accent="text-amber-300" />
+          </div>
+        </div>
+      )}
+
+      {/* Product performance */}
+      <div className="card p-6 mt-6">
+        <h3 className="text-white mb-4 flex items-center gap-2"><Trophy size={16} className="text-amber-400" /> Product performance (90 days)</h3>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[420px]">
+            <thead className="text-left text-slate-400 border-b border-white/5">
+              <tr><th className="py-2 font-medium">Product</th><th className="py-2 font-medium text-right">Units</th><th className="py-2 font-medium text-right">Revenue</th></tr>
+            </thead>
+            <tbody className="divide-y divide-white/5">
+              {(top || []).length === 0 && <tr><td colSpan={3} className="py-4 text-slate-500">No sales yet.</td></tr>}
+              {(top || []).map((p) => (
+                <tr key={p.name}><td className="py-2 text-slate-200">{p.name}</td><td className="py-2 text-right text-slate-300">{p.units}</td><td className="py-2 text-right text-white">{p.revenueFormatted}</td></tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <div className="card p-6 mt-6">
         <h3 className="text-white mb-4">Top customers by lifetime value</h3>
         <div className="space-y-2">
@@ -91,6 +143,15 @@ export default function Analytics() {
           ))}
         </div>
       </div>
+    </div>
+  );
+}
+
+function Row({ label, value, accent = 'text-white' }) {
+  return (
+    <div className="flex items-center justify-between py-1.5 text-sm">
+      <span className="text-slate-400">{label}</span>
+      <span className={`font-semibold ${accent}`}>{value}</span>
     </div>
   );
 }

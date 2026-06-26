@@ -111,3 +111,58 @@ export async function customerLifetimeValue({ limit = 10 } = {}) {
 export function statusBreakdown() {
   return all(`SELECT status, COUNT(*) AS n FROM orders GROUP BY status`);
 }
+
+/** Retention analytics: repeat-rate, loyalty tier mix, Forge+ members, affiliate. */
+export async function retentionMetrics() {
+  const now = new Date().toISOString();
+
+  const repeat = await get(`
+    SELECT COUNT(*) AS with_orders, COUNT(*) FILTER (WHERE c >= 2) AS repeat_customers
+      FROM (SELECT user_id, COUNT(*) c FROM orders
+             WHERE user_id IS NOT NULL AND ${PAID} GROUP BY user_id) t`);
+
+  const tiers = await get(`
+    WITH spend AS (
+      SELECT user_id, COALESCE(SUM(total),0) AS s FROM orders
+       WHERE user_id IS NOT NULL AND ${PAID} GROUP BY user_id)
+    SELECT
+      COUNT(*) FILTER (WHERE s >= 200000) AS platinum,
+      COUNT(*) FILTER (WHERE s >= 50000  AND s < 200000) AS gold,
+      COUNT(*) FILTER (WHERE s >= 10000  AND s < 50000)  AS silver,
+      COUNT(*) FILTER (WHERE s < 10000) AS bronze
+      FROM spend`);
+
+  const members = await get(`SELECT COUNT(*) AS n FROM users WHERE membership_until > @now`, { now });
+  const totalCustomers = (await get(`SELECT COUNT(*) AS n FROM users`)).n;
+
+  let affiliate = { referrals: 0, total: 0, owed: 0 };
+  try {
+    const a = await get(`
+      SELECT COUNT(DISTINCT referred_id) AS referrals,
+             COALESCE(SUM(commission),0) AS total,
+             COALESCE(SUM(commission) FILTER (WHERE status IN ('pending','approved')),0) AS owed
+        FROM referral_events`);
+    affiliate = { referrals: Number(a?.referrals || 0), total: Number(a?.total || 0), owed: Number(a?.owed || 0) };
+  } catch { /* table may not exist on very old DBs */ }
+
+  const withOrders = Number(repeat?.with_orders || 0);
+  const repeatCustomers = Number(repeat?.repeat_customers || 0);
+  return {
+    totalCustomers: Number(totalCustomers || 0),
+    customersWithOrders: withOrders,
+    repeatCustomers,
+    repeatRate: withOrders ? Math.round((repeatCustomers / withOrders) * 1000) / 10 : 0,
+    activeMembers: Number(members?.n || 0),
+    tiers: {
+      bronze: Number(tiers?.bronze || 0), silver: Number(tiers?.silver || 0),
+      gold: Number(tiers?.gold || 0), platinum: Number(tiers?.platinum || 0),
+    },
+    affiliate: {
+      referrals: affiliate.referrals,
+      commissionTotal: affiliate.total,
+      commissionTotalFormatted: formatMoney(affiliate.total),
+      commissionOwed: affiliate.owed,
+      commissionOwedFormatted: formatMoney(affiliate.owed),
+    },
+  };
+}

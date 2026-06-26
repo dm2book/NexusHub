@@ -256,3 +256,22 @@ h1, h2, h3, .font-display { font-family: 'Orbitron', sans-serif; letter-spacing:
 /* Hidden-scrollbar horizontal rail (trending / popular carousels) */
 .fm-rail::-webkit-scrollbar { height: 0; }
 .fm-rail { scrollbar-width: none; }
+
+/* ── Phase 7: premium micro-interactions ───────────────────────────────── */
+.btn-primary:active, .btn-ghost:active, .btn:active { transform: translateY(0) scale(.98); }
+
+/* Staggered card entrance for product grids */
+@keyframes fmCardIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+.fm-grid-in > * { animation: fmCardIn .5s cubic-bezier(.22,.61,.36,1) both; }
+.fm-grid-in > *:nth-child(1){animation-delay:.02s}
+.fm-grid-in > *:nth-child(2){animation-delay:.06s}
+.fm-grid-in > *:nth-child(3){animation-delay:.10s}
+.fm-grid-in > *:nth-child(4){animation-delay:.14s}
+.fm-grid-in > *:nth-child(5){animation-delay:.18s}
+.fm-grid-in > *:nth-child(6){animation-delay:.22s}
+.fm-grid-in > *:nth-child(7){animation-delay:.26s}
+.fm-grid-in > *:nth-child(8){animation-delay:.30s}
+
+@media (prefers-reduced-motion: reduce) {
+  .fm-grid-in > * { animation: none !important; }
+}

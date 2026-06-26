@@ -28,4 +28,8 @@ router.get('/clv', asyncHandler(async (_req, res) => {
   res.json(await analytics.customerLifetimeValue({ limit: 10 }));
 }));
 
+router.get('/retention', asyncHandler(async (_req, res) => {
+  res.json(await analytics.retentionMetrics());
+}));
+
 export default router;

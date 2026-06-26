@@ -1,5 +1,6 @@
+import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Search, ShoppingCart, Zap, ArrowRight, Shield } from 'lucide-react';
+import { Search, ShoppingCart, Zap, ArrowRight, Shield, Menu, X } from 'lucide-react';
 import { useCart } from '../../context/CartContext.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
 
@@ -16,11 +17,17 @@ export default function StoreNav() {
   const { count } = useCart();
   const { user, isStaff } = useAuth();
   const { pathname } = useLocation();
+  const [open, setOpen] = useState(false);
   const active = (to) => (to === '/' ? pathname === '/' : pathname.startsWith(to));
+  useEffect(() => { setOpen(false); }, [pathname]);
 
   return (
     <header className="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-slate-200/70">
       <div className="max-w-[1400px] mx-auto px-4 lg:px-8 h-[68px] flex items-center gap-6">
+        <button onClick={() => setOpen((v) => !v)} aria-label="Menu"
+          className="lg:hidden w-10 h-10 -ml-1 rounded-xl hover:bg-slate-100 grid place-items-center text-slate-700">
+          {open ? <X size={20} /> : <Menu size={20} />}
+        </button>
         <Link to="/" className="flex items-center gap-2.5 shrink-0">
           <span className="w-9 h-9 rounded-xl flex items-center justify-center text-white shadow-lg shadow-violet-500/30"
             style={{ backgroundImage: 'linear-gradient(135deg,#7c5cff,#a855f7)' }}>
@@ -65,12 +72,33 @@ export default function StoreNav() {
           <Link to="/login" className="hidden sm:inline-flex text-[15px] font-medium text-slate-600 hover:text-slate-900">Log in</Link>
         )}
         {!user && (
-          <Link to="/login" className="inline-flex items-center gap-1.5 text-white text-[15px] font-semibold rounded-xl px-4 h-10 shadow-lg shadow-violet-500/30 hover:brightness-105 transition"
+          <Link to="/login" className="hidden sm:inline-flex items-center gap-1.5 text-white text-[15px] font-semibold rounded-xl px-4 h-10 shadow-lg shadow-violet-500/30 hover:brightness-105 transition"
             style={{ backgroundImage: 'linear-gradient(135deg,#7c5cff,#a855f7)' }}>
             Sign Up <ArrowRight size={16} />
           </Link>
         )}
       </div>
+
+      {/* Mobile drawer */}
+      {open && (
+        <div className="lg:hidden border-t border-slate-200/70 bg-white px-4 py-3 space-y-1 fm-page">
+          {NAV.map((n) => (
+            <Link key={n.label} to={n.to}
+              className={`block px-3 py-2.5 rounded-xl text-[15px] font-medium ${active(n.to) ? 'bg-violet-50 text-violet-700' : 'text-slate-700 hover:bg-slate-50'}`}>
+              {n.label}
+            </Link>
+          ))}
+          <div className="h-px bg-slate-100 my-2" />
+          {isStaff && <Link to="/admin" className="block px-3 py-2.5 rounded-xl text-[15px] font-medium text-violet-700 bg-violet-50">🛡 Admin</Link>}
+          <Link to={user ? '/account' : '/login'} className="block px-3 py-2.5 rounded-xl text-[15px] font-medium text-slate-700 hover:bg-slate-50">
+            {user ? 'Account' : 'Log in'}
+          </Link>
+          {!user && (
+            <Link to="/login" className="block text-center text-white font-semibold rounded-xl py-2.5 mt-1"
+              style={{ backgroundImage: 'linear-gradient(135deg,#7c5cff,#a855f7)' }}>Sign Up</Link>
+          )}
+        </div>
+      )}
     </header>
   );
 }
