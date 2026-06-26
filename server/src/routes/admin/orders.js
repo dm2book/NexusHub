@@ -11,6 +11,7 @@ import {
   listOrders, getOrder, transitionOrder, markPaymentReceived, setOrderNotes, deliverOrder,
 } from '../../services/orderService.js';
 import { fulfillOrder, listFulfillment, listFulfillmentLogs } from '../../services/fulfillmentService.js';
+import { listPendingProofs, confirmProof, rejectProof } from '../../services/paymentProofService.js';
 import { sendEmail } from '../../services/emailService.js';
 import { notify } from '../../services/notificationService.js';
 import { audit } from '../../services/auditService.js';
@@ -29,6 +30,24 @@ router.get('/', requirePermission('orders.read'), asyncHandler(async (req, res) 
     offset: Number(offset) || 0,
   }));
 }));
+
+// ── Payment verification queue ───────────────────────────────────────────────
+router.get('/payment/queue', requirePermission('orders.update'), asyncHandler(async (_req, res) => {
+  res.json({ proofs: await listPendingProofs() });
+}));
+
+router.post('/payment/proofs/:id/confirm', requirePermission('orders.update'),
+  asyncHandler(async (req, res) => {
+    const order = await confirmProof(req.params.id, { user: req.user, req });
+    res.json({ order });
+  }));
+
+router.post('/payment/proofs/:id/reject', requirePermission('orders.update'),
+  asyncHandler(async (req, res) => {
+    const { reason } = z.object({ reason: z.string().max(300).optional() }).parse(req.body || {});
+    await rejectProof(req.params.id, reason, { user: req.user, req });
+    res.json({ ok: true });
+  }));
 
 router.get('/:id', requirePermission('orders.read'), asyncHandler(async (req, res) => {
   const order = await getOrder(req.params.id);

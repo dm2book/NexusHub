@@ -429,4 +429,29 @@ CREATE INDEX IF NOT EXISTS idx_coupon_redemptions_code  ON coupon_redemptions (c
 CREATE INDEX IF NOT EXISTS idx_coupon_redemptions_user  ON coupon_redemptions (user_id, code);
 `,
   },
+  {
+    id: '003_payment_verification',
+    sql: `
+-- Customer-submitted payment proof + admin verification queue (manual payments).
+CREATE TABLE IF NOT EXISTS payment_proofs (
+  id              TEXT PRIMARY KEY,
+  order_id        TEXT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  method          TEXT,
+  transaction_id  TEXT,
+  screenshot_url  TEXT,
+  note            TEXT,
+  amount          BIGINT,
+  status          TEXT NOT NULL DEFAULT 'pending',   -- pending | confirmed | rejected
+  fraud_flags     TEXT NOT NULL DEFAULT '[]',
+  reviewed_by     TEXT,
+  reviewed_at     TEXT,
+  reject_reason   TEXT,
+  ip              TEXT,
+  created_at      TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_payment_proofs_status ON payment_proofs (status, created_at);
+CREATE INDEX IF NOT EXISTS idx_payment_proofs_order  ON payment_proofs (order_id);
+CREATE INDEX IF NOT EXISTS idx_payment_proofs_txn    ON payment_proofs (transaction_id);
+`,
+  },
 ];

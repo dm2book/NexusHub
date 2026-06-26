@@ -138,8 +138,10 @@ export default function Checkout() {
             </div>
           )}
 
-          <div className="flex gap-3 mt-7">
-            <Link to={user ? `/account/orders/${placed.id}` : `/track?number=${placed.number}`} className="btn-ghost flex-1 py-3"><CheckCircle2 size={18} /> I’ve paid — track order</Link>
+          <PaymentProofForm orderId={placed.id} email={email} method={methodId} />
+
+          <div className="flex gap-3 mt-5">
+            <Link to={user ? `/account/orders/${placed.id}` : `/track?number=${placed.number}`} className="btn-ghost flex-1 py-3"><CheckCircle2 size={18} /> Track order</Link>
             <Link to="/shop" className="btn-ghost flex-1 py-3">Keep shopping</Link>
           </div>
         </div>
@@ -232,6 +234,52 @@ export default function Checkout() {
           </div>
         </div>
       </form>
+    </div>
+  );
+}
+
+/** After paying via Tikkie/Revolut/PayPal, the customer submits proof which
+ *  lands in the admin verification queue. */
+function PaymentProofForm({ orderId, email, method }) {
+  const [txn, setTxn] = useState('');
+  const [shot, setShot] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState(false);
+  const [err, setErr] = useState('');
+
+  const submit = async () => {
+    setErr('');
+    if (!txn.trim() && !shot.trim()) { setErr('Add a transaction ID or a screenshot link.'); return; }
+    setBusy(true);
+    try {
+      await api.post(`/api/orders/${orderId}/proof`, {
+        method, email, transactionId: txn.trim() || undefined, screenshotUrl: shot.trim() || undefined,
+      });
+      setDone(true);
+    } catch (e) { setErr(e.message); } finally { setBusy(false); }
+  };
+
+  if (done) {
+    return (
+      <div className="glass rounded-2xl p-5 mt-6 text-left border border-emerald-500/30">
+        <div className="flex items-center gap-2 text-emerald-300 font-medium"><CheckCircle2 size={18} /> Payment submitted</div>
+        <p className="text-slate-300 text-sm mt-1">Your payment is in our verification queue. We’ll confirm it (usually within minutes) and your order moves to delivery automatically.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="glass rounded-2xl p-5 mt-6 text-left">
+      <h3 className="text-white font-medium mb-1">Already paid? Confirm it</h3>
+      <p className="text-slate-400 text-sm mb-3">Paste your payment reference / transaction ID (and optionally a screenshot link). This speeds up verification a lot.</p>
+      <div className="space-y-2.5">
+        <input value={txn} onChange={(e) => setTxn(e.target.value)} className="input" placeholder="Transaction ID / payment reference" />
+        <input value={shot} onChange={(e) => setShot(e.target.value)} className="input" placeholder="Screenshot link (optional) — e.g. imgur / drive" />
+        {err && <p className="text-red-300 text-xs">{err}</p>}
+        <button onClick={submit} disabled={busy} className="btn-primary w-full py-3">
+          {busy ? <Loader2 size={18} className="animate-spin" /> : <>I’ve paid — submit for verification</>}
+        </button>
+      </div>
     </div>
   );
 }
