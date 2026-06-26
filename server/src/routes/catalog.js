@@ -8,9 +8,20 @@ import { listProducts, getProduct } from '../services/productService.js';
 import { createOrder, getOrderByNumber, getOrder, markPaymentReceived } from '../services/orderService.js';
 import { listEnabledProviders } from '../services/oauthService.js';
 import { isEnabled as stripeEnabled, createCheckoutSession } from '../services/stripeService.js';
+import { publicStats } from '../services/publicStatsService.js';
 import { ApiError, forbidden } from '../utils/errors.js';
 
 const router = Router();
+
+// Public trust stats for the storefront (orders delivered, avg delivery, recent
+// deliveries…). Cached briefly so the homepage stays fast under load.
+let statsCache = { at: 0, data: null };
+router.get('/stats', asyncHandler(async (_req, res) => {
+  if (!statsCache.data || Date.now() - statsCache.at > 30_000) {
+    statsCache = { at: Date.now(), data: await publicStats() };
+  }
+  res.json(statsCache.data);
+}));
 
 // Which payment path the storefront should use. Manual methods (Tikkie/Revolut/
 // PayPal) take priority when configured, then Stripe, then demo.

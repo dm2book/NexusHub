@@ -7,6 +7,10 @@ import {
 import { useCart } from '../context/CartContext.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { usePageMeta } from '../lib/useMeta.js';
+import { useStats } from '../lib/useStats.js';
+import { useReveal } from '../lib/useReveal.js';
+import CountUp from '../components/CountUp.jsx';
+import RecentlyDelivered from '../components/store/RecentlyDelivered.jsx';
 
 const ICON = (n) => `/products/icons/${n}.png`;
 
@@ -59,10 +63,10 @@ const TRUST = [
   { icon: Headphones, title: '24/7 Support', sub: 'Always here to help', color: 'text-blue-600 bg-blue-100' },
 ];
 
-const STATS = [
-  { icon: Users, value: '10,000+', label: 'Happy Customers', color: 'text-violet-600 bg-violet-100' },
+const statCards = (s) => [
+  { icon: Users, value: `${s.customers.toLocaleString('en-US')}+`, label: 'Happy Customers', color: 'text-violet-600 bg-violet-100' },
   { icon: CheckCircle2, value: '99.9%', label: 'Success Rate', color: 'text-emerald-600 bg-emerald-100' },
-  { icon: ShoppingCart, value: '50,000+', label: 'Orders Completed', color: 'text-blue-600 bg-blue-100' },
+  { icon: ShoppingCart, value: `${s.delivered.toLocaleString('en-US')}+`, label: 'Orders Delivered', color: 'text-blue-600 bg-blue-100' },
   { icon: Headphones, value: '24/7', label: 'Customer Support', color: 'text-amber-600 bg-amber-100' },
 ];
 
@@ -84,10 +88,13 @@ function useCountdown(seconds = 2 * 3600 + 47 * 60 + 19) {
 export default function HomeStore() {
   const { count, add } = useCart();
   const { user } = useAuth();
+  const stats = useStats();
+  useReveal();
   usePageMeta('ForgeMarket — Everything You Need, All in One Place',
     'Buy Robux, V-Bucks, Valorant Points, gift cards and more instantly. Fast delivery, secure payments, 24/7 support.');
   const [h, m, s] = useCountdown();
   const railRef = useRef(null);
+  const STATS = statCards(stats);
 
   const scrollRail = () => railRef.current?.scrollBy({ left: 320, behavior: 'smooth' });
   const addToCart = (p) => add({
@@ -96,7 +103,7 @@ export default function HomeStore() {
   });
 
   return (
-    <div className="min-h-screen bg-[#f6f7fb] text-slate-900" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
+    <div className="min-h-screen bg-[#f6f7fb] text-slate-900 fm-page" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
       <style>{`
         @keyframes fmFloat { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-14px)} }
         @keyframes fmFloat2 { 0%,100%{transform:translateY(0)} 50%{transform:translateY(10px)} }
@@ -234,9 +241,7 @@ export default function HomeStore() {
                 </span>
                 <h1 className="fm-head text-[40px] sm:text-[52px] leading-[1.05] mt-5">
                   Everything You Need,<br />
-                  <span style={{ backgroundImage: 'linear-gradient(90deg,#7c5cff,#a855f7)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>
-                    All in One Place.
-                  </span>
+                  <span className="fm-gradient-text">All in One Place.</span>
                 </h1>
                 <p className="text-slate-500 text-[16px] mt-5 max-w-lg leading-relaxed">
                   Get Robux, V-Bucks, Valorant Points and more instantly. Fast delivery,
@@ -290,7 +295,7 @@ export default function HomeStore() {
           </section>
 
           {/* Popular products */}
-          <section>
+          <section className="fm-reveal">
             <div className="flex items-center justify-between mb-4">
               <h2 className="fm-head text-2xl flex items-center gap-2">Popular Products <span>🔥</span></h2>
               <Link to="/shop" className="text-violet-600 font-semibold text-sm inline-flex items-center gap-1 hover:gap-2 transition-all">
@@ -326,24 +331,24 @@ export default function HomeStore() {
           </section>
 
           {/* Bottom: stats + reviews + discord */}
-          <section className="grid lg:grid-cols-3 gap-5">
+          <section className="grid lg:grid-cols-3 gap-5 fm-reveal">
             {/* Stats */}
-            <div className="bg-white rounded-2xl border border-slate-200/70 shadow-sm p-5 grid grid-cols-2 gap-4">
+            <div className="bg-white rounded-2xl border border-slate-200/70 shadow-sm p-5 grid grid-cols-2 gap-4 fm-lift">
               {STATS.map((st) => (
                 <div key={st.label} className="flex items-center gap-3">
                   <span className={`w-11 h-11 rounded-xl grid place-items-center ${st.color}`}><st.icon size={20} /></span>
-                  <div><div className="fm-head text-lg leading-none">{st.value}</div><div className="text-[12px] text-slate-400 mt-1">{st.label}</div></div>
+                  <div><div className="fm-head text-lg leading-none"><CountUp value={st.value} /></div><div className="text-[12px] text-slate-400 mt-1">{st.label}</div></div>
                 </div>
               ))}
             </div>
 
             {/* Reviews */}
-            <div className="bg-white rounded-2xl border border-slate-200/70 shadow-sm p-5">
+            <div className="bg-white rounded-2xl border border-slate-200/70 shadow-sm p-5 fm-lift">
               <div className="font-bold mb-3">What Our Customers Say</div>
               <div className="flex items-center gap-2 mb-4">
                 <div className="flex text-amber-400">{Array.from({ length: 5 }).map((_, i) => <Star key={i} size={16} fill="currentColor" />)}</div>
-                <span className="fm-head">4.9 out of 5</span>
-                <span className="text-[12px] text-slate-400">Based on 2,345 reviews</span>
+                <span className="fm-head">{stats.rating} out of 5</span>
+                <span className="text-[12px] text-slate-400">Based on {stats.reviews.toLocaleString('en-US')} reviews</span>
               </div>
               <div className="space-y-2.5">
                 {RV.map((r) => (
@@ -357,11 +362,15 @@ export default function HomeStore() {
             </div>
 
             {/* Discord */}
-            <div className="rounded-2xl p-6 text-white shadow-lg shadow-indigo-500/20 flex flex-col"
+            <div className="rounded-2xl p-6 text-white shadow-lg shadow-indigo-500/20 flex flex-col fm-lift"
               style={{ backgroundImage: 'linear-gradient(150deg,#6366f1,#8b5cf6)' }}>
               <span className="w-12 h-12 rounded-2xl bg-white/15 grid place-items-center mb-4"><MessageCircle size={24} /></span>
               <div className="fm-head text-xl">Join Our Discord</div>
               <p className="text-white/85 text-sm mt-2 leading-relaxed flex-1">Get support, updates and exclusive giveaways!</p>
+              <div className="flex items-center gap-2 mt-3 text-white/90 text-sm">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <b>{stats.discordMembers.toLocaleString('en-US')}</b> members online
+              </div>
               <Link to="/discord" className="mt-4 inline-flex items-center justify-center gap-2 bg-white text-indigo-600 font-semibold text-sm rounded-xl h-11 hover:bg-indigo-50 transition">
                 Join Discord <ArrowRight size={16} />
               </Link>
@@ -383,6 +392,7 @@ export default function HomeStore() {
           </footer>
         </main>
       </div>
+      <RecentlyDelivered />
     </div>
   );
 }

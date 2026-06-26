@@ -9,11 +9,16 @@ export default function CountUp({ value, duration = 1400, className = '' }) {
   const ref = useRef(null);
   const [display, setDisplay] = useState(null);
 
-  // Parse "50k+", "< 30s", "4.9/5", "24/7" → { prefix, num, suffix }
-  const m = String(value).match(/^(\D*)([\d.]+)(.*)$/);
+  // Parse "50k+", "52,340+", "< 30s", "4.9/5", "24/7" → { prefix, num, suffix }
+  const m = String(value).match(/^(\D*)([\d.,]+)(.*)$/);
   const isNum = !!m;
-  const num = isNum ? parseFloat(m[2]) : 0;
+  const num = isNum ? parseFloat(m[2].replace(/,/g, '')) : 0;
   const decimals = isNum && m[2].includes('.') ? 1 : 0;
+  const grouped = isNum && m[2].includes(',');
+  const fmt = (n) => {
+    const v = n.toFixed(decimals);
+    return grouped ? Number(v).toLocaleString('en-US') : v;
+  };
 
   useEffect(() => {
     if (!isNum) { setDisplay(value); return; }
@@ -27,7 +32,7 @@ export default function CountUp({ value, duration = 1400, className = '' }) {
       const tick = (t) => {
         const k = Math.min(1, (t - start) / duration);
         const eased = 1 - Math.pow(1 - k, 3);
-        setDisplay(`${m[1]}${(num * eased).toFixed(decimals)}${m[3]}`);
+        setDisplay(`${m[1]}${fmt(num * eased)}${m[3]}`);
         if (k < 1) raf = requestAnimationFrame(tick);
       };
       raf = requestAnimationFrame(tick);
@@ -36,5 +41,5 @@ export default function CountUp({ value, duration = 1400, className = '' }) {
     return () => { io.disconnect(); cancelAnimationFrame(raf); };
   }, [value]);
 
-  return <span ref={ref} className={className}>{display ?? (isNum ? `${m[1]}0${m[3]}` : value)}</span>;
+  return <span ref={ref} className={className}>{display ?? (isNum ? `${m[1]}${fmt(0)}${m[3]}` : value)}</span>;
 }
