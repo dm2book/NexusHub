@@ -38,7 +38,9 @@ export default function Login() {
     e.preventDefault();
     setBusy(true);
     try {
-      const { accessToken } = await api.post('/api/auth/otp/verify', { email, code });
+      const ref = localStorage.getItem('fm_ref') || undefined;
+      const { accessToken } = await api.post('/api/auth/otp/verify', { email, code, ref });
+      localStorage.removeItem('fm_ref');
       await login(accessToken);
       navigate(dest, { replace: true });
     } catch (err) { toast.error(err.message); }

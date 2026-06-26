@@ -14,6 +14,7 @@ import {
   listEnabledProviders, buildAuthUrl, handleOAuthCallback,
 } from '../services/oauthService.js';
 import { publicUser } from '../services/userService.js';
+import { attributeSignup } from '../services/affiliateService.js';
 import { audit } from '../services/auditService.js';
 import { sendEmailAsync } from '../services/emailService.js';
 import { badRequest } from '../utils/errors.js';
@@ -51,13 +52,14 @@ router.post('/otp/request', otpLimiter, asyncHandler(async (req, res) => {
 }));
 
 router.post('/otp/verify', otpLimiter, asyncHandler(async (req, res) => {
-  const { email, code } = z.object({
-    email: z.string().email(), code: z.string().min(4).max(8),
+  const { email, code, ref } = z.object({
+    email: z.string().email(), code: z.string().min(4).max(8), ref: z.string().max(40).optional(),
   }).parse(req.body);
   const session = await verifyEmailOtp(email, code, ctxOf(req));
   if (session.firstLogin) {
     sendEmailAsync('account_created', session.user.email,
       { user: { name: session.user.display_name || email.split('@')[0] } });
+    if (ref) await attributeSignup(session.user.id, ref).catch(() => {});
   }
   await audit({ actor: { id: session.user.id, email: session.user.email },
     action: 'auth.login', metadata: { method: 'otp' }, req });
