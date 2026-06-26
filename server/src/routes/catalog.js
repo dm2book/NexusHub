@@ -6,6 +6,7 @@ import { asyncHandler } from '../middleware/error.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 import { listProducts, getProduct, trendingProducts } from '../services/productService.js';
 import { createOrder, getOrderByNumber, getOrder, markPaymentReceived } from '../services/orderService.js';
+import { submitProof, getOrderProof } from '../services/paymentProofService.js';
 import { listEnabledProviders } from '../services/oauthService.js';
 import { isEnabled as stripeEnabled, createCheckoutSession } from '../services/stripeService.js';
 import { publicStats } from '../services/publicStatsService.js';
@@ -161,6 +162,31 @@ router.post('/orders/:id/pay', rateLimit({ bucket: 'pay', windowMs: 60_000, max:
       { actorId: req.user?.id || 'customer', reason: 'Demo payment' });
     res.json({ order: updated });
   }));
+
+// Customer submits proof of payment for a manual-payment order.
+router.post('/orders/:id/proof', rateLimit({ bucket: 'proof', windowMs: 60_000, max: 10 }),
+  asyncHandler(async (req, res) => {
+    const order = await getOrder(req.params.id);
+    if (!order) throw new ApiError(404, 'Order not found');
+    const body = z.object({
+      method: z.string().max(20).optional(),
+      transactionId: z.string().max(120).optional(),
+      screenshotUrl: z.string().url().max(500).optional(),
+      note: z.string().max(300).optional(),
+      email: z.string().email().optional(),
+    }).parse(req.body || {});
+    await assertOwnsOrder(req, order, body.email);
+    const result = await submitProof(order.id, body, { ip: req.ip, user: req.user, req });
+    res.status(201).json(result);
+  }));
+
+// Current proof status for an order (customer view).
+router.get('/orders/:id/proof', asyncHandler(async (req, res) => {
+  const order = await getOrder(req.params.id);
+  if (!order) throw new ApiError(404, 'Order not found');
+  await assertOwnsOrder(req, order, req.query.email);
+  res.json({ proof: await getOrderProof(order.id), status: order.status });
+}));
 
 // Public tracking by order number (no PII beyond status timeline).
 router.get('/track/:number', asyncHandler(async (req, res) => {

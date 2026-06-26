@@ -34,19 +34,35 @@ export async function availableCounts(productIds = []) {
 }
 
 /** Claim up to `n` available codes for a product, marking them used by an order.
- *  Returns the claimed code strings (may be fewer than n if stock is low). */
+ *  Returns the claimed code strings (may be fewer than n if stock is low).
+ *
+ *  Race-safe: rows are selected with `FOR UPDATE SKIP LOCKED` inside a
+ *  transaction, so two concurrent orders can never grab the same code (no
+ *  double-delivery / duplicate assignment). Idempotent per order — if this order
+ *  already holds codes for the product they're returned instead of claiming more. */
 export async function claimCodes(productId, n, orderId) {
-  const claimed = [];
+  let claimed = [];
   await tx(async () => {
+    // Already claimed by THIS order? Return them (idempotent re-delivery).
+    const existing = await all(
+      `SELECT code FROM product_codes WHERE product_id=@p AND order_id=@o AND status='used'
+        ORDER BY used_at ASC`, { p: productId, o: orderId });
+    if (existing.length >= n) { claimed = existing.slice(0, n).map((r) => r.code); return; }
+
+    const need = n - existing.length;
     const rows = await all(
-      `SELECT id, code FROM product_codes WHERE product_id=@p AND status='available'
-        ORDER BY created_at ASC LIMIT @n`, { p: productId, n });
+      `SELECT id, code FROM product_codes
+        WHERE product_id=@p AND status='available'
+        ORDER BY created_at ASC LIMIT @n
+        FOR UPDATE SKIP LOCKED`, { p: productId, n: need });
     const at = nowIso();
+    const fresh = [];
     for (const row of rows) {
-      await run(`UPDATE product_codes SET status='used', order_id=@o, used_at=@at WHERE id=@id AND status='available'`,
+      await run(`UPDATE product_codes SET status='used', order_id=@o, used_at=@at WHERE id=@id`,
           { o: orderId, at, id: row.id });
-      claimed.push(row.code);
+      fresh.push(row.code);
     }
+    claimed = [...existing.map((r) => r.code), ...fresh];
   });
   return claimed;
 }

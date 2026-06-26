@@ -2,13 +2,14 @@ import { useState } from 'react';
 import { Outlet, NavLink, Link, useNavigate } from 'react-router-dom';
 import {
   Zap, BarChart3, ShoppingCart, Truck, PackageCheck, Package,
-  Mail, ShieldAlert, LogOut, Store, LifeBuoy, Menu, X, Users,
+  Mail, ShieldAlert, LogOut, Store, LifeBuoy, Menu, X, Users, ShieldCheck,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 
 const NAV = [
   { to: '/admin', icon: BarChart3, label: 'Analytics', end: true, perm: 'analytics.read' },
   { to: '/admin/orders', icon: ShoppingCart, label: 'Orders', perm: 'orders.read' },
+  { to: '/admin/payments', icon: ShieldCheck, label: 'Payments', perm: 'orders.update' },
   { to: '/admin/products', icon: Package, label: 'Products', perm: 'orders.read' },
   { to: '/admin/users', icon: Users, label: 'Users', perm: 'users.read' },
   { to: '/admin/fulfillment', icon: PackageCheck, label: 'Fulfillment', perm: 'fulfillment.manage' },

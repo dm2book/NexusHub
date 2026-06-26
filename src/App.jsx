@@ -46,6 +46,7 @@ const AdminOrders = lazy(() => import('./pages/admin/Orders.jsx'));
 const AdminOrderDetail = lazy(() => import('./pages/admin/OrderDetail.jsx'));
 const AdminProducts = lazy(() => import('./pages/admin/Products.jsx'));
 const AdminUsers = lazy(() => import('./pages/admin/Users.jsx'));
+const AdminPayments = lazy(() => import('./pages/admin/Payments.jsx'));
 const AdminSuppliers = lazy(() => import('./pages/admin/Suppliers.jsx'));
 const AdminFulfillment = lazy(() => import('./pages/admin/Fulfillment.jsx'));
 const AdminEmails = lazy(() => import('./pages/admin/Emails.jsx'));
@@ -100,6 +101,7 @@ export default function App() {
           <Route path="/admin" element={<AdminAnalytics />} />
           <Route path="/admin/orders" element={<AdminOrders />} />
           <Route path="/admin/orders/:id" element={<AdminOrderDetail />} />
+          <Route path="/admin/payments" element={<AdminPayments />} />
           <Route path="/admin/products" element={<AdminProducts />} />
           <Route path="/admin/users" element={<AdminUsers />} />
           <Route path="/admin/suppliers" element={<AdminSuppliers />} />
