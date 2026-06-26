@@ -14,6 +14,11 @@ import { useReveal } from '../lib/useReveal.js';
 export default function StoreLayout() {
   const { pathname } = useLocation();
   useEffect(() => { window.scrollTo(0, 0); }, [pathname]);
+  // Capture an affiliate referral code from ?ref=CODE for attribution on signup.
+  useEffect(() => {
+    const ref = new URLSearchParams(window.location.search).get('ref');
+    if (ref) localStorage.setItem('fm_ref', ref.toUpperCase().slice(0, 40));
+  }, []);
   useReveal();
 
   return (

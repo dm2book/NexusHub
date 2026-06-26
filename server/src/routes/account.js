@@ -11,6 +11,9 @@ import { run, get, all } from '../db/index.js';
 import { notFound, forbidden } from '../utils/errors.js';
 import { listOrders, getOrder } from '../services/orderService.js';
 import { updateProfile, updatePreferences } from '../services/userService.js';
+import { loyaltyFor } from '../services/loyaltyService.js';
+import { affiliateStats } from '../services/affiliateService.js';
+import { getMembership } from '../services/membershipService.js';
 import * as notif from '../services/notificationService.js';
 import * as billing from '../services/billingService.js';
 import * as support from '../services/supportService.js';
@@ -34,6 +37,16 @@ function dedupe(orders) {
   for (const o of orders) seen.set(o.id, o);
   return [...seen.values()].sort((a, b) => (a.date < b.date ? 1 : -1));
 }
+
+// ── Rewards: loyalty tier, affiliate program, Forge+ membership ──────────────
+router.get('/rewards', asyncHandler(async (req, res) => {
+  const [loyalty, affiliate, membership] = await Promise.all([
+    loyaltyFor(req.user.id),
+    affiliateStats(req.user.id, req.user.email),
+    getMembership(req.user.id),
+  ]);
+  res.json({ loyalty, affiliate, membership });
+}));
 
 // ── Dashboard summary ──────────────────────────────────────────────────────
 router.get('/dashboard', asyncHandler(async (req, res) => {

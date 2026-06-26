@@ -92,6 +92,10 @@ export default function HomeStore() {
   const stats = useStats();
   const reviews = useReviews();
   useReveal();
+  useEffect(() => {
+    const ref = new URLSearchParams(window.location.search).get('ref');
+    if (ref) localStorage.setItem('fm_ref', ref.toUpperCase().slice(0, 40));
+  }, []);
   usePageMeta('ForgeMarket — Everything You Need, All in One Place',
     'Buy Robux, V-Bucks, Valorant Points, gift cards and more instantly. Fast delivery, secure payments, 24/7 support.');
   const [h, m, s] = useCountdown();

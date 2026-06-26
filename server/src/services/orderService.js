@@ -21,6 +21,8 @@ import { getProduct } from './productService.js';
 import { postOrderEvent } from './discordService.js';
 import { grantTierForOrder } from './discordRolesService.js';
 import { availableCount, claimCodes } from './codeStockService.js';
+import { memberDiscountPercent } from './membershipService.js';
+import { recordOrderCommission } from './affiliateService.js';
 
 export const STATUSES = [
   'pending', 'payment_received', 'processing', 'awaiting_fulfillment',
@@ -80,10 +82,15 @@ export async function createOrder(input, ctx = {}) {
   }
   // Apply a discount coupon if one was supplied and is valid.
   const coupon = couponFor(input.coupon);
-  const discount = coupon ? Math.round(subtotal * coupon.percent / 100) : 0;
+  const couponDiscount = coupon ? Math.round(subtotal * coupon.percent / 100) : 0;
+  // Forge+ members get a standing discount on top (stacked with any coupon).
+  const memberPercent = input.userId ? await memberDiscountPercent(input.userId) : 0;
+  const memberDiscount = memberPercent ? Math.round(subtotal * memberPercent / 100) : 0;
+  const discount = Math.min(subtotal, couponDiscount + memberDiscount);
   const total = Math.max(0, subtotal - discount);
   const billing = { ...(input.billing || {}) };
-  if (coupon) { billing.coupon = coupon.code; billing.discount = discount; }
+  if (coupon) { billing.coupon = coupon.code; billing.discount = couponDiscount; }
+  if (memberDiscount) { billing.memberDiscount = memberDiscount; billing.memberPercent = memberPercent; }
 
   await tx(async () => {
     await run(`INSERT INTO orders
@@ -273,7 +280,10 @@ async function summarize(row) {
 
 export async function markPaymentReceived(orderId, paymentRef, ctx = {}) {
   if (paymentRef) await run('UPDATE orders SET payment_ref=@r WHERE id=@id', { r: paymentRef, id: orderId });
-  return transitionOrder(orderId, 'payment_received', { ...ctx, reason: ctx.reason || 'Payment received' });
+  const result = await transitionOrder(orderId, 'payment_received', { ...ctx, reason: ctx.reason || 'Payment received' });
+  // Record an affiliate commission if this buyer was referred (best-effort).
+  try { await recordOrderCommission(await getOrder(orderId)); } catch { /* non-fatal */ }
+  return result;
 }
 
 export async function setOrderNotes(orderId, notes) {

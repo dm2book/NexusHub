@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Search, ShieldCheck, Mail, Crown, Loader2, BadgeCheck } from 'lucide-react';
+import { Search, ShieldCheck, Mail, Crown, Loader2, BadgeCheck, Gift } from 'lucide-react';
 import { api } from '../../lib/api.js';
 import { date } from '../../lib/format.js';
 import { PageLoader } from '../../components/ui.jsx';
@@ -37,6 +37,12 @@ export default function AdminUsers() {
     const t = setTimeout(() => load(search.trim()), 300);
     return () => clearTimeout(t);
   }, [search, load]);
+
+  const grantPlus = async (u) => {
+    setBusyId(u.id);
+    try { await api.post(`/api/admin/security/users/${u.id}/membership`, { days: 30 }); toast.success(`Forge+ granted to ${u.email} (30 days).`); }
+    catch (err) { toast.error(err.message); } finally { setBusyId(null); }
+  };
 
   const toggleRole = async (u, roleId) => {
     const has = u.roles.includes(roleId);
@@ -104,6 +110,10 @@ export default function AdminUsers() {
 
               <div className="flex flex-wrap gap-1.5 lg:ml-auto items-center">
                 {busyId === u.id && <Loader2 size={14} className="animate-spin text-slate-400" />}
+                <button onClick={() => grantPlus(u)} title="Grant Forge+ (30 days)"
+                  className="text-xs px-2.5 py-1 rounded-md border border-violet-500/30 bg-violet-500/10 text-violet-300 hover:bg-violet-500/20 inline-flex items-center gap-1">
+                  <Gift size={11} /> Forge+
+                </button>
                 {roles.map((r) => {
                   const active = u.roles.includes(r.id);
                   const selfOwnerLock = u.id === me.id && r.id === 'owner';

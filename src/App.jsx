@@ -41,6 +41,7 @@ const TicketDetail = lazy(() => import('./pages/account/TicketDetail.jsx'));
 const Billing = lazy(() => import('./pages/account/Billing.jsx'));
 const Notifications = lazy(() => import('./pages/account/Notifications.jsx'));
 const Settings = lazy(() => import('./pages/account/Settings.jsx'));
+const Rewards = lazy(() => import('./pages/account/Rewards.jsx'));
 
 const AdminAnalytics = lazy(() => import('./pages/admin/Analytics.jsx'));
 const AdminOrders = lazy(() => import('./pages/admin/Orders.jsx'));
@@ -88,6 +89,7 @@ export default function App() {
         {/* Customer dashboard */}
         <Route element={<ProtectedRoute><AccountLayout /></ProtectedRoute>}>
           <Route path="/account" element={<Dashboard />} />
+          <Route path="/account/rewards" element={<Rewards />} />
           <Route path="/account/orders" element={<Orders />} />
           <Route path="/account/orders/:id" element={<OrderDetail />} />
           <Route path="/account/downloads" element={<Downloads />} />

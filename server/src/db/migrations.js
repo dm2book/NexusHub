@@ -454,4 +454,34 @@ CREATE INDEX IF NOT EXISTS idx_payment_proofs_order  ON payment_proofs (order_id
 CREATE INDEX IF NOT EXISTS idx_payment_proofs_txn    ON payment_proofs (transaction_id);
 `,
   },
+  {
+    id: '004_retention',
+    sql: `
+-- Affiliate / referral program: one code per user, attributed events per order.
+CREATE TABLE IF NOT EXISTS referrals (
+  code            TEXT PRIMARY KEY,
+  user_id         TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at      TEXT NOT NULL,
+  UNIQUE (user_id)
+);
+CREATE TABLE IF NOT EXISTS referral_events (
+  id              TEXT PRIMARY KEY,
+  code            TEXT NOT NULL,
+  referrer_id     TEXT REFERENCES users(id) ON DELETE SET NULL,
+  referred_id     TEXT REFERENCES users(id) ON DELETE SET NULL,
+  order_id        TEXT REFERENCES orders(id) ON DELETE SET NULL,
+  kind            TEXT NOT NULL DEFAULT 'order',   -- signup | order
+  commission      BIGINT NOT NULL DEFAULT 0,       -- cents
+  status          TEXT NOT NULL DEFAULT 'pending', -- pending | approved | paid | void
+  created_at      TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_referral_events_ref ON referral_events (referrer_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_referral_events_code ON referral_events (code);
+
+-- Forge+ membership (and the referral code captured at signup).
+ALTER TABLE users ADD COLUMN IF NOT EXISTS membership_tier  TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS membership_until TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_by      TEXT;
+`,
+  },
 ];
