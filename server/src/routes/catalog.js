@@ -9,9 +9,37 @@ import { createOrder, getOrderByNumber, getOrder, markPaymentReceived } from '..
 import { listEnabledProviders } from '../services/oauthService.js';
 import { isEnabled as stripeEnabled, createCheckoutSession } from '../services/stripeService.js';
 import { publicStats } from '../services/publicStatsService.js';
+import { addReview, listReviews } from '../services/reviewsService.js';
 import { ApiError, forbidden } from '../utils/errors.js';
 
 const router = Router();
+
+// Public customer reviews (vouches ingested from Discord). Cached briefly.
+let reviewsCache = { at: 0, data: null };
+router.get('/reviews', asyncHandler(async (_req, res) => {
+  if (!reviewsCache.data || Date.now() - reviewsCache.at > 20_000) {
+    reviewsCache = { at: Date.now(), data: await listReviews({ limit: 30 }) };
+  }
+  res.json({ reviews: reviewsCache.data });
+}));
+
+// Ingest a review from the Discord bot. Protected by a shared secret header.
+router.post('/reviews/ingest', rateLimit({ bucket: 'review_ingest', windowMs: 60_000, max: 30 }),
+  asyncHandler(async (req, res) => {
+    const secret = config.discord.reviewIngestSecret;
+    if (!secret || req.get('x-ingest-secret') !== secret) throw forbidden('Bad ingest secret');
+    const body = z.object({
+      author: z.string().min(1).max(80),
+      avatarUrl: z.string().url().optional(),
+      stars: z.number().int().min(1).max(5).optional(),
+      body: z.string().min(1).max(600),
+      product: z.string().max(120).optional(),
+      externalId: z.string().max(120).optional(),
+    }).parse(req.body);
+    const r = await addReview({ ...body, source: 'discord' });
+    reviewsCache = { at: 0, data: null }; // bust cache
+    res.status(201).json({ ok: true, ...r });
+  }));
 
 // Public trust stats for the storefront (orders delivered, avg delivery, recent
 // deliveries…). Cached briefly so the homepage stays fast under load.

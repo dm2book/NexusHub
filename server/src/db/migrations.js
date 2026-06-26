@@ -355,6 +355,21 @@ CREATE TABLE IF NOT EXISTS rate_limit_hits (
   count           INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (key, window_start)
 );
+
+-- Public customer reviews/vouches (e.g. ingested from the Discord /vouch command).
+CREATE TABLE IF NOT EXISTS reviews (
+  id              TEXT PRIMARY KEY,
+  author          TEXT NOT NULL,
+  avatar_url      TEXT,
+  stars           INTEGER NOT NULL DEFAULT 5,
+  body            TEXT NOT NULL,
+  product         TEXT,
+  source          TEXT NOT NULL DEFAULT 'discord',
+  external_id     TEXT UNIQUE,
+  status          TEXT NOT NULL DEFAULT 'visible',
+  created_at      TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_reviews_visible ON reviews (status, created_at);
 `,
   },
 ];

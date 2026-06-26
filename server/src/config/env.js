@@ -88,6 +88,10 @@ export const config = {
     vipThreshold: Number(env.DISCORD_VIP_THRESHOLD_CENTS || 2000),
     // Optional webhook to post order events into an ops/sales channel.
     orderWebhookUrl: env.DISCORD_ORDER_WEBHOOK_URL || '',
+    // Live member count shown on the storefront trust stats (optional).
+    memberCount: Number(env.DISCORD_MEMBER_COUNT || 0) || null,
+    // Shared secret the bot uses to push /vouch reviews to /api/reviews/ingest.
+    reviewIngestSecret: env.REVIEW_INGEST_SECRET || '',
   },
 
   email: {
