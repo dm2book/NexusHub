@@ -32,7 +32,9 @@ async function refresh() {
   return true;
 }
 
-async function request(path, { method = 'GET', body, raw = false, retry = true, timeout = 12000 } = {}) {
+// Default 30s: serverless cold-starts + a sleeping Neon database waking up can
+// take 10-20s on the very first request, which would otherwise time out.
+async function request(path, { method = 'GET', body, raw = false, retry = true, timeout = 30000, _coldRetry = true } = {}) {
   const headers = {};
   const token = getAccessToken();
   if (token) headers.authorization = `Bearer ${token}`;
@@ -50,6 +52,11 @@ async function request(path, { method = 'GET', body, raw = false, retry = true, 
     });
   } catch (e) {
     clearTimeout(timer);
+    // First request woke a cold serverless function / sleeping DB — retry once,
+    // by which point it's warm and responds quickly.
+    if (e.name === 'AbortError' && _coldRetry) {
+      return request(path, { method, body, raw, retry, timeout, _coldRetry: false });
+    }
     const err = new Error(e.name === 'AbortError'
       ? 'The server took too long to respond. Please try again.'
       : 'Network error. Please check your connection and try again.');
