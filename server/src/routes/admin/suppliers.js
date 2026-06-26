@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { asyncHandler } from '../../middleware/error.js';
 import { requirePermission } from '../../middleware/rbac.js';
 import * as suppliers from '../../services/supplier/supplierService.js';
+import { supplierMetrics } from '../../services/supplier/supplierMetricsService.js';
 import { availableKinds } from '../../services/supplier/registry.js';
 import { audit } from '../../services/auditService.js';
 import { notFound } from '../../utils/errors.js';
@@ -16,6 +17,11 @@ router.get('/connector-kinds', requirePermission('suppliers.read'), (_req, res) 
 
 router.get('/', requirePermission('suppliers.read'), asyncHandler(async (_req, res) => {
   res.json({ suppliers: await suppliers.listSuppliers() });
+}));
+
+// Performance dashboard: margin, reliability, fulfillment speed per supplier.
+router.get('/metrics', requirePermission('suppliers.read'), asyncHandler(async (_req, res) => {
+  res.json({ metrics: await supplierMetrics() });
 }));
 
 router.get('/:id', requirePermission('suppliers.read'), asyncHandler(async (req, res) => {
