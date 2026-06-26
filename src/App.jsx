@@ -30,6 +30,7 @@ const Reviews = lazy(() => import('./pages/info/Reviews.jsx'));
 const Legal = lazy(() => import('./pages/info/Legal.jsx'));
 const NotFound = lazy(() => import('./pages/NotFound.jsx'));
 const Wishlist = lazy(() => import('./pages/Wishlist.jsx'));
+const Trust = lazy(() => import('./pages/Trust.jsx'));
 
 const Dashboard = lazy(() => import('./pages/account/Dashboard.jsx'));
 const Orders = lazy(() => import('./pages/account/Orders.jsx'));
@@ -77,6 +78,7 @@ export default function App() {
           <Route path="/how-it-works" element={<HowItWorks />} />
           <Route path="/refunds" element={<Refunds />} />
           <Route path="/reviews" element={<Reviews />} />
+          <Route path="/trust" element={<Trust />} />
           <Route path="/terms" element={<Legal kind="terms" />} />
           <Route path="/privacy" element={<Legal kind="privacy" />} />
           <Route path="/login" element={<Login />} />

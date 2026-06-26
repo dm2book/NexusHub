@@ -3,7 +3,7 @@ import { Zap } from 'lucide-react';
 
 const COLS = [
   { title: 'Shop', links: [['All Products', '/shop'], ['Wishlist', '/wishlist'], ['Track Order', '/track'], ['Payment Methods', '/payment-methods']] },
-  { title: 'Company', links: [['About Us', '/about'], ['How it works', '/how-it-works'], ['Reviews', '/reviews'], ['Contact', '/contact']] },
+  { title: 'Company', links: [['About Us', '/about'], ['How it works', '/how-it-works'], ['Trust Center', '/trust'], ['Reviews', '/reviews'], ['Contact', '/contact']] },
   { title: 'Help & Legal', links: [['FAQ', '/faq'], ['Refund Policy', '/refunds'], ['Terms', '/terms'], ['Privacy', '/privacy']] },
 ];
 

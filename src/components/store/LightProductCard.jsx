@@ -15,6 +15,14 @@ export default function LightProductCard({ product, onAdd }) {
         {product.featured && (
           <span className="absolute top-2.5 left-2.5 z-10 text-[10px] font-bold text-amber-600 bg-amber-100 rounded-full px-2 py-0.5">★ Featured</span>
         )}
+        {typeof product.stock === 'number' && product.stock > 0 && product.stock <= 10 && (
+          <span className="absolute top-2.5 right-2.5 z-10 text-[10px] font-bold text-red-600 bg-red-100 rounded-full px-2 py-0.5 animate-pulse">
+            Only {product.stock} left
+          </span>
+        )}
+        {product.sold > 20 && (
+          <span className="absolute bottom-2.5 left-2.5 z-10 text-[10px] font-semibold text-orange-600 bg-orange-50 rounded-full px-2 py-0.5">🔥 High demand</span>
+        )}
         {img ? (
           <img src={img} alt={product.name} className="w-24 h-24 object-contain drop-shadow-md group-hover:scale-105 transition-transform" />
         ) : (
