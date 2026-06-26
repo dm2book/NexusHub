@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Search, ShoppingCart, Zap, ShieldCheck, Headphones, Tag, Star, ArrowRight,
-  Plus, LayoutGrid, Users, CheckCircle2, Clock, MessageCircle, ChevronRight, Sparkles,
+  Plus, LayoutGrid, Users, CheckCircle2, Clock, MessageCircle, ChevronRight, Sparkles, Shield,
 } from 'lucide-react';
 import { useCart } from '../context/CartContext.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -88,7 +88,7 @@ function useCountdown(seconds = 2 * 3600 + 47 * 60 + 19) {
 
 export default function HomeStore() {
   const { count, add } = useCart();
-  const { user } = useAuth();
+  const { user, isStaff } = useAuth();
   const stats = useStats();
   const reviews = useReviews();
   useReveal();
@@ -152,15 +152,22 @@ export default function HomeStore() {
             )}
           </Link>
 
+          {isStaff && (
+            <Link to="/admin" className="inline-flex items-center gap-1.5 text-[15px] font-semibold rounded-xl px-3.5 h-10 border border-violet-300 text-violet-700 bg-violet-50 hover:bg-violet-100 transition">
+              <Shield size={16} /> <span className="hidden sm:inline">Admin</span>
+            </Link>
+          )}
           {user ? (
             <Link to="/account" className="hidden sm:inline-flex text-[15px] font-medium text-slate-600 hover:text-slate-900">Account</Link>
           ) : (
             <Link to="/login" className="hidden sm:inline-flex text-[15px] font-medium text-slate-600 hover:text-slate-900">Log in</Link>
           )}
-          <Link to="/login" className="inline-flex items-center gap-1.5 text-white text-[15px] font-semibold rounded-xl px-4 h-10 shadow-lg shadow-violet-500/30 hover:brightness-105 transition"
-            style={{ backgroundImage: 'linear-gradient(135deg,#7c5cff,#a855f7)' }}>
-            Sign Up <ArrowRight size={16} />
-          </Link>
+          {!user && (
+            <Link to="/login" className="inline-flex items-center gap-1.5 text-white text-[15px] font-semibold rounded-xl px-4 h-10 shadow-lg shadow-violet-500/30 hover:brightness-105 transition"
+              style={{ backgroundImage: 'linear-gradient(135deg,#7c5cff,#a855f7)' }}>
+              Sign Up <ArrowRight size={16} />
+            </Link>
+          )}
         </div>
       </header>
 
