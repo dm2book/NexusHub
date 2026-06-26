@@ -8,6 +8,7 @@ import { useCart } from '../context/CartContext.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { usePageMeta } from '../lib/useMeta.js';
 import { useStats } from '../lib/useStats.js';
+import { useReviews } from '../lib/useReviews.js';
 import { useReveal } from '../lib/useReveal.js';
 import CountUp from '../components/CountUp.jsx';
 import RecentlyDelivered from '../components/store/RecentlyDelivered.jsx';
@@ -89,6 +90,7 @@ export default function HomeStore() {
   const { count, add } = useCart();
   const { user } = useAuth();
   const stats = useStats();
+  const reviews = useReviews();
   useReveal();
   usePageMeta('ForgeMarket — Everything You Need, All in One Place',
     'Buy Robux, V-Bucks, Valorant Points, gift cards and more instantly. Fast delivery, secure payments, 24/7 support.');
@@ -351,11 +353,11 @@ export default function HomeStore() {
                 <span className="text-[12px] text-slate-400">Based on {stats.reviews.toLocaleString('en-US')} reviews</span>
               </div>
               <div className="space-y-2.5">
-                {RV.map((r) => (
-                  <div key={r.name} className="bg-slate-50 rounded-xl p-3">
-                    <div className="flex text-amber-400 mb-1">{Array.from({ length: 5 }).map((_, i) => <Star key={i} size={12} fill="currentColor" />)}</div>
-                    <p className="text-[13px] text-slate-600">"{r.text}"</p>
-                    <p className="text-[11px] text-slate-400 mt-1">– {r.name}</p>
+                {reviews.slice(0, 2).map((r) => (
+                  <div key={r.id} className="bg-slate-50 rounded-xl p-3">
+                    <div className="flex text-amber-400 mb-1">{Array.from({ length: r.stars || 5 }).map((_, i) => <Star key={i} size={12} fill="currentColor" />)}</div>
+                    <p className="text-[13px] text-slate-600 line-clamp-3">"{r.body}"</p>
+                    <p className="text-[11px] text-slate-400 mt-1">– {r.author}{r.product ? ` · ${r.product}` : ''}</p>
                   </div>
                 ))}
               </div>

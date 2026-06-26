@@ -9,6 +9,8 @@ import { withFallback, iconFor } from '../lib/sampleCatalog.js';
 import LightProductCard from '../components/store/LightProductCard.jsx';
 import { Skeleton } from '../components/ui.jsx';
 import { usePageMeta } from '../lib/useMeta.js';
+import { useTrending } from '../lib/useTrending.js';
+import { Flame } from 'lucide-react';
 
 const SORTS = {
   popular: { label: 'Popular', fn: (a, b) => (b.featured === true) - (a.featured === true) },
@@ -52,7 +54,9 @@ export default function Shop() {
     setParams(next);
   };
 
+  const trending = useTrending();
   const onAdd = (p) => { add(p); toast.success(`${p.name} added to cart`); };
+  const showTrending = !category && !search.trim() && trending?.length > 0;
 
   return (
     <div className="max-w-[1400px] mx-auto px-4 lg:px-8 py-6 flex gap-6 items-start">
@@ -92,6 +96,23 @@ export default function Shop() {
           </h1>
           <p className="text-white/85 mt-1.5">Digital goods, delivered instantly to your inbox & dashboard.</p>
         </div>
+
+        {/* Trending row */}
+        {showTrending && (
+          <div className="mb-7">
+            <div className="flex items-center gap-2 mb-3">
+              <Flame size={18} className="text-orange-500" />
+              <h2 className="font-extrabold text-lg text-slate-900">Trending now</h2>
+            </div>
+            <div className="fm-rail flex gap-4 overflow-x-auto pb-2 snap-x">
+              {trending.slice(0, 8).map((p) => (
+                <div key={p.id} className="snap-start shrink-0 w-[210px]">
+                  <LightProductCard product={p} onAdd={onAdd} />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* controls */}
         <div className="flex flex-col sm:flex-row gap-3 sm:items-center justify-between mb-5">

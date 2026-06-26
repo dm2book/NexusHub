@@ -20,6 +20,8 @@ export default function Analytics() {
 
   const kpis = [
     { icon: TrendingUp, label: 'Revenue (30d)', value: o.revenueFormatted, sub: `${o.paidOrders} paid orders` },
+    { icon: TrendingUp, label: 'Profit (30d)', value: o.profitFormatted ?? '—', sub: o.margin != null ? `${o.margin}% margin` : 'set product costs' },
+    { icon: Percent, label: 'Margin', value: o.margin != null ? `${o.margin}%` : '—', sub: `cost ${o.costFormatted ?? '—'}` },
     { icon: ShoppingCart, label: 'Orders (30d)', value: o.totalOrders, sub: `${o.completedOrders} completed` },
     { icon: Percent, label: 'Conversion', value: `${o.conversionRate}%`, sub: 'paid / placed' },
     { icon: Users, label: 'Avg. order value', value: o.averageOrderValueFormatted, sub: `Avg LTV ${clv?.averageLtvFormatted || '—'}` },
@@ -31,7 +33,7 @@ export default function Analytics() {
     <div>
       <h1 className="text-2xl text-white mb-6">Analytics</h1>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
         {kpis.map(({ icon: Icon, label, value, sub }) => (
           <div key={label} className="card p-5 hover:border-primary/30 transition">
             <Icon size={18} className="text-primary mb-3" />

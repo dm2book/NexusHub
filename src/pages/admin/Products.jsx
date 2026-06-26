@@ -5,7 +5,7 @@ import { money, categoryVisual } from '../../lib/catalog.js';
 import { PageLoader, EmptyState, Modal } from '../../components/ui.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
 
-const BLANK = { name: '', sku: '', category: '', description: '', priceEuro: '',
+const BLANK = { name: '', sku: '', category: '', description: '', priceEuro: '', costEuro: '',
   kind: 'digital', stock: '', active: true, featured: false, imageUrl: '' };
 
 export default function AdminProducts() {
@@ -35,7 +35,9 @@ export default function AdminProducts() {
     setEditing(p);
     setForm({
       name: p.name, sku: p.sku || '', category: p.category || '', description: p.description || '',
-      priceEuro: (p.price / 100).toFixed(2), kind: p.kind || 'digital',
+      priceEuro: (p.price / 100).toFixed(2),
+      costEuro: p.metadata?.cost != null ? (p.metadata.cost / 100).toFixed(2) : '',
+      kind: p.kind || 'digital',
       stock: p.stock ?? '', active: !!p.active, featured: !!p.featured,
       imageUrl: p.image || '',
     });
@@ -50,7 +52,11 @@ export default function AdminProducts() {
         price: Math.round(parseFloat(form.priceEuro || '0') * 100),
         kind: form.kind, active: form.active,
         stock: form.stock === '' ? null : Number(form.stock),
-        metadata: { featured: form.featured, image: form.imageUrl || undefined },
+        metadata: {
+          featured: form.featured,
+          image: form.imageUrl || undefined,
+          cost: form.costEuro === '' ? undefined : Math.round(parseFloat(form.costEuro || '0') * 100),
+        },
       };
       if (editing === 'new') await api.post('/api/admin/products', payload);
       else await api.patch(`/api/admin/products/${editing.id}`, payload);
@@ -206,6 +212,15 @@ export default function AdminProducts() {
           <div><label className="label">Price (€)</label>
             <input type="number" step="0.01" min="0" className="input" value={form.priceEuro}
               onChange={(e) => setForm({ ...form, priceEuro: e.target.value })} placeholder="9.99" /></div>
+          <div><label className="label">Cost / supplier price (€)</label>
+            <input type="number" step="0.01" min="0" className="input" value={form.costEuro}
+              onChange={(e) => setForm({ ...form, costEuro: e.target.value })} placeholder="for profit tracking" />
+            {form.priceEuro && form.costEuro && (
+              <p className="text-xs text-emerald-400 mt-1">
+                Margin: €{(parseFloat(form.priceEuro || 0) - parseFloat(form.costEuro || 0)).toFixed(2)}
+                {parseFloat(form.priceEuro) > 0 ? ` (${Math.round((1 - parseFloat(form.costEuro || 0) / parseFloat(form.priceEuro)) * 100)}%)` : ''}
+              </p>
+            )}</div>
           <div><label className="label">Stock</label>
             <input type="number" className="input" value={form.stock}
               onChange={(e) => setForm({ ...form, stock: e.target.value })} placeholder="blank = unlimited" /></div>

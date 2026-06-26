@@ -8,6 +8,7 @@
  */
 import { get, all } from '../db/index.js';
 import { config } from '../config/env.js';
+import { reviewStats } from './reviewsService.js';
 
 const BASELINE = {
   delivered: 52340,
@@ -79,14 +80,19 @@ export async function publicStats() {
 
   const discordMembers = Number(config.discord?.memberCount || process.env.DISCORD_MEMBER_COUNT || 1240);
 
+  // Real review aggregates (from Discord vouches) override the baseline once we
+  // have a meaningful number of them.
+  const rev = await safe(() => reviewStats(), { count: 0, average: 0 });
+  const haveReviews = rev.count >= 3;
+
   // Blend with baseline so a young store still reads as established & trustworthy.
   return {
     delivered: Math.max(delivered, BASELINE.delivered),
     customers: Math.max(customers, BASELINE.customers),
     products: products || 70,
     avgDeliverySeconds: avgDeliverySeconds || BASELINE.avgDeliverySeconds,
-    rating: BASELINE.rating,
-    reviews: BASELINE.reviews,
+    rating: haveReviews ? rev.average : BASELINE.rating,
+    reviews: haveReviews ? rev.count : BASELINE.reviews,
     discordMembers,
     recent: recent || SAMPLE_RECENT,
     realDelivered: delivered,

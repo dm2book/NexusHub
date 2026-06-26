@@ -44,7 +44,20 @@ const SCAM = /(discord\.(gg|com\/invite)\/|free\s*nitro|steamcommunity\.com\/(gi
 const {
   DISCORD_TOKEN, ANTHROPIC_API_KEY, AI_MODEL = 'claude-sonnet-4-6',
   FORGEMARKET_API_URL = '', STORE_URL = 'https://forgemarket-store.vercel.app',
+  REVIEW_INGEST_SECRET = '',
 } = process.env;
+
+// Push a /vouch to the website so it appears on the storefront reviews section.
+async function pushReviewToSite({ author, avatarUrl, stars, body, externalId }) {
+  if (!FORGEMARKET_API_URL || !REVIEW_INGEST_SECRET) return;
+  try {
+    await fetch(`${FORGEMARKET_API_URL.replace(/\/$/, '')}/api/reviews/ingest`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-ingest-secret': REVIEW_INGEST_SECRET },
+      body: JSON.stringify({ author, avatarUrl, stars, body, externalId }),
+    });
+  } catch (e) { console.error('[review->site]', e?.message || e); }
+}
 
 const P = PermissionFlagsBits;
 const anthropic = ANTHROPIC_API_KEY ? new Anthropic({ apiKey: ANTHROPIC_API_KEY }) : null;
@@ -621,7 +634,13 @@ async function postVouch(i) {
     .setDescription(`${'⭐'.repeat(stars)}\n\n${message}`)
     .setFooter({ text: 'Community vouch' }).setTimestamp();
   if (ch) await ch.send({ embeds: [e] }).catch(() => {});
-  return i.reply({ content: 'Thanks for the vouch! 💚 Posted in #vouchers.', ephemeral: true });
+  // Mirror the vouch onto the website's reviews section.
+  pushReviewToSite({
+    author: i.user.username,
+    avatarUrl: i.user.displayAvatarURL({ extension: 'png', size: 128 }),
+    stars, body: message, externalId: `vouch:${i.user.id}:${i.id}`,
+  });
+  return i.reply({ content: 'Thanks for the vouch! 💚 Posted in #vouchers **and** on the website.', ephemeral: true });
 }
 
 // ── /coupon (staff) → posts a discount code to #discount-codes ────────────────
