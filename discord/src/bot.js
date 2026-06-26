@@ -12,6 +12,7 @@
  */
 import 'dotenv/config';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { createHmac } from 'node:crypto';
 import {
   Client, GatewayIntentBits, Partials, Events, PermissionFlagsBits, ChannelType,
   EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, AttachmentBuilder,
@@ -48,13 +49,24 @@ const {
 } = process.env;
 
 // Push a /vouch to the website so it appears on the storefront reviews section.
+// Signed with HMAC-SHA256 (x-timestamp + x-signature) so the API can verify
+// authenticity and reject replays — must match the server's canonicalReview().
 async function pushReviewToSite({ author, avatarUrl, stars, body, externalId }) {
   if (!FORGEMARKET_API_URL || !REVIEW_INGEST_SECRET) return;
   try {
+    const payload = { author, avatarUrl, stars, body, externalId };
+    const ts = String(Date.now());
+    const canonical = [author, stars ?? 5, body, externalId || ''].join(' ');
+    const signature = createHmac('sha256', REVIEW_INGEST_SECRET).update(`${ts}.${canonical}`).digest('hex');
     await fetch(`${FORGEMARKET_API_URL.replace(/\/$/, '')}/api/reviews/ingest`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-ingest-secret': REVIEW_INGEST_SECRET },
-      body: JSON.stringify({ author, avatarUrl, stars, body, externalId }),
+      headers: {
+        'content-type': 'application/json',
+        'x-timestamp': ts,
+        'x-signature': signature,
+        'x-ingest-secret': REVIEW_INGEST_SECRET, // legacy fallback during rollout
+      },
+      body: JSON.stringify(payload),
     });
   } catch (e) { console.error('[review->site]', e?.message || e); }
 }
