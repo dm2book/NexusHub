@@ -223,3 +223,32 @@ h1, h2, h3, .font-display { font-family: 'Orbitron', sans-serif; letter-spacing:
 .theme-light .border-white\/10 { border-color:#e7e9ee; }
 .theme-light .divide-white\/5 > :not([hidden]) ~ :not([hidden]) { border-color:#eef0f4; }
 .theme-light .bg-space-black, .theme-light .bg-elevated { background:#f8fafc; }
+
+/* ── Premium storefront motion & effects ───────────────────────────────── */
+@keyframes fmPageIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+.fm-page { animation: fmPageIn .42s cubic-bezier(.22,.61,.36,1) both; }
+
+/* Scroll-reveal (toggled via IntersectionObserver adding .is-in) */
+.fm-reveal { opacity: 0; transform: translateY(22px); transition: opacity .7s cubic-bezier(.22,.61,.36,1), transform .7s cubic-bezier(.22,.61,.36,1); }
+.fm-reveal.is-in { opacity: 1; transform: none; }
+
+/* Premium card hover lift + sheen */
+.fm-lift { transition: transform .35s cubic-bezier(.22,.61,.36,1), box-shadow .35s ease; }
+.fm-lift:hover { transform: translateY(-6px); box-shadow: 0 20px 40px -16px rgba(124,92,255,.35); }
+
+/* Animated gradient text */
+@keyframes fmGrad { 0%,100%{background-position:0% 50%} 50%{background-position:100% 50%} }
+.fm-gradient-text { background-image: linear-gradient(90deg,#7c5cff,#a855f7,#ec4899,#7c5cff); background-size: 300% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: fmGrad 6s ease infinite; }
+
+/* Marquee for trust strip */
+@keyframes fmMarquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+.fm-marquee { animation: fmMarquee 28s linear infinite; }
+.fm-marquee:hover { animation-play-state: paused; }
+
+/* Soft floating glow blobs */
+@keyframes fmBlob { 0%,100%{transform:translate(0,0) scale(1)} 50%{transform:translate(18px,-22px) scale(1.08)} }
+.fm-blob { animation: fmBlob 14s ease-in-out infinite; will-change: transform; }
+
+@media (prefers-reduced-motion: reduce) {
+  .fm-page, .fm-reveal, .fm-lift, .fm-gradient-text, .fm-marquee, .fm-blob { animation: none !important; transition: none !important; transform: none !important; opacity: 1 !important; }
+}

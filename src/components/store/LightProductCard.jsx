@@ -10,7 +10,7 @@ export default function LightProductCard({ product, onAdd }) {
   const img = product.image || iconFor(product.category);
 
   return (
-    <div className="group bg-white rounded-2xl border border-slate-200/70 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all p-4 flex flex-col">
+    <div className="group bg-white rounded-2xl border border-slate-200/70 shadow-sm fm-lift p-4 flex flex-col">
       <Link to={`/product/${product.id}`} className="relative rounded-xl bg-slate-50 h-[150px] grid place-items-center mb-3 overflow-hidden">
         {product.featured && (
           <span className="absolute top-2.5 left-2.5 z-10 text-[10px] font-bold text-amber-600 bg-amber-100 rounded-full px-2 py-0.5">★ Featured</span>
