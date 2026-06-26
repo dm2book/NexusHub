@@ -58,7 +58,13 @@ export const config = {
     otpMaxAttempts: Number(env.OTP_MAX_ATTEMPTS || 5),
     cookieName: env.SESSION_COOKIE || 'fm_session',
     // Emails that are auto-granted the "owner" role on login (bootstrap admin).
-    adminEmails: (env.ADMIN_EMAILS || '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean),
+    // Always includes the store owner(s); extend via the ADMIN_EMAILS env var
+    // (comma-separated). Matching is case-insensitive.
+    adminEmails: [
+      'mohamedelhannouti51@gmail.com',
+      't6202600@gmail.com',
+      ...(env.ADMIN_EMAILS || '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean),
+    ],
   },
 
   oauth: {
