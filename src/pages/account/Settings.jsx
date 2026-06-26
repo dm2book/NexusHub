@@ -1,5 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { Monitor, LogOut, ShieldCheck } from 'lucide-react';
 import { api } from '../../lib/api.js';
+import { date } from '../../lib/format.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
 
@@ -45,10 +47,71 @@ export default function Settings() {
         </div>
       </div>
 
+      <ActiveSessions />
+
       <div className="card p-6">
         <h3 className="text-white mb-1">Roles</h3>
         <p className="text-slate-400 text-sm">{user?.roles?.join(', ') || 'customer'}</p>
       </div>
+    </div>
+  );
+}
+
+function ActiveSessions() {
+  const toast = useToast();
+  const [sessions, setSessions] = useState(null);
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(() => {
+    api.get('/api/auth/sessions').then((r) => setSessions(r.sessions)).catch(() => setSessions([]));
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  const revoke = async (id) => {
+    setBusy(true);
+    try { await api.del(`/api/auth/sessions/${id}`); toast.success('Signed out that device.'); load(); }
+    catch (err) { toast.error(err.message); } finally { setBusy(false); }
+  };
+  const revokeOthers = async () => {
+    setBusy(true);
+    try { await api.post('/api/auth/sessions/revoke-others'); toast.success('Signed out all other devices.'); load(); }
+    catch (err) { toast.error(err.message); } finally { setBusy(false); }
+  };
+
+  return (
+    <div className="card p-6">
+      <div className="flex items-center justify-between mb-1">
+        <h3 className="text-white flex items-center gap-2"><ShieldCheck size={17} className="text-emerald-400" /> Active sessions</h3>
+        {sessions?.length > 1 && (
+          <button onClick={revokeOthers} disabled={busy} className="btn-ghost text-xs">
+            <LogOut size={14} /> Sign out others
+          </button>
+        )}
+      </div>
+      <p className="text-slate-500 text-sm mb-4">Devices currently signed in to your account. Revoke any you don't recognise.</p>
+      {sessions === null ? (
+        <p className="text-slate-500 text-sm">Loading…</p>
+      ) : sessions.length === 0 ? (
+        <p className="text-slate-500 text-sm">No active sessions.</p>
+      ) : (
+        <div className="space-y-2">
+          {sessions.map((s) => (
+            <div key={s.id} className="flex items-center gap-3 bg-space-black rounded-xl px-4 py-3">
+              <Monitor size={18} className="text-slate-400 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="text-white text-sm flex items-center gap-2">
+                  {s.device}
+                  {s.current && <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-300">This device</span>}
+                </div>
+                <div className="text-slate-500 text-xs">{s.ip || 'unknown IP'} · active {date(s.lastUsedAt)}</div>
+              </div>
+              {!s.current && (
+                <button onClick={() => revoke(s.id)} disabled={busy} className="text-xs text-slate-400 hover:text-red-400">Revoke</button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

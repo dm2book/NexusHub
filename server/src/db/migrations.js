@@ -372,4 +372,61 @@ CREATE TABLE IF NOT EXISTS reviews (
 CREATE INDEX IF NOT EXISTS idx_reviews_visible ON reviews (status, created_at);
 `,
   },
+  {
+    id: '002_security_phase1',
+    sql: `
+-- Ensure tables added to 001 after it was first applied also exist on databases
+-- that were initialised earlier (forward-only migrations never re-run 001).
+CREATE TABLE IF NOT EXISTS product_codes (
+  id              TEXT PRIMARY KEY,
+  product_id      TEXT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  code            TEXT NOT NULL,
+  status          TEXT NOT NULL DEFAULT 'available',
+  order_id        TEXT,
+  created_at      TEXT NOT NULL,
+  used_at         TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_product_codes_avail ON product_codes (product_id, status);
+
+CREATE TABLE IF NOT EXISTS reviews (
+  id              TEXT PRIMARY KEY,
+  author          TEXT NOT NULL,
+  avatar_url      TEXT,
+  stars           INTEGER NOT NULL DEFAULT 5,
+  body            TEXT NOT NULL,
+  product         TEXT,
+  source          TEXT NOT NULL DEFAULT 'discord',
+  external_id     TEXT UNIQUE,
+  status          TEXT NOT NULL DEFAULT 'visible',
+  created_at      TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_reviews_visible ON reviews (status, created_at);
+
+-- Refresh-token rotation + per-session device tracking.
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS last_used_at TEXT;
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS device       TEXT;
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS rotated_count INTEGER NOT NULL DEFAULT 0;
+CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions (user_id, revoked_at);
+
+-- OTP abuse tracking (per-IP attribution + audit of every code request).
+ALTER TABLE otp_codes ADD COLUMN IF NOT EXISTS ip          TEXT;
+ALTER TABLE otp_codes ADD COLUMN IF NOT EXISTS fingerprint TEXT;
+CREATE INDEX IF NOT EXISTS idx_otp_email_created ON otp_codes (email, created_at);
+CREATE INDEX IF NOT EXISTS idx_otp_ip_created    ON otp_codes (ip, created_at);
+
+-- Coupon redemption ledger (per-user / per-IP abuse prevention + fraud scoring).
+CREATE TABLE IF NOT EXISTS coupon_redemptions (
+  id              TEXT PRIMARY KEY,
+  code            TEXT NOT NULL,
+  user_id         TEXT REFERENCES users(id) ON DELETE SET NULL,
+  email           TEXT,
+  ip              TEXT,
+  fingerprint     TEXT,
+  order_id        TEXT REFERENCES orders(id) ON DELETE SET NULL,
+  created_at      TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_coupon_redemptions_code  ON coupon_redemptions (code, created_at);
+CREATE INDEX IF NOT EXISTS idx_coupon_redemptions_user  ON coupon_redemptions (user_id, code);
+`,
+  },
 ];

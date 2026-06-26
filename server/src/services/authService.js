@@ -11,28 +11,68 @@ import { sha256, safeEqual, randomToken } from '../utils/crypto.js';
 import { badRequest, unauthorized, tooMany } from '../utils/errors.js';
 import { sendEmailAsync } from './emailService.js';
 import { upsertUserByEmail, touchLogin, getUserPermissions } from './userService.js';
+import { audit } from './auditService.js';
+
+/** Human-readable device label from a User-Agent string (best-effort). */
+export function deviceLabel(ua = '') {
+  const s = String(ua);
+  const os = /Windows/i.test(s) ? 'Windows' : /iPhone|iPad|iOS/i.test(s) ? 'iOS'
+    : /Android/i.test(s) ? 'Android' : /Mac OS X|Macintosh/i.test(s) ? 'macOS'
+    : /Linux/i.test(s) ? 'Linux' : 'Unknown OS';
+  const br = /Edg\//i.test(s) ? 'Edge' : /OPR\/|Opera/i.test(s) ? 'Opera'
+    : /Chrome\//i.test(s) ? 'Chrome' : /Firefox\//i.test(s) ? 'Firefox'
+    : /Safari\//i.test(s) ? 'Safari' : 'Browser';
+  return `${br} · ${os}`;
+}
 
 // ── Email OTP ──────────────────────────────────────────────────────────────
 
-/** Create + email a one-time login code. Rate-limited per address. */
-export async function requestEmailOtp(email) {
+/**
+ * Create + email a one-time login code. Layered abuse protection:
+ *  - per-email throttle (max 3 live codes / TTL window),
+ *  - per-IP throttle (max 8 codes / TTL window across all emails),
+ *  - a short cooldown between consecutive requests for the same email,
+ *  - the requesting IP + device fingerprint are stored for audit/forensics.
+ */
+export async function requestEmailOtp(email, ctx = {}) {
   const e = String(email || '').trim().toLowerCase();
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) throw badRequest('Enter a valid email address');
-
-  // Throttle: max 3 codes within the TTL window per address.
+  const ip = ctx.ip || null;
+  const fp = ctx.fingerprint || null;
   const since = new Date(Date.now() - config.auth.otpTtlMinutes * 60_000).toISOString();
+
+  // Per-email throttle.
   const recent = await get(
-    `SELECT COUNT(*) AS n FROM otp_codes WHERE email = @e AND created_at > @since`,
+    `SELECT COUNT(*) AS n, MAX(created_at) AS last FROM otp_codes WHERE email = @e AND created_at > @since`,
     { e, since });
-  if (recent.n >= 3) throw tooMany('Too many codes requested. Try again shortly.');
+  if (recent.n >= 3) {
+    await audit({ action: 'auth.otp_throttled', actor: { email: e }, metadata: { reason: 'email', ip }, req: ctx.req });
+    throw tooMany('Too many codes requested for this email. Try again shortly.');
+  }
+  // 30s cooldown between codes for the same email (blunts automated hammering).
+  if (recent.last && Date.now() - new Date(recent.last).getTime() < 30_000) {
+    throw tooMany('Please wait a few seconds before requesting another code.');
+  }
+  // Per-IP throttle (defends against enumerating many emails from one host).
+  if (ip) {
+    const ipCount = await get(
+      `SELECT COUNT(*) AS n FROM otp_codes WHERE ip = @ip AND created_at > @since`, { ip, since });
+    if (ipCount.n >= 8) {
+      await audit({ action: 'auth.otp_throttled', actor: { email: e }, metadata: { reason: 'ip', ip }, req: ctx.req });
+      throw tooMany('Too many login attempts from your network. Try again shortly.');
+    }
+  }
 
   const code = newOtp();
   const id = newId('otp');
   const at = nowIso();
   const expires = new Date(Date.now() + config.auth.otpTtlMinutes * 60_000).toISOString();
-  await run(`INSERT INTO otp_codes (id, email, code_hash, purpose, expires_at, created_at)
-       VALUES (@id, @e, @h, 'login', @exp, @at)`,
-      { id, e, h: sha256(code), exp: expires, at });
+  await run(`INSERT INTO otp_codes (id, email, code_hash, purpose, ip, fingerprint, expires_at, created_at)
+       VALUES (@id, @e, @h, 'login', @ip, @fp, @exp, @at)`,
+      { id, e, h: sha256(code), ip, fp, exp: expires, at });
+
+  await audit({ action: 'auth.otp_request', actor: { email: e }, targetType: 'email', targetId: e,
+    metadata: { ip, fingerprint: fp }, req: ctx.req });
 
   // Deliver the code, but never let a mail failure break login: the code is
   // already stored, and the failure is recorded in email_log for diagnosis.
@@ -45,7 +85,7 @@ export async function requestEmailOtp(email) {
   if (!config.isProd && !config.email.smtpUrl) {
     console.log(`\n🔑  [dev] Login code for ${e}:  ${code}\n`);
   }
-  return { sent: true, expiresAt: expires };
+  return { sent: true, expiresAt: expires, cooldownSeconds: 30 };
 }
 
 /** Verify an OTP and return an authenticated session. */
@@ -68,6 +108,8 @@ export async function verifyEmailOtp(email, code, ctx = {}) {
     // Wrong code: count the attempt against the newest live code, and lock out
     // only once that one has burned through its attempts.
     const newest = live[0];
+    await audit({ action: 'auth.otp_verify_fail', actor: { email: e }, targetType: 'email', targetId: e,
+      metadata: { ip: ctx.ip, attempts: newest.attempts + 1 }, req: ctx.req });
     if (newest.attempts >= config.auth.otpMaxAttempts) {
       throw tooMany('Too many attempts. Request a new code.');
     }
@@ -92,10 +134,10 @@ export async function finalizeLogin(user, ctx = {}, extra = {}) {
   const refresh = randomToken(32);
   const at = nowIso();
   const expires = new Date(Date.now() + config.auth.refreshTtlDays * 86_400_000).toISOString();
-  await run(`INSERT INTO sessions (id, user_id, refresh_hash, user_agent, ip, expires_at, created_at)
-       VALUES (@id, @uid, @rh, @ua, @ip, @exp, @at)`,
+  await run(`INSERT INTO sessions (id, user_id, refresh_hash, user_agent, device, ip, last_used_at, expires_at, created_at)
+       VALUES (@id, @uid, @rh, @ua, @dev, @ip, @at, @exp, @at)`,
       { id: sessionId, uid: user.id, rh: sha256(refresh),
-        ua: ctx.userAgent || null, ip: ctx.ip || null, exp: expires, at });
+        ua: ctx.userAgent || null, dev: deviceLabel(ctx.userAgent), ip: ctx.ip || null, exp: expires, at });
 
   const accessToken = await signAccess(user, sessionId);
   return { accessToken, refreshToken: `${sessionId}.${refresh}`, user, ...extra };
@@ -117,23 +159,75 @@ export function verifyAccess(token) {
   }
 }
 
-/** Exchange a refresh token for a fresh access token (rotation-safe). */
-export async function refreshSession(refreshToken) {
+/**
+ * Exchange a refresh token for a fresh access token AND a rotated refresh token
+ * (one-time-use rotation). If a refresh secret that doesn't match the current
+ * hash is ever presented, that's a sign the token was stolen/replayed — we
+ * revoke the entire session chain so neither party can keep using it.
+ */
+export async function refreshSession(refreshToken, ctx = {}) {
   const [sessionId, secret] = String(refreshToken || '').split('.');
   const session = await get('SELECT * FROM sessions WHERE id = @id', { id: sessionId });
   if (!session || session.revoked_at) throw unauthorized('Invalid session');
   if (new Date(session.expires_at) < new Date()) throw unauthorized('Session expired');
+
   if (!safeEqual(session.refresh_hash, sha256(secret || ''))) {
+    // Reuse/theft detected — kill this session.
     await run('UPDATE sessions SET revoked_at = @at WHERE id = @id', { at: nowIso(), id: sessionId });
-    throw unauthorized('Invalid session');
+    await audit({ action: 'auth.refresh_reuse', actor: { id: session.user_id },
+      targetType: 'session', targetId: sessionId, metadata: { ip: ctx.ip }, req: ctx.req });
+    throw unauthorized('Session expired. Please sign in again.');
   }
+
   const user = await get('SELECT * FROM users WHERE id = @id', { id: session.user_id });
   if (!user || user.status !== 'active') throw unauthorized('Account unavailable');
-  return { accessToken: await signAccess(user, sessionId) };
+
+  // Rotate: issue a brand-new refresh secret and update the row in place.
+  const newSecret = randomToken(32);
+  await run(`UPDATE sessions SET refresh_hash = @rh, last_used_at = @at,
+        rotated_count = COALESCE(rotated_count,0) + 1,
+        ip = COALESCE(@ip, ip), user_agent = COALESCE(@ua, user_agent)
+      WHERE id = @id`,
+      { rh: sha256(newSecret), at: nowIso(), ip: ctx.ip || null, ua: ctx.userAgent || null, id: sessionId });
+
+  return { accessToken: await signAccess(user, sessionId), refreshToken: `${sessionId}.${newSecret}` };
 }
 
 export async function revokeSession(sessionId) {
   await run('UPDATE sessions SET revoked_at = @at WHERE id = @id', { at: nowIso(), id: sessionId });
+}
+
+/** Active (non-revoked, unexpired) sessions for a user, newest activity first. */
+export async function listSessions(userId, currentSid = null) {
+  const rows = await all(
+    `SELECT id, device, ip, user_agent, created_at, last_used_at
+       FROM sessions
+      WHERE user_id = @u AND revoked_at IS NULL AND expires_at > @now
+      ORDER BY COALESCE(last_used_at, created_at) DESC`,
+    { u: userId, now: nowIso() });
+  return rows.map((r) => ({
+    id: r.id,
+    device: r.device || deviceLabel(r.user_agent),
+    ip: r.ip,
+    createdAt: r.created_at,
+    lastUsedAt: r.last_used_at || r.created_at,
+    current: r.id === currentSid,
+  }));
+}
+
+/** Revoke every active session for a user except (optionally) one to keep. */
+export async function revokeOtherSessions(userId, keepSid = null) {
+  await run(
+    `UPDATE sessions SET revoked_at = @at
+       WHERE user_id = @u AND revoked_at IS NULL AND id <> @keep`,
+    { at: nowIso(), u: userId, keep: keepSid || '' });
+}
+
+/** Revoke a single session, but only if it belongs to the given user. */
+export async function revokeUserSession(userId, sessionId) {
+  const s = await get('SELECT user_id FROM sessions WHERE id = @id', { id: sessionId });
+  if (!s || s.user_id !== userId) throw unauthorized('Session not found');
+  await revokeSession(sessionId);
 }
 
 export async function isSessionActive(sessionId) {

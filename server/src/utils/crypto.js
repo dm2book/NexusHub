@@ -12,3 +12,7 @@ export function safeEqual(a, b) {
 }
 
 export const randomToken = (bytes = 32) => crypto.randomBytes(bytes).toString('hex');
+
+/** HMAC-SHA256 hex digest of `message` with `secret`. */
+export const hmacSha256 = (secret, message) =>
+  crypto.createHmac('sha256', String(secret)).update(String(message)).digest('hex');

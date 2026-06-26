@@ -10,6 +10,8 @@ import { listEnabledProviders } from '../services/oauthService.js';
 import { isEnabled as stripeEnabled, createCheckoutSession } from '../services/stripeService.js';
 import { publicStats } from '../services/publicStatsService.js';
 import { addReview, listReviews } from '../services/reviewsService.js';
+import { verifyIngest, canonicalReview } from '../middleware/ingestSignature.js';
+import { audit } from '../services/auditService.js';
 import { ApiError, forbidden } from '../utils/errors.js';
 
 const router = Router();
@@ -23,11 +25,13 @@ router.get('/reviews', asyncHandler(async (_req, res) => {
   res.json({ reviews: reviewsCache.data });
 }));
 
-// Ingest a review from the Discord bot. Protected by a shared secret header.
-router.post('/reviews/ingest', rateLimit({ bucket: 'review_ingest', windowMs: 60_000, max: 30 }),
+// Ingest a review from the Discord bot. Protected by an HMAC signature
+// (x-timestamp + x-signature) with replay protection; legacy shared-secret
+// header still accepted during rollout.
+router.post('/reviews/ingest',
+  rateLimit({ bucket: 'review_ingest', windowMs: 60_000, max: 30 }),
+  verifyIngest(canonicalReview)(config.discord.reviewIngestSecret),
   asyncHandler(async (req, res) => {
-    const secret = config.discord.reviewIngestSecret;
-    if (!secret || req.get('x-ingest-secret') !== secret) throw forbidden('Bad ingest secret');
     const body = z.object({
       author: z.string().min(1).max(80),
       avatarUrl: z.string().url().optional(),
@@ -38,6 +42,10 @@ router.post('/reviews/ingest', rateLimit({ bucket: 'review_ingest', windowMs: 60
     }).parse(req.body);
     const r = await addReview({ ...body, source: 'discord' });
     reviewsCache = { at: 0, data: null }; // bust cache
+    if (!r.deduped) {
+      await audit({ action: 'review.ingest', actor: { email: body.author }, targetType: 'review',
+        targetId: r.id, metadata: { stars: body.stars }, req });
+    }
     res.status(201).json({ ok: true, ...r });
   }));
 
