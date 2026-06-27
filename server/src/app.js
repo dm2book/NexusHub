@@ -19,6 +19,7 @@ import { rateLimit } from './middleware/rateLimit.js';
 import { errorHandler, notFoundHandler } from './middleware/error.js';
 
 import authRoutes from './routes/auth.js';
+import cronRoutes from './routes/cron.js';
 import accountRoutes from './routes/account.js';
 import catalogRoutes from './routes/catalog.js';
 import discordRoutes from './routes/discord.js';
@@ -63,6 +64,23 @@ export function createApp({ lazyReady = false } = {}) {
       try { await ensureReady(); next(); } catch (err) { next(err); }
     });
   }
+
+  // Structured request logging → Vercel logs (method, path, status, duration).
+  app.use((req, res, next) => {
+    const t = Date.now();
+    res.on('finish', () => {
+      if (req.path === '/api/health') return; // don't spam logs with health pings
+      console.log(JSON.stringify({
+        lvl: res.statusCode >= 500 ? 'error' : 'info',
+        method: req.method, path: req.path, status: res.statusCode, ms: Date.now() - t,
+      }));
+    });
+    next();
+  });
+
+  // Health + scheduled maintenance — mounted before auth/rate-limit so uptime
+  // monitors and Vercel Cron aren't throttled or require a session.
+  app.use('/api', cronRoutes);
 
   app.use(attachUser);
   app.use('/api', rateLimit({ bucket: 'api' }));

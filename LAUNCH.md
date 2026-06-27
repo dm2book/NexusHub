@@ -1,104 +1,85 @@
-# 🚀 ForgeMarket — Go‑Live Checklist (start selling)
+# 🚀 ForgeMarket — Go‑Live Checklist
 
-Everything below is what it takes to take ForgeMarket from "built" to "accepting
-real orders". Steps marked **(only you)** are dashboard/account actions I can't do
-for you. Do them in order.
+From "built" to "accepting real orders". Steps marked **(only you)** are dashboard
+actions I can't do for you. The code is all on **`main`** and Vercel **auto‑deploys
+every merge**, so there's nothing to "merge" — just set the config below.
 
 Live site: **https://forgemarket-store.vercel.app** · Vercel project: **forgemarket**
 
 ---
 
-## 0. Merge the code  **(only you)**
-All the latest work (new design, animations, fixes, Discord) is in **PR #5**.
-- Merge it → https://github.com/dm2book/NexusHub/pull/5
-- Vercel auto‑deploys on merge.
+## 1. Database — Neon Postgres  **(only you)** — *required*
+The shop, login, orders, rewards and admin all need Postgres.
+- Vercel → project **forgemarket** → **Storage** → **Connect Database** → your **Neon**
+  DB → Connect (injects `DATABASE_URL` / `POSTGRES_*`).
+- **Use the POOLED connection** (host contains `-pooler`) for fast serverless logins.
+- Schema + 4 migrations apply automatically on first request; the catalog auto‑seeds.
 
-## 1. Database  **(only you)**
-The shop, login and orders need Postgres connected to the **forgemarket** project.
-- Vercel → project **forgemarket** → **Storage** → **Connect Database** → pick your
-  existing **Neon** DB → Connect. This injects `DATABASE_URL` / `POSTGRES_*`.
-- The catalog auto‑seeds on first boot (no `SEED_DEMO` needed).
-
-## 2. Payments — Tikkie / Revolut / PayPal  **(only you)**
-You chose manual methods — easiest to start. Set any of these env vars (project
-forgemarket → Environment Variables); the storefront auto-switches to "manual" pay:
+## 2. Core secrets  **(only you)** — *required*
+Project **forgemarket** → Settings → Environment Variables:
 | Variable | Value |
 |---|---|
-| `PAY_TIKKIE` | your Tikkie payment-request link |
+| `JWT_SECRET` | a long random string |
+| `RESEND_API_KEY` | your Resend key (for login codes + order emails) |
+| `EMAIL_FROM_ADDRESS` | a sender on your **verified** Resend domain (e.g. `noreply@yourdomain`) |
+| `EMAIL_FROM_NAME` | `ForgeMarket` |
+| `ADMIN_EMAILS` | extra owner emails (comma‑sep). `t6202600@gmail.com` is already built in. |
+
+## 3. Payments — Tikkie / Revolut / PayPal  **(only you)**
+Set any of these; the storefront auto‑switches to manual pay with a verification queue:
+| Variable | Value |
+|---|---|
+| `PAY_TIKKIE` | your Tikkie request link |
 | `PAY_REVOLUT` | `revolut.me/yourname` |
 | `PAY_PAYPAL` | `paypal.me/yourname` **or** your PayPal email |
-| `PAY_NOTE` | (optional) note shown on the payment screen |
+| `PAY_NOTE` | (optional) note on the pay screen |
 
-**How it works:** customer places the order → sees the amount + a **Pay** button
-(your Tikkie/Revolut/PayPal link) + their **order number as reference** → pays →
-you see the order in **/admin → Orders** and click **Mark as paid / Complete** to
-fulfil it. (PayPal.me auto-fills the amount; for Tikkie/Revolut the customer enters
-the shown amount.)
+Customers pay → submit a transaction ID/screenshot → you confirm in **Admin → Payments**.
 
-> Tip: use **PayPal Goods & Services** if you want buyer/seller protection. Friends
-> & Family has no fees but no protection.
+## 4. Reviews + Discord bot link  **(only you)**
+| Variable (site **and** bot) | Value |
+|---|---|
+| `REVIEW_INGEST_SECRET` | a shared random string (same on both) |
 
-_(Alternative — automatic card payments: set `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET`
-instead. Or `DEMO_PAYMENTS=true` to test without money — never leave demo on for real sales.)_
+On the **bot** host (Railway) also set: `DISCORD_TOKEN`, `DISCORD_CLIENT_ID`,
+`DISCORD_GUILD_ID`, `FORGEMARKET_API_URL=https://forgemarket-store.vercel.app`,
+and optionally `ANTHROPIC_API_KEY`. Then `/vouch` in Discord auto‑publishes (HMAC‑signed)
+to the site's reviews + Trust Center.
 
-## 3. Email — REQUIRED for login codes + order emails  **(only you)**
-Customers sign in with a one‑time code and get order confirmations by email.
-1. [Resend](https://resend.com) → **API Keys** → create one (`re_…`).
-2. Vercel env var: `RESEND_API_KEY=re_…`
-3. ⚠️ **Verify a domain in Resend** (Resend → Domains) and set
-   `EMAIL_FROM_ADDRESS=no-reply@yourdomain`. The default `onboarding@resend.dev`
-   only delivers to *your own* Resend account email — fine for a test, **not** for
-   real customers. A verified domain is required to email buyers.
+## 5. Background maintenance (Phase 8)  **(only you)**
+| Variable | Value |
+|---|---|
+| `CRON_SECRET` | a random string |
 
-## 4. Other env vars  **(only you)** — project forgemarket → Environment Variables
-| Variable | Value | Why |
-|---|---|---|
-| `JWT_SECRET` | a long random string | signs sessions (required in prod) |
-| `APP_URL` | `https://forgemarket-store.vercel.app` | email links / redirects (already defaults) |
-| `DISCORD_INVITE_URL` | `https://discord.gg/vNcfgDbVd` | Join button (already defaults) |
-| `DISCORD_ORDER_WEBHOOK_URL` | a Discord channel webhook | (optional) post sales to an ops channel |
-| `DISCORD_BOT_TOKEN` + `DISCORD_GUILD_ID` | from your bot | (optional) auto VIP/Customer roles on purchase |
+Vercel runs `/api/cron/maintenance` hourly (configured in `vercel.json`) to purge
+expired codes, expire stale sessions and auto‑cancel 14‑day‑unpaid orders.
+Health probe for uptime monitors: **`/api/health`**.
 
-After setting vars → **Deployments → Redeploy**.
-
-## 5. Make yourself admin  **(only you)**
-1. Set env var `ADMIN_EMAILS=youremail@example.com` (comma-separated for several).
-2. Sign in at `/login` with that email — you're auto‑granted the **owner** role, so
-   the **/admin** dashboard unlocks (products, orders, suppliers, fulfilment, emails).
-
-## 6. Catalog & pricing  **(you, in the app)**
-- The shop auto‑fills with the demo catalog (Robux, V‑Bucks, etc., Eldorado‑style
-  pricing). Review/adjust prices and add stock in **/admin/products**.
-- Hook suppliers/fulfilment in **/admin/suppliers** + **/admin/fulfillment** (or
-  fulfil manually — orders show in **/admin/orders** with a "Complete order" action).
-
-## 7. Discord  **(only you — run once)**
-```bash
-git pull && cd discord && npm install
-cp .env.example .env   # fill DISCORD_TOKEN, DISCORD_CLIENT_ID, DISCORD_GUILD_ID
-npm run setup          # builds roles/channels/gate/panels
-npm run register       # slash commands (/rank /leaderboard /giveaway /reroll …)
-npm run start          # run the bot (keep it on a host: Railway/Render/VPS)
-```
-Developer Portal → your **ForgeMarket** bot → enable **Server Members** +
-**Message Content** intents. In Server Settings → Roles, drag **Bot** above
-*Verified Customer / VIP*.
-
-## 8. Smoke test before announcing
-- [ ] Open the site → shop shows products
-- [ ] Enter email at `/login` → receive the 6‑digit code → sign in
-- [ ] Add an item → checkout → pay (Stripe test card `4242 4242 4242 4242`, or demo)
-- [ ] Order appears in `/admin/orders`; complete it → buyer gets the delivery email
-- [ ] Track the order at `/track`
-- [ ] Discord: join → verify → buy → VIP/Customer role granted (if bot token set)
-
-## 9. Rotate exposed secrets ⚠️
-You shared a Discord token, a Vercel token and a Resend key in chat earlier —
-**rotate all three** (Discord Dev Portal → Reset Token, Vercel → Tokens, Resend →
-API Keys) and only store them as Vercel env vars, never in code or chat.
+## 6. Optional
+| Variable | Purpose |
+|---|---|
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | "Continue with Google" |
+| `DISCORD_CLIENT_ID` / `DISCORD_CLIENT_SECRET` | "Continue with Discord" |
+| `COUPONS` | `CODE:percent,CODE2:percent` discount codes |
+| `DISCORD_MEMBER_COUNT` | shown in trust stats if the widget isn't public |
+| `STRIPE_SECRET_KEY` | enable card payments instead of/alongside manual |
 
 ---
 
-### TL;DR — minimum to take the first real order
-1. Merge PR #5  2. Connect Neon DB  3. `RESEND_API_KEY` + verified domain
-4. `STRIPE_SECRET_KEY` (+ webhook)  5. `JWT_SECRET`  6. Redeploy  7. Smoke test.
+## 7. Smoke test (2 min) once deployed
+1. Open the site → **Log in** with `t6202600@gmail.com` → code from email → you're **Owner**.
+2. Top‑right **Admin 🛡** → check **Payments**, **Users**, **Analytics** (Retention panel).
+3. Buy a product → submit a fake transaction ID → confirm it in **Admin → Payments** → order completes.
+4. Account → **Rewards**: loyalty tier, referral link, Forge+.
+
+## 8. Security housekeeping  **(only you)**
+Rotate anything ever pasted in chat: Discord **bot token**, Vercel token, Resend key.
+Generate fresh values and set them only as env vars.
+
+---
+
+### What's live (all 8 phases)
+Security (OTP throttle + audit, refresh rotation, sessions, signed ingest) ·
+Payment verification queue · Race‑safe fulfillment + supplier dashboard · Trust
+Center + live social proof · Loyalty/Affiliate/Forge+ · 8 admin dashboards ·
+Mobile UI + motion · Cron maintenance + health + structured logs.
