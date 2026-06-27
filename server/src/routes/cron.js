@@ -2,14 +2,16 @@
 import { Router } from 'express';
 import { config } from '../config/env.js';
 import { asyncHandler } from '../middleware/error.js';
-import { runMaintenance, healthCheck } from '../services/maintenanceService.js';
+import { runMaintenance } from '../services/maintenanceService.js';
+import { healthSummary } from '../services/diagnosticsService.js';
 import { forbidden } from '../utils/errors.js';
 
 const router = Router();
 
-// Public, cheap health probe (DB connectivity). Used by monitors / load balancers.
-router.get('/health', asyncHandler(async (_req, res) => {
-  const h = await healthCheck();
+// Health & diagnostics: { database, email, sms, storage, queue }.
+// ?deep=1 also runs a read/write/update/delete DB self-test.
+router.get('/health', asyncHandler(async (req, res) => {
+  const h = await healthSummary({ deep: req.query.deep === '1' });
   res.status(h.ok ? 200 : 503).json(h);
 }));
 
