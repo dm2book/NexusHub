@@ -10,7 +10,8 @@ import { newId, newOtp } from '../utils/ids.js';
 import { sha256, safeEqual, randomToken } from '../utils/crypto.js';
 import { badRequest, unauthorized, tooMany } from '../utils/errors.js';
 import { sendEmailAsync } from './emailService.js';
-import { upsertUserByEmail, touchLogin, getUserPermissions } from './userService.js';
+import { upsertUserByEmail, upsertUserByPhone, touchLogin, getUserPermissions } from './userService.js';
+import { sendSms, isValidPhone, normalizePhone } from './smsService.js';
 import { audit } from './auditService.js';
 
 /** Human-readable device label from a User-Agent string (best-effort). */
@@ -122,6 +123,57 @@ export async function verifyEmailOtp(email, code, ctx = {}) {
   if (!user.email_verified) {
     await run('UPDATE users SET email_verified = 1 WHERE id = @id', { id: user.id });
   }
+  return finalizeLogin(user, ctx, { firstLogin: created });
+}
+
+// ── Phone / SMS OTP ─────────────────────────────────────────────────────────
+
+/** Create + SMS a one-time login code to a phone number. Rate-limited per number/IP. */
+export async function requestPhoneOtp(phone, ctx = {}) {
+  const p = normalizePhone(phone);
+  if (!isValidPhone(p)) throw badRequest('Enter a valid phone number (e.g. +31612345678)');
+  const ip = ctx.ip || null;
+  const since = new Date(Date.now() - config.auth.otpTtlMinutes * 60_000).toISOString();
+
+  const recent = await get(
+    `SELECT COUNT(*) AS n, MAX(created_at) AS last FROM sms_verifications WHERE phone=@p AND created_at>@since`,
+    { p, since });
+  if (recent.n >= 3) { await audit({ action: 'auth.sms_throttled', metadata: { reason: 'phone', ip }, req: ctx.req }); throw tooMany('Too many SMS codes. Try again shortly.'); }
+  if (recent.last && Date.now() - new Date(recent.last).getTime() < 30_000) throw tooMany('Please wait before requesting another SMS code.');
+  if (ip) {
+    const ipc = await get(`SELECT COUNT(*) AS n FROM sms_verifications WHERE ip=@ip AND created_at>@since`, { ip, since });
+    if (ipc.n >= 8) { await audit({ action: 'auth.sms_throttled', metadata: { reason: 'ip', ip }, req: ctx.req }); throw tooMany('Too many SMS attempts from your network.'); }
+  }
+
+  const code = newOtp();
+  const expires = new Date(Date.now() + config.auth.otpTtlMinutes * 60_000).toISOString();
+  await run(`INSERT INTO sms_verifications (id, phone, code_hash, ip, expires_at, created_at)
+       VALUES (@id, @p, @h, @ip, @exp, @at)`,
+      { id: newId('sms'), p, h: sha256(code), ip, exp: expires, at: nowIso() });
+  await audit({ action: 'auth.sms_request', targetType: 'phone', targetId: p, metadata: { ip }, req: ctx.req });
+
+  const r = await sendSms(p, `Your ${config.email.fromName} code is ${code}. It expires in ${config.auth.otpTtlMinutes} min.`);
+  return { sent: true, delivered: r.sent, expiresAt: expires, cooldownSeconds: 30 };
+}
+
+/** Verify a phone OTP → authenticated session. */
+export async function verifyPhoneOtp(phone, code, ctx = {}) {
+  const p = normalizePhone(phone);
+  const supplied = sha256(String(code).trim());
+  const rows = await all(
+    `SELECT * FROM sms_verifications WHERE phone=@p AND consumed_at IS NULL ORDER BY created_at DESC LIMIT 10`, { p });
+  if (!rows.length) throw badRequest('No active code. Request a new one.');
+  const live = rows.filter((r) => new Date(r.expires_at) >= new Date());
+  if (!live.length) throw badRequest('Code expired. Request a new one.');
+  const match = live.find((r) => safeEqual(r.code_hash, supplied));
+  if (!match) {
+    const newest = live[0];
+    if (newest.attempts >= config.auth.otpMaxAttempts) throw tooMany('Too many attempts. Request a new code.');
+    await run('UPDATE sms_verifications SET attempts = attempts + 1 WHERE id=@id', { id: newest.id });
+    throw badRequest('Incorrect code');
+  }
+  await run('UPDATE sms_verifications SET consumed_at=@at WHERE id=@id', { at: nowIso(), id: match.id });
+  const { user, created } = await upsertUserByPhone(p);
   return finalizeLogin(user, ctx, { firstLogin: created });
 }
 

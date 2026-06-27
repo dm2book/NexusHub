@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Monitor, LogOut, ShieldCheck } from 'lucide-react';
+import { Monitor, LogOut, ShieldCheck, Smartphone, Pencil, History, Check } from 'lucide-react';
 import { api } from '../../lib/api.js';
 import { date } from '../../lib/format.js';
 import { useAuth } from '../../context/AuthContext.jsx';
@@ -48,6 +48,8 @@ export default function Settings() {
       </div>
 
       <ActiveSessions />
+      <TrustedDevices />
+      <LoginHistory />
 
       <div className="card p-6">
         <h3 className="text-white mb-1">Roles</h3>
@@ -125,5 +127,93 @@ function Toggle({ label, checked, onChange }) {
         <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition ${checked ? 'left-5' : 'left-0.5'}`} />
       </button>
     </label>
+  );
+}
+
+function TrustedDevices() {
+  const toast = useToast();
+  const [devices, setDevices] = useState(null);
+  const [editing, setEditing] = useState(null);
+  const [name, setName] = useState('');
+
+  const load = useCallback(() => {
+    api.get('/api/auth/devices').then((r) => setDevices(r.devices)).catch(() => setDevices([]));
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  const rename = async (id) => {
+    try { await api.patch(`/api/auth/devices/${id}`, { name }); toast.success('Renamed.'); setEditing(null); load(); }
+    catch (err) { toast.error(err.message); }
+  };
+  const revoke = async (id) => {
+    try { await api.del(`/api/auth/devices/${id}`); toast.success('Device removed — it’ll need a code next time.'); load(); }
+    catch (err) { toast.error(err.message); }
+  };
+  const logoutAll = async () => {
+    try { await api.post('/api/auth/logout-all'); toast.success('Signed out everywhere.'); window.location.href = '/login'; }
+    catch (err) { toast.error(err.message); }
+  };
+
+  return (
+    <div className="card p-6">
+      <div className="flex items-center justify-between mb-1">
+        <h3 className="text-white flex items-center gap-2"><Smartphone size={17} className="text-indigo-300" /> Trusted devices</h3>
+        <button onClick={logoutAll} className="btn-ghost text-xs text-red-300 hover:bg-red-500/10"><LogOut size={14} /> Sign out everywhere</button>
+      </div>
+      <p className="text-slate-500 text-sm mb-4">Devices that skip the login code. Remove any you don’t recognise.</p>
+      {devices === null ? <p className="text-slate-500 text-sm">Loading…</p>
+        : devices.length === 0 ? <p className="text-slate-500 text-sm">No trusted devices yet. Tick “Trust this device” at login.</p>
+        : (
+          <div className="space-y-2">
+            {devices.map((d) => (
+              <div key={d.id} className="flex items-center gap-3 bg-space-black rounded-xl px-4 py-3">
+                <Monitor size={18} className="text-slate-400 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  {editing === d.id ? (
+                    <div className="flex gap-2">
+                      <input className="input py-1 text-sm" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+                      <button onClick={() => rename(d.id)} className="btn-primary px-3 py-1 text-xs"><Check size={13} /></button>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="text-white text-sm">{d.name || 'Device'}</div>
+                      <div className="text-slate-500 text-xs">{d.ip || 'unknown IP'} · last used {date(d.lastUsedAt)}</div>
+                    </>
+                  )}
+                </div>
+                {editing !== d.id && (
+                  <button onClick={() => { setEditing(d.id); setName(d.name || ''); }} className="p-1.5 text-slate-400 hover:text-white"><Pencil size={14} /></button>
+                )}
+                <button onClick={() => revoke(d.id)} className="text-xs text-slate-400 hover:text-red-400">Remove</button>
+              </div>
+            ))}
+          </div>
+        )}
+    </div>
+  );
+}
+
+function LoginHistory() {
+  const [history, setHistory] = useState(null);
+  useEffect(() => { api.get('/api/auth/login-history').then((r) => setHistory(r.history)).catch(() => setHistory([])); }, []);
+  return (
+    <div className="card p-6">
+      <h3 className="text-white flex items-center gap-2 mb-4"><History size={17} className="text-slate-400" /> Login history</h3>
+      {history === null ? <p className="text-slate-500 text-sm">Loading…</p>
+        : history.length === 0 ? <p className="text-slate-500 text-sm">No login history yet.</p>
+        : (
+          <div className="space-y-1.5 max-h-64 overflow-auto">
+            {history.map((h, i) => (
+              <div key={i} className="flex items-center justify-between text-sm bg-space-black rounded-lg px-3 py-2">
+                <span className="text-slate-300">
+                  {h.success ? '✅' : '❌'} {h.channel?.replace('_', ' ')}
+                  {h.suspicious ? <span className="text-amber-300 text-xs ml-1">· new device</span> : ''}
+                </span>
+                <span className="text-slate-500 text-xs">{h.ip || '—'} · {date(h.createdAt)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+    </div>
   );
 }
