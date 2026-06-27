@@ -122,6 +122,9 @@ export const config = {
     // Sliding-window rate limit defaults; per-route overrides live in code.
     rateLimitWindowMs: Number(env.RATE_LIMIT_WINDOW_MS || 60_000),
     rateLimitMax: Number(env.RATE_LIMIT_MAX || 120),
+    // Shared secret the maintenance cron must present (Vercel Cron sets the
+    // Authorization header to `Bearer <CRON_SECRET>`).
+    cronSecret: env.CRON_SECRET || '',
     // Fraud scoring threshold above which an order is flagged for review.
     fraudReviewThreshold: Number(env.FRAUD_REVIEW_THRESHOLD || 60),
     fraudBlockThreshold: Number(env.FRAUD_BLOCK_THRESHOLD || 85),
