@@ -484,4 +484,62 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS membership_until TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_by      TEXT;
 `,
   },
+  {
+    id: '005_auth_devices',
+    sql: `
+-- Phone number for SMS OTP login (optional second identifier).
+ALTER TABLE users ADD COLUMN IF NOT EXISTS phone          TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_verified INTEGER NOT NULL DEFAULT 0;
+CREATE INDEX IF NOT EXISTS idx_users_phone ON users (phone);
+
+-- Trusted "remember this device" tokens → future logins skip OTP.
+CREATE TABLE IF NOT EXISTS trusted_devices (
+  id              TEXT PRIMARY KEY,
+  user_id         TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  device_id       TEXT,                 -- client fingerprint (x-device-id)
+  token_hash      TEXT NOT NULL,        -- sha256 of the httpOnly device secret
+  name            TEXT,                 -- editable label, e.g. "Chrome · Windows"
+  user_agent      TEXT,
+  ip              TEXT,
+  last_used_at    TEXT,
+  expires_at      TEXT NOT NULL,
+  revoked_at      TEXT,
+  created_at      TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_trusted_devices_user ON trusted_devices (user_id, revoked_at);
+CREATE INDEX IF NOT EXISTS idx_trusted_devices_dev  ON trusted_devices (device_id);
+
+-- SMS verification codes (phone OTP), kept separate from email otp_codes.
+CREATE TABLE IF NOT EXISTS sms_verifications (
+  id              TEXT PRIMARY KEY,
+  phone           TEXT NOT NULL,
+  code_hash       TEXT NOT NULL,
+  attempts        INTEGER NOT NULL DEFAULT 0,
+  consumed_at     TEXT,
+  ip              TEXT,
+  expires_at      TEXT NOT NULL,
+  created_at      TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_sms_phone ON sms_verifications (phone, created_at);
+CREATE INDEX IF NOT EXISTS idx_sms_ip    ON sms_verifications (ip, created_at);
+
+-- Login history + brute-force tracking (both successful and failed attempts).
+CREATE TABLE IF NOT EXISTS login_attempts (
+  id              TEXT PRIMARY KEY,
+  user_id         TEXT REFERENCES users(id) ON DELETE SET NULL,
+  identifier      TEXT,                 -- email or phone entered
+  channel         TEXT,                 -- email | sms | trusted_device | oauth
+  success         INTEGER NOT NULL DEFAULT 0,
+  suspicious      INTEGER NOT NULL DEFAULT 0,
+  reason          TEXT,
+  ip              TEXT,
+  user_agent      TEXT,
+  device_id       TEXT,
+  created_at      TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_login_attempts_user ON login_attempts (user_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_login_attempts_id   ON login_attempts (identifier, created_at);
+CREATE INDEX IF NOT EXISTS idx_login_attempts_ip   ON login_attempts (ip, created_at);
+`,
+  },
 ];

@@ -100,6 +100,15 @@ export const config = {
     reviewIngestSecret: env.REVIEW_INGEST_SECRET || '',
   },
 
+  // SMS / phone OTP via Twilio. Without credentials, phone codes are logged to
+  // the server console in non-prod (so the flow is testable) and disabled in prod.
+  sms: {
+    accountSid: env.TWILIO_ACCOUNT_SID || '',
+    authToken: env.TWILIO_AUTH_TOKEN || '',
+    from: env.TWILIO_FROM || '',
+    enabled: !!(env.TWILIO_ACCOUNT_SID && env.TWILIO_AUTH_TOKEN && env.TWILIO_FROM),
+  },
+
   email: {
     // When SMTP is not configured, the email service falls back to a JSON
     // transport that records messages in the email_log table (never silently

@@ -44,6 +44,26 @@ export async function upsertUserByEmail(email, profile = {}) {
   return { user: await getUserById(id), created: true };
 }
 
+/** Find a user by verified phone, or create a phone-first account. */
+export async function upsertUserByPhone(phone, profile = {}) {
+  const p = String(phone).trim();
+  const existing = await get('SELECT * FROM users WHERE phone = @p', { p });
+  const at = nowIso();
+  if (existing) {
+    if (!existing.phone_verified) await run('UPDATE users SET phone_verified = 1 WHERE id = @id', { id: existing.id });
+    return { user: await getUserById(existing.id), created: false };
+  }
+  // Phone-first signup: email is required+unique, so seed a clearly-marked
+  // placeholder the customer can change in Settings.
+  const id = newId('usr');
+  const placeholderEmail = `${p.replace(/[^0-9]/g, '')}@phone.forgemarket.local`;
+  await run(`INSERT INTO users (id, email, email_verified, phone, phone_verified, display_name, created_at, updated_at)
+       VALUES (@id, @e, 0, @p, 1, @dn, @at, @at)`,
+      { id, e: placeholderEmail, p, dn: profile.display_name || `+${p.replace(/[^0-9]/g, '').slice(-4)}`, at });
+  await run(`INSERT INTO user_roles (user_id, role_id, granted_at) VALUES (@u, 'customer', @at)`, { u: id, at });
+  return { user: await getUserById(id), created: true };
+}
+
 export async function touchLogin(userId) {
   await run('UPDATE users SET last_login_at = @at, updated_at = @at WHERE id = @id',
       { at: nowIso(), id: userId });

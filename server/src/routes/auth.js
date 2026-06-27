@@ -7,17 +7,29 @@ import { rateLimit } from '../middleware/rateLimit.js';
 import { requireAuth } from '../middleware/auth.js';
 import { randomToken } from '../utils/crypto.js';
 import {
-  requestEmailOtp, verifyEmailOtp, refreshSession, revokeSession,
+  requestEmailOtp, verifyEmailOtp, requestPhoneOtp, verifyPhoneOtp,
+  refreshSession, revokeSession, finalizeLogin,
   listSessions, revokeOtherSessions, revokeUserSession,
 } from '../services/authService.js';
 import {
   listEnabledProviders, buildAuthUrl, handleOAuthCallback,
 } from '../services/oauthService.js';
-import { publicUser } from '../services/userService.js';
+import { publicUser, getUserByEmail, getUserById } from '../services/userService.js';
+import {
+  createTrustedDevice, resolveTrustedDevice, listTrustedDevices, renameTrustedDevice,
+  revokeTrustedDevice, revokeAllTrustedDevices, recordLoginAttempt, recentFailures,
+  loginHistory, isSuspiciousLogin,
+} from '../services/deviceService.js';
+import { normalizePhone, isValidPhone } from '../services/smsService.js';
+import { get } from '../db/index.js';
 import { attributeSignup } from '../services/affiliateService.js';
 import { audit } from '../services/auditService.js';
 import { sendEmailAsync } from '../services/emailService.js';
-import { badRequest } from '../utils/errors.js';
+import { notify } from '../services/notificationService.js';
+import { badRequest, tooMany } from '../utils/errors.js';
+
+const DEVICE_COOKIE = 'fm_device';
+const isEmail = (s) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(s || ''));
 
 const router = Router();
 
@@ -42,8 +54,54 @@ function setSessionCookie(res, refreshToken) {
   });
 }
 
+function setDeviceCookie(res, token) {
+  res.cookie(DEVICE_COOKIE, token, {
+    httpOnly: true, secure: config.isProd, sameSite: config.isProd ? 'none' : 'lax',
+    maxAge: 60 * 86_400_000, path: '/api/auth',
+  });
+}
+
+// Resolve an identifier (email or phone) to an existing user, if any.
+async function userForIdentifier(identifier) {
+  if (isEmail(identifier)) return getUserByEmail(String(identifier).toLowerCase());
+  const p = normalizePhone(identifier);
+  return isValidPhone(p) ? get('SELECT * FROM users WHERE phone=@p', { p }) : null;
+}
+
 // ── Email OTP ──────────────────────────────────────────────────────────────
 const otpLimiter = rateLimit({ bucket: 'auth_otp', windowMs: 60_000, max: 5 });
+
+// Unified entry point: email OR phone. If this device is trusted for the
+// matching account → instant login, no OTP. Otherwise send a code.
+router.post('/start', otpLimiter, asyncHandler(async (req, res) => {
+  const { identifier } = z.object({ identifier: z.string().min(3).max(120) }).parse(req.body);
+  const ctx = ctxOf(req);
+  const channel = isEmail(identifier) ? 'email' : 'sms';
+
+  // Brute-force gate (per identifier / IP).
+  if (await recentFailures(identifier, ctx.ip) >= 10) {
+    throw tooMany('Too many attempts. Please wait a few minutes and try again.');
+  }
+
+  // Trusted-device instant login.
+  const deviceToken = req.cookies?.[DEVICE_COOKIE];
+  if (deviceToken) {
+    const trustedUserId = await resolveTrustedDevice(deviceToken, ctx);
+    const user = await userForIdentifier(identifier);
+    if (trustedUserId && user && user.id === trustedUserId && user.status === 'active') {
+      const session = await finalizeLogin(user, ctx);
+      setSessionCookie(res, session.refreshToken);
+      await recordLoginAttempt({ userId: user.id, identifier, channel: 'trusted_device', success: true, ctx });
+      await audit({ actor: { id: user.id, email: user.email }, action: 'auth.login', metadata: { method: 'trusted_device' }, req });
+      return res.json({ loggedIn: true, accessToken: session.accessToken, user: await publicUser(user.id) });
+    }
+  }
+
+  // Otherwise send an OTP on the right channel.
+  if (channel === 'email') await requestEmailOtp(identifier, ctx);
+  else await requestPhoneOtp(identifier, ctx);
+  res.json({ loggedIn: false, channel });
+}));
 
 router.post('/otp/request', otpLimiter, asyncHandler(async (req, res) => {
   const { email } = z.object({ email: z.string().email() }).parse(req.body);
@@ -52,17 +110,60 @@ router.post('/otp/request', otpLimiter, asyncHandler(async (req, res) => {
 }));
 
 router.post('/otp/verify', otpLimiter, asyncHandler(async (req, res) => {
-  const { email, code, ref } = z.object({
-    email: z.string().email(), code: z.string().min(4).max(8), ref: z.string().max(40).optional(),
+  const body = z.object({
+    email: z.string().email().optional(),
+    phone: z.string().max(40).optional(),
+    identifier: z.string().max(120).optional(),
+    code: z.string().min(4).max(8),
+    remember: z.boolean().optional(),
+    ref: z.string().max(40).optional(),
   }).parse(req.body);
-  const session = await verifyEmailOtp(email, code, ctxOf(req));
-  if (session.firstLogin) {
-    sendEmailAsync('account_created', session.user.email,
-      { user: { name: session.user.display_name || email.split('@')[0] } });
-    if (ref) await attributeSignup(session.user.id, ref).catch(() => {});
+  const ctx = ctxOf(req);
+
+  // Resolve channel from explicit field or the unified identifier.
+  const id = body.email || body.phone || body.identifier;
+  const channel = body.phone || (body.identifier && !isEmail(body.identifier)) ? 'sms' : 'email';
+
+  let session;
+  try {
+    session = channel === 'sms'
+      ? await verifyPhoneOtp(id, body.code, ctx)
+      : await verifyEmailOtp(id, body.code, ctx);
+  } catch (err) {
+    await recordLoginAttempt({ identifier: id, channel, success: false, reason: err.message, ctx });
+    throw err;
   }
+
+  // Suspicious-login detection (established account, brand-new device/IP).
+  const suspicious = await isSuspiciousLogin(session.user.id, ctx);
+  await recordLoginAttempt({ userId: session.user.id, identifier: id, channel, success: true, suspicious, ctx });
+  if (suspicious) {
+    await audit({ actor: { id: session.user.id, email: session.user.email }, action: 'auth.login_suspicious',
+      metadata: { ip: ctx.ip, device: ctx.userAgent }, req });
+    sendEmailAsync('custom_message', session.user.email, {
+      subject: 'New sign-in to your ForgeMarket account',
+      message: `We noticed a sign-in from a new device or location (IP ${ctx.ip || 'unknown'}). If this was you, you can ignore this. If not, revoke the device in your account security settings and contact support.`,
+      order: { number: '', url: `${config.appUrl}/account/settings` },
+    });
+    if (session.user.id) await notify(session.user.id, { type: 'security', title: 'New device sign-in',
+      body: 'A new device signed in to your account. Review your active devices if this wasn’t you.', link: '/account/settings' });
+  }
+
+  if (session.firstLogin) {
+    if (session.user.email && !session.user.email.endsWith('@phone.forgemarket.local')) {
+      sendEmailAsync('account_created', session.user.email, { user: { name: session.user.display_name || String(id).split('@')[0] } });
+    }
+    if (body.ref) await attributeSignup(session.user.id, body.ref).catch(() => {});
+  }
+
+  // Remember this device → future logins skip OTP.
+  if (body.remember) {
+    const td = await createTrustedDevice(session.user.id, ctx);
+    setDeviceCookie(res, td.token);
+  }
+
   await audit({ actor: { id: session.user.id, email: session.user.email },
-    action: 'auth.login', metadata: { method: 'otp' }, req });
+    action: 'auth.login', metadata: { method: channel }, req });
   setSessionCookie(res, session.refreshToken);
   res.json({
     accessToken: session.accessToken,
@@ -140,6 +241,41 @@ router.post('/sessions/revoke-others', requireAuth, asyncHandler(async (req, res
   await revokeOtherSessions(req.user.id, req.auth?.sid);
   await audit({ actor: { id: req.user.id, email: req.user.email },
     action: 'auth.session_revoke_others', req });
+  res.json({ ok: true });
+}));
+
+// ── Trusted devices + login history ──────────────────────────────────────────
+router.get('/devices', requireAuth, asyncHandler(async (req, res) => {
+  res.json({ devices: await listTrustedDevices(req.user.id) });
+}));
+
+router.patch('/devices/:id', requireAuth, asyncHandler(async (req, res) => {
+  const { name } = z.object({ name: z.string().min(1).max(60) }).parse(req.body);
+  const ok = await renameTrustedDevice(req.user.id, req.params.id, name);
+  if (!ok) throw badRequest('Device not found');
+  res.json({ ok: true });
+}));
+
+router.delete('/devices/:id', requireAuth, asyncHandler(async (req, res) => {
+  const ok = await revokeTrustedDevice(req.user.id, req.params.id);
+  if (!ok) throw badRequest('Device not found');
+  await audit({ actor: { id: req.user.id, email: req.user.email },
+    action: 'auth.device_revoke', targetType: 'trusted_device', targetId: req.params.id, req });
+  res.json({ ok: true });
+}));
+
+router.get('/login-history', requireAuth, asyncHandler(async (req, res) => {
+  res.json({ history: await loginHistory(req.user.id, 20) });
+}));
+
+// Sign out of everything: all sessions + all trusted devices.
+router.post('/logout-all', requireAuth, asyncHandler(async (req, res) => {
+  await revokeOtherSessions(req.user.id, null);
+  if (req.auth?.sid) await revokeSession(req.auth.sid);
+  await revokeAllTrustedDevices(req.user.id);
+  res.clearCookie(config.auth.cookieName, { path: '/api/auth' });
+  res.clearCookie(DEVICE_COOKIE, { path: '/api/auth' });
+  await audit({ actor: { id: req.user.id, email: req.user.email }, action: 'auth.logout_all', req });
   res.json({ ok: true });
 }));
 
