@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from 'react';
  */
 export default function CountUp({ value, duration = 1400, className = '' }) {
   const ref = useRef(null);
+  const started = useRef(false);
   const [display, setDisplay] = useState(null);
 
   // Parse "50k+", "52,340+", "< 30s", "4.9/5", "24/7" → { prefix, num, suffix }
@@ -22,12 +23,17 @@ export default function CountUp({ value, duration = 1400, className = '' }) {
 
   useEffect(() => {
     if (!isNum) { setDisplay(value); return; }
+    // If the number already revealed once, snap to the new target (handles the
+    // value arriving/changing after the count-up has already played — e.g. real
+    // stats replacing the initial zeros).
+    if (started.current) { setDisplay(`${m[1]}${fmt(num)}${m[3]}`); return; }
     const el = ref.current;
     if (!el) return;
     let raf;
     const io = new IntersectionObserver(([e]) => {
       if (!e.isIntersecting) return;
       io.disconnect();
+      started.current = true;
       const start = performance.now();
       const tick = (t) => {
         const k = Math.min(1, (t - start) / duration);

@@ -109,7 +109,9 @@ export default function ProductDetail() {
             <span className="flex items-center gap-1 text-amber-400">
               {Array.from({ length: 5 }).map((_, i) => <Star key={i} size={14} fill="currentColor" />)}
             </span>
-            <span className="text-slate-400">{stats.rating} · {stats.reviews.toLocaleString('en-US')} reviews</span>
+            {stats.reviews > 0
+              ? <span className="text-slate-400">{stats.rating} · {stats.reviews.toLocaleString('en-US')} reviews</span>
+              : <span className="text-slate-400">New</span>}
             {typeof product.stock === 'number' && product.stock > 0 && product.stock <= 10 && (
               <span className="text-red-500 font-semibold">Only {product.stock} left</span>
             )}
@@ -167,14 +169,19 @@ export default function ProductDetail() {
             <h2 className="text-2xl font-extrabold text-slate-900">What buyers say</h2>
             <Link to="/reviews" className="text-violet-600 text-sm font-semibold hover:underline">All reviews →</Link>
           </div>
-          <div className="flex items-center gap-3 mb-5">
-            <div className="text-4xl font-extrabold text-slate-900">{stats.rating}</div>
-            <div>
-              <div className="flex text-amber-400">{Array.from({ length: 5 }).map((_, i) => <Star key={i} size={15} fill="currentColor" />)}</div>
-              <div className="text-slate-400 text-sm">{stats.reviews.toLocaleString('en-US')} verified reviews</div>
+          {stats.reviews > 0 && (
+            <div className="flex items-center gap-3 mb-5">
+              <div className="text-4xl font-extrabold text-slate-900">{stats.rating}</div>
+              <div>
+                <div className="flex text-amber-400">{Array.from({ length: 5 }).map((_, i) => <Star key={i} size={15} fill="currentColor" />)}</div>
+                <div className="text-slate-400 text-sm">{stats.reviews.toLocaleString('en-US')} verified reviews</div>
+              </div>
             </div>
-          </div>
+          )}
           <div className="space-y-3">
+            {reviews.length === 0 && (
+              <div className="card p-4 text-slate-400 text-sm">No reviews yet — be the first after your purchase.</div>
+            )}
             {reviews.slice(0, 3).map((r) => (
               <div key={r.id} className="card p-4 fm-lift">
                 <div className="flex text-amber-400 mb-1.5">{Array.from({ length: r.stars || 5 }).map((_, i) => <Star key={i} size={13} fill="currentColor" />)}</div>
