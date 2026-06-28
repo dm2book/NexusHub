@@ -10,6 +10,7 @@ import { requireAuth } from '../middleware/auth.js';
 import { run, get, all } from '../db/index.js';
 import { notFound, forbidden } from '../utils/errors.js';
 import { listOrders, getOrder } from '../services/orderService.js';
+import { addVerifiedReview } from '../services/reviewsService.js';
 import { updateProfile, updatePreferences } from '../services/userService.js';
 import { loyaltyFor } from '../services/loyaltyService.js';
 import { affiliateStats } from '../services/affiliateService.js';
@@ -129,6 +130,37 @@ router.post('/orders/:id/refund-request', asyncHandler(async (req, res) => {
   const r = await support.requestRefund({ orderId: order.id, userId: req.user.id, reason });
   await audit({ actor: req.user, action: 'refund.request', targetType: 'order', targetId: order.id, req });
   res.status(201).json({ refundRequest: r });
+}));
+
+// ── Verified-buyer reviews ───────────────────────────────────────────────────
+// Whether the current user has already reviewed this (owned) order.
+router.get('/orders/:id/review', asyncHandler(async (req, res) => {
+  await ownedOrder(req, req.params.id);
+  const r = await get(
+    `SELECT id, stars, body, created_at AS createdAt FROM reviews WHERE order_id=@o`,
+    { o: req.params.id });
+  res.json({ review: r || null });
+}));
+
+// Leave a verified review on a completed order. Anti-spam: must own the order,
+// it must be delivered, and only one review per order (enforced in the service).
+router.post('/orders/:id/review', asyncHandler(async (req, res) => {
+  const order = await ownedOrder(req, req.params.id);
+  if (order.status !== 'completed') throw forbidden('You can review an order once it is delivered.');
+  const { stars, body, city } = z.object({
+    stars: z.number().int().min(1).max(5),
+    body: z.string().min(3).max(600),
+    city: z.string().max(40).optional(),
+  }).parse(req.body || {});
+  const author = req.user.displayName || order.billing?.full_name?.split(/\s+/)[0] || 'Verified buyer';
+  const product = order.items?.[0]?.name || null;
+  const result = await addVerifiedReview({
+    userId: req.user.id, email: order.email, orderId: order.id,
+    author, stars, body, product, city: city || order.billing?.city || null,
+  });
+  await audit({ actor: req.user, action: 'review.create', targetType: 'order', targetId: order.id,
+    metadata: { stars }, req });
+  res.status(201).json(result);
 }));
 
 // ── Support tickets ──────────────────────────────────────────────────────

@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, FileText, RefreshCw, Download, Copy } from 'lucide-react';
+import { ArrowLeft, FileText, RefreshCw, Download, Copy, Star, BadgeCheck } from 'lucide-react';
 import { api } from '../../lib/api.js';
 import { money, date } from '../../lib/format.js';
 import { PageLoader, StatusBadge, STATUS_META, Modal } from '../../components/ui.jsx';
@@ -13,11 +13,32 @@ export default function OrderDetail() {
   const [refundOpen, setRefundOpen] = useState(false);
   const [reason, setReason] = useState('');
   const [reveal, setReveal] = useState({});
+  const [review, setReview] = useState(undefined);    // undefined=loading, null=none, object=exists
+  const [stars, setStars] = useState(5);
+  const [reviewBody, setReviewBody] = useState('');
+  const [reviewBusy, setReviewBusy] = useState(false);
 
   const load = useCallback(() => {
     api.get(`/api/account/orders/${id}`).then((r) => setOrder(r.order)).catch(() => {});
   }, [id]);
   useEffect(() => { load(); }, [load]);
+
+  // Whether this (delivered) order has already been reviewed.
+  useEffect(() => {
+    if (!order || order.status !== 'completed') return;
+    api.get(`/api/account/orders/${id}/review`).then((r) => setReview(r.review)).catch(() => setReview(null));
+  }, [order, id]);
+
+  const submitReview = async () => {
+    if (reviewBody.trim().length < 3) { toast.error('Please write a few words.'); return; }
+    setReviewBusy(true);
+    try {
+      await api.post(`/api/account/orders/${id}/review`, { stars, body: reviewBody.trim() });
+      toast.success('Thanks for your review!');
+      setReview({ stars, body: reviewBody.trim() });
+    } catch (err) { toast.error(err.message); }
+    finally { setReviewBusy(false); }
+  };
 
   // Poll status while the order is still in flight (real-time tracking).
   useEffect(() => {
@@ -83,6 +104,35 @@ export default function OrderDetail() {
               <span className="text-white text-lg font-semibold">{money(order.total, order.currency)}</span>
             </div>
           </div>
+
+          {order.status === 'completed' && review !== undefined && (
+            <div className="card p-5">
+              <h3 className="text-white mb-1 flex items-center gap-2"><BadgeCheck size={16} className="text-emerald-400" /> Verified review</h3>
+              {review ? (
+                <div className="mt-3">
+                  <div className="flex text-amber-400 mb-1">{Array.from({ length: review.stars || 5 }).map((_, i) => <Star key={i} size={15} fill="currentColor" />)}</div>
+                  <p className="text-slate-300 text-sm">"{review.body}"</p>
+                  <p className="text-emerald-400/80 text-xs mt-2">Thanks — your review is published as a verified purchase.</p>
+                </div>
+              ) : (
+                <div className="mt-3">
+                  <p className="text-slate-400 text-sm mb-3">How was your order? Your review shows up with a Verified buyer badge.</p>
+                  <div className="flex gap-1 mb-3">
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <button key={i} type="button" onClick={() => setStars(i + 1)} aria-label={`${i + 1} stars`}>
+                        <Star size={24} className={i < stars ? 'text-amber-400' : 'text-slate-600'} fill={i < stars ? 'currentColor' : 'none'} />
+                      </button>
+                    ))}
+                  </div>
+                  <textarea value={reviewBody} onChange={(e) => setReviewBody(e.target.value)} rows={3} maxLength={600}
+                    className="input" placeholder="Tell other buyers about your experience…" />
+                  <button onClick={submitReview} disabled={reviewBusy} className="btn-primary mt-3 text-sm">
+                    {reviewBusy ? 'Submitting…' : 'Submit review'}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
 
           {order.deliveries.length > 0 && (
             <div className="card p-5">

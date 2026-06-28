@@ -26,6 +26,7 @@ export default function Checkout() {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [fullName, setFullName] = useState('');
+  const [city, setCity] = useState('');
   const [busy, setBusy] = useState(false);
   const [provider, setProvider] = useState('none');     // stripe | demo | manual | none
   const [methods, setMethods] = useState([]);
@@ -74,7 +75,7 @@ export default function Checkout() {
       const { order } = await api.post('/api/orders', {
         email,
         items: items.map((i) => ({ productId: i.id, quantity: i.qty })),
-        billing: { full_name: fullName, email },
+        billing: { full_name: fullName, city, email },
         currency,
         coupon: coupon?.code,
         paymentMethod: methodId || undefined,
@@ -166,9 +167,15 @@ export default function Checkout() {
                 <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
                   className="input" placeholder="you@example.com" />
               </div>
-              <div>
-                <label className="label">Full name</label>
-                <input value={fullName} onChange={(e) => setFullName(e.target.value)} className="input" placeholder="Optional" />
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="label">Full name</label>
+                  <input value={fullName} onChange={(e) => setFullName(e.target.value)} className="input" placeholder="Optional" />
+                </div>
+                <div>
+                  <label className="label">City</label>
+                  <input value={city} onChange={(e) => setCity(e.target.value)} className="input" placeholder="Optional" />
+                </div>
               </div>
             </div>
             {!user && (

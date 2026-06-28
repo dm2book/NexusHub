@@ -36,8 +36,15 @@ export default function Reviews() {
                 ? <img src={r.avatarUrl} alt="" className="w-9 h-9 rounded-full object-cover" />
                 : <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-fuchsia-500 flex items-center justify-center text-white text-sm font-semibold">{(r.author || '?')[0]}</div>}
               <div>
-                <div className="text-white text-sm flex items-center gap-1">{r.author} <BadgeCheck size={13} className="text-emerald-400" /></div>
-                <div className="text-slate-500 text-xs">Verified{r.product ? ` · ${r.product}` : ' · Discord vouch'}</div>
+                <div className="text-white text-sm flex items-center gap-1">
+                  {r.author} <BadgeCheck size={13} className="text-emerald-400" />
+                </div>
+                <div className="text-slate-500 text-xs flex items-center gap-1">
+                  {r.verified
+                    ? <span className="text-emerald-400 font-semibold">Verified buyer</span>
+                    : 'Verified'}{r.product ? ` · ${r.product}` : (!r.verified ? ' · Discord vouch' : '')}
+                  {r.city ? ` · ${r.city}` : ''}
+                </div>
               </div>
             </div>
           </div>

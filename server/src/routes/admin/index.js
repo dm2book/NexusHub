@@ -11,6 +11,7 @@ import analytics from './analytics.js';
 import security from './security.js';
 import products from './products.js';
 import support from './support.js';
+import social from './social.js';
 
 const router = Router();
 router.use(requireAuth, requireStaff);
@@ -23,5 +24,6 @@ router.use('/analytics', analytics);
 router.use('/security', security);
 router.use('/products', products);
 router.use('/support', support);
+router.use('/social', social);
 
 export default router;

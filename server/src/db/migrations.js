@@ -542,4 +542,48 @@ CREATE INDEX IF NOT EXISTS idx_login_attempts_id   ON login_attempts (identifier
 CREATE INDEX IF NOT EXISTS idx_login_attempts_ip   ON login_attempts (ip, created_at);
 `,
   },
+  {
+    id: '006_social_proof',
+    sql: `
+-- Live social-proof feed. One privacy-safe snapshot per delivered order:
+-- ONLY a first name + (optional) city are stored — never the email, surname or
+-- any other PII. Captured at completion so the public feed is a cheap read and
+-- past deliveries can't change retroactively.
+CREATE TABLE IF NOT EXISTS social_events (
+  id               TEXT PRIMARY KEY,
+  type             TEXT NOT NULL DEFAULT 'purchase',  -- purchase
+  order_id         TEXT REFERENCES orders(id) ON DELETE CASCADE,
+  first_name       TEXT,                 -- privacy-safe display name (first name only)
+  city             TEXT,                 -- optional, "from {city}"
+  country          TEXT,                 -- optional ISO/name
+  product_label    TEXT NOT NULL,        -- e.g. "1,700 Robux"
+  category         TEXT,                 -- product category (for the icon)
+  delivery_seconds INTEGER,              -- completed_at − created_at
+  status           TEXT NOT NULL DEFAULT 'visible',   -- visible | hidden
+  pinned           INTEGER NOT NULL DEFAULT 0,
+  created_at       TEXT NOT NULL         -- delivery time
+);
+-- One feed event per order (idempotent re-delivery never double-posts).
+CREATE UNIQUE INDEX IF NOT EXISTS idx_social_events_order ON social_events (order_id);
+CREATE INDEX IF NOT EXISTS idx_social_events_feed ON social_events (status, pinned, created_at);
+
+-- Tie reviews to a real, completed purchase so we can show a "Verified buyer"
+-- badge that actually means something (only set for account-submitted reviews).
+ALTER TABLE reviews ADD COLUMN IF NOT EXISTS verified  INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE reviews ADD COLUMN IF NOT EXISTS order_id  TEXT;
+ALTER TABLE reviews ADD COLUMN IF NOT EXISTS user_id   TEXT;
+ALTER TABLE reviews ADD COLUMN IF NOT EXISTS email     TEXT;
+ALTER TABLE reviews ADD COLUMN IF NOT EXISTS city      TEXT;
+-- One verified review per order.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_reviews_order ON reviews (order_id) WHERE order_id IS NOT NULL;
+
+-- Moderation permission (added here, not just in seed(), so it lands on already-
+-- seeded production databases where seed() no longer runs). Granted to owner+admin.
+INSERT INTO permissions (id, description) VALUES ('social.moderate', 'Moderate social proof feed & reviews')
+  ON CONFLICT(id) DO NOTHING;
+INSERT INTO role_permissions (role_id, permission_id)
+  SELECT r.id, 'social.moderate' FROM roles r WHERE r.id IN ('owner', 'admin')
+  ON CONFLICT DO NOTHING;
+`,
+  },
 ];

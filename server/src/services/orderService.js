@@ -23,6 +23,7 @@ import { grantTierForOrder } from './discordRolesService.js';
 import { availableCount, claimCodes } from './codeStockService.js';
 import { memberDiscountPercent } from './membershipService.js';
 import { recordOrderCommission } from './affiliateService.js';
+import { recordPurchaseEvent } from './socialProofService.js';
 
 export const STATUSES = [
   'pending', 'payment_received', 'processing', 'awaiting_fulfillment',
@@ -169,7 +170,11 @@ export async function transitionOrder(orderId, to, ctx = {}) {
   if (emailEvent) {
     await sendEmailAsync(emailEvent, updated.email, emailContext(updated, ctx));
   }
-  if (to === 'completed') await postOrderEvent(updated, 'completed').catch(() => {});
+  if (to === 'completed') {
+    await postOrderEvent(updated, 'completed').catch(() => {});
+    // Capture a privacy-safe snapshot for the live social-proof feed (best-effort).
+    await recordPurchaseEvent(updated).catch(() => {});
+  }
   if (to === 'refunded') await postOrderEvent(updated, 'refunded').catch(() => {});
   // Grant the buyer's Discord tier (Verified vs VIP) once the order is paid.
   if (to === 'payment_received' || to === 'completed') await grantTierForOrder(updated);

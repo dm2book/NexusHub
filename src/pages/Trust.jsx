@@ -6,6 +6,7 @@ import {
 import { useStats } from '../lib/useStats.js';
 import { useReviews } from '../lib/useReviews.js';
 import { usePageMeta } from '../lib/useMeta.js';
+import LiveActivity from '../components/store/LiveActivity.jsx';
 
 const GUARANTEES = [
   { icon: Zap, title: 'Instant, automated delivery', text: 'Most orders are delivered in seconds straight to your email and dashboard — fully automated, 24/7.' },
@@ -56,6 +57,9 @@ export default function Trust() {
         <Stat icon={Users} value={stats.discordMembers.toLocaleString('en-US')} label="Discord members" color="text-blue-600 bg-blue-100" />
       </div>
 
+      {/* Live, database-backed activity (hides itself until there's real data) */}
+      <LiveActivity />
+
       {/* Guarantees */}
       <h2 className="text-2xl font-extrabold text-slate-900 mb-5">Our guarantees</h2>
       <div className="grid sm:grid-cols-2 gap-4 mb-12">
@@ -91,7 +95,8 @@ export default function Trust() {
             <div className="flex text-amber-400 mb-2">{Array.from({ length: r.stars || 5 }).map((_, i) => <Star key={i} size={14} fill="currentColor" />)}</div>
             <p className="text-slate-600 text-sm">"{r.body}"</p>
             <div className="flex items-center gap-2 mt-3 text-xs text-slate-400">
-              <BadgeCheck size={13} className="text-emerald-500" /> {r.author}{r.product ? ` · ${r.product}` : ' · Verified'}
+              <BadgeCheck size={13} className="text-emerald-500" /> {r.author}{r.product ? ` · ${r.product}` : ''}
+              {r.verified ? <span className="inline-flex items-center gap-1 text-emerald-600 font-semibold">· Verified buyer</span> : ' · Verified'}
             </div>
           </div>
         ))}

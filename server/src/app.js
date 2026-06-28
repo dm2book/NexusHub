@@ -24,6 +24,7 @@ import accountRoutes from './routes/account.js';
 import catalogRoutes from './routes/catalog.js';
 import discordRoutes from './routes/discord.js';
 import paymentRoutes from './routes/payments.js';
+import socialRoutes from './routes/social.js';
 import adminRoutes from './routes/admin/index.js';
 
 let readyPromise = null;
@@ -91,6 +92,7 @@ export function createApp({ lazyReady = false } = {}) {
   app.use('/api/account', accountRoutes);
   app.use('/api/discord', discordRoutes);
   app.use('/api/payments', paymentRoutes);
+  app.use('/api/social', socialRoutes);
   app.use('/api', catalogRoutes);
   app.use('/api/admin', adminRoutes);
 
