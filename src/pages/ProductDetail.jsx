@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Minus, Plus, ShoppingCart, Zap, ShieldCheck, Clock, BadgeCheck,
+  Star, RefreshCw, Headphones, ChevronDown, Heart,
 } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { useCart } from '../context/CartContext.jsx';
@@ -10,17 +11,38 @@ import { categoryVisual, money } from '../lib/catalog.js';
 import { SAMPLE_PRODUCTS, withFallback } from '../lib/sampleCatalog.js';
 import { PageLoader } from '../components/ui.jsx';
 import LightProductCard from '../components/store/LightProductCard.jsx';
+import { useReviews } from '../lib/useReviews.js';
+import { useStats } from '../lib/useStats.js';
+import { useWishlist } from '../lib/wishlist.js';
 import { usePageMeta } from '../lib/useMeta.js';
+
+const TRUST = [
+  { icon: Zap, title: 'Instant delivery', sub: 'Codes in seconds' },
+  { icon: ShieldCheck, title: 'Buyer protected', sub: 'Money-back guarantee' },
+  { icon: BadgeCheck, title: 'Verified reviews', sub: 'Real purchases only' },
+  { icon: Headphones, title: '24/7 support', sub: 'Always here to help' },
+];
+
+const FAQ = [
+  ['How fast will I get it?', 'Most orders are delivered automatically within seconds of your payment being confirmed — straight to your email and account dashboard.'],
+  ['How do I pay?', 'Securely via Tikkie, Revolut or PayPal. You submit your transaction reference and we confirm it, usually within minutes.'],
+  ['Is it safe?', 'Yes — every order is buyer-protected and money-back guaranteed. We use passwordless login and fraud screening on every order.'],
+  ['What if it doesn’t arrive?', 'Open a ticket from your dashboard or our Discord — we resolve delivery issues fast, and eligible orders are fully refundable.'],
+];
 
 export default function ProductDetail() {
   const { id } = useParams();
   const { add } = useCart();
   const toast = useToast();
   const navigate = useNavigate();
+  const reviews = useReviews();
+  const stats = useStats();
+  const { has, toggle } = useWishlist();
   const [product, setProduct] = useState(null);
   const [all, setAll] = useState([]);
   const [qty, setQty] = useState(1);
   const [notFound, setNotFound] = useState(false);
+  const [openFaq, setOpenFaq] = useState(0);
   usePageMeta(product?.name || 'Product', product?.description || 'Instant digital delivery.');
 
   useEffect(() => {
@@ -28,7 +50,6 @@ export default function ProductDetail() {
     api.get(`/api/products/${id}`)
       .then((r) => setProduct(r.product))
       .catch(() => {
-        // Fall back to the built-in showcase product if the API has no catalog yet.
         const sample = SAMPLE_PRODUCTS.find((p) => p.id === id);
         if (sample) setProduct(sample); else setNotFound(true);
       });
@@ -47,6 +68,8 @@ export default function ProductDetail() {
 
   const { icon: Icon, grad, label } = categoryVisual(product.category);
   const related = all.filter((p) => p.id !== product.id && p.category === product.category).slice(0, 4);
+  const eta = stats.avgDeliverySeconds < 60 ? `~${Math.max(5, Math.round(stats.avgDeliverySeconds))} seconds` : `~${Math.round(stats.avgDeliverySeconds / 60)} min`;
+  const wished = has(product.id);
 
   const addToCart = () => { add(product, qty); toast.success(`${qty}× ${product.name} added to cart`); };
   const buyNow = () => { add(product, qty); navigate('/cart'); };
@@ -80,7 +103,25 @@ export default function ProductDetail() {
         <div className="animate-fade-up">
           <span className="text-xs uppercase tracking-wider text-indigo-400 font-rajdhani">{label}</span>
           <h1 className="text-3xl sm:text-4xl text-white mt-2">{product.name}</h1>
+
+          {/* rating + stock */}
+          <div className="flex items-center gap-3 mt-3 text-sm">
+            <span className="flex items-center gap-1 text-amber-400">
+              {Array.from({ length: 5 }).map((_, i) => <Star key={i} size={14} fill="currentColor" />)}
+            </span>
+            <span className="text-slate-400">{stats.rating} · {stats.reviews.toLocaleString('en-US')} reviews</span>
+            {typeof product.stock === 'number' && product.stock > 0 && product.stock <= 10 && (
+              <span className="text-red-500 font-semibold">Only {product.stock} left</span>
+            )}
+          </div>
+
           <div className="text-3xl font-semibold mt-4 gradient-text gradient-anim">{money(product.price, product.currency)}</div>
+
+          {/* delivery estimate */}
+          <div className="inline-flex items-center gap-2 mt-3 text-sm text-emerald-600 bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-3 py-1.5">
+            <Zap size={14} /> Estimated delivery: <b>{eta}</b> after payment
+          </div>
+
           {product.description && <p className="text-slate-400 mt-5 leading-relaxed">{product.description}</p>}
 
           <div className="mt-8 space-y-3">
@@ -92,17 +133,23 @@ export default function ProductDetail() {
               </div>
               <span className="text-slate-500 text-sm font-rajdhani uppercase tracking-wide">Quantity</span>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-[1fr_1fr_auto] gap-3">
               <button onClick={addToCart} className="btn-ghost py-3"><ShoppingCart size={18} /> Add to cart</button>
               <button onClick={buyNow} className="btn-primary py-3">Buy now</button>
+              <button onClick={() => toggle(product)} aria-label="Wishlist"
+                className={`btn-ghost px-3.5 ${wished ? 'text-pink-500' : ''}`}>
+                <Heart size={18} fill={wished ? 'currentColor' : 'none'} />
+              </button>
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-3 mt-8">
-            {[[Zap, 'Instant delivery'], [ShieldCheck, 'Secure payment'], [Clock, '24/7 support']].map(([I, t]) => (
-              <div key={t} className="glass rounded-xl p-3 text-center">
+          {/* trust badges */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-8">
+            {TRUST.map(({ icon: I, title, sub }) => (
+              <div key={title} className="glass rounded-xl p-3 text-center">
                 <I size={18} className="text-indigo-300 mx-auto mb-1.5" />
-                <div className="text-xs text-slate-300">{t}</div>
+                <div className="text-xs text-white font-medium">{title}</div>
+                <div className="text-[11px] text-slate-500">{sub}</div>
               </div>
             ))}
           </div>
@@ -113,10 +160,54 @@ export default function ProductDetail() {
         </div>
       </div>
 
+      {/* Reviews + FAQ */}
+      <div className="grid lg:grid-cols-2 gap-10 mt-16">
+        <section>
+          <div className="flex items-center justify-between mb-5">
+            <h2 className="text-2xl font-extrabold text-slate-900">What buyers say</h2>
+            <Link to="/reviews" className="text-violet-600 text-sm font-semibold hover:underline">All reviews →</Link>
+          </div>
+          <div className="flex items-center gap-3 mb-5">
+            <div className="text-4xl font-extrabold text-slate-900">{stats.rating}</div>
+            <div>
+              <div className="flex text-amber-400">{Array.from({ length: 5 }).map((_, i) => <Star key={i} size={15} fill="currentColor" />)}</div>
+              <div className="text-slate-400 text-sm">{stats.reviews.toLocaleString('en-US')} verified reviews</div>
+            </div>
+          </div>
+          <div className="space-y-3">
+            {reviews.slice(0, 3).map((r) => (
+              <div key={r.id} className="card p-4 fm-lift">
+                <div className="flex text-amber-400 mb-1.5">{Array.from({ length: r.stars || 5 }).map((_, i) => <Star key={i} size={13} fill="currentColor" />)}</div>
+                <p className="text-slate-200 text-sm">“{r.body}”</p>
+                <div className="flex items-center gap-1.5 mt-2 text-xs text-slate-500">
+                  <BadgeCheck size={12} className="text-emerald-500" /> {r.author}{r.product ? ` · ${r.product}` : ' · Verified'}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section>
+          <h2 className="text-2xl font-extrabold text-slate-900 mb-5">Frequently asked</h2>
+          <div className="space-y-3">
+            {FAQ.map(([q, a], i) => (
+              <button key={q} onClick={() => setOpenFaq(openFaq === i ? -1 : i)}
+                className="card w-full text-left p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-white font-medium text-sm">{q}</span>
+                  <ChevronDown size={16} className={`text-slate-400 shrink-0 transition-transform ${openFaq === i ? 'rotate-180' : ''}`} />
+                </div>
+                {openFaq === i && <p className="text-slate-400 text-sm mt-2.5 leading-relaxed">{a}</p>}
+              </button>
+            ))}
+          </div>
+        </section>
+      </div>
+
       {related.length > 0 && (
-        <div className="mt-20">
+        <div className="mt-16">
           <h2 className="text-2xl font-extrabold text-slate-900 mb-6">You might also like</h2>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 fm-grid-in">
             {related.map((p) => <LightProductCard key={p.id} product={p} onAdd={(x) => { add(x); toast.success(`${x.name} added`); }} />)}
           </div>
         </div>
