@@ -36,7 +36,10 @@ export default function Trust() {
   const stats = useStats();
   const reviews = useReviews();
   usePageMeta('Trust Center — ForgeMarket', 'Delivery, review and refund statistics, security guarantees and proof you can trust ForgeMarket.');
-  const avgDelivery = stats.avgDeliverySeconds < 60 ? `< ${Math.max(5, Math.round(stats.avgDeliverySeconds))}s` : `${Math.round(stats.avgDeliverySeconds / 60)}m`;
+  const avgDelivery = stats.avgDeliverySeconds == null ? '—'
+    : stats.avgDeliverySeconds < 60 ? `< ${Math.max(1, Math.round(stats.avgDeliverySeconds))}s`
+    : `${Math.round(stats.avgDeliverySeconds / 60)}m`;
+  const fmt = (n) => `${Number(n || 0).toLocaleString('en-US')}${Number(n || 0) >= 100 ? '+' : ''}`;
 
   return (
     <div className="max-w-[1100px] mx-auto px-4 lg:px-8 py-10">
@@ -49,12 +52,12 @@ export default function Trust() {
         <p className="text-slate-500 mt-3 max-w-xl mx-auto">Real numbers, real guarantees. Here's exactly how we keep every order safe, fast and protected.</p>
       </div>
 
-      {/* Live stats */}
+      {/* Live stats (real) */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-12">
-        <Stat icon={CheckCircle2} value={`${stats.delivered.toLocaleString('en-US')}+`} label="Orders delivered" color="text-violet-600 bg-violet-100" />
+        <Stat icon={CheckCircle2} value={fmt(stats.delivered)} label="Orders delivered" color="text-violet-600 bg-violet-100" />
         <Stat icon={Clock} value={avgDelivery} label="Average delivery" color="text-emerald-600 bg-emerald-100" />
-        <Stat icon={Star} value={`${stats.rating}/5`} label={`${stats.reviews.toLocaleString('en-US')} reviews`} color="text-amber-600 bg-amber-100" />
-        <Stat icon={Users} value={stats.discordMembers.toLocaleString('en-US')} label="Discord members" color="text-blue-600 bg-blue-100" />
+        <Stat icon={Star} value={stats.reviews > 0 ? `${stats.rating}/5` : '—'} label={stats.reviews > 0 ? `${stats.reviews.toLocaleString('en-US')} reviews` : 'No reviews yet'} color="text-amber-600 bg-amber-100" />
+        <Stat icon={Users} value={stats.discordMembers > 0 ? stats.discordMembers.toLocaleString('en-US') : '24/7'} label={stats.discordMembers > 0 ? 'Discord members' : 'Community support'} color="text-blue-600 bg-blue-100" />
       </div>
 
       {/* Live, database-backed activity (hides itself until there's real data) */}
@@ -79,7 +82,9 @@ export default function Trust() {
         style={{ backgroundImage: 'linear-gradient(150deg,#6366f1,#8b5cf6)' }}>
         <span className="w-14 h-14 rounded-2xl bg-white/15 grid place-items-center shrink-0"><MessageCircle size={26} /></span>
         <div className="flex-1">
-          <h3 className="text-xl font-extrabold">{stats.discordMembers.toLocaleString('en-US')} members can vouch for us</h3>
+          <h3 className="text-xl font-extrabold">
+            {stats.discordMembers > 0 ? `${stats.discordMembers.toLocaleString('en-US')} members can vouch for us` : 'Join a community that can vouch for us'}
+          </h3>
           <p className="text-white/85 text-sm mt-1">Public reviews, proof-of-delivery and a 24/7 community. See for yourself before you buy.</p>
         </div>
         <Link to="/discord" className="inline-flex items-center justify-center gap-2 bg-white text-indigo-600 font-semibold text-sm rounded-xl h-11 px-6 hover:bg-indigo-50 transition shrink-0">
@@ -87,20 +92,24 @@ export default function Trust() {
         </Link>
       </div>
 
-      {/* Recent verified reviews */}
-      <h2 className="text-2xl font-extrabold text-slate-900 mb-5">Verified customer reviews</h2>
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-12">
-        {reviews.slice(0, 6).map((r) => (
-          <div key={r.id} className="bg-white rounded-2xl border border-slate-200/70 shadow-sm p-5 fm-lift">
-            <div className="flex text-amber-400 mb-2">{Array.from({ length: r.stars || 5 }).map((_, i) => <Star key={i} size={14} fill="currentColor" />)}</div>
-            <p className="text-slate-600 text-sm">"{r.body}"</p>
-            <div className="flex items-center gap-2 mt-3 text-xs text-slate-400">
-              <BadgeCheck size={13} className="text-emerald-500" /> {r.author}{r.product ? ` · ${r.product}` : ''}
-              {r.verified ? <span className="inline-flex items-center gap-1 text-emerald-600 font-semibold">· Verified buyer</span> : ' · Verified'}
-            </div>
+      {/* Recent verified reviews (only when we have real ones) */}
+      {reviews.length > 0 && (
+        <>
+          <h2 className="text-2xl font-extrabold text-slate-900 mb-5">Verified customer reviews</h2>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-12">
+            {reviews.slice(0, 6).map((r) => (
+              <div key={r.id} className="bg-white rounded-2xl border border-slate-200/70 shadow-sm p-5 fm-lift">
+                <div className="flex text-amber-400 mb-2">{Array.from({ length: r.stars || 5 }).map((_, i) => <Star key={i} size={14} fill="currentColor" />)}</div>
+                <p className="text-slate-600 text-sm">"{r.body}"</p>
+                <div className="flex items-center gap-2 mt-3 text-xs text-slate-400">
+                  <BadgeCheck size={13} className="text-emerald-500" /> {r.author}{r.product ? ` · ${r.product}` : ''}
+                  {r.verified ? <span className="inline-flex items-center gap-1 text-emerald-600 font-semibold">· Verified buyer</span> : ' · Verified'}
+                </div>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        </>
+      )}
 
       {/* FAQ */}
       <h2 className="text-2xl font-extrabold text-slate-900 mb-5">Questions, answered</h2>

@@ -1,16 +1,11 @@
 import { useEffect, useState } from 'react';
 import { api } from './api.js';
 
+// Neutral defaults — never fabricated numbers. Real values arrive from /api/stats;
+// until then (and on error) the UI shows zeros / hides empty counters.
 const FALLBACK = {
-  delivered: 52340, customers: 10200, products: 70, avgDeliverySeconds: 24,
-  rating: 4.9, reviews: 2345, discordMembers: 1240,
-  recent: [
-    { item: '4,500 Robux', cat: 'robux', secondsAgo: 18 },
-    { item: '2,800 V-Bucks', cat: 'v-bucks', secondsAgo: 54 },
-    { item: 'Discord Nitro — 1 Month', cat: 'discord-nitro', secondsAgo: 92 },
-    { item: '3,650 VP — Valorant', cat: 'valorant', secondsAgo: 140 },
-    { item: '€25 Steam Wallet', cat: 'steam', secondsAgo: 205 },
-  ],
+  delivered: 0, customers: 0, products: 0, avgDeliverySeconds: null,
+  rating: null, reviews: 0, discordMembers: 0, recent: [],
 };
 
 let cache = null;

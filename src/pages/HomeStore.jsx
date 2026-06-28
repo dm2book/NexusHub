@@ -64,10 +64,12 @@ const TRUST = [
   { icon: Headphones, title: '24/7 Support', sub: 'Always here to help', color: 'text-blue-600 bg-blue-100' },
 ];
 
+// Real counts only — append "+" once the number is large enough to round.
+const fmtCount = (n) => `${Number(n || 0).toLocaleString('en-US')}${Number(n || 0) >= 100 ? '+' : ''}`;
 const statCards = (s) => [
-  { icon: Users, value: `${s.customers.toLocaleString('en-US')}+`, label: 'Happy Customers', color: 'text-violet-600 bg-violet-100' },
+  { icon: Users, value: fmtCount(s.customers), label: 'Happy Customers', color: 'text-violet-600 bg-violet-100' },
   { icon: CheckCircle2, value: '99.9%', label: 'Success Rate', color: 'text-emerald-600 bg-emerald-100' },
-  { icon: ShoppingCart, value: `${s.delivered.toLocaleString('en-US')}+`, label: 'Orders Delivered', color: 'text-blue-600 bg-blue-100' },
+  { icon: ShoppingCart, value: fmtCount(s.delivered), label: 'Orders Delivered', color: 'text-blue-600 bg-blue-100' },
   { icon: Headphones, value: '24/7', label: 'Customer Support', color: 'text-amber-600 bg-amber-100' },
 ];
 
@@ -269,14 +271,16 @@ export default function HomeStore() {
                     View All Products
                   </Link>
                 </div>
-                <div className="flex items-center gap-3 mt-7">
-                  <div className="flex -space-x-2.5">
-                    {['#f472b6', '#60a5fa', '#34d399', '#fbbf24'].map((c, i) => (
-                      <span key={i} className="w-9 h-9 rounded-full border-2 border-white" style={{ background: c }} />
-                    ))}
+                {stats.customers > 0 && (
+                  <div className="flex items-center gap-3 mt-7">
+                    <div className="flex -space-x-2.5">
+                      {['#f472b6', '#60a5fa', '#34d399', '#fbbf24'].map((c, i) => (
+                        <span key={i} className="w-9 h-9 rounded-full border-2 border-white" style={{ background: c }} />
+                      ))}
+                    </div>
+                    <div className="text-sm"><b className="fm-head">{fmtCount(stats.customers)}</b> <span className="text-slate-500">Happy Customers</span></div>
                   </div>
-                  <div className="text-sm"><b className="fm-head">10,000+</b> <span className="text-slate-500">Happy Customers</span></div>
-                </div>
+                )}
               </div>
 
               {/* 3D render */}
@@ -358,20 +362,26 @@ export default function HomeStore() {
             {/* Reviews */}
             <div className="bg-white rounded-2xl border border-slate-200/70 shadow-sm p-5 fm-lift">
               <div className="font-bold mb-3">What Our Customers Say</div>
-              <div className="flex items-center gap-2 mb-4">
-                <div className="flex text-amber-400">{Array.from({ length: 5 }).map((_, i) => <Star key={i} size={16} fill="currentColor" />)}</div>
-                <span className="fm-head">{stats.rating} out of 5</span>
-                <span className="text-[12px] text-slate-400">Based on {stats.reviews.toLocaleString('en-US')} reviews</span>
-              </div>
-              <div className="space-y-2.5">
-                {reviews.slice(0, 2).map((r) => (
-                  <div key={r.id} className="bg-slate-50 rounded-xl p-3">
-                    <div className="flex text-amber-400 mb-1">{Array.from({ length: r.stars || 5 }).map((_, i) => <Star key={i} size={12} fill="currentColor" />)}</div>
-                    <p className="text-[13px] text-slate-600 line-clamp-3">"{r.body}"</p>
-                    <p className="text-[11px] text-slate-400 mt-1">– {r.author}{r.product ? ` · ${r.product}` : ''}</p>
-                  </div>
-                ))}
-              </div>
+              {stats.reviews > 0 && (
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="flex text-amber-400">{Array.from({ length: 5 }).map((_, i) => <Star key={i} size={16} fill="currentColor" />)}</div>
+                  {stats.rating != null && <span className="fm-head">{stats.rating} out of 5</span>}
+                  <span className="text-[12px] text-slate-400">Based on {stats.reviews.toLocaleString('en-US')} reviews</span>
+                </div>
+              )}
+              {reviews.length > 0 ? (
+                <div className="space-y-2.5">
+                  {reviews.slice(0, 2).map((r) => (
+                    <div key={r.id} className="bg-slate-50 rounded-xl p-3">
+                      <div className="flex text-amber-400 mb-1">{Array.from({ length: r.stars || 5 }).map((_, i) => <Star key={i} size={12} fill="currentColor" />)}</div>
+                      <p className="text-[13px] text-slate-600 line-clamp-3">"{r.body}"</p>
+                      <p className="text-[11px] text-slate-400 mt-1">– {r.author}{r.product ? ` · ${r.product}` : ''}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-[13px] text-slate-400">Be the first to leave a verified review after your purchase.</p>
+              )}
             </div>
 
             {/* Discord */}
@@ -380,10 +390,12 @@ export default function HomeStore() {
               <span className="w-12 h-12 rounded-2xl bg-white/15 grid place-items-center mb-4"><MessageCircle size={24} /></span>
               <div className="fm-head text-xl">Join Our Discord</div>
               <p className="text-white/85 text-sm mt-2 leading-relaxed flex-1">Get support, updates and exclusive giveaways!</p>
-              <div className="flex items-center gap-2 mt-3 text-white/90 text-sm">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                <b>{stats.discordMembers.toLocaleString('en-US')}</b> members online
-              </div>
+              {stats.discordMembers > 0 && (
+                <div className="flex items-center gap-2 mt-3 text-white/90 text-sm">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <b>{stats.discordMembers.toLocaleString('en-US')}</b> members online
+                </div>
+              )}
               <Link to="/discord" className="mt-4 inline-flex items-center justify-center gap-2 bg-white text-indigo-600 font-semibold text-sm rounded-xl h-11 hover:bg-indigo-50 transition">
                 Join Discord <ArrowRight size={16} />
               </Link>

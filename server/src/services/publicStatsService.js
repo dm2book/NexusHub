@@ -1,31 +1,15 @@
 /**
  * Public, unauthenticated trust stats for the storefront (orders delivered,
  * average delivery time, catalogue size, Discord members, and a feed of recent
- * anonymised deliveries for social proof).
+ * deliveries for social proof).
  *
- * Every query is wrapped so a fresh/empty database or a transient DB issue never
- * breaks the homepage — we fall back to sensible baseline figures instead.
+ * REAL DATA ONLY — no baseline padding or sample feed. A brand-new store reports
+ * zeros and the UI degrades gracefully (the homepage hides empty counters). Every
+ * query is still wrapped so a transient DB issue never breaks the page.
  */
 import { get, all } from '../db/index.js';
 import { config } from '../config/env.js';
 import { reviewStats } from './reviewsService.js';
-
-const BASELINE = {
-  delivered: 52340,
-  customers: 10200,
-  avgDeliverySeconds: 24,
-  rating: 4.9,
-  reviews: 2345,
-};
-
-const SAMPLE_RECENT = [
-  { item: '4,500 Robux', cat: 'robux', secondsAgo: 18 },
-  { item: '2,800 V-Bucks', cat: 'v-bucks', secondsAgo: 54 },
-  { item: 'Discord Nitro — 1 Month', cat: 'discord-nitro', secondsAgo: 92 },
-  { item: '3,650 VP — Valorant', cat: 'valorant', secondsAgo: 140 },
-  { item: '€25 Steam Wallet', cat: 'steam', secondsAgo: 205 },
-  { item: '5,000 CP — Call of Duty', cat: 'cod', secondsAgo: 280 },
-];
 
 async function safe(fn, fallback) {
   try { const v = await fn(); return v == null ? fallback : v; }
@@ -38,8 +22,9 @@ export async function publicStats() {
     return Number(r?.n || 0);
   }, 0);
 
+  // Real customers = distinct people who have actually ordered (incl. guests).
   const customers = await safe(async () => {
-    const r = await get(`SELECT COUNT(*) AS n FROM users`);
+    const r = await get(`SELECT COUNT(DISTINCT email) AS n FROM orders`);
     return Number(r?.n || 0);
   }, 0);
 
@@ -57,10 +42,10 @@ export async function publicStats() {
       .map((r) => (new Date(r.updated_at) - new Date(r.created_at)) / 1000)
       .filter((s) => s > 0 && s < 86_400);
     if (!secs.length) return null;
-    return Math.max(5, Math.round(secs.reduce((a, b) => a + b, 0) / secs.length));
+    return Math.max(1, Math.round(secs.reduce((a, b) => a + b, 0) / secs.length));
   }, null);
 
-  // Recent anonymised deliveries for the social-proof ticker.
+  // Recent real deliveries for the ticker (empty when there are none).
   const recent = await safe(async () => {
     const rows = await all(
       `SELECT oi.name AS item, p.category AS cat, o.updated_at AS at
@@ -69,32 +54,28 @@ export async function publicStats() {
          LEFT JOIN products p ON p.id = oi.product_id
         WHERE o.status='completed'
         ORDER BY o.updated_at DESC LIMIT 8`);
-    if (!rows?.length) return null;
     const now = Date.now();
-    return rows.map((r) => ({
+    return (rows || []).map((r) => ({
       item: r.item,
       cat: r.cat || '',
       secondsAgo: Math.max(3, Math.round((now - new Date(r.at)) / 1000)),
     }));
-  }, null);
+  }, []);
 
-  const discordMembers = Number(config.discord?.memberCount || process.env.DISCORD_MEMBER_COUNT || 1240);
+  const discordMembers = Number(config.discord?.memberCount || process.env.DISCORD_MEMBER_COUNT || 0);
 
-  // Real review aggregates (from Discord vouches) override the baseline once we
-  // have a meaningful number of them.
+  // Real review aggregates only.
   const rev = await safe(() => reviewStats(), { count: 0, average: 0 });
-  const haveReviews = rev.count >= 3;
 
-  // Blend with baseline so a young store still reads as established & trustworthy.
   return {
-    delivered: Math.max(delivered, BASELINE.delivered),
-    customers: Math.max(customers, BASELINE.customers),
-    products: products || 70,
-    avgDeliverySeconds: avgDeliverySeconds || BASELINE.avgDeliverySeconds,
-    rating: haveReviews ? rev.average : BASELINE.rating,
-    reviews: haveReviews ? rev.count : BASELINE.reviews,
-    discordMembers,
-    recent: recent || SAMPLE_RECENT,
+    delivered,
+    customers,
+    products,
+    avgDeliverySeconds,                 // null when there are no completed orders yet
+    rating: rev.count ? rev.average : null,
+    reviews: rev.count,
+    discordMembers,                     // 0 unless DISCORD_MEMBER_COUNT is set
+    recent,
     realDelivered: delivered,
   };
 }
