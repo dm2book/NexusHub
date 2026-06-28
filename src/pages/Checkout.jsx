@@ -151,7 +151,11 @@ export default function Checkout() {
 
   return (
     <div className="section py-12">
-      <h1 className="text-3xl text-white mb-8">Checkout</h1>
+      <h1 className="text-3xl text-white mb-6">Checkout</h1>
+
+      {/* Progress indicator */}
+      <CheckoutSteps current={1} />
+
       <form onSubmit={placeOrder} className="grid lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
           <div className="card p-6">
@@ -229,8 +233,14 @@ export default function Checkout() {
               : provider === 'manual' ? <>Place order & pay</>
               : <>Place order</>}
           </button>
-          <div className="flex items-center justify-center gap-2 mt-4 text-xs text-slate-500">
-            <ShieldCheck size={14} /> Fraud-screened & encrypted
+          {/* Purchase protection */}
+          <div className="mt-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 p-3">
+            <div className="flex items-center gap-2 text-emerald-300 text-sm font-medium"><ShieldCheck size={15} /> Buyer protection</div>
+            <ul className="mt-1.5 space-y-1 text-xs text-slate-400">
+              <li className="flex items-center gap-1.5"><CheckCircle2 size={11} className="text-emerald-400 shrink-0" /> Money-back guarantee if undelivered</li>
+              <li className="flex items-center gap-1.5"><CheckCircle2 size={11} className="text-emerald-400 shrink-0" /> Instant, automated delivery</li>
+              <li className="flex items-center gap-1.5"><CheckCircle2 size={11} className="text-emerald-400 shrink-0" /> Fraud-screened &amp; encrypted checkout</li>
+            </ul>
           </div>
         </div>
       </form>
@@ -280,6 +290,30 @@ function PaymentProofForm({ orderId, email, method }) {
           {busy ? <Loader2 size={18} className="animate-spin" /> : <>I’ve paid — submit for verification</>}
         </button>
       </div>
+    </div>
+  );
+}
+
+/** Cart → Details → Payment → Done progress indicator. */
+function CheckoutSteps({ current = 1 }) {
+  const steps = ['Cart', 'Details', 'Payment', 'Done'];
+  return (
+    <div className="flex items-center mb-8 max-w-2xl">
+      {steps.map((s, i) => {
+        const done = i < current, active = i === current;
+        return (
+          <div key={s} className="flex items-center flex-1 last:flex-none">
+            <div className="flex items-center gap-2">
+              <span className={`w-7 h-7 rounded-full grid place-items-center text-xs font-semibold shrink-0 ${
+                done ? 'bg-emerald-500 text-white' : active ? 'bg-primary text-white' : 'bg-white/10 text-slate-400'}`}>
+                {done ? '✓' : i + 1}
+              </span>
+              <span className={`text-sm ${active ? 'text-white font-medium' : done ? 'text-slate-300' : 'text-slate-500'}`}>{s}</span>
+            </div>
+            {i < steps.length - 1 && <div className={`flex-1 h-px mx-3 ${done ? 'bg-emerald-500/50' : 'bg-white/10'}`} />}
+          </div>
+        );
+      })}
     </div>
   );
 }
