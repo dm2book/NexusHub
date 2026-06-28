@@ -180,7 +180,8 @@ export default function ProductDetail() {
                 <div className="flex text-amber-400 mb-1.5">{Array.from({ length: r.stars || 5 }).map((_, i) => <Star key={i} size={13} fill="currentColor" />)}</div>
                 <p className="text-slate-200 text-sm">“{r.body}”</p>
                 <div className="flex items-center gap-1.5 mt-2 text-xs text-slate-500">
-                  <BadgeCheck size={12} className="text-emerald-500" /> {r.author}{r.product ? ` · ${r.product}` : ' · Verified'}
+                  <BadgeCheck size={12} className="text-emerald-500" /> {r.author}
+                  {r.verified ? <span className="text-emerald-600 font-semibold">· Verified buyer</span> : (r.product ? ` · ${r.product}` : ' · Verified')}
                 </div>
               </div>
             ))}

@@ -54,6 +54,7 @@ const AdminFulfillment = lazy(() => import('./pages/admin/Fulfillment.jsx'));
 const AdminEmails = lazy(() => import('./pages/admin/Emails.jsx'));
 const AdminSupport = lazy(() => import('./pages/admin/Support.jsx'));
 const AdminSecurity = lazy(() => import('./pages/admin/Security.jsx'));
+const AdminSocialProof = lazy(() => import('./pages/admin/SocialProof.jsx'));
 
 export default function App() {
   return (
@@ -112,6 +113,7 @@ export default function App() {
           <Route path="/admin/fulfillment" element={<AdminFulfillment />} />
           <Route path="/admin/emails" element={<AdminEmails />} />
           <Route path="/admin/support" element={<AdminSupport />} />
+          <Route path="/admin/social" element={<AdminSocialProof />} />
           <Route path="/admin/security" element={<AdminSecurity />} />
         </Route>
 

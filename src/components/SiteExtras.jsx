@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
+import { useLiveFeed, deliveryPhrase, timeAgo } from '../lib/useSocialProof.js';
 
 /** Dismissible promo strip above the header (set SITE_ANNOUNCEMENT on the server). */
 export function AnnouncementBar() {
@@ -35,35 +36,39 @@ export function CookieConsent() {
   );
 }
 
-/** Rotating "someone just bought X" social-proof popups (FOMO, pure client-side). */
-const NAMES = ['Liam', 'Noa', 'Sam', 'Emma', 'Luca', 'Mила', 'Finn', 'Yara', 'Jay', 'Sara', 'Tom', 'Ravi'];
-const BUYS = ['1,000 Robux', '2,800 V-Bucks', 'Valorant Points', 'CoD Points', 'a Steam Wallet code',
-  'Genshin Crystals', 'a PlayStation card', 'Brawl Stars Gems', 'Discord Nitro'];
-const CITIES = ['Amsterdam', 'Berlin', 'London', 'Paris', 'Madrid', 'Rotterdam', 'Dublin', 'Oslo'];
+/**
+ * Rotating live social-proof popups — REAL delivered orders only (privacy-safe:
+ * first name + city). Renders nothing until the store has real activity; we never
+ * fabricate a purchase. Data comes from /api/social/feed.
+ */
 export function SocialProof() {
-  const [pop, setPop] = useState(null);
+  const feed = useLiveFeed();
+  const [idx, setIdx] = useState(-1);
   useEffect(() => {
+    if (!feed?.length) return undefined;
     if (localStorage.getItem('fm_cookies') == null) return undefined; // wait until consent shown once
-    let t1, t2;
+    let i = 0, hideT;
     const show = () => {
-      const name = NAMES[Math.floor(Math.random() * NAMES.length)];
-      const buy = BUYS[Math.floor(Math.random() * BUYS.length)];
-      const city = CITIES[Math.floor(Math.random() * CITIES.length)];
-      const mins = 1 + Math.floor(Math.random() * 30);
-      setPop({ name, buy, city, mins, id: Date.now() });
-      t2 = setTimeout(() => setPop(null), 5500);
+      setIdx(i % feed.length); i += 1;
+      hideT = setTimeout(() => setIdx(-1), 5500);
     };
-    const loop = () => { show(); t1 = setTimeout(loop, 11000 + Math.random() * 9000); };
-    t1 = setTimeout(loop, 6000);
-    return () => { clearTimeout(t1); clearTimeout(t2); };
-  }, []);
-  if (!pop) return null;
+    const first = setTimeout(show, 6000);
+    const loop = setInterval(show, 13000);
+    return () => { clearTimeout(first); clearTimeout(hideT); clearInterval(loop); };
+  }, [feed]);
+
+  if (idx < 0 || !feed?.length) return null;
+  const r = feed[idx] || feed[0];
+  const who = r.city ? `${r.name} from ${r.city}` : r.name;
+  const delivered = deliveryPhrase(r.deliverySeconds);
   return (
-    <div key={pop.id} className="fixed bottom-4 left-4 z-[60] card p-3 pr-5 border border-white/10 shadow-2xl flex items-center gap-3 animate-fade-up max-w-xs">
+    <div key={r.id} className="fixed bottom-4 left-4 z-[60] card p-3 pr-5 border border-white/10 shadow-2xl flex items-center gap-3 animate-fade-up max-w-xs">
       <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500/30 to-teal-500/10 flex items-center justify-center text-lg">🛒</div>
       <div>
-        <div className="text-sm text-white"><span className="font-semibold">{pop.name}</span> from {pop.city} just bought <span className="text-emerald-300">{pop.buy}</span></div>
-        <div className="text-[11px] text-slate-500">{pop.mins} min ago · ✅ verified purchase</div>
+        <div className="text-sm text-white"><span className="font-semibold">{who}</span> got <span className="text-emerald-300">{r.item}</span></div>
+        <div className="text-[11px] text-slate-500">
+          {delivered ? `Delivered in ${delivered} · ` : ''}{timeAgo(r.secondsAgo)} · ✅ verified purchase
+        </div>
       </div>
     </div>
   );
