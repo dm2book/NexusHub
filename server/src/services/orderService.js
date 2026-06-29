@@ -29,17 +29,18 @@ import { grantTierRewards } from './loyaltyService.js';
 
 export const STATUSES = [
   'pending', 'payment_received', 'processing', 'awaiting_fulfillment',
-  'completed', 'refunded', 'cancelled',
+  'completed', 'refunded', 'cancelled', 'failed',
 ];
 
 const TRANSITIONS = {
-  pending: ['payment_received', 'cancelled'],
-  payment_received: ['processing', 'refunded', 'cancelled'],
-  processing: ['awaiting_fulfillment', 'completed', 'refunded', 'cancelled'],
-  awaiting_fulfillment: ['completed', 'refunded', 'cancelled'],
+  pending: ['payment_received', 'cancelled', 'failed'],
+  payment_received: ['processing', 'refunded', 'cancelled', 'failed'],
+  processing: ['awaiting_fulfillment', 'completed', 'refunded', 'cancelled', 'failed'],
+  awaiting_fulfillment: ['completed', 'refunded', 'cancelled', 'failed'],
   completed: ['refunded'],
   refunded: [],
   cancelled: [],
+  failed: ['cancelled', 'pending'],   // can retry or close out a failed order
 };
 
 const STATUS_EMAIL = {
@@ -276,15 +277,27 @@ async function hydrate(row) {
   };
 }
 
-export async function listOrders({ status, userId, email, search, limit = 50, offset = 0 } = {}) {
+// Whitelisted sort columns (never interpolate raw user input into SQL).
+const SORT_COLUMNS = { date: 'created_at', amount: 'total', status: 'status', number: 'number' };
+
+export async function listOrders({ status, statuses, userId, email, search, sort, dir, limit = 50, offset = 0 } = {}) {
   const where = [];
   const params = { limit, offset };
   if (status) { where.push('status = @status'); params.status = status; }
+  // Multi-status filter (dashboard buckets span several internal statuses).
+  const list = Array.isArray(statuses) ? statuses : (statuses ? String(statuses).split(',') : []);
+  const clean = list.map((s) => s.trim()).filter((s) => STATUSES.includes(s));
+  if (clean.length) {
+    where.push(`status IN (${clean.map((_, i) => `@st${i}`).join(',')})`);
+    clean.forEach((s, i) => { params[`st${i}`] = s; });
+  }
   if (userId) { where.push('user_id = @userId'); params.userId = userId; }
   if (email) { where.push('email = @email'); params.email = String(email).toLowerCase(); }
   if (search) { where.push('(number ILIKE @q OR email ILIKE @q)'); params.q = `%${search}%`; }
   const clause = where.length ? `WHERE ${where.join(' AND ')}` : '';
-  const rows = await all(`SELECT * FROM orders ${clause} ORDER BY created_at DESC
+  const col = SORT_COLUMNS[sort] || 'created_at';
+  const order = String(dir).toLowerCase() === 'asc' ? 'ASC' : 'DESC';
+  const rows = await all(`SELECT * FROM orders ${clause} ORDER BY ${col} ${order}, created_at DESC
                     LIMIT @limit OFFSET @offset`, params);
   const totalRow = await get(`SELECT COUNT(*) AS n FROM orders ${clause}`, params);
   const orders = await Promise.all(rows.map((r) => summarize(r)));
@@ -332,6 +345,7 @@ export function labelFor(status) {
     completed: 'Completed',
     refunded: 'Refunded',
     cancelled: 'Cancelled',
+    failed: 'Failed',
   }[status] || status;
 }
 
