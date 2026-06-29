@@ -624,4 +624,22 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_credit_tx_user_tag
   ON credit_transactions (user_id, tag) WHERE tag IS NOT NULL;
 `,
   },
+  {
+    id: '009_page_views',
+    sql: `
+-- Privacy-friendly visitor analytics: anonymous page views keyed by a random
+-- client-generated session id. NO IP, no PII — just enough to count real unique
+-- visitors and compute a true conversion rate (paid orders ÷ unique visitors).
+CREATE TABLE IF NOT EXISTS page_views (
+  id          TEXT PRIMARY KEY,
+  session_id  TEXT NOT NULL,        -- anonymous visitor id (random, client-side)
+  path        TEXT,
+  referrer    TEXT,
+  user_id     TEXT,                 -- set only if the visitor is signed in
+  created_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_page_views_session ON page_views (session_id);
+CREATE INDEX IF NOT EXISTS idx_page_views_time    ON page_views (created_at);
+`,
+  },
 ];

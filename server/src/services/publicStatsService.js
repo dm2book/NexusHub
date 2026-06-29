@@ -64,6 +64,18 @@ export async function publicStats() {
 
   const discordMembers = Number(config.discord?.memberCount || process.env.DISCORD_MEMBER_COUNT || 0);
 
+  // Real fulfilment success rate = completed ÷ (completed + refunded + cancelled
+  // + failed). Null until there are finished orders (so the UI can hide it).
+  const successRate = await safe(async () => {
+    const r = await get(
+      `SELECT COUNT(*) FILTER (WHERE status='completed') AS ok,
+              COUNT(*) FILTER (WHERE status IN ('completed','refunded','cancelled','failed')) AS finished
+         FROM orders`);
+    const finished = Number(r?.finished || 0);
+    if (!finished) return null;
+    return Math.round((Number(r.ok) / finished) * 1000) / 10;
+  }, null);
+
   // Real review aggregates only.
   const rev = await safe(() => reviewStats(), { count: 0, average: 0 });
 
@@ -72,6 +84,7 @@ export async function publicStats() {
     customers,
     products,
     avgDeliverySeconds,                 // null when there are no completed orders yet
+    successRate,                        // null until orders have finished
     rating: rev.count ? rev.average : null,
     reviews: rev.count,
     discordMembers,                     // 0 unless DISCORD_MEMBER_COUNT is set

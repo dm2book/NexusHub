@@ -36,11 +36,12 @@ router.get('/', requirePermission('orders.read'), asyncHandler(async (req, res) 
 // orders.read so fulfillment staff see them without the analytics permission.
 router.get('/stats', requirePermission('orders.read'), asyncHandler(async (req, res) => {
   const days = Math.min(Number(req.query.days) || 30, 365);
-  const [overview, topProducts] = await Promise.all([
+  const [overview, topProducts, revenueSeries] = await Promise.all([
     analytics.overview({ days }),
     analytics.topProducts({ days, limit: 5 }),
+    analytics.revenueSeries({ days }),
   ]);
-  res.json({ overview, topProducts });
+  res.json({ overview, topProducts, revenueSeries });
 }));
 
 // ── Payment verification queue ───────────────────────────────────────────────

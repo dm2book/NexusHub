@@ -10,6 +10,7 @@ import { submitProof, getOrderProof } from '../services/paymentProofService.js';
 import { listEnabledProviders } from '../services/oauthService.js';
 import { isEnabled as stripeEnabled, createCheckoutSession } from '../services/stripeService.js';
 import { publicStats } from '../services/publicStatsService.js';
+import { recordPageView } from '../services/trackingService.js';
 import { addReview, listReviews } from '../services/reviewsService.js';
 import { verifyIngest, canonicalReview } from '../middleware/ingestSignature.js';
 import { audit } from '../services/auditService.js';
@@ -48,6 +49,19 @@ router.post('/reviews/ingest',
         targetId: r.id, metadata: { stars: body.stars }, req });
     }
     res.status(201).json({ ok: true, ...r });
+  }));
+
+// Anonymous page-view beacon (privacy-friendly: random session id, no PII).
+// Powers real unique-visitor counts + true conversion rate. Lenient rate limit.
+router.post('/track', rateLimit({ bucket: 'track', windowMs: 60_000, max: 120 }),
+  asyncHandler(async (req, res) => {
+    const body = z.object({
+      sid: z.string().min(8).max(64),
+      path: z.string().max(300).optional(),
+      ref: z.string().max(300).optional(),
+    }).parse(req.body || {});
+    await recordPageView({ sessionId: body.sid, path: body.path, referrer: body.ref, userId: req.user?.id });
+    res.status(204).end();
   }));
 
 // Public trust stats for the storefront (orders delivered, avg delivery, recent

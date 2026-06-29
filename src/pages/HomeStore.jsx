@@ -7,6 +7,7 @@ import {
 import { useCart } from '../context/CartContext.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { usePageMeta } from '../lib/useMeta.js';
+import { api } from '../lib/api.js';
 import { useStats } from '../lib/useStats.js';
 import { useReviews } from '../lib/useReviews.js';
 import { useReveal } from '../lib/useReveal.js';
@@ -66,27 +67,16 @@ const TRUST = [
 
 // Real counts only — append "+" once the number is large enough to round.
 const fmtCount = (n) => `${Number(n || 0).toLocaleString('en-US')}${Number(n || 0) >= 100 ? '+' : ''}`;
+// All real (or honest service promises) — no fabricated metrics. The 2nd card
+// shows a real fulfilment rate once orders have finished, else a real guarantee.
 const statCards = (s) => [
   { icon: Users, value: fmtCount(s.customers), label: 'Happy Customers', color: 'text-violet-600 bg-violet-100' },
-  { icon: CheckCircle2, value: '99.9%', label: 'Success Rate', color: 'text-emerald-600 bg-emerald-100' },
+  s.successRate != null
+    ? { icon: CheckCircle2, value: `${s.successRate}%`, label: 'Fulfilled', color: 'text-emerald-600 bg-emerald-100' }
+    : { icon: ShieldCheck, value: '100%', label: 'Buyer protected', color: 'text-emerald-600 bg-emerald-100' },
   { icon: ShoppingCart, value: fmtCount(s.delivered), label: 'Orders Delivered', color: 'text-blue-600 bg-blue-100' },
   { icon: Headphones, value: '24/7', label: 'Customer Support', color: 'text-amber-600 bg-amber-100' },
 ];
-
-const RV = [
-  { text: 'Fast delivery and best prices!', name: 'Alex M.' },
-  { text: 'Super reliable and great support!', name: 'Sarah K.' },
-];
-
-function useCountdown(seconds = 2 * 3600 + 47 * 60 + 19) {
-  const [t, setT] = useState(seconds);
-  useEffect(() => {
-    const id = setInterval(() => setT((v) => (v > 0 ? v - 1 : 0)), 1000);
-    return () => clearInterval(id);
-  }, []);
-  const h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), s = t % 60;
-  return [h, m, s].map((n) => String(n).padStart(2, '0'));
-}
 
 export default function HomeStore() {
   const { count, add } = useCart();
@@ -100,7 +90,8 @@ export default function HomeStore() {
   }, []);
   usePageMeta('ForgeMarket — Everything You Need, All in One Place',
     'Buy Robux, V-Bucks, Valorant Points, gift cards and more instantly. Fast delivery, secure payments, 24/7 support.');
-  const [h, m, s] = useCountdown();
+  const [announcement, setAnnouncement] = useState('');
+  useEffect(() => { api.get('/api/config').then((c) => setAnnouncement(c.announcement || '')).catch(() => {}); }, []);
   const railRef = useRef(null);
   const STATS = statCards(stats);
 
@@ -203,23 +194,17 @@ export default function HomeStore() {
             </nav>
           </div>
 
-          {/* Limited offer */}
-          <div className="rounded-2xl p-5 text-white shadow-lg shadow-violet-500/20"
-            style={{ backgroundImage: 'linear-gradient(150deg,#7c5cff,#9333ea)' }}>
-            <div className="font-bold text-[15px] flex items-center gap-1.5">Limited Time Offer! <span>🔥</span></div>
-            <p className="text-white/85 text-[13px] mt-1 leading-snug">Get <b>10% OFF</b> your first purchase</p>
-            <div className="grid grid-cols-3 gap-2 mt-4">
-              {[[h, 'Hours'], [m, 'Minutes'], [s, 'Seconds']].map(([v, l]) => (
-                <div key={l} className="bg-white/15 rounded-xl py-2 text-center">
-                  <div className="font-bold text-lg leading-none tabular-nums">{v}</div>
-                  <div className="text-[10px] text-white/75 mt-1">{l}</div>
-                </div>
-              ))}
+          {/* Promo — only shown when a real announcement/offer is configured */}
+          {announcement && (
+            <div className="rounded-2xl p-5 text-white shadow-lg shadow-violet-500/20"
+              style={{ backgroundImage: 'linear-gradient(150deg,#7c5cff,#9333ea)' }}>
+              <div className="font-bold text-[15px] flex items-center gap-1.5">Offer <span>🔥</span></div>
+              <p className="text-white/90 text-[13px] mt-1 leading-snug">{announcement}</p>
+              <Link to="/shop" className="mt-4 flex items-center justify-center gap-2 bg-white text-violet-700 font-semibold text-sm rounded-xl h-10 hover:bg-violet-50 transition">
+                Shop now <ArrowRight size={15} />
+              </Link>
             </div>
-            <Link to="/shop" className="mt-4 flex items-center justify-center gap-2 bg-white text-violet-700 font-semibold text-sm rounded-xl h-10 hover:bg-violet-50 transition">
-              Claim Discount <ArrowRight size={15} />
-            </Link>
-          </div>
+          )}
 
           {/* ForgeBot widget */}
           <div className="bg-white rounded-2xl border border-slate-200/70 p-4 shadow-sm">
