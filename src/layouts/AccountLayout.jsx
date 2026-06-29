@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Outlet, NavLink, Link, useNavigate } from 'react-router-dom';
+import { Outlet, NavLink, Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   Zap, LayoutDashboard, ShoppingBag, Download, LifeBuoy,
   Wallet, Bell, User, LogOut, Shield, Menu, Gift, Star,
@@ -21,6 +21,7 @@ const NAV = [
 export default function AccountLayout() {
   const { user, isStaff, logout } = useAuth();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
 
@@ -89,7 +90,7 @@ export default function AccountLayout() {
             </div>
           </div>
         </header>
-        <div className="relative p-4 sm:p-6 max-w-6xl"><Outlet /></div>
+        <div key={pathname} className="relative p-4 sm:p-6 max-w-6xl fm-page"><Outlet /></div>
       </div>
     </div>
   );

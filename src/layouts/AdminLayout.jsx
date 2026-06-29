@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Outlet, NavLink, Link, useNavigate } from 'react-router-dom';
+import { Outlet, NavLink, Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   Zap, BarChart3, ShoppingCart, Truck, PackageCheck, Package,
   Mail, ShieldAlert, LogOut, Store, LifeBuoy, Menu, X, Users, ShieldCheck, Activity, Gauge,
@@ -24,6 +24,7 @@ const NAV = [
 export default function AdminLayout() {
   const { user, logout, hasPermission } = useAuth();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
   const items = NAV.filter((n) => !n.perm || hasPermission(n.perm));
@@ -94,7 +95,7 @@ export default function AdminLayout() {
             <span className="text-sm text-slate-300 hidden md:block">{user?.email}</span>
           </div>
         </header>
-        <div className="relative p-4 sm:p-6"><Outlet /></div>
+        <div key={pathname} className="relative p-4 sm:p-6 fm-page"><Outlet /></div>
       </div>
     </div>
   );
