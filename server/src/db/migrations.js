@@ -586,4 +586,32 @@ INSERT INTO role_permissions (role_id, permission_id)
   ON CONFLICT DO NOTHING;
 `,
   },
+  {
+    id: '007_wallet',
+    sql: `
+-- Store credit / wallet. An append-only ledger: the balance is SUM(amount) over
+-- a user's rows (amount is positive for credits, negative for debits). Every entry
+-- records the running balance for an auditable statement.
+CREATE TABLE IF NOT EXISTS credit_transactions (
+  id             TEXT PRIMARY KEY,
+  user_id        TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  amount         BIGINT NOT NULL,            -- cents, signed (+credit / -debit)
+  balance_after  BIGINT NOT NULL,            -- running balance after this entry
+  type           TEXT NOT NULL,              -- referral | refund | grant | spend | adjustment
+  description    TEXT,
+  order_id       TEXT REFERENCES orders(id) ON DELETE SET NULL,
+  created_by     TEXT,                       -- staff/system actor for grants
+  created_at     TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_credit_tx_user ON credit_transactions (user_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_credit_tx_order ON credit_transactions (order_id);
+
+-- Permission to adjust customer store credit (granted to owner+admin).
+INSERT INTO permissions (id, description) VALUES ('wallet.manage', 'Grant or adjust customer store credit')
+  ON CONFLICT(id) DO NOTHING;
+INSERT INTO role_permissions (role_id, permission_id)
+  SELECT r.id, 'wallet.manage' FROM roles r WHERE r.id IN ('owner', 'admin')
+  ON CONFLICT DO NOTHING;
+`,
+  },
 ];

@@ -127,6 +127,7 @@ router.post('/orders', rateLimit({ bucket: 'checkout', windowMs: 60_000, max: 20
       billing: z.record(z.any()).optional(),
       currency: z.string().length(3).optional(),
       coupon: z.string().max(40).optional(),
+      useCredit: z.number().int().nonnegative().max(100_000_00).optional(),
       paymentMethod: z.string().max(20).optional(),
     }).parse(req.body);
 

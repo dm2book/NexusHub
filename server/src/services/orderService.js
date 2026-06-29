@@ -24,6 +24,7 @@ import { availableCount, claimCodes } from './codeStockService.js';
 import { memberDiscountPercent } from './membershipService.js';
 import { recordOrderCommission } from './affiliateService.js';
 import { recordPurchaseEvent } from './socialProofService.js';
+import { balanceOf, debit, credit, hasOrderEntry } from './walletService.js';
 
 export const STATUSES = [
   'pending', 'payment_received', 'processing', 'awaiting_fulfillment',
@@ -88,10 +89,18 @@ export async function createOrder(input, ctx = {}) {
   const memberPercent = input.userId ? await memberDiscountPercent(input.userId) : 0;
   const memberDiscount = memberPercent ? Math.round(subtotal * memberPercent / 100) : 0;
   const discount = Math.min(subtotal, couponDiscount + memberDiscount);
-  const total = Math.max(0, subtotal - discount);
+  const afterDiscount = Math.max(0, subtotal - discount);
+  // Optionally pay part of the order with the customer's store credit.
+  let creditApplied = 0;
+  if (input.userId && input.useCredit) {
+    const bal = await balanceOf(input.userId);
+    creditApplied = Math.max(0, Math.min(Math.round(Number(input.useCredit) || 0), bal, afterDiscount));
+  }
+  const total = Math.max(0, afterDiscount - creditApplied);
   const billing = { ...(input.billing || {}) };
   if (coupon) { billing.coupon = coupon.code; billing.discount = couponDiscount; }
   if (memberDiscount) { billing.memberDiscount = memberDiscount; billing.memberPercent = memberPercent; }
+  if (creditApplied) billing.creditApplied = creditApplied;
 
   await tx(async () => {
     await run(`INSERT INTO orders
@@ -105,6 +114,11 @@ export async function createOrder(input, ctx = {}) {
            VALUES (@id, @oid, @pid, @name, @qty, @price, @meta)`,
           { id: it.id, oid: orderId, pid: it.product_id, name: it.name,
             qty: it.quantity, price: it.unit_price, meta: JSON.stringify(it.metadata) });
+    }
+    // Spend the store credit atomically with the order (rolls back if it can't).
+    if (creditApplied) {
+      await debit(input.userId, creditApplied, 'spend',
+        `Applied to order ${number}`, { orderId, createdBy: input.userId });
     }
     await appendHistory(orderId, null, 'pending', ctx.actorId || 'system', 'Order created');
   });
@@ -174,6 +188,13 @@ export async function transitionOrder(orderId, to, ctx = {}) {
     await postOrderEvent(updated, 'completed').catch(() => {});
     // Capture a privacy-safe snapshot for the live social-proof feed (best-effort).
     await recordPurchaseEvent(updated).catch(() => {});
+  }
+  // If the order is cancelled/refunded, return any store credit that was spent on it.
+  if ((to === 'refunded' || to === 'cancelled') && updated.userId && updated.billing?.creditApplied > 0) {
+    if (!(await hasOrderEntry(orderId, 'refund').catch(() => true))) {
+      await credit(updated.userId, updated.billing.creditApplied, 'refund',
+        `Store credit returned · order ${updated.number}`, { orderId }).catch((e) => console.error('[wallet refund]', e.message));
+    }
   }
   if (to === 'refunded') await postOrderEvent(updated, 'refunded').catch(() => {});
   // Grant the buyer's Discord tier (Verified vs VIP) once the order is paid.

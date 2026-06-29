@@ -42,6 +42,9 @@ const Billing = lazy(() => import('./pages/account/Billing.jsx'));
 const Notifications = lazy(() => import('./pages/account/Notifications.jsx'));
 const Settings = lazy(() => import('./pages/account/Settings.jsx'));
 const Rewards = lazy(() => import('./pages/account/Rewards.jsx'));
+const WalletPage = lazy(() => import('./pages/account/Wallet.jsx'));
+const Referrals = lazy(() => import('./pages/account/Referrals.jsx'));
+const Profile = lazy(() => import('./pages/account/Profile.jsx'));
 
 const AdminAnalytics = lazy(() => import('./pages/admin/Analytics.jsx'));
 const AdminOrders = lazy(() => import('./pages/admin/Orders.jsx'));
@@ -91,6 +94,8 @@ export default function App() {
         <Route element={<ProtectedRoute><AccountLayout /></ProtectedRoute>}>
           <Route path="/account" element={<Dashboard />} />
           <Route path="/account/rewards" element={<Rewards />} />
+          <Route path="/account/wallet" element={<WalletPage />} />
+          <Route path="/account/referrals" element={<Referrals />} />
           <Route path="/account/orders" element={<Orders />} />
           <Route path="/account/orders/:id" element={<OrderDetail />} />
           <Route path="/account/downloads" element={<Downloads />} />
@@ -98,7 +103,8 @@ export default function App() {
           <Route path="/account/tickets/:id" element={<TicketDetail />} />
           <Route path="/account/billing" element={<Billing />} />
           <Route path="/account/notifications" element={<Notifications />} />
-          <Route path="/account/settings" element={<Settings />} />
+          <Route path="/account/profile" element={<Profile />} />
+          <Route path="/account/settings" element={<Profile />} />
         </Route>
 
         {/* Admin */}

@@ -11,10 +11,15 @@ import { run, get, all } from '../db/index.js';
 import { notFound, forbidden } from '../utils/errors.js';
 import { listOrders, getOrder } from '../services/orderService.js';
 import { addVerifiedReview } from '../services/reviewsService.js';
-import { updateProfile, updatePreferences } from '../services/userService.js';
+import { updateProfile, updatePreferences, publicUser } from '../services/userService.js';
 import { loyaltyFor } from '../services/loyaltyService.js';
 import { affiliateStats } from '../services/affiliateService.js';
 import { getMembership } from '../services/membershipService.js';
+import { walletSummary } from '../services/walletService.js';
+import { requestPhoneOtp } from '../services/authService.js';
+import { normalizePhone, isValidPhone } from '../services/smsService.js';
+import { sha256, safeEqual } from '../utils/crypto.js';
+import { nowIso } from '../db/index.js';
 import * as notif from '../services/notificationService.js';
 import * as billing from '../services/billingService.js';
 import * as support from '../services/supportService.js';
@@ -49,9 +54,60 @@ router.get('/rewards', asyncHandler(async (req, res) => {
   res.json({ loyalty, affiliate, membership });
 }));
 
+// ── Wallet / store credit ────────────────────────────────────────────────────
+router.get('/wallet', asyncHandler(async (req, res) => {
+  res.json(await walletSummary(req.user.id));
+}));
+
+// ── Phone number (add + verify via SMS OTP) ──────────────────────────────────
+router.post('/phone/request', asyncHandler(async (req, res) => {
+  const { phone } = z.object({ phone: z.string().min(5).max(40) }).parse(req.body || {});
+  const p = normalizePhone(phone);
+  if (!isValidPhone(p)) throw badRequest('Enter a valid phone number (e.g. +31612345678)');
+  const taken = await get('SELECT id FROM users WHERE phone=@p AND phone_verified=1 AND id<>@me', { p, me: req.user.id });
+  if (taken) throw badRequest('That phone number is already in use.');
+  const r = await requestPhoneOtp(p, { ip: req.ip, userAgent: req.get('user-agent'), req });
+  res.json({ sent: true, cooldownSeconds: r.cooldownSeconds });
+}));
+
+router.post('/phone/verify', asyncHandler(async (req, res) => {
+  const { phone, code } = z.object({ phone: z.string().min(5).max(40), code: z.string().min(4).max(8) }).parse(req.body || {});
+  const p = normalizePhone(phone);
+  const rows = await all(
+    `SELECT * FROM sms_verifications WHERE phone=@p AND consumed_at IS NULL ORDER BY created_at DESC LIMIT 10`, { p });
+  const live = rows.filter((x) => new Date(x.expires_at) >= new Date());
+  if (!live.length) throw badRequest('Code expired or not found. Request a new one.');
+  const match = live.find((x) => safeEqual(x.code_hash, sha256(String(code).trim())));
+  if (!match) {
+    await run('UPDATE sms_verifications SET attempts = attempts + 1 WHERE id=@id', { id: live[0].id });
+    throw badRequest('Incorrect code');
+  }
+  const taken = await get('SELECT id FROM users WHERE phone=@p AND phone_verified=1 AND id<>@me', { p, me: req.user.id });
+  if (taken) throw badRequest('That phone number is already in use.');
+  await run('UPDATE sms_verifications SET consumed_at=@at WHERE id=@id', { at: nowIso(), id: match.id });
+  await run('UPDATE users SET phone=@p, phone_verified=1, updated_at=@at WHERE id=@id',
+    { p, at: nowIso(), id: req.user.id });
+  await audit({ actor: req.user, action: 'profile.phone_verified', targetType: 'user', targetId: req.user.id, req });
+  res.json({ user: await publicUser(req.user.id) });
+}));
+
+router.delete('/phone', asyncHandler(async (req, res) => {
+  await run('UPDATE users SET phone=NULL, phone_verified=0, updated_at=@at WHERE id=@id',
+    { at: nowIso(), id: req.user.id });
+  res.json({ user: await publicUser(req.user.id) });
+}));
+
 // ── Dashboard summary ──────────────────────────────────────────────────────
+// Group order statuses into the four customer-facing buckets.
+const STATUS_BUCKET = {
+  pending: 'pending', payment_received: 'pending',
+  processing: 'processing', awaiting_fulfillment: 'processing',
+  completed: 'delivered',
+  refunded: 'refunded', cancelled: 'refunded',
+};
+
 router.get('/dashboard', asyncHandler(async (req, res) => {
-  const [byId, byEmail, downloads, tickets, unread] = await Promise.all([
+  const [byId, byEmail, downloads, tickets, unread, wallet, affiliate] = await Promise.all([
     listOrders({ userId: req.user.id, limit: 100 }),
     listOrders({ email: req.user.email, limit: 100 }),
     all(`SELECT d.* FROM deliveries d JOIN orders o ON o.id=d.order_id
@@ -59,17 +115,24 @@ router.get('/dashboard', asyncHandler(async (req, res) => {
         { u: req.user.id, e: req.user.email }),
     support.listTickets({ userId: req.user.id, status: 'open' }),
     notif.unreadCount(req.user.id),
+    walletSummary(req.user.id),
+    affiliateStats(req.user.id, req.user.email),
   ]);
   const merged = dedupe([...byId.orders, ...byEmail.orders]);
-  const completed = merged.filter((o) => o.status === 'completed');
+  const buckets = { pending: 0, processing: 0, delivered: 0, refunded: 0 };
+  for (const o of merged) { const b = STATUS_BUCKET[o.status]; if (b) buckets[b] += 1; }
   res.json({
     stats: {
       orders: merged.length,
-      purchases: completed.length,
+      purchases: buckets.delivered,
       downloads: downloads.length,
       openTickets: tickets.length,
       unreadNotifications: unread,
+      walletBalance: wallet.balance,
+      referralEarnings: affiliate.totalCommission,
+      referrals: affiliate.referrals,
     },
+    ordersByStatus: buckets,
     recentOrders: merged.slice(0, 5),
   });
 }));

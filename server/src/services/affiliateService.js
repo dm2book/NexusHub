@@ -5,6 +5,8 @@
  */
 import { run, get, all, nowIso } from '../db/index.js';
 import { newId } from '../utils/ids.js';
+import { credit } from './walletService.js';
+import { notify } from './notificationService.js';
 
 export const COMMISSION_PERCENT = 5;
 
@@ -55,20 +57,33 @@ export async function attributeSignup(referredUserId, code) {
 
 /** Record a commission for a paid order placed by a referred customer. */
 export async function recordOrderCommission(order) {
-  if (!order?.user_id) return;
-  const u = await get('SELECT referred_by FROM users WHERE id=@u', { u: order.user_id });
+  // getOrder() hydrates to `userId`; raw rows use `user_id` — accept both.
+  const buyerId = order?.userId || order?.user_id;
+  if (!buyerId) return;
+  const u = await get('SELECT referred_by FROM users WHERE id=@u', { u: buyerId });
   const code = u?.referred_by;
   if (!code) return;
   const referrerId = await referrerForCode(code);
-  if (!referrerId || referrerId === order.user_id) return;
+  if (!referrerId || referrerId === buyerId) return;
   // One commission per order.
   const dupe = await get(`SELECT id FROM referral_events WHERE order_id=@o AND kind='order'`, { o: order.id });
   if (dupe) return;
   const commission = Math.round((order.total || 0) * COMMISSION_PERCENT / 100);
+  if (commission <= 0) return;
+  // Pay the commission straight into the referrer's store-credit wallet — referral
+  // earnings ARE spendable credit. The ledger entry is the source of truth; the
+  // referral_event records it as paid for the affiliate dashboard.
   await run(`INSERT INTO referral_events (id, code, referrer_id, referred_id, order_id, kind, commission, status, created_at)
-       VALUES (@id, @c, @ref, @rd, @o, 'order', @com, 'pending', @at)`,
-    { id: newId('rev'), c: String(code).toUpperCase(), ref: referrerId, rd: order.user_id,
+       VALUES (@id, @c, @ref, @rd, @o, 'order', @com, 'paid', @at)`,
+    { id: newId('rev'), c: String(code).toUpperCase(), ref: referrerId, rd: buyerId,
       o: order.id, com: commission, at: nowIso() });
+  await credit(referrerId, commission, 'referral', `Referral commission · order ${order.number || order.id}`, { orderId: order.id })
+    .catch((e) => console.error('[affiliate] wallet credit', e.message));
+  await notify(referrerId, {
+    type: 'system', title: 'You earned store credit',
+    body: `A referral order earned you ${(commission / 100).toFixed(2)} in store credit.`,
+    link: '/account/wallet',
+  }).catch(() => {});
 }
 
 /** Dashboard stats for a referrer. */

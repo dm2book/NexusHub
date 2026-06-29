@@ -100,6 +100,8 @@ export async function publicUser(userId) {
     id: u.id,
     email: u.email,
     emailVerified: !!u.email_verified,
+    phone: u.phone || null,
+    phoneVerified: !!u.phone_verified,
     displayName: u.display_name,
     avatarUrl: u.avatar_url,
     status: u.status,

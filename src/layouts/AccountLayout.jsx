@@ -2,19 +2,20 @@ import { useState } from 'react';
 import { Outlet, NavLink, Link, useNavigate } from 'react-router-dom';
 import {
   Zap, LayoutDashboard, ShoppingBag, Download, LifeBuoy,
-  CreditCard, Bell, Settings, LogOut, Shield, Menu, X, Gift,
+  Wallet, Bell, User, LogOut, Shield, Menu, Gift, Star,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 
 const NAV = [
   { to: '/account', icon: LayoutDashboard, label: 'Overview', end: true },
   { to: '/account/orders', icon: ShoppingBag, label: 'Orders' },
-  { to: '/account/rewards', icon: Gift, label: 'Rewards' },
+  { to: '/account/wallet', icon: Wallet, label: 'Wallet' },
+  { to: '/account/referrals', icon: Gift, label: 'Referrals' },
+  { to: '/account/rewards', icon: Star, label: 'Rewards' },
   { to: '/account/downloads', icon: Download, label: 'Downloads' },
-  { to: '/account/tickets', icon: LifeBuoy, label: 'Support' },
-  { to: '/account/billing', icon: CreditCard, label: 'Billing' },
   { to: '/account/notifications', icon: Bell, label: 'Notifications' },
-  { to: '/account/settings', icon: Settings, label: 'Settings' },
+  { to: '/account/tickets', icon: LifeBuoy, label: 'Support' },
+  { to: '/account/profile', icon: User, label: 'Profile' },
 ];
 
 export default function AccountLayout() {

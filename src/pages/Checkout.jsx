@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Lock, ShieldCheck, Loader2, ShoppingBag, ExternalLink, Copy, CheckCircle2 } from 'lucide-react';
+import { Lock, ShieldCheck, Loader2, ShoppingBag, ExternalLink, Copy, CheckCircle2, Wallet } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { useCart } from '../context/CartContext.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -35,9 +35,13 @@ export default function Checkout() {
   const [placed, setPlaced] = useState(null);           // created order (manual flow)
   const [couponInput, setCouponInput] = useState('');
   const [coupon, setCoupon] = useState(null);           // { code, percent }
+  const [creditBalance, setCreditBalance] = useState(0); // store credit (cents)
+  const [useCredit, setUseCredit] = useState(false);
 
   const discount = coupon ? Math.round(subtotal * coupon.percent / 100) : 0;
-  const grandTotal = Math.max(0, subtotal - discount);
+  const afterDiscount = Math.max(0, subtotal - discount);
+  const creditToApply = useCredit ? Math.min(creditBalance, afterDiscount) : 0;
+  const grandTotal = Math.max(0, afterDiscount - creditToApply);
 
   const applyCoupon = async () => {
     const code = couponInput.trim();
@@ -47,6 +51,10 @@ export default function Checkout() {
   };
 
   useEffect(() => { if (user?.email) setEmail(user.email); }, [user]);
+  useEffect(() => {
+    if (!user) { setCreditBalance(0); return; }
+    api.get('/api/account/wallet').then((w) => setCreditBalance(w.balance || 0)).catch(() => {});
+  }, [user]);
   useEffect(() => {
     api.get('/api/config').then((c) => {
       setProvider(c.paymentProvider);
@@ -78,6 +86,7 @@ export default function Checkout() {
         billing: { full_name: fullName, city, email },
         currency,
         coupon: coupon?.code,
+        useCredit: creditToApply || undefined,
         paymentMethod: methodId || undefined,
       });
 
@@ -229,9 +238,23 @@ export default function Checkout() {
               placeholder="Discount code" className="input py-2 text-sm" />
             <button type="button" onClick={applyCoupon} className="btn-ghost px-4 text-sm">Apply</button>
           </div>
+          {/* Store credit */}
+          {creditBalance > 0 && (
+            <label className="flex items-center justify-between gap-2 mb-4 cursor-pointer rounded-xl bg-space-black border border-white/10 px-3.5 py-3">
+              <span className="flex items-center gap-2 text-sm text-slate-200">
+                <Wallet size={15} className="text-indigo-300" /> Use store credit
+                <span className="text-slate-500 text-xs">({money(creditBalance, currency)} available)</span>
+              </span>
+              <button type="button" onClick={() => setUseCredit((v) => !v)}
+                className={`w-11 h-6 rounded-full transition relative shrink-0 ${useCredit ? 'bg-primary' : 'bg-white/10'}`}>
+                <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition ${useCredit ? 'left-5' : 'left-0.5'}`} />
+              </button>
+            </label>
+          )}
           <div className="border-t border-white/5 pt-4 mb-6 space-y-1.5">
             <div className="flex justify-between text-sm text-slate-400"><span>Subtotal</span><span>{money(subtotal, currency)}</span></div>
             {coupon && <div className="flex justify-between text-sm text-emerald-300"><span>Discount ({coupon.code} · {coupon.percent}%)</span><span>−{money(discount, currency)}</span></div>}
+            {creditToApply > 0 && <div className="flex justify-between text-sm text-indigo-300"><span>Store credit</span><span>−{money(creditToApply, currency)}</span></div>}
             <div className="flex justify-between text-lg pt-1"><span className="text-slate-300">Total</span><span className="text-white font-semibold">{money(grandTotal, currency)}</span></div>
           </div>
           <button disabled={busy} className="btn-primary w-full py-3">
