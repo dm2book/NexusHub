@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Search, Eye, CheckCircle2, RotateCcw, Mail, StickyNote, AlertTriangle,
   ArrowUpDown, ArrowUp, ArrowDown, DollarSign, ShoppingCart, Percent, TrendingUp, Package,
+  Users, LineChart,
 } from 'lucide-react';
 import { api } from '../../lib/api.js';
 import { money, dateShort } from '../../lib/format.js';
@@ -91,10 +92,14 @@ export default function Operations() {
       {/* KPI strip */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
         <Kpi icon={DollarSign} label="Revenue (30d)" value={o ? o.revenueFormatted : '—'} tone="text-emerald-300 bg-emerald-500/10" sub={o ? `${o.paidOrders} paid orders` : ''} />
-        <Kpi icon={ShoppingCart} label="Orders (30d)" value={o ? o.totalOrders : '—'} tone="text-indigo-300 bg-indigo-500/10" sub={o ? `${o.completedOrders} delivered` : ''} />
-        <Kpi icon={Percent} label="Conversion" value={o ? `${o.conversionRate}%` : '—'} tone="text-violet-300 bg-violet-500/10" sub="paid / total" />
-        <Kpi icon={TrendingUp} label="Avg order" value={o ? o.averageOrderValueFormatted : '—'} tone="text-amber-300 bg-amber-500/10" sub={o ? `${o.refundedFormatted} refunded` : ''} />
+        <Kpi icon={Users} label="Visitors (30d)" value={o ? o.uniqueVisitors.toLocaleString('en-US') : '—'} tone="text-sky-300 bg-sky-500/10" sub={o ? `${o.pageViews.toLocaleString('en-US')} page views` : ''} />
+        <Kpi icon={Percent} label="Conversion" value={o ? `${o.conversionRate}%` : '—'} tone="text-violet-300 bg-violet-500/10"
+          sub={o ? (o.conversionBasis === 'visitors' ? `paid ÷ ${o.uniqueVisitors.toLocaleString('en-US')} visitors` : 'paid ÷ orders (no visitor data yet)') : ''} />
+        <Kpi icon={TrendingUp} label="Avg order" value={o ? o.averageOrderValueFormatted : '—'} tone="text-amber-300 bg-amber-500/10" sub={o ? `${o.totalOrders} orders · ${o.completedOrders} delivered` : ''} />
       </div>
+
+      {/* Revenue chart */}
+      {stats?.revenueSeries?.length > 0 && <RevenueChart series={stats.revenueSeries} />}
 
       {/* Top products */}
       {stats?.topProducts?.length > 0 && (
@@ -255,6 +260,46 @@ export default function Operations() {
           </div>
         )}
       </Modal>
+    </div>
+  );
+}
+
+// Lightweight SVG area chart of daily revenue (no chart library).
+function RevenueChart({ series }) {
+  const W = 1000, H = 200, P = 8;
+  const days = series.slice(-30);
+  const max = Math.max(1, ...days.map((d) => d.revenue));
+  const stepX = days.length > 1 ? (W - P * 2) / (days.length - 1) : 0;
+  const x = (i) => P + i * stepX;
+  const y = (v) => H - P - (v / max) * (H - P * 2);
+  const pts = days.map((d, i) => `${x(i)},${y(d.revenue)}`);
+  const line = pts.map((p, i) => (i ? 'L' : 'M') + p).join(' ');
+  const area = `${line} L${x(days.length - 1)},${H - P} L${x(0)},${H - P} Z`;
+  const total = days.reduce((s, d) => s + d.revenue, 0);
+  const peak = days.reduce((m, d) => (d.revenue > m.revenue ? d : m), days[0]);
+
+  return (
+    <div className="card p-5 mb-6">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2 text-sm font-semibold text-slate-300"><LineChart size={15} className="text-emerald-400" /> Revenue · last {days.length} days</div>
+        <div className="text-xs text-slate-500">Peak {money(peak.revenue, 'EUR')} on {peak.day}</div>
+      </div>
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-40" preserveAspectRatio="none">
+        <defs>
+          <linearGradient id="revfill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#34d399" stopOpacity="0.35" />
+            <stop offset="100%" stopColor="#34d399" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <path d={area} fill="url(#revfill)" />
+        <path d={line} fill="none" stroke="#34d399" strokeWidth="2.5" vectorEffect="non-scaling-stroke" />
+        {days.map((d, i) => <circle key={i} cx={x(i)} cy={y(d.revenue)} r="2.5" fill="#34d399" />)}
+      </svg>
+      <div className="flex items-center justify-between text-xs text-slate-500 mt-2">
+        <span>{days[0]?.day}</span>
+        <span className="text-slate-400">Total {money(total, 'EUR')} · {days.reduce((s, d) => s + d.orders, 0)} orders</span>
+        <span>{days[days.length - 1]?.day}</span>
+      </div>
     </div>
   );
 }

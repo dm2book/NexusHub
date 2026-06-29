@@ -5,7 +5,7 @@ import { api } from './api.js';
 // until then (and on error) the UI shows zeros / hides empty counters.
 const FALLBACK = {
   delivered: 0, customers: 0, products: 0, avgDeliverySeconds: null,
-  rating: null, reviews: 0, discordMembers: 0, recent: [],
+  successRate: null, rating: null, reviews: 0, discordMembers: 0, recent: [],
 };
 
 let cache = null;

@@ -27,7 +27,9 @@ export default function Reviews() {
           </>
         )}
         <div className="grid grid-cols-3 gap-6 text-center">
-          {[[fmt(stats.delivered), 'Delivered'], ['99.9%', 'Success'], [avgDelivery, 'Avg. delivery']].map(([n, l]) => (
+          {[[fmt(stats.delivered), 'Delivered'],
+            [stats.successRate != null ? `${stats.successRate}%` : '100%', stats.successRate != null ? 'Fulfilled' : 'Protected'],
+            [avgDelivery, 'Avg. delivery']].map(([n, l]) => (
             <div key={l}><div className="text-2xl font-display text-white">{n}</div><div className="text-slate-500 text-xs">{l}</div></div>
           ))}
         </div>

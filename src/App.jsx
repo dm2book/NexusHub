@@ -5,6 +5,7 @@ import AdminLayout from './layouts/AdminLayout.jsx';
 import AccountLayout from './layouts/AccountLayout.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 import { PageLoader } from './components/ui.jsx';
+import { usePageViews } from './lib/usePageViews.js';
 
 // Eager: first-paint storefront pages (small, instant).
 import HomeStore from './pages/HomeStore.jsx';
@@ -61,6 +62,7 @@ const AdminSocialProof = lazy(() => import('./pages/admin/SocialProof.jsx'));
 const AdminOperations = lazy(() => import('./pages/admin/Operations.jsx'));
 
 export default function App() {
+  usePageViews();   // anonymous, privacy-friendly visitor analytics
   return (
     <Suspense fallback={<PageLoader />}>
       <Routes>

@@ -4,6 +4,7 @@
  */
 import { get, all } from '../db/index.js';
 import { formatMoney } from '../utils/money.js';
+import { visitorStats } from './trackingService.js';
 
 const PAID = "status IN ('payment_received','processing','awaiting_fulfillment','completed')";
 
@@ -22,7 +23,12 @@ export async function overview({ days = 30 } = {}) {
     `SELECT COALESCE(SUM(total),0) AS cents FROM orders
       WHERE status='refunded' AND created_at > @since`, { since })).cents;
 
-  const conversionRate = allOrders ? Math.round((revenue.orders / allOrders) * 1000) / 10 : 0;
+  // True conversion = paid orders ÷ real unique visitors. Until we have visitor
+  // data in the window, fall back to paid ÷ total orders (clearly labelled).
+  const { uniqueVisitors, pageViews } = await visitorStats({ days });
+  const conversionBasis = uniqueVisitors > 0 ? 'visitors' : 'orders';
+  const conversionDenom = uniqueVisitors > 0 ? uniqueVisitors : allOrders;
+  const conversionRate = conversionDenom ? Math.round((revenue.orders / conversionDenom) * 1000) / 10 : 0;
   const aov = revenue.orders ? Math.round(revenue.cents / revenue.orders) : 0;
 
   // Gross profit = paid revenue − supplier cost. Each product's unit cost is
@@ -45,7 +51,10 @@ export async function overview({ days = 30 } = {}) {
     completedOrders: completed,
     refundedAmount: refunded,
     refundedFormatted: formatMoney(refunded),
+    uniqueVisitors,
+    pageViews,
     conversionRate,
+    conversionBasis,
     averageOrderValue: aov,
     averageOrderValueFormatted: formatMoney(aov),
   };
