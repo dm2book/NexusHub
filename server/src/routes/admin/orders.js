@@ -11,6 +11,7 @@ import {
   listOrders, getOrder, transitionOrder, markPaymentReceived, setOrderNotes, deliverOrder,
 } from '../../services/orderService.js';
 import { fulfillOrder, listFulfillment, listFulfillmentLogs } from '../../services/fulfillmentService.js';
+import * as analytics from '../../services/analyticsService.js';
 import { listPendingProofs, confirmProof, rejectProof } from '../../services/paymentProofService.js';
 import { sendEmail } from '../../services/emailService.js';
 import { notify } from '../../services/notificationService.js';
@@ -21,14 +22,25 @@ import { notFound } from '../../utils/errors.js';
 const router = Router();
 const actor = (req) => ({ actorId: req.user.id, user: req.user });
 
-// List / filter orders for the dashboard table.
+// List / filter / sort orders for the dashboard table.
 router.get('/', requirePermission('orders.read'), asyncHandler(async (req, res) => {
-  const { status, search, limit, offset } = req.query;
+  const { status, statuses, search, sort, dir, limit, offset } = req.query;
   res.json(await listOrders({
-    status, search,
+    status, statuses, search, sort, dir,
     limit: Math.min(Number(limit) || 50, 200),
     offset: Number(offset) || 0,
   }));
+}));
+
+// Fulfillment KPIs (revenue / orders / conversion / top products) — scoped to
+// orders.read so fulfillment staff see them without the analytics permission.
+router.get('/stats', requirePermission('orders.read'), asyncHandler(async (req, res) => {
+  const days = Math.min(Number(req.query.days) || 30, 365);
+  const [overview, topProducts] = await Promise.all([
+    analytics.overview({ days }),
+    analytics.topProducts({ days, limit: 5 }),
+  ]);
+  res.json({ overview, topProducts });
 }));
 
 // ── Payment verification queue ───────────────────────────────────────────────

@@ -50,6 +50,7 @@ export const STATUS_META = {
   completed: { label: 'Completed', color: 'bg-emerald-500/20 text-emerald-300' },
   refunded: { label: 'Refunded', color: 'bg-fuchsia-500/20 text-fuchsia-300' },
   cancelled: { label: 'Cancelled', color: 'bg-red-500/20 text-red-300' },
+  failed: { label: 'Failed', color: 'bg-red-500/20 text-red-300' },
 };
 
 export function StatusBadge({ status }) {
