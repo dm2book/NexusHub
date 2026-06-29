@@ -8,6 +8,8 @@ import { listAuditLogs, audit } from '../../services/auditService.js';
 import { listFlaggedOrders } from '../../services/fraudService.js';
 import { publicUser, setUserRoles, getUserById } from '../../services/userService.js';
 import { grantMembership, cancelMembership } from '../../services/membershipService.js';
+import { addEntry, balanceOf } from '../../services/walletService.js';
+import { notify } from '../../services/notificationService.js';
 import { notFound, badRequest } from '../../utils/errors.js';
 
 const router = Router();
@@ -72,6 +74,30 @@ router.post('/users/:id/membership', requirePermission('users.manage'),
     await audit({ actor: req.user, action: cancel ? 'membership.cancel' : 'membership.grant',
       targetType: 'user', targetId: req.params.id, metadata: { days }, req });
     res.json({ membership });
+  }));
+
+// Grant or deduct store credit for a user (e.g. goodwill, manual payout).
+router.post('/users/:id/credit', requirePermission('wallet.manage'),
+  asyncHandler(async (req, res) => {
+    const { amount, description } = z.object({
+      amount: z.number().int(),            // cents, positive = grant, negative = deduct
+      description: z.string().max(200).optional(),
+    }).parse(req.body || {});
+    if (!(await getUserById(req.params.id))) throw notFound('User not found');
+    if (amount === 0) throw badRequest('Amount cannot be zero');
+    const entry = await addEntry({
+      userId: req.params.id, amount, type: amount > 0 ? 'grant' : 'adjustment',
+      description: description || (amount > 0 ? 'Store credit granted' : 'Store credit adjustment'),
+      createdBy: req.user.id,
+    });
+    await notify(req.params.id, {
+      type: 'system', title: amount > 0 ? 'Store credit added' : 'Store credit adjusted',
+      body: `${amount > 0 ? '+' : ''}${(amount / 100).toFixed(2)} — ${description || 'by support'}.`,
+      link: '/account/wallet',
+    }).catch(() => {});
+    await audit({ actor: req.user, action: 'wallet.adjust', targetType: 'user', targetId: req.params.id,
+      metadata: { amount }, req });
+    res.json({ balance: await balanceOf(req.params.id), entry });
   }));
 
 export default router;
