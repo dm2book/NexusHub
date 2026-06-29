@@ -1,8 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Search, ShieldCheck, Mail, Crown, Loader2, BadgeCheck, Gift } from 'lucide-react';
+import { Search, ShieldCheck, Mail, Crown, Loader2, BadgeCheck, Gift, Wallet, Plus, Minus } from 'lucide-react';
 import { api } from '../../lib/api.js';
-import { date } from '../../lib/format.js';
-import { PageLoader } from '../../components/ui.jsx';
+import { date, money } from '../../lib/format.js';
+import { PageLoader, Modal } from '../../components/ui.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
 
@@ -21,6 +21,7 @@ export default function AdminUsers() {
   const [roles, setRoles] = useState([]);
   const [search, setSearch] = useState('');
   const [busyId, setBusyId] = useState(null);
+  const [creditUser, setCreditUser] = useState(null);
 
   const load = useCallback((q = '') => {
     const qs = q ? `?search=${encodeURIComponent(q)}` : '';
@@ -110,6 +111,10 @@ export default function AdminUsers() {
 
               <div className="flex flex-wrap gap-1.5 lg:ml-auto items-center">
                 {busyId === u.id && <Loader2 size={14} className="animate-spin text-slate-400" />}
+                <button onClick={() => setCreditUser(u)} title="Manage store credit"
+                  className="text-xs px-2.5 py-1 rounded-md border border-emerald-500/30 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 inline-flex items-center gap-1">
+                  <Wallet size={11} /> Credit
+                </button>
                 <button onClick={() => grantPlus(u)} title="Grant Forge+ (30 days)"
                   className="text-xs px-2.5 py-1 rounded-md border border-violet-500/30 bg-violet-500/10 text-violet-300 hover:bg-violet-500/20 inline-flex items-center gap-1">
                   <Gift size={11} /> Forge+
@@ -134,6 +139,80 @@ export default function AdminUsers() {
           ))}
         </div>
       )}
+
+      <CreditModal user={creditUser} onClose={() => setCreditUser(null)} />
     </div>
+  );
+}
+
+// Store-credit manager: balance, recent ledger, grant/deduct.
+function CreditModal({ user, onClose }) {
+  const toast = useToast();
+  const [data, setData] = useState(null);
+  const [amount, setAmount] = useState('');
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(() => {
+    if (!user) return;
+    setData(null);
+    api.get(`/api/admin/security/users/${user.id}/wallet`).then(setData).catch((e) => toast.error(e.message));
+  }, [user, toast]);
+  useEffect(() => { load(); }, [load]);
+
+  if (!user) return null;
+
+  const apply = async (sign) => {
+    const euros = parseFloat(String(amount).replace(',', '.'));
+    if (!euros || euros <= 0) { toast.error('Enter an amount.'); return; }
+    const cents = Math.round(euros * 100) * sign;
+    setBusy(true);
+    try {
+      await api.post(`/api/admin/security/users/${user.id}/credit`, { amount: cents, description: note.trim() || undefined });
+      toast.success(`${sign > 0 ? 'Added' : 'Deducted'} ${money(Math.abs(cents), 'EUR')}.`);
+      setAmount(''); setNote(''); load();
+    } catch (e) { toast.error(e.message); } finally { setBusy(false); }
+  };
+
+  return (
+    <Modal open={!!user} onClose={onClose} title={`Store credit — ${user.displayName || user.email}`}>
+      <div className="rounded-2xl p-5 mb-5 text-white" style={{ backgroundImage: 'linear-gradient(135deg,#4f46e5,#7c3aed)' }}>
+        <div className="text-white/70 text-xs">Current balance</div>
+        <div className="text-3xl font-display mt-0.5">{data ? money(data.balance || 0, 'EUR') : '…'}</div>
+      </div>
+
+      <div className="space-y-3 mb-5">
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="label">Amount (€)</label>
+            <input className="input" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="5.00" inputMode="decimal" />
+          </div>
+          <div>
+            <label className="label">Note (optional)</label>
+            <input className="input" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Goodwill, payout…" />
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <button onClick={() => apply(1)} disabled={busy} className="btn-primary flex-1"><Plus size={15} /> Add credit</button>
+          <button onClick={() => apply(-1)} disabled={busy} className="btn-ghost flex-1 text-red-300 hover:bg-red-500/10"><Minus size={15} /> Deduct</button>
+        </div>
+      </div>
+
+      <div className="text-slate-400 text-xs uppercase tracking-wide mb-2">Recent transactions</div>
+      {!data ? <p className="text-slate-500 text-sm">Loading…</p>
+        : (data.transactions || []).length === 0 ? <p className="text-slate-500 text-sm">No transactions yet.</p>
+        : (
+          <div className="space-y-1.5 max-h-56 overflow-auto">
+            {(data.transactions || []).map((t) => (
+              <div key={t.id} className="flex items-center justify-between text-sm bg-space-black rounded-lg px-3 py-2">
+                <span className="text-slate-300 truncate pr-2">{t.description || t.type}</span>
+                <span className={`shrink-0 font-medium ${t.amount > 0 ? 'text-emerald-400' : 'text-slate-200'}`}>
+                  {t.amount > 0 ? '+' : '−'}{money(Math.abs(t.amount), 'EUR')}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+    </Modal>
   );
 }

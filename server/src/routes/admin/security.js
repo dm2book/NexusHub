@@ -8,7 +8,7 @@ import { listAuditLogs, audit } from '../../services/auditService.js';
 import { listFlaggedOrders } from '../../services/fraudService.js';
 import { publicUser, setUserRoles, getUserById } from '../../services/userService.js';
 import { grantMembership, cancelMembership } from '../../services/membershipService.js';
-import { addEntry, balanceOf } from '../../services/walletService.js';
+import { addEntry, balanceOf, walletSummary } from '../../services/walletService.js';
 import { notify } from '../../services/notificationService.js';
 import { notFound, badRequest } from '../../utils/errors.js';
 
@@ -74,6 +74,13 @@ router.post('/users/:id/membership', requirePermission('users.manage'),
     await audit({ actor: req.user, action: cancel ? 'membership.cancel' : 'membership.grant',
       targetType: 'user', targetId: req.params.id, metadata: { days }, req });
     res.json({ membership });
+  }));
+
+// A user's store-credit balance + recent ledger (admin view).
+router.get('/users/:id/wallet', requirePermission('wallet.manage'),
+  asyncHandler(async (req, res) => {
+    if (!(await getUserById(req.params.id))) throw notFound('User not found');
+    res.json(await walletSummary(req.params.id));
   }));
 
 // Grant or deduct store credit for a user (e.g. goodwill, manual payout).

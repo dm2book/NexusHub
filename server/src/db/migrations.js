@@ -614,4 +614,14 @@ INSERT INTO role_permissions (role_id, permission_id)
   ON CONFLICT DO NOTHING;
 `,
   },
+  {
+    id: '008_wallet_tag',
+    sql: `
+-- Idempotency marker for one-time credits (e.g. "loyalty:gold") so a given bonus
+-- is granted at most once per user.
+ALTER TABLE credit_transactions ADD COLUMN IF NOT EXISTS tag TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_credit_tx_user_tag
+  ON credit_transactions (user_id, tag) WHERE tag IS NOT NULL;
+`,
+  },
 ];
