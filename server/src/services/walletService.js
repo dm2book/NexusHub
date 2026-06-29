@@ -21,7 +21,7 @@ export async function balanceOf(userId) {
  * Append a ledger entry. `amount` is signed (positive = credit, negative =
  * debit). Debits cannot take the balance below zero. Returns the entry.
  */
-export async function addEntry({ userId, amount, type, description, orderId = null, createdBy = null }) {
+export async function addEntry({ userId, amount, type, description, orderId = null, createdBy = null, tag = null }) {
   const amt = Math.round(Number(amount));
   if (!userId || !amt) throw badRequest('A wallet entry needs a user and a non-zero amount');
   if (!TX_TYPES.includes(type)) throw badRequest(`Unknown wallet transaction type: ${type}`);
@@ -29,6 +29,11 @@ export async function addEntry({ userId, amount, type, description, orderId = nu
     // Serialize concurrent wallet writes for this user by locking their user row
     // (Postgres forbids FOR UPDATE with an aggregate, so we lock here then sum).
     await get('SELECT id FROM users WHERE id=@u FOR UPDATE', { u: userId });
+    // One-time tagged grants are idempotent.
+    if (tag) {
+      const dupe = await get('SELECT id FROM credit_transactions WHERE user_id=@u AND tag=@t', { u: userId, t: tag });
+      if (dupe) return { id: dupe.id, deduped: true };
+    }
     const cur = await get(
       'SELECT COALESCE(SUM(amount),0) AS bal FROM credit_transactions WHERE user_id=@u', { u: userId });
     const balance = Number(cur?.bal || 0);
@@ -37,11 +42,18 @@ export async function addEntry({ userId, amount, type, description, orderId = nu
     const id = newId('ctx');
     const at = nowIso();
     await run(
-      `INSERT INTO credit_transactions (id, user_id, amount, balance_after, type, description, order_id, created_by, created_at)
-       VALUES (@id, @u, @amt, @after, @type, @desc, @oid, @by, @at)`,
-      { id, u: userId, amt, after, type, desc: description || null, oid: orderId, by: createdBy, at });
+      `INSERT INTO credit_transactions (id, user_id, amount, balance_after, type, description, order_id, created_by, tag, created_at)
+       VALUES (@id, @u, @amt, @after, @type, @desc, @oid, @by, @tag, @at)`,
+      { id, u: userId, amt, after, type, desc: description || null, oid: orderId, by: createdBy, tag, at });
     return { id, amount: amt, balanceAfter: after, type, description, orderId, createdAt: at };
   });
+}
+
+/** Has this user already received a one-time tagged grant? */
+export async function hasUserGrant(userId, tag) {
+  if (!userId || !tag) return false;
+  const r = await get('SELECT id FROM credit_transactions WHERE user_id=@u AND tag=@t LIMIT 1', { u: userId, t: tag });
+  return !!r;
 }
 
 /** Convenience helpers. */

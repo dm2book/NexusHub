@@ -25,6 +25,7 @@ import { memberDiscountPercent } from './membershipService.js';
 import { recordOrderCommission } from './affiliateService.js';
 import { recordPurchaseEvent } from './socialProofService.js';
 import { balanceOf, debit, credit, hasOrderEntry } from './walletService.js';
+import { grantTierRewards } from './loyaltyService.js';
 
 export const STATUSES = [
   'pending', 'payment_received', 'processing', 'awaiting_fulfillment',
@@ -210,6 +211,8 @@ export async function transitionOrder(orderId, to, ctx = {}) {
   // Once paid, auto-deliver from code stock if every item is in stock (best-effort).
   if (to === 'payment_received') {
     autoDispenseFromStock(orderId, ctx).catch((e) => console.error('[autodispense]', e.message));
+    // Paid spend may push the buyer into a new loyalty tier → grant its bonus.
+    if (updated.userId) grantTierRewards(updated.userId).catch((e) => console.error('[loyalty]', e.message));
   }
   return updated;
 }
