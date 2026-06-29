@@ -6,6 +6,7 @@ import AccountLayout from './layouts/AccountLayout.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 import { PageLoader } from './components/ui.jsx';
 import { usePageViews } from './lib/usePageViews.js';
+import RouteProgress from './components/RouteProgress.jsx';
 
 // Eager: first-paint storefront pages (small, instant).
 import HomeStore from './pages/HomeStore.jsx';
@@ -64,6 +65,8 @@ const AdminOperations = lazy(() => import('./pages/admin/Operations.jsx'));
 export default function App() {
   usePageViews();   // anonymous, privacy-friendly visitor analytics
   return (
+    <>
+    <RouteProgress />
     <Suspense fallback={<PageLoader />}>
       <Routes>
         {/* Storefront home — self-contained light theme (own nav + sidebar) */}
@@ -130,5 +133,6 @@ export default function App() {
         <Route path="*" element={<NotFound />} />
       </Routes>
     </Suspense>
+    </>
   );
 }

@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { api } from '../../lib/api.js';
 import { money, dateShort } from '../../lib/format.js';
-import { PageLoader, StatusBadge, EmptyState } from '../../components/ui.jsx';
+import { StatusBadge, EmptyState, SkeletonStat, SkeletonRows, Skeleton } from '../../components/ui.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
 
 export default function Dashboard() {
@@ -13,7 +13,17 @@ export default function Dashboard() {
   const [data, setData] = useState(null);
 
   useEffect(() => { api.get('/api/account/dashboard').then(setData).catch(() => {}); }, []);
-  if (!data) return <PageLoader />;
+  if (!data) {
+    return (
+      <div className="fm-page">
+        <Skeleton className="h-7 w-72 rounded-lg mb-2" />
+        <Skeleton className="h-4 w-80 rounded-md mb-7" />
+        <div className="grid md:grid-cols-3 gap-4 mb-6">{Array.from({ length: 3 }).map((_, i) => <SkeletonStat key={i} />)}</div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-9">{Array.from({ length: 4 }).map((_, i) => <SkeletonStat key={i} />)}</div>
+        <SkeletonRows rows={4} cols={3} />
+      </div>
+    );
+  }
 
   const s = data.stats;
   const buckets = data.ordersByStatus || { pending: 0, processing: 0, delivered: 0, refunded: 0 };

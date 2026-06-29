@@ -2,7 +2,27 @@
 @tailwind components;
 @tailwind utilities;
 
-:root { color-scheme: dark; }
+:root {
+  color-scheme: dark;
+
+  /* ── Motion system: premium easing curves ──────────────────────────────────
+     Each curve has an intent, inspired by the products that use them well:
+       productive — Stripe: quick, confident, no overshoot (UI state changes)
+       expressive — Apple: long soft tail, settles gently (entrances, reveals)
+       spring     — Linear: snappy with a hair of overshoot (toggles, pops)
+       glide      — Notion: even, calm (hovers, color/opacity)                   */
+  --ease-productive: cubic-bezier(.2, .6, .35, 1);
+  --ease-expressive: cubic-bezier(.22, 1, .36, 1);
+  --ease-spring:     cubic-bezier(.34, 1.4, .5, 1);
+  --ease-glide:      cubic-bezier(.4, 0, .2, 1);
+
+  /* Durations — short and intentional; nothing lingers. */
+  --dur-fast: .14s;
+  --dur-quick: .22s;
+  --dur-base: .32s;
+  --dur-slow: .5s;
+  --dur-page: .5s;
+}
 
 html { scroll-behavior: smooth; background: #070710; }
 
@@ -28,11 +48,21 @@ h1, h2, h3, .font-display { font-family: 'Orbitron', sans-serif; letter-spacing:
   .glass { @apply bg-white/[0.04] border border-white/10 backdrop-blur-xl; }
 
   .btn { @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5
-         font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed; }
+         font-medium disabled:opacity-50 disabled:cursor-not-allowed;
+         transition: transform var(--dur-quick) var(--ease-spring),
+                     box-shadow var(--dur-quick) var(--ease-glide),
+                     background-position var(--dur-slow) var(--ease-glide),
+                     background-color var(--dur-quick) var(--ease-glide); }
   .btn-primary { @apply btn text-white relative overflow-hidden;
     background-image: linear-gradient(120deg, #6366f1, #a855f7, #ec4899);
     background-size: 200% 100%; }
-  .btn-primary:hover { background-position: 100% 0; box-shadow: 0 0 28px rgba(139,92,246,.55); transform: translateY(-1px); }
+  /* Light sheen that sweeps across the primary CTA on hover. */
+  .btn-primary::after {
+    content: ''; position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(105deg, transparent 30%, rgba(255,255,255,.35) 50%, transparent 70%);
+    transform: translateX(-130%); transition: transform var(--dur-slow) var(--ease-productive); }
+  .btn-primary:hover { background-position: 100% 0; box-shadow: 0 8px 28px -6px rgba(139,92,246,.6); transform: translateY(-1px); }
+  .btn-primary:hover::after { transform: translateX(130%); }
   .btn-ghost { @apply btn bg-white/[0.06] text-slate-200 hover:bg-white/[0.12] border border-white/5; }
   .btn-outline { @apply btn border border-primary/40 text-indigo-200 hover:bg-primary/10; }
   .btn-danger { @apply btn bg-red-500/15 text-red-300 hover:bg-red-500/25 border border-red-500/30; }
@@ -225,16 +255,24 @@ h1, h2, h3, .font-display { font-family: 'Orbitron', sans-serif; letter-spacing:
 .theme-light .bg-space-black, .theme-light .bg-elevated { background:#f8fafc; }
 
 /* ── Premium storefront motion & effects ───────────────────────────────── */
-@keyframes fmPageIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
-.fm-page { animation: fmPageIn .42s cubic-bezier(.22,.61,.36,1) both; }
+/* Route/page entrance — a single, intentional gesture: rise + settle + de-blur.
+   Uses the expressive (Apple-like) curve so it lands softly. ~360ms feels
+   instant on navigation yet reads as deliberate. */
+@keyframes fmPageIn {
+  from { opacity: 0; transform: translateY(9px) scale(.994); filter: blur(6px); }
+  to   { opacity: 1; transform: none; filter: blur(0); }
+}
+.fm-page { animation: fmPageIn .36s var(--ease-expressive) both; }
 
 /* Scroll-reveal (toggled via IntersectionObserver adding .is-in) */
-.fm-reveal { opacity: 0; transform: translateY(22px); transition: opacity .7s cubic-bezier(.22,.61,.36,1), transform .7s cubic-bezier(.22,.61,.36,1); }
+.fm-reveal { opacity: 0; transform: translateY(22px); transition: opacity .7s var(--ease-expressive), transform .7s var(--ease-expressive); }
 .fm-reveal.is-in { opacity: 1; transform: none; }
 
-/* Premium card hover lift + sheen */
-.fm-lift { transition: transform .35s cubic-bezier(.22,.61,.36,1), box-shadow .35s ease; }
-.fm-lift:hover { transform: translateY(-6px); box-shadow: 0 20px 40px -16px rgba(124,92,255,.35); }
+/* Premium card hover lift + sheen (hover-capable pointers only). */
+.fm-lift { transition: transform var(--dur-base) var(--ease-expressive), box-shadow var(--dur-base) var(--ease-glide); }
+@media (hover: hover) {
+  .fm-lift:hover { transform: translateY(-6px); box-shadow: 0 20px 40px -16px rgba(124,92,255,.35); }
+}
 
 /* Animated gradient text */
 @keyframes fmGrad { 0%,100%{background-position:0% 50%} 50%{background-position:100% 50%} }
@@ -274,4 +312,95 @@ h1, h2, h3, .font-display { font-family: 'Orbitron', sans-serif; letter-spacing:
 
 @media (prefers-reduced-motion: reduce) {
   .fm-grid-in > * { animation: none !important; }
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   MOTION SYSTEM — premium loading, micro-interactions & route motion
+   CSS-only, GPU-friendly (transform/opacity/filter), token-driven.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* ── Route progress bar (Linear-style): thin gradient sweep on navigation ── */
+.fm-route-progress {
+  position: fixed; top: 0; left: 0; right: 0; height: 2.5px; z-index: 100;
+  transform-origin: 0 50%;
+  background: linear-gradient(90deg, #6366f1, #a855f7, #ec4899);
+  box-shadow: 0 0 10px rgba(168,85,247,.6);
+  animation: fmRouteBar .5s var(--ease-productive) both;
+}
+@keyframes fmRouteBar {
+  0%   { transform: scaleX(0);   opacity: 1; }
+  60%  { transform: scaleX(.7);  opacity: 1; }
+  100% { transform: scaleX(1);   opacity: 0; }
+}
+
+/* ── Premium loaders ──────────────────────────────────────────────────────── */
+/* Orbit spinner: two counter-rotating arcs — calmer & more bespoke than a
+   single spinning ring. Sized via font-size (1em = ring diameter). */
+.fm-orbit { position: relative; width: 1em; height: 1em; color: currentColor; }
+.fm-orbit::before, .fm-orbit::after {
+  content: ''; position: absolute; inset: 0; border-radius: 50%;
+  border: 2px solid transparent;
+}
+.fm-orbit::before { border-top-color: currentColor; border-right-color: currentColor; animation: fmSpin .7s var(--ease-glide) infinite; }
+.fm-orbit::after  { border-bottom-color: currentColor; opacity: .4; inset: .18em; animation: fmSpin 1.05s var(--ease-glide) infinite reverse; }
+@keyframes fmSpin { to { transform: rotate(360deg); } }
+
+/* Three-dot "thinking" pulse — for inline/button loading. */
+.fm-dots { display: inline-flex; gap: .28em; align-items: center; }
+.fm-dots i { width: .34em; height: .34em; border-radius: 50%; background: currentColor; animation: fmDot 1s var(--ease-glide) infinite; }
+.fm-dots i:nth-child(2) { animation-delay: .15s; }
+.fm-dots i:nth-child(3) { animation-delay: .3s; }
+@keyframes fmDot { 0%,100% { opacity: .25; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-.18em); } }
+
+/* ── Skeletons (shimmer) ──────────────────────────────────────────────────── */
+.fm-skeleton {
+  position: relative; overflow: hidden;
+  background: rgba(255,255,255,.05); border-radius: .75rem;
+}
+.fm-skeleton::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.09), transparent);
+  transform: translateX(-100%);
+  animation: fmShimmer 1.5s var(--ease-glide) infinite;
+}
+.theme-light .fm-skeleton { background: rgba(15,23,42,.05); }
+.theme-light .fm-skeleton::after { background: linear-gradient(90deg, transparent, rgba(15,23,42,.06), transparent); }
+@keyframes fmShimmer { 100% { transform: translateX(100%); } }
+
+/* ── Micro-interactions ───────────────────────────────────────────────────── */
+/* Tap/press feedback — works on touch + mouse, snappy spring return. */
+.btn:active, .btn-primary:active, .btn-ghost:active, .btn-outline:active, .fm-tap:active { transform: scale(.96); }
+.fm-tap { transition: transform var(--dur-fast) var(--ease-spring); -webkit-tap-highlight-color: transparent; }
+
+/* Animated underline that grows from the left (nav/text links). */
+.fm-underline { position: relative; }
+.fm-underline::after {
+  content: ''; position: absolute; left: 0; bottom: -2px; height: 1.5px; width: 100%;
+  background: currentColor; transform: scaleX(0); transform-origin: 0 50%;
+  transition: transform var(--dur-base) var(--ease-expressive);
+}
+@media (hover: hover) { .fm-underline:hover::after { transform: scaleX(1); } }
+
+/* Icon nudge — arrow/chevron slides on hover of its group. */
+.fm-nudge { transition: transform var(--dur-quick) var(--ease-spring); }
+@media (hover: hover) {
+  .group:hover .fm-nudge, .fm-nudge-host:hover .fm-nudge { transform: translateX(3px); }
+}
+
+/* Pop-in: scale+fade for badges, toasts, popovers, success ticks. */
+@keyframes fmPop { from { opacity: 0; transform: scale(.9); } to { opacity: 1; transform: none; } }
+.fm-pop { animation: fmPop var(--dur-quick) var(--ease-spring) both; }
+
+/* Count/value flip-in for KPI numbers. */
+@keyframes fmRise { from { opacity: 0; transform: translateY(.4em); } to { opacity: 1; transform: none; } }
+.fm-rise { animation: fmRise var(--dur-base) var(--ease-expressive) both; }
+
+/* Soft focus ring for inputs/cards (additive glow, not just border). */
+.fm-focus:focus-visible, .input:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(124,92,255,.25); }
+
+@media (prefers-reduced-motion: reduce) {
+  .fm-route-progress, .fm-orbit::before, .fm-orbit::after, .fm-dots i,
+  .fm-skeleton::after, .fm-pop, .fm-rise { animation: none !important; }
+  .fm-skeleton::after { display: none; }
+  .fm-tap:active, .btn:active, .fm-underline::after, .fm-nudge { transition: none !important; transform: none !important; }
 }

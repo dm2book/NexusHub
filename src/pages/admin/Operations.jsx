@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { api } from '../../lib/api.js';
 import { money, dateShort } from '../../lib/format.js';
-import { PageLoader, StatusBadge, EmptyState, Modal } from '../../components/ui.jsx';
+import { StatusBadge, EmptyState, Modal, SkeletonStat, SkeletonRows, Skeleton } from '../../components/ui.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
 
@@ -81,7 +81,19 @@ export default function Operations() {
 
   const toggleSort = (id) => { if (sort === id) setDir((d) => (d === 'asc' ? 'desc' : 'asc')); else { setSort(id); setDir('desc'); } };
 
-  if (!data) return <PageLoader />;
+  if (!data) {
+    return (
+      <div className="fm-page">
+        <Skeleton className="h-7 w-64 rounded-lg mb-2" />
+        <Skeleton className="h-4 w-96 rounded-md mb-6" />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+          {Array.from({ length: 4 }).map((_, i) => <SkeletonStat key={i} />)}
+        </div>
+        <Skeleton className="h-48 rounded-2xl mb-6" />
+        <SkeletonRows rows={6} cols={6} />
+      </div>
+    );
+  }
   const o = stats?.overview;
 
   return (

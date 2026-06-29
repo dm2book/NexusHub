@@ -7,7 +7,7 @@ import { useToast } from '../context/ToastContext.jsx';
 import { categoryVisual } from '../lib/catalog.js';
 import { withFallback, iconFor } from '../lib/sampleCatalog.js';
 import LightProductCard from '../components/store/LightProductCard.jsx';
-import { Skeleton } from '../components/ui.jsx';
+import { SkeletonCard } from '../components/ui.jsx';
 import { usePageMeta } from '../lib/useMeta.js';
 import { useTrending } from '../lib/useTrending.js';
 import { Flame } from 'lucide-react';
@@ -138,7 +138,7 @@ export default function Shop() {
         {/* grid */}
         {products === null ? (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-72 !bg-slate-100" />)}
+            {Array.from({ length: 8 }).map((_, i) => <SkeletonCard key={i} />)}
           </div>
         ) : visible.length === 0 ? (
           <div className="bg-white rounded-2xl border border-slate-200/70 p-14 text-center">

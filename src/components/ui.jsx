@@ -1,15 +1,21 @@
 import { useEffect } from 'react';
-import { X, Loader2 } from 'lucide-react';
+import { X } from 'lucide-react';
 
+/** Premium orbit spinner (two counter-rotating arcs). Size is in px. */
 export function Spinner({ size = 20, className = '' }) {
-  return <Loader2 size={size} className={`animate-spin ${className}`} />;
+  return <span className={`fm-orbit ${className}`} style={{ fontSize: `${size}px` }} role="status" aria-label="Loading" />;
 }
 
-export function PageLoader({ label = 'Loading…' }) {
+/** Inline three-dot "thinking" pulse — for buttons / inline loading. */
+export function Dots({ className = '' }) {
+  return <span className={`fm-dots ${className}`} aria-hidden="true"><i /><i /><i /></span>;
+}
+
+export function PageLoader({ label = 'Loading' }) {
   return (
-    <div className="flex flex-col items-center justify-center py-24 text-slate-400 gap-3">
-      <Spinner size={28} className="text-primary" />
-      <span className="text-sm">{label}</span>
+    <div className="flex flex-col items-center justify-center py-24 text-slate-400 gap-4 fm-page">
+      <Spinner size={30} className="text-primary" />
+      <span className="text-sm tracking-wide text-slate-500 flex items-center gap-1.5">{label}<Dots className="text-slate-500" /></span>
     </div>
   );
 }
@@ -63,7 +69,56 @@ export function StatusBadge({ status }) {
 }
 
 export function Skeleton({ className = '' }) {
-  return <div className={`skeleton rounded-xl ${className}`} />;
+  return <div className={`fm-skeleton ${className}`} />;
+}
+
+/** A few lines of placeholder text (last line shorter). */
+export function SkeletonText({ lines = 3, className = '' }) {
+  return (
+    <div className={`space-y-2 ${className}`}>
+      {Array.from({ length: lines }).map((_, i) => (
+        <Skeleton key={i} className={`h-3 rounded-md ${i === lines - 1 ? 'w-2/3' : 'w-full'}`} />
+      ))}
+    </div>
+  );
+}
+
+/** Product-card placeholder (storefront grids). */
+export function SkeletonCard({ className = '' }) {
+  return (
+    <div className={`card p-4 ${className}`}>
+      <Skeleton className="h-32 rounded-xl mb-4" />
+      <Skeleton className="h-3.5 w-3/4 rounded-md mb-2" />
+      <Skeleton className="h-3 w-1/2 rounded-md mb-4" />
+      <Skeleton className="h-9 rounded-xl" />
+    </div>
+  );
+}
+
+/** KPI / stat-card placeholder. */
+export function SkeletonStat({ className = '' }) {
+  return (
+    <div className={`card p-4 ${className}`}>
+      <Skeleton className="w-9 h-9 rounded-xl mb-3" />
+      <Skeleton className="h-6 w-2/3 rounded-md mb-2" />
+      <Skeleton className="h-3 w-1/2 rounded-md" />
+    </div>
+  );
+}
+
+/** Table-row placeholders (admin/account tables). */
+export function SkeletonRows({ rows = 6, cols = 5, className = '' }) {
+  return (
+    <div className={`card divide-y divide-white/5 ${className}`}>
+      {Array.from({ length: rows }).map((_, r) => (
+        <div key={r} className="flex items-center gap-4 px-4 py-3.5">
+          {Array.from({ length: cols }).map((_, c) => (
+            <Skeleton key={c} className={`h-3.5 rounded-md ${c === 0 ? 'w-24' : c === cols - 1 ? 'w-12 ml-auto' : 'flex-1'}`} />
+          ))}
+        </div>
+      ))}
+    </div>
+  );
 }
 
 /** Marketing section heading with eyebrow + gradient title. */
