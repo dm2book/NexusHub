@@ -81,8 +81,9 @@ export default function ProductDetail() {
       </Link>
 
       <div className="grid lg:grid-cols-2 gap-10">
-        {/* visual */}
-        <div className={`shine-host group relative rounded-3xl bg-gradient-to-br ${grad} h-80 lg:h-[420px] overflow-hidden animate-fade-in ${product.featured ? 'ring-featured' : ''}`}>
+        {/* visual — shared-element morph target from the product card */}
+        <div style={{ viewTransitionName: 'product-hero' }}
+          className={`shine-host group relative rounded-3xl bg-gradient-to-br ${grad} h-80 lg:h-[420px] overflow-hidden animate-fade-in ${product.featured ? 'ring-featured' : ''}`}>
           {product.image ? (
             <img src={product.image} alt={product.name} className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
           ) : (
