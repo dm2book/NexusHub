@@ -12,7 +12,7 @@
 import { run, get, all, nowIso, tx } from '../db/index.js';
 import { newId, newOrderNumber } from '../utils/ids.js';
 import { formatMoney } from '../utils/money.js';
-import { config, manualPayMethods, couponFor } from '../config/env.js';
+import { config, manualPayMethods } from '../config/env.js';
 import { badRequest, notFound, conflict } from '../utils/errors.js';
 import { sendEmailAsync } from './emailService.js';
 import { notify } from './notificationService.js';
@@ -26,6 +26,8 @@ import { recordOrderCommission } from './affiliateService.js';
 import { recordPurchaseEvent } from './socialProofService.js';
 import { balanceOf, debit, credit, hasOrderEntry } from './walletService.js';
 import { grantTierRewards } from './loyaltyService.js';
+import { evaluateCoupon, recordCouponRedemption } from './couponService.js';
+import { bestBundleDiscount } from './bundleService.js';
 
 export const STATUSES = [
   'pending', 'payment_received', 'processing', 'awaiting_fulfillment',
@@ -84,13 +86,18 @@ export async function createOrder(input, ctx = {}) {
       quantity: qty, unit_price: unit, metadata: li.metadata || {},
     });
   }
-  // Apply a discount coupon if one was supplied and is valid.
-  const coupon = couponFor(input.coupon);
-  const couponDiscount = coupon ? Math.round(subtotal * coupon.percent / 100) : 0;
+  // Apply a discount coupon if one was supplied and is valid (DB-backed; server
+  // is authoritative — the discount is recomputed here, never trusted from client).
+  const couponEval = await evaluateCoupon(input.coupon, { subtotal, userId: input.userId, email });
+  const couponCode = couponEval.ok ? couponEval.code : null;
+  const couponDiscount = couponEval.ok ? couponEval.discount : 0;
   // Forge+ members get a standing discount on top (stacked with any coupon).
   const memberPercent = input.userId ? await memberDiscountPercent(input.userId) : 0;
   const memberDiscount = memberPercent ? Math.round(subtotal * memberPercent / 100) : 0;
-  const discount = Math.min(subtotal, couponDiscount + memberDiscount);
+  // Bundle discount: best single bundle whose products are all in the order.
+  const bundle = await bestBundleDiscount(lineItems);
+  const bundleDiscount = bundle.discount;
+  const discount = Math.min(subtotal, couponDiscount + memberDiscount + bundleDiscount);
   const afterDiscount = Math.max(0, subtotal - discount);
   // Optionally pay part of the order with the customer's store credit.
   let creditApplied = 0;
@@ -100,8 +107,9 @@ export async function createOrder(input, ctx = {}) {
   }
   const total = Math.max(0, afterDiscount - creditApplied);
   const billing = { ...(input.billing || {}) };
-  if (coupon) { billing.coupon = coupon.code; billing.discount = couponDiscount; }
+  if (couponCode) { billing.coupon = couponCode; billing.discount = couponDiscount; }
   if (memberDiscount) { billing.memberDiscount = memberDiscount; billing.memberPercent = memberPercent; }
+  if (bundleDiscount) { billing.bundle = bundle.bundle?.name; billing.bundleDiscount = bundleDiscount; }
   if (creditApplied) billing.creditApplied = creditApplied;
 
   await tx(async () => {
@@ -124,6 +132,12 @@ export async function createOrder(input, ctx = {}) {
     }
     await appendHistory(orderId, null, 'pending', ctx.actorId || 'system', 'Order created');
   });
+
+  // Record the coupon redemption (per-user limits + usage counter). Best-effort.
+  if (couponCode) {
+    await recordCouponRedemption({ code: couponCode, userId: input.userId, email, orderId, ip: ctx.ip })
+      .catch((e) => console.error('[coupon] redemption', e.message));
+  }
 
   // Fraud screening (records signals; may flag/block).
   const order = await getOrder(orderId);

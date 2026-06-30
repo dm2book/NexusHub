@@ -1,10 +1,14 @@
 /** Public storefront routes: browse catalog, place an order, track by number. */
 import { Router } from 'express';
 import { z } from 'zod';
-import { config, manualPayMethods, couponFor } from '../config/env.js';
+import { config, manualPayMethods } from '../config/env.js';
 import { asyncHandler } from '../middleware/error.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 import { listProducts, getProduct, trendingProducts } from '../services/productService.js';
+import { evaluateCoupon } from '../services/couponService.js';
+import { recommendationsFor } from '../services/recommendationService.js';
+import { pricedBundles } from '../services/bundleService.js';
+import { peekGiftCard } from '../services/giftCardService.js';
 import { createOrder, getOrderByNumber, getOrder, markPaymentReceived } from '../services/orderService.js';
 import { submitProof, getOrderProof } from '../services/paymentProofService.js';
 import { listEnabledProviders } from '../services/oauthService.js';
@@ -120,12 +124,35 @@ router.get('/products/:id', asyncHandler(async (req, res) => {
   res.json({ product: p });
 }));
 
-// Validate a discount code (checkout preview).
-router.get('/coupons/:code', (req, res) => {
-  const c = couponFor(req.params.code);
-  if (!c) throw new ApiError(404, 'Invalid or expired code');
-  res.json(c);
-});
+// Validate a discount code (checkout preview). Pass ?subtotal=cents for an exact
+// discount + min-spend / limit checks; the order endpoint re-validates server-side.
+router.get('/coupons/:code', asyncHandler(async (req, res) => {
+  const subtotal = Math.max(0, Number(req.query.subtotal) || 0);
+  const r = await evaluateCoupon(req.params.code, { subtotal, userId: req.user?.id, email: req.user?.email });
+  if (!r.ok) throw new ApiError(404, r.reason || 'Invalid or expired code');
+  res.json({ code: r.code, kind: r.kind, percent: r.percent, value: r.value, discount: r.discount, label: r.label });
+}));
+
+// Cross-sell + upsell recommendations for a product.
+router.get('/products/:id/recommendations', asyncHandler(async (req, res) => {
+  res.json(await recommendationsFor(req.params.id, { limit: 4 }));
+}));
+
+// Active bundle offers (resolved products + pricing). Cached briefly.
+let bundlesCache = { at: 0, data: null };
+router.get('/bundles', asyncHandler(async (_req, res) => {
+  if (!bundlesCache.data || Date.now() - bundlesCache.at > 30_000) {
+    bundlesCache = { at: Date.now(), data: await pricedBundles() };
+  }
+  res.json({ bundles: bundlesCache.data });
+}));
+
+// Check a gift-card balance (redemption requires being signed in — see account API).
+router.get('/gift-cards/:code', asyncHandler(async (req, res) => {
+  const g = await peekGiftCard(req.params.code);
+  if (!g) throw new ApiError(404, 'Gift card not found');
+  res.json(g);
+}));
 
 // Place an order. Authenticated users get it linked to their account; guests
 // may order by email. Checkout/payment capture would call markPaymentReceived.

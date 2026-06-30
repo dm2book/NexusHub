@@ -15,7 +15,8 @@ import { updateProfile, updatePreferences, publicUser } from '../services/userSe
 import { loyaltyFor } from '../services/loyaltyService.js';
 import { affiliateStats } from '../services/affiliateService.js';
 import { getMembership } from '../services/membershipService.js';
-import { walletSummary } from '../services/walletService.js';
+import { walletSummary, balanceOf } from '../services/walletService.js';
+import { redeemGiftCard } from '../services/giftCardService.js';
 import { requestPhoneOtp } from '../services/authService.js';
 import { normalizePhone, isValidPhone } from '../services/smsService.js';
 import { sha256, safeEqual } from '../utils/crypto.js';
@@ -57,6 +58,15 @@ router.get('/rewards', asyncHandler(async (req, res) => {
 // ── Wallet / store credit ────────────────────────────────────────────────────
 router.get('/wallet', asyncHandler(async (req, res) => {
   res.json(await walletSummary(req.user.id));
+}));
+
+// Redeem a gift card → credited to the wallet.
+router.post('/wallet/redeem', asyncHandler(async (req, res) => {
+  const { code } = z.object({ code: z.string().min(4).max(40) }).parse(req.body || {});
+  const r = await redeemGiftCard(code, req.user.id);
+  await audit({ actor: req.user, action: 'giftcard.redeem', targetType: 'user', targetId: req.user.id,
+    metadata: { amount: r.amount }, req });
+  res.json({ redeemed: r.amount, balance: await balanceOf(req.user.id) });
 }));
 
 // ── Phone number (add + verify via SMS OTP) ──────────────────────────────────

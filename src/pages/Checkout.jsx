@@ -34,11 +34,24 @@ export default function Checkout() {
   const [methodId, setMethodId] = useState('');
   const [placed, setPlaced] = useState(null);           // created order (manual flow)
   const [couponInput, setCouponInput] = useState('');
-  const [coupon, setCoupon] = useState(null);           // { code, percent }
+  const [coupon, setCoupon] = useState(null);           // { code, kind, percent, value, label }
   const [creditBalance, setCreditBalance] = useState(0); // store credit (cents)
   const [useCredit, setUseCredit] = useState(false);
+  const [bundles, setBundles] = useState([]);
 
-  const discount = coupon ? Math.round(subtotal * coupon.percent / 100) : 0;
+  // Best matching bundle: all of its products are in the cart.
+  const inCart = new Set(items.map((i) => i.id));
+  const itemTotal = (id) => items.filter((i) => i.id === id).reduce((s, i) => s + i.price * i.qty, 0);
+  const matchedBundle = bundles
+    .filter((b) => b.products?.every((p) => inCart.has(p.id)))
+    .map((b) => ({ name: b.name, percent: b.discountPercent, discount: Math.round(b.products.reduce((s, p) => s + itemTotal(p.id), 0) * b.discountPercent / 100) }))
+    .sort((a, b) => b.discount - a.discount)[0] || null;
+  const bundleDiscount = matchedBundle?.discount || 0;
+
+  const couponDiscount = coupon
+    ? (coupon.percent ? Math.round(subtotal * coupon.percent / 100) : Math.min(subtotal, coupon.value || 0))
+    : 0;
+  const discount = Math.min(subtotal, couponDiscount + bundleDiscount);
   const afterDiscount = Math.max(0, subtotal - discount);
   const creditToApply = useCredit ? Math.min(creditBalance, afterDiscount) : 0;
   const grandTotal = Math.max(0, afterDiscount - creditToApply);
@@ -46,8 +59,10 @@ export default function Checkout() {
   const applyCoupon = async () => {
     const code = couponInput.trim();
     if (!code) return;
-    try { const c = await api.get(`/api/coupons/${encodeURIComponent(code)}`); setCoupon(c); toast.success(`Code applied — ${c.percent}% off!`); }
-    catch { setCoupon(null); toast.error('Invalid or expired code'); }
+    try {
+      const c = await api.get(`/api/coupons/${encodeURIComponent(code)}?subtotal=${subtotal}`);
+      setCoupon(c); toast.success(`Code applied — ${c.label || 'discount'}!`);
+    } catch (e) { setCoupon(null); toast.error(e.message || 'Invalid or expired code'); }
   };
 
   useEffect(() => { if (user?.email) setEmail(user.email); }, [user]);
@@ -55,6 +70,7 @@ export default function Checkout() {
     if (!user) { setCreditBalance(0); return; }
     api.get('/api/account/wallet').then((w) => setCreditBalance(w.balance || 0)).catch(() => {});
   }, [user]);
+  useEffect(() => { api.get('/api/bundles').then((r) => setBundles(r.bundles || [])).catch(() => {}); }, []);
   useEffect(() => {
     api.get('/api/config').then((c) => {
       setProvider(c.paymentProvider);
@@ -253,7 +269,8 @@ export default function Checkout() {
           )}
           <div className="border-t border-white/5 pt-4 mb-6 space-y-1.5">
             <div className="flex justify-between text-sm text-slate-400"><span>Subtotal</span><span>{money(subtotal, currency)}</span></div>
-            {coupon && <div className="flex justify-between text-sm text-emerald-300"><span>Discount ({coupon.code} · {coupon.percent}%)</span><span>−{money(discount, currency)}</span></div>}
+            {matchedBundle && <div className="flex justify-between text-sm text-amber-300"><span>Bundle ({matchedBundle.name} · {matchedBundle.percent}%)</span><span>−{money(bundleDiscount, currency)}</span></div>}
+            {coupon && <div className="flex justify-between text-sm text-emerald-300"><span>Coupon ({coupon.code}{coupon.percent ? ` · ${coupon.percent}%` : ''})</span><span>−{money(couponDiscount, currency)}</span></div>}
             {creditToApply > 0 && <div className="flex justify-between text-sm text-indigo-300"><span>Store credit</span><span>−{money(creditToApply, currency)}</span></div>}
             <div className="flex justify-between text-lg pt-1"><span className="text-slate-300">Total</span><span className="text-white font-semibold">{money(grandTotal, currency)}</span></div>
           </div>

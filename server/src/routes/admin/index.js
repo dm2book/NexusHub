@@ -12,6 +12,7 @@ import security from './security.js';
 import products from './products.js';
 import support from './support.js';
 import social from './social.js';
+import monetization from './monetization.js';
 
 const router = Router();
 router.use(requireAuth, requireStaff);
@@ -25,5 +26,6 @@ router.use('/security', security);
 router.use('/products', products);
 router.use('/support', support);
 router.use('/social', social);
+router.use('/monetization', monetization);
 
 export default router;

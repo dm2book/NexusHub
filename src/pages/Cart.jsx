@@ -1,12 +1,16 @@
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Minus, Plus, Trash2, ShoppingBag, ArrowRight } from 'lucide-react';
 import { useCart } from '../context/CartContext.jsx';
+import { useToast } from '../context/ToastContext.jsx';
+import { api } from '../lib/api.js';
 import { categoryVisual, money } from '../lib/catalog.js';
 import { iconFor } from '../lib/sampleCatalog.js';
 import { navigateWithTransition } from '../lib/viewTransition.js';
+import LightProductCard from '../components/store/LightProductCard.jsx';
 
 export default function Cart() {
-  const { items, setQty, remove, subtotal, currency } = useCart();
+  const { items, setQty, remove, subtotal, currency, add } = useCart();
   const navigate = useNavigate();
 
   if (items.length === 0) {
@@ -69,6 +73,38 @@ export default function Cart() {
           </button>
           <Link to="/shop" className="block text-center text-sm text-slate-500 hover:text-violet-600 mt-4">Continue shopping</Link>
         </div>
+      </div>
+
+      <CartCrossSell items={items} onAdd={add} />
+    </div>
+  );
+}
+
+/** "Complete your order" — cross-sell rail driven by the first cart item's
+ *  recommendations, falling back to trending; hides items already in the cart. */
+function CartCrossSell({ items, onAdd }) {
+  const toast = useToast();
+  const [recs, setRecs] = useState([]);
+  const seed = items[0]?.id;
+  useEffect(() => {
+    let live = true;
+    const fromTrending = () => api.get('/api/products/trending').then((r) => r.products || []);
+    const p = seed
+      ? api.get(`/api/products/${seed}/recommendations`).then((r) => (r.crossSell?.length ? r.crossSell : fromTrending())).catch(fromTrending)
+      : fromTrending();
+    Promise.resolve(p).then((list) => { if (live) setRecs(list || []); }).catch(() => {});
+    return () => { live = false; };
+  }, [seed]);
+
+  const inCart = new Set(items.map((i) => i.id));
+  const show = recs.filter((p) => !inCart.has(p.id)).slice(0, 4);
+  if (show.length === 0) return null;
+
+  return (
+    <div className="mt-12">
+      <h2 className="text-xl font-extrabold text-slate-900 mb-5">Complete your order</h2>
+      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 fm-grid-in">
+        {show.map((p) => <LightProductCard key={p.id} product={p} onAdd={(x) => { onAdd(x); toast.success(`${x.name} added`); }} />)}
       </div>
     </div>
   );
