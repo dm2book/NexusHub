@@ -3,6 +3,7 @@ import { Minus, Plus, Trash2, ShoppingBag, ArrowRight } from 'lucide-react';
 import { useCart } from '../context/CartContext.jsx';
 import { categoryVisual, money } from '../lib/catalog.js';
 import { iconFor } from '../lib/sampleCatalog.js';
+import { navigateWithTransition } from '../lib/viewTransition.js';
 
 export default function Cart() {
   const { items, setQty, remove, subtotal, currency } = useCart();
@@ -51,7 +52,7 @@ export default function Cart() {
           })}
         </div>
 
-        <div className="bg-white rounded-2xl border border-slate-200/70 shadow-sm p-6 h-fit">
+        <div style={{ viewTransitionName: 'order-summary' }} className="bg-white rounded-2xl border border-slate-200/70 shadow-sm p-6 h-fit">
           <h3 className="font-bold text-slate-900 mb-5">Order summary</h3>
           <div className="flex justify-between text-sm text-slate-500 mb-2">
             <span>Subtotal</span><span className="text-slate-900 font-medium">{money(subtotal, currency)}</span>
@@ -63,7 +64,7 @@ export default function Cart() {
             <span className="text-slate-600">Total</span>
             <span className="text-slate-900 font-bold">{money(subtotal, currency)}</span>
           </div>
-          <button onClick={() => navigate('/checkout')} className="btn-primary w-full py-3">
+          <button onClick={() => navigateWithTransition(navigate, '/checkout')} className="btn-primary w-full py-3">
             Checkout <ArrowRight size={18} />
           </button>
           <Link to="/shop" className="block text-center text-sm text-slate-500 hover:text-violet-600 mt-4">Continue shopping</Link>

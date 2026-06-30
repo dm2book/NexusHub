@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useCallback } from 'react';
 import { CheckCircle, AlertCircle, Info, X } from 'lucide-react';
+import { feedback } from '../lib/feedback.js';
 
 const ToastContext = createContext(null);
 export const useToast = () => useContext(ToastContext);
@@ -18,6 +19,10 @@ export function ToastProvider({ children }) {
   const push = useCallback((message, type = 'info') => {
     const id = Math.random().toString(36).slice(2);
     setToasts((t) => [...t, { id, message, type }]);
+    // Tactile cue: success/error get a distinct haptic + (opt-in) chime.
+    if (type === 'success') feedback('success');
+    else if (type === 'error') feedback('error');
+    else feedback('light');
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 4000);
   }, []);
 

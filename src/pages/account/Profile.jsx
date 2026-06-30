@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   Monitor, LogOut, ShieldCheck, Smartphone, Pencil, History, Check,
-  User, Mail, Phone, BadgeCheck, Trash2, X,
+  User, Mail, Phone, BadgeCheck, Trash2, X, Volume2,
 } from 'lucide-react';
 import { api } from '../../lib/api.js';
 import { date } from '../../lib/format.js';
+import { getFeedbackPrefs, setFeedbackPref, feedback } from '../../lib/feedback.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
 
@@ -19,6 +20,7 @@ export default function Profile() {
       <Identity />
       <PhoneSection />
       <Preferences />
+      <FeedbackPrefs />
       <ActiveSessions />
       <TrustedDevices />
       <LoginHistory />
@@ -155,6 +157,27 @@ function Preferences() {
         <Toggle label="Order & delivery emails" checked={emailOrderUpdates} onChange={setOrderUpdates} />
         <Toggle label="Product news & offers" checked={emailMarketing} onChange={setMarketing} />
         <button onClick={save} className="btn-primary mt-2">Save preferences</button>
+      </div>
+    </div>
+  );
+}
+
+// ── Sound & haptics ──────────────────────────────────────────────────────────
+function FeedbackPrefs() {
+  const [prefs, setPrefs] = useState(() => getFeedbackPrefs());
+  const set = (kind, on) => {
+    setFeedbackPref(kind, on);
+    const next = { ...prefs, [kind]: on };
+    setPrefs(next);
+    if (on) feedback(kind === 'sound' ? 'success' : 'light'); // sample the cue
+  };
+  return (
+    <div className="card p-6">
+      <h3 className="text-white flex items-center gap-2 mb-1"><Volume2 size={17} className="text-indigo-300" /> Sound &amp; haptics</h3>
+      <p className="text-slate-500 text-sm mb-4">Subtle feedback on actions. Haptics work on supported phones; sound is off by default.</p>
+      <div className="space-y-3">
+        <Toggle label="Haptic feedback (vibration)" checked={prefs.haptics} onChange={(v) => set('haptics', v)} />
+        <Toggle label="Interface sounds" checked={prefs.sound} onChange={(v) => set('sound', v)} />
       </div>
     </div>
   );

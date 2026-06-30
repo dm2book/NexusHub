@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { useCart } from '../context/CartContext.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import Confetti from '../components/Confetti.jsx';
+import { feedback } from '../lib/feedback.js';
 
 export default function CheckoutSuccess() {
   const [params] = useSearchParams();
@@ -12,14 +13,15 @@ export default function CheckoutSuccess() {
   const orderId = params.get('order');
   const number = params.get('n');
 
-  useEffect(() => { clear(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { clear(); feedback('success'); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="section py-28 text-center relative overflow-hidden">
       <Confetti />
       <div className="orb w-96 h-96 bg-emerald-500/15 -top-20 left-1/3" />
       <div className="relative max-w-lg mx-auto">
-        <div className="w-20 h-20 rounded-3xl mx-auto flex items-center justify-center mb-6 bg-emerald-500/15 border border-emerald-500/30">
+        <div className="fm-pop w-20 h-20 rounded-3xl mx-auto flex items-center justify-center mb-6 bg-emerald-500/15 border border-emerald-500/30"
+          style={{ viewTransitionName: 'order-summary' }}>
           <CheckCircle2 size={40} className="text-emerald-400" />
         </div>
         <h1 className="text-3xl text-white">Payment received 🎉</h1>
