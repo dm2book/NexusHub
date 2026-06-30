@@ -8,6 +8,7 @@ import { categoryVisual } from '../lib/catalog.js';
 import { withFallback, iconFor } from '../lib/sampleCatalog.js';
 import LightProductCard from '../components/store/LightProductCard.jsx';
 import { SkeletonCard } from '../components/ui.jsx';
+import BundlesShowcase from '../components/store/BundlesShowcase.jsx';
 import { usePageMeta } from '../lib/useMeta.js';
 import { useTrending } from '../lib/useTrending.js';
 import { Flame } from 'lucide-react';
@@ -113,6 +114,9 @@ export default function Shop() {
             </div>
           </div>
         )}
+
+        {/* Bundle offers (hides itself when there are none) */}
+        {(!category || category === 'all') && !search && <BundlesShowcase />}
 
         {/* controls */}
         <div className="flex flex-col sm:flex-row gap-3 sm:items-center justify-between mb-5">

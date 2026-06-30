@@ -121,6 +121,64 @@ export function statusBreakdown() {
   return all(`SELECT status, COUNT(*) AS n FROM orders GROUP BY status`);
 }
 
+/**
+ * Monetization report — which coupons & bundles drive revenue, and gift-card
+ * liability. Derived from the discount fields recorded on each paid order's
+ * billing JSON (coupon/discount, bundle/bundleDiscount) + the gift_cards table.
+ */
+export async function monetizationReport({ days = 90 } = {}) {
+  const since = new Date(Date.now() - days * 86_400_000).toISOString();
+  const safe = async (fn, d) => { try { return await fn(); } catch { return d; } };
+
+  const coupons = await safe(() => all(
+    `SELECT billing::jsonb->>'coupon' AS code,
+            COUNT(*) AS orders,
+            COALESCE(SUM((billing::jsonb->>'discount')::bigint),0) AS discount,
+            COALESCE(SUM(total),0) AS revenue
+       FROM orders
+      WHERE ${PAID} AND created_at > @since AND billing::jsonb ? 'coupon'
+      GROUP BY code ORDER BY revenue DESC LIMIT 50`, { since }), []);
+
+  const bundles = await safe(() => all(
+    `SELECT billing::jsonb->>'bundle' AS name,
+            COUNT(*) AS orders,
+            COALESCE(SUM((billing::jsonb->>'bundleDiscount')::bigint),0) AS discount,
+            COALESCE(SUM(total),0) AS revenue
+       FROM orders
+      WHERE ${PAID} AND created_at > @since AND billing::jsonb ? 'bundle'
+      GROUP BY name ORDER BY revenue DESC LIMIT 50`, { since }), []);
+
+  const gc = await safe(() => get(
+    `SELECT COUNT(*) AS issued,
+            COALESCE(SUM(initial_balance),0) AS issued_value,
+            COUNT(*) FILTER (WHERE status='redeemed') AS redeemed,
+            COALESCE(SUM(initial_balance) FILTER (WHERE status='redeemed'),0) AS redeemed_value,
+            COALESCE(SUM(balance) FILTER (WHERE status='active'),0) AS outstanding
+       FROM gift_cards`), {});
+
+  const fmtRows = (rows, key) => rows.map((r) => ({
+    [key]: r[key] || '—', orders: Number(r.orders), discount: Number(r.discount),
+    discountFormatted: formatMoney(Number(r.discount)), revenue: Number(r.revenue), revenueFormatted: formatMoney(Number(r.revenue)),
+  }));
+  const totalDiscount = coupons.reduce((s, r) => s + Number(r.discount), 0) + bundles.reduce((s, r) => s + Number(r.discount), 0);
+  const promoRevenue = coupons.reduce((s, r) => s + Number(r.revenue), 0) + bundles.reduce((s, r) => s + Number(r.revenue), 0);
+
+  return {
+    rangeDays: days,
+    coupons: fmtRows(coupons, 'code'),
+    bundles: fmtRows(bundles, 'name'),
+    giftCards: {
+      issued: Number(gc?.issued || 0), issuedValue: Number(gc?.issued_value || 0), issuedValueFormatted: formatMoney(Number(gc?.issued_value || 0)),
+      redeemed: Number(gc?.redeemed || 0), redeemedValue: Number(gc?.redeemed_value || 0), redeemedValueFormatted: formatMoney(Number(gc?.redeemed_value || 0)),
+      outstanding: Number(gc?.outstanding || 0), outstandingFormatted: formatMoney(Number(gc?.outstanding || 0)),
+    },
+    totals: {
+      totalDiscount, totalDiscountFormatted: formatMoney(totalDiscount),
+      promoRevenue, promoRevenueFormatted: formatMoney(promoRevenue),
+    },
+  };
+}
+
 /** Retention analytics: repeat-rate, loyalty tier mix, Forge+ members, affiliate. */
 export async function retentionMetrics() {
   const now = new Date().toISOString();

@@ -1,16 +1,18 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
-  Tag, Gift, Package, Plus, Trash2, Eye, EyeOff, Power, Copy, Loader2, Percent, Euro,
+  Tag, Gift, Package, Plus, Trash2, Eye, EyeOff, Power, Copy, Percent, Euro,
+  BarChart3, TrendingDown, Wallet,
 } from 'lucide-react';
 import { api } from '../../lib/api.js';
 import { money, date } from '../../lib/format.js';
-import { PageLoader, Skeleton } from '../../components/ui.jsx';
+import { PageLoader } from '../../components/ui.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
 
 const TABS = [
   { id: 'coupons', label: 'Coupons', icon: Tag },
   { id: 'giftcards', label: 'Gift cards', icon: Gift },
   { id: 'bundles', label: 'Bundles', icon: Package },
+  { id: 'report', label: 'Report', icon: BarChart3 },
 ];
 
 export default function Monetization() {
@@ -40,7 +42,8 @@ export default function Monetization() {
           <button key={t.id} onClick={() => setTab(t.id)}
             className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm border transition ${
               tab === t.id ? 'bg-primary/20 border-primary/40 text-white' : 'border-white/10 text-slate-400 hover:text-white'}`}>
-            <t.icon size={15} /> {t.label} <span className="text-xs text-slate-500">{data[t.id === 'giftcards' ? 'giftCards' : t.id]?.length || 0}</span>
+            <t.icon size={15} /> {t.label}
+            {t.id !== 'report' && <span className="text-xs text-slate-500">{data[t.id === 'giftcards' ? 'giftCards' : t.id]?.length || 0}</span>}
           </button>
         ))}
       </div>
@@ -48,6 +51,7 @@ export default function Monetization() {
       {tab === 'coupons' && <Coupons coupons={data.coupons} toast={toast} call={call} busy={busy} />}
       {tab === 'giftcards' && <GiftCards cards={data.giftCards} toast={toast} call={call} busy={busy} />}
       {tab === 'bundles' && <Bundles bundles={data.bundles} products={products} toast={toast} call={call} busy={busy} />}
+      {tab === 'report' && <Report toast={toast} />}
     </div>
   );
 }
@@ -165,6 +169,62 @@ function GiftCards({ cards, toast, call }) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// ── Report ───────────────────────────────────────────────────────────────────
+function Report({ toast }) {
+  const [r, setR] = useState(null);
+  useEffect(() => { api.get('/api/admin/monetization/report?days=90').then(setR).catch((e) => toast.error(e.message)); }, [toast]);
+  if (!r) return <PageLoader />;
+
+  const Table = ({ title, rows, keyField, keyLabel }) => (
+    <div>
+      <h3 className="text-white text-sm font-semibold mb-3">{title}</h3>
+      {rows.length === 0 ? <div className="card p-6 text-slate-500 text-sm">No data in the last {r.rangeDays} days.</div> : (
+        <div className="card overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="text-left text-slate-400 border-b border-white/5">
+              <tr><th className="px-4 py-2.5 font-medium">{keyLabel}</th><th className="px-4 py-2.5 font-medium text-right">Orders</th><th className="px-4 py-2.5 font-medium text-right">Discount given</th><th className="px-4 py-2.5 font-medium text-right">Revenue</th></tr>
+            </thead>
+            <tbody className="divide-y divide-white/5">
+              {rows.map((row, i) => (
+                <tr key={i} className="hover:bg-white/5">
+                  <td className="px-4 py-2.5 font-mono text-white">{row[keyField]}</td>
+                  <td className="px-4 py-2.5 text-right text-slate-300">{row.orders}</td>
+                  <td className="px-4 py-2.5 text-right text-amber-300">−{row.discountFormatted}</td>
+                  <td className="px-4 py-2.5 text-right text-emerald-300">{row.revenueFormatted}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <Kpi icon={TrendingDown} label="Discounts given (90d)" value={r.totals.totalDiscountFormatted} tone="text-amber-300 bg-amber-500/10" />
+        <Kpi icon={BarChart3} label="Promo-driven revenue" value={r.totals.promoRevenueFormatted} tone="text-emerald-300 bg-emerald-500/10" />
+        <Kpi icon={Gift} label="Gift cards outstanding" value={r.giftCards.outstandingFormatted} tone="text-pink-300 bg-pink-500/10" sub={`${r.giftCards.issued} issued · ${r.giftCards.redeemed} redeemed`} />
+        <Kpi icon={Wallet} label="Gift-card value redeemed" value={r.giftCards.redeemedValueFormatted} tone="text-violet-300 bg-violet-500/10" />
+      </div>
+      <Table title="Top coupons by revenue" rows={r.coupons} keyField="code" keyLabel="Code" />
+      <Table title="Top bundles by revenue" rows={r.bundles} keyField="name" keyLabel="Bundle" />
+    </div>
+  );
+}
+
+function Kpi({ icon: Icon, label, value, sub, tone }) {
+  return (
+    <div className="card p-4">
+      <span className={`w-9 h-9 rounded-xl grid place-items-center mb-3 ${tone}`}><Icon size={17} /></span>
+      <div className="text-xl font-display text-white leading-none">{value}</div>
+      <div className="text-slate-400 text-sm mt-1.5">{label}</div>
+      {sub && <div className="text-slate-500 text-xs mt-0.5">{sub}</div>}
     </div>
   );
 }
