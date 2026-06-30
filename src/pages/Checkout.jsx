@@ -222,7 +222,7 @@ export default function Checkout() {
           </div>
         </div>
 
-        <div className="card p-6 h-fit">
+        <div style={{ viewTransitionName: 'order-summary' }} className="card p-6 h-fit">
           <h3 className="text-white mb-5">Summary</h3>
           <div className="space-y-2.5 mb-4">
             {items.map((i) => (
