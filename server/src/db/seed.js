@@ -29,6 +29,7 @@ const PERMISSIONS = {
   'security.manage': 'Manage security settings / fraud rules',
   'social.moderate': 'Moderate social proof feed & reviews',
   'wallet.manage': 'Grant or adjust customer store credit',
+  'monetization.manage': 'Manage coupons, gift cards & bundles',
 };
 
 // Role → permission map. "owner" implicitly gets everything via '*'.
@@ -42,7 +43,7 @@ const ROLES = {
       'orders.refund', 'orders.contact', 'suppliers.read', 'suppliers.manage',
       'suppliers.sync', 'fulfillment.manage', 'emails.manage', 'analytics.read',
       'tickets.read', 'tickets.manage', 'users.read', 'users.manage', 'audit.read',
-      'social.moderate', 'wallet.manage',
+      'social.moderate', 'wallet.manage', 'monetization.manage',
     ],
   },
   support: {

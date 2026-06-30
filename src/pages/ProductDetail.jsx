@@ -43,10 +43,11 @@ export default function ProductDetail() {
   const [qty, setQty] = useState(1);
   const [notFound, setNotFound] = useState(false);
   const [openFaq, setOpenFaq] = useState(0);
+  const [recs, setRecs] = useState({ crossSell: [], upsell: [] });
   usePageMeta(product?.name || 'Product', product?.description || 'Instant digital delivery.');
 
   useEffect(() => {
-    setProduct(null); setQty(1); setNotFound(false);
+    setProduct(null); setQty(1); setNotFound(false); setRecs({ crossSell: [], upsell: [] });
     api.get(`/api/products/${id}`)
       .then((r) => setProduct(r.product))
       .catch(() => {
@@ -54,6 +55,7 @@ export default function ProductDetail() {
         if (sample) setProduct(sample); else setNotFound(true);
       });
     api.get('/api/products').then((r) => setAll(withFallback(r.products))).catch(() => setAll(SAMPLE_PRODUCTS));
+    api.get(`/api/products/${id}/recommendations`).then(setRecs).catch(() => {});
   }, [id]);
 
   if (notFound) {
@@ -68,6 +70,8 @@ export default function ProductDetail() {
 
   const { icon: Icon, grad, label } = categoryVisual(product.category);
   const related = all.filter((p) => p.id !== product.id && p.category === product.category).slice(0, 4);
+  const crossSell = (recs.crossSell?.length ? recs.crossSell : related).slice(0, 4);
+  const upsell = recs.upsell?.[0] || null;
   const eta = stats.avgDeliverySeconds < 60 ? `~${Math.max(5, Math.round(stats.avgDeliverySeconds))} seconds` : `~${Math.round(stats.avgDeliverySeconds / 60)} min`;
   const wished = has(product.id);
 
@@ -124,6 +128,15 @@ export default function ProductDetail() {
           <div className="inline-flex items-center gap-2 mt-3 text-sm text-emerald-600 bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-3 py-1.5">
             <Zap size={14} /> Estimated delivery: <b>{eta}</b> after payment
           </div>
+
+          {/* Upsell: nudge to a bigger pack */}
+          {upsell && (
+            <Link to={`/product/${upsell.id}`} className="group mt-4 flex items-center gap-3 rounded-xl border border-violet-200 bg-violet-50 px-3.5 py-2.5 hover:border-violet-300 transition">
+              <span className="text-[11px] font-bold uppercase tracking-wide text-violet-600 bg-white rounded-md px-1.5 py-0.5">Upgrade</span>
+              <span className="text-sm text-slate-600 flex-1">Get more with <b className="text-slate-900">{upsell.name}</b> — {money(upsell.price, upsell.currency)}</span>
+              <ChevronDown size={16} className="-rotate-90 text-violet-500 fm-nudge" />
+            </Link>
+          )}
 
           {product.description && <p className="text-slate-400 mt-5 leading-relaxed">{product.description}</p>}
 
@@ -213,11 +226,11 @@ export default function ProductDetail() {
         </section>
       </div>
 
-      {related.length > 0 && (
+      {crossSell.length > 0 && (
         <div className="mt-16">
-          <h2 className="text-2xl font-extrabold text-slate-900 mb-6">You might also like</h2>
+          <h2 className="text-2xl font-extrabold text-slate-900 mb-6">{recs.crossSell?.length ? 'Frequently bought together' : 'You might also like'}</h2>
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 fm-grid-in">
-            {related.map((p) => <LightProductCard key={p.id} product={p} onAdd={(x) => { add(x); toast.success(`${x.name} added`); }} />)}
+            {crossSell.map((p) => <LightProductCard key={p.id} product={p} onAdd={(x) => { add(x); toast.success(`${x.name} added`); }} />)}
           </div>
         </div>
       )}

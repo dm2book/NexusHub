@@ -642,4 +642,65 @@ CREATE INDEX IF NOT EXISTS idx_page_views_session ON page_views (session_id);
 CREATE INDEX IF NOT EXISTS idx_page_views_time    ON page_views (created_at);
 `,
   },
+  {
+    id: '010_monetization',
+    sql: `
+-- ── Coupons (database-backed, admin-managed) ───────────────────────────────
+-- Replaces the env-only COUPONS list. Supports percent or fixed-amount discounts,
+-- a minimum spend, total + per-user redemption caps, and a validity window.
+CREATE TABLE IF NOT EXISTS coupons (
+  id              TEXT PRIMARY KEY,
+  code            TEXT NOT NULL UNIQUE,          -- stored uppercased
+  kind            TEXT NOT NULL DEFAULT 'percent', -- percent | fixed
+  value           BIGINT NOT NULL,               -- percent (1-90) or cents off
+  min_subtotal    BIGINT NOT NULL DEFAULT 0,     -- cents
+  max_redemptions INTEGER,                        -- null = unlimited
+  per_user_limit  INTEGER,                        -- null = unlimited
+  redeemed_count  INTEGER NOT NULL DEFAULT 0,
+  starts_at       TEXT,
+  expires_at      TEXT,
+  active          INTEGER NOT NULL DEFAULT 1,
+  created_at      TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_coupons_active ON coupons (active, code);
+
+-- ── Gift cards ─────────────────────────────────────────────────────────────
+-- A code carrying store value; redeeming credits the customer's wallet.
+CREATE TABLE IF NOT EXISTS gift_cards (
+  id              TEXT PRIMARY KEY,
+  code            TEXT NOT NULL UNIQUE,          -- stored uppercased
+  initial_balance BIGINT NOT NULL,               -- cents
+  balance         BIGINT NOT NULL,               -- cents remaining
+  currency        TEXT NOT NULL DEFAULT 'EUR',
+  status          TEXT NOT NULL DEFAULT 'active', -- active | redeemed | disabled
+  note            TEXT,
+  recipient_email TEXT,
+  issued_by       TEXT,                           -- staff user id
+  redeemed_by     TEXT,                           -- customer user id
+  redeemed_at     TEXT,
+  created_at      TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_gift_cards_status ON gift_cards (status);
+
+-- ── Bundles ────────────────────────────────────────────────────────────────
+-- A named set of products that earns a % discount when all are bought together.
+CREATE TABLE IF NOT EXISTS bundles (
+  id              TEXT PRIMARY KEY,
+  name            TEXT NOT NULL,
+  description     TEXT,
+  product_ids     TEXT NOT NULL DEFAULT '[]',    -- JSON array of product ids
+  discount_percent INTEGER NOT NULL DEFAULT 0,
+  active          INTEGER NOT NULL DEFAULT 1,
+  created_at      TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_bundles_active ON bundles (active);
+
+-- Single permission covering all monetization tooling (granted to owner+admin).
+INSERT INTO permissions (id, description) VALUES ('monetization.manage', 'Manage coupons, gift cards & bundles')
+  ON CONFLICT(id) DO NOTHING;
+INSERT INTO role_permissions (role_id, permission_id)
+  SELECT r.id, 'monetization.manage' FROM roles r WHERE r.id IN ('owner', 'admin')
+  ON CONFLICT DO NOTHING;
+`,
+  },
 ];

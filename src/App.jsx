@@ -61,6 +61,7 @@ const AdminSupport = lazy(() => import('./pages/admin/Support.jsx'));
 const AdminSecurity = lazy(() => import('./pages/admin/Security.jsx'));
 const AdminSocialProof = lazy(() => import('./pages/admin/SocialProof.jsx'));
 const AdminOperations = lazy(() => import('./pages/admin/Operations.jsx'));
+const AdminMonetization = lazy(() => import('./pages/admin/Monetization.jsx'));
 
 export default function App() {
   usePageViews();   // anonymous, privacy-friendly visitor analytics
@@ -127,6 +128,7 @@ export default function App() {
           <Route path="/admin/emails" element={<AdminEmails />} />
           <Route path="/admin/support" element={<AdminSupport />} />
           <Route path="/admin/social" element={<AdminSocialProof />} />
+          <Route path="/admin/monetization" element={<AdminMonetization />} />
           <Route path="/admin/security" element={<AdminSecurity />} />
         </Route>
 

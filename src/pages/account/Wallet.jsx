@@ -7,6 +7,7 @@ import {
 import { api } from '../../lib/api.js';
 import { money, date } from '../../lib/format.js';
 import { PageLoader, EmptyState } from '../../components/ui.jsx';
+import { useToast } from '../../context/ToastContext.jsx';
 
 // Visual treatment per ledger entry type.
 const TX_META = {
@@ -18,8 +19,20 @@ const TX_META = {
 };
 
 export default function Wallet() {
+  const toast = useToast();
   const [data, setData] = useState(null);
-  useEffect(() => { api.get('/api/account/wallet').then(setData).catch(() => setData(false)); }, []);
+  const [code, setCode] = useState('');
+  const [busy, setBusy] = useState(false);
+  const load = () => api.get('/api/account/wallet').then(setData).catch(() => setData(false));
+  useEffect(() => { load(); }, []);
+
+  const redeem = async () => {
+    if (!code.trim()) return;
+    setBusy(true);
+    try { const r = await api.post('/api/account/wallet/redeem', { code: code.trim() }); toast.success(`Added ${money(r.redeemed, 'EUR')} to your wallet!`); setCode(''); load(); }
+    catch (e) { toast.error(e.message); } finally { setBusy(false); }
+  };
+
   if (data === null) return <PageLoader />;
   if (!data) return <div className="card p-8 text-slate-400">Couldn’t load your wallet.</div>;
 
@@ -49,6 +62,16 @@ export default function Wallet() {
             <div className="text-lg font-semibold mt-0.5 flex items-center gap-1"><ArrowDownRight size={15} /> {money(lifetimeSpent, 'EUR')}</div>
           </div>
         </div>
+      </div>
+
+      {/* Redeem a gift card */}
+      <div className="card p-4 flex flex-col sm:flex-row sm:items-end gap-3">
+        <div className="flex-1">
+          <label className="label flex items-center gap-1.5"><Gift size={13} className="text-pink-400" /> Redeem a gift card</label>
+          <input className="input font-mono" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())}
+            placeholder="GIFT-XXXX-XXXX-XXXX-XXXX" onKeyDown={(e) => e.key === 'Enter' && redeem()} />
+        </div>
+        <button onClick={redeem} disabled={busy || !code.trim()} className="btn-primary sm:w-40 py-2.5">{busy ? 'Redeeming…' : 'Redeem'}</button>
       </div>
 
       {/* How to earn */}
