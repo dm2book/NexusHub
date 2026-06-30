@@ -287,6 +287,13 @@ h1, h2, h3, .font-display { font-family: 'Orbitron', sans-serif; letter-spacing:
 @keyframes fmBlob { 0%,100%{transform:translate(0,0) scale(1)} 50%{transform:translate(18px,-22px) scale(1.08)} }
 .fm-blob { animation: fmBlob 14s ease-in-out infinite; will-change: transform; }
 
+/* Idle float for hero assets (the inner image; the parallax layer wraps it). */
+@keyframes fmFloat  { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+@keyframes fmFloat2 { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-7px) translateX(2px); } }
+.fm-float  { animation: fmFloat 5s ease-in-out infinite; will-change: transform; }
+.fm-float2 { animation: fmFloat2 6.5s ease-in-out infinite; will-change: transform; }
+@media (prefers-reduced-motion: reduce) { .fm-float, .fm-float2 { animation: none !important; } }
+
 @media (prefers-reduced-motion: reduce) {
   .fm-page, .fm-reveal, .fm-lift, .fm-gradient-text, .fm-marquee, .fm-blob { animation: none !important; transition: none !important; transform: none !important; opacity: 1 !important; }
 }
@@ -398,9 +405,24 @@ h1, h2, h3, .font-display { font-family: 'Orbitron', sans-serif; letter-spacing:
 /* Soft focus ring for inputs/cards (additive glow, not just border). */
 .fm-focus:focus-visible, .input:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(124,92,255,.25); }
 
+/* ── Scroll parallax ──────────────────────────────────────────────────────
+   Uses the independent `translate` property so it composes with any Tailwind
+   `-translate-*` centering on the same element (which sets `transform`). The
+   parent sets `--sy` (scroll px); each layer multiplies by its own depth `--d`. */
+.fm-px { translate: 0 calc(var(--sy, 0) * var(--d, 0) * -1px); will-change: translate; }
+
+/* ── Shared-element route transitions (View Transitions API) ───────────────
+   The product card media morphs into the product page hero (`product-hero`),
+   with a quick cross-fade between page roots. No-op where unsupported. */
+::view-transition-group(product-hero) { animation-duration: .5s; animation-timing-function: var(--ease-expressive); }
+::view-transition-image-pair(product-hero) { border-radius: 1.5rem; overflow: hidden; }
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: .26s; animation-timing-function: var(--ease-productive); }
+
 @media (prefers-reduced-motion: reduce) {
   .fm-route-progress, .fm-orbit::before, .fm-orbit::after, .fm-dots i,
   .fm-skeleton::after, .fm-pop, .fm-rise { animation: none !important; }
   .fm-skeleton::after { display: none; }
   .fm-tap:active, .btn:active, .fm-underline::after, .fm-nudge { transition: none !important; transform: none !important; }
+  .fm-px { translate: none !important; }
+  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
 }

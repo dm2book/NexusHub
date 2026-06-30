@@ -11,6 +11,7 @@ import { api } from '../lib/api.js';
 import { useStats } from '../lib/useStats.js';
 import { useReviews } from '../lib/useReviews.js';
 import { useReveal } from '../lib/useReveal.js';
+import { useParallax } from '../lib/useParallax.js';
 import CountUp from '../components/CountUp.jsx';
 import RecentlyDelivered from '../components/store/RecentlyDelivered.jsx';
 
@@ -408,28 +409,44 @@ export default function HomeStore() {
 }
 
 /* ── 3D hero composition built from the real product icons ────────────── */
-function HeroRender() {
+/* Each asset sits in a `.fm-px` parallax layer (`--d` = depth) that drifts on
+   scroll, while the inner image keeps its idle float — two independent layers so
+   they never fight for `transform`. */
+function PxAsset({ icon, depth, float = 'fm-float', size = 'w-24 h-24', pos, delay = '0s', z = '' }) {
   return (
-    <div className="relative h-[300px] sm:h-[340px]">
+    <div className={`fm-px absolute ${pos} ${z}`} style={{ '--d': depth }}>
+      <img src={ICON(icon)} alt="" className={`${size} object-contain drop-shadow-xl ${float}`} style={{ animationDelay: delay }} />
+    </div>
+  );
+}
+
+function HeroRender() {
+  const ref = useRef(null);
+  useParallax(ref);
+  return (
+    <div ref={ref} className="relative h-[300px] sm:h-[340px]">
       {/* glow */}
-      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] rounded-full blur-3xl"
-        style={{ background: 'radial-gradient(circle, rgba(124,92,255,.35), transparent 65%)' }} />
+      <div className="fm-px absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] rounded-full blur-3xl" style={{ '--d': 0.03, background: 'radial-gradient(circle, rgba(124,92,255,.35), transparent 65%)' }} />
       {/* podium */}
       <div className="absolute left-1/2 bottom-6 -translate-x-1/2 w-[260px] h-[40px] rounded-[50%]"
         style={{ background: 'radial-gradient(ellipse at center, rgba(168,85,247,.35), transparent 70%)' }} />
-      {/* sparkles */}
+      {/* sparkles (deepest layer — drift the most) */}
       {[['12%', '18%'], ['82%', '24%'], ['68%', '8%'], ['22%', '70%'], ['88%', '62%']].map(([l, t], i) => (
-        <Sparkles key={i} size={i % 2 ? 16 : 12} className="absolute text-violet-400/70 fm-float2" style={{ left: l, top: t, animationDelay: `${i * 0.4}s` }} />
+        <div key={i} className="fm-px absolute" style={{ left: l, top: t, '--d': 0.16 + (i % 3) * 0.04 }}>
+          <Sparkles size={i % 2 ? 16 : 12} className="text-violet-400/70 fm-float2" style={{ animationDelay: `${i * 0.4}s` }} />
+        </div>
       ))}
-      {/* center V-Bucks (largest) */}
-      <img src={ICON('v-bucks')} alt="" className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-36 h-36 object-contain drop-shadow-2xl fm-float z-10" />
-      {/* surrounding */}
-      <img src={ICON('robux')} alt="" className="absolute left-[6%] top-[26%] w-24 h-24 object-contain drop-shadow-xl fm-float2" style={{ animationDelay: '.3s' }} />
-      <img src={ICON('steam')} alt="" className="absolute left-[20%] top-[2%] w-20 h-20 object-contain drop-shadow-xl fm-float" style={{ animationDelay: '.6s' }} />
-      <img src={ICON('valorant')} alt="" className="absolute left-[10%] bottom-[10%] w-20 h-20 object-contain drop-shadow-xl fm-float" style={{ animationDelay: '.9s' }} />
-      <img src={ICON('xbox')} alt="" className="absolute right-[20%] bottom-[6%] w-20 h-20 object-contain drop-shadow-xl fm-float2" style={{ animationDelay: '.2s' }} />
-      <img src={ICON('playstation')} alt="" className="absolute right-[5%] top-[34%] w-24 h-24 object-contain drop-shadow-xl fm-float" style={{ animationDelay: '.5s' }} />
-      <img src={ICON('discord-nitro')} alt="" className="absolute right-[26%] top-[6%] w-16 h-16 object-contain drop-shadow-xl fm-float2" style={{ animationDelay: '.8s' }} />
+      {/* center V-Bucks (foreground — drifts least, feels closest) */}
+      <div className="fm-px absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10" style={{ '--d': 0.04 }}>
+        <img src={ICON('v-bucks')} alt="" className="w-36 h-36 object-contain drop-shadow-2xl fm-float" />
+      </div>
+      {/* surrounding (mid layers) */}
+      <PxAsset icon="robux" depth={0.1} float="fm-float2" pos="left-[6%] top-[26%]" delay=".3s" />
+      <PxAsset icon="steam" depth={0.12} size="w-20 h-20" pos="left-[20%] top-[2%]" delay=".6s" />
+      <PxAsset icon="valorant" depth={0.13} size="w-20 h-20" pos="left-[10%] bottom-[10%]" delay=".9s" />
+      <PxAsset icon="xbox" depth={0.11} float="fm-float2" size="w-20 h-20" pos="right-[20%] bottom-[6%]" delay=".2s" />
+      <PxAsset icon="playstation" depth={0.09} pos="right-[5%] top-[34%]" delay=".5s" />
+      <PxAsset icon="discord-nitro" depth={0.14} float="fm-float2" size="w-16 h-16" pos="right-[26%] top-[6%]" delay=".8s" />
     </div>
   );
 }

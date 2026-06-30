@@ -1,17 +1,29 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { ShoppingCart } from 'lucide-react';
 import { categoryVisual, money } from '../../lib/catalog.js';
 import { iconFor } from '../../lib/sampleCatalog.js';
+import { navigateWithTransition } from '../../lib/viewTransition.js';
 
 /** Light-theme product card matching the storefront design. */
 export default function LightProductCard({ product, onAdd }) {
   const v = categoryVisual(product.category);
   const Icon = v.icon;
   const img = product.image || iconFor(product.category);
+  const navigate = useNavigate();
+  const to = `/product/${product.id}`;
+
+  // Open the product with a shared-element morph: the clicked card media becomes
+  // the destination hero. Plain navigation on modifier/middle clicks.
+  const openWithMorph = (e) => {
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1) return;
+    e.preventDefault();
+    const media = e.currentTarget.querySelector('[data-morph]') || e.currentTarget;
+    navigateWithTransition(navigate, to, media);
+  };
 
   return (
     <div className="group bg-white rounded-2xl border border-slate-200/70 shadow-sm fm-lift p-4 flex flex-col">
-      <Link to={`/product/${product.id}`} className="relative rounded-xl bg-slate-50 h-[150px] grid place-items-center mb-3 overflow-hidden">
+      <a href={to} onClick={openWithMorph} className="relative rounded-xl bg-slate-50 h-[150px] grid place-items-center mb-3 overflow-hidden">
         {product.featured && (
           <span className="absolute top-2.5 left-2.5 z-10 text-[10px] font-bold text-amber-600 bg-amber-100 rounded-full px-2 py-0.5">★ Featured</span>
         )}
@@ -24,15 +36,15 @@ export default function LightProductCard({ product, onAdd }) {
           <span className="absolute bottom-2.5 left-2.5 z-10 text-[10px] font-semibold text-orange-600 bg-orange-50 rounded-full px-2 py-0.5">🔥 High demand</span>
         )}
         {img ? (
-          <img src={img} alt={product.name} className="w-24 h-24 object-contain drop-shadow-md group-hover:scale-105 transition-transform" />
+          <img data-morph src={img} alt={product.name} className="w-24 h-24 object-contain drop-shadow-md group-hover:scale-105 transition-transform" />
         ) : (
-          <div className={`w-20 h-20 rounded-2xl bg-gradient-to-br ${v.grad} grid place-items-center`}>
+          <div data-morph className={`w-20 h-20 rounded-2xl bg-gradient-to-br ${v.grad} grid place-items-center`}>
             <Icon size={34} className="text-white" />
           </div>
         )}
-      </Link>
+      </a>
       <div className="text-[11px] font-semibold uppercase tracking-wide text-violet-500">{v.label}</div>
-      <Link to={`/product/${product.id}`} className="font-bold text-[15px] text-slate-900 mt-0.5 hover:text-violet-600 line-clamp-2">{product.name}</Link>
+      <Link to={to} className="font-bold text-[15px] text-slate-900 mt-0.5 hover:text-violet-600 line-clamp-2">{product.name}</Link>
       {product.description && <p className="text-[12.5px] text-slate-400 mt-1 line-clamp-2 flex-1">{product.description}</p>}
       <div className="text-[12px] text-slate-400 mt-3">From <span className="font-extrabold text-violet-600 text-[18px]">{money(product.price, product.currency)}</span></div>
       <div className="flex items-center gap-2 mt-3">
