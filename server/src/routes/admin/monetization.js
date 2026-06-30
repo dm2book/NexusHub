@@ -8,9 +8,15 @@ import { notFound } from '../../utils/errors.js';
 import { listCoupons, createCoupon, updateCoupon, deleteCoupon } from '../../services/couponService.js';
 import { listGiftCards, issueGiftCard, setGiftCardStatus } from '../../services/giftCardService.js';
 import { listBundles, createBundle, updateBundle, deleteBundle } from '../../services/bundleService.js';
+import { monetizationReport } from '../../services/analyticsService.js';
 
 const router = Router();
 router.use(requirePermission('monetization.manage'));
+
+// Revenue / discount report: top coupons & bundles + gift-card liability.
+router.get('/report', asyncHandler(async (req, res) => {
+  res.json(await monetizationReport({ days: Math.min(Number(req.query.days) || 90, 365) }));
+}));
 
 // Everything on one screen.
 router.get('/', asyncHandler(async (_req, res) => {
