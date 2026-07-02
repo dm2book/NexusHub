@@ -600,7 +600,8 @@ async function handleCommand(i) {
       "`/shop` — open the shop\n`/invite` — get the invite link\n`/stats` — server stats\n" +
       "`/rank` — your level & XP\n`/daily` — claim your daily XP (streaks!)\n`/leaderboard` — top members\n" +
       "`/close` — staff: close a ticket\n`/giveaway` — staff: start a giveaway\n`/reroll` — staff: reroll a winner\n" +
-      "`/coupon` — staff: post a discount code\n`/announce` — staff: post an announcement\n`/serverinfo` — server stats\n" +
+      "`/coupon` — staff: post a discount code\n`/flashsale` — staff: countdown deal in #deals\n" +
+      "`/announce` — staff: post an announcement\n`/serverinfo` — server stats\n" +
       "Buttons: verify in #verify, pick roles in #roles, open a ticket in #open-a-ticket." });
   }
   if (i.commandName === 'order') return lookupOrder(i);
@@ -614,6 +615,7 @@ async function handleCommand(i) {
   if (i.commandName === 'leaderboard') return leaderboardCmd(i);
   if (i.commandName === 'suggest') return postSuggestion(i);
   if (i.commandName === 'coupon') return postCoupon(i);
+  if (i.commandName === 'flashsale') return flashSale(i);
   if (i.commandName === 'announce') return postAnnounce(i);
   if (i.commandName === 'serverinfo') {
     const g = i.guild;
@@ -954,6 +956,42 @@ function maybePostWeeklyLeaderboard(guild) {
     .setTitle('🏆 Weekly XP leaderboard')
     .setDescription(`${lines}\n\nChat to earn XP and don’t forget your \`/daily\` streak! 🔥`)
     .setFooter({ text: 'Posted every Monday' }).setTimestamp()] }).catch(() => {});
+}
+
+// ── /flashsale (staff) → limited-time deal with a live countdown ─────────────
+// Uses Discord's relative timestamps (<t:…:R>) so the countdown ticks client-side
+// without any message editing; the embed is greyed out automatically when it ends.
+async function flashSale(i) {
+  if (!isStaff(i.member)) return i.reply({ content: 'Only staff can start a flash sale.', ephemeral: true });
+  const deal = i.options.getString('deal');
+  const minutes = Math.min(24 * 60, Math.max(5, i.options.getInteger('minutes') || 60));
+  const code = i.options.getString('code');
+  const endsAt = Math.floor((Date.now() + minutes * 60_000) / 1000);
+  const ch = findChannel(i.guild, 'deals') || findChannel(i.guild, 'discount-codes') || i.channel;
+  const dealRole = i.guild.roles.cache.find((r) => r.name === 'Deals');
+
+  const e = new EmbedBuilder().setColor(0xef4444).setTitle('⚡ FLASH SALE')
+    .setDescription(
+      `**${deal}**\n\n` +
+      (code ? `Use code **\`${code.toUpperCase()}\`** at checkout.\n` : '') +
+      `🛒 ${STORE_URL}/shop — instant delivery\n\n` +
+      `⏳ Ends <t:${endsAt}:R> (at <t:${endsAt}:t>)`)
+    .setFooter({ text: 'ForgeMarket · limited time' }).setTimestamp();
+  const msg = await ch.send({
+    content: dealRole ? `<@&${dealRole.id}>` : '',
+    embeds: [e],
+    allowedMentions: dealRole ? { roles: [dealRole.id] } : { parse: [] },
+  });
+  // Grey out the post when the sale ends (best-effort; survives a restart only
+  // visually via the timestamp, which is fine — the countdown itself is live).
+  setTimeout(() => {
+    const ended = EmbedBuilder.from(msg.embeds[0]).setColor(0x64748b)
+      .setTitle('⚡ FLASH SALE — ENDED')
+      .setDescription(`**${deal}**\n\nThis flash sale has ended — keep an eye on <#${ch.id}> for the next one! 👀`);
+    msg.edit({ embeds: [ended] }).catch(() => {});
+  }, minutes * 60_000);
+  leadLog(i.guild, `⚡ Flash sale started by <@${i.user.id}>: "${deal}" (${minutes} min${code ? `, code ${code.toUpperCase()}` : ''})`);
+  return i.reply({ content: `Flash sale live in <#${ch.id}> — ends in **${minutes} min**.`, ephemeral: true });
 }
 
 // ── /coupon (staff) → posts a discount code to #discount-codes ────────────────

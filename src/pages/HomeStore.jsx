@@ -60,30 +60,30 @@ const NAV = [
 ];
 
 const HERO_FEATURES = [
-  { icon: Zap, title: 'Instant Delivery', sub: 'Get your items instantly', color: 'text-violet-600 bg-violet-100' },
-  { icon: ShieldCheck, title: 'Secure Payments', sub: '100% secure & trusted', color: 'text-emerald-600 bg-emerald-100' },
-  { icon: Headphones, title: '24/7 Support', sub: "We're here for you", color: 'text-blue-600 bg-blue-100' },
-  { icon: Tag, title: 'Best Prices', sub: 'Competitive prices daily', color: 'text-amber-600 bg-amber-100' },
+  { icon: Zap, key: 'instant', title: 'Instant Delivery', sub: 'Get your items instantly', color: 'text-violet-600 bg-violet-100' },
+  { icon: ShieldCheck, key: 'secure', title: 'Secure Payments', sub: '100% secure & trusted', color: 'text-emerald-600 bg-emerald-100' },
+  { icon: Headphones, key: 'support', title: '24/7 Support', sub: "We're here for you", color: 'text-blue-600 bg-blue-100' },
+  { icon: Tag, key: 'prices', title: 'Best Prices', sub: 'Competitive prices daily', color: 'text-amber-600 bg-amber-100' },
 ];
 
 const TRUST = [
-  { icon: Zap, title: 'Instant Delivery', sub: 'Fast & reliable delivery', color: 'text-violet-600 bg-violet-100' },
-  { icon: ShieldCheck, title: '100% Secure', sub: 'Your data is protected', color: 'text-emerald-600 bg-emerald-100' },
-  { icon: Tag, title: 'Best Prices', sub: 'Competitive prices daily', color: 'text-amber-600 bg-amber-100' },
-  { icon: Headphones, title: '24/7 Support', sub: 'Always here to help', color: 'text-blue-600 bg-blue-100' },
+  { icon: Zap, key: 'tInstant', title: 'Instant Delivery', sub: 'Fast & reliable delivery', color: 'text-violet-600 bg-violet-100' },
+  { icon: ShieldCheck, key: 'tSecure', title: '100% Secure', sub: 'Your data is protected', color: 'text-emerald-600 bg-emerald-100' },
+  { icon: Tag, key: 'prices', title: 'Best Prices', sub: 'Competitive prices daily', color: 'text-amber-600 bg-amber-100' },
+  { icon: Headphones, key: 'tSupport', title: '24/7 Support', sub: 'Always here to help', color: 'text-blue-600 bg-blue-100' },
 ];
 
 // Real counts only — append "+" once the number is large enough to round.
 const fmtCount = (n) => `${Number(n || 0).toLocaleString('en-US')}${Number(n || 0) >= 100 ? '+' : ''}`;
 // All real (or honest service promises) — no fabricated metrics. The 2nd card
 // shows a real fulfilment rate once orders have finished, else a real guarantee.
-const statCards = (s) => [
-  { icon: Users, value: fmtCount(s.customers), label: 'Happy Customers', color: 'text-violet-600 bg-violet-100' },
+const statCards = (s, tr = (_k, en) => en) => [
+  { icon: Users, value: fmtCount(s.customers), label: tr('home.s.customers', 'Happy Customers'), color: 'text-violet-600 bg-violet-100' },
   s.successRate != null
-    ? { icon: CheckCircle2, value: `${s.successRate}%`, label: 'Fulfilled', color: 'text-emerald-600 bg-emerald-100' }
-    : { icon: ShieldCheck, value: '100%', label: 'Buyer protected', color: 'text-emerald-600 bg-emerald-100' },
-  { icon: ShoppingCart, value: fmtCount(s.delivered), label: 'Orders Delivered', color: 'text-blue-600 bg-blue-100' },
-  { icon: Headphones, value: '24/7', label: 'Customer Support', color: 'text-amber-600 bg-amber-100' },
+    ? { icon: CheckCircle2, value: `${s.successRate}%`, label: tr('home.s.fulfilled', 'Fulfilled'), color: 'text-emerald-600 bg-emerald-100' }
+    : { icon: ShieldCheck, value: '100%', label: tr('home.s.protected', 'Buyer protected'), color: 'text-emerald-600 bg-emerald-100' },
+  { icon: ShoppingCart, value: fmtCount(s.delivered), label: tr('home.s.delivered', 'Orders Delivered'), color: 'text-blue-600 bg-blue-100' },
+  { icon: Headphones, value: '24/7', label: tr('home.s.support', 'Customer Support'), color: 'text-amber-600 bg-amber-100' },
 ];
 
 export default function HomeStore() {
@@ -124,7 +124,7 @@ export default function HomeStore() {
   const [announcement, setAnnouncement] = useState('');
   useEffect(() => { api.get('/api/config').then((c) => setAnnouncement(c.announcement || '')).catch(() => {}); }, []);
   const railRef = useRef(null);
-  const STATS = statCards(stats);
+  const STATS = statCards(stats, tr);
 
   const scrollRail = () => railRef.current?.scrollBy({ left: 320, behavior: 'smooth' });
 
@@ -233,7 +233,7 @@ export default function HomeStore() {
                       ? <span className={`w-7 h-7 rounded-lg bg-gradient-to-br ${c.grad} grid place-items-center text-white text-xs font-bold`}>{c.letter}</span>
                       : <img src={ICON(c.img)} alt="" className="w-7 h-7 object-contain" />)}
                   </span>
-                  {c.label}
+                  {c.slug ? c.label : tr('shop.all', c.label)}
                 </Link>
               ))}
               <Link to="/shop" className="flex items-center gap-3 px-2.5 py-2 rounded-xl text-[14.5px] font-medium text-slate-500 hover:bg-slate-50">
@@ -326,8 +326,8 @@ export default function HomeStore() {
                 <div key={f.title} className="flex items-center gap-3 bg-white/95 backdrop-blur border border-slate-200/70 rounded-2xl px-3.5 py-2.5 shadow-md">
                   <span className={`w-9 h-9 rounded-xl grid place-items-center ${f.color}`}><f.icon size={17} /></span>
                   <div className="leading-tight">
-                    <div className="text-[13px] font-semibold">{f.title}</div>
-                    <div className="text-[11px] text-slate-400">{f.sub}</div>
+                    <div className="text-[13px] font-semibold">{tr(`home.f.${f.key}`, f.title)}</div>
+                    <div className="text-[11px] text-slate-400">{tr(`home.f.${f.key}Sub`, f.sub)}</div>
                   </div>
                 </div>
               ))}
@@ -339,7 +339,7 @@ export default function HomeStore() {
             {TRUST.map((t) => (
               <div key={t.title} className="flex items-center gap-3 px-5 py-5">
                 <span className={`w-11 h-11 rounded-xl grid place-items-center ${t.color}`}><t.icon size={20} /></span>
-                <div><div className="font-semibold text-[15px]">{t.title}</div><div className="text-[12.5px] text-slate-400">{t.sub}</div></div>
+                <div><div className="font-semibold text-[15px]">{tr(`home.f.${t.key}`, t.title)}</div><div className="text-[12.5px] text-slate-400">{tr(`home.f.${t.key}Sub`, t.sub)}</div></div>
               </div>
             ))}
           </section>

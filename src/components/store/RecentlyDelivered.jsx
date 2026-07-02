@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { CheckCircle2, Zap } from 'lucide-react';
 import { useLiveFeed, deliveryPhrase, timeAgo } from '../../lib/useSocialProof.js';
 import { iconFor } from '../../lib/sampleCatalog.js';
+import { useI18n } from '../../lib/i18n.jsx';
 
 /**
  * Floating live social-proof ticker — "John from Amsterdam got 1,700 Robux ·
@@ -9,6 +10,7 @@ import { iconFor } from '../../lib/sampleCatalog.js';
  * only). Renders nothing until the store has real activity. Rotates in/out.
  */
 export default function RecentlyDelivered() {
+  const { t } = useI18n();
   const feed = useLiveFeed();
   const [idx, setIdx] = useState(0);
   const [show, setShow] = useState(false);
@@ -46,8 +48,8 @@ export default function RecentlyDelivered() {
           </div>
           <div className="text-[11px] text-slate-400 flex items-center gap-1">
             {delivered
-              ? <><Zap size={11} className="text-amber-500" /> Delivered in {delivered} · {timeAgo(r.secondsAgo)}</>
-              : <><CheckCircle2 size={11} className="text-emerald-500" /> Delivered · {timeAgo(r.secondsAgo)}</>}
+              ? <><Zap size={11} className="text-amber-500" /> {t('live.deliveredIn', 'Delivered in')} {delivered} · {timeAgo(r.secondsAgo)}</>
+              : <><CheckCircle2 size={11} className="text-emerald-500" /> {t('live.delivered', 'Delivered')} · {timeAgo(r.secondsAgo)}</>}
           </div>
         </div>
       </div>
