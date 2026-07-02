@@ -6,8 +6,8 @@ import { withFallback } from '../lib/sampleCatalog.js';
 import { useWishlist } from '../lib/wishlist.js';
 import { useCart } from '../context/CartContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
-import ProductCard from '../components/ProductCard.jsx';
-import { EmptyState } from '../components/ui.jsx';
+import LightProductCard from '../components/store/LightProductCard.jsx';
+import { EmptyState, SkeletonCard } from '../components/ui.jsx';
 import { usePageMeta } from '../lib/useMeta.js';
 
 export default function Wishlist() {
@@ -25,18 +25,22 @@ export default function Wishlist() {
   const onAdd = (p) => { add(p); toast.success(`${p.name} added to cart`); };
 
   return (
-    <div className="section py-12">
-      <h1 className="text-3xl text-white mb-2 flex items-center gap-2"><Heart className="text-rose-400" /> Wishlist</h1>
-      <p className="text-slate-400 mb-8">Items you saved — they live in this browser.</p>
-      {products === null
-        ? <p className="text-slate-500">Loading…</p>
-        : items.length === 0
-          ? <EmptyState icon={PackageX} title="No saved items yet"
-              hint="Tap the heart on any product to save it here."
-              action={<Link to="/shop" className="btn-primary">Browse shop</Link>} />
-          : <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-              {items.map((p) => <ProductCard key={p.id} product={p} onAdd={onAdd} />)}
-            </div>}
+    <div className="max-w-[1200px] mx-auto px-4 lg:px-8 py-12">
+      <h1 className="text-3xl font-extrabold text-slate-900 mb-2 flex items-center gap-2"><Heart className="text-rose-500" /> Wishlist</h1>
+      <p className="text-slate-500 mb-8">Items you saved — they live in this browser.</p>
+      {products === null ? (
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)}
+        </div>
+      ) : items.length === 0 ? (
+        <EmptyState icon={PackageX} title="No saved items yet"
+          hint="Tap the heart on any product to save it here."
+          action={<Link to="/shop" className="btn-primary">Browse shop</Link>} />
+      ) : (
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 fm-grid-in">
+          {items.map((p) => <LightProductCard key={p.id} product={p} onAdd={onAdd} />)}
+        </div>
+      )}
     </div>
   );
 }

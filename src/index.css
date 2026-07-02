@@ -210,11 +210,11 @@ h1, h2, h3, .font-display { font-family: 'Orbitron', sans-serif; letter-spacing:
 /* Magnetic elements (translate set from JS) */
 .magnetic { transition: transform .25s cubic-bezier(.2,.8,.2,1); will-change: transform; }
 
-/* Crazier page transition: blur + scale + rise */
-.page-enter { animation: pageReveal .55s cubic-bezier(.2,.8,.2,1) both; }
+/* Crazier page transition: blur + scale + rise (backwards: see fmPageIn note) */
+.page-enter { animation: pageReveal .55s cubic-bezier(.2,.8,.2,1) backwards; }
 @keyframes pageReveal {
   from { opacity: 0; transform: translateY(18px) scale(.985); filter: blur(8px); }
-  to   { opacity: 1; transform: none; filter: blur(0); }
+  to   { opacity: 1; transform: none; filter: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -258,11 +258,15 @@ h1, h2, h3, .font-display { font-family: 'Orbitron', sans-serif; letter-spacing:
 /* Route/page entrance — a single, intentional gesture: rise + settle + de-blur.
    Uses the expressive (Apple-like) curve so it lands softly. ~360ms feels
    instant on navigation yet reads as deliberate. */
+/* NOTE: fill-mode is `backwards` (not `both`) on purpose — a retained transform/
+   filter keyframe turns the page wrapper into a containing block, which breaks
+   `position: fixed` descendants (e.g. the mobile buy bar). With `backwards` the
+   element returns to its clean base styles the moment the entrance finishes. */
 @keyframes fmPageIn {
   from { opacity: 0; transform: translateY(9px) scale(.994); filter: blur(6px); }
-  to   { opacity: 1; transform: none; filter: blur(0); }
+  to   { opacity: 1; transform: none; filter: none; }
 }
-.fm-page { animation: fmPageIn .36s var(--ease-expressive) both; }
+.fm-page { animation: fmPageIn .36s var(--ease-expressive) backwards; }
 
 /* Scroll-reveal (toggled via IntersectionObserver adding .is-in) */
 .fm-reveal { opacity: 0; transform: translateY(22px); transition: opacity .7s var(--ease-expressive), transform .7s var(--ease-expressive); }

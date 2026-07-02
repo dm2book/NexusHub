@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import StoreNav from '../components/store/StoreNav.jsx';
 import StoreFooter from '../components/store/StoreFooter.jsx';
 import RecentlyDelivered from '../components/store/RecentlyDelivered.jsx';
+import CommandPalette from '../components/store/CommandPalette.jsx';
 import { useReveal } from '../lib/useReveal.js';
 
 /**
@@ -29,6 +30,7 @@ export default function StoreLayout() {
       </main>
       <StoreFooter />
       <RecentlyDelivered />
+      <CommandPalette />
     </div>
   );
 }

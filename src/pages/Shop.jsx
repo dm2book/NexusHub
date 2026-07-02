@@ -25,7 +25,7 @@ export default function Shop() {
   const toast = useToast();
   const [params, setParams] = useSearchParams();
   const [products, setProducts] = useState(null);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(() => new URLSearchParams(window.location.search).get('search') || '');
   const [sort, setSort] = useState('popular');
   const category = params.get('category') || '';
   usePageMeta('Shop', 'Browse game currency, gift cards and subscriptions — instant delivery.');

@@ -1,5 +1,21 @@
 import { Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import { Zap } from 'lucide-react';
+import { api } from '../../lib/api.js';
+
+/** Real system status from /api/health (no fake claims). */
+export function SystemStatus() {
+  const [ok, setOk] = useState(null);   // null = loading → show nothing
+  useEffect(() => {
+    let live = true;
+    fetch(`${api.base}/api/health`).then((r) => { if (live) setOk(r.ok); }).catch(() => { if (live) setOk(false); });
+    return () => { live = false; };
+  }, []);
+  if (ok === null) return null;
+  return ok
+    ? <span className="text-emerald-500">● All systems operational</span>
+    : <span className="text-amber-500">● Partial degradation — orders may be delayed</span>;
+}
 
 const COLS = [
   { title: 'Shop', links: [['All Products', '/shop'], ['Wishlist', '/wishlist'], ['Track Order', '/track'], ['Payment Methods', '/payment-methods']] },
@@ -41,7 +57,7 @@ export default function StoreFooter() {
       <div className="border-t border-slate-200/70">
         <div className="max-w-[1400px] mx-auto px-4 lg:px-8 py-5 flex flex-wrap items-center justify-between gap-3 text-sm text-slate-400">
           <span>© {new Date().getFullYear()} ForgeMarket · Instant digital goods</span>
-          <span className="text-emerald-500">● All systems operational</span>
+          <SystemStatus />
         </div>
       </div>
     </footer>
