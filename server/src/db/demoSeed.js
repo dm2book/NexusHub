@@ -1,14 +1,19 @@
 /**
  * OPTIONAL demo catalog seeder — run explicitly with `npm run seed:demo` (or set
- * SEED_DEMO=true to run it on first boot).
+ * SEED_DEMO=true to run it on first boot; with SEED_DEMO=true existing seeded
+ * products also get their PRICE re-synced to these defaults — handy after a
+ * repricing like this one. Products you renamed/repriced by hand keep your
+ * price unless SEED_DEMO is set).
  *
- * Prices: Robux & V-Bucks are based on real Eldorado.gg "from" prices (cheapest
- * seller, converted USD→EUR ≈ 0.92) plus a +€2 margin, rounded to .99. Eldorado
- * prices fluctuate per seller, so treat these as a starting point and adjust in
- * Admin → Products. Gift cards / Nitro aren't sold on Eldorado, so those are
- * priced at face value + a small margin.
- *
- * Each pack has its own cover image (amount printed on it) under /public/products.
+ * PRICING (July 2026): anchored on real Eldorado.gg "from" prices (cheapest
+ * offer, USD→EUR ≈ 0.92) plus a healthy margin, always below the official store
+ * price so every listing is a genuine deal:
+ *   · Robux top-up: ~$8.75/1k on Eldorado (2,000 from $17.50)
+ *   · V-Bucks: 4,500 from $16.50 · 5,000 from $23.42 · 13,500 from $37.50
+ *   · Valorant: 2,050 VP from $12.99 (~$6.34/1k)
+ *   · Nitro: 1 month from $8.49 · 1 year ≈ $79 market
+ * Categories without Eldorado listings are priced ~15-25% under the official
+ * in-game store. Adjust anytime in Admin → Products.
  */
 import { run, get, nowIso } from './index.js';
 import { migrate } from './migrate.js';
@@ -21,85 +26,85 @@ const CATALOG = [
     image: '/products/packs/robux-1000.svg', description: 'Instant Robux top-up to your Roblox account.' },
   { sku: 'ROBUX-2000', name: '2,000 Robux', category: 'robux', price: 1799,
     image: '/products/packs/robux-2000.svg', description: '2,000 Robux delivered fast and securely.' },
-  { sku: 'ROBUX-4500', name: '4,500 Robux', category: 'robux', price: 3599, featured: true,
+  { sku: 'ROBUX-4500', name: '4,500 Robux', category: 'robux', price: 3899, featured: true,
     image: '/products/packs/robux-4500.svg', description: 'Popular value pack for serious builders.' },
-  { sku: 'ROBUX-10000', name: '10,000 Robux', category: 'robux', price: 7399,
+  { sku: 'ROBUX-10000', name: '10,000 Robux', category: 'robux', price: 7999,
     image: '/products/packs/robux-10000.svg', description: 'Big Robux bundle — best price per Robux.' },
-  { sku: 'ROBUX-22500', name: '22,500 Robux', category: 'robux', price: 15699,
+  { sku: 'ROBUX-22500', name: '22,500 Robux', category: 'robux', price: 17499,
     image: '/products/packs/robux-22500.svg', description: 'Maximum Robux top-up for power users.' },
 
   // ── Fortnite V-Bucks (Eldorado + €2) ─────────────────────────────────────
-  { sku: 'VBUCKS-1000', name: '1,000 V-Bucks', category: 'v-bucks', price: 699,
+  { sku: 'VBUCKS-1000', name: '1,000 V-Bucks', category: 'v-bucks', price: 599,
     image: '/products/packs/vbucks-1000.svg', description: 'Fortnite V-Bucks for skins and the Battle Pass.' },
-  { sku: 'VBUCKS-2800', name: '2,800 V-Bucks', category: 'v-bucks', price: 1399, featured: true,
+  { sku: 'VBUCKS-2800', name: '2,800 V-Bucks', category: 'v-bucks', price: 1299, featured: true,
     image: '/products/packs/vbucks-2800.svg', description: 'Great-value V-Bucks bundle, instant delivery.' },
   { sku: 'VBUCKS-5000', name: '5,000 V-Bucks', category: 'v-bucks', price: 2399,
     image: '/products/packs/vbucks-5000.svg', description: '5,000 V-Bucks delivered to your account.' },
-  { sku: 'VBUCKS-13500', name: '13,500 V-Bucks', category: 'v-bucks', price: 3699, featured: true,
+  { sku: 'VBUCKS-13500', name: '13,500 V-Bucks', category: 'v-bucks', price: 3999, featured: true,
     image: '/products/packs/vbucks-13500.svg', description: 'The biggest V-Bucks stack at the best rate.' },
 
   // ── Call of Duty Points (estimate; verify) ───────────────────────────────
-  { sku: 'COD-2400', name: '2,400 CP — Call of Duty', category: 'cod', price: 2399,
+  { sku: 'COD-2400', name: '2,400 CP — Call of Duty', category: 'cod', price: 1599,
     image: '/products/packs/cod-2400.svg', description: 'Call of Duty Points for skins, bundles and Battle Pass.' },
-  { sku: 'COD-5000', name: '5,000 CP — Call of Duty', category: 'cod', price: 4499, featured: true,
+  { sku: 'COD-5000', name: '5,000 CP — Call of Duty', category: 'cod', price: 2999, featured: true,
     image: '/products/packs/cod-5000.svg', description: 'Best-value CoD Points bundle, instant delivery.' },
-  { sku: 'COD-9500', name: '9,500 CP — Call of Duty', category: 'cod', price: 7999,
+  { sku: 'COD-9500', name: '9,500 CP — Call of Duty', category: 'cod', price: 5499,
     image: '/products/packs/cod-9500.svg', description: 'Large CoD Points top-up.' },
-  { sku: 'COD-21000', name: '21,000 CP — Call of Duty', category: 'cod', price: 15999,
+  { sku: 'COD-21000', name: '21,000 CP — Call of Duty', category: 'cod', price: 11499,
     image: '/products/packs/cod-21000.svg', description: 'Maximum CoD Points stack.' },
 
   // ── Brawl Stars Gems (estimate; verify) ──────────────────────────────────
-  { sku: 'BRAWL-360', name: '360 Gems — Brawl Stars', category: 'brawl', price: 699,
+  { sku: 'BRAWL-360', name: '360 Gems — Brawl Stars', category: 'brawl', price: 1499,
     image: '/products/packs/brawl-360.svg', description: 'Brawl Stars gems for brawlers, skins and the Pass.' },
-  { sku: 'BRAWL-950', name: '950 Gems — Brawl Stars', category: 'brawl', price: 1799, featured: true,
+  { sku: 'BRAWL-950', name: '950 Gems — Brawl Stars', category: 'brawl', price: 3699, featured: true,
     image: '/products/packs/brawl-950.svg', description: 'Popular Brawl Stars gem bundle.' },
-  { sku: 'BRAWL-2000', name: '2,000 Gems — Brawl Stars', category: 'brawl', price: 3499,
+  { sku: 'BRAWL-2000', name: '2,000 Gems — Brawl Stars', category: 'brawl', price: 7499,
     image: '/products/packs/brawl-2000.svg', description: 'Big Brawl Stars gem stack.' },
 
   // ── Apex Coins (estimate; verify) ────────────────────────────────────────
-  { sku: 'APEX-1000', name: '1,000 Apex Coins', category: 'apex', price: 999,
+  { sku: 'APEX-1000', name: '1,000 Apex Coins', category: 'apex', price: 799,
     image: '/products/packs/apex-1000.svg', description: 'Apex Coins for skins, the Battle Pass and packs.' },
-  { sku: 'APEX-2150', name: '2,150 Apex Coins', category: 'apex', price: 1899,
+  { sku: 'APEX-2150', name: '2,150 Apex Coins', category: 'apex', price: 1599,
     image: '/products/packs/apex-2150.svg', description: 'Apex Coins bundle, instant delivery.' },
-  { sku: 'APEX-4350', name: '4,350 Apex Coins', category: 'apex', price: 3699, featured: true,
+  { sku: 'APEX-4350', name: '4,350 Apex Coins', category: 'apex', price: 3099, featured: true,
     image: '/products/packs/apex-4350.svg', description: 'Great-value Apex Coins pack.' },
-  { sku: 'APEX-11500', name: '11,500 Apex Coins', category: 'apex', price: 8999,
+  { sku: 'APEX-11500', name: '11,500 Apex Coins', category: 'apex', price: 7499,
     image: '/products/packs/apex-11500.svg', description: 'Maximum Apex Coins top-up.' },
 
   // ── Valorant Points (estimate; verify) ───────────────────────────────────
-  { sku: 'VAL-1000', name: '1,000 VP — Valorant', category: 'valorant', price: 999,
+  { sku: 'VAL-1000', name: '1,000 VP — Valorant', category: 'valorant', price: 799,
     image: '/products/packs/valorant-1000.svg', description: 'Valorant Points for skins and the Battle Pass.' },
-  { sku: 'VAL-2050', name: '2,050 VP — Valorant', category: 'valorant', price: 1799,
+  { sku: 'VAL-2050', name: '2,050 VP — Valorant', category: 'valorant', price: 1449,
     image: '/products/packs/valorant-2050.svg', description: 'Valorant Points bundle.' },
-  { sku: 'VAL-3650', name: '3,650 VP — Valorant', category: 'valorant', price: 3199, featured: true,
+  { sku: 'VAL-3650', name: '3,650 VP — Valorant', category: 'valorant', price: 2399, featured: true,
     image: '/products/packs/valorant-3650.svg', description: 'Popular Valorant Points pack.' },
-  { sku: 'VAL-5350', name: '5,350 VP — Valorant', category: 'valorant', price: 4499,
+  { sku: 'VAL-5350', name: '5,350 VP — Valorant', category: 'valorant', price: 3499,
     image: '/products/packs/valorant-5350.svg', description: 'Large Valorant Points top-up.' },
 
   // ── Genshin Genesis Crystals (estimate; verify) ──────────────────────────
-  { sku: 'GEN-980', name: '980 Genesis Crystals — Genshin', category: 'genshin', price: 1599,
+  { sku: 'GEN-980', name: '980 Genesis Crystals — Genshin', category: 'genshin', price: 1199,
     image: '/products/packs/genshin-980.svg', description: 'Genesis Crystals for wishes and the Battle Pass.' },
-  { sku: 'GEN-1980', name: '1,980 Genesis Crystals — Genshin', category: 'genshin', price: 2999, featured: true,
+  { sku: 'GEN-1980', name: '1,980 Genesis Crystals — Genshin', category: 'genshin', price: 2299, featured: true,
     image: '/products/packs/genshin-1980.svg', description: 'Popular Genshin crystals bundle.' },
-  { sku: 'GEN-3280', name: '3,280 Genesis Crystals — Genshin', category: 'genshin', price: 4999,
+  { sku: 'GEN-3280', name: '3,280 Genesis Crystals — Genshin', category: 'genshin', price: 3799,
     image: '/products/packs/genshin-3280.svg', description: 'Large Genesis Crystals pack.' },
-  { sku: 'GEN-6480', name: '6,480 Genesis Crystals — Genshin', category: 'genshin', price: 9499,
+  { sku: 'GEN-6480', name: '6,480 Genesis Crystals — Genshin', category: 'genshin', price: 7499,
     image: '/products/packs/genshin-6480.svg', description: 'Maximum Genesis Crystals top-up.' },
 
   // ── Clash of Clans Gems (estimate; verify) ───────────────────────────────
-  { sku: 'COC-500', name: '500 Gems — Clash of Clans', category: 'clash', price: 499,
+  { sku: 'COC-500', name: '500 Gems — Clash of Clans', category: 'clash', price: 449,
     image: '/products/packs/clash-500.svg', description: 'Clash of Clans gems to speed up your village.' },
-  { sku: 'COC-1200', name: '1,200 Gems — Clash of Clans', category: 'clash', price: 999,
+  { sku: 'COC-1200', name: '1,200 Gems — Clash of Clans', category: 'clash', price: 849,
     image: '/products/packs/clash-1200.svg', description: 'Clash of Clans gem bundle.' },
-  { sku: 'COC-2500', name: '2,500 Gems — Clash of Clans', category: 'clash', price: 1999, featured: true,
+  { sku: 'COC-2500', name: '2,500 Gems — Clash of Clans', category: 'clash', price: 1699, featured: true,
     image: '/products/packs/clash-2500.svg', description: 'Popular Clash of Clans gem pack.' },
-  { sku: 'COC-6500', name: '6,500 Gems — Clash of Clans', category: 'clash', price: 4999,
+  { sku: 'COC-6500', name: '6,500 Gems — Clash of Clans', category: 'clash', price: 3999,
     image: '/products/packs/clash-6500.svg', description: 'Big Clash of Clans gem stack.' },
 
   // ── Discord Nitro (market price; not on Eldorado) ────────────────────────
-  { sku: 'NITRO-1M', name: 'Discord Nitro — 1 Month', category: 'discord-nitro', price: 999,
+  { sku: 'NITRO-1M', name: 'Discord Nitro — 1 Month', category: 'discord-nitro', price: 899,
     image: '/products/nitro.svg', description: 'Full Nitro for a month: HD streaming, emojis, boosts.' },
-  { sku: 'NITRO-1Y', name: 'Discord Nitro — 1 Year', category: 'discord-nitro', price: 9999, featured: true,
+  { sku: 'NITRO-1Y', name: 'Discord Nitro — 1 Year', category: 'discord-nitro', price: 8499, featured: true,
     image: '/products/nitro.svg', description: 'A full year of Discord Nitro.' },
 
   // ── Gift cards (face value + small margin; not on Eldorado) ──────────────
@@ -115,36 +120,36 @@ const CATALOG = [
     image: '/products/xbox.svg', description: 'Spend on games and add-ons across Xbox & PC.' },
 
   // ── More games (no per-pack art yet → storefront shows a category tile) ───
-  { sku: 'LOL-1380', name: '1,380 RP — League of Legends', category: 'league', price: 999, description: 'Riot Points for champions, skins and the Battle Pass.' },
-  { sku: 'LOL-3500', name: '3,500 RP — League of Legends', category: 'league', price: 2499, featured: true, description: 'Best-value RP bundle, instant delivery.' },
-  { sku: 'LOL-8000', name: '8,000 RP — League of Legends', category: 'league', price: 4999, description: 'Large Riot Points top-up.' },
-  { sku: 'FF-530', name: '530 Diamonds — Free Fire', category: 'freefire', price: 599, description: 'Free Fire Diamonds for skins, characters and the Pass.' },
-  { sku: 'FF-1080', name: '1,080 Diamonds — Free Fire', category: 'freefire', price: 1099, featured: true, description: 'Popular Free Fire diamond bundle.' },
-  { sku: 'FF-2200', name: '2,200 Diamonds — Free Fire', category: 'freefire', price: 2199, description: 'Big Free Fire diamond stack.' },
-  { sku: 'PUBG-660', name: '660 UC — PUBG Mobile', category: 'pubg', price: 999, description: 'Unknown Cash for crates, skins and the Royale Pass.' },
-  { sku: 'PUBG-1800', name: '1,800 UC — PUBG Mobile', category: 'pubg', price: 2599, featured: true, description: 'Great-value PUBG Mobile UC bundle.' },
-  { sku: 'PUBG-3850', name: '3,850 UC — PUBG Mobile', category: 'pubg', price: 4999, description: 'Large PUBG Mobile UC top-up.' },
-  { sku: 'MLBB-275', name: '275 Diamonds — Mobile Legends', category: 'mlbb', price: 699, description: 'MLBB Diamonds for heroes, skins and the Pass.' },
-  { sku: 'MLBB-565', name: '565 Diamonds — Mobile Legends', category: 'mlbb', price: 1399, featured: true, description: 'Popular Mobile Legends diamond bundle.' },
-  { sku: 'MLBB-1155', name: '1,155 Diamonds — Mobile Legends', category: 'mlbb', price: 2799, description: 'Big Mobile Legends diamond stack.' },
-  { sku: 'EAFC-1600', name: '1,600 FC Points — EA FC', category: 'eafc', price: 1499, description: 'FC Points for Ultimate Team packs and drafts.' },
-  { sku: 'EAFC-4600', name: '4,600 FC Points — EA FC', category: 'eafc', price: 3999, featured: true, description: 'Best-value FC Points bundle.' },
-  { sku: 'EAFC-12000', name: '12,000 FC Points — EA FC', category: 'eafc', price: 9999, description: 'Maximum FC Points stack.' },
-  { sku: 'GTA-GREAT', name: 'Great White Shark Card — GTA', category: 'gta', price: 1599, description: '$1,250,000 in-game cash for GTA Online.' },
-  { sku: 'GTA-WHALE', name: 'Whale Shark Card — GTA', category: 'gta', price: 3499, featured: true, description: '$3,500,000 in-game cash for GTA Online.' },
-  { sku: 'GTA-MEGALODON', name: 'Megalodon Shark Card — GTA', category: 'gta', price: 6999, description: '$8,000,000 in-game cash for GTA Online.' },
-  { sku: 'MC-1720', name: '1,720 Minecoins — Minecraft', category: 'minecraft', price: 999, description: 'Minecoins for skins, worlds and texture packs.' },
-  { sku: 'MC-3500', name: '3,500 Minecoins — Minecraft', category: 'minecraft', price: 1899, featured: true, description: 'Popular Minecoins bundle.' },
-  { sku: 'CR-500', name: '500 Gems — Clash Royale', category: 'clashroyale', price: 499, description: 'Clash Royale gems for chests and the Pass Royale.' },
-  { sku: 'CR-1200', name: '1,200 Gems — Clash Royale', category: 'clashroyale', price: 999, featured: true, description: 'Popular Clash Royale gem bundle.' },
-  { sku: 'CR-2500', name: '2,500 Gems — Clash Royale', category: 'clashroyale', price: 1999, description: 'Big Clash Royale gem stack.' },
-  { sku: 'PGO-550', name: '550 PokéCoins — Pokémon GO', category: 'pokemongo', price: 599, description: 'PokéCoins for items, storage and raids.' },
-  { sku: 'PGO-1200', name: '1,200 PokéCoins — Pokémon GO', category: 'pokemongo', price: 1199, featured: true, description: 'Popular PokéCoins bundle.' },
+  { sku: 'LOL-1380', name: '1,380 RP — League of Legends', category: 'league', price: 899, description: 'Riot Points for champions, skins and the Battle Pass.' },
+  { sku: 'LOL-3500', name: '3,500 RP — League of Legends', category: 'league', price: 2099, featured: true, description: 'Best-value RP bundle, instant delivery.' },
+  { sku: 'LOL-8000', name: '8,000 RP — League of Legends', category: 'league', price: 4299, description: 'Large Riot Points top-up.' },
+  { sku: 'FF-530', name: '530 Diamonds — Free Fire', category: 'freefire', price: 449, description: 'Free Fire Diamonds for skins, characters and the Pass.' },
+  { sku: 'FF-1080', name: '1,080 Diamonds — Free Fire', category: 'freefire', price: 849, featured: true, description: 'Popular Free Fire diamond bundle.' },
+  { sku: 'FF-2200', name: '2,200 Diamonds — Free Fire', category: 'freefire', price: 1699, description: 'Big Free Fire diamond stack.' },
+  { sku: 'PUBG-660', name: '660 UC — PUBG Mobile', category: 'pubg', price: 849, description: 'Unknown Cash for crates, skins and the Royale Pass.' },
+  { sku: 'PUBG-1800', name: '1,800 UC — PUBG Mobile', category: 'pubg', price: 2099, featured: true, description: 'Great-value PUBG Mobile UC bundle.' },
+  { sku: 'PUBG-3850', name: '3,850 UC — PUBG Mobile', category: 'pubg', price: 4199, description: 'Large PUBG Mobile UC top-up.' },
+  { sku: 'MLBB-275', name: '275 Diamonds — Mobile Legends', category: 'mlbb', price: 449, description: 'MLBB Diamonds for heroes, skins and the Pass.' },
+  { sku: 'MLBB-565', name: '565 Diamonds — Mobile Legends', category: 'mlbb', price: 799, featured: true, description: 'Popular Mobile Legends diamond bundle.' },
+  { sku: 'MLBB-1155', name: '1,155 Diamonds — Mobile Legends', category: 'mlbb', price: 1699, description: 'Big Mobile Legends diamond stack.' },
+  { sku: 'EAFC-1600', name: '1,600 FC Points — EA FC', category: 'eafc', price: 1299, description: 'FC Points for Ultimate Team packs and drafts.' },
+  { sku: 'EAFC-4600', name: '4,600 FC Points — EA FC', category: 'eafc', price: 3399, featured: true, description: 'Best-value FC Points bundle.' },
+  { sku: 'EAFC-12000', name: '12,000 FC Points — EA FC', category: 'eafc', price: 7999, description: 'Maximum FC Points stack.' },
+  { sku: 'GTA-GREAT', name: 'Great White Shark Card — GTA', category: 'gta', price: 1299, description: '$1,250,000 in-game cash for GTA Online.' },
+  { sku: 'GTA-WHALE', name: 'Whale Shark Card — GTA', category: 'gta', price: 2999, featured: true, description: '$3,500,000 in-game cash for GTA Online.' },
+  { sku: 'GTA-MEGALODON', name: 'Megalodon Shark Card — GTA', category: 'gta', price: 5499, description: '$8,000,000 in-game cash for GTA Online.' },
+  { sku: 'MC-1720', name: '1,720 Minecoins — Minecraft', category: 'minecraft', price: 849, description: 'Minecoins for skins, worlds and texture packs.' },
+  { sku: 'MC-3500', name: '3,500 Minecoins — Minecraft', category: 'minecraft', price: 1649, featured: true, description: 'Popular Minecoins bundle.' },
+  { sku: 'CR-500', name: '500 Gems — Clash Royale', category: 'clashroyale', price: 449, description: 'Clash Royale gems for chests and the Pass Royale.' },
+  { sku: 'CR-1200', name: '1,200 Gems — Clash Royale', category: 'clashroyale', price: 849, featured: true, description: 'Popular Clash Royale gem bundle.' },
+  { sku: 'CR-2500', name: '2,500 Gems — Clash Royale', category: 'clashroyale', price: 1699, description: 'Big Clash Royale gem stack.' },
+  { sku: 'PGO-550', name: '550 PokéCoins — Pokémon GO', category: 'pokemongo', price: 449, description: 'PokéCoins for items, storage and raids.' },
+  { sku: 'PGO-1200', name: '1,200 PokéCoins — Pokémon GO', category: 'pokemongo', price: 849, featured: true, description: 'Popular PokéCoins bundle.' },
 
   // ── Subscriptions ────────────────────────────────────────────────────────
-  { sku: 'SPOTIFY-3M', name: 'Spotify Premium — 3 Months', category: 'spotify', price: 2999, description: 'Ad-free music, offline listening and better quality.' },
+  { sku: 'SPOTIFY-3M', name: 'Spotify Premium — 3 Months', category: 'spotify', price: 2499, description: 'Ad-free music, offline listening and better quality.' },
   { sku: 'NETFLIX-25', name: 'Netflix Gift Card €25', category: 'netflix', price: 2599, featured: true, description: 'Redeemable towards any Netflix plan.' },
-  { sku: 'GAMEPASS-3M', name: 'Xbox Game Pass Ultimate — 3 Months', category: 'gamepass', price: 3899, featured: true, description: '100+ games, EA Play and online multiplayer.' },
+  { sku: 'GAMEPASS-3M', name: 'Xbox Game Pass Ultimate — 3 Months', category: 'gamepass', price: 3499, featured: true, description: '100+ games, EA Play and online multiplayer.' },
 
   // ── More gift cards ──────────────────────────────────────────────────────
   { sku: 'NINTENDO-25', name: 'Nintendo eShop €25', category: 'nintendo', price: 2699, description: 'Switch games, DLC and Nintendo Switch Online.' },
@@ -174,10 +179,21 @@ export async function seedDemoCatalog() {
     if (existing) {
       // Keep the premium 3D icon in sync (also backfills missing covers).
       const meta = parse(existing.metadata);
-      if (img && meta.image !== img) {
-        meta.image = img;
+      let dirty = false;
+      if (img && meta.image !== img) { meta.image = img; dirty = true; }
+      if (dirty) {
         await run('UPDATE products SET metadata = @m, updated_at = @at WHERE id = @id',
           { m: JSON.stringify(meta), at, id: existing.id });
+        updated++;
+      }
+      // Explicit re-seed (SEED_DEMO=true / npm run seed:demo): also re-sync the
+      // PRICE to the current defaults — used after a repricing pass. Products
+      // keep admin-set prices on normal boots because this branch only runs
+      // when the seeder was explicitly invoked.
+      const row = await get('SELECT price FROM products WHERE id = @id', { id: existing.id });
+      if (Number(row?.price) !== p.price) {
+        await run('UPDATE products SET price = @p, updated_at = @at WHERE id = @id',
+          { p: p.price, at, id: existing.id });
         updated++;
       }
       continue;

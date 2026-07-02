@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Search, ShoppingCart, Zap, ShieldCheck, Headphones, Tag, Star, ArrowRight,
@@ -16,6 +16,8 @@ import CountUp from '../components/CountUp.jsx';
 import RecentlyDelivered from '../components/store/RecentlyDelivered.jsx';
 import CommandPalette from '../components/store/CommandPalette.jsx';
 import { SystemStatus } from '../components/store/StoreFooter.jsx';
+import { money } from '../lib/catalog.js';
+import { withFallback, SAMPLE_PRODUCTS } from '../lib/sampleCatalog.js';
 
 const ICON = (n) => `/products/icons/${n}.png`;
 
@@ -34,16 +36,17 @@ const CATEGORIES = [
   { label: 'iTunes', slug: 'itunes', img: 'itunes' },
 ];
 
-/* ── Popular products (exact cards from the reference) ─────────────────── */
-const POPULAR = [
-  { name: 'Robux', sub: '100 - 10,000 Robux', from: '€1,99', img: 'robux', slug: 'robux' },
-  { name: 'V-Bucks', sub: '1,000 - 13,500 V-Bucks', from: '€4,99', img: 'v-bucks', slug: 'v-bucks' },
-  { name: 'Valorant Points', sub: '475 - 11,000 VP', from: '€4,49', img: 'valorant', slug: 'valorant', popular: true },
-  { name: 'Fortnite Accounts', sub: 'Various Accounts', from: '€9,99', img: 'v-bucks', slug: 'v-bucks' },
-  { name: 'Steam Wallet', sub: '€5 - €100 Wallet', from: '€5,00', img: 'steam', slug: 'steam' },
-  { name: 'PlayStation Store', sub: '€10 - €100 Wallet', from: '€10,00', img: 'playstation', slug: 'playstation' },
-  { name: 'Xbox Gift Card', sub: '€10 - €100 Card', from: '€10,00', img: 'xbox', slug: 'xbox' },
-  { name: 'Discord Nitro', sub: '1 - 12 Months', from: '€4,99', img: 'discord-nitro', slug: 'discord-nitro' },
+/* ── Popular category tiles — prices/data are resolved from the REAL catalog
+   at runtime (cheapest product per category; add-to-cart adds a real product). */
+const POPULAR_TILES = [
+  { name: 'Robux', img: 'robux', slug: 'robux' },
+  { name: 'V-Bucks', img: 'v-bucks', slug: 'v-bucks' },
+  { name: 'Valorant Points', img: 'valorant', slug: 'valorant', popular: true },
+  { name: 'Discord Nitro', img: 'discord-nitro', slug: 'discord-nitro' },
+  { name: 'Steam Wallet', img: 'steam', slug: 'steam' },
+  { name: 'PlayStation Store', img: 'playstation', slug: 'playstation' },
+  { name: 'Xbox Gift Card', img: 'xbox', slug: 'xbox' },
+  { name: 'CoD Points', img: 'cod', slug: 'cod' },
 ];
 
 const NAV = [
@@ -99,10 +102,20 @@ export default function HomeStore() {
   const STATS = statCards(stats);
 
   const scrollRail = () => railRef.current?.scrollBy({ left: 320, behavior: 'smooth' });
-  const addToCart = (p) => add({
-    id: `pop-${p.slug}`, name: p.name, price: 199, currency: 'EUR',
-    category: p.slug, image: ICON(p.img),
-  });
+
+  // Real catalog → tiles show the true "From" price; add-to-cart adds the
+  // cheapest REAL product in that category (no fabricated items/prices).
+  const [products, setProducts] = useState([]);
+  useEffect(() => {
+    api.get('/api/products').then((r) => setProducts(withFallback(r.products))).catch(() => setProducts(SAMPLE_PRODUCTS));
+  }, []);
+  const popular = useMemo(() => POPULAR_TILES.map((t) => {
+    const items = products.filter((p) => p.category === t.slug && p.active !== false);
+    if (!items.length) return null;
+    const cheapest = items.reduce((a, b) => (a.price <= b.price ? a : b));
+    return { ...t, cheapest, from: cheapest.price, currency: cheapest.currency || 'EUR', count: items.length };
+  }).filter(Boolean), [products]);
+  const addToCart = (t) => add(t.cheapest);
 
   return (
     <div className="min-h-screen bg-[#f6f7fb] text-slate-900 fm-page" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
@@ -315,19 +328,20 @@ export default function HomeStore() {
             </div>
             <div className="relative">
               <div ref={railRef} className="fm-rail flex gap-4 overflow-x-auto pb-2 scroll-smooth snap-x">
-                {POPULAR.map((p) => (
+                {popular.map((p) => (
                   <div key={p.name} className="snap-start shrink-0 w-[230px] bg-white rounded-2xl border border-slate-200/70 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all p-4">
                     <div className="relative rounded-xl bg-slate-50 h-[150px] grid place-items-center mb-3">
                       {p.popular && <span className="absolute top-2.5 right-2.5 text-[10px] font-bold text-violet-700 bg-violet-100 rounded-full px-2 py-0.5">Popular</span>}
                       <img src={ICON(p.img)} alt={p.name} className="w-24 h-24 object-contain drop-shadow-md" />
                     </div>
                     <h3 className="font-bold text-[15px]">{p.name}</h3>
-                    <p className="text-[12.5px] text-slate-400 mt-0.5">{p.sub}</p>
-                    <div className="text-[12px] text-slate-400 mt-2">From <span className="fm-head text-violet-600 text-[17px]">{p.from}</span></div>
+                    <p className="text-[12.5px] text-slate-400 mt-0.5">{p.count} pack{p.count !== 1 ? 's' : ''} available</p>
+                    <div className="text-[12px] text-slate-400 mt-2">From <span className="fm-head text-violet-600 text-[17px]">{money(p.from, p.currency)}</span></div>
                     <div className="flex items-center gap-2 mt-3">
                       <Link to={`/shop?category=${p.slug}`} className="flex-1 text-center text-white text-sm font-semibold rounded-lg h-9 grid place-items-center hover:brightness-105 transition"
                         style={{ backgroundImage: 'linear-gradient(135deg,#7c5cff,#a855f7)' }}>Buy Now</Link>
-                      <button onClick={() => addToCart(p)} className="w-9 h-9 rounded-lg border border-slate-200 grid place-items-center text-slate-500 hover:bg-slate-50">
+                      <button onClick={() => addToCart(p)} aria-label={`Add ${p.cheapest.name} to cart`}
+                        className="w-9 h-9 rounded-lg border border-slate-200 grid place-items-center text-slate-500 hover:bg-slate-50 hover:text-violet-600">
                         <ShoppingCart size={16} />
                       </button>
                     </div>
