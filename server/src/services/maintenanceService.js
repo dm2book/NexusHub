@@ -4,13 +4,13 @@
  * safe to run repeatedly.
  */
 import { run, get, all, nowIso } from '../db/index.js';
-import { transitionOrder } from './orderService.js';
+import { transitionOrder, sendPaymentReminders } from './orderService.js';
 
 const HOURS = (n) => new Date(Date.now() - n * 3_600_000).toISOString();
 const DAYS = (n) => new Date(Date.now() - n * 86_400_000).toISOString();
 
 export async function runMaintenance() {
-  const summary = { otpPurged: 0, sessionsExpired: 0, ordersCancelled: 0, at: nowIso() };
+  const summary = { otpPurged: 0, sessionsExpired: 0, ordersCancelled: 0, remindersSent: 0, at: nowIso() };
 
   // 1. Purge OTP codes that are long expired / already consumed (keep table small).
   try {
@@ -37,6 +37,12 @@ export async function runMaintenance() {
       } catch { /* skip individual failures */ }
     }
   } catch (e) { summary.orderError = e.message; }
+
+  // 4. Abandoned-payment recovery: remind customers whose order is still unpaid
+  //    an hour after checkout (one reminder per order, includes the pay links).
+  try {
+    summary.remindersSent = await sendPaymentReminders({ afterMinutes: 60 });
+  } catch (e) { summary.reminderError = e.message; }
 
   return summary;
 }

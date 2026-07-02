@@ -94,6 +94,13 @@ export const config = {
     vipThreshold: Number(env.DISCORD_VIP_THRESHOLD_CENTS || 2000),
     // Optional webhook to post order events into an ops/sales channel.
     orderWebhookUrl: env.DISCORD_ORDER_WEBHOOK_URL || '',
+    // Optional webhook for the public #drops-and-deals channel (new products,
+    // restocks, coupons, bundles). Separate from the private ops webhook.
+    dropsWebhookUrl: env.DISCORD_DROPS_WEBHOOK_URL || '',
+    // Optional webhook for staff stock alerts; falls back to the order webhook.
+    stockWebhookUrl: env.DISCORD_STOCK_WEBHOOK_URL || '',
+    // Alert when a product's available code count drops below this.
+    lowStockThreshold: Number(env.LOW_STOCK_THRESHOLD || 5),
     // Live member count shown on the storefront trust stats (optional).
     memberCount: Number(env.DISCORD_MEMBER_COUNT || 0) || null,
     // Shared secret the bot uses to push /vouch reviews to /api/reviews/ingest.

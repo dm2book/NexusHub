@@ -123,6 +123,11 @@ export async function verifyEmailOtp(email, code, ctx = {}) {
   if (!user.email_verified) {
     await run('UPDATE users SET email_verified = 1 WHERE id = @id', { id: user.id });
   }
+  // Accounts with an authenticator app enabled need the second factor before a
+  // session is issued — return a short-lived challenge ticket instead.
+  if (user.totp_secret && user.totp_enabled_at) {
+    return { totpRequired: true, ticket: issueTotpTicket(user), user, firstLogin: created };
+  }
   return finalizeLogin(user, ctx, { firstLogin: created });
 }
 
@@ -174,7 +179,31 @@ export async function verifyPhoneOtp(phone, code, ctx = {}) {
   }
   await run('UPDATE sms_verifications SET consumed_at=@at WHERE id=@id', { at: nowIso(), id: match.id });
   const { user, created } = await upsertUserByPhone(p);
+  if (user.totp_secret && user.totp_enabled_at) {
+    return { totpRequired: true, ticket: issueTotpTicket(user), user, firstLogin: created };
+  }
   return finalizeLogin(user, ctx, { firstLogin: created });
+}
+
+// ── TOTP second-factor challenge ─────────────────────────────────────────────
+
+/** Short-lived proof that the first factor (email/phone OTP) succeeded. */
+export function issueTotpTicket(user) {
+  return jwt.sign({ sub: user.id, purpose: 'totp' }, config.auth.jwtSecret, { expiresIn: '5m' });
+}
+
+/** Validate a challenge ticket → the user row it belongs to (or throws). */
+export async function resolveTotpTicket(ticket) {
+  let payload;
+  try {
+    payload = jwt.verify(ticket, config.auth.jwtSecret);
+  } catch {
+    throw unauthorized('Your login expired — sign in again.');
+  }
+  if (payload.purpose !== 'totp') throw unauthorized('Invalid login ticket');
+  const user = await get('SELECT * FROM users WHERE id = @id', { id: payload.sub });
+  if (!user || user.status !== 'active') throw unauthorized('Account unavailable');
+  return user;
 }
 
 // ── Sessions / tokens ────────────────────────────────────────────────────

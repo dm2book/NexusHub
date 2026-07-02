@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Lock, ShieldCheck, Loader2, ShoppingBag, ExternalLink, Copy, CheckCircle2, Wallet } from 'lucide-react';
 import { api } from '../lib/api.js';
+import { useI18n } from '../lib/i18n.jsx';
 import { useCart } from '../context/CartContext.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
@@ -85,7 +86,7 @@ export default function Checkout() {
   if (items.length === 0 && !placed) {
     return (
       <div className="section py-16">
-        <h1 className="text-3xl text-white mb-8">Checkout</h1>
+        <h1 className="text-3xl text-white mb-8">{t('checkout.title', 'Checkout')}</h1>
         <EmptyState icon={ShoppingBag} title="Nothing to check out"
           action={<Link to="/shop" className="btn-primary">Browse shop</Link>} />
       </div>
@@ -177,7 +178,7 @@ export default function Checkout() {
 
   return (
     <div className="section py-12">
-      <h1 className="text-3xl text-white mb-6">Checkout</h1>
+      <h1 className="text-3xl text-white mb-6">{t('checkout.title', 'Checkout')}</h1>
 
       {/* Progress indicator */}
       <CheckoutSteps current={1} />
@@ -188,13 +189,13 @@ export default function Checkout() {
             <h3 className="text-white mb-5">Contact & billing</h3>
             <div className="space-y-4">
               <div>
-                <label className="label">Email (delivery + receipt)</label>
+                <label className="label">{t('checkout.email', 'Email (delivery + receipt)')}</label>
                 <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
                   className="input" placeholder="you@example.com" />
               </div>
               <div className="grid sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="label">Full name</label>
+                  <label className="label">{t('checkout.name', 'Full name')}</label>
                   <input value={fullName} onChange={(e) => setFullName(e.target.value)} className="input" placeholder="Optional" />
                 </div>
                 <div>

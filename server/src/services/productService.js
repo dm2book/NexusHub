@@ -2,6 +2,7 @@
 import { run, get, all, nowIso } from '../db/index.js';
 import { newId } from '../utils/ids.js';
 import { notFound, badRequest } from '../utils/errors.js';
+import { postDropEvent } from './discordService.js';
 
 const parse = (s) => { try { return JSON.parse(s || '{}'); } catch { return {}; } };
 const hydrate = (r) => {
@@ -63,7 +64,13 @@ export async function createProduct(p = {}) {
     stock: p.stock ?? null, active: p.active === false ? 0 : 1,
     meta: JSON.stringify(p.metadata || {}), at,
   });
-  return getProduct(id);
+  const created = await getProduct(id);
+  // Announce active new products in the community #drops-and-deals channel.
+  // Skipped during bulk seeding (announce=false) to avoid flooding the channel.
+  if (created?.active && p.announce !== false) {
+    postDropEvent('product', created).catch(() => {});
+  }
+  return created;
 }
 
 export async function updateProduct(id, patch = {}) {

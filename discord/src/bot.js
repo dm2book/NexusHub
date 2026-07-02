@@ -56,7 +56,9 @@ async function pushReviewToSite({ author, avatarUrl, stars, body, externalId }) 
   try {
     const payload = { author, avatarUrl, stars, body, externalId };
     const ts = String(Date.now());
-    const canonical = [author, stars ?? 5, body, externalId || ''].join(' ');
+    // NUL separator — must byte-match the server's canonicalReview() exactly,
+    // or the HMAC never verifies and vouches fall back to the legacy header.
+    const canonical = [author, stars ?? 5, body, externalId || ''].join('\u0000');
     const signature = createHmac('sha256', REVIEW_INGEST_SECRET).update(`${ts}.${canonical}`).digest('hex');
     await fetch(`${FORGEMARKET_API_URL.replace(/\/$/, '')}/api/reviews/ingest`, {
       method: 'POST',
@@ -188,6 +190,85 @@ async function updateServerStats(guild) {
   } catch (e) { console.error('[stats]', e.message); }
 }
 
+// ── Auto-updated #price-list (live catalog → pinned embed) ───────────────────
+async function updatePriceList(guild) {
+  try {
+    const ch = findChannel(guild, 'price-list');
+    if (!ch) return;
+    const products = await getProducts();
+    if (!products.length) return;
+
+    const byCat = {};
+    for (const p of products) (byCat[p.category || 'other'] ||= []).push(p);
+    const fields = Object.entries(byCat)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(0, 24) // Discord embed cap: 25 fields
+      .map(([cat, list]) => ({
+        name: `🎮 ${cat.replace(/-/g, ' ').replace(/\b\w/g, (m) => m.toUpperCase())}`,
+        value: list
+          .sort((a, b) => a.price - b.price)
+          .map((p) => `${p.name} — **${money(p.price, p.currency)}**`)
+          .join('\n').slice(0, 1024),
+      }));
+
+    const embed = new EmbedBuilder().setColor(0x6366f1)
+      .setTitle('🏷️ Live price list')
+      .setDescription(`Prices sync automatically from the store — always current.\n🛒 Order at ${STORE_URL}/shop (instant delivery)`)
+      .addFields(fields)
+      .setFooter({ text: 'ForgeMarket · auto-updated every 10 min' })
+      .setTimestamp();
+
+    // Edit our previous price-list message so the channel stays clean.
+    const msgs = await ch.messages.fetch({ limit: 25 }).catch(() => null);
+    const mine = msgs?.find((m) => m.author.id === client.user.id && m.embeds[0]?.title?.includes('price list'));
+    if (mine) await mine.edit({ embeds: [embed] });
+    else await ch.send({ embeds: [embed] });
+  } catch (e) { console.error('[price-list]', e.message); }
+}
+
+// ── Anti-scam: staff impersonation detection ─────────────────────────────────
+// Normalizes lookalike characters (0→o, 1→l, …) so "F0rgeSupp0rt" matches
+// "ForgeSupport". Alerts land in #scam-warning (falls back to #mod-log).
+const normalizeName = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '')
+  .replace(/0/g, 'o').replace(/1/g, 'l').replace(/3/g, 'e').replace(/4/g, 'a')
+  .replace(/5/g, 's').replace(/7/g, 't').replace(/8/g, 'b');
+
+function staffNameSet(guild) {
+  const names = new Set([normalizeName(guild.name), normalizeName(client.user?.username)]);
+  for (const m of guild.members.cache.values()) {
+    if (!isStaff(m) || m.user.bot) continue;
+    names.add(normalizeName(m.user.username));
+    names.add(normalizeName(m.displayName));
+    if (m.user.globalName) names.add(normalizeName(m.user.globalName));
+  }
+  names.delete('');
+  return names;
+}
+
+async function checkImpersonation(member) {
+  try {
+    if (member.user.bot || member.id === client.user.id || isStaff(member)) return;
+    const staff = staffNameSet(member.guild);
+    const candidates = [member.user.username, member.displayName, member.user.globalName]
+      .map(normalizeName).filter(Boolean);
+    const hit = candidates.find((c) => staff.has(c));
+    if (!hit) return;
+    const ch = findChannel(member.guild, 'scam-warning') || findChannel(member.guild, 'mod-log');
+    if (!ch) return;
+    await ch.send({ embeds: [new EmbedBuilder().setColor(0xef4444)
+      .setTitle('🚨 Possible staff impersonation')
+      .setDescription(
+        `<@${member.id}> (\`${member.user.tag}\`) uses a name matching a staff member or the brand.\n` +
+        'Review their profile and ban if fake. Reminder for everyone: **staff will never DM you first.**')
+      .setThumbnail(member.user.displayAvatarURL())
+      .setTimestamp()] });
+  } catch (e) { console.error('[impersonation]', e.message); }
+}
+
+client.on(Events.GuildMemberUpdate, (oldM, newM) => {
+  if (oldM.displayName !== newM.displayName) checkImpersonation(newM);
+});
+
 // ── ready ────────────────────────────────────────────────────────────────
 client.once(Events.ClientReady, (c) => {
   console.log(`✅ ${c.user.tag} online — AI: ${anthropic ? 'on' : 'rule-based'} · API: ${FORGEMARKET_API_URL || 'sample'}`);
@@ -195,9 +276,17 @@ client.once(Events.ClientReady, (c) => {
   const refresh = () => c.guilds.cache.forEach((g) => updateServerStats(g));
   refresh();
   setInterval(refresh, 6 * 60_000); // respect channel-rename rate limits
+
+  // Cache members once so staff-impersonation checks see the full roster.
+  c.guilds.cache.forEach((g) => g.members.fetch().catch(() => {}));
+
+  // Live price list: refresh now + every 10 minutes.
+  const prices = () => c.guilds.cache.forEach((g) => updatePriceList(g));
+  prices();
+  setInterval(prices, 10 * 60_000);
 });
 
-// ── greet new members ──────────────────────────────────────────────────────
+// ── greet new members (with anti-scam warning) ─────────────────────────────
 client.on(Events.GuildMemberAdd, async (member) => {
   const dm = new EmbedBuilder().setColor(0x6366f1)
     .setTitle(`Welcome to ${member.guild.name} ⚡`)
@@ -206,9 +295,13 @@ client.on(Events.GuildMemberAdd, async (member) => {
       "✅ **Verify** in the #verify channel to unlock everything\n" +
       "🛒 Browse top-ups or ask me in **#ask-the-bot**\n" +
       "🎁 Join **#giveaways** for free drops\n" +
-      "🎫 Need help? **#open-a-ticket**\n\nInstant delivery · buyer-protected · 24/7 support.");
+      "🎫 Need help? **#open-a-ticket**\n\n" +
+      "🛡️ **Stay safe:** our staff will **NEVER** DM you first, never ask for your password, " +
+      "and we only sell via the official store link in the server. Anyone else is a scammer — report them in #open-a-ticket.\n\n" +
+      "Instant delivery · buyer-protected · 24/7 support.");
   member.send({ embeds: [dm] }).catch(() => {});
   leadLog(member.guild, `🟢 New member joined: <@${member.id}> (${member.guild.memberCount} total)`);
+  checkImpersonation(member); // scam guard: flag staff-lookalike names on join
 });
 
 // ── interactions: buttons + slash ──────────────────────────────────────────

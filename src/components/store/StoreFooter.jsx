@@ -2,9 +2,11 @@ import { Link } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { Zap } from 'lucide-react';
 import { api } from '../../lib/api.js';
+import { useI18n } from '../../lib/i18n.jsx';
 
 /** Real system status from /api/health (no fake claims). */
 export function SystemStatus() {
+  const { t } = useI18n();
   const [ok, setOk] = useState(null);   // null = loading → show nothing
   useEffect(() => {
     let live = true;
@@ -13,18 +15,31 @@ export function SystemStatus() {
   }, []);
   if (ok === null) return null;
   return ok
-    ? <span className="text-emerald-500">● All systems operational</span>
-    : <span className="text-amber-500">● Partial degradation — orders may be delayed</span>;
+    ? <span className="text-emerald-500">{t('status.ok', '● All systems operational')}</span>
+    : <span className="text-amber-500">{t('status.degraded', '● Partial degradation — orders may be delayed')}</span>;
 }
-
-const COLS = [
-  { title: 'Shop', links: [['All Products', '/shop'], ['Wishlist', '/wishlist'], ['Track Order', '/track'], ['Payment Methods', '/payment-methods']] },
-  { title: 'Company', links: [['About Us', '/about'], ['How it works', '/how-it-works'], ['Trust Center', '/trust'], ['Reviews', '/reviews'], ['Contact', '/contact']] },
-  { title: 'Help & Legal', links: [['FAQ', '/faq'], ['Refund Policy', '/refunds'], ['Terms', '/terms'], ['Privacy', '/privacy']] },
-];
 
 /** Shared light storefront footer. */
 export default function StoreFooter() {
+  const { t } = useI18n();
+  const COLS = [
+    { title: t('footer.shop', 'Shop'), links: [
+      [t('footer.allProducts', 'All Products'), '/shop'],
+      [t('footer.wishlist', 'Wishlist'), '/wishlist'],
+      [t('footer.track', 'Track Order'), '/track'],
+      [t('footer.payments', 'Payment Methods'), '/payment-methods']] },
+    { title: t('footer.company', 'Company'), links: [
+      [t('footer.about', 'About Us'), '/about'],
+      [t('footer.how', 'How it works'), '/how-it-works'],
+      [t('footer.trust', 'Trust Center'), '/trust'],
+      [t('footer.reviews', 'Reviews'), '/reviews'],
+      [t('footer.contact', 'Contact'), '/contact']] },
+    { title: t('footer.help', 'Help & Legal'), links: [
+      [t('footer.faq', 'FAQ'), '/faq'],
+      [t('footer.refunds', 'Refund Policy'), '/refunds'],
+      [t('footer.terms', 'Terms'), '/terms'],
+      [t('footer.privacy', 'Privacy'), '/privacy']] },
+  ];
   return (
     <footer className="border-t border-slate-200/70 bg-white mt-12">
       <div className="max-w-[1400px] mx-auto px-4 lg:px-8 py-12 grid sm:grid-cols-2 lg:grid-cols-4 gap-8">
@@ -37,10 +52,10 @@ export default function StoreFooter() {
             <span className="text-lg font-extrabold tracking-tight text-slate-900">ForgeMarket</span>
           </Link>
           <p className="text-slate-500 text-sm mt-4 leading-relaxed">
-            The marketplace for digital goods — delivered instantly, tracked in real time.
+            {t('footer.tagline', 'The marketplace for digital goods — delivered instantly, tracked in real time.')}
           </p>
           <Link to="/discord" className="inline-flex items-center gap-2 mt-4 text-sm font-semibold text-violet-600 hover:text-violet-700">
-            💬 Join our Discord
+            {t('footer.discord', '💬 Join our Discord')}
           </Link>
         </div>
         {COLS.map((c) => (
@@ -56,7 +71,7 @@ export default function StoreFooter() {
       </div>
       <div className="border-t border-slate-200/70">
         <div className="max-w-[1400px] mx-auto px-4 lg:px-8 py-5 flex flex-wrap items-center justify-between gap-3 text-sm text-slate-400">
-          <span>© {new Date().getFullYear()} ForgeMarket · Instant digital goods</span>
+          <span>© {new Date().getFullYear()} ForgeMarket · {t('footer.rights', 'Instant digital goods')}</span>
           <SystemStatus />
         </div>
       </div>

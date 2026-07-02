@@ -3,23 +3,37 @@ import { Link, useLocation } from 'react-router-dom';
 import { Search, ShoppingCart, Zap, ArrowRight, Shield, Menu, X } from 'lucide-react';
 import { useCart } from '../../context/CartContext.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
+import { useI18n } from '../../lib/i18n.jsx';
 
-const NAV = [
-  { label: 'Home', to: '/' },
-  { label: 'All Products', to: '/shop' },
-  { label: 'Reviews', to: '/reviews' },
-  { label: 'How it works', to: '/how-it-works' },
-  { label: 'Support', to: '/contact' },
-];
+/** EN ⇄ NL toggle — a compact pill that shows the language you can switch TO. */
+export function LangSwitch({ className = '' }) {
+  const { lang, setLang } = useI18n();
+  return (
+    <button onClick={() => setLang(lang === 'nl' ? 'en' : 'nl')}
+      title={lang === 'nl' ? 'Switch to English' : 'Schakel naar Nederlands'}
+      className={`inline-flex items-center gap-1 h-10 px-2.5 rounded-xl text-[13px] font-bold tracking-wide text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition ${className}`}>
+      🌐 {lang === 'nl' ? 'EN' : 'NL'}
+    </button>
+  );
+}
 
 /** Shared light storefront top-nav (used on the home page and every store page). */
 export default function StoreNav() {
   const { count } = useCart();
   const { user, isStaff } = useAuth();
   const { pathname } = useLocation();
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const active = (to) => (to === '/' ? pathname === '/' : pathname.startsWith(to));
   useEffect(() => { setOpen(false); }, [pathname]);
+
+  const NAV = [
+    { label: t('nav.home', 'Home'), to: '/' },
+    { label: t('nav.products', 'All Products'), to: '/shop' },
+    { label: t('nav.reviews', 'Reviews'), to: '/reviews' },
+    { label: t('nav.how', 'How it works'), to: '/how-it-works' },
+    { label: t('nav.support', 'Support'), to: '/contact' },
+  ];
 
   return (
     <header className="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-slate-200/70">
@@ -52,13 +66,15 @@ export default function StoreNav() {
         <button onClick={() => window.dispatchEvent(new CustomEvent('forge:cmdk'))}
           className="hidden md:flex items-center gap-2 bg-slate-100 rounded-xl px-3.5 h-10 w-[240px] text-slate-400 hover:bg-slate-200/70 transition">
           <Search size={16} />
-          <span className="text-sm">Search for products...</span>
+          <span className="text-sm">{t('nav.search', 'Search for products...')}</span>
           <kbd className="ml-auto text-[11px] bg-white border border-slate-200 rounded px-1.5 py-0.5">⌘K</kbd>
         </button>
         <button onClick={() => window.dispatchEvent(new CustomEvent('forge:cmdk'))} aria-label="Search"
           className="md:hidden w-10 h-10 rounded-xl hover:bg-slate-100 grid place-items-center text-slate-700">
           <Search size={20} />
         </button>
+
+        <LangSwitch className="hidden sm:inline-flex" />
 
         <Link to="/cart" className="relative w-10 h-10 rounded-xl hover:bg-slate-100 grid place-items-center text-slate-700">
           <ShoppingCart size={20} />
@@ -73,14 +89,14 @@ export default function StoreNav() {
           </Link>
         )}
         {user ? (
-          <Link to="/account" className="hidden sm:inline-flex text-[15px] font-medium text-slate-600 hover:text-slate-900">Account</Link>
+          <Link to="/account" className="hidden sm:inline-flex text-[15px] font-medium text-slate-600 hover:text-slate-900">{t('nav.account', 'Account')}</Link>
         ) : (
-          <Link to="/login" className="hidden sm:inline-flex text-[15px] font-medium text-slate-600 hover:text-slate-900">Log in</Link>
+          <Link to="/login" className="hidden sm:inline-flex text-[15px] font-medium text-slate-600 hover:text-slate-900">{t('nav.login', 'Log in')}</Link>
         )}
         {!user && (
           <Link to="/login" className="hidden sm:inline-flex items-center gap-1.5 text-white text-[15px] font-semibold rounded-xl px-4 h-10 shadow-lg shadow-violet-500/30 hover:brightness-105 transition"
             style={{ backgroundImage: 'linear-gradient(135deg,#7c5cff,#a855f7)' }}>
-            Sign Up <ArrowRight size={16} />
+            {t('nav.signup', 'Sign Up')} <ArrowRight size={16} />
           </Link>
         )}
       </div>
@@ -95,13 +111,14 @@ export default function StoreNav() {
             </Link>
           ))}
           <div className="h-px bg-slate-100 my-2" />
+          <div className="px-1"><LangSwitch /></div>
           {isStaff && <Link to="/admin" className="block px-3 py-2.5 rounded-xl text-[15px] font-medium text-violet-700 bg-violet-50">🛡 Admin</Link>}
           <Link to={user ? '/account' : '/login'} className="block px-3 py-2.5 rounded-xl text-[15px] font-medium text-slate-700 hover:bg-slate-50">
-            {user ? 'Account' : 'Log in'}
+            {user ? t('nav.account', 'Account') : t('nav.login', 'Log in')}
           </Link>
           {!user && (
             <Link to="/login" className="block text-center text-white font-semibold rounded-xl py-2.5 mt-1"
-              style={{ backgroundImage: 'linear-gradient(135deg,#7c5cff,#a855f7)' }}>Sign Up</Link>
+              style={{ backgroundImage: 'linear-gradient(135deg,#7c5cff,#a855f7)' }}>{t('nav.signup', 'Sign Up')}</Link>
           )}
         </div>
       )}

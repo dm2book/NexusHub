@@ -703,4 +703,42 @@ INSERT INTO role_permissions (role_id, permission_id)
   ON CONFLICT DO NOTHING;
 `,
   },
+  {
+    id: '011_growth_ops',
+    sql: `
+-- ── Abandoned-payment recovery ──────────────────────────────────────────────
+-- One reminder email per unpaid order; stamped so it is never sent twice.
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS reminder_sent_at TEXT;
+CREATE INDEX IF NOT EXISTS idx_orders_pending_reminder
+  ON orders (created_at) WHERE status = 'pending' AND reminder_sent_at IS NULL;
+
+-- ── TOTP two-factor authentication (authenticator apps) ─────────────────────
+-- pending secret lives until the user confirms a first valid code, then it is
+-- promoted to totp_secret + totp_enabled_at (both cleared on disable).
+ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_secret TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_pending_secret TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_enabled_at TEXT;
+
+-- ── Low-stock alerting ──────────────────────────────────────────────────────
+-- When code stock drops under the threshold we post one Discord alert; the
+-- stamp prevents repeats and is cleared again on restock.
+ALTER TABLE products ADD COLUMN IF NOT EXISTS low_stock_alerted_at TEXT;
+
+-- Seed the abandoned-payment reminder template on existing databases (fresh
+-- installs also get it via seed.js). Admin-editable like every other template.
+INSERT INTO email_templates (id, name, subject, body_html, enabled, updated_at)
+VALUES ('payment_reminder', 'Payment Reminder',
+  'Your {{brand.name}} order {{order.number}} is waiting ⏳',
+  '<h1>Your order is reserved — complete your payment</h1>' ||
+  '<p>Hi {{user.name}}, we noticed you placed order <strong>{{order.number}}</strong> ' ||
+  '(total <strong>{{order.total}}</strong>) but we have not received your payment yet. ' ||
+  'Your items are still reserved for you.</p>' ||
+  '{{order.itemsHtml}}{{order.paymentHtml}}' ||
+  '<p><a class="btn" href="{{order.url}}">Complete your order</a></p>' ||
+  '<p>Already paid? Then you can ignore this email — payments can take a few minutes ' ||
+  'to be confirmed. Questions? Just reply or open a ticket in our Discord.</p>',
+  1, '2026-07-02T00:00:00.000Z')
+ON CONFLICT (id) DO NOTHING;
+`,
+  },
 ];

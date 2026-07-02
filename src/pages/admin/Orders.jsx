@@ -1,9 +1,9 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Search, Eye, Truck, CheckCircle2, RotateCcw, Mail, AlertTriangle,
+  Search, Eye, Truck, CheckCircle2, RotateCcw, Mail, AlertTriangle, Download,
 } from 'lucide-react';
-import { api } from '../../lib/api.js';
+import { api, getAccessToken } from '../../lib/api.js';
 import { money, dateShort } from '../../lib/format.js';
 import { PageLoader, StatusBadge, EmptyState, Modal } from '../../components/ui.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
@@ -33,6 +33,27 @@ export default function AdminOrders() {
 
   useEffect(() => { load(); }, [load]);
 
+  // Download the current view (same filters) as a bookkeeping-ready CSV.
+  const exportCsv = async () => {
+    try {
+      const q = new URLSearchParams();
+      if (status) q.set('status', status);
+      if (search) q.set('search', search);
+      const res = await fetch(`${api.base}/api/admin/orders/export.csv?${q}`, {
+        headers: { authorization: `Bearer ${getAccessToken()}` }, credentials: 'include',
+      });
+      if (!res.ok) throw new Error('Export failed');
+      const blobUrl = URL.createObjectURL(await res.blob());
+      const a = Object.assign(document.createElement('a'), {
+        href: blobUrl,
+        download: `forgemarket-orders-${new Date().toISOString().slice(0, 10)}.csv`,
+      });
+      a.click();
+      URL.revokeObjectURL(blobUrl);
+      toast.success('Orders exported.');
+    } catch (err) { toast.error(err.message); }
+  };
+
   const act = async (order, action, body) => {
     setBusy(true);
     try {
@@ -50,11 +71,16 @@ export default function AdminOrders() {
     <div>
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <h1 className="text-2xl text-white">Orders</h1>
-        <div className="relative">
-          <Search size={16} className="absolute left-3 top-3 text-slate-500" />
-          <input value={search} onChange={(e) => setSearch(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && load()}
-            placeholder="Search number or email…" className="input pl-9 w-72" />
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <Search size={16} className="absolute left-3 top-3 text-slate-500" />
+            <input value={search} onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && load()}
+              placeholder="Search number or email…" className="input pl-9 w-72" />
+          </div>
+          <button onClick={exportCsv} className="btn-ghost text-sm" title="Download the current view as CSV (bookkeeping)">
+            <Download size={15} /> Export CSV
+          </button>
         </div>
       </div>
 

@@ -5,6 +5,7 @@ import {
   ShoppingBag, Mail, LayoutDashboard, RotateCcw, XCircle,
 } from 'lucide-react';
 import { api } from '../lib/api.js';
+import { useI18n } from '../lib/i18n.jsx';
 import { StatusBadge, STATUS_META } from '../components/ui.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -36,6 +37,7 @@ const stepIndex = (status) => {
 export default function Track() {
   const [params] = useSearchParams();
   const toast = useToast();
+  const { t } = useI18n();
   const { user } = useAuth();
   const [number, setNumber] = useState('');
   const [result, setResult] = useState(null);
@@ -83,7 +85,7 @@ export default function Track() {
   return (
     <div className="max-w-2xl mx-auto px-5 py-16">
       {celebrate && <Confetti />}
-      <h1 className="text-3xl text-white mb-2">Track your order</h1>
+      <h1 className="text-3xl text-white mb-2">{t('track.title', 'Track your order')}</h1>
       <p className="text-slate-400 mb-8">Enter your order number (e.g. FM-2026-XXXXXXXX).</p>
 
       <form onSubmit={track} className="flex gap-3 mb-8">

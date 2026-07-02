@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Zap, AtSign, ArrowRight, Loader2, CheckCircle2, MailCheck } from 'lucide-react';
+import { Zap, AtSign, ArrowRight, Loader2, CheckCircle2, MailCheck, ShieldCheck } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { track } from '../lib/track.js';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -28,7 +28,8 @@ export default function Login() {
   const dest = location.state?.from || '/account';
 
   const [providers, setProviders] = useState([]);
-  const [step, setStep] = useState('id');        // id | code
+  const [step, setStep] = useState('id');        // id | code | totp
+  const [totpTicket, setTotpTicket] = useState(null); // 2FA challenge after a correct OTP
   const [identifier, setIdentifier] = useState('');
   const [channel, setChannel] = useState('email');
   const [remember, setRemember] = useState(true);
@@ -91,15 +92,40 @@ export default function Login() {
     setBusy(true); setError('');
     try {
       const ref = localStorage.getItem('fm_ref') || undefined;
-      const { accessToken } = await api.post('/api/auth/otp/verify', { identifier: identifier.trim(), code, remember, ref });
+      const r = await api.post('/api/auth/otp/verify', { identifier: identifier.trim(), code, remember, ref });
+      if (r.totpRequired) {
+        // Account has an authenticator app — one more step.
+        setTotpTicket(r.ticket);
+        setOtpKey((k) => k + 1);
+        setStep('totp');
+        return;
+      }
       localStorage.removeItem('fm_ref');
       track('otp_verified', { channel });
-      await login(accessToken);
+      await login(r.accessToken);
       navigate(dest, { replace: true });
     } catch (err) {
       track('otp_failed', { phase: 'verify', status: err?.status });
       setError(friendlyError(err));
       setOtpKey((k) => k + 1); // clear boxes for another try
+    } finally { setBusy(false); }
+  };
+
+  // Final step for 2FA-protected accounts: the current authenticator code.
+  const verifyTotp = async (code) => {
+    setBusy(true); setError('');
+    try {
+      const { accessToken } = await api.post('/api/auth/totp/login', { ticket: totpTicket, code, remember });
+      localStorage.removeItem('fm_ref');
+      track('otp_verified', { channel: 'totp' });
+      await login(accessToken);
+      navigate(dest, { replace: true });
+    } catch (err) {
+      track('otp_failed', { phase: 'totp', status: err?.status });
+      setError(err?.status === 401
+        ? 'Your login expired — start over and try again.'
+        : friendlyError(err));
+      setOtpKey((k) => k + 1);
     } finally { setBusy(false); }
   };
 
@@ -118,7 +144,29 @@ export default function Login() {
           <p className="text-slate-400 text-sm mt-1">Sign in or create an account</p>
         </div>
 
-        {step === 'id' ? (
+        {step === 'totp' ? (
+          <div className="space-y-5">
+            <div className="flex flex-col items-center text-center">
+              <div className="w-12 h-12 rounded-full bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center mb-3">
+                <ShieldCheck size={22} className="text-indigo-400" />
+              </div>
+              <div className="text-white font-medium">Two-factor authentication</div>
+              <p className="text-sm text-slate-400 mt-1">
+                Enter the 6-digit code from your <span className="text-white font-medium">authenticator app</span>.
+              </p>
+            </div>
+
+            <OtpInput key={otpKey} onComplete={verifyTotp} disabled={busy} />
+
+            {error && <p className="text-sm text-red-300 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2 text-center">{error}</p>}
+            {busy && <div className="flex items-center justify-center gap-2 text-sm text-slate-400"><Loader2 size={16} className="animate-spin" /> Verifying…</div>}
+
+            <button type="button" onClick={() => { setStep('id'); setTotpTicket(null); setError(''); }}
+              className="text-sm text-slate-400 hover:text-white w-full text-center">
+              Start over
+            </button>
+          </div>
+        ) : step === 'id' ? (
           <form onSubmit={start} className="space-y-4">
             <div>
               <label className="label">Email or phone</label>

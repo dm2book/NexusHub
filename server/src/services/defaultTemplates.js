@@ -38,6 +38,21 @@ export const DEFAULT_TEMPLATES = [
       <p>Need help? Just reply to this email or open a ticket in our Discord.</p>`,
   },
   {
+    id: 'payment_reminder',
+    name: 'Payment Reminder',
+    subject: 'Your {{brand.name}} order {{order.number}} is waiting ⏳',
+    body_html: `
+      <h1>Your order is reserved — complete your payment</h1>
+      <p>Hi {{user.name}}, we noticed you placed order <strong>{{order.number}}</strong>
+      (total <strong>{{order.total}}</strong>) but we have not received your payment yet.
+      Your items are still reserved for you.</p>
+      {{order.itemsHtml}}
+      {{order.paymentHtml}}
+      <p><a class="btn" href="{{order.url}}">Complete your order</a></p>
+      <p>Already paid? Then you can ignore this email — payments can take a few minutes
+      to be confirmed. Questions? Just reply or open a ticket in our Discord.</p>`,
+  },
+  {
     id: 'payment_confirmed',
     name: 'Payment Confirmed',
     subject: 'Payment confirmed for {{order.number}}',
