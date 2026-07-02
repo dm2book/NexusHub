@@ -8,6 +8,7 @@ import { date } from '../../lib/format.js';
 import { getFeedbackPrefs, setFeedbackPref, feedback } from '../../lib/feedback.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
+import TwoFactor from '../../components/account/TwoFactor.jsx';
 
 export default function Profile() {
   const { user } = useAuth();
@@ -21,6 +22,7 @@ export default function Profile() {
       <PhoneSection />
       <Preferences />
       <FeedbackPrefs />
+      <TwoFactor />
       <ActiveSessions />
       <TrustedDevices />
       <LoginHistory />

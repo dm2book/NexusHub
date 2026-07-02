@@ -7,6 +7,7 @@ import { run, get, all, nowIso } from '../db/index.js';
 import { newId } from '../utils/ids.js';
 import { couponFor } from '../config/env.js';
 import { badRequest, notFound } from '../utils/errors.js';
+import { postDropEvent } from './discordService.js';
 
 const up = (c) => String(c || '').trim().toUpperCase();
 
@@ -87,7 +88,12 @@ export async function createCoupon(input, actorId) {
       max: input.maxRedemptions ?? null, per: input.perUserLimit ?? null,
       starts: input.startsAt || null, exp: input.expiresAt || null,
       active: input.active === false ? 0 : 1, at: nowIso(), actorId });
-  return getCoupon(id);
+  const created = await getCoupon(id);
+  // Share fresh public discount codes in #drops-and-deals (best-effort).
+  if (created?.active && input.announce !== false) {
+    postDropEvent('coupon', created).catch(() => {});
+  }
+  return created;
 }
 
 export async function updateCoupon(id, patch) {

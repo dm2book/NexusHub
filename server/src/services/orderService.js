@@ -19,8 +19,8 @@ import { notify } from './notificationService.js';
 import { scoreOrder } from './fraudService.js';
 import { getProduct } from './productService.js';
 import { postOrderEvent } from './discordService.js';
-import { grantTierForOrder } from './discordRolesService.js';
-import { availableCount, claimCodes } from './codeStockService.js';
+import { grantTierForOrder, syncLoyaltyRoles, sendDeliveryDm } from './discordRolesService.js';
+import { availableCount, claimCodes, checkLowStock } from './codeStockService.js';
 import { memberDiscountPercent } from './membershipService.js';
 import { recordOrderCommission } from './affiliateService.js';
 import { recordPurchaseEvent } from './socialProofService.js';
@@ -204,6 +204,8 @@ export async function transitionOrder(orderId, to, ctx = {}) {
     await postOrderEvent(updated, 'completed').catch(() => {});
     // Capture a privacy-safe snapshot for the live social-proof feed (best-effort).
     await recordPurchaseEvent(updated).catch(() => {});
+    // DM Discord-linked buyers their codes + a /vouch prompt (best-effort).
+    await sendDeliveryDm(updated).catch(() => {});
   }
   // If the order is cancelled/refunded, return any store credit that was spent on it.
   if ((to === 'refunded' || to === 'cancelled') && updated.userId && updated.billing?.creditApplied > 0) {
@@ -213,8 +215,12 @@ export async function transitionOrder(orderId, to, ctx = {}) {
     }
   }
   if (to === 'refunded') await postOrderEvent(updated, 'refunded').catch(() => {});
-  // Grant the buyer's Discord tier (Verified vs VIP) once the order is paid.
-  if (to === 'payment_received' || to === 'completed') await grantTierForOrder(updated);
+  // Grant the buyer's Discord tier (Verified vs VIP) once the order is paid,
+  // and mirror their loyalty tier (Bronze→Platinum) as a server role.
+  if (to === 'payment_received' || to === 'completed') {
+    await grantTierForOrder(updated);
+    await syncLoyaltyRoles(updated.userId).catch(() => {});
+  }
   if (updated.userId) {
     await notify(updated.userId, {
       type: 'order_update',
@@ -246,7 +252,48 @@ export async function autoDispenseFromStock(orderId, ctx = {}) {
   }
   if (!deliveries.length) return false;
   await deliverOrder(orderId, deliveries, { ...ctx, reason: 'Auto-delivered from stock' });
+  // Stock just moved — ping staff once if any item is now running low.
+  for (const it of order.items) checkLowStock(it.product_id).catch(() => {});
   return true;
+}
+
+/**
+ * Abandoned-payment recovery: email a single reminder (with the pay links) for
+ * orders that are still unpaid `afterMinutes` after checkout. One reminder per
+ * order — reminder_sent_at is stamped BEFORE sending so a crash can never cause
+ * duplicates. Runs from the hourly maintenance cron.
+ */
+export async function sendPaymentReminders({ afterMinutes = 60, maxAgeHours = 72, limit = 50 } = {}) {
+  const newest = new Date(Date.now() - afterMinutes * 60_000).toISOString();
+  const oldest = new Date(Date.now() - maxAgeHours * 3_600_000).toISOString();
+  const rows = await all(
+    `SELECT id FROM orders
+      WHERE status = 'pending' AND reminder_sent_at IS NULL
+        AND created_at < @newest AND created_at > @oldest
+      ORDER BY created_at ASC LIMIT @limit`,
+    { newest, oldest, limit });
+
+  let sent = 0;
+  for (const row of rows) {
+    // Claim the reminder atomically; if another cron run got here first, skip.
+    const r = await run(
+      `UPDATE orders SET reminder_sent_at = @at
+        WHERE id = @id AND reminder_sent_at IS NULL AND status = 'pending'`,
+      { at: nowIso(), id: row.id });
+    if (!r?.changes) continue;
+    const order = await getOrder(row.id);
+    if (!order) continue;
+    await sendEmailAsync('payment_reminder', order.email, emailContext(order));
+    if (order.userId) {
+      await notify(order.userId, {
+        type: 'order_update', title: `Order ${order.number} is waiting for payment`,
+        body: 'Complete your payment to receive your items — they are still reserved for you.',
+        link: `/account/orders/${order.id}`,
+      }).catch(() => {});
+    }
+    sent++;
+  }
+  return sent;
 }
 
 export async function appendHistory(orderId, from, to, changedBy, reason) {
@@ -332,6 +379,50 @@ async function summarize(row) {
     fraudStatus: row.fraud_status, fraudScore: row.fraud_score,
     date: row.created_at,
   };
+}
+
+/**
+ * Bookkeeping export: the (filtered) order list as CSV. Money is exported in
+ * euros (decimal point) so it drops straight into a spreadsheet; per-order
+ * discounts/credit are broken out of the billing snapshot.
+ */
+export async function exportOrdersCsv({ status, statuses, search, from, to } = {}) {
+  const where = [];
+  const params = {};
+  if (status) { where.push('status = @status'); params.status = status; }
+  const list = Array.isArray(statuses) ? statuses : (statuses ? String(statuses).split(',') : []);
+  const clean = list.map((s) => s.trim()).filter((s) => STATUSES.includes(s));
+  if (clean.length) {
+    where.push(`status IN (${clean.map((_, i) => `@st${i}`).join(',')})`);
+    clean.forEach((s, i) => { params[`st${i}`] = s; });
+  }
+  if (search) { where.push('(number ILIKE @q OR email ILIKE @q)'); params.q = `%${search}%`; }
+  if (from) { where.push('created_at >= @from'); params.from = new Date(from).toISOString(); }
+  if (to) { where.push('created_at <= @to'); params.to = new Date(to).toISOString(); }
+  const clause = where.length ? `WHERE ${where.join(' AND ')}` : '';
+  const rows = await all(`SELECT * FROM orders ${clause} ORDER BY created_at ASC LIMIT 10000`, params);
+
+  const eur = (cents) => (Number(cents || 0) / 100).toFixed(2);
+  const cell = (v) => {
+    const s = String(v ?? '');
+    return /[",\n;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const header = ['order_number', 'date', 'customer_email', 'status', 'payment_status',
+    'payment_ref', 'currency', 'subtotal_eur', 'discount_eur', 'store_credit_eur',
+    'total_eur', 'coupon', 'items'];
+  const lines = [header.join(',')];
+  for (const r of rows) {
+    const billing = parse(r.billing);
+    const items = await all('SELECT name, quantity FROM order_items WHERE order_id=@id', { id: r.id });
+    const discount = (billing.discount || 0) + (billing.memberDiscount || 0) + (billing.bundleDiscount || 0);
+    lines.push([
+      cell(r.number), cell(r.created_at), cell(r.email), cell(r.status),
+      cell(r.payment_status), cell(r.payment_ref), cell(r.currency),
+      eur(r.subtotal), eur(discount), eur(billing.creditApplied || 0), eur(r.total),
+      cell(billing.coupon || ''), cell(items.map((i) => `${i.name} x${i.quantity}`).join(' | ')),
+    ].join(','));
+  }
+  return '\ufeff' + lines.join('\n'); // BOM so Excel detects UTF-8
 }
 
 export async function markPaymentReceived(orderId, paymentRef, ctx = {}) {

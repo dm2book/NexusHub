@@ -4,6 +4,7 @@ import { api } from '../../lib/api.js';
 import { date } from '../../lib/format.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
+import TwoFactor from '../../components/account/TwoFactor.jsx';
 
 export default function Settings() {
   const { user, reload } = useAuth();
@@ -47,6 +48,7 @@ export default function Settings() {
         </div>
       </div>
 
+      <TwoFactor />
       <ActiveSessions />
       <TrustedDevices />
       <LoginHistory />

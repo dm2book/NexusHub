@@ -1,9 +1,13 @@
 /**
  * Pre-loaded code stock per product. Admins paste a list of codes; when an order
  * is paid we auto-claim the right number and deliver them to the customer.
+ * Stock movements also drive the Discord automations: restocks are announced in
+ * #drops-and-deals and staff get one low-stock alert when supply runs short.
  */
 import { run, get, all, nowIso, tx } from '../db/index.js';
 import { newId } from '../utils/ids.js';
+import { config } from '../config/env.js';
+import { postDropEvent, postStockAlert } from './discordService.js';
 
 /** Add a batch of codes (array of strings) to a product's stock. Returns count added. */
 export async function addProductCodes(productId, codes = []) {
@@ -18,7 +22,41 @@ export async function addProductCodes(productId, codes = []) {
       added++;
     }
   });
+  if (added > 0) {
+    // Restock: re-arm the low-stock alert and announce it to the community.
+    await run(`UPDATE products SET low_stock_alerted_at = NULL WHERE id = @p`, { p: productId })
+      .catch(() => {});
+    const product = await get(`SELECT id, name, price, currency, active FROM products WHERE id = @p`, { p: productId });
+    if (product?.active) {
+      await postDropEvent('restock', { ...product, added }).catch(() => {});
+    }
+  }
   return added;
+}
+
+/**
+ * After codes are claimed, alert staff once when a product's remaining stock
+ * falls below the threshold. The products.low_stock_alerted_at stamp keeps it
+ * to a single alert per stock cycle (cleared again on restock). Best-effort.
+ */
+export async function checkLowStock(productId) {
+  try {
+    // Without a webhook there is nowhere to alert — don't burn the once-per-cycle
+    // stamp, so alerts start working the moment a webhook is configured.
+    if (!config.discord.stockWebhookUrl && !config.discord.orderWebhookUrl) return;
+    const remaining = await availableCount(productId);
+    if (remaining >= config.discord.lowStockThreshold) return;
+    // Claim the alert atomically so concurrent orders produce only one ping.
+    const r = await run(
+      `UPDATE products SET low_stock_alerted_at = @at
+        WHERE id = @p AND low_stock_alerted_at IS NULL`,
+      { at: nowIso(), p: productId });
+    if (!r?.changes) return;
+    const product = await get(`SELECT id, name FROM products WHERE id = @p`, { p: productId });
+    if (product) await postStockAlert(product, remaining);
+  } catch (err) {
+    console.error('[stock] low-stock check failed:', err.message);
+  }
 }
 
 export async function availableCount(productId) {

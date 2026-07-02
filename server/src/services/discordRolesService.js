@@ -1,19 +1,21 @@
 /**
- * Discord role automation for buyers.
+ * Discord automation for buyers, driven straight from the API (bot token via
+ * REST — no separate bot process required). All best-effort: any failure is
+ * logged and swallowed so it can never affect the order itself.
  *
- * When an order is paid by a customer who signed in with Discord, grant them a
- * role in the community server based on spend:
- *   • total  < VIP threshold  → "Verified Customer" (normal customer)
- *   • total >= VIP threshold  → "VIP Customer"
+ * - grantTierForOrder(): "Verified Customer" / "VIP Customer" role on paid orders.
+ * - syncLoyaltyRoles(): mirrors the site's loyalty tier (Bronze/Silver/Gold/
+ *   Platinum) as Discord roles, removing outdated tier roles.
+ * - sendDeliveryDm(): DMs Discord-linked buyers their delivered codes the moment
+ *   an order completes, with a /vouch prompt (closed vouch loop).
  *
- * Uses the Discord REST API directly with the bot token, so no separate bot
- * process is required. Entirely best-effort: any failure is logged and swallowed
- * so it can never affect the order itself. Requires DISCORD_BOT_TOKEN +
- * DISCORD_GUILD_ID, the bot to outrank the target roles, and the buyer to be a
- * member of the server.
+ * Requires DISCORD_BOT_TOKEN + DISCORD_GUILD_ID, the bot to outrank the target
+ * roles, and the buyer to be a member of the server (DMs additionally require
+ * the member to allow DMs from server members).
  */
 import { config } from '../config/env.js';
 import { get } from '../db/index.js';
+import { TIERS, loyaltyFor } from './loyaltyService.js';
 
 const API = 'https://discord.com/api/v10';
 
@@ -64,5 +66,84 @@ export async function grantTierForOrder(order) {
     console.log(`[discord] granted "${tierName}" to ${uid} for order ${order.number}`);
   } catch (err) {
     console.error('[discord] role grant failed:', err.message);
+  }
+}
+
+/**
+ * Mirror the buyer's loyalty tier (Bronze/Silver/Gold/Platinum, derived from
+ * lifetime paid spend) as a Discord role. Adds the current tier's role and
+ * removes any other tier roles the member still carries, so exactly one is
+ * active. Roles are matched by name; missing roles are skipped silently.
+ */
+export async function syncLoyaltyRoles(userId) {
+  try {
+    const { botToken, guildId } = config.discord;
+    if (!botToken || !guildId || !userId) return;
+    const uid = await discordUidForUser(userId);
+    if (!uid) return;
+
+    const { tierName } = await loyaltyFor(userId);
+    const member = await discord(`/guilds/${guildId}/members/${uid}`).catch(() => null);
+    if (!member) return; // not in the server
+
+    const memberRoles = new Set(member.roles || []);
+    for (const tier of TIERS) {
+      const roleId = await getRoleId(guildId, tier.name);
+      if (!roleId) continue;
+      const shouldHave = tier.name === tierName;
+      if (shouldHave && !memberRoles.has(roleId)) {
+        await discord(`/guilds/${guildId}/members/${uid}/roles/${roleId}`, { method: 'PUT' });
+        console.log(`[discord] loyalty role "${tier.name}" granted to ${uid}`);
+      } else if (!shouldHave && memberRoles.has(roleId)) {
+        await discord(`/guilds/${guildId}/members/${uid}/roles/${roleId}`, { method: 'DELETE' });
+      }
+    }
+  } catch (err) {
+    console.error('[discord] loyalty sync failed:', err.message);
+  }
+}
+
+/** Open (or reuse) the DM channel with a Discord user and send a payload. */
+async function dmUser(uid, payload) {
+  const channel = await discord('/users/@me/channels', {
+    method: 'POST', body: JSON.stringify({ recipient_id: uid }),
+  });
+  await discord(`/channels/${channel.id}/messages`, {
+    method: 'POST', body: JSON.stringify(payload),
+  });
+}
+
+/**
+ * DM a Discord-linked buyer their delivered items the moment the order
+ * completes — instant delivery where the customer already hangs out — and
+ * close the loop with a /vouch prompt that feeds the on-site reviews.
+ */
+export async function sendDeliveryDm(order) {
+  try {
+    if (!config.discord.botToken || !order?.userId) return;
+    const uid = await discordUidForUser(order.userId);
+    if (!uid) return;
+
+    const items = (order.items || [])
+      .map((i) => `• **${i.name}** × ${i.quantity}`).join('\n') || '—';
+    const codes = (order.deliveries || [])
+      .filter((d) => d.content)
+      .map((d) => `\`\`\`${String(d.content).slice(0, 100)}\`\`\``).join('') || '';
+
+    const embed = {
+      title: `🎁 Your order ${order.number} is delivered!`,
+      description:
+        `Thanks for shopping with **${config.email.fromName}** — here are your items:\n\n${items}\n${codes}\n` +
+        `📧 A copy is in your email. Keep your codes private and never share them in public channels.\n\n` +
+        `💚 Happy with your order? Type **/vouch** in the server — it posts in #vouchers *and* on the website, and helps us a lot!`,
+      color: 0x10b981,
+      footer: { text: `${config.email.fromName} · instant delivery` },
+      timestamp: new Date().toISOString(),
+    };
+    await dmUser(uid, { embeds: [embed] });
+    console.log(`[discord] delivery DM sent to ${uid} for order ${order.number}`);
+  } catch (err) {
+    // Common: user disallows DMs (50007) — never let that affect the order.
+    console.error('[discord] delivery DM failed:', err.message);
   }
 }

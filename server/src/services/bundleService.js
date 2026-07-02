@@ -7,6 +7,7 @@ import { run, get, all, nowIso } from '../db/index.js';
 import { newId } from '../utils/ids.js';
 import { getProduct } from './productService.js';
 import { badRequest, notFound } from '../utils/errors.js';
+import { postDropEvent } from './discordService.js';
 
 const parseIds = (s) => { try { const a = JSON.parse(s || '[]'); return Array.isArray(a) ? a : []; } catch { return []; } };
 const shape = (r) => r && ({
@@ -71,7 +72,12 @@ export async function createBundle(input, _actorId) {
      VALUES (@id, @name, @desc, @pids, @disc, @active, @at)`,
     { id, name, desc: input.description || null, pids: JSON.stringify(productIds),
       disc: Math.max(1, Math.min(90, Math.round(input.discountPercent || 0))), active: input.active === false ? 0 : 1, at: nowIso() });
-  return getBundle(id);
+  const created = await getBundle(id);
+  // Announce new bundle deals in #drops-and-deals (best-effort).
+  if (created?.active && input.announce !== false) {
+    postDropEvent('bundle', created).catch(() => {});
+  }
+  return created;
 }
 
 export async function updateBundle(id, patch) {

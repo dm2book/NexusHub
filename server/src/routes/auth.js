@@ -8,9 +8,12 @@ import { requireAuth } from '../middleware/auth.js';
 import { randomToken } from '../utils/crypto.js';
 import {
   requestEmailOtp, verifyEmailOtp, requestPhoneOtp, verifyPhoneOtp,
-  refreshSession, revokeSession, finalizeLogin,
+  refreshSession, revokeSession, finalizeLogin, resolveTotpTicket,
   listSessions, revokeOtherSessions, revokeUserSession,
 } from '../services/authService.js';
+import {
+  totpStatus, startTotpEnrollment, confirmTotpEnrollment, disableTotp, verifyUserTotp,
+} from '../services/totpService.js';
 import {
   listEnabledProviders, buildAuthUrl, handleOAuthCallback,
 } from '../services/oauthService.js';
@@ -134,6 +137,11 @@ router.post('/otp/verify', otpLimiter, asyncHandler(async (req, res) => {
     throw err;
   }
 
+  // Account has an authenticator app enabled → second factor before a session.
+  if (session.totpRequired) {
+    return res.json({ totpRequired: true, ticket: session.ticket });
+  }
+
   // Suspicious-login detection (established account, brand-new device/IP).
   const suspicious = await isSuspiciousLogin(session.user.id, ctx);
   await recordLoginAttempt({ userId: session.user.id, identifier: id, channel, success: true, suspicious, ctx });
@@ -170,6 +178,68 @@ router.post('/otp/verify', otpLimiter, asyncHandler(async (req, res) => {
     user: await publicUser(session.user.id),
     firstLogin: !!session.firstLogin,
   });
+}));
+
+// ── Two-factor authentication (TOTP / authenticator apps) ────────────────────
+
+// Complete a 2FA-gated login: OTP already verified (proven by the ticket) +
+// the current authenticator code → real session.
+router.post('/totp/login', otpLimiter, asyncHandler(async (req, res) => {
+  const { ticket, code, remember } = z.object({
+    ticket: z.string().min(10),
+    code: z.string().min(6).max(8),
+    remember: z.boolean().optional(),
+  }).parse(req.body);
+  const ctx = ctxOf(req);
+  const user = await resolveTotpTicket(ticket);
+  if (!(await verifyUserTotp(user.id, code))) {
+    await recordLoginAttempt({ userId: user.id, identifier: user.email, channel: 'totp',
+      success: false, reason: 'bad totp code', ctx });
+    throw badRequest('Incorrect authenticator code');
+  }
+  const session = await finalizeLogin(user, ctx);
+  const suspicious = await isSuspiciousLogin(user.id, ctx);
+  await recordLoginAttempt({ userId: user.id, identifier: user.email, channel: 'totp',
+    success: true, suspicious, ctx });
+  if (remember) {
+    const td = await createTrustedDevice(user.id, ctx);
+    setDeviceCookie(res, td.token);
+  }
+  await audit({ actor: { id: user.id, email: user.email }, action: 'auth.login',
+    metadata: { method: 'otp+totp' }, req });
+  setSessionCookie(res, session.refreshToken);
+  res.json({ accessToken: session.accessToken, user: await publicUser(user.id) });
+}));
+
+// Status / setup / enable / disable for the signed-in user.
+router.get('/totp', requireAuth, asyncHandler(async (req, res) => {
+  res.json(await totpStatus(req.user.id));
+}));
+
+router.post('/totp/setup', requireAuth, asyncHandler(async (req, res) => {
+  const result = await startTotpEnrollment(req.user);
+  await audit({ actor: { id: req.user.id, email: req.user.email }, action: 'auth.totp_setup', req });
+  res.json(result);
+}));
+
+router.post('/totp/enable', requireAuth, asyncHandler(async (req, res) => {
+  const { code } = z.object({ code: z.string().min(6).max(8) }).parse(req.body);
+  const result = await confirmTotpEnrollment(req.user.id, code);
+  await audit({ actor: { id: req.user.id, email: req.user.email }, action: 'auth.totp_enabled', req });
+  await notify(req.user.id, { type: 'security', title: 'Two-factor authentication enabled',
+    body: 'Logins now require a code from your authenticator app. Nice — your account is safer.',
+    link: '/account/settings' }).catch(() => {});
+  res.json(result);
+}));
+
+router.post('/totp/disable', requireAuth, asyncHandler(async (req, res) => {
+  const { code } = z.object({ code: z.string().min(6).max(8) }).parse(req.body);
+  const result = await disableTotp(req.user.id, code);
+  await audit({ actor: { id: req.user.id, email: req.user.email }, action: 'auth.totp_disabled', req });
+  await notify(req.user.id, { type: 'security', title: 'Two-factor authentication disabled',
+    body: 'Your account no longer requires an authenticator code at login. If this wasn’t you, contact support immediately.',
+    link: '/account/settings' }).catch(() => {});
+  res.json(result);
 }));
 
 // ── OAuth ────────────────────────────────────────────────────────────────

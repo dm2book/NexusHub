@@ -106,6 +106,7 @@ export async function publicUser(userId) {
     avatarUrl: u.avatar_url,
     status: u.status,
     preferences: safeJson(u.preferences),
+    totpEnabled: !!u.totp_enabled_at,
     roles,
     permissions: [...perms],
     createdAt: u.created_at,

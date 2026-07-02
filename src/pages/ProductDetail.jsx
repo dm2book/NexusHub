@@ -14,14 +14,15 @@ import LightProductCard from '../components/store/LightProductCard.jsx';
 import { useReviews } from '../lib/useReviews.js';
 import { useStats } from '../lib/useStats.js';
 import { useWishlist } from '../lib/wishlist.js';
-import { usePageMeta } from '../lib/useMeta.js';
+import { usePageMeta, useJsonLd } from '../lib/useMeta.js';
+import { useI18n } from '../lib/i18n.jsx';
 import { recordProductView, useRecentlyViewed } from '../lib/recentlyViewed.js';
 
 const TRUST = [
-  { icon: Zap, title: 'Instant delivery', sub: 'Codes in seconds' },
-  { icon: ShieldCheck, title: 'Buyer protected', sub: 'Money-back guarantee' },
-  { icon: BadgeCheck, title: 'Verified reviews', sub: 'Real purchases only' },
-  { icon: Headphones, title: '24/7 support', sub: 'Always here to help' },
+  { icon: Zap, key: 'instant', title: 'Instant delivery', sub: 'Codes in seconds' },
+  { icon: ShieldCheck, key: 'protected', title: 'Buyer protected', sub: 'Money-back guarantee' },
+  { icon: BadgeCheck, key: 'verified', title: 'Verified reviews', sub: 'Real purchases only' },
+  { icon: Headphones, key: 'support', title: '24/7 support', sub: 'Always here to help' },
 ];
 
 const FAQ = [
@@ -38,6 +39,7 @@ export default function ProductDetail() {
   const navigate = useNavigate();
   const reviews = useReviews();
   const stats = useStats();
+  const { t } = useI18n();
   const { has, toggle } = useWishlist();
   const [product, setProduct] = useState(null);
   const [all, setAll] = useState([]);
@@ -46,6 +48,32 @@ export default function ProductDetail() {
   const [openFaq, setOpenFaq] = useState(0);
   const [recs, setRecs] = useState({ crossSell: [], upsell: [] });
   usePageMeta(product?.name || 'Product', product?.description || 'Instant digital delivery.');
+  // Product structured data → rich results (price, rating) in Google.
+  useJsonLd('product', product && {
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: product.name,
+    description: product.description || 'Instant digital delivery.',
+    sku: product.sku || product.id,
+    category: product.category,
+    ...(product.image ? { image: product.image } : {}),
+    brand: { '@type': 'Brand', name: 'ForgeMarket' },
+    ...(stats.reviews > 0 ? {
+      aggregateRating: {
+        '@type': 'AggregateRating',
+        ratingValue: String(stats.rating),
+        reviewCount: stats.reviews,
+      },
+    } : {}),
+    offers: {
+      '@type': 'Offer',
+      price: ((product.price || 0) / 100).toFixed(2),
+      priceCurrency: product.currency || 'EUR',
+      availability: typeof product.stock === 'number' && product.stock <= 0
+        ? 'https://schema.org/OutOfStock' : 'https://schema.org/InStock',
+      url: typeof window !== 'undefined' ? window.location.href : undefined,
+    },
+  });
 
   useEffect(() => {
     setProduct(null); setQty(1); setNotFound(false); setRecs({ crossSell: [], upsell: [] });
@@ -86,7 +114,7 @@ export default function ProductDetail() {
   return (
     <div className="section pt-10 pb-28 lg:pb-10">
       <Link to="/shop" className="inline-flex items-center gap-2 text-slate-400 hover:text-white text-sm mb-6">
-        <ArrowLeft size={16} /> Back to shop
+        <ArrowLeft size={16} /> {t('product.back', 'Back to shop')}
       </Link>
 
       <div className="grid lg:grid-cols-2 gap-10">
@@ -123,7 +151,7 @@ export default function ProductDetail() {
               ? <span className="text-slate-400">{stats.rating} · {stats.reviews.toLocaleString('en-US')} reviews</span>
               : <span className="text-slate-400">New</span>}
             {typeof product.stock === 'number' && product.stock > 0 && product.stock <= 10 && (
-              <span className="text-red-500 font-semibold">Only {product.stock} left</span>
+              <span className="text-red-500 font-semibold">{t('product.onlyLeft', 'Only {n} left', { n: product.stock })}</span>
             )}
           </div>
 
@@ -155,8 +183,8 @@ export default function ProductDetail() {
               <span className="text-slate-500 text-sm font-rajdhani uppercase tracking-wide">Quantity</span>
             </div>
             <div className="grid grid-cols-[1fr_1fr_auto] gap-3">
-              <button onClick={addToCart} className="btn-ghost py-3"><ShoppingCart size={18} /> Add to cart</button>
-              <button onClick={buyNow} className="btn-primary py-3">Buy now</button>
+              <button onClick={addToCart} className="btn-ghost py-3"><ShoppingCart size={18} /> {t('product.addToCart', 'Add to cart')}</button>
+              <button onClick={buyNow} className="btn-primary py-3">{t('product.buyNow', 'Buy now')}</button>
               <button onClick={() => toggle(product)} aria-label="Wishlist"
                 className={`btn-ghost px-3.5 ${wished ? 'text-pink-500' : ''}`}>
                 <Heart size={18} fill={wished ? 'currentColor' : 'none'} />
@@ -166,11 +194,11 @@ export default function ProductDetail() {
 
           {/* trust badges */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-8">
-            {TRUST.map(({ icon: I, title, sub }) => (
+            {TRUST.map(({ icon: I, title, sub, key }) => (
               <div key={title} className="glass rounded-xl p-3 text-center">
                 <I size={18} className="text-indigo-300 mx-auto mb-1.5" />
-                <div className="text-xs text-white font-medium">{title}</div>
-                <div className="text-[11px] text-slate-500">{sub}</div>
+                <div className="text-xs text-white font-medium">{t(`product.${key}`, title)}</div>
+                <div className="text-[11px] text-slate-500">{t(`product.${key}Sub`, sub)}</div>
               </div>
             ))}
           </div>

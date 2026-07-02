@@ -6,7 +6,9 @@ import {
 } from 'lucide-react';
 import { useCart } from '../context/CartContext.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
-import { usePageMeta } from '../lib/useMeta.js';
+import { usePageMeta, useJsonLd } from '../lib/useMeta.js';
+import { useI18n } from '../lib/i18n.jsx';
+import { LangSwitch } from '../components/store/StoreNav.jsx';
 import { api } from '../lib/api.js';
 import { useStats } from '../lib/useStats.js';
 import { useReviews } from '../lib/useReviews.js';
@@ -50,11 +52,11 @@ const POPULAR_TILES = [
 ];
 
 const NAV = [
-  { label: 'Home', to: '/' },
-  { label: 'All Products', to: '/shop' },
-  { label: 'Reviews', to: '/reviews' },
-  { label: 'How it works', to: '/how-it-works' },
-  { label: 'Support', to: '/contact' },
+  { key: 'nav.home', label: 'Home', to: '/' },
+  { key: 'nav.products', label: 'All Products', to: '/shop' },
+  { key: 'nav.reviews', label: 'Reviews', to: '/reviews' },
+  { key: 'nav.how', label: 'How it works', to: '/how-it-works' },
+  { key: 'nav.support', label: 'Support', to: '/contact' },
 ];
 
 const HERO_FEATURES = [
@@ -87,6 +89,7 @@ const statCards = (s) => [
 export default function HomeStore() {
   const { count, add } = useCart();
   const { user, isStaff } = useAuth();
+  const { t: tr } = useI18n();
   const stats = useStats();
   const reviews = useReviews();
   useReveal();
@@ -96,6 +99,28 @@ export default function HomeStore() {
   }, []);
   usePageMeta('ForgeMarket — Everything You Need, All in One Place',
     'Buy Robux, V-Bucks, Valorant Points, gift cards and more instantly. Fast delivery, secure payments, 24/7 support.');
+  // Organization + site-search structured data for rich Google results.
+  useJsonLd('org', {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'OnlineStore',
+        name: 'ForgeMarket',
+        url: window.location.origin,
+        description: 'Premium gaming top-ups: Robux, V-Bucks, gift cards & more with instant delivery.',
+      },
+      {
+        '@type': 'WebSite',
+        name: 'ForgeMarket',
+        url: window.location.origin,
+        potentialAction: {
+          '@type': 'SearchAction',
+          target: `${window.location.origin}/shop?q={search_term_string}`,
+          'query-input': 'required name=search_term_string',
+        },
+      },
+    ],
+  });
   const [announcement, setAnnouncement] = useState('');
   useEffect(() => { api.get('/api/config').then((c) => setAnnouncement(c.announcement || '')).catch(() => {}); }, []);
   const railRef = useRef(null);
@@ -144,7 +169,7 @@ export default function HomeStore() {
             {NAV.map((n, i) => (
               <Link key={n.label} to={n.to}
                 className={`relative py-1 hover:text-slate-900 transition ${i === 0 ? 'text-violet-600' : ''}`}>
-                {n.label}
+                {tr(n.key, n.label)}
                 {i === 0 && <span className="absolute -bottom-[22px] left-0 right-0 h-0.5 bg-violet-600 rounded-full" />}
               </Link>
             ))}
@@ -156,13 +181,15 @@ export default function HomeStore() {
           <button onClick={() => window.dispatchEvent(new CustomEvent('forge:cmdk'))}
             className="hidden md:flex items-center gap-2 bg-slate-100 rounded-xl px-3.5 h-10 w-[260px] text-slate-400 hover:bg-slate-200/70 transition">
             <Search size={16} />
-            <span className="text-sm">Search for products...</span>
+            <span className="text-sm">{tr('nav.search', 'Search for products...')}</span>
             <kbd className="ml-auto text-[11px] bg-white border border-slate-200 rounded px-1.5 py-0.5 text-slate-400">⌘K</kbd>
           </button>
           <button onClick={() => window.dispatchEvent(new CustomEvent('forge:cmdk'))} aria-label="Search"
             className="md:hidden w-10 h-10 rounded-xl hover:bg-slate-100 grid place-items-center text-slate-700">
             <Search size={20} />
           </button>
+
+          <LangSwitch className="hidden sm:inline-flex" />
 
           <Link to="/cart" className="relative w-10 h-10 rounded-xl hover:bg-slate-100 grid place-items-center text-slate-700">
             <ShoppingCart size={20} />
@@ -177,14 +204,14 @@ export default function HomeStore() {
             </Link>
           )}
           {user ? (
-            <Link to="/account" className="hidden sm:inline-flex text-[15px] font-medium text-slate-600 hover:text-slate-900">Account</Link>
+            <Link to="/account" className="hidden sm:inline-flex text-[15px] font-medium text-slate-600 hover:text-slate-900">{tr('nav.account', 'Account')}</Link>
           ) : (
-            <Link to="/login" className="hidden sm:inline-flex text-[15px] font-medium text-slate-600 hover:text-slate-900">Log in</Link>
+            <Link to="/login" className="hidden sm:inline-flex text-[15px] font-medium text-slate-600 hover:text-slate-900">{tr('nav.login', 'Log in')}</Link>
           )}
           {!user && (
             <Link to="/login" className="inline-flex items-center gap-1.5 text-white text-[15px] font-semibold rounded-xl px-4 h-10 shadow-lg shadow-violet-500/30 hover:brightness-105 transition"
               style={{ backgroundImage: 'linear-gradient(135deg,#7c5cff,#a855f7)' }}>
-              Sign Up <ArrowRight size={16} />
+              {tr('nav.signup', 'Sign Up')} <ArrowRight size={16} />
             </Link>
           )}
         </div>
@@ -195,7 +222,7 @@ export default function HomeStore() {
         {/* Sidebar */}
         <aside className="hidden lg:block w-[248px] shrink-0 sticky top-[84px] space-y-4">
           <div className="bg-white rounded-2xl border border-slate-200/70 p-3 shadow-sm">
-            <p className="text-[11px] font-bold tracking-wider text-slate-400 px-2 py-2">BROWSE CATEGORIES</p>
+            <p className="text-[11px] font-bold tracking-wider text-slate-400 px-2 py-2">{tr('shop.browseCategories', 'BROWSE CATEGORIES')}</p>
             <nav className="space-y-0.5">
               {CATEGORIES.map((c, i) => (
                 <Link key={c.label} to={`/shop${c.slug ? `?category=${c.slug}` : ''}`}
@@ -211,7 +238,7 @@ export default function HomeStore() {
               ))}
               <Link to="/shop" className="flex items-center gap-3 px-2.5 py-2 rounded-xl text-[14.5px] font-medium text-slate-500 hover:bg-slate-50">
                 <span className="w-7 h-7 grid place-items-center"><Plus size={18} /></span>
-                More Categories
+                {tr('home.moreCategories', 'More Categories')}
               </Link>
             </nav>
           </div>
@@ -220,10 +247,10 @@ export default function HomeStore() {
           {announcement && (
             <div className="rounded-2xl p-5 text-white shadow-lg shadow-violet-500/20"
               style={{ backgroundImage: 'linear-gradient(150deg,#7c5cff,#9333ea)' }}>
-              <div className="font-bold text-[15px] flex items-center gap-1.5">Offer <span>🔥</span></div>
+              <div className="font-bold text-[15px] flex items-center gap-1.5">{tr('home.offer', 'Offer')} <span>🔥</span></div>
               <p className="text-white/90 text-[13px] mt-1 leading-snug">{announcement}</p>
               <Link to="/shop" className="mt-4 flex items-center justify-center gap-2 bg-white text-violet-700 font-semibold text-sm rounded-xl h-10 hover:bg-violet-50 transition">
-                Shop now <ArrowRight size={15} />
+                {tr('home.shopNow', 'Shop now')} <ArrowRight size={15} />
               </Link>
             </div>
           )}
@@ -242,12 +269,12 @@ export default function HomeStore() {
               <span className="w-9 h-9 rounded-xl grid place-items-center text-white shrink-0"
                 style={{ backgroundImage: 'linear-gradient(135deg,#7c5cff,#a855f7)' }}>🤖</span>
               <div className="bg-slate-100 rounded-xl rounded-tl-sm px-3 py-2 text-[13px] text-slate-600">
-                Hi! 👋 How can I help you today?
+                {tr('home.botHi', 'Hi! 👋 How can I help you today?')}
               </div>
             </div>
             <Link to="/contact" className="mt-3 flex items-center justify-center gap-2 text-white font-semibold text-sm rounded-xl h-10 transition hover:brightness-105"
               style={{ backgroundImage: 'linear-gradient(135deg,#7c5cff,#a855f7)' }}>
-              <MessageCircle size={16} /> Chat with us
+              <MessageCircle size={16} /> {tr('home.chat', 'Chat with us')}
             </Link>
           </div>
         </aside>
@@ -259,23 +286,22 @@ export default function HomeStore() {
             <div className="grid lg:grid-cols-[1.05fr_1fr] gap-8 items-center">
               <div>
                 <span className="inline-flex items-center gap-2 text-[13px] font-semibold text-violet-700 bg-violet-100 rounded-full px-3 py-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-violet-500" /> #1 Trusted Marketplace
+                  <span className="w-1.5 h-1.5 rounded-full bg-violet-500" /> {tr('home.badge', '#1 Trusted Marketplace')}
                 </span>
                 <h1 className="fm-head text-[40px] sm:text-[52px] leading-[1.05] mt-5">
-                  Everything You Need,<br />
-                  <span className="fm-gradient-text">All in One Place.</span>
+                  {tr('home.h1a', 'Everything You Need,')}<br />
+                  <span className="fm-gradient-text">{tr('home.h1b', 'All in One Place.')}</span>
                 </h1>
                 <p className="text-slate-500 text-[16px] mt-5 max-w-lg leading-relaxed">
-                  Get Robux, V-Bucks, Valorant Points and more instantly. Fast delivery,
-                  secure payments, 24/7 support.
+                  {tr('home.sub', 'Get Robux, V-Bucks, Valorant Points and more instantly. Fast delivery, secure payments, 24/7 support.')}
                 </p>
                 <div className="flex flex-wrap items-center gap-3 mt-7">
                   <Link to="/shop" className="inline-flex items-center gap-2 text-white font-semibold rounded-xl px-6 h-12 shadow-lg shadow-violet-500/30 hover:brightness-105 transition"
                     style={{ backgroundImage: 'linear-gradient(135deg,#7c5cff,#a855f7)' }}>
-                    Shop Now <ArrowRight size={18} />
+                    {tr('home.shopNowBig', 'Shop Now')} <ArrowRight size={18} />
                   </Link>
                   <Link to="/shop" className="inline-flex items-center gap-2 font-semibold rounded-xl px-6 h-12 border border-slate-300 text-slate-700 hover:bg-slate-50 transition">
-                    View All Products
+                    {tr('home.viewAll', 'View All Products')}
                   </Link>
                 </div>
                 {stats.customers > 0 && (
@@ -285,7 +311,7 @@ export default function HomeStore() {
                         <span key={i} className="w-9 h-9 rounded-full border-2 border-white" style={{ background: c }} />
                       ))}
                     </div>
-                    <div className="text-sm"><b className="fm-head">{fmtCount(stats.customers)}</b> <span className="text-slate-500">Happy Customers</span></div>
+                    <div className="text-sm"><b className="fm-head">{fmtCount(stats.customers)}</b> <span className="text-slate-500">{tr('home.happy', 'Happy Customers')}</span></div>
                   </div>
                 )}
               </div>
@@ -321,9 +347,9 @@ export default function HomeStore() {
           {/* Popular products */}
           <section className="fm-reveal">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="fm-head text-2xl flex items-center gap-2">Popular Products <span>🔥</span></h2>
+              <h2 className="fm-head text-2xl flex items-center gap-2">{tr('home.popular', 'Popular Products')} <span>🔥</span></h2>
               <Link to="/shop" className="text-violet-600 font-semibold text-sm inline-flex items-center gap-1 hover:gap-2 transition-all">
-                View All Products <ArrowRight size={15} />
+                {tr('home.viewAll', 'View All Products')} <ArrowRight size={15} />
               </Link>
             </div>
             <div className="relative">
@@ -335,11 +361,11 @@ export default function HomeStore() {
                       <img src={ICON(p.img)} alt={p.name} className="w-24 h-24 object-contain drop-shadow-md" />
                     </div>
                     <h3 className="font-bold text-[15px]">{p.name}</h3>
-                    <p className="text-[12.5px] text-slate-400 mt-0.5">{p.count} pack{p.count !== 1 ? 's' : ''} available</p>
-                    <div className="text-[12px] text-slate-400 mt-2">From <span className="fm-head text-violet-600 text-[17px]">{money(p.from, p.currency)}</span></div>
+                    <p className="text-[12.5px] text-slate-400 mt-0.5">{tr('home.packs', '{n} packs available', { n: p.count })}</p>
+                    <div className="text-[12px] text-slate-400 mt-2">{tr('home.from', 'From')} <span className="fm-head text-violet-600 text-[17px]">{money(p.from, p.currency)}</span></div>
                     <div className="flex items-center gap-2 mt-3">
                       <Link to={`/shop?category=${p.slug}`} className="flex-1 text-center text-white text-sm font-semibold rounded-lg h-9 grid place-items-center hover:brightness-105 transition"
-                        style={{ backgroundImage: 'linear-gradient(135deg,#7c5cff,#a855f7)' }}>Buy Now</Link>
+                        style={{ backgroundImage: 'linear-gradient(135deg,#7c5cff,#a855f7)' }}>{tr('product.buyNow', 'Buy Now')}</Link>
                       <button onClick={() => addToCart(p)} aria-label={`Add ${p.cheapest.name} to cart`}
                         className="w-9 h-9 rounded-lg border border-slate-200 grid place-items-center text-slate-500 hover:bg-slate-50 hover:text-violet-600">
                         <ShoppingCart size={16} />
@@ -369,12 +395,12 @@ export default function HomeStore() {
 
             {/* Reviews */}
             <div className="bg-white rounded-2xl border border-slate-200/70 shadow-sm p-5 fm-lift">
-              <div className="font-bold mb-3">What Our Customers Say</div>
+              <div className="font-bold mb-3">{tr('home.reviewsTitle', 'What Our Customers Say')}</div>
               {stats.reviews > 0 && (
                 <div className="flex items-center gap-2 mb-4">
                   <div className="flex text-amber-400">{Array.from({ length: 5 }).map((_, i) => <Star key={i} size={16} fill="currentColor" />)}</div>
-                  {stats.rating != null && <span className="fm-head">{stats.rating} out of 5</span>}
-                  <span className="text-[12px] text-slate-400">Based on {stats.reviews.toLocaleString('en-US')} reviews</span>
+                  {stats.rating != null && <span className="fm-head">{stats.rating} {tr('home.outOf5', 'out of 5')}</span>}
+                  <span className="text-[12px] text-slate-400">{tr('home.basedOn', 'Based on {n} reviews', { n: stats.reviews.toLocaleString('en-US') })}</span>
                 </div>
               )}
               {reviews.length > 0 ? (
@@ -388,7 +414,7 @@ export default function HomeStore() {
                   ))}
                 </div>
               ) : (
-                <p className="text-[13px] text-slate-400">Be the first to leave a verified review after your purchase.</p>
+                <p className="text-[13px] text-slate-400">{tr('home.beFirst', 'Be the first to leave a verified review after your purchase.')}</p>
               )}
             </div>
 
@@ -396,16 +422,16 @@ export default function HomeStore() {
             <div className="rounded-2xl p-6 text-white shadow-lg shadow-indigo-500/20 flex flex-col fm-lift"
               style={{ backgroundImage: 'linear-gradient(150deg,#6366f1,#8b5cf6)' }}>
               <span className="w-12 h-12 rounded-2xl bg-white/15 grid place-items-center mb-4"><MessageCircle size={24} /></span>
-              <div className="fm-head text-xl">Join Our Discord</div>
-              <p className="text-white/85 text-sm mt-2 leading-relaxed flex-1">Get support, updates and exclusive giveaways!</p>
+              <div className="fm-head text-xl">{tr('home.joinDiscord', 'Join Our Discord')}</div>
+              <p className="text-white/85 text-sm mt-2 leading-relaxed flex-1">{tr('home.discordSub', 'Get support, updates and exclusive giveaways!')}</p>
               {stats.discordMembers > 0 && (
                 <div className="flex items-center gap-2 mt-3 text-white/90 text-sm">
                   <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                  <b>{stats.discordMembers.toLocaleString('en-US')}</b> members online
+                  <b>{stats.discordMembers.toLocaleString('en-US')}</b> {tr('home.membersOnline', 'members online')}
                 </div>
               )}
               <Link to="/discord" className="mt-4 inline-flex items-center justify-center gap-2 bg-white text-indigo-600 font-semibold text-sm rounded-xl h-11 hover:bg-indigo-50 transition">
-                Join Discord <ArrowRight size={16} />
+                {tr('home.joinBtn', 'Join Discord')} <ArrowRight size={16} />
               </Link>
             </div>
           </section>
@@ -413,15 +439,15 @@ export default function HomeStore() {
           {/* Footer */}
           <footer className="pt-6 pb-10 text-center text-sm text-slate-400">
             <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 mb-3">
-              <Link to="/about" className="hover:text-slate-700">About</Link>
-              <Link to="/faq" className="hover:text-slate-700">FAQ</Link>
-              <Link to="/payment-methods" className="hover:text-slate-700">Payment Methods</Link>
-              <Link to="/track" className="hover:text-slate-700">Track Order</Link>
-              <Link to="/refunds" className="hover:text-slate-700">Refunds</Link>
-              <Link to="/terms" className="hover:text-slate-700">Terms</Link>
-              <Link to="/privacy" className="hover:text-slate-700">Privacy</Link>
+              <Link to="/about" className="hover:text-slate-700">{tr('footer.about', 'About')}</Link>
+              <Link to="/faq" className="hover:text-slate-700">{tr('footer.faq', 'FAQ')}</Link>
+              <Link to="/payment-methods" className="hover:text-slate-700">{tr('footer.payments', 'Payment Methods')}</Link>
+              <Link to="/track" className="hover:text-slate-700">{tr('footer.track', 'Track Order')}</Link>
+              <Link to="/refunds" className="hover:text-slate-700">{tr('footer.refunds', 'Refunds')}</Link>
+              <Link to="/terms" className="hover:text-slate-700">{tr('footer.terms', 'Terms')}</Link>
+              <Link to="/privacy" className="hover:text-slate-700">{tr('footer.privacy', 'Privacy')}</Link>
             </div>
-            © {new Date().getFullYear()} ForgeMarket · Instant digital goods · <SystemStatus />
+            © {new Date().getFullYear()} ForgeMarket · {tr('footer.rights', 'Instant digital goods')} · <SystemStatus />
           </footer>
         </main>
       </div>

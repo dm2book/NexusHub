@@ -9,6 +9,7 @@ import { asyncHandler } from '../../middleware/error.js';
 import { requirePermission } from '../../middleware/rbac.js';
 import {
   listOrders, getOrder, transitionOrder, markPaymentReceived, setOrderNotes, deliverOrder,
+  exportOrdersCsv,
 } from '../../services/orderService.js';
 import { fulfillOrder, listFulfillment, listFulfillmentLogs } from '../../services/fulfillmentService.js';
 import * as analytics from '../../services/analyticsService.js';
@@ -42,6 +43,20 @@ router.get('/stats', requirePermission('orders.read'), asyncHandler(async (req, 
     analytics.revenueSeries({ days }),
   ]);
   res.json({ overview, topProducts, revenueSeries });
+}));
+
+// ── CSV export (bookkeeping) ─────────────────────────────────────────────────
+// Streams the (filtered) order list as a spreadsheet-ready CSV. Amounts are in
+// euros with a decimal point; use your spreadsheet's import settings if your
+// locale expects commas. Mounted before /:id so "export.csv" never matches it.
+router.get('/export.csv', requirePermission('orders.read'), asyncHandler(async (req, res) => {
+  const { status, statuses, search, from, to } = req.query;
+  const csv = await exportOrdersCsv({ status, statuses, search, from, to });
+  await audit({ actor: req.user, action: 'order.export_csv', metadata: { status, statuses, search, from, to }, req });
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition',
+    `attachment; filename="forgemarket-orders-${new Date().toISOString().slice(0, 10)}.csv"`);
+  res.send(csv);
 }));
 
 // ── Payment verification queue ───────────────────────────────────────────────
