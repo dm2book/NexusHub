@@ -1,6 +1,7 @@
 import { Activity, Zap, CheckCircle2, Clock, Gauge, BadgeCheck } from 'lucide-react';
 import { useLiveFeed, useTrustStats, deliveryPhrase, timeAgo } from '../../lib/useSocialProof.js';
 import { iconFor } from '../../lib/sampleCatalog.js';
+import { useI18n } from '../../lib/i18n.jsx';
 
 const fmt = (n) => Number(n || 0).toLocaleString('en-US');
 const secs = (s) => (s == null ? '—' : s < 90 ? `${s}s` : `${Math.round(s / 60)}m`);
@@ -11,6 +12,7 @@ const secs = (s) => (s == null ? '—' : s < 90 ? `${s}s` : `${Math.round(s / 60
  * the whole block hides itself rather than show fake activity.
  */
 export default function LiveActivity() {
+  const { t } = useI18n();
   const feed = useLiveFeed();
   const stats = useTrustStats();
 
@@ -32,7 +34,7 @@ export default function LiveActivity() {
           <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 animate-ping" />
           <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
         </span>
-        <h2 className="text-2xl font-extrabold text-slate-900">Live on ForgeMarket</h2>
+        <h2 className="text-2xl font-extrabold text-slate-900">{t('live.title', 'Live on ForgeMarket')}</h2>
       </div>
 
       <div className="grid lg:grid-cols-2 gap-5">
@@ -56,7 +58,7 @@ export default function LiveActivity() {
                         <span className="font-semibold text-violet-600">{r.city ? `${r.name} from ${r.city}` : r.name}</span> got {r.item}
                       </div>
                       <div className="text-[11px] text-slate-400 flex items-center gap-1">
-                        {delivered ? <><Zap size={10} className="text-amber-500" /> Delivered in {delivered}</> : <>Delivered</>} · {timeAgo(r.secondsAgo)}
+                        {delivered ? <><Zap size={10} className="text-amber-500" /> {t('live.deliveredIn', 'Delivered in')} {delivered}</> : <>{t('live.delivered', 'Delivered')}</>} · {timeAgo(r.secondsAgo)}
                       </div>
                     </div>
                   </li>

@@ -87,8 +87,8 @@ export default function Checkout() {
     return (
       <div className="section py-16">
         <h1 className="text-3xl text-white mb-8">{t('checkout.title', 'Checkout')}</h1>
-        <EmptyState icon={ShoppingBag} title="Nothing to check out"
-          action={<Link to="/shop" className="btn-primary">Browse shop</Link>} />
+        <EmptyState icon={ShoppingBag} title={t('checkout.empty', 'Nothing to check out')}
+          action={<Link to="/shop" className="btn-primary">{t('cart.browse', 'Browse shop')}</Link>} />
       </div>
     );
   }
@@ -186,7 +186,7 @@ export default function Checkout() {
       <form onSubmit={placeOrder} className="grid lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
           <div className="card p-6">
-            <h3 className="text-white mb-5">Contact & billing</h3>
+            <h3 className="text-white mb-5">{t('checkout.contact', 'Contact & billing')}</h3>
             <div className="space-y-4">
               <div>
                 <label className="label">{t('checkout.email', 'Email (delivery + receipt)')}</label>
@@ -196,11 +196,11 @@ export default function Checkout() {
               <div className="grid sm:grid-cols-2 gap-4">
                 <div>
                   <label className="label">{t('checkout.name', 'Full name')}</label>
-                  <input value={fullName} onChange={(e) => setFullName(e.target.value)} className="input" placeholder="Optional" />
+                  <input value={fullName} onChange={(e) => setFullName(e.target.value)} className="input" placeholder={t('checkout.optional', 'Optional')} />
                 </div>
                 <div>
-                  <label className="label">City</label>
-                  <input value={city} onChange={(e) => setCity(e.target.value)} className="input" placeholder="Optional" />
+                  <label className="label">{t('checkout.city', 'City')}</label>
+                  <input value={city} onChange={(e) => setCity(e.target.value)} className="input" placeholder={t('checkout.optional', 'Optional')} />
                 </div>
               </div>
             </div>
@@ -212,7 +212,7 @@ export default function Checkout() {
           </div>
 
           <div className="card p-6">
-            <h3 className="text-white mb-3 flex items-center gap-2"><Lock size={16} className="text-indigo-300" /> Payment method</h3>
+            <h3 className="text-white mb-3 flex items-center gap-2"><Lock size={16} className="text-indigo-300" /> {t('checkout.method', 'Payment method')}</h3>
             {provider === 'manual' ? (
               <>
                 <div className="grid sm:grid-cols-3 gap-3">
@@ -221,7 +221,7 @@ export default function Checkout() {
                       className={`rounded-xl border p-4 text-left transition ${methodId === m.id ? 'border-primary bg-primary/10' : 'border-white/10 hover:border-white/25'}`}>
                       <div className="text-2xl">{METHOD_ICON[m.id] || '💳'}</div>
                       <div className="text-white font-medium mt-1">{m.label}</div>
-                      <div className="text-slate-500 text-xs">Pay by link</div>
+                      <div className="text-slate-500 text-xs">{t('checkout.payByLink', 'Pay by link')}</div>
                     </button>
                   ))}
                 </div>
@@ -269,25 +269,25 @@ export default function Checkout() {
             </label>
           )}
           <div className="border-t border-white/5 pt-4 mb-6 space-y-1.5">
-            <div className="flex justify-between text-sm text-slate-400"><span>Subtotal</span><span>{money(subtotal, currency)}</span></div>
+            <div className="flex justify-between text-sm text-slate-400"><span>{t('cart.subtotal', 'Subtotal')}</span><span>{money(subtotal, currency)}</span></div>
             {matchedBundle && <div className="flex justify-between text-sm text-amber-300"><span>Bundle ({matchedBundle.name} · {matchedBundle.percent}%)</span><span>−{money(bundleDiscount, currency)}</span></div>}
             {coupon && <div className="flex justify-between text-sm text-emerald-300"><span>Coupon ({coupon.code}{coupon.percent ? ` · ${coupon.percent}%` : ''})</span><span>−{money(couponDiscount, currency)}</span></div>}
-            {creditToApply > 0 && <div className="flex justify-between text-sm text-indigo-300"><span>Store credit</span><span>−{money(creditToApply, currency)}</span></div>}
-            <div className="flex justify-between text-lg pt-1"><span className="text-slate-300">Total</span><span className="text-white font-semibold">{money(grandTotal, currency)}</span></div>
+            {creditToApply > 0 && <div className="flex justify-between text-sm text-indigo-300"><span>{t('checkout.credit', 'Store credit')}</span><span>−{money(creditToApply, currency)}</span></div>}
+            <div className="flex justify-between text-lg pt-1"><span className="text-slate-300">{t('cart.total', 'Total')}</span><span className="text-white font-semibold">{money(grandTotal, currency)}</span></div>
           </div>
           <button disabled={busy} className="btn-primary w-full py-3">
             {busy ? <Loader2 size={18} className="animate-spin" />
-              : provider === 'stripe' ? <>Pay with card</>
-              : provider === 'manual' ? <>Place order & pay</>
-              : <>Place order</>}
+              : provider === 'stripe' ? <>{t('checkout.payCard', 'Pay with card')}</>
+              : provider === 'manual' ? <>{t('checkout.placePay', 'Place order & pay')}</>
+              : <>{t('checkout.placeOrder', 'Place order')}</>}
           </button>
           {/* Purchase protection */}
           <div className="mt-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 p-3">
-            <div className="flex items-center gap-2 text-emerald-300 text-sm font-medium"><ShieldCheck size={15} /> Buyer protection</div>
+            <div className="flex items-center gap-2 text-emerald-300 text-sm font-medium"><ShieldCheck size={15} /> {t('checkout.protection', 'Buyer protection')}</div>
             <ul className="mt-1.5 space-y-1 text-xs text-slate-400">
-              <li className="flex items-center gap-1.5"><CheckCircle2 size={11} className="text-emerald-400 shrink-0" /> Money-back guarantee if undelivered</li>
-              <li className="flex items-center gap-1.5"><CheckCircle2 size={11} className="text-emerald-400 shrink-0" /> Instant, automated delivery</li>
-              <li className="flex items-center gap-1.5"><CheckCircle2 size={11} className="text-emerald-400 shrink-0" /> Fraud-screened &amp; encrypted checkout</li>
+              <li className="flex items-center gap-1.5"><CheckCircle2 size={11} className="text-emerald-400 shrink-0" /> {t('checkout.p1', 'Money-back guarantee if undelivered')}</li>
+              <li className="flex items-center gap-1.5"><CheckCircle2 size={11} className="text-emerald-400 shrink-0" /> {t('checkout.p2', 'Instant, automated delivery')}</li>
+              <li className="flex items-center gap-1.5"><CheckCircle2 size={11} className="text-emerald-400 shrink-0" /> {t('checkout.p3', 'Fraud-screened & encrypted checkout')}</li>
             </ul>
           </div>
         </div>

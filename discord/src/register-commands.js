@@ -46,6 +46,10 @@ const commands = [
     .addStringOption((o) => o.setName('code').setDescription('e.g. FORGE10').setRequired(true))
     .addIntegerOption((o) => o.setName('percent').setDescription('% off (1–90)').setRequired(true))
     .addStringOption((o) => o.setName('note').setDescription('Optional note')),
+  new SlashCommandBuilder().setName('flashsale').setDescription('Staff: post a limited-time deal with a live countdown')
+    .addStringOption((o) => o.setName('deal').setDescription('e.g. 20% OFF all Robux').setRequired(true))
+    .addIntegerOption((o) => o.setName('minutes').setDescription('How long it runs (default 60, max 1440)'))
+    .addStringOption((o) => o.setName('code').setDescription('Optional checkout code, e.g. FLASH20')),
   new SlashCommandBuilder().setName('announce').setDescription('Staff: post an announcement')
     .addStringOption((o) => o.setName('message').setDescription('What to announce').setRequired(true)),
   new SlashCommandBuilder().setName('serverinfo').setDescription('Show server statistics'),

@@ -1,11 +1,13 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { ShoppingCart } from 'lucide-react';
 import { categoryVisual, money } from '../../lib/catalog.js';
+import { useI18n } from '../../lib/i18n.jsx';
 import { iconFor } from '../../lib/sampleCatalog.js';
 import { navigateWithTransition } from '../../lib/viewTransition.js';
 
 /** Light-theme product card matching the storefront design. */
 export default function LightProductCard({ product, onAdd }) {
+  const { t } = useI18n();
   const v = categoryVisual(product.category);
   const Icon = v.icon;
   const img = product.image || iconFor(product.category);
@@ -46,10 +48,10 @@ export default function LightProductCard({ product, onAdd }) {
       <div className="text-[11px] font-semibold uppercase tracking-wide text-violet-500">{v.label}</div>
       <Link to={to} className="font-bold text-[15px] text-slate-900 mt-0.5 hover:text-violet-600 line-clamp-2">{product.name}</Link>
       {product.description && <p className="text-[12.5px] text-slate-400 mt-1 line-clamp-2 flex-1">{product.description}</p>}
-      <div className="text-[12px] text-slate-400 mt-3">From <span className="font-extrabold text-violet-600 text-[18px]">{money(product.price, product.currency)}</span></div>
+      <div className="text-[12px] text-slate-400 mt-3">{t('home.from', 'From')} <span className="font-extrabold text-violet-600 text-[18px]">{money(product.price, product.currency)}</span></div>
       <div className="flex items-center gap-2 mt-3">
         <Link to={`/product/${product.id}`} className="flex-1 text-center text-sm font-semibold rounded-lg h-9 grid place-items-center hover:brightness-105 transition"
-          style={{ backgroundImage: 'linear-gradient(135deg,#7c5cff,#a855f7)', color: '#fff' }}>Buy Now</Link>
+          style={{ backgroundImage: 'linear-gradient(135deg,#7c5cff,#a855f7)', color: '#fff' }}>{t('product.buyNow', 'Buy Now')}</Link>
         <button onClick={() => onAdd?.(product)} aria-label="Add to cart"
           className="w-9 h-9 rounded-lg border border-slate-200 grid place-items-center text-slate-500 hover:bg-slate-50 hover:text-violet-600">
           <ShoppingCart size={16} />

@@ -8,6 +8,7 @@ import { money } from '../../lib/catalog.js';
 import { iconFor, SAMPLE_PRODUCTS, withFallback } from '../../lib/sampleCatalog.js';
 import { useCart } from '../../context/CartContext.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
+import { useI18n } from '../../lib/i18n.jsx';
 
 /**
  * Global search command palette (⌘K / Ctrl+K, or the nav search box).
@@ -26,6 +27,7 @@ const ACTIONS = [
 let productCache = null;
 
 export default function CommandPalette() {
+  const { t } = useI18n();
   const navigate = useNavigate();
   const { add } = useCart();
   const toast = useToast();
@@ -114,7 +116,7 @@ export default function CommandPalette() {
         <div className="flex items-center gap-3 px-4 h-14 border-b border-slate-100">
           <Search size={18} className="text-slate-400 shrink-0" />
           <input ref={inputRef} value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={onKeyDown}
-            placeholder="Search products, or type what you need…"
+            placeholder={t('palette.placeholder', 'Search products, or type what you need…')}
             className="flex-1 outline-none text-[15px] text-slate-900 placeholder-slate-400 bg-transparent" />
           <kbd className="text-[11px] bg-slate-100 border border-slate-200 rounded px-1.5 py-0.5 text-slate-400">esc</kbd>
         </div>
@@ -127,7 +129,7 @@ export default function CommandPalette() {
             </div>
           )}
 
-          {results.prods.length > 0 && <div className="px-4 pt-1 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Products</div>}
+          {results.prods.length > 0 && <div className="px-4 pt-1 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">{t('palette.products', 'Products')}</div>}
           {results.prods.map((p, i) => {
             const img = p.image || iconFor(p.category);
             const idx = i;
@@ -152,7 +154,7 @@ export default function CommandPalette() {
             );
           })}
 
-          {results.acts.length > 0 && <div className="px-4 pt-3 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Quick actions</div>}
+          {results.acts.length > 0 && <div className="px-4 pt-3 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">{t('palette.actions', 'Quick actions')}</div>}
           {results.acts.map((a, i) => {
             const idx = results.prods.length + i;
             const Icon = a.icon;

@@ -37,19 +37,26 @@ export function useTrustStats() {
   return stats;
 }
 
-/** "delivered in 34 seconds" / "in 2 min". */
+// These run outside React, so read the storefront language directly.
+const isNl = () => { try { return localStorage.getItem('fm_lang') === 'nl'; } catch { return false; } };
+
+/** "delivered in 34 seconds" / "in 2 min" (localized). */
 export function deliveryPhrase(seconds) {
   if (!seconds || seconds <= 0) return null;
-  if (seconds < 90) return `${seconds} second${seconds === 1 ? '' : 's'}`;
+  if (seconds < 90) {
+    return isNl() ? `${seconds} seconde${seconds === 1 ? '' : 'n'}`
+      : `${seconds} second${seconds === 1 ? '' : 's'}`;
+  }
   const m = Math.round(seconds / 60);
   return `${m} min`;
 }
 
-/** "12s ago" / "4m ago" / "2h ago" / "3d ago". */
+/** "12s ago" / "4m ago" / "2h ago" / "3d ago" (localized). */
 export function timeAgo(seconds) {
   const s = Math.max(1, Math.round(seconds || 0));
-  if (s < 60) return `${s}s ago`;
-  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
-  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
-  return `${Math.floor(s / 86400)}d ago`;
+  const ago = (v) => (isNl() ? `${v} geleden` : `${v} ago`);
+  if (s < 60) return ago(`${s}s`);
+  if (s < 3600) return ago(`${Math.floor(s / 60)}m`);
+  if (s < 86400) return ago(`${Math.floor(s / 3600)}${isNl() ? 'u' : 'h'}`);
+  return ago(`${Math.floor(s / 86400)}d`);
 }

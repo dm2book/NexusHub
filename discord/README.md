@@ -263,7 +263,8 @@ verified reviews from the store webhook into `#reviews`, and a leveling/XP syste
 - **VIP automation** (store side): a paid order auto-grants *Verified Customer*
   (< €20) or *VIP Customer* (≥ €20) to buyers who signed in with Discord.
 - **Promos:** `/coupon code percent` → posts to `#discount-codes` (pings Deals);
-  `/announce message` → posts to `#announcements`.
+  `/flashsale deal minutes [code]` → live-countdown deal in `#deals` (auto-greys
+  out when it ends); `/announce message` → posts to `#announcements`.
 - **Live server stats:** auto-managed voice channels (👥 Members, 💎 Boosts).
 - **Order lookup:** `/order <number>` via the store's public tracking API.
 - **Vouches:** `/vouch` posts a formatted, starred vouch to `#vouchers`.
@@ -282,7 +283,7 @@ verified reviews from the store webhook into `#reviews`, and a leveling/XP syste
 - **Logging + leads:** joins, leaves, tickets and buying-intent posted to staff channels.
 - **Slash commands:** `/help /ask /recommend /price /order /vouch /suggest /poll
   /daily /shop /invite /stats /serverinfo /rank /leaderboard` and staff:
-  `/giveaway /reroll /coupon /announce /close`.
+  `/giveaway /reroll /coupon /flashsale /announce /close`.
 
 ## 12. Brand assets
 

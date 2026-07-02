@@ -71,6 +71,45 @@ const NL = {
   'home.discordSub': 'Krijg support, updates en exclusieve giveaways!',
   'home.membersOnline': 'leden online',
   'home.joinBtn': 'Join Discord',
+  // Feature/trust cards + stat labels
+  'home.f.instant': 'Directe levering',
+  'home.f.instantSub': 'Ontvang je items direct',
+  'home.f.secure': 'Veilige betalingen',
+  'home.f.secureSub': '100% veilig & vertrouwd',
+  'home.f.support': '24/7 support',
+  'home.f.supportSub': 'We staan voor je klaar',
+  'home.f.prices': 'Beste prijzen',
+  'home.f.pricesSub': 'Dagelijks scherpe prijzen',
+  'home.f.tInstant': 'Directe levering',
+  'home.f.tInstantSub': 'Snel & betrouwbaar geleverd',
+  'home.f.tSecure': '100% veilig',
+  'home.f.tSecureSub': 'Je gegevens zijn beschermd',
+  'home.f.tSupport': '24/7 support',
+  'home.f.tSupportSub': 'Altijd bereikbaar',
+  'home.s.customers': 'Tevreden klanten',
+  'home.s.fulfilled': 'Afgerond',
+  'home.s.protected': 'Kopersbescherming',
+  'home.s.delivered': 'Bestellingen geleverd',
+  'home.s.support': 'Klantenservice',
+
+  // Product card
+  'card.from': 'Vanaf',
+
+  // Wishlist
+  'wish.title': 'Verlanglijst',
+  'wish.sub': 'Opgeslagen items — bewaard in deze browser.',
+  'wish.empty': 'Nog niets opgeslagen',
+  'wish.emptyHint': 'Tik op het hartje bij een product om het hier te bewaren.',
+
+  // Live social-proof feed
+  'live.title': 'Live op ForgeMarket',
+  'live.deliveredIn': 'Geleverd in',
+  'live.delivered': 'Geleverd',
+
+  // Command palette (⌘K)
+  'palette.placeholder': 'Zoek producten, of typ wat je zoekt…',
+  'palette.products': 'Producten',
+  'palette.actions': 'Snelle acties',
 
   // Cart
   'cart.title': 'Je winkelwagen',
@@ -125,15 +164,37 @@ const NL = {
   'checkout.title': 'Afrekenen',
   'checkout.back': 'Terug naar winkelwagen',
   'checkout.details': 'Jouw gegevens',
-  'checkout.email': 'E-mailadres',
+  'checkout.email': 'E-mail (levering + bon)',
   'checkout.name': 'Volledige naam',
+  'checkout.city': 'Stad',
+  'checkout.optional': 'Optioneel',
+  'checkout.contact': 'Contact & facturatie',
+  'checkout.method': 'Betaalmethode',
+  'checkout.payByLink': 'Betalen via link',
+  'checkout.credit': 'Winkeltegoed',
   'checkout.pay': 'Bestelling plaatsen',
+  'checkout.placeOrder': 'Bestelling plaatsen',
+  'checkout.placePay': 'Bestellen & betalen',
+  'checkout.payCard': 'Betalen met kaart',
+  'checkout.protection': 'Kopersbescherming',
+  'checkout.p1': 'Geld terug als er niet geleverd wordt',
+  'checkout.p2': 'Directe, automatische levering',
+  'checkout.p3': 'Fraudecontrole & versleutelde checkout',
+  'checkout.empty': 'Niets om af te rekenen',
   'checkout.summary': 'Besteloverzicht',
 
   // Track
   'track.title': 'Volg je bestelling',
+  'track.sub': 'Vul je bestelnummer in (bijv. FM-2026-XXXXXXXX).',
   'track.placeholder': 'Bestelnummer (bijv. FM-2026-000123)',
   'track.button': 'Zoek bestelling',
+  'track.s.placed': 'Geplaatst',
+  'track.s.paid': 'Betaald',
+  'track.s.processing': 'In behandeling',
+  'track.s.delivered': 'Geleverd',
+  'track.awaiting': '⏳ Wacht op betaling',
+  'track.confirmed': '✅ Betaling bevestigd — we gaan aan de slag',
+  'track.delivered': '🎉 Geleverd!',
 };
 
 const LanguageContext = createContext({

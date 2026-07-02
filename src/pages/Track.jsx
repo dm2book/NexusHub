@@ -23,10 +23,10 @@ function payHref(m, eur) {
 
 // Visual progress: 4 customer-facing steps over the internal statuses.
 const STEPS = [
-  { id: 'placed', label: 'Placed', icon: ShoppingBag, statuses: ['pending'] },
-  { id: 'paid', label: 'Paid', icon: CreditCard, statuses: ['payment_received'] },
-  { id: 'processing', label: 'Processing', icon: Cog, statuses: ['processing', 'awaiting_fulfillment'] },
-  { id: 'delivered', label: 'Delivered', icon: PackageCheck, statuses: ['completed'] },
+  { id: 'placed', key: 'track.s.placed', label: 'Placed', icon: ShoppingBag, statuses: ['pending'] },
+  { id: 'paid', key: 'track.s.paid', label: 'Paid', icon: CreditCard, statuses: ['payment_received'] },
+  { id: 'processing', key: 'track.s.processing', label: 'Processing', icon: Cog, statuses: ['processing', 'awaiting_fulfillment'] },
+  { id: 'delivered', key: 'track.s.delivered', label: 'Delivered', icon: PackageCheck, statuses: ['completed'] },
 ];
 const TERMINAL = ['completed', 'refunded', 'cancelled', 'failed'];
 const stepIndex = (status) => {
@@ -86,7 +86,7 @@ export default function Track() {
     <div className="max-w-2xl mx-auto px-5 py-16">
       {celebrate && <Confetti />}
       <h1 className="text-3xl text-white mb-2">{t('track.title', 'Track your order')}</h1>
-      <p className="text-slate-400 mb-8">Enter your order number (e.g. FM-2026-XXXXXXXX).</p>
+      <p className="text-slate-400 mb-8">{t('track.sub', 'Enter your order number (e.g. FM-2026-XXXXXXXX).')}</p>
 
       <form onSubmit={track} className="flex gap-3 mb-8">
         <input value={number} onChange={(e) => setNumber(e.target.value.toUpperCase())}
@@ -136,7 +136,7 @@ export default function Track() {
                             : 'bg-white/5 border-white/15 text-slate-500'}`}>
                           {current ? <Icon size={15} className={s.id === 'processing' ? 'animate-spin [animation-duration:2.5s]' : ''} /> : <Icon size={15} />}
                         </span>
-                        <span className={`mt-1.5 text-[11px] font-medium ${done ? 'text-emerald-300' : current ? 'text-white' : 'text-slate-500'}`}>{s.label}</span>
+                        <span className={`mt-1.5 text-[11px] font-medium ${done ? 'text-emerald-300' : current ? 'text-white' : 'text-slate-500'}`}>{t(s.key, s.label)}</span>
                       </div>
                       {i < STEPS.length - 1 && (
                         <div className={`h-0.5 flex-1 mx-1.5 -mt-5 rounded-full ${i < idx || result.status === 'completed' ? 'bg-emerald-400/70' : 'bg-white/10'}`} />
@@ -168,7 +168,7 @@ export default function Track() {
           {result.status === 'pending' && (cfg.paymentMethods || []).length > 0 && (
             <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-5 mb-6">
               <div className="flex items-center justify-between">
-                <div className="text-amber-200 font-semibold">⏳ Awaiting payment</div>
+                <div className="text-amber-200 font-semibold">{t('track.awaiting', '⏳ Awaiting payment')}</div>
                 <div className="text-white font-semibold">{result.totalFormatted}</div>
               </div>
               <p className="text-slate-300 text-sm mt-1">
@@ -192,7 +192,7 @@ export default function Track() {
           {/* In-flight reassurance */}
           {['payment_received', 'processing', 'awaiting_fulfillment'].includes(result.status) && (
             <div className="rounded-2xl border border-indigo-500/30 bg-indigo-500/10 p-5 mb-6">
-              <div className="text-indigo-200 font-semibold">✅ Payment confirmed — we’re on it</div>
+              <div className="text-indigo-200 font-semibold">{t('track.confirmed', '✅ Payment confirmed — we’re on it')}</div>
               <p className="text-slate-300 text-sm mt-1">
                 Your order is being prepared. Most orders are delivered automatically within seconds —
                 keep this page open, it updates live.
@@ -203,7 +203,7 @@ export default function Track() {
           {/* Delivered: where to find the goods */}
           {result.status === 'completed' && (
             <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-5 mb-6">
-              <div className="text-emerald-200 font-semibold">🎉 Delivered!</div>
+              <div className="text-emerald-200 font-semibold">{t('track.delivered', '🎉 Delivered!')}</div>
               <p className="text-slate-300 text-sm mt-1">
                 Your code(s) were sent to your email{user ? ' and are available in your dashboard' : ''}.
                 Can’t find the mail? Check spam, or {user ? 'open your order below.' : 'sign in with the same email to see your order.'}
