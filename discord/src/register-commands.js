@@ -16,6 +16,15 @@ const commands = [
     .addStringOption((o) => o.setName('budget').setDescription('Your budget, e.g. €20')),
   new SlashCommandBuilder().setName('order').setDescription('Check the status of an order')
     .addStringOption((o) => o.setName('number').setDescription('Your order number, e.g. FM-2026-XXXX').setRequired(true)),
+  new SlashCommandBuilder().setName('price').setDescription('Look up a product’s live price')
+    .addStringOption((o) => o.setName('product').setDescription('e.g. 1700 Robux, Nitro, Valorant').setRequired(true)),
+  new SlashCommandBuilder().setName('poll').setDescription('Start a quick poll (👍/👎 or up to 4 options)')
+    .addStringOption((o) => o.setName('question').setDescription('The poll question').setRequired(true))
+    .addStringOption((o) => o.setName('option1').setDescription('Option 1'))
+    .addStringOption((o) => o.setName('option2').setDescription('Option 2'))
+    .addStringOption((o) => o.setName('option3').setDescription('Option 3'))
+    .addStringOption((o) => o.setName('option4').setDescription('Option 4')),
+  new SlashCommandBuilder().setName('daily').setDescription('Claim your daily XP bonus (build a streak!)'),
   new SlashCommandBuilder().setName('vouch').setDescription('Leave a vouch for ForgeMarket')
     .addStringOption((o) => o.setName('message').setDescription('Your experience').setRequired(true))
     .addIntegerOption((o) => o.setName('stars').setDescription('1–5 stars').setMinValue(1).setMaxValue(5)),

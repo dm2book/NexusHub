@@ -254,6 +254,8 @@ verified reviews from the store webhook into `#reviews`, and a leveling/XP syste
   winner **DMs**, auto-post to `#winners`, and `/reroll` to pick a new winner.
 - **Leveling / XP:** earn XP per message (cooldown), **level-up announcements**,
   `/rank` (level, XP bar, rank) and `/leaderboard`. Persisted to `xp.json`.
+  `/daily` claims a growing daily XP bonus (streaks, caps at 10 days) and a
+  **weekly top-10 leaderboard** auto-posts to `#general` every Monday evening.
 - **Suggestions:** `/suggest` → embed in `#suggestions` with ✅/❌ voting.
 - **Starboard:** ⭐-react any message → at 3 stars it's reposted to `#starboard`.
 - **AI assistant "Forge"** (`#ask-the-bot`, `/ask`, `/recommend`): FAQ + live
@@ -267,10 +269,20 @@ verified reviews from the store webhook into `#reviews`, and a leveling/XP syste
 - **Vouches:** `/vouch` posts a formatted, starred vouch to `#vouchers`.
 - **Auto-moderation:** removes Discord invites / "free nitro"-style scams from
   non-staff (outside tickets) and logs to `#mod-log`.
+- **Anti-scam & anti-raid:** welcome DM warns *staff never DMs first*;
+  staff-impersonation detection (lookalike characters normalized) alerts
+  `#mod-log` on join/nickname change; a join-rate spike (8+/min) pings staff.
+- **Live #price-list:** auto-updating embed from the real catalog, every 10 min.
+- **Price lookup:** `/price <product>` — fuzzy match with buy link + close matches.
+- **Polls:** `/poll question [option1..4]` → reaction voting (👍/👎 or 1️⃣–4️⃣).
+- **Ticket hygiene:** tickets idle for 24h get a "still there?" ping; 24h later
+  they auto-close with the usual transcript + rating DM (restart-safe).
+- **Community sparkle:** boost thank-yous in `#general`, member-count milestone
+  celebrations every 100 members.
 - **Logging + leads:** joins, leaves, tickets and buying-intent posted to staff channels.
-- **Slash commands:** `/help /ask /recommend /order /vouch /suggest /shop /invite
-  /stats /serverinfo /rank /leaderboard` and staff: `/giveaway /reroll /coupon
-  /announce /close`.
+- **Slash commands:** `/help /ask /recommend /price /order /vouch /suggest /poll
+  /daily /shop /invite /stats /serverinfo /rank /leaderboard` and staff:
+  `/giveaway /reroll /coupon /announce /close`.
 
 ## 12. Brand assets
 

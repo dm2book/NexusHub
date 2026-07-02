@@ -284,6 +284,14 @@ client.once(Events.ClientReady, (c) => {
   const prices = () => c.guilds.cache.forEach((g) => updatePriceList(g));
   prices();
   setInterval(prices, 10 * 60_000);
+
+  // Ticket hygiene: warn idle tickets after 24h, auto-close 24h later.
+  const sweep = () => c.guilds.cache.forEach((g) => sweepIdleTickets(g));
+  setTimeout(sweep, 60_000); // let caches warm up first
+  setInterval(sweep, 30 * 60_000);
+
+  // Weekly XP leaderboard (Mondays 17:00+ UTC, once per week).
+  setInterval(() => c.guilds.cache.forEach((g) => maybePostWeeklyLeaderboard(g)), 60 * 60_000);
 });
 
 // ── greet new members (with anti-scam warning) ─────────────────────────────
@@ -302,6 +310,8 @@ client.on(Events.GuildMemberAdd, async (member) => {
   member.send({ embeds: [dm] }).catch(() => {});
   leadLog(member.guild, `🟢 New member joined: <@${member.id}> (${member.guild.memberCount} total)`);
   checkImpersonation(member); // scam guard: flag staff-lookalike names on join
+  trackJoinForRaid(member.guild); // raid guard: alert staff on join spikes
+  celebrateMilestone(member.guild); // 🎉 every 100 members
 });
 
 // ── interactions: buttons + slash ──────────────────────────────────────────
@@ -478,14 +488,12 @@ async function openTicket(i, type) {
   return i.editReply(`✅ Your ticket is ready: <#${channel.id}>`);
 }
 
-async function closeTicket(i) {
-  const ch = i.channel;
-  if (!ch?.topic?.startsWith('ticket-owner:')) {
-    return i.reply({ content: 'This isn’t a ticket channel.', ephemeral: true });
-  }
-  await i.reply({ embeds: [new EmbedBuilder().setColor(0xef4444)
-    .setDescription('🔒 Closing this ticket and saving a transcript… (channel deletes in a few seconds)')] });
-
+/**
+ * Shared ticket teardown: transcript → #ticket-logs, transcript + rating DM to
+ * the owner, then delete the channel. Used by /close, the Close button AND the
+ * inactivity auto-closer.
+ */
+async function archiveTicket(ch, closedByText, dmLabel = null) {
   // Build a readable transcript including attachments.
   const msgs = await ch.messages.fetch({ limit: 100 }).catch(() => null);
   const lines = msgs ? [...msgs.values()].reverse().map((m) => {
@@ -500,31 +508,75 @@ async function closeTicket(i) {
   const mins = openedAt ? Math.max(1, Math.round((Date.now() - openedAt) / 60000)) : null;
   const file = new AttachmentBuilder(Buffer.from(lines, 'utf8'), { name: `${ch.name}.txt` });
 
-  const logs = findChannel(i.guild, 'ticket-logs');
+  const logs = findChannel(ch.guild, 'ticket-logs');
   if (logs) {
     const logEmbed = new EmbedBuilder().setColor(0x6366f1).setTitle('📄 Ticket closed')
       .addFields(
         { name: 'Channel', value: `#${ch.name}`, inline: true },
         { name: 'Owner', value: ownerId ? `<@${ownerId}>` : 'unknown', inline: true },
-        { name: 'Closed by', value: `<@${i.user.id}>`, inline: true },
+        { name: 'Closed by', value: closedByText, inline: true },
         ...(mins ? [{ name: 'Open for', value: `${mins} min`, inline: true }] : []))
       .setTimestamp();
     await logs.send({ embeds: [logEmbed], files: [file] }).catch(() => {});
   }
   // DM the owner their transcript + a quick rating prompt.
   if (ownerId) {
-    const owner = await i.guild.members.fetch(ownerId).catch(() => null);
+    const owner = await ch.guild.members.fetch(ownerId).catch(() => null);
     if (owner) {
       const stars = new ActionRowBuilder().addComponents(
         ...[1, 2, 3, 4, 5].map((n) => new ButtonBuilder()
           .setCustomId(`rate:${n}`).setLabel('⭐'.repeat(n)).setStyle(n >= 4 ? ButtonStyle.Success : ButtonStyle.Secondary)));
       await owner.send({
-        content: `Here’s the transcript of your ForgeMarket ticket (closed by ${i.user.tag}).\n\n**How was our support?** Tap a rating below 👇`,
+        content: `Here’s the transcript of your ForgeMarket ticket (closed by ${dmLabel || 'our team'}).\n\n**How was our support?** Tap a rating below 👇`,
         files: [file], components: [stars],
       }).catch(() => {});
     }
   }
   setTimeout(() => ch.delete().catch(() => {}), 5000);
+}
+
+async function closeTicket(i) {
+  const ch = i.channel;
+  if (!ch?.topic?.startsWith('ticket-owner:')) {
+    return i.reply({ content: 'This isn’t a ticket channel.', ephemeral: true });
+  }
+  await i.reply({ embeds: [new EmbedBuilder().setColor(0xef4444)
+    .setDescription('🔒 Closing this ticket and saving a transcript… (channel deletes in a few seconds)')] });
+  await archiveTicket(ch, `<@${i.user.id}>`, i.user.tag);
+}
+
+/**
+ * Inactivity sweep (every 30 min): a ticket idle for 24h gets one "still
+ * there?" warning; 24h after the warning it auto-closes with a transcript.
+ * State lives in the channel topic, so it survives bot restarts.
+ */
+async function sweepIdleTickets(guild) {
+  for (const ch of guild.channels.cache.values()) {
+    try {
+      if (ch.type !== ChannelType.GuildText || !ch.topic?.startsWith('ticket-owner:')) continue;
+      const msgs = await ch.messages.fetch({ limit: 1 }).catch(() => null);
+      const lastTs = msgs?.first()?.createdTimestamp
+        || Number(ch.topic.match(/opened:(\d+)/)?.[1]) || Date.now();
+      const idleHours = (Date.now() - lastTs) / 3_600_000;
+      if (idleHours < 24) continue;
+
+      if (ch.topic.includes('idlewarned')) {
+        // Warned 24h+ ago and still silence → close it (warning was the last message).
+        await ch.send({ embeds: [new EmbedBuilder().setColor(0xef4444)
+          .setDescription('🔒 Closing this ticket due to inactivity. You can always open a new one in #open-a-ticket.')] }).catch(() => {});
+        await archiveTicket(ch, 'Auto-close (inactive)');
+      } else {
+        const ownerId = ch.topic.match(/ticket-owner:(\d+)/)?.[1];
+        await ch.setTopic(`${ch.topic} · idlewarned`).catch(() => {});
+        await ch.send({
+          content: ownerId ? `<@${ownerId}>` : '',
+          embeds: [new EmbedBuilder().setColor(0xf59e0b)
+            .setTitle('⏰ Still need help?')
+            .setDescription('This ticket has been quiet for a day. Reply to keep it open — otherwise it closes automatically in **24 hours** (you’ll get the transcript by DM).')],
+        }).catch(() => {});
+      }
+    } catch (e) { console.error('[ticket-sweep]', e.message); }
+  }
 }
 
 async function rateSupport(i, stars) {
@@ -543,14 +595,18 @@ async function handleCommand(i) {
   if (i.commandName === 'help') {
     return i.reply({ ephemeral: true, content:
       "**Forge — your assistant**\n`/ask` — ask anything\n`/recommend` — product recommendation\n" +
-      "`/order` — check an order status\n`/vouch` — leave a vouch\n`/suggest` — suggest an idea\n" +
+      "`/price` — look up a product's live price\n`/order` — check an order status\n" +
+      "`/vouch` — leave a vouch\n`/suggest` — suggest an idea\n`/poll` — start a quick poll\n" +
       "`/shop` — open the shop\n`/invite` — get the invite link\n`/stats` — server stats\n" +
-      "`/rank` — your level & XP\n`/leaderboard` — top members\n" +
+      "`/rank` — your level & XP\n`/daily` — claim your daily XP (streaks!)\n`/leaderboard` — top members\n" +
       "`/close` — staff: close a ticket\n`/giveaway` — staff: start a giveaway\n`/reroll` — staff: reroll a winner\n" +
       "`/coupon` — staff: post a discount code\n`/announce` — staff: post an announcement\n`/serverinfo` — server stats\n" +
       "Buttons: verify in #verify, pick roles in #roles, open a ticket in #open-a-ticket." });
   }
   if (i.commandName === 'order') return lookupOrder(i);
+  if (i.commandName === 'price') return priceCmd(i);
+  if (i.commandName === 'poll') return pollCmd(i);
+  if (i.commandName === 'daily') return dailyCmd(i);
   if (i.commandName === 'vouch') return postVouch(i);
   if (i.commandName === 'giveaway') return startGiveaway(i);
   if (i.commandName === 'reroll') return rerollGiveaway(i);
@@ -669,6 +725,15 @@ client.on(Events.MessageCreate, async (m) => {
   if (log) log.send(`🚫 Auto-removed from <@${m.author.id}> in <#${m.channel.id}>: \`${m.content.slice(0, 140).replace(/`/g, "'")}\``).catch(() => {});
 });
 
+// ── Ticket activity: a human reply re-arms the inactivity timer ──────────────
+client.on(Events.MessageCreate, (m) => {
+  if (m.author.bot || !m.guild) return;
+  const ch = m.channel;
+  if (ch.topic?.startsWith('ticket-owner:') && ch.topic.includes(' · idlewarned')) {
+    ch.setTopic(ch.topic.replace(' · idlewarned', '')).catch(() => {});
+  }
+});
+
 // ── Member leave logging ────────────────────────────────────────────────────
 client.on(Events.GuildMemberRemove, (member) => {
   const log = findChannel(member.guild, 'mod-log');
@@ -746,6 +811,149 @@ async function postVouch(i) {
     stars, body: message, externalId: `vouch:${i.user.id}:${i.id}`,
   });
   return i.reply({ content: 'Thanks for the vouch! 💚 Posted in #vouchers **and** on the website.', ephemeral: true });
+}
+
+// ── /price → live price lookup from the real catalog ─────────────────────────
+async function priceCmd(i) {
+  await i.deferReply({ ephemeral: true });
+  const q = i.options.getString('product').toLowerCase().trim();
+  const products = await getProducts();
+  if (!products.length) return i.editReply(`I can’t reach the catalog right now — browse ${STORE_URL}/shop 🛍️`);
+  const scored = products
+    .map((p) => {
+      const name = p.name.toLowerCase();
+      let score = 0;
+      if (name === q) score = 100;
+      else if (name.includes(q)) score = 60 + q.length;
+      else score = q.split(/\s+/).filter((w) => w.length > 1 && name.includes(w)).length * 20;
+      if ((p.category || '').includes(q.replace(/\s+/g, '-'))) score += 15;
+      return { p, score };
+    })
+    .filter((x) => x.score > 0)
+    .sort((a, b) => b.score - a.score);
+  if (!scored.length) {
+    return i.editReply(`No product matching **${q}** — see the full list in #price-list or at ${STORE_URL}/shop`);
+  }
+  const top = scored.slice(0, 5);
+  const e = new EmbedBuilder().setColor(0x6366f1)
+    .setTitle(`🏷️ ${top[0].p.name}`)
+    .setDescription(
+      `**${money(top[0].p.price, top[0].p.currency)}** · instant delivery\n[Buy now](${STORE_URL}/product/${top[0].p.id})` +
+      (top.length > 1
+        ? `\n\n**Also matching:**\n${top.slice(1).map(({ p }) => `• ${p.name} — ${money(p.price, p.currency)}`).join('\n')}`
+        : ''))
+    .setFooter({ text: 'Live prices from the store' });
+  return i.editReply({ embeds: [e] });
+}
+
+// ── /poll → quick reaction poll (up to 4 options) ────────────────────────────
+const POLL_EMOJI = ['1️⃣', '2️⃣', '3️⃣', '4️⃣'];
+async function pollCmd(i) {
+  const question = i.options.getString('question');
+  const options = [1, 2, 3, 4]
+    .map((n) => i.options.getString(`option${n}`))
+    .filter(Boolean);
+  const isYesNo = options.length === 0;
+  const e = new EmbedBuilder().setColor(0xa855f7).setTitle(`📊 ${question}`)
+    .setDescription(isYesNo
+      ? 'Vote with 👍 or 👎'
+      : options.map((o, n) => `${POLL_EMOJI[n]} ${o}`).join('\n'))
+    .setAuthor({ name: i.user.username, iconURL: i.user.displayAvatarURL() })
+    .setFooter({ text: 'ForgeMarket poll' }).setTimestamp();
+  await i.reply({ embeds: [e] });
+  const msg = await i.fetchReply();
+  const reactions = isYesNo ? ['👍', '👎'] : POLL_EMOJI.slice(0, options.length);
+  for (const r of reactions) await msg.react(r).catch(() => {});
+}
+
+// ── /daily → daily XP claim with streaks ─────────────────────────────────────
+const dayKey = (t = Date.now()) => new Date(t).toISOString().slice(0, 10);
+async function dailyCmd(i) {
+  const rec = XP[i.user.id] || (XP[i.user.id] = { xp: 0, lvl: 0 });
+  const today = dayKey();
+  if (rec.daily?.last === today) {
+    return i.reply({ ephemeral: true, content: `You already claimed today — come back tomorrow to keep your **${rec.daily.streak}-day streak** going! 🔥` });
+  }
+  const yesterday = dayKey(Date.now() - 86_400_000);
+  const streak = rec.daily?.last === yesterday ? (rec.daily.streak || 0) + 1 : 1;
+  const bonus = 50 + 10 * Math.min(streak, 10); // 60 XP day 1 → caps at 150/day
+  rec.daily = { last: today, streak };
+  const before = rec.lvl;
+  rec.xp += bonus;
+  rec.lvl = levelFor(rec.xp);
+  saveXP();
+  const lvlUp = rec.lvl > before ? `\n🎉 **Level up!** You’re now level ${rec.lvl}.` : '';
+  return i.reply({ content:
+    `✅ Daily claimed: **+${bonus} XP** · streak **${streak} day${streak > 1 ? 's' : ''}** 🔥` +
+    `${streak < 10 ? ` (bonus grows every day up to 10)` : ' (max bonus!)'}${lvlUp}` });
+}
+
+// ── Anti-raid: alert staff on a join-rate spike ──────────────────────────────
+const recentJoins = [];
+let lastRaidAlert = 0;
+function trackJoinForRaid(guild) {
+  const now = Date.now();
+  recentJoins.push(now);
+  while (recentJoins.length && recentJoins[0] < now - 60_000) recentJoins.shift();
+  if (recentJoins.length >= 8 && now - lastRaidAlert > 10 * 60_000) {
+    lastRaidAlert = now;
+    const log = findChannel(guild, 'mod-log');
+    log?.send({
+      content: '@here',
+      embeds: [new EmbedBuilder().setColor(0xef4444).setTitle('🚨 Possible raid')
+        .setDescription(`**${recentJoins.length} accounts joined in the last 60 seconds.**\n` +
+          'Consider enabling higher verification (Server Settings → Safety Setup → raid protection) and watch #mod-log.')
+        .setTimestamp()],
+      allowedMentions: { parse: ['everyone'] },
+    }).catch(() => {});
+  }
+}
+
+// ── Boost thank-you + member milestones ──────────────────────────────────────
+client.on(Events.GuildMemberUpdate, (oldM, newM) => {
+  if (!oldM.premiumSince && newM.premiumSince) {
+    const ch = findChannel(newM.guild, 'general') || findChannel(newM.guild, 'announcements');
+    ch?.send({ embeds: [new EmbedBuilder().setColor(0xf47fff)
+      .setDescription(`💎 **<@${newM.id}> just boosted the server!** Thank you — enjoy the extra love from the team. 💜`)] })
+      .catch(() => {});
+    leadLog(newM.guild, `💎 New boost from <@${newM.id}> (total ${newM.guild.premiumSubscriptionCount || 0})`);
+  }
+});
+
+function celebrateMilestone(guild) {
+  const n = guild.memberCount;
+  if (n > 0 && n % 100 === 0) {
+    const ch = findChannel(guild, 'general') || findChannel(guild, 'announcements');
+    ch?.send({ embeds: [new EmbedBuilder().setColor(0xf5b324)
+      .setTitle(`🎉 ${n} members!`)
+      .setDescription(`We just hit **${n} members** — thank you all! Keep an eye on #giveaways, something special might drop soon… 👀`)] })
+      .catch(() => {});
+  }
+}
+
+// ── Weekly XP leaderboard → #general every Monday evening ────────────────────
+const META_FILE = new URL('../bot-meta.json', import.meta.url);
+let META = {};
+try { if (existsSync(META_FILE)) META = JSON.parse(readFileSync(META_FILE, 'utf8')); } catch { META = {}; }
+const saveMeta = () => { try { writeFileSync(META_FILE, JSON.stringify(META)); } catch { /* ignore */ } };
+
+function maybePostWeeklyLeaderboard(guild) {
+  const now = new Date();
+  if (now.getUTCDay() !== 1 || now.getUTCHours() < 17) return; // Mondays from 17:00 UTC
+  const week = `${now.getUTCFullYear()}-w${Math.ceil(((now - new Date(Date.UTC(now.getUTCFullYear(), 0, 1))) / 86_400_000 + 1) / 7)}`;
+  if (META.lastWeeklyPost === week) return;
+  const top = Object.entries(XP).sort((a, b) => b[1].xp - a[1].xp).slice(0, 10);
+  if (!top.length) return;
+  META.lastWeeklyPost = week;
+  saveMeta();
+  const ch = findChannel(guild, 'general') || findChannel(guild, 'events');
+  if (!ch) return;
+  const lines = top.map(([id, r], n) =>
+    `**${['🥇', '🥈', '🥉'][n] || `${n + 1}.`}** <@${id}> — Level ${r.lvl} · ${r.xp} XP`).join('\n');
+  ch.send({ embeds: [new EmbedBuilder().setColor(0xa855f7)
+    .setTitle('🏆 Weekly XP leaderboard')
+    .setDescription(`${lines}\n\nChat to earn XP and don’t forget your \`/daily\` streak! 🔥`)
+    .setFooter({ text: 'Posted every Monday' }).setTimestamp()] }).catch(() => {});
 }
 
 // ── /coupon (staff) → posts a discount code to #discount-codes ────────────────
