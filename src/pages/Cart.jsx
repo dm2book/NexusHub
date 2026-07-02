@@ -23,6 +23,8 @@ export default function Cart() {
           <p className="text-slate-400 text-sm mt-1">Browse the shop and add some digital goods.</p>
           <Link to="/shop" className="btn-primary mt-6 inline-flex">Browse shop</Link>
         </div>
+        {/* Turn the dead end into a starting point: real trending products. */}
+        <EmptyCartTrending onAdd={add} />
       </div>
     );
   }
@@ -76,6 +78,22 @@ export default function Cart() {
       </div>
 
       <CartCrossSell items={items} onAdd={add} />
+    </div>
+  );
+}
+
+/** Trending rail for the empty-cart state (real sales data; hides when empty). */
+function EmptyCartTrending({ onAdd }) {
+  const toast = useToast();
+  const [trending, setTrending] = useState([]);
+  useEffect(() => { api.get('/api/products/trending').then((r) => setTrending(r.products || [])).catch(() => {}); }, []);
+  if (trending.length === 0) return null;
+  return (
+    <div className="mt-12">
+      <h2 className="text-xl font-extrabold text-slate-900 mb-5">Popular right now</h2>
+      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 fm-grid-in">
+        {trending.slice(0, 4).map((p) => <LightProductCard key={p.id} product={p} onAdd={(x) => { onAdd(x); toast.success(`${x.name} added`); }} />)}
+      </div>
     </div>
   );
 }

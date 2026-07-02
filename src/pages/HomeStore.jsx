@@ -14,6 +14,8 @@ import { useReveal } from '../lib/useReveal.js';
 import { useParallax } from '../lib/useParallax.js';
 import CountUp from '../components/CountUp.jsx';
 import RecentlyDelivered from '../components/store/RecentlyDelivered.jsx';
+import CommandPalette from '../components/store/CommandPalette.jsx';
+import { SystemStatus } from '../components/store/StoreFooter.jsx';
 
 const ICON = (n) => `/products/icons/${n}.png`;
 
@@ -137,11 +139,17 @@ export default function HomeStore() {
 
           <div className="flex-1" />
 
-          <div className="hidden md:flex items-center gap-2 bg-slate-100 rounded-xl px-3.5 h-10 w-[260px] text-slate-400">
+          {/* Real global search — opens the ⌘K command palette */}
+          <button onClick={() => window.dispatchEvent(new CustomEvent('forge:cmdk'))}
+            className="hidden md:flex items-center gap-2 bg-slate-100 rounded-xl px-3.5 h-10 w-[260px] text-slate-400 hover:bg-slate-200/70 transition">
             <Search size={16} />
-            <input placeholder="Search for products..." className="bg-transparent outline-none text-sm text-slate-700 w-full" />
-            <kbd className="text-[11px] bg-white border border-slate-200 rounded px-1.5 py-0.5 text-slate-400">⌘K</kbd>
-          </div>
+            <span className="text-sm">Search for products...</span>
+            <kbd className="ml-auto text-[11px] bg-white border border-slate-200 rounded px-1.5 py-0.5 text-slate-400">⌘K</kbd>
+          </button>
+          <button onClick={() => window.dispatchEvent(new CustomEvent('forge:cmdk'))} aria-label="Search"
+            className="md:hidden w-10 h-10 rounded-xl hover:bg-slate-100 grid place-items-center text-slate-700">
+            <Search size={20} />
+          </button>
 
           <Link to="/cart" className="relative w-10 h-10 rounded-xl hover:bg-slate-100 grid place-items-center text-slate-700">
             <ShoppingCart size={20} />
@@ -399,11 +407,12 @@ export default function HomeStore() {
               <Link to="/terms" className="hover:text-slate-700">Terms</Link>
               <Link to="/privacy" className="hover:text-slate-700">Privacy</Link>
             </div>
-            © {new Date().getFullYear()} ForgeMarket · Instant digital goods · <span className="text-emerald-500">● All systems operational</span>
+            © {new Date().getFullYear()} ForgeMarket · Instant digital goods · <SystemStatus />
           </footer>
         </main>
       </div>
       <RecentlyDelivered />
+      <CommandPalette />
     </div>
   );
 }

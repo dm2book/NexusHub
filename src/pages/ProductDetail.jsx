@@ -15,6 +15,7 @@ import { useReviews } from '../lib/useReviews.js';
 import { useStats } from '../lib/useStats.js';
 import { useWishlist } from '../lib/wishlist.js';
 import { usePageMeta } from '../lib/useMeta.js';
+import { recordProductView, useRecentlyViewed } from '../lib/recentlyViewed.js';
 
 const TRUST = [
   { icon: Zap, title: 'Instant delivery', sub: 'Codes in seconds' },
@@ -58,6 +59,10 @@ export default function ProductDetail() {
     api.get(`/api/products/${id}/recommendations`).then(setRecs).catch(() => {});
   }, [id]);
 
+  // Record this visit in the customer's own recently-viewed history.
+  const recentlyViewed = useRecentlyViewed();
+  useEffect(() => { if (product && !product.sample) recordProductView(product); }, [product]);
+
   if (notFound) {
     return (
       <div className="section py-24 text-center">
@@ -79,7 +84,7 @@ export default function ProductDetail() {
   const buyNow = () => { add(product, qty); navigate('/cart'); };
 
   return (
-    <div className="section py-10">
+    <div className="section pt-10 pb-28 lg:pb-10">
       <Link to="/shop" className="inline-flex items-center gap-2 text-slate-400 hover:text-white text-sm mb-6">
         <ArrowLeft size={16} /> Back to shop
       </Link>
@@ -234,6 +239,30 @@ export default function ProductDetail() {
           </div>
         </div>
       )}
+
+      {/* Recently viewed — the visitor's own history (excludes this product) */}
+      {recentlyViewed.filter((p) => p.id !== product.id).length > 0 && (
+        <div className="mt-14">
+          <h2 className="text-xl font-extrabold text-slate-900 mb-5">Recently viewed</h2>
+          <div className="fm-rail flex gap-4 overflow-x-auto pb-2 snap-x">
+            {recentlyViewed.filter((p) => p.id !== product.id).slice(0, 6).map((p) => (
+              <div key={p.id} className="snap-start shrink-0 w-[210px]">
+                <LightProductCard product={p} onAdd={(x) => { add(x); toast.success(`${x.name} added`); }} />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Sticky mobile buy bar — price + CTA always in reach on phones */}
+      <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur border-t border-slate-200 px-4 py-3 flex items-center gap-3"
+        style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}>
+        <div className="min-w-0">
+          <div className="text-[11px] text-slate-400 truncate">{product.name}</div>
+          <div className="text-lg font-extrabold text-violet-600 leading-tight">{money(product.price * qty, product.currency)}</div>
+        </div>
+        <button onClick={addToCart} className="btn-primary flex-1 py-3 fm-tap"><ShoppingCart size={17} /> Add to cart</button>
+      </div>
     </div>
   );
 }

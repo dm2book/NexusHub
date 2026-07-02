@@ -48,11 +48,17 @@ export default function StoreNav() {
 
         <div className="flex-1" />
 
-        <Link to="/shop" className="hidden md:flex items-center gap-2 bg-slate-100 rounded-xl px-3.5 h-10 w-[240px] text-slate-400 hover:bg-slate-200/70 transition">
+        {/* Real global search: opens the ⌘K command palette */}
+        <button onClick={() => window.dispatchEvent(new CustomEvent('forge:cmdk'))}
+          className="hidden md:flex items-center gap-2 bg-slate-100 rounded-xl px-3.5 h-10 w-[240px] text-slate-400 hover:bg-slate-200/70 transition">
           <Search size={16} />
           <span className="text-sm">Search for products...</span>
           <kbd className="ml-auto text-[11px] bg-white border border-slate-200 rounded px-1.5 py-0.5">⌘K</kbd>
-        </Link>
+        </button>
+        <button onClick={() => window.dispatchEvent(new CustomEvent('forge:cmdk'))} aria-label="Search"
+          className="md:hidden w-10 h-10 rounded-xl hover:bg-slate-100 grid place-items-center text-slate-700">
+          <Search size={20} />
+        </button>
 
         <Link to="/cart" className="relative w-10 h-10 rounded-xl hover:bg-slate-100 grid place-items-center text-slate-700">
           <ShoppingCart size={20} />
