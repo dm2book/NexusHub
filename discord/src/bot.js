@@ -106,6 +106,10 @@ async function pushReviewToSite({ author, avatarUrl, stars, body, externalId }) 
 const P = PermissionFlagsBits;
 const anthropic = ANTHROPIC_API_KEY ? new Anthropic({ apiKey: ANTHROPIC_API_KEY }) : null;
 
+// Brand assets, hosted by the storefront (public/discord/*).
+const BANNER = (n) => `${STORE_URL}/discord/banner-${n}.png`;
+const BRAND_ICON = `${STORE_URL}/icon-512.png`;
+
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -247,16 +251,20 @@ async function updatePriceList(guild) {
 
     const embed = new EmbedBuilder().setColor(0x6366f1)
       .setTitle('🏷️ Live price list')
-      .setDescription(`Prices sync automatically from the store — always current.\n🛒 Order at ${STORE_URL}/shop (instant delivery)`)
+      .setThumbnail(BRAND_ICON)
+      .setImage(BANNER('products'))
+      .setDescription('Prices sync automatically from the store — always current. Instant delivery on everything.')
       .addFields(fields)
       .setFooter({ text: 'ForgeMarket · auto-updated every 10 min' })
       .setTimestamp();
+    const shopRow = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setLabel('🛍️ Open the shop').setStyle(ButtonStyle.Link).setURL(`${STORE_URL}/shop`));
 
     // Edit our previous price-list message so the channel stays clean.
     const msgs = await ch.messages.fetch({ limit: 25 }).catch(() => null);
     const mine = msgs?.find((m) => m.author.id === client.user.id && m.embeds[0]?.title?.includes('price list'));
-    if (mine) await mine.edit({ embeds: [embed] });
-    else await ch.send({ embeds: [embed] });
+    if (mine) await mine.edit({ embeds: [embed], components: [shopRow] });
+    else await ch.send({ embeds: [embed], components: [shopRow] });
   } catch (e) { console.error('[price-list]', e.message); }
 }
 
@@ -337,8 +345,10 @@ client.once(Events.ClientReady, (c) => {
 
 // ── greet new members (with anti-scam warning) ─────────────────────────────
 client.on(Events.GuildMemberAdd, async (member) => {
-  const dm = new EmbedBuilder().setColor(0x6366f1)
+  const dm = new EmbedBuilder().setColor(0x7c5cff)
     .setTitle(`Welcome to ${member.guild.name} ⚡`)
+    .setThumbnail(BRAND_ICON)
+    .setImage(BANNER('welcome'))
     .setDescription(
       `Hey ${member.user.username}! Glad you're here.\n\n` +
       "✅ **Verify** in the #verify channel to unlock everything\n" +
@@ -347,8 +357,12 @@ client.on(Events.GuildMemberAdd, async (member) => {
       "🎫 Need help? **#open-a-ticket**\n\n" +
       "🛡️ **Stay safe:** our staff will **NEVER** DM you first, never ask for your password, " +
       "and we only sell via the official store link in the server. Anyone else is a scammer — report them in #open-a-ticket.\n\n" +
-      "Instant delivery · buyer-protected · 24/7 support.");
-  member.send({ embeds: [dm] }).catch(() => {});
+      "Instant delivery · buyer-protected · 24/7 support.")
+    .setFooter({ text: 'ForgeMarket · instant game top-ups' });
+  const dmButtons = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setLabel('🛍️ Open the shop').setStyle(ButtonStyle.Link).setURL(`${STORE_URL}/shop`),
+    new ButtonBuilder().setLabel('📦 Track an order').setStyle(ButtonStyle.Link).setURL(`${STORE_URL}/track`));
+  member.send({ embeds: [dm], components: [dmButtons] }).catch(() => {});
   leadLog(member.guild, `🟢 New member joined: <@${member.id}> (${member.guild.memberCount} total)`);
   checkImpersonation(member); // scam guard: flag staff-lookalike names on join
   trackJoinForRaid(member.guild); // raid guard: alert staff on join spikes
@@ -807,7 +821,10 @@ client.on(Events.MessageCreate, (m) => {
   saveXP();
   if (rec.lvl > before && rec.lvl > 0) {
     const ch = findChannel(m.guild, 'general') || m.channel;
-    ch.send(`🎉 GG <@${m.author.id}> — you reached **Level ${rec.lvl}**! Keep chatting to level up. ⚡`).catch(() => {});
+    ch.send({ embeds: [new EmbedBuilder().setColor(0xf5b324)
+      .setAuthor({ name: m.author.username, iconURL: m.author.displayAvatarURL() })
+      .setDescription(`🎉 GG <@${m.author.id}> — you reached **Level ${rec.lvl}**! Keep chatting (and claim your \`/daily\`) to level up. ⚡`)] })
+      .catch(() => {});
   }
 });
 
@@ -979,6 +996,7 @@ function celebrateMilestone(guild) {
     const ch = findChannel(guild, 'general') || findChannel(guild, 'announcements');
     ch?.send({ embeds: [new EmbedBuilder().setColor(0xf5b324)
       .setTitle(`🎉 ${n} members!`)
+      .setImage(BANNER('welcome'))
       .setDescription(`We just hit **${n} members** — thank you all! Keep an eye on #giveaways, something special might drop soon… 👀`)] })
       .catch(() => {});
   }
@@ -1005,6 +1023,7 @@ function maybePostWeeklyLeaderboard(guild) {
     `**${['🥇', '🥈', '🥉'][n] || `${n + 1}.`}** <@${id}> — Level ${r.lvl} · ${r.xp} XP`).join('\n');
   ch.send({ embeds: [new EmbedBuilder().setColor(0xa855f7)
     .setTitle('🏆 Weekly XP leaderboard')
+    .setThumbnail(BRAND_ICON)
     .setDescription(`${lines}\n\nChat to earn XP and don’t forget your \`/daily\` streak! 🔥`)
     .setFooter({ text: 'Posted every Monday' }).setTimestamp()] }).catch(() => {});
 }
@@ -1022,6 +1041,8 @@ async function flashSale(i) {
   const dealRole = i.guild.roles.cache.find((r) => r.name === 'Deals');
 
   const e = new EmbedBuilder().setColor(0xef4444).setTitle('⚡ FLASH SALE')
+    .setImage(BANNER('deals'))
+    .setThumbnail(BRAND_ICON)
     .setDescription(
       `**${deal}**\n\n` +
       (code ? `Use code **\`${code.toUpperCase()}\`** at checkout.\n` : '') +
@@ -1102,6 +1123,7 @@ async function postCoupon(i) {
   const note = i.options.getString('note') || 'Redeem at checkout on the website.';
   const ch = findChannel(i.guild, 'discount-codes') || i.channel;
   const e = new EmbedBuilder().setColor(0xec4899).setTitle('🏷️ New discount code!')
+    .setImage(BANNER('deals'))
     .setDescription(`Use code **\`${code}\`** for **${percent}% OFF** your order.\n\n${note}`)
     .addFields({ name: 'Code', value: `\`${code}\``, inline: true }, { name: 'Discount', value: `${percent}%`, inline: true })
     .setFooter({ text: 'ForgeMarket • limited time' }).setTimestamp();
@@ -1132,6 +1154,8 @@ async function startGiveaway(i) {
   const ch = findChannel(i.guild, 'giveaways') || i.channel;
   const gwRole = i.guild.roles.cache.find((r) => r.name === 'Giveaways');
   const e = new EmbedBuilder().setColor(0xa855f7).setTitle('🎉 GIVEAWAY')
+    .setThumbnail(BRAND_ICON)
+    .setImage(BANNER('giveaways'))
     .setDescription(`**Prize:** ${prize}\n**Winners:** ${winnersCount}\n**Ends:** <t:${Math.floor(endsAt / 1000)}:R>\n\nTap **Enter** below to join!\nHosted by <@${i.user.id}>`)
     .addFields({ name: 'Entries', value: '🎟️ 0', inline: true })
     .setFooter({ text: 'ForgeMarket giveaway · verified members only' });

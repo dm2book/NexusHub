@@ -33,7 +33,13 @@ const REPOST = /^(1|true|yes)$/i.test(process.env.REPOST || ''); // REPOST=1 →
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 const resolvePerms = (arr = []) => arr.map((n) => P[n]).filter(Boolean);
 const sub = (s) => String(s).replaceAll('{STORE_URL}', STORE_URL);
-const embed = (m) => new EmbedBuilder().setColor(0x6366f1).setTitle(sub(m.title)).setDescription(sub(m.description)).setFooter({ text: MARKER });
+const embed = (m) => {
+  const e = new EmbedBuilder().setColor(m.color ?? 0x6366f1)
+    .setTitle(sub(m.title)).setDescription(sub(m.description)).setFooter({ text: MARKER });
+  if (m.image) e.setImage(sub(m.image));           // brand banner (hosted by the store)
+  if (m.thumbnail) e.setThumbnail(sub(m.thumbnail));
+  return e;
+};
 const row = (...buttons) => new ActionRowBuilder().addComponents(...buttons);
 const link = (label, url) => new ButtonBuilder().setLabel(label).setStyle(ButtonStyle.Link).setURL(url);
 
