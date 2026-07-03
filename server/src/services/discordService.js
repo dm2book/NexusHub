@@ -65,6 +65,7 @@ export async function postOrderEvent(order, event = 'received') {
   const embed = {
     title,
     color: COLORS[event] || 0x6366f1,
+    thumbnail: { url: `${config.appUrl}/icon-512.png` },
     fields: [
       { name: 'Order', value: `\`${order.number}\``, inline: true },
       { name: 'Total', value: order.totalFormatted || String(order.total), inline: true },
@@ -136,6 +137,11 @@ export async function postDropEvent(kind, data = {}) {
     };
   } else return;
 
+  // Product announcements show the product's own art when available; every
+  // drop gets the brand banner so the channel looks consistently premium.
+  const banner = { product: 'products', restock: 'products', coupon: 'deals', bundle: 'deals' }[kind];
+  embed.image = { url: `${config.appUrl}/discord/banner-${banner}.png` };
+  embed.thumbnail = { url: (kind === 'product' && data.image) ? data.image : `${config.appUrl}/icon-512.png` };
   embed.footer = { text: `${config.email.fromName} · drops & deals` };
   embed.timestamp = new Date().toISOString();
   await postWebhook(url, { embeds: [embed] });

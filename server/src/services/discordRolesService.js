@@ -132,6 +132,7 @@ export async function sendDeliveryDm(order) {
 
     const embed = {
       title: `🎁 Your order ${order.number} is delivered!`,
+      thumbnail: { url: `${config.appUrl}/icon-512.png` },
       description:
         `Thanks for shopping with **${config.email.fromName}** — here are your items:\n\n${items}\n${codes}\n` +
         `📧 A copy is in your email. Keep your codes private and never share them in public channels.\n\n` +

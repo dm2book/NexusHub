@@ -209,6 +209,8 @@ export const NOTIFY_ROLES = [
 // ── Onboarding & content ────────────────────────────────────────────────────
 export const MESSAGES = {
   welcome: (g) => ({
+    image: '{STORE_URL}/discord/banner-welcome.png',
+    color: 0x7c5cff,
     title: `Welcome to ${g} ⚡`,
     description:
       "**The premium marketplace for game top-ups — delivered in seconds.**\n\n" +
@@ -221,6 +223,8 @@ export const MESSAGES = {
       "Instant delivery · buyer-protected · 24/7 support.",
   }),
   rules: {
+    image: '{STORE_URL}/discord/banner-rules.png',
+    color: 0x94a3b8,
     title: '📜 Server Rules',
     description:
       "**1. Be respectful.** No harassment, hate, or NSFW.\n" +
@@ -245,12 +249,16 @@ export const MESSAGES = {
       "👉 First step: verify in <#verify>.",
   },
   verify: {
+    image: '{STORE_URL}/discord/banner-verify.png',
+    color: 0x22c55e,
     title: '✅ Verify to enter',
     description:
       "Tap **Verify** below to confirm you're human and unlock the full server: " +
       "marketplace, community, giveaways and support.\n\nThis keeps the community safe from bots and scammers.",
   },
   ticketPanel: {
+    image: '{STORE_URL}/discord/banner-support.png',
+    color: 0x3b82f6,
     title: '🎫 Open a support ticket',
     description:
       "Pick a topic below and we'll open a **private channel** with our team.\n\n" +
@@ -261,6 +269,8 @@ export const MESSAGES = {
       "Average first response: **under 10 minutes** during open hours.",
   },
   products: {
+    image: '{STORE_URL}/discord/banner-products.png',
+    color: 0x6366f1,
     title: '🛒 The ForgeMarket catalog',
     description:
       "Game currency, top-ups, gift cards and subscriptions — **delivered in seconds**, " +
@@ -279,6 +289,8 @@ export const MESSAGES = {
       "Problem with an order? Open a ticket in <#open-a-ticket> — eligible orders are money-back guaranteed.",
   },
   deals: {
+    image: '{STORE_URL}/discord/banner-deals.png',
+    color: 0xef4444,
     title: '🔥 Deals & bundles',
     description:
       "Limited-time offers and best-value bundles drop here.\n\n" +
@@ -296,6 +308,8 @@ export const MESSAGES = {
       "Verify in <#verify>, then browse <#products>. Welcome aboard! 🎉",
   },
   supportInfo: {
+    image: '{STORE_URL}/discord/banner-support.png',
+    color: 0x3b82f6,
     title: '📋 How support works',
     description:
       "**Open hours:** every day, with fast responses (avg. under 10 min).\n" +
@@ -304,6 +318,8 @@ export const MESSAGES = {
       "**Safety:** our staff will **never DM you first** and never ask for passwords. Report anyone who does.",
   },
   reviewsIntro: {
+    image: '{STORE_URL}/discord/banner-vouches.png',
+    color: 0x22c55e,
     title: '⭐ Verified customer reviews',
     description:
       "Every review here is tied to a **real, completed order** — no fakes.\n\n" +
@@ -315,6 +331,8 @@ export const MESSAGES = {
     description: "Real screenshots of completed, instant deliveries. Transparency builds trust. 🔒",
   },
   giveawaysIntro: {
+    image: '{STORE_URL}/discord/banner-giveaways.png',
+    color: 0xa855f7,
     title: '🎉 Giveaways',
     description:
       "Free top-ups, every week! 🎁\n\n" +
@@ -350,6 +368,8 @@ export const MESSAGES = {
       "We post here if anything is ever delayed. No news = all good.",
   },
   priceList: {
+    image: '{STORE_URL}/discord/banner-products.png',
+    color: 0x6366f1,
     title: '🏷️ Live price list',
     description:
       "Our most popular top-ups (full catalog + live prices on the site):\n\n" +
@@ -359,6 +379,8 @@ export const MESSAGES = {
       "Prices may change — always check the shop for the live price 👇",
   },
   vouchersIntro: {
+    image: '{STORE_URL}/discord/banner-vouches.png',
+    color: 0x22c55e,
     title: '💚 Vouchers & vouches',
     description:
       "Bought from us? Leave a quick **voucher** here — a screenshot + a line about your experience " +
@@ -366,6 +388,8 @@ export const MESSAGES = {
       "Real customers only. Verified reviews are also posted in <#reviews>.",
   },
   discountCodes: {
+    image: '{STORE_URL}/discord/banner-deals.png',
+    color: 0xec4899,
     title: '🏷️ Discount & voucher codes',
     description:
       "Active codes drop here — redeem them at checkout for money off.\n\n" +
