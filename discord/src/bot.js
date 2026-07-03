@@ -25,9 +25,39 @@ const STAFF_ROLE_NAMES = ['Owner', 'Admin', 'Moderator', 'Support'];
 const isStaff = (member) => member?.permissions?.has?.(PermissionFlagsBits.ManageMessages)
   || member?.roles?.cache?.some((r) => STAFF_ROLE_NAMES.includes(r.name));
 
-// Simple in-memory giveaway store (one bot instance).
-const GIVEAWAYS = new Map(); // messageId -> { prize, entries:Set, endsAt, channelId, msgId, winnersCount, hostId }
+// Giveaway store — persisted to giveaways.json so active giveaways (and their
+// entries) survive a bot restart; timers are re-armed on boot.
+const GIVEAWAYS = new Map(); // messageId -> { prize, entries:Set, endsAt, channelId, msgId, winnersCount, hostId, guildId }
 const ENDED = new Map();     // messageId -> { prize, entries:[], channelId }  (kept ~1h for /reroll)
+const GW_FILE = new URL('../giveaways.json', import.meta.url);
+let gwSaveTimer = null;
+function saveGiveaways() {
+  clearTimeout(gwSaveTimer);
+  gwSaveTimer = setTimeout(() => {
+    try {
+      const data = [...GIVEAWAYS.entries()].map(([id, g]) => ({ ...g, msgId: id, entries: [...g.entries] }));
+      writeFileSync(GW_FILE, JSON.stringify(data));
+    } catch { /* ignore */ }
+  }, 1500);
+}
+async function restoreGiveaways(c) {
+  let data = [];
+  try { if (existsSync(GW_FILE)) data = JSON.parse(readFileSync(GW_FILE, 'utf8')); } catch { return; }
+  for (const g of data) {
+    const guild = c.guilds.cache.get(g.guildId) || c.guilds.cache.first();
+    if (!guild) continue;
+    GIVEAWAYS.set(g.msgId, { ...g, entries: new Set(g.entries || []) });
+    const msLeft = Math.max(0, (g.endsAt || 0) - Date.now());
+    const ch = guild.channels.cache.get(g.channelId);
+    const finish = async () => {
+      const msg = await ch?.messages?.fetch(g.msgId).catch(() => null);
+      endGiveaway(guild, g.msgId, msg);
+    };
+    if (msLeft === 0) finish();               // ended while offline → resolve now
+    else setTimeout(finish, msLeft);          // re-arm the timer
+    console.log(`[giveaway] restored "${g.prize}" (${Math.round(msLeft / 60000)} min left, ${(g.entries || []).length} entries)`);
+  }
+}
 
 // ── Leveling / XP (persisted to xp.json so it survives restarts) ─────────────
 const XP_FILE = new URL('../xp.json', import.meta.url);
@@ -88,7 +118,11 @@ const client = new Client({
 });
 
 const STAR_THRESHOLD = 3;            // ⭐ reactions needed to hit the starboard
-const starred = new Set();           // message ids already posted to #starboard
+// Starboard dedup — persisted in bot-meta.json so a restart can't repost.
+const starred = {
+  has: (id) => (META.starred || []).includes(id),
+  add: (id) => { META.starred = [...(META.starred || []), id].slice(-500); saveMeta(); },
+};
 
 // ── helpers ──────────────────────────────────────────────────────────────
 const findRole = (g, name) => g.roles.cache.find((r) => r.name === name);
@@ -292,6 +326,13 @@ client.once(Events.ClientReady, (c) => {
 
   // Weekly XP leaderboard (Mondays 17:00+ UTC, once per week).
   setInterval(() => c.guilds.cache.forEach((g) => maybePostWeeklyLeaderboard(g)), 60 * 60_000);
+
+  // Resume any giveaways that were live before a restart.
+  restoreGiveaways(c);
+
+  // Daily vouch spotlight → #general (checked hourly, posts once a day).
+  setInterval(() => c.guilds.cache.forEach((g) => maybeVouchSpotlight(g)), 60 * 60_000);
+  setTimeout(() => c.guilds.cache.forEach((g) => maybeVouchSpotlight(g)), 90_000);
 });
 
 // ── greet new members (with anti-scam warning) ─────────────────────────────
@@ -312,6 +353,14 @@ client.on(Events.GuildMemberAdd, async (member) => {
   checkImpersonation(member); // scam guard: flag staff-lookalike names on join
   trackJoinForRaid(member.guild); // raid guard: alert staff on join spikes
   celebrateMilestone(member.guild); // 🎉 every 100 members
+  // Public greeting — skipped during join spikes so a raid can't flood #general.
+  if (recentJoins.length < 5) {
+    const ch = findChannel(member.guild, 'general');
+    const verifyCh = findChannel(member.guild, 'verify');
+    ch?.send(`👋 Welcome <@${member.id}>! Verify in ${verifyCh ? `<#${verifyCh.id}>` : '#verify'} to unlock everything, and say hi 💜`)
+      .then((m) => setTimeout(() => m.delete().catch(() => {}), 10 * 60_000))
+      .catch(() => {});
+  }
 });
 
 // ── interactions: buttons + slash ──────────────────────────────────────────
@@ -422,10 +471,12 @@ async function enterGiveaway(i, messageId) {
   if (gw.entries.has(i.user.id)) {
     gw.entries.delete(i.user.id);
     updateGwCount(i.guild, gw);
+    saveGiveaways();
     return i.reply({ content: 'You left the giveaway. 👋', ephemeral: true });
   }
   gw.entries.add(i.user.id);
   updateGwCount(i.guild, gw);
+  saveGiveaways();
   return i.reply({ content: `🎉 You’re in! **${gw.entries.size}** entries. (Tap again to leave.)`, ephemeral: true });
 }
 
@@ -994,6 +1045,55 @@ async function flashSale(i) {
   return i.reply({ content: `Flash sale live in <#${ch.id}> — ends in **${minutes} min**.`, ephemeral: true });
 }
 
+// ── Daily vouch spotlight → #general (social proof on autopilot) ─────────────
+async function maybeVouchSpotlight(guild) {
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    if (META.lastSpotlight === today) return;
+    const hour = new Date().getUTCHours();
+    if (hour < 15) return; // afternoon post (17:00 NL)
+    const src = findChannel(guild, 'vouchers');
+    const dst = findChannel(guild, 'general');
+    if (!src || !dst) return;
+    const msgs = await src.messages.fetch({ limit: 50 }).catch(() => null);
+    if (!msgs) return;
+    const week = Date.now() - 7 * 86_400_000;
+    const candidates = [...msgs.values()].filter((m) =>
+      m.createdTimestamp > week && m.embeds[0]?.description?.includes('⭐'));
+    if (!candidates.length) return;
+    META.lastSpotlight = today;
+    saveMeta();
+    const pick = candidates[Math.floor(Math.random() * candidates.length)];
+    const e = EmbedBuilder.from(pick.embeds[0]).setColor(0x22c55e)
+      .setFooter({ text: 'Vouch spotlight · leave yours with /vouch' });
+    await dst.send({ content: '💚 **Vouch of the day**', embeds: [e] });
+  } catch (e) { console.error('[spotlight]', e.message); }
+}
+
+// ── Ticket QoL: paste an order number → instant live status ──────────────────
+const ORDER_RE = /\bFM-\d{4}-[A-Z0-9]{4,}\b/i;
+const orderLookupCooldown = new Map(); // channelId -> ts
+client.on(Events.MessageCreate, async (m) => {
+  try {
+    if (m.author.bot || !m.guild || !m.channel.topic?.startsWith('ticket-owner:')) return;
+    const match = m.content.match(ORDER_RE);
+    if (!match || !FORGEMARKET_API_URL) return;
+    const now = Date.now();
+    if (now - (orderLookupCooldown.get(m.channel.id) || 0) < 60_000) return; // 1/min per ticket
+    orderLookupCooldown.set(m.channel.id, now);
+    const num = match[0].toUpperCase();
+    const res = await fetch(`${FORGEMARKET_API_URL}/api/track/${encodeURIComponent(num)}`);
+    if (!res.ok) return;
+    const o = await res.json();
+    const hist = (o.history || []).slice(-4).map((h) =>
+      `• ${h.to || h.to_status} — ${new Date(h.at || h.created_at).toLocaleString()}`).join('\n') || '—';
+    await m.reply({ embeds: [new EmbedBuilder().setColor(0x6366f1)
+      .setTitle(`📦 Order ${o.number}`)
+      .setDescription(`**Status:** ${o.statusLabel || o.status}\n\n**Latest updates:**\n${hist}`)
+      .setFooter({ text: 'Auto-lookup · live from the store' })] });
+  } catch { /* best-effort */ }
+});
+
 // ── /coupon (staff) → posts a discount code to #discount-codes ────────────────
 async function postCoupon(i) {
   if (!isStaff(i.member)) return i.reply({ content: 'Only staff can post coupons.', ephemeral: true });
@@ -1039,7 +1139,8 @@ async function startGiveaway(i) {
   const btn = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId(`gw:enter:${msg.id}`).setLabel('Enter').setEmoji('🎉').setStyle(ButtonStyle.Success));
   await msg.edit({ components: [btn] });
-  GIVEAWAYS.set(msg.id, { prize, entries: new Set(), endsAt, channelId: ch.id, msgId: msg.id, winnersCount, hostId: i.user.id });
+  GIVEAWAYS.set(msg.id, { prize, entries: new Set(), endsAt, channelId: ch.id, msgId: msg.id, winnersCount, hostId: i.user.id, guildId: i.guild.id });
+  saveGiveaways();
   setTimeout(() => endGiveaway(i.guild, msg.id, msg), minutes * 60_000);
 }
 
@@ -1047,6 +1148,7 @@ async function endGiveaway(guild, id, msg) {
   const gw = GIVEAWAYS.get(id);
   if (!gw) return;
   GIVEAWAYS.delete(id);
+  saveGiveaways();
   const ids = [...gw.entries];
   const pool = [...ids];
   const picks = [];
