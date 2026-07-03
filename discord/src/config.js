@@ -40,6 +40,28 @@ export const ROLES = [
     perms: [],
     responsibility: 'Approved collaborators / affiliates. Access to the partner channel and co-marketing.',
   },
+  // Loyalty tiers — mirrored automatically from the store (lifetime spend).
+  // Cosmetic colour roles; the site's role-sync matches these by NAME.
+  {
+    key: 'platinum', name: 'Platinum', color: '#a78bfa', hoist: false, mentionable: false,
+    perms: [],
+    responsibility: 'Loyalty tier: €2000+ lifetime spend on the store. Synced automatically.',
+  },
+  {
+    key: 'gold', name: 'Gold', color: '#f59e0b', hoist: false, mentionable: false,
+    perms: [],
+    responsibility: 'Loyalty tier: €500+ lifetime spend on the store. Synced automatically.',
+  },
+  {
+    key: 'silver', name: 'Silver', color: '#9ca3af', hoist: false, mentionable: false,
+    perms: [],
+    responsibility: 'Loyalty tier: €100+ lifetime spend on the store. Synced automatically.',
+  },
+  {
+    key: 'bronze', name: 'Bronze', color: '#cd7f32', hoist: false, mentionable: false,
+    perms: [],
+    responsibility: 'Loyalty tier: first paid order on the store. Synced automatically.',
+  },
   {
     key: 'verified', name: 'Verified Customer', color: '#22c55e', hoist: false, mentionable: false,
     perms: [],

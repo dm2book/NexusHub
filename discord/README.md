@@ -279,7 +279,16 @@ verified reviews from the store webhook into `#reviews`, and a leveling/XP syste
 - **Ticket hygiene:** tickets idle for 24h get a "still there?" ping; 24h later
   they auto-close with the usual transcript + rating DM (restart-safe).
 - **Community sparkle:** boost thank-yous in `#general`, member-count milestone
-  celebrations every 100 members.
+  celebrations every 100 members, a public welcome in `#general` on every join
+  (auto-suppressed during join spikes, auto-deletes after 10 min) and a daily
+  **vouch spotlight** — one recent vouch reposted to `#general` every afternoon.
+- **Loyalty tier roles:** Bronze / Silver / Gold / Platinum are created by setup
+  (colour-matched to the site) and assigned automatically by the store's
+  role-sync on every paid order.
+- **Restart-safe:** active giveaways (incl. entries + timers) and the starboard
+  index persist to disk and are restored on boot.
+- **Ticket QoL:** paste an order number (FM-2026-…) in any ticket and the bot
+  instantly replies with the live order status + latest timeline.
 - **Logging + leads:** joins, leaves, tickets and buying-intent posted to staff channels.
 - **Slash commands:** `/help /ask /recommend /price /order /vouch /suggest /poll
   /daily /shop /invite /stats /serverinfo /rank /leaderboard` and staff:
