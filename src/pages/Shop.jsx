@@ -92,12 +92,27 @@ export default function Shop() {
 
       {/* Main */}
       <main className="flex-1 min-w-0">
-        <div className="rounded-2xl p-7 mb-6 text-white shadow-lg shadow-violet-500/20"
+        <div className="fm-hero-brand rounded-2xl p-7 mb-6 text-white shadow-lg shadow-violet-500/20"
           style={{ backgroundImage: 'linear-gradient(120deg,#7c5cff,#a855f7)' }}>
+          {(() => { const img = category && iconFor(category); return img ? (
+            <img src={img} alt="" aria-hidden
+              className="absolute right-8 inset-y-0 my-auto w-24 h-24 object-contain drop-shadow-2xl fm-float hidden sm:block" />
+          ) : (
+            <span aria-hidden className="absolute right-9 inset-y-0 my-auto h-fit text-6xl drop-shadow-2xl fm-float hidden sm:block">🛒</span>
+          ); })()}
           <h1 className="text-3xl font-extrabold tracking-tight" style={{ color: '#fff' }}>
             {category ? categoryVisual(category).label : t('shop.all', 'All Products')}
           </h1>
           <p className="text-white/85 mt-1.5">{t('shop.tagline', 'Digital goods, delivered instantly to your inbox & dashboard.')}</p>
+          <div className="flex flex-wrap items-center gap-2 mt-4">
+            <span className="text-[11.5px] font-semibold bg-white/15 border border-white/25 rounded-full px-2.5 py-1">⚡ {t('product.instant', 'Instant delivery')}</span>
+            <span className="text-[11.5px] font-semibold bg-white/15 border border-white/25 rounded-full px-2.5 py-1">🛡 {t('product.protected', 'Buyer protected')}</span>
+            {products !== null && (
+              <span className="text-[11.5px] font-semibold bg-white/15 border border-white/25 rounded-full px-2.5 py-1">
+                {visible.length} {t('shop.items', 'items')}
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Trending row */}

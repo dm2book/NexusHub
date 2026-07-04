@@ -9,6 +9,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { usePageMeta, useJsonLd } from '../lib/useMeta.js';
 import { useI18n } from '../lib/i18n.jsx';
 import { LangSwitch } from '../components/store/StoreNav.jsx';
+import { flyToCart } from '../lib/flyToCart.js';
 import { api } from '../lib/api.js';
 import { useStats } from '../lib/useStats.js';
 import { useReviews } from '../lib/useReviews.js';
@@ -191,7 +192,7 @@ export default function HomeStore() {
 
           <LangSwitch className="hidden sm:inline-flex" />
 
-          <Link to="/cart" className="relative w-10 h-10 rounded-xl hover:bg-slate-100 grid place-items-center text-slate-700">
+          <Link to="/cart" data-cart-target className="relative w-10 h-10 rounded-xl hover:bg-slate-100 grid place-items-center text-slate-700">
             <ShoppingCart size={20} />
             {count > 0 && (
               <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-violet-600 text-white text-[11px] font-semibold grid place-items-center">{count}</span>
@@ -366,8 +367,9 @@ export default function HomeStore() {
                     <div className="flex items-center gap-2 mt-3">
                       <Link to={`/shop?category=${p.slug}`} className="flex-1 text-center text-white text-sm font-semibold rounded-lg h-9 grid place-items-center hover:brightness-105 transition"
                         style={{ backgroundImage: 'linear-gradient(135deg,#7c5cff,#a855f7)' }}>{tr('product.buyNow', 'Buy Now')}</Link>
-                      <button onClick={() => addToCart(p)} aria-label={`Add ${p.cheapest.name} to cart`}
-                        className="w-9 h-9 rounded-lg border border-slate-200 grid place-items-center text-slate-500 hover:bg-slate-50 hover:text-violet-600">
+                      <button aria-label={`Add ${p.cheapest.name} to cart`}
+                        onClick={(e) => { flyToCart(e.currentTarget.closest('.snap-start')?.querySelector('img')); addToCart(p); }}
+                        className="w-9 h-9 rounded-lg border border-slate-200 grid place-items-center text-slate-500 hover:bg-slate-50 hover:text-violet-600 active:scale-90 transition-transform">
                         <ShoppingCart size={16} />
                       </button>
                     </div>
@@ -419,7 +421,7 @@ export default function HomeStore() {
             </div>
 
             {/* Discord */}
-            <div className="rounded-2xl p-6 text-white shadow-lg shadow-indigo-500/20 flex flex-col fm-lift"
+            <div className="fm-hero-brand rounded-2xl p-6 text-white shadow-lg shadow-indigo-500/20 flex flex-col fm-lift"
               style={{ backgroundImage: 'linear-gradient(150deg,#6366f1,#8b5cf6)' }}>
               <span className="w-12 h-12 rounded-2xl bg-white/15 grid place-items-center mb-4"><MessageCircle size={24} /></span>
               <div className="fm-head text-xl">{tr('home.joinDiscord', 'Join Our Discord')}</div>
