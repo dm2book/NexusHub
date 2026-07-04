@@ -96,6 +96,13 @@ const NL = {
   'card.from': 'Vanaf',
   'card.instant': 'Direct',
 
+  // Mobile tab bar
+  'tab.home': 'Home',
+  'tab.shop': 'Shop',
+  'tab.track': 'Volgen',
+  'tab.saved': 'Bewaard',
+  'tab.cart': 'Mandje',
+
   // Wishlist
   'wish.title': 'Verlanglijst',
   'wish.sub': 'Opgeslagen items — bewaard in deze browser.',
@@ -162,6 +169,7 @@ const NL = {
   'product.reviewsAll': 'Alle reviews →',
   'product.verifiedCount': 'geverifieerde reviews',
   'product.realBuyers': 'Alleen echte kopers',
+  'product.chooseAmount': 'Kies je hoeveelheid',
   'product.related': 'Vergelijkbare producten',
 
   // Checkout

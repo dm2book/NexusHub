@@ -388,7 +388,10 @@ client.once(Events.ClientReady, (c) => {
   setInterval(sweep, 30 * 60_000);
 
   // Weekly XP leaderboard (Mondays 17:00+ UTC, once per week).
-  setInterval(() => c.guilds.cache.forEach((g) => maybePostWeeklyLeaderboard(g)), 60 * 60_000);
+  setInterval(() => c.guilds.cache.forEach((g) => {
+    maybePostWeeklyLeaderboard(g);
+    maybePostWeeklyDigest(g);
+  }), 60 * 60_000);
 
   // Resume any giveaways that were live before a restart.
   restoreGiveaways(c);
@@ -727,6 +730,7 @@ async function handleCommand(i) {
       "`/rank` — your level & XP\n`/daily` — claim your daily XP (streaks!)\n`/leaderboard` — top members\n" +
       "`/close` — staff: close a ticket\n`/giveaway` — staff: start a giveaway\n`/reroll` — staff: reroll a winner\n" +
       "`/coupon` — staff: post a discount code\n`/flashsale` — staff: countdown deal in #deals\n" +
+      "`/digest` — staff: live store numbers\n`/stock` — staff: low-stock check\n" +
       "`/announce` — staff: post an announcement\n`/serverinfo` — server stats\n" +
       "Buttons: verify in #verify, pick roles in #roles, open a ticket in #open-a-ticket." });
   }
@@ -740,6 +744,8 @@ async function handleCommand(i) {
   if (i.commandName === 'rank') return rankCmd(i);
   if (i.commandName === 'leaderboard') return leaderboardCmd(i);
   if (i.commandName === 'suggest') return postSuggestion(i);
+  if (i.commandName === 'digest') return digestCmd(i);
+  if (i.commandName === 'stock') return stockCmd(i);
   if (i.commandName === 'coupon') return postCoupon(i);
   if (i.commandName === 'flashsale') return flashSale(i);
   if (i.commandName === 'announce') return postAnnounce(i);
@@ -1125,6 +1131,75 @@ async function flashSale(i) {
   }, minutes * 60_000);
   leadLog(i.guild, `⚡ Flash sale started by <@${i.user.id}>: "${deal}" (${minutes} min${code ? `, code ${code.toUpperCase()}` : ''})`);
   return i.reply({ content: `Flash sale live in <#${ch.id}> — ends in **${minutes} min**.`, ephemeral: true });
+}
+
+// ── Staff digest: live store numbers via the signed digest endpoint ──────────
+async function fetchDigest() {
+  if (!FORGEMARKET_API_URL || !REVIEW_INGEST_SECRET) return null;
+  try {
+    const ts = String(Date.now());
+    const signature = createHmac('sha256', REVIEW_INGEST_SECRET).update(`${ts}.digest`).digest('hex');
+    const res = await fetch(`${FORGEMARKET_API_URL.replace(/\/$/, '')}/api/discord/digest`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-timestamp': ts, 'x-signature': signature },
+      body: '{}',
+    });
+    if (!res.ok) throw new Error(`digest ${res.status}`);
+    return await res.json();
+  } catch (e) { console.error('[digest]', e.message); return null; }
+}
+
+function digestEmbed(d) {
+  const w = d.week || {};
+  const top = (d.topProducts || []).map((p, i) =>
+    `${i + 1}. ${p.name} — ${money(p.revenue ?? 0)} (${p.units ?? 0}×)`).join('\n') || '—';
+  const low = (d.lowStock || []).map((p) => `• ${p.name}: **${p.available}** left`).join('\n') || 'All stocked ✅';
+  return new EmbedBuilder().setColor(0x6366f1)
+    .setTitle('📈 Weekly store digest')
+    .setThumbnail(BRAND_ICON)
+    .addFields(
+      { name: '💶 Revenue (7d)', value: money(w.revenue || 0), inline: true },
+      { name: '🧾 Paid orders (7d)', value: String(w.paidOrders ?? 0), inline: true },
+      { name: '⏳ Pending now', value: String(d.pendingOrders ?? 0), inline: true },
+      { name: '🏆 Top products (7d)', value: top.slice(0, 1024) },
+      { name: '📦 Low stock', value: low.slice(0, 1024) })
+    .setFooter({ text: 'ForgeMarket · live from the store' }).setTimestamp();
+}
+
+function maybePostWeeklyDigest(guild) {
+  const now = new Date();
+  if (now.getUTCDay() !== 1 || now.getUTCHours() < 8) return; // Monday morning
+  const week = `${now.getUTCFullYear()}-dw${Math.ceil(((now - new Date(Date.UTC(now.getUTCFullYear(), 0, 1))) / 86_400_000 + 1) / 7)}`;
+  if (META.lastDigestPost === week) return;
+  fetchDigest().then((d) => {
+    if (!d) return;
+    const ch = findChannel(guild, 'staff-announcements') || findChannel(guild, 'leads');
+    if (!ch) return;
+    META.lastDigestPost = week;
+    saveMeta();
+    ch.send({ embeds: [digestEmbed(d)] }).catch(() => {});
+  });
+}
+
+// /digest + /stock — staff-only, on demand
+async function digestCmd(i) {
+  if (!isStaff(i.member)) return i.reply({ content: 'Staff only.', ephemeral: true });
+  await i.deferReply({ ephemeral: true });
+  const d = await fetchDigest();
+  if (!d) return i.editReply('Couldn’t reach the store digest — check FORGEMARKET_API_URL & REVIEW_INGEST_SECRET.');
+  return i.editReply({ embeds: [digestEmbed(d)] });
+}
+
+async function stockCmd(i) {
+  if (!isStaff(i.member)) return i.reply({ content: 'Staff only.', ephemeral: true });
+  await i.deferReply({ ephemeral: true });
+  const d = await fetchDigest();
+  if (!d) return i.editReply('Couldn’t reach the store — check FORGEMARKET_API_URL & REVIEW_INGEST_SECRET.');
+  const low = (d.lowStock || []).map((p) => `• ${p.name}: **${p.available}** codes left`).join('\n');
+  return i.editReply({ embeds: [new EmbedBuilder().setColor(low ? 0xf59e0b : 0x10b981)
+    .setTitle(low ? '🟠 Low stock' : '✅ Stock levels healthy')
+    .setDescription(low || 'Every active product has enough pre-loaded codes.')
+    .setFooter({ text: 'ForgeMarket · stock monitor' }).setTimestamp()] });
 }
 
 // ── Daily vouch spotlight → #general (social proof on autopilot) ─────────────

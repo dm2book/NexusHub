@@ -29,6 +29,14 @@ export default function CheckoutSuccess() {
           Thanks! Your order{number ? <> <span className="font-mono text-white">{number}</span></> : ''} is confirmed and
           now being prepared. Digital deliveries appear automatically once fulfilled.
         </p>
+        <div className="mt-6 mx-auto max-w-sm rounded-2xl border border-indigo-500/25 bg-indigo-500/10 p-4 text-left">
+          <div className="text-white text-sm font-semibold">💬 Join our Discord</div>
+          <p className="text-slate-400 text-[13px] mt-1">
+            Live restock pings, flash deals & giveaways — and instant support if you need us.
+          </p>
+          <Link to="/discord" className="inline-flex items-center gap-1.5 mt-2.5 text-sm font-semibold text-white rounded-lg px-3.5 py-2"
+            style={{ background: '#5865F2' }}>Join the community →</Link>
+        </div>
         <div className="flex justify-center gap-3 mt-8">
           {user && orderId
             ? <Link to={`/account/orders/${orderId}`} className="btn-primary"><LayoutDashboard size={18} /> View order</Link>

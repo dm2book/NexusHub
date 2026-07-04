@@ -164,6 +164,34 @@ export default function ProductDetail() {
 
           <div className="text-3xl font-semibold mt-4 gradient-text gradient-anim">{money(product.price, product.currency)}</div>
 
+          {/* Pack switcher — jump between sizes of the same category in one tap */}
+          {related.length > 0 && (
+            <div className="mt-5">
+              <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">
+                {t('product.chooseAmount', 'Choose your amount')}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {[product, ...related]
+                  .sort((a, b) => a.price - b.price)
+                  .map((p) => {
+                    const current = p.id === product.id;
+                    return current ? (
+                      <span key={p.id}
+                        className="px-3.5 py-2 rounded-xl text-sm font-bold text-white shadow-lg shadow-violet-500/30"
+                        style={{ backgroundImage: 'linear-gradient(135deg,#7c5cff,#a855f7)' }}>
+                        {p.name} · {money(p.price, p.currency)}
+                      </span>
+                    ) : (
+                      <Link key={p.id} to={`/product/${p.id}`}
+                        className="px-3.5 py-2 rounded-xl text-sm font-semibold glass text-slate-300 border border-white/10 hover:border-violet-400/60 hover:text-white transition">
+                        {p.name} · {money(p.price, p.currency)}
+                      </Link>
+                    );
+                  })}
+              </div>
+            </div>
+          )}
+
           {/* delivery estimate */}
           <div className="inline-flex items-center gap-2 mt-3 text-sm text-emerald-600 bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-3 py-1.5">
             <Zap size={14} /> Estimated delivery: <b>{eta}</b> after payment
