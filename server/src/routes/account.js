@@ -117,7 +117,7 @@ const STATUS_BUCKET = {
 };
 
 router.get('/dashboard', asyncHandler(async (req, res) => {
-  const [byId, byEmail, downloads, tickets, unread, wallet, affiliate] = await Promise.all([
+  const [byId, byEmail, downloads, tickets, unread, wallet, affiliate, loyalty] = await Promise.all([
     listOrders({ userId: req.user.id, limit: 100 }),
     listOrders({ email: req.user.email, limit: 100 }),
     all(`SELECT d.* FROM deliveries d JOIN orders o ON o.id=d.order_id
@@ -127,6 +127,7 @@ router.get('/dashboard', asyncHandler(async (req, res) => {
     notif.unreadCount(req.user.id),
     walletSummary(req.user.id),
     affiliateStats(req.user.id, req.user.email),
+    loyaltyFor(req.user.id),
   ]);
   const merged = dedupe([...byId.orders, ...byEmail.orders]);
   const buckets = { pending: 0, processing: 0, delivered: 0, refunded: 0 };
@@ -144,6 +145,7 @@ router.get('/dashboard', asyncHandler(async (req, res) => {
     },
     ordersByStatus: buckets,
     recentOrders: merged.slice(0, 5),
+    loyalty,
   });
 }));
 

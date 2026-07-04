@@ -268,6 +268,61 @@ async function updatePriceList(guild) {
   } catch (e) { console.error('[price-list]', e.message); }
 }
 
+// ── Self-healing panel banners ────────────────────────────────────────────────
+// setup.js posts the panels, but banners were added later — instead of asking
+// the owner to re-run setup, the bot upgrades its own panels in place on boot:
+// it finds each marker message and EDITS the embed to add the banner + colour.
+const PANEL_BANNERS = {
+  welcome: ['welcome', 0x7c5cff],
+  rules: ['rules', 0x94a3b8],
+  verify: ['verify', 0x22c55e],
+  'open-a-ticket': ['support', 0x3b82f6],
+  'support-info': ['support', 0x3b82f6],
+  products: ['products', 0x6366f1],
+  'price-list': ['products', 0x6366f1],
+  deals: ['deals', 0xef4444],
+  'discount-codes': ['deals', 0xec4899],
+  reviews: ['vouches', 0x22c55e],
+  vouchers: ['vouches', 0x22c55e],
+  giveaways: ['giveaways', 0xa855f7],
+};
+
+async function syncPanelBanners(guild) {
+  let edited = 0;
+  const missing = [];
+  for (const [chName, [banner, color]] of Object.entries(PANEL_BANNERS)) {
+    try {
+      const ch = findChannel(guild, chName);
+      if (!ch || typeof ch.messages?.fetch !== 'function') continue;
+      const msgs = await ch.messages.fetch({ limit: 30 }).catch(() => null);
+      const mine = msgs?.find((m) => m.author.id === client.user.id
+        && m.embeds[0]?.footer?.text === 'forgemarket-setup');
+      if (!mine) { missing.push(chName); continue; }
+      const url = BANNER(banner);
+      if (mine.embeds[0].image?.url === url) { edited += 0; continue; } // already current
+      const e = EmbedBuilder.from(mine.embeds[0]).setImage(url).setColor(color);
+      await mine.edit({ embeds: [e] });
+      edited++;
+    } catch (e) { console.error('[panel-sync]', chName, e.message); }
+  }
+  if (edited) console.log(`🖼️  [panel-sync] banners added/refreshed on ${edited} panel(s)`);
+  if (missing.length) console.log(`ℹ️  [panel-sync] no setup panel found in: ${missing.join(', ')} — run \`REPOST=1 npm run setup\` once to create them`);
+}
+
+// Startup self-check: are the brand banners actually reachable? If the store
+// deploy isn't live (or STORE_URL is wrong) this makes the cause obvious in logs.
+async function checkBrandAssets() {
+  try {
+    const res = await fetch(BANNER('welcome'), { method: 'HEAD' });
+    if (res.ok) console.log(`✅ Brand banners live at ${STORE_URL}/discord/`);
+    else console.warn(`⚠️  Banner check: ${BANNER('welcome')} → HTTP ${res.status}.\n   Panels/embeds will show WITHOUT images until the site serves them.\n   Fix: make sure the latest site deploy is live and STORE_URL (${STORE_URL}) is your real site URL.`);
+    return res.ok;
+  } catch (e) {
+    console.warn(`⚠️  Banner check failed (${e.message}) — is STORE_URL correct? (${STORE_URL})`);
+    return false;
+  }
+}
+
 // ── Anti-scam: staff impersonation detection ─────────────────────────────────
 // Normalizes lookalike characters (0→o, 1→l, …) so "F0rgeSupp0rt" matches
 // "ForgeSupport". Alerts land in #scam-warning (falls back to #mod-log).
@@ -337,6 +392,12 @@ client.once(Events.ClientReady, (c) => {
 
   // Resume any giveaways that were live before a restart.
   restoreGiveaways(c);
+
+  // Self-heal the channel panels: verify banner URLs, then edit banners into
+  // the existing setup messages (no manual re-run of setup needed).
+  checkBrandAssets().then((ok) => {
+    if (ok) c.guilds.cache.forEach((g) => syncPanelBanners(g));
+  });
 
   // Daily vouch spotlight → #general (checked hourly, posts once a day).
   setInterval(() => c.guilds.cache.forEach((g) => maybeVouchSpotlight(g)), 60 * 60_000);

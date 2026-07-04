@@ -34,10 +34,38 @@ export default function Dashboard() {
     { icon: RotateCcw, label: 'Refunded', value: buckets.refunded, tone: 'text-fuchsia-300 bg-fuchsia-500/10', to: '/account/orders' },
   ];
 
+  const loyalty = data.loyalty;
   return (
     <div>
-      <h1 className="text-2xl text-white mb-1">Welcome back{user?.displayName ? `, ${user.displayName}` : ''}</h1>
-      <p className="text-slate-400 mb-7">Here’s everything happening on your account.</p>
+      {/* Gradient welcome header with live loyalty tier + progress to the next */}
+      <div className="fm-hero-brand relative overflow-hidden rounded-2xl p-6 mb-7 text-white shadow-lg shadow-violet-900/30"
+        style={{ backgroundImage: 'linear-gradient(120deg,#4f46e5,#7c3aed 55%,#a21caf)' }}>
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className="text-2xl font-bold">Welcome back{user?.displayName ? `, ${user.displayName}` : ''} 👋</h1>
+          {loyalty && (
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide rounded-full px-3 py-1 border"
+              style={{ color: loyalty.color, borderColor: `${loyalty.color}66`, background: `${loyalty.color}1f` }}>
+              ★ {loyalty.tierName}
+            </span>
+          )}
+        </div>
+        <p className="text-white/75 mt-1 text-sm">Here’s everything happening on your account.</p>
+        {loyalty?.next && (
+          <div className="mt-4 max-w-md">
+            <div className="flex justify-between text-[11.5px] text-white/70 mb-1.5">
+              <span>{loyalty.tierName}</span>
+              <span>{money(loyalty.remainingToNext, 'EUR')} to {loyalty.next.name}</span>
+            </div>
+            <div className="h-2 rounded-full bg-white/15 overflow-hidden">
+              <div className="h-full rounded-full bg-gradient-to-r from-amber-300 to-amber-400 transition-all duration-700"
+                style={{ width: `${Math.max(4, loyalty.progress)}%` }} />
+            </div>
+          </div>
+        )}
+        {loyalty && !loyalty.next && (
+          <p className="mt-3 text-[12.5px] text-amber-200 font-semibold">💎 Highest tier reached — enjoy the perks!</p>
+        )}
+      </div>
 
       {/* Highlight cards: wallet + referrals + notifications */}
       <div className="grid md:grid-cols-3 gap-4 mb-6">
