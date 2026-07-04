@@ -160,6 +160,8 @@ const NL = {
   'product.supportSub': 'Altijd bereikbaar',
   'product.onlyLeft': 'Nog maar {n} beschikbaar',
   'product.reviewsAll': 'Alle reviews →',
+  'product.verifiedCount': 'geverifieerde reviews',
+  'product.realBuyers': 'Alleen echte kopers',
   'product.related': 'Vergelijkbare producten',
 
   // Checkout

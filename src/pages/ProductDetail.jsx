@@ -18,6 +18,7 @@ import { usePageMeta, useJsonLd } from '../lib/useMeta.js';
 import { useI18n } from '../lib/i18n.jsx';
 import { recordProductView, useRecentlyViewed } from '../lib/recentlyViewed.js';
 import { flyToCart } from '../lib/flyToCart.js';
+import Tilt from '../components/Tilt.jsx';
 
 const TRUST = [
   { icon: Zap, key: 'instant', title: 'Instant delivery', sub: 'Codes in seconds' },
@@ -122,9 +123,10 @@ export default function ProductDetail() {
       </Link>
 
       <div className="grid lg:grid-cols-2 gap-10">
-        {/* visual — shared-element morph target from the product card */}
+        {/* visual — shared-element morph target, with pointer-driven 3D tilt */}
+        <Tilt max={6} className="h-80 lg:h-[420px]">
         <div style={{ viewTransitionName: 'product-hero' }}
-          className={`shine-host group relative rounded-3xl bg-gradient-to-br ${grad} h-80 lg:h-[420px] overflow-hidden animate-fade-in ${product.featured ? 'ring-featured' : ''}`}>
+          className={`shine-host group relative rounded-3xl bg-gradient-to-br ${grad} h-full overflow-hidden animate-fade-in ${product.featured ? 'ring-featured' : ''}`}>
           {product.image ? (
             <img data-pd-media src={product.image} alt={product.name} className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
           ) : (
@@ -140,6 +142,7 @@ export default function ProductDetail() {
             </span>
           )}
         </div>
+        </Tilt>
 
         {/* details */}
         <div className="animate-fade-up">
@@ -221,12 +224,18 @@ export default function ProductDetail() {
             <Link to="/reviews" className="text-violet-600 text-sm font-semibold hover:underline">All reviews →</Link>
           </div>
           {stats.reviews > 0 && (
-            <div className="flex items-center gap-3 mb-5">
-              <div className="text-4xl font-extrabold text-slate-900">{stats.rating}</div>
+            <div className="fm-hero-brand flex items-center gap-4 mb-5 rounded-2xl p-5 text-white shadow-lg shadow-violet-500/20"
+              style={{ backgroundImage: 'linear-gradient(120deg,#7c5cff,#a855f7)' }}>
+              <div className="text-5xl font-extrabold leading-none drop-shadow">{stats.rating}</div>
               <div>
-                <div className="flex text-amber-400">{Array.from({ length: 5 }).map((_, i) => <Star key={i} size={15} fill="currentColor" />)}</div>
-                <div className="text-slate-400 text-sm">{stats.reviews.toLocaleString('en-US')} verified reviews</div>
+                <div className="flex text-amber-300">{Array.from({ length: 5 }).map((_, i) => <Star key={i} size={16} fill="currentColor" />)}</div>
+                <div className="text-white/85 text-sm mt-1">
+                  {stats.reviews.toLocaleString('en-US')} {t('product.verifiedCount', 'verified reviews')}
+                </div>
               </div>
+              <span className="ml-auto hidden sm:inline-flex items-center gap-1.5 text-[11px] font-bold bg-white/15 border border-white/25 rounded-full px-2.5 py-1">
+                <BadgeCheck size={12} /> {t('product.realBuyers', 'Real buyers only')}
+              </span>
             </div>
           )}
           <div className="space-y-3">
