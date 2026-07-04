@@ -17,6 +17,7 @@ import { useWishlist } from '../lib/wishlist.js';
 import { usePageMeta, useJsonLd } from '../lib/useMeta.js';
 import { useI18n } from '../lib/i18n.jsx';
 import { recordProductView, useRecentlyViewed } from '../lib/recentlyViewed.js';
+import { flyToCart } from '../lib/flyToCart.js';
 
 const TRUST = [
   { icon: Zap, key: 'instant', title: 'Instant delivery', sub: 'Codes in seconds' },
@@ -108,7 +109,10 @@ export default function ProductDetail() {
   const eta = stats.avgDeliverySeconds < 60 ? `~${Math.max(5, Math.round(stats.avgDeliverySeconds))} seconds` : `~${Math.round(stats.avgDeliverySeconds / 60)} min`;
   const wished = has(product.id);
 
-  const addToCart = () => { add(product, qty); toast.success(`${qty}× ${product.name} added to cart`); };
+  const addToCart = () => {
+    flyToCart(document.querySelector('[data-pd-media]'));
+    add(product, qty); toast.success(`${qty}× ${product.name} added to cart`);
+  };
   const buyNow = () => { add(product, qty); navigate('/cart'); };
 
   return (
@@ -122,7 +126,7 @@ export default function ProductDetail() {
         <div style={{ viewTransitionName: 'product-hero' }}
           className={`shine-host group relative rounded-3xl bg-gradient-to-br ${grad} h-80 lg:h-[420px] overflow-hidden animate-fade-in ${product.featured ? 'ring-featured' : ''}`}>
           {product.image ? (
-            <img src={product.image} alt={product.name} className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+            <img data-pd-media src={product.image} alt={product.name} className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
           ) : (
             <>
               <div className="absolute inset-0 bg-grid opacity-30" />

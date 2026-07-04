@@ -1,9 +1,19 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { ShoppingCart } from 'lucide-react';
+import { ShoppingCart, Zap } from 'lucide-react';
 import { categoryVisual, money } from '../../lib/catalog.js';
 import { useI18n } from '../../lib/i18n.jsx';
 import { iconFor } from '../../lib/sampleCatalog.js';
 import { navigateWithTransition } from '../../lib/viewTransition.js';
+import { flyToCart } from '../../lib/flyToCart.js';
+
+// Per-category glow colour behind the artwork (falls back to brand violet).
+const GLOW = {
+  robux: '#22c55e', 'v-bucks': '#3b82f6', valorant: '#ef4444', giftcard: '#f59e0b',
+  steam: '#64748b', playstation: '#2563eb', xbox: '#16a34a', 'discord-nitro': '#5865F2',
+  itunes: '#ec4899', cod: '#84cc16', apex: '#dc2626', genshin: '#a855f7',
+  brawl: '#f59e0b', clash: '#f97316', subscriptions: '#8b5cf6', amazon: '#f59e0b',
+};
+const glowFor = (cat) => GLOW[cat] || '#7c5cff';
 
 /** Light-theme product card matching the storefront design. */
 export default function LightProductCard({ product, onAdd }) {
@@ -25,7 +35,9 @@ export default function LightProductCard({ product, onAdd }) {
 
   return (
     <div className="group bg-white rounded-2xl border border-slate-200/70 shadow-sm fm-lift p-4 flex flex-col">
-      <a href={to} onClick={openWithMorph} className="relative rounded-xl bg-slate-50 h-[150px] grid place-items-center mb-3 overflow-hidden">
+      <a href={to} onClick={openWithMorph}
+        className="fm-card-media relative rounded-xl bg-slate-50 h-[150px] grid place-items-center mb-3"
+        style={{ '--card-glow': `radial-gradient(circle, ${glowFor(product.category)}45, transparent 70%)` }}>
         {product.featured && (
           <span className="absolute top-2.5 left-2.5 z-10 text-[10px] font-bold text-amber-600 bg-amber-100 rounded-full px-2 py-0.5">★ Featured</span>
         )}
@@ -37,6 +49,9 @@ export default function LightProductCard({ product, onAdd }) {
         {product.sold > 20 && (
           <span className="absolute bottom-2.5 left-2.5 z-10 text-[10px] font-semibold text-orange-600 bg-orange-50 rounded-full px-2 py-0.5">🔥 High demand</span>
         )}
+        <span className="absolute bottom-2.5 right-2.5 z-10 inline-flex items-center gap-0.5 text-[10px] font-bold text-violet-700 bg-white/85 backdrop-blur rounded-full px-2 py-0.5 shadow-sm">
+          <Zap size={10} className="fill-current" /> {t('card.instant', 'Instant')}
+        </span>
         {img ? (
           <img data-morph src={img} alt={product.name} className="w-24 h-24 object-contain drop-shadow-md group-hover:scale-105 transition-transform" />
         ) : (
@@ -52,8 +67,12 @@ export default function LightProductCard({ product, onAdd }) {
       <div className="flex items-center gap-2 mt-3">
         <Link to={`/product/${product.id}`} className="flex-1 text-center text-sm font-semibold rounded-lg h-9 grid place-items-center hover:brightness-105 transition"
           style={{ backgroundImage: 'linear-gradient(135deg,#7c5cff,#a855f7)', color: '#fff' }}>{t('product.buyNow', 'Buy Now')}</Link>
-        <button onClick={() => onAdd?.(product)} aria-label="Add to cart"
-          className="w-9 h-9 rounded-lg border border-slate-200 grid place-items-center text-slate-500 hover:bg-slate-50 hover:text-violet-600">
+        <button aria-label="Add to cart"
+          onClick={(e) => {
+            flyToCart(e.currentTarget.closest('.group')?.querySelector('[data-morph]'));
+            onAdd?.(product);
+          }}
+          className="w-9 h-9 rounded-lg border border-slate-200 grid place-items-center text-slate-500 hover:bg-slate-50 hover:text-violet-600 active:scale-90 transition-transform">
           <ShoppingCart size={16} />
         </button>
       </div>

@@ -430,3 +430,71 @@ h1, h2, h3, .font-display { font-family: 'Orbitron', sans-serif; letter-spacing:
   .fm-px { translate: none !important; }
   ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
 }
+
+/* ── Storefront 100x polish ─────────────────────────────────────────────── */
+
+/* Brand text selection everywhere. */
+::selection { background: rgba(124, 92, 255, .28); color: inherit; }
+
+/* Slim, on-brand scrollbars (WebKit + Firefox). */
+* { scrollbar-width: thin; scrollbar-color: rgba(124, 92, 255, .35) transparent; }
+*::-webkit-scrollbar { width: 9px; height: 9px; }
+*::-webkit-scrollbar-thumb { background: rgba(124, 92, 255, .3); border-radius: 999px; border: 2px solid transparent; background-clip: content-box; }
+*::-webkit-scrollbar-thumb:hover { background-color: rgba(124, 92, 255, .5); }
+*::-webkit-scrollbar-track { background: transparent; }
+
+/* Cart badge pop — fired by flyToCart() when an item lands in the cart. */
+@keyframes fmCartPop {
+  0% { transform: scale(1); }
+  35% { transform: scale(1.35) rotate(-6deg); }
+  70% { transform: scale(.94); }
+  100% { transform: scale(1); }
+}
+.fm-cart-pop { animation: fmCartPop .5s var(--ease-spring); }
+
+/* Product-card media: per-category glow blob behind the artwork. */
+.fm-card-media { position: relative; overflow: hidden; isolation: isolate; }
+.fm-card-media::before {
+  content: ''; position: absolute; inset: 18% 22%; z-index: 0; border-radius: 50%;
+  background: var(--card-glow, radial-gradient(circle, rgba(124,92,255,.35), transparent 70%));
+  filter: blur(18px); opacity: .55;
+  transition: opacity var(--dur-base) ease, transform var(--dur-base) var(--ease-expressive);
+}
+/* Only lift the artwork above the glow — NOT the absolutely-positioned badges,
+   which must keep their Tailwind `absolute` (this rule would otherwise override
+   it at equal specificity and stack every badge inline at the top). */
+.fm-card-media > [data-morph] { position: relative; z-index: 1; }
+@media (hover: hover) {
+  .group:hover .fm-card-media::before { opacity: .85; transform: scale(1.15); }
+}
+
+/* Shine sweep across card media on hover (uses the existing shine tokens). */
+.fm-card-media::after {
+  content: ''; position: absolute; top: -60%; bottom: -60%; left: -80%; width: 50%;
+  z-index: 2; transform: rotate(18deg);
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.5), transparent);
+  transition: left .7s var(--ease-glide); pointer-events: none;
+}
+@media (hover: hover) { .group:hover .fm-card-media::after { left: 170%; } }
+
+/* Storefront hero panel: brand grid + glow composition (pure CSS, no assets). */
+.fm-hero-brand { position: relative; overflow: hidden; isolation: isolate; }
+.fm-hero-brand::before {
+  content: ''; position: absolute; inset: 0; z-index: 0; opacity: .16;
+  background-image: linear-gradient(rgba(255,255,255,.5) 1px, transparent 1px),
+                    linear-gradient(90deg, rgba(255,255,255,.5) 1px, transparent 1px);
+  background-size: 42px 42px;
+  mask-image: radial-gradient(ellipse at 25% 40%, black 25%, transparent 78%);
+}
+.fm-hero-brand::after {
+  content: ''; position: absolute; right: -120px; top: -140px; z-index: 0;
+  width: 420px; height: 420px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,255,255,.28), transparent 65%);
+  filter: blur(6px);
+}
+.fm-hero-brand > * { position: relative; z-index: 1; }
+
+@media (prefers-reduced-motion: reduce) {
+  .fm-cart-pop { animation: none !important; }
+  .fm-card-media::after { display: none; }
+}

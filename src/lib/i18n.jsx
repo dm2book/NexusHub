@@ -94,6 +94,7 @@ const NL = {
 
   // Product card
   'card.from': 'Vanaf',
+  'card.instant': 'Direct',
 
   // Wishlist
   'wish.title': 'Verlanglijst',
@@ -139,6 +140,7 @@ const NL = {
   'shop.sortPriceAsc': 'Prijs: laag → hoog',
   'shop.sortPriceDesc': 'Prijs: hoog → laag',
   'shop.sortName': 'Naam A–Z',
+  'shop.items': 'producten',
   'shop.none': 'Nog geen producten',
   'shop.noMatches': 'Geen resultaten',
   'shop.noneSub': 'Producten verschijnen hier zodra ze zijn toegevoegd.',
