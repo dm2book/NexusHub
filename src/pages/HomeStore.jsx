@@ -18,6 +18,7 @@ import { useParallax } from '../lib/useParallax.js';
 import CountUp from '../components/CountUp.jsx';
 import RecentlyDelivered from '../components/store/RecentlyDelivered.jsx';
 import CommandPalette from '../components/store/CommandPalette.jsx';
+import MobileTabBar from '../components/store/MobileTabBar.jsx';
 import { SystemStatus } from '../components/store/StoreFooter.jsx';
 import { money } from '../lib/catalog.js';
 import { withFallback, SAMPLE_PRODUCTS } from '../lib/sampleCatalog.js';
@@ -455,6 +456,7 @@ export default function HomeStore() {
       </div>
       <RecentlyDelivered />
       <CommandPalette />
+      <MobileTabBar />
     </div>
   );
 }
