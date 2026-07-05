@@ -28,10 +28,10 @@ const TRUST = [
 ];
 
 const FAQ = [
-  ['How fast will I get it?', 'Most orders are delivered automatically within seconds of your payment being confirmed — straight to your email and account dashboard.'],
-  ['How do I pay?', 'Securely via Tikkie, Revolut or PayPal. You submit your transaction reference and we confirm it, usually within minutes.'],
-  ['Is it safe?', 'Yes — every order is buyer-protected and money-back guaranteed. We use passwordless login and fraud screening on every order.'],
-  ['What if it doesn’t arrive?', 'Open a ticket from your dashboard or our Discord — we resolve delivery issues fast, and eligible orders are fully refundable.'],
+  ['How fast will I get it?', 'Most orders are delivered automatically within seconds of your payment being confirmed — straight to your email and account dashboard.', 'speed'],
+  ['How do I pay?', 'Securely via Tikkie, Revolut or PayPal. You submit your transaction reference and we confirm it, usually within minutes.', 'pay'],
+  ['Is it safe?', 'Yes — every order is buyer-protected and money-back guaranteed. We use passwordless login and fraud screening on every order.', 'safe'],
+  ['What if it doesn’t arrive?', 'Open a ticket from your dashboard or our Discord — we resolve delivery issues fast, and eligible orders are fully refundable.', 'arrive'],
 ];
 
 export default function ProductDetail() {
@@ -96,8 +96,8 @@ export default function ProductDetail() {
   if (notFound) {
     return (
       <div className="section py-24 text-center">
-        <h1 className="text-2xl text-white mb-2">Product not found</h1>
-        <Link to="/shop" className="btn-primary mt-4 inline-flex">Back to shop</Link>
+        <h1 className="text-2xl text-white mb-2">{t('product.notFound', 'Product not found')}</h1>
+        <Link to="/shop" className="btn-primary mt-4 inline-flex">{t('product.back', 'Back to shop')}</Link>
       </div>
     );
   }
@@ -112,7 +112,7 @@ export default function ProductDetail() {
 
   const addToCart = () => {
     flyToCart(document.querySelector('[data-pd-media]'));
-    add(product, qty); toast.success(`${qty}× ${product.name} added to cart`);
+    add(product, qty); toast.success(`${qty}× ${product.name} ${t('cart.addedToCart', 'added to cart')}`);
   };
   const buyNow = () => { add(product, qty); navigate('/cart'); };
 
@@ -138,7 +138,7 @@ export default function ProductDetail() {
           )}
           {product.featured && (
             <span className="absolute left-5 top-5 inline-flex items-center gap-1 text-xs font-bold uppercase bg-black/40 text-amber-300 px-3 py-1.5 rounded-full backdrop-blur">
-              <Zap size={13} /> Featured
+              <Zap size={13} /> {t('product.featured', 'Featured')}
             </span>
           )}
         </div>
@@ -155,8 +155,8 @@ export default function ProductDetail() {
               {Array.from({ length: 5 }).map((_, i) => <Star key={i} size={14} fill="currentColor" />)}
             </span>
             {stats.reviews > 0
-              ? <span className="text-slate-400">{stats.rating} · {stats.reviews.toLocaleString('en-US')} reviews</span>
-              : <span className="text-slate-400">New</span>}
+              ? <span className="text-slate-400">{stats.rating} · {stats.reviews.toLocaleString('en-US')} {t('product.reviewsWord', 'reviews')}</span>
+              : <span className="text-slate-400">{t('product.new', 'New')}</span>}
             {typeof product.stock === 'number' && product.stock > 0 && product.stock <= 10 && (
               <span className="text-red-500 font-semibold">{t('product.onlyLeft', 'Only {n} left', { n: product.stock })}</span>
             )}
@@ -194,14 +194,14 @@ export default function ProductDetail() {
 
           {/* delivery estimate */}
           <div className="inline-flex items-center gap-2 mt-3 text-sm text-emerald-600 bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-3 py-1.5">
-            <Zap size={14} /> Estimated delivery: <b>{eta}</b> after payment
+            <Zap size={14} /> {t('product.eta', 'Estimated delivery:')} <b>{eta}</b> {t('product.etaAfter', 'after payment')}
           </div>
 
           {/* Upsell: nudge to a bigger pack */}
           {upsell && (
             <Link to={`/product/${upsell.id}`} className="group mt-4 flex items-center gap-3 rounded-xl border border-violet-200 bg-violet-50 px-3.5 py-2.5 hover:border-violet-300 transition">
-              <span className="text-[11px] font-bold uppercase tracking-wide text-violet-600 bg-white rounded-md px-1.5 py-0.5">Upgrade</span>
-              <span className="text-sm text-slate-600 flex-1">Get more with <b className="text-slate-900">{upsell.name}</b> — {money(upsell.price, upsell.currency)}</span>
+              <span className="text-[11px] font-bold uppercase tracking-wide text-violet-600 bg-white rounded-md px-1.5 py-0.5">{t('product.upgrade', 'Upgrade')}</span>
+              <span className="text-sm text-slate-600 flex-1">{t('product.getMore', 'Get more with')} <b className="text-slate-900">{upsell.name}</b> — {money(upsell.price, upsell.currency)}</span>
               <ChevronDown size={16} className="-rotate-90 text-violet-500 fm-nudge" />
             </Link>
           )}
@@ -215,7 +215,7 @@ export default function ProductDetail() {
                 <span className="w-10 text-center text-white">{qty}</span>
                 <button onClick={() => setQty((q) => q + 1)} className="p-3 text-slate-300 hover:text-white"><Plus size={16} /></button>
               </div>
-              <span className="text-slate-500 text-sm font-rajdhani uppercase tracking-wide">Quantity</span>
+              <span className="text-slate-500 text-sm font-rajdhani uppercase tracking-wide">{t('product.qty', 'Quantity')}</span>
             </div>
             <div className="grid grid-cols-[1fr_1fr_auto] gap-3">
               <button onClick={addToCart} className="btn-ghost py-3"><ShoppingCart size={18} /> {t('product.addToCart', 'Add to cart')}</button>
@@ -239,7 +239,7 @@ export default function ProductDetail() {
           </div>
 
           <div className="flex items-center gap-2 mt-6 text-sm text-emerald-300">
-            <BadgeCheck size={16} /> Delivered to your dashboard automatically after payment
+            <BadgeCheck size={16} /> {t('product.autoDeliver', 'Delivered to your dashboard automatically after payment')}
           </div>
         </div>
       </div>
@@ -248,8 +248,8 @@ export default function ProductDetail() {
       <div className="grid lg:grid-cols-2 gap-10 mt-16">
         <section>
           <div className="flex items-center justify-between mb-5">
-            <h2 className="text-2xl font-extrabold text-slate-900">What buyers say</h2>
-            <Link to="/reviews" className="text-violet-600 text-sm font-semibold hover:underline">All reviews →</Link>
+            <h2 className="text-2xl font-extrabold text-slate-900">{t('product.buyersSay', 'What buyers say')}</h2>
+            <Link to="/reviews" className="text-violet-600 text-sm font-semibold hover:underline">{t('product.reviewsAll', 'All reviews →')}</Link>
           </div>
           {stats.reviews > 0 && (
             <div className="fm-hero-brand flex items-center gap-4 mb-5 rounded-2xl p-5 text-white shadow-lg shadow-violet-500/20"
@@ -268,7 +268,7 @@ export default function ProductDetail() {
           )}
           <div className="space-y-3">
             {reviews.length === 0 && (
-              <div className="card p-4 text-slate-400 text-sm">No reviews yet — be the first after your purchase.</div>
+              <div className="card p-4 text-slate-400 text-sm">{t('product.noReviews', 'No reviews yet — be the first after your purchase.')}</div>
             )}
             {reviews.slice(0, 3).map((r) => (
               <div key={r.id} className="card p-4 fm-lift">
@@ -276,7 +276,7 @@ export default function ProductDetail() {
                 <p className="text-slate-200 text-sm">“{r.body}”</p>
                 <div className="flex items-center gap-1.5 mt-2 text-xs text-slate-500">
                   <BadgeCheck size={12} className="text-emerald-500" /> {r.author}
-                  {r.verified ? <span className="text-emerald-600 font-semibold">· Verified buyer</span> : (r.product ? ` · ${r.product}` : ' · Verified')}
+                  {r.verified ? <span className="text-emerald-600 font-semibold">· {t('product.verifiedBuyer', 'Verified buyer')}</span> : (r.product ? ` · ${r.product}` : ` · ${t('product.verifiedShort', 'Verified')}`)}
                 </div>
               </div>
             ))}
@@ -284,16 +284,16 @@ export default function ProductDetail() {
         </section>
 
         <section>
-          <h2 className="text-2xl font-extrabold text-slate-900 mb-5">Frequently asked</h2>
+          <h2 className="text-2xl font-extrabold text-slate-900 mb-5">{t('product.faqTitle', 'Frequently asked')}</h2>
           <div className="space-y-3">
-            {FAQ.map(([q, a], i) => (
+            {FAQ.map(([q, a, key], i) => (
               <button key={q} onClick={() => setOpenFaq(openFaq === i ? -1 : i)}
                 className="card w-full text-left p-4">
                 <div className="flex items-center justify-between gap-3">
-                  <span className="text-white font-medium text-sm">{q}</span>
+                  <span className="text-white font-medium text-sm">{t(`faq.${key}q`, q)}</span>
                   <ChevronDown size={16} className={`text-slate-400 shrink-0 transition-transform ${openFaq === i ? 'rotate-180' : ''}`} />
                 </div>
-                {openFaq === i && <p className="text-slate-400 text-sm mt-2.5 leading-relaxed">{a}</p>}
+                {openFaq === i && <p className="text-slate-400 text-sm mt-2.5 leading-relaxed">{t(`faq.${key}a`, a)}</p>}
               </button>
             ))}
           </div>
@@ -302,9 +302,9 @@ export default function ProductDetail() {
 
       {crossSell.length > 0 && (
         <div className="mt-16">
-          <h2 className="text-2xl font-extrabold text-slate-900 mb-6">{recs.crossSell?.length ? 'Frequently bought together' : 'You might also like'}</h2>
+          <h2 className="text-2xl font-extrabold text-slate-900 mb-6">{recs.crossSell?.length ? t('product.boughtTogether', 'Frequently bought together') : t('product.alsoLike', 'You might also like')}</h2>
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 fm-grid-in">
-            {crossSell.map((p) => <LightProductCard key={p.id} product={p} onAdd={(x) => { add(x); toast.success(`${x.name} added`); }} />)}
+            {crossSell.map((p) => <LightProductCard key={p.id} product={p} onAdd={(x) => { add(x); toast.success(`${x.name} ${t('cart.added', 'added')}`); }} />)}
           </div>
         </div>
       )}
@@ -312,11 +312,11 @@ export default function ProductDetail() {
       {/* Recently viewed — the visitor's own history (excludes this product) */}
       {recentlyViewed.filter((p) => p.id !== product.id).length > 0 && (
         <div className="mt-14">
-          <h2 className="text-xl font-extrabold text-slate-900 mb-5">Recently viewed</h2>
+          <h2 className="text-xl font-extrabold text-slate-900 mb-5">{t('product.recentlyViewed', 'Recently viewed')}</h2>
           <div className="fm-rail flex gap-4 overflow-x-auto pb-2 snap-x">
             {recentlyViewed.filter((p) => p.id !== product.id).slice(0, 6).map((p) => (
               <div key={p.id} className="snap-start shrink-0 w-[210px]">
-                <LightProductCard product={p} onAdd={(x) => { add(x); toast.success(`${x.name} added`); }} />
+                <LightProductCard product={p} onAdd={(x) => { add(x); toast.success(`${x.name} ${t('cart.added', 'added')}`); }} />
               </div>
             ))}
           </div>
@@ -330,7 +330,7 @@ export default function ProductDetail() {
           <div className="text-[11px] text-slate-400 truncate">{product.name}</div>
           <div className="text-lg font-extrabold text-violet-600 leading-tight">{money(product.price * qty, product.currency)}</div>
         </div>
-        <button onClick={addToCart} className="btn-primary flex-1 py-3 fm-tap"><ShoppingCart size={17} /> Add to cart</button>
+        <button onClick={addToCart} className="btn-primary flex-1 py-3 fm-tap"><ShoppingCart size={17} /> {t('product.addToCart', 'Add to cart')}</button>
       </div>
     </div>
   );

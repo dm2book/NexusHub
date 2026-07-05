@@ -58,7 +58,7 @@ export default function Shop() {
   };
 
   const trending = useTrending();
-  const onAdd = (p) => { add(p); toast.success(`${p.name} added to cart`); };
+  const onAdd = (p) => { add(p); toast.success(`${p.name} ${t('cart.addedToCart', 'added to cart')}`); };
   const showTrending = !category && !search.trim() && trending?.length > 0;
 
   return (

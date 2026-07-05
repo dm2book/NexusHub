@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { X } from 'lucide-react';
+import { useI18n } from '../lib/i18n.jsx';
 
 /** Premium orbit spinner (two counter-rotating arcs). Size is in px. */
 export function Spinner({ size = 20, className = '' }) {
@@ -60,10 +61,11 @@ export const STATUS_META = {
 };
 
 export function StatusBadge({ status }) {
+  const { t } = useI18n();
   const meta = STATUS_META[status] || { label: status, color: 'bg-slate-500/20 text-slate-300' };
   return (
     <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${meta.color}`}>
-      {meta.label}
+      {t(`status.${status}`, meta.label)}
     </span>
   );
 }

@@ -103,14 +103,14 @@ export default function Track() {
           <div className="flex items-center justify-between mb-6">
             <div>
               <div className="text-slate-400 text-sm flex items-center gap-2">
-                Order
+                {t('track.order', 'Order')}
                 {live && (
                   <span className="inline-flex items-center gap-1.5 text-[11px] text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 rounded-full px-2 py-0.5">
                     <span className="relative flex h-1.5 w-1.5">
                       <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 animate-ping" />
                       <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-400" />
                     </span>
-                    Live — updates automatically
+                    {t('track.live', 'Live — updates automatically')}
                   </span>
                 )}
               </div>
@@ -153,13 +153,13 @@ export default function Track() {
             <div className="rounded-2xl border border-fuchsia-500/30 bg-fuchsia-500/10 p-5 mb-6 flex items-start gap-3">
               {result.status === 'refunded' ? <RotateCcw size={20} className="text-fuchsia-300 shrink-0 mt-0.5" /> : <XCircle size={20} className="text-red-300 shrink-0 mt-0.5" />}
               <div>
-                <div className="text-white font-semibold">{STATUS_META[result.status]?.label || result.status}</div>
+                <div className="text-white font-semibold">{t(`status.${result.status}`, STATUS_META[result.status]?.label || result.status)}</div>
                 <p className="text-slate-300 text-sm mt-1">
                   {result.status === 'refunded'
-                    ? 'This order was refunded. Any store credit used has been returned to your wallet.'
-                    : 'This order was closed. If you think this is a mistake, contact support and we’ll sort it out.'}
+                    ? t('track.refundedSub', 'This order was refunded. Any store credit used has been returned to your wallet.')
+                    : t('track.closedSub', 'This order was closed. If you think this is a mistake, contact support and we’ll sort it out.')}
                 </p>
-                <Link to="/contact" className="text-indigo-300 text-sm hover:underline mt-1 inline-block">Contact support →</Link>
+                <Link to="/contact" className="text-indigo-300 text-sm hover:underline mt-1 inline-block">{t('track.contactSupport', 'Contact support →')}</Link>
               </div>
             </div>
           )}
@@ -172,10 +172,10 @@ export default function Track() {
                 <div className="text-white font-semibold">{result.totalFormatted}</div>
               </div>
               <p className="text-slate-300 text-sm mt-1">
-                Pay with your order number{' '}
-                <button onClick={() => { navigator.clipboard?.writeText(result.number); toast.success('Reference copied'); }}
+                {t('track.payWith', 'Pay with your order number')}{' '}
+                <button onClick={() => { navigator.clipboard?.writeText(result.number); toast.success(t('track.copied', 'Reference copied')); }}
                   className="font-mono text-white inline-flex items-center gap-1"><Copy size={12} /> {result.number}</button>{' '}
-                as the reference. We confirm it manually (usually within minutes) — this page updates by itself.
+                {t('track.payRef', 'as the reference. We confirm it manually (usually within minutes) — this page updates by itself.')}
               </p>
               <div className="flex flex-wrap gap-2 mt-4">
                 {cfg.paymentMethods.map((m) => {
@@ -194,8 +194,7 @@ export default function Track() {
             <div className="rounded-2xl border border-indigo-500/30 bg-indigo-500/10 p-5 mb-6">
               <div className="text-indigo-200 font-semibold">{t('track.confirmed', '✅ Payment confirmed — we’re on it')}</div>
               <p className="text-slate-300 text-sm mt-1">
-                Your order is being prepared. Most orders are delivered automatically within seconds —
-                keep this page open, it updates live.
+                {t('track.confirmedSub', 'Your order is being prepared. Most orders are delivered automatically within seconds — keep this page open, it updates live.')}
               </p>
             </div>
           )}
@@ -205,21 +204,22 @@ export default function Track() {
             <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-5 mb-6">
               <div className="text-emerald-200 font-semibold">{t('track.delivered', '🎉 Delivered!')}</div>
               <p className="text-slate-300 text-sm mt-1">
-                Your code(s) were sent to your email{user ? ' and are available in your dashboard' : ''}.
-                Can’t find the mail? Check spam, or {user ? 'open your order below.' : 'sign in with the same email to see your order.'}
+                {user
+                  ? t('track.deliveredUser', 'Your code(s) were sent to your email and are available in your dashboard. Can’t find the mail? Check spam, or open your order below.')
+                  : t('track.deliveredGuest', 'Your code(s) were sent to your email. Can’t find the mail? Check spam, or sign in with the same email to see your order.')}
               </p>
               <div className="flex flex-wrap gap-2 mt-4">
                 <Link to={user ? '/account/orders' : '/login'} className="btn-primary text-sm">
-                  <LayoutDashboard size={15} /> {user ? 'View in dashboard' : 'Sign in to view codes'}
+                  <LayoutDashboard size={15} /> {user ? t('track.viewDash', 'View in dashboard') : t('track.signInCodes', 'Sign in to view codes')}
                 </Link>
-                <Link to="/contact" className="btn-ghost text-sm"><Mail size={15} /> Didn’t arrive? Contact us</Link>
+                <Link to="/contact" className="btn-ghost text-sm"><Mail size={15} /> {t('track.notArrived', 'Didn’t arrive? Contact us')}</Link>
               </div>
             </div>
           )}
 
           {result.status === 'completed' && <GuestReview number={result.number} t={t} />}
 
-          <Timeline history={result.history} />
+          <Timeline history={result.history} t={t} />
         </div>
       )}
     </div>
@@ -290,13 +290,13 @@ function GuestReview({ number, t }) {
   );
 }
 
-function Timeline({ history }) {
+function Timeline({ history, t }) {
   return (
     <ol className="relative border-l border-white/10 ml-2 space-y-5">
       {history.map((h, i) => (
         <li key={i} className="ml-5">
           <span className={`absolute -left-[7px] w-3.5 h-3.5 rounded-full ${i === history.length - 1 ? 'bg-primary' : 'bg-white/20'}`} />
-          <div className="text-white text-sm">{STATUS_META[h.to]?.label || h.to}</div>
+          <div className="text-white text-sm">{t(`status.${h.to}`, STATUS_META[h.to]?.label || h.to)}</div>
           <div className="text-slate-500 text-xs">{new Date(h.at).toLocaleString()}</div>
         </li>
       ))}
