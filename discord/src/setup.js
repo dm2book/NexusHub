@@ -15,7 +15,7 @@ import {
   Client, GatewayIntentBits, PermissionFlagsBits, ChannelType,
   EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle,
 } from 'discord.js';
-import { ROLES, CATEGORIES, MESSAGES, FAQ, STAFF, MEMBERS, GAME_ROLES, NOTIFY_ROLES } from './config.js';
+import { ROLES, CATEGORIES, MESSAGES, FAQ, STAFF, MEMBERS, GAME_ROLES, NOTIFY_ROLES, LEVEL_ROLES } from './config.js';
 
 const { DISCORD_TOKEN, DISCORD_GUILD_ID } = process.env;
 let STORE_URL = process.env.STORE_URL || 'https://forgemarket-store.vercel.app';
@@ -80,6 +80,38 @@ client.once('ready', async () => {
       } catch (e) { console.log(`  ! self-role ${r.label} failed: ${e.message}`); }
     }
 
+    // Level roles — granted automatically by the bot as members level up.
+    for (const r of LEVEL_ROLES) {
+      try {
+        if (!guild.roles.cache.find((x) => x.name === r.name)) {
+          await guild.roles.create({ name: r.name, color: r.color, reason: 'ForgeMarket level roles' });
+          console.log(`  + level role ${r.name}`);
+        }
+      } catch (e) { console.log(`  ! level role ${r.name} failed: ${e.message}`); }
+    }
+
+    // Role ORDER — staff on top, then community tiers, loyalty, levels, verified,
+    // then the cosmetic self-roles. Everything in one bulk call (best-effort:
+    // roles above the bot's own highest role can't be moved).
+    try {
+      const me = await guild.members.fetchMe();
+      const order = [
+        ...ROLES.map((r) => r.name),
+        ...LEVEL_ROLES.map((r) => r.name).reverse(), // Level 30 above Level 5
+        ...GAME_ROLES.map((r) => r.label),
+        ...NOTIFY_ROLES.map((r) => r.label),
+      ];
+      const movable = order
+        .map((n) => guild.roles.cache.find((x) => x.name === n))
+        .filter((r) => r && r.editable && r.position < me.roles.highest.position);
+      // Bottom-up: last in `order` gets position 1 (just above @everyone).
+      const payload = movable.slice().reverse().map((r, idx) => ({ role: r.id, position: idx + 1 }));
+      if (payload.length) {
+        await guild.roles.setPositions(payload);
+        console.log(`  · role order synced (${payload.length} roles)`);
+      }
+    } catch (e) { console.log(`  ! role ordering failed: ${e.message}`); }
+
     const viewers = (access) => access === 'staff' ? STAFF
       : access === 'vip' ? ['vip', ...STAFF] : MEMBERS;
 
@@ -87,13 +119,20 @@ client.once('ready', async () => {
     // view; otherwise everyone is denied and only the listed roles + bot can view.
     // This is the verification gate: only 'public' categories are visible before a
     // member gets the Verified role.
+    // Voice fix: gated categories also grant Connect/Speak explicitly to the
+    // allowed roles (and deny Connect to everyone), so voice channels are
+    // joinable regardless of how the server's base @everyone permissions are set.
     const categoryOverwrites = (access) => access === 'public'
       ? [{ id: everyone, allow: [P.ViewChannel] }, botOW]
-      : [{ id: everyone, deny: [P.ViewChannel] }, botOW,
-         ...viewers(access).filter((k) => roleIds[k]).map((k) => ({ id: roleIds[k], allow: [P.ViewChannel] }))];
+      : [{ id: everyone, deny: [P.ViewChannel, P.Connect] }, botOW,
+         ...viewers(access).filter((k) => roleIds[k]).map((k) => ({
+           id: roleIds[k],
+           allow: [P.ViewChannel, P.Connect, P.Speak, P.Stream, P.UseVAD],
+         }))];
 
     // 2) Categories + channels ────────────────────────────────────────────────
     const channelByName = {};
+    const categoryByName = {};
     for (const cat of CATEGORIES) {
       let category;
       try {
@@ -111,11 +150,17 @@ client.once('ready', async () => {
           await category.permissionOverwrites.set(categoryOverwrites(cat.access)).catch(() => {});
           console.log(`  · category ${cat.name}: perms synced (${cat.access})`);
         }
+        categoryByName[cat.name] = category;
       } catch (e) { console.log(`  ! category ${cat.name} failed: ${e.message}`); continue; }
 
       for (const ch of cat.channels) {
         try {
-          let channel = guild.channels.cache.find((c) => c.name === ch.name && c.parentId === category.id);
+          const wantedType = TYPE[ch.type] ?? ChannelType.GuildText;
+          // Match by name in the right category, then anywhere by name or an
+          // old alias (aka) — so renamed/moved channels are adopted, not duplicated.
+          let channel = guild.channels.cache.find((c) => c.name === ch.name && c.parentId === category.id)
+            || guild.channels.cache.find((c) => c.type === wantedType
+              && (c.name === ch.name || (ch.aka || []).includes(c.name)));
           if (!channel) {
             const overwrites = [botOW];
             if (ch.readOnly) {
@@ -123,14 +168,24 @@ client.once('ready', async () => {
               for (const k of STAFF) if (roleIds[k]) overwrites.push({ id: roleIds[k], allow: [P.SendMessages] });
             }
             channel = await guild.channels.create({
-              name: ch.name, type: TYPE[ch.type] ?? ChannelType.GuildText, parent: category.id,
+              name: ch.name, type: wantedType, parent: category.id,
               topic: ch.type === 'voice' ? undefined : (ch.topic || '').replace('{STORE_URL}', STORE_URL),
               rateLimitPerUser: ch.slowmode || 0,
+              userLimit: ch.type === 'voice' ? (ch.userLimit || 0) : undefined,
               permissionOverwrites: overwrites,
               reason: 'ForgeMarket setup',
             });
             console.log(`    + #${ch.name}`);
           } else {
+            // Adopt: right place, right name, then enforce policy on it.
+            if (channel.parentId !== category.id) {
+              await channel.setParent(category.id, { lockPermissions: true }).catch(() => {});
+              console.log(`    → moved #${channel.name} into ${cat.name}`);
+            }
+            if (channel.name !== ch.name) {
+              await channel.setName(ch.name).catch(() => {});
+              console.log(`    → renamed to ${ch.name}`);
+            }
             // Enforce policy on existing channels: clear any channel-level view
             // override so it INHERITS the (gated) category, re-apply read-only,
             // and make sure the bot can still post.
@@ -145,11 +200,48 @@ client.once('ready', async () => {
             }
             await channel.permissionOverwrites.edit(client.user.id,
               { ViewChannel: true, SendMessages: true, ManageMessages: true }).catch(() => {});
+            if (ch.type === 'voice' && (ch.userLimit || 0) !== channel.userLimit) {
+              await channel.setUserLimit(ch.userLimit || 0).catch(() => {});
+            }
           }
           channelByName[ch.name] = channel;
         } catch (e) { console.log(`    ! #${ch.name} failed: ${e.message}`); }
       }
     }
+
+    // 2b) Order — categories in config order, channels in config order inside
+    // each category. Discord sorts voice below text automatically; positions
+    // are enforced per type, so this is one pass of best-effort moves.
+    try {
+      // The bot-managed "📊 SERVER STATS" category stays pinned to the very top.
+      const stats = guild.channels.cache.find(
+        (c) => c.type === ChannelType.GuildCategory && c.name === '📊 SERVER STATS');
+      let catPos = 0;
+      if (stats) await stats.setPosition(catPos++).catch(() => {});
+      for (const cat of CATEGORIES) {
+        const category = categoryByName[cat.name];
+        if (category) await category.setPosition(catPos++).catch(() => {});
+      }
+      for (const cat of CATEGORIES) {
+        let pos = 0;
+        for (const ch of cat.channels) {
+          const channel = channelByName[ch.name];
+          if (channel) await channel.setPosition(pos++).catch(() => {});
+        }
+      }
+      console.log('  · category & channel order synced');
+    } catch (e) { console.log(`  ! ordering failed: ${e.message}`); }
+
+    // 2c) AFK — point the guild at the 💤 AFK channel (5 min timeout) so idle
+    // members are moved out of active voice rooms automatically.
+    try {
+      const afkDef = CATEGORIES.flatMap((c) => c.channels).find((c) => c.afk);
+      const afk = afkDef && channelByName[afkDef.name];
+      if (afk && guild.afkChannelId !== afk.id) {
+        await guild.edit({ afkChannel: afk.id, afkTimeout: 300 });
+        console.log('  · AFK channel set (5 min timeout)');
+      }
+    } catch (e) { console.log(`  ! AFK setup failed: ${e.message}`); }
 
     // 3) Panels (rich content in every key channel) ───────────────────────────
     const faqEmbed = new EmbedBuilder().setColor(0x6366f1).setTitle('❓ Frequently Asked Questions')
