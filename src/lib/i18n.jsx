@@ -309,6 +309,7 @@ const NL = {
   'login.discord': 'Doorgaan met Discord',
   'login.noPassword': 'Geen wachtwoord nodig — we gebruiken veilige eenmalige codes.',
   'login.or': 'of',
+  'login.checking': 'Even kijken of je al ingelogd bent…',
 
   // Contact
   'contact.title': 'Neem contact op',

@@ -86,6 +86,27 @@ router.post('/start', otpLimiter, asyncHandler(async (req, res) => {
     throw tooMany('Too many attempts. Please wait a few minutes and try again.');
   }
 
+  // Already signed in on this browser? If the session cookie belongs to the
+  // same account, don't email a code — rotate the session and sign straight in.
+  // (Kills the race where the silent boot login and a manual login overlap.)
+  const existingRefresh = req.cookies?.[config.auth.cookieName];
+  if (existingRefresh) {
+    try {
+      const [sessionId] = String(existingRefresh).split('.');
+      const sess = await get('SELECT * FROM sessions WHERE id = @id', { id: sessionId });
+      if (sess && !sess.revoked_at && new Date(sess.expires_at) > new Date()) {
+        const user = await userForIdentifier(identifier);
+        if (user && user.id === sess.user_id && user.status === 'active') {
+          const rotated = await refreshSession(existingRefresh, ctx);
+          setSessionCookie(res, rotated.refreshToken);
+          await audit({ actor: { id: user.id, email: user.email }, action: 'auth.login',
+            metadata: { method: 'existing_session' }, req });
+          return res.json({ loggedIn: true, accessToken: rotated.accessToken, user: await publicUser(user.id) });
+        }
+      }
+    } catch { /* invalid/rotated cookie → fall through to the normal flow */ }
+  }
+
   // Trusted-device instant login.
   const deviceToken = req.cookies?.[DEVICE_COOKIE];
   if (deviceToken) {

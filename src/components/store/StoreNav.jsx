@@ -20,7 +20,7 @@ export function LangSwitch({ className = '' }) {
 /** Shared light storefront top-nav (used on the home page and every store page). */
 export default function StoreNav() {
   const { count } = useCart();
-  const { user, isStaff } = useAuth();
+  const { user, isStaff, loading } = useAuth();
   const { pathname } = useLocation();
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
@@ -88,12 +88,14 @@ export default function StoreNav() {
             <Shield size={16} /> <span className="hidden sm:inline">Admin</span>
           </Link>
         )}
-        {user ? (
+        {loading ? (
+          <span className="hidden sm:inline-flex w-16 h-4 rounded fm-skeleton" aria-hidden />
+        ) : user ? (
           <Link to="/account" className="hidden sm:inline-flex text-[15px] font-medium text-slate-600 hover:text-slate-900">{t('nav.account', 'Account')}</Link>
         ) : (
           <Link to="/login" className="hidden sm:inline-flex text-[15px] font-medium text-slate-600 hover:text-slate-900">{t('nav.login', 'Log in')}</Link>
         )}
-        {!user && (
+        {!loading && !user && (
           <Link to="/login" className="hidden sm:inline-flex items-center gap-1.5 text-white text-[15px] font-semibold rounded-xl px-4 h-10 shadow-lg shadow-violet-500/30 hover:brightness-105 transition"
             style={{ backgroundImage: 'linear-gradient(135deg,#7c5cff,#a855f7)' }}>
             {t('nav.signup', 'Sign Up')} <ArrowRight size={16} />
