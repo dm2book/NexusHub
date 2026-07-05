@@ -126,11 +126,21 @@ export const CATEGORIES = [
       { name: 'clips', type: 'text', topic: 'Drop your best plays and clips.' },
       { name: 'screenshots-media', type: 'text', topic: 'Share your best gaming moments.' },
       { name: 'memes', type: 'text', topic: 'Gaming memes & fun.' },
-      { name: 'suggestions', type: 'text', topic: 'Got an idea? Use /suggest — the community votes ✅/❌.' },
+      { name: 'suggestions', type: 'text', topic: 'Got an idea? Use /suggest — the community votes and staff respond.' },
       { name: 'starboard', type: 'text', readOnly: true, topic: 'The best messages, starred by the community ⭐ (react with ⭐).' },
       { name: 'off-topic', type: 'text', topic: 'Anything goes (within the rules).' },
-      { name: 'lounge', type: 'voice', topic: 'Hang out in voice.' },
-      { name: 'game-night', type: 'voice', topic: 'Community game nights.' },
+    ],
+  },
+  {
+    // Dedicated voice hub — earn XP while you hang out (5 XP/min, capped/session).
+    name: '🔊 VOICE', access: 'verified',
+    channels: [
+      { name: '🛋️ Lounge', aka: ['lounge'], type: 'voice' },
+      { name: '🎮 Game Night', aka: ['game-night'], type: 'voice' },
+      { name: '🎧 Duo', type: 'voice', userLimit: 2 },
+      { name: '🎯 Squad', type: 'voice', userLimit: 5 },
+      { name: '🎵 Music', type: 'voice' },
+      { name: '💤 AFK', type: 'voice', afk: true },
     ],
   },
   {
@@ -175,6 +185,12 @@ export const CATEGORIES = [
     ],
   },
   {
+    // Ticket channels are created here by the bot. Staff-gated: members only
+    // ever see their own ticket (the bot grants them a per-channel overwrite).
+    name: '🎫 TICKETS', access: 'staff',
+    channels: [],
+  },
+  {
     name: '🛠️ STAFF', access: 'staff',
     channels: [
       { name: 'staff-chat', type: 'text', topic: 'Internal staff discussion.' },
@@ -204,6 +220,15 @@ export const NOTIFY_ROLES = [
   { key: 'drops', label: 'Drops & Restocks', emoji: '🔔', color: '#6366f1' },
   { key: 'deals', label: 'Deals', emoji: '🔥', color: '#ec4899' },
   { key: 'giveaways', label: 'Giveaways', emoji: '🎉', color: '#a855f7' },
+];
+
+// Level roles — earned automatically by chatting & voice (the bot keeps only
+// the highest earned tier on your profile). Matched by NAME, like loyalty roles.
+export const LEVEL_ROLES = [
+  { level: 5, name: 'Level 5 ⚡', color: '#60a5fa' },
+  { level: 10, name: 'Level 10 🔥', color: '#a78bfa' },
+  { level: 20, name: 'Level 20 💎', color: '#f472b6' },
+  { level: 30, name: 'Level 30 👑', color: '#f59e0b' },
 ];
 
 // ── Onboarding & content ────────────────────────────────────────────────────
@@ -426,8 +451,9 @@ export const MESSAGES = {
     title: '💡 Suggestions',
     description:
       "Help shape ForgeMarket! Use **/suggest** `your idea` and it gets posted here with " +
-      "✅/❌ voting buttons so the community can weigh in.\n\n" +
-      "Good ideas get built — the best ones earn you a shout-out. 🚀",
+      "live ✅/❌ vote buttons and its own discussion thread.\n\n" +
+      "Staff review every idea — you'll see it marked **Approved**, **Planned** or **Declined**, " +
+      "and you get a DM when a decision lands. Good ideas get built. 🚀",
   },
   starboardIntro: {
     title: '⭐ Starboard',

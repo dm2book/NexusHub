@@ -16,9 +16,10 @@ import { createHmac } from 'node:crypto';
 import {
   Client, GatewayIntentBits, Partials, Events, PermissionFlagsBits, ChannelType,
   EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, AttachmentBuilder,
+  ModalBuilder, TextInputBuilder, TextInputStyle,
 } from 'discord.js';
 import Anthropic from '@anthropic-ai/sdk';
-import { FAQ, GAME_ROLES, NOTIFY_ROLES } from './config.js';
+import { FAQ, GAME_ROLES, NOTIFY_ROLES, LEVEL_ROLES } from './config.js';
 
 const SELF_ROLES = [...GAME_ROLES, ...NOTIFY_ROLES];
 const STAFF_ROLE_NAMES = ['Owner', 'Admin', 'Moderator', 'Support'];
@@ -116,6 +117,7 @@ const client = new Client({
     GatewayIntentBits.GuildMembers,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.GuildMessageReactions,
+    GatewayIntentBits.GuildVoiceStates, // voice XP + voice presence
     GatewayIntentBits.MessageContent,
   ],
   partials: [Partials.Channel, Partials.Message, Partials.Reaction],
@@ -449,6 +451,12 @@ client.on(Events.GuildMemberAdd, async (member) => {
 client.on(Events.InteractionCreate, async (i) => {
   try {
     if (i.isButton()) return await handleButton(i);
+    if (i.isModalSubmit() && i.customId.startsWith('tmodal:')) {
+      return await openTicket(i, i.customId.split(':')[1], {
+        orderNumber: (i.fields.fields.get('ordernum')?.value || '').trim(),
+        details: (i.fields.getTextInputValue('details') || '').trim(),
+      });
+    }
     if (i.isChatInputCommand()) return await handleCommand(i);
   } catch (e) {
     console.error('[interaction]', e?.stack || e?.message || e);
@@ -505,9 +513,33 @@ async function handleButton(i) {
   if (i.customId.startsWith('role:')) return toggleRole(i, i.customId.split(':')[1]);
   if (i.customId === 'ticket:close') return closeTicket(i);
   if (i.customId === 'ticket:claim') return claimTicket(i);
-  if (i.customId.startsWith('ticket:')) return openTicket(i, i.customId.split(':')[1]);
+  if (i.customId.startsWith('ticket:')) return openTicketModal(i, i.customId.split(':')[1]);
   if (i.customId.startsWith('rate:')) return rateSupport(i, Number(i.customId.split(':')[1]));
   if (i.customId.startsWith('gw:enter:')) return enterGiveaway(i, i.customId.split(':')[2]);
+  if (i.customId.startsWith('sug:')) return voteSuggestion(i, i.customId.split(':')[1]);
+  if (i.customId.startsWith('sugmod:')) return moderateSuggestion(i, i.customId.split(':')[1]);
+}
+
+// Step 1 of a ticket: a small form. An order number up front means staff can
+// help immediately instead of opening with "what's your order number?".
+const TICKET_LABEL = { order: '🛒 Order issue', payment: '💳 Payment', partner: '🤝 Partnership', other: '❓ Other' };
+async function openTicketModal(i, type) {
+  // One open ticket per member — check BEFORE showing the form.
+  const existing = i.guild.channels.cache.find((c) => c.topic?.includes(`ticket-owner:${i.user.id}`));
+  if (existing) return i.reply({ content: `You already have an open ticket: <#${existing.id}>`, ephemeral: true });
+
+  const modal = new ModalBuilder().setCustomId(`tmodal:${type}`).setTitle(TICKET_LABEL[type] || '🎫 Support');
+  if (type === 'order' || type === 'payment') {
+    modal.addComponents(new ActionRowBuilder().addComponents(
+      new TextInputBuilder().setCustomId('ordernum').setLabel('Order number (e.g. FM-2026-XXXX)')
+        .setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(30)
+        .setPlaceholder('Leave empty if you don’t have one')));
+  }
+  modal.addComponents(new ActionRowBuilder().addComponents(
+    new TextInputBuilder().setCustomId('details').setLabel('What can we help you with?')
+      .setStyle(TextInputStyle.Paragraph).setRequired(true).setMaxLength(900)
+      .setPlaceholder('Describe the issue in a few sentences…')));
+  return i.showModal(modal);
 }
 
 async function toggleRole(i, key) {
@@ -571,10 +603,13 @@ function updateGwCount(guild, gw) {
   }).catch(() => {});
 }
 
-async function openTicket(i, type) {
+async function openTicket(i, type, { orderNumber = '', details = '' } = {}) {
   await i.deferReply({ ephemeral: true });
+  // Tickets get their own staff-gated category; falls back to the panel's
+  // category on servers that haven't re-run setup yet.
   const support = findChannel(i.guild, 'open-a-ticket');
-  const category = support?.parent;
+  const category = i.guild.channels.cache.find(
+    (c) => c.type === ChannelType.GuildCategory && c.name === '🎫 TICKETS') || support?.parent;
 
   // One open ticket per member.
   const existing = i.guild.channels.cache.find((c) => c.topic?.includes(`ticket-owner:${i.user.id}`));
@@ -604,19 +639,27 @@ async function openTicket(i, type) {
     return i.editReply('⚠️ I couldn’t create your ticket — make sure my role has **Manage Channels** and is high in the list. Ask an admin.');
   }
 
-  const label = { order: '🛒 Order issue', payment: '💳 Payment', partner: '🤝 Partnership', other: '❓ Other' }[type] || '🎫 Support';
+  const label = TICKET_LABEL[type] || '🎫 Support';
   const embed = new EmbedBuilder().setColor(0x6366f1)
     .setTitle(`${label}`)
     .setDescription(
-      `Hi <@${i.user.id}>, thanks for reaching out! A team member will be with you shortly. ⚡\n\n` +
-      '**To speed things up, please share:**\n' +
-      '• Your **order number** (if any)\n• A short description of the issue\n• Screenshots if relevant')
+      `Hi <@${i.user.id}>, thanks for reaching out! A team member will be with you shortly. ⚡` +
+      (details ? `\n\n**Their message:**\n> ${details.slice(0, 800).replace(/\n/g, '\n> ')}` : '') +
+      (orderNumber ? `\n\n**Order number:** \`${orderNumber}\`` : '') +
+      (!details && !orderNumber
+        ? '\n\n**To speed things up, please share:**\n• Your **order number** (if any)\n• A short description of the issue\n• Screenshots if relevant'
+        : '\n\nFeel free to add screenshots if relevant.'))
     .setFooter({ text: 'ForgeMarket Support • use the buttons below' }).setTimestamp();
   const controls = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('ticket:claim').setLabel('Claim').setEmoji('🛠️').setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId('ticket:close').setLabel('Close ticket').setEmoji('🔒').setStyle(ButtonStyle.Danger));
   const supportPing = findRole(i.guild, 'Support');
   await channel.send({ content: supportPing ? `<@&${supportPing.id}> — new ticket` : '', embeds: [embed], components: [controls] }).catch(() => {});
+  // Order number in the form? Post the live status right away, before staff arrive.
+  const num = orderNumber.match(ORDER_RE)?.[0]?.toUpperCase();
+  if (num) {
+    orderStatusEmbed(num).then((e) => { if (e) channel.send({ embeds: [e] }).catch(() => {}); });
+  }
   leadLog(i.guild, `🎫 Ticket opened by <@${i.user.id}> — **${label}** → <#${channel.id}>`);
   return i.editReply(`✅ Your ticket is ready: <#${channel.id}>`);
 }
@@ -732,6 +775,7 @@ async function handleCommand(i) {
       "`/vouch` — leave a vouch\n`/suggest` — suggest an idea\n`/poll` — start a quick poll\n" +
       "`/shop` — open the shop\n`/invite` — get the invite link\n`/stats` — server stats\n" +
       "`/rank` — your level & XP\n`/daily` — claim your daily XP (streaks!)\n`/leaderboard` — top members\n" +
+      "💬 Chat + 🔊 voice time both earn XP — level roles (5/10/20/30) are automatic.\n" +
       "`/close` — staff: close a ticket\n`/giveaway` — staff: start a giveaway\n`/reroll` — staff: reroll a winner\n" +
       "`/coupon` — staff: post a discount code\n`/flashsale` — staff: countdown deal in #deals\n" +
       "`/digest` — staff: live store numbers\n`/stock` — staff: low-stock check\n`/launch` — staff: ready-to-sell check\n" +
@@ -803,19 +847,79 @@ async function handleCommand(i) {
   }
 }
 
-// ── Suggestions (/suggest → #suggestions with ✅/❌ voting) ───────────────────
+// ── Suggestions 2.0 ───────────────────────────────────────────────────────────
+// /suggest → embed with live ✅/❌ vote buttons + a discussion thread. Staff get
+// Approve / Planned / Decline buttons; a decision recolors the card and DMs the
+// author. Votes persist in bot-meta.json so a restart never loses them.
+const SUG_STATUS = {
+  approve: { label: '✅ Approved', color: 0x10b981 },
+  planned: { label: '🚧 Planned', color: 0xf59e0b },
+  decline: { label: '❌ Declined', color: 0xef4444 },
+};
+const sugStore = () => (META.suggestions ||= {});
+function sugRows(rec) {
+  const votes = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('sug:up').setLabel(`✅ ${rec.up.length}`).setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId('sug:down').setLabel(`❌ ${rec.down.length}`).setStyle(ButtonStyle.Secondary));
+  const mod = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('sugmod:approve').setLabel('Approve').setEmoji('✅').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('sugmod:planned').setLabel('Planned').setEmoji('🚧').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('sugmod:decline').setLabel('Decline').setEmoji('❌').setStyle(ButtonStyle.Secondary));
+  return rec.status ? [votes] : [votes, mod];
+}
+
 async function postSuggestion(i) {
   const text = i.options.getString('idea');
   const ch = findChannel(i.guild, 'suggestions');
   if (!ch) return i.reply({ content: 'No #suggestions channel — ask an admin to run setup.', ephemeral: true });
   const e = new EmbedBuilder().setColor(0x6366f1).setTitle('💡 New suggestion')
     .setDescription(text).setAuthor({ name: i.user.username, iconURL: i.user.displayAvatarURL() })
-    .setFooter({ text: 'Vote with the reactions below' }).setTimestamp();
-  const msg = await ch.send({ embeds: [e] });
-  await msg.react('✅').catch(() => {});
-  await msg.react('❌').catch(() => {});
+    .setFooter({ text: 'Vote below · staff review every idea' }).setTimestamp();
+  const rec = { author: i.user.id, up: [], down: [], status: null };
+  const msg = await ch.send({ embeds: [e], components: sugRows(rec) });
+  const store = sugStore();
+  store[msg.id] = rec;
+  // Cap the store so bot-meta.json can't grow forever.
+  const ids = Object.keys(store);
+  if (ids.length > 200) for (const id of ids.slice(0, ids.length - 200)) delete store[id];
+  saveMeta();
+  await msg.startThread({ name: `💡 ${text.slice(0, 80)}` }).catch(() => {});
   leadLog(i.guild, `💡 Suggestion from <@${i.user.id}>: "${text.slice(0, 120)}"`);
-  return i.reply({ content: `✅ Posted your suggestion in <#${ch.id}>!`, ephemeral: true });
+  return i.reply({ content: `✅ Posted your suggestion in <#${ch.id}> — votes & staff review happen there!`, ephemeral: true });
+}
+
+async function voteSuggestion(i, dir) {
+  const rec = sugStore()[i.message.id];
+  if (!rec) return i.reply({ content: 'This suggestion is too old to vote on.', ephemeral: true });
+  const mine = dir === 'up' ? rec.up : rec.down;
+  const other = dir === 'up' ? rec.down : rec.up;
+  const had = mine.includes(i.user.id);
+  if (had) mine.splice(mine.indexOf(i.user.id), 1);          // tap again = remove vote
+  else {
+    mine.push(i.user.id);
+    const idx = other.indexOf(i.user.id);                    // switch sides
+    if (idx !== -1) other.splice(idx, 1);
+  }
+  saveMeta();
+  await i.update({ components: sugRows(rec) }).catch(() => {});
+}
+
+async function moderateSuggestion(i, action) {
+  if (!isStaff(i.member)) return i.reply({ content: 'Only staff can decide on suggestions.', ephemeral: true });
+  const rec = sugStore()[i.message.id];
+  const status = SUG_STATUS[action];
+  if (!rec || !status) return i.reply({ content: 'This suggestion is too old to update.', ephemeral: true });
+  rec.status = action;
+  saveMeta();
+  const e = EmbedBuilder.from(i.message.embeds[0]).setColor(status.color)
+    .setTitle(`💡 Suggestion · ${status.label}`)
+    .setFooter({ text: `Decided by ${i.user.username} · ✅ ${rec.up.length} / ❌ ${rec.down.length}` });
+  await i.update({ embeds: [e], components: sugRows(rec) }).catch(() => {});
+  // Tell the author their idea got a decision.
+  i.guild.members.fetch(rec.author).then((m) => m.send(
+    `${status.label.split(' ')[0]} Your ForgeMarket suggestion was marked **${status.label.slice(2).trim()}**:\n> ${
+      (i.message.embeds[0]?.description || '').slice(0, 200)}\n\nThanks for helping shape the store! 💜`,
+  ).catch(() => {})).catch(() => {});
 }
 
 // ── Starboard (⭐ reactions repost the best messages) ─────────────────────────
@@ -879,6 +983,38 @@ client.on(Events.GuildMemberRemove, (member) => {
   if (log) log.send(`🔴 ${member.user?.tag || member.id} left the server.`).catch(() => {});
 });
 
+// Level roles: keep exactly the highest earned tier on the member's profile.
+// Returns the newly-unlocked role name when this level-up crossed a threshold.
+async function syncLevelRoles(member, lvl) {
+  if (!member) return null;
+  const earned = LEVEL_ROLES.filter((r) => lvl >= r.level);
+  const target = earned[earned.length - 1] || null;
+  let unlocked = null;
+  for (const def of LEVEL_ROLES) {
+    const role = findRole(member.guild, def.name);
+    if (!role) continue;
+    const has = member.roles.cache.has(role.id);
+    if (def === target && !has) {
+      await member.roles.add(role).catch(() => {});
+      unlocked = def.name;
+    } else if (def !== target && has) {
+      await member.roles.remove(role).catch(() => {});
+    }
+  }
+  return unlocked;
+}
+
+async function announceLevelUp(guild, user, member, lvl, fallbackCh) {
+  const unlocked = await syncLevelRoles(member, lvl);
+  const ch = findChannel(guild, 'general') || fallbackCh;
+  ch?.send({ embeds: [new EmbedBuilder().setColor(0xf5b324)
+    .setAuthor({ name: user.username, iconURL: user.displayAvatarURL() })
+    .setDescription(`🎉 GG <@${user.id}> — you reached **Level ${lvl}**!` +
+      (unlocked ? `\n🏅 Role unlocked: **${unlocked}**` : '') +
+      ' Keep chatting, hang out in voice and claim your `/daily` to level up. ⚡')] })
+    .catch(() => {});
+}
+
 // ── Leveling: award XP per message (60s cooldown), announce level-ups ─────────
 client.on(Events.MessageCreate, (m) => {
   if (m.author.bot || !m.guild) return;
@@ -891,13 +1027,35 @@ client.on(Events.MessageCreate, (m) => {
   rec.xp += 15 + Math.floor(Math.random() * 11);
   rec.lvl = levelFor(rec.xp);
   saveXP();
-  if (rec.lvl > before && rec.lvl > 0) {
-    const ch = findChannel(m.guild, 'general') || m.channel;
-    ch.send({ embeds: [new EmbedBuilder().setColor(0xf5b324)
-      .setAuthor({ name: m.author.username, iconURL: m.author.displayAvatarURL() })
-      .setDescription(`🎉 GG <@${m.author.id}> — you reached **Level ${rec.lvl}**! Keep chatting (and claim your \`/daily\`) to level up. ⚡`)] })
-      .catch(() => {});
-  }
+  if (rec.lvl > before && rec.lvl > 0) announceLevelUp(m.guild, m.author, m.member, rec.lvl, m.channel);
+});
+
+// ── Voice XP: 5 XP per minute in voice, capped at 2h/session ─────────────────
+// Joining AFK (or going solo-deaf in AFK) earns nothing; switching rooms keeps
+// the session running. Awarded when the member leaves voice.
+const voiceSessions = new Map(); // userId -> { since, guildId }
+const inRealVoice = (state) => !!state.channelId && state.channelId !== state.guild.afkChannelId;
+client.on(Events.VoiceStateUpdate, (oldS, newS) => {
+  try {
+    if (newS.member?.user?.bot) return;
+    const was = inRealVoice(oldS), is = inRealVoice(newS);
+    if (!was && is) { voiceSessions.set(newS.id, { since: Date.now(), guildId: newS.guild.id }); return; }
+    if (was && !is) {
+      const s = voiceSessions.get(newS.id);
+      voiceSessions.delete(newS.id);
+      if (!s) return;
+      const minutes = Math.min(120, Math.floor((Date.now() - s.since) / 60_000));
+      if (minutes < 1) return;
+      const rec = XP[newS.id] || (XP[newS.id] = { xp: 0, lvl: 0 });
+      const before = rec.lvl;
+      rec.xp += minutes * 5;
+      rec.lvl = levelFor(rec.xp);
+      saveXP();
+      if (rec.lvl > before && rec.lvl > 0) {
+        announceLevelUp(newS.guild, newS.member.user, newS.member, rec.lvl, null);
+      }
+    }
+  } catch (e) { console.error('[voice-xp]', e.message); }
 });
 
 function rankCmd(i) {
@@ -920,20 +1078,28 @@ function leaderboardCmd(i) {
   return i.reply({ embeds: [e] });
 }
 
-// ── /order lookup (uses the store's public tracking endpoint) ─────────────────
+// ── Order status (shared by /order, ticket auto-lookup and the ticket form) ──
+async function orderStatusEmbed(num) {
+  if (!FORGEMARKET_API_URL) return null;
+  try {
+    const res = await fetch(`${FORGEMARKET_API_URL}/api/track/${encodeURIComponent(num)}`);
+    if (!res.ok) return null;
+    const o = await res.json();
+    const hist = (o.history || []).slice(-6).map((h) =>
+      `• ${h.to || h.to_status} — ${new Date(h.at || h.created_at).toLocaleString()}`).join('\n') || '—';
+    return new EmbedBuilder().setColor(0x6366f1).setTitle(`📦 Order ${o.number}`)
+      .setDescription(`**Status:** ${o.statusLabel || o.status}\n\n**Latest updates:**\n${hist}`)
+      .setFooter({ text: 'Live from the store' });
+  } catch { return null; }
+}
+
 async function lookupOrder(i) {
   await i.deferReply({ ephemeral: true });
   const num = i.options.getString('number').trim();
   if (!FORGEMARKET_API_URL) return i.editReply('Order lookup isn’t configured yet.');
-  try {
-    const res = await fetch(`${FORGEMARKET_API_URL}/api/track/${encodeURIComponent(num)}`);
-    if (!res.ok) return i.editReply(`No order found for \`${num}\`. Check the number or open a ticket in #open-a-ticket.`);
-    const o = await res.json();
-    const hist = (o.history || []).map((h) => `• ${h.to || h.to_status} — ${new Date(h.at || h.created_at).toLocaleString()}`).join('\n') || '—';
-    const e = new EmbedBuilder().setColor(0x6366f1).setTitle(`Order ${o.number}`)
-      .setDescription(`**Status:** ${o.statusLabel || o.status}\n\n**Timeline:**\n${hist}`);
-    return i.editReply({ embeds: [e] });
-  } catch { return i.editReply('Couldn’t reach the store right now — try again shortly or open a ticket.'); }
+  const e = await orderStatusEmbed(num);
+  if (!e) return i.editReply(`No order found for \`${num}\`. Check the number or open a ticket in #open-a-ticket.`);
+  return i.editReply({ embeds: [e] });
 }
 
 // ── /vouch → posts to #vouchers ───────────────────────────────────────────────
@@ -1287,16 +1453,8 @@ client.on(Events.MessageCreate, async (m) => {
     const now = Date.now();
     if (now - (orderLookupCooldown.get(m.channel.id) || 0) < 60_000) return; // 1/min per ticket
     orderLookupCooldown.set(m.channel.id, now);
-    const num = match[0].toUpperCase();
-    const res = await fetch(`${FORGEMARKET_API_URL}/api/track/${encodeURIComponent(num)}`);
-    if (!res.ok) return;
-    const o = await res.json();
-    const hist = (o.history || []).slice(-4).map((h) =>
-      `• ${h.to || h.to_status} — ${new Date(h.at || h.created_at).toLocaleString()}`).join('\n') || '—';
-    await m.reply({ embeds: [new EmbedBuilder().setColor(0x6366f1)
-      .setTitle(`📦 Order ${o.number}`)
-      .setDescription(`**Status:** ${o.statusLabel || o.status}\n\n**Latest updates:**\n${hist}`)
-      .setFooter({ text: 'Auto-lookup · live from the store' })] });
+    const e = await orderStatusEmbed(match[0].toUpperCase());
+    if (e) await m.reply({ embeds: [e] });
   } catch { /* best-effort */ }
 });
 

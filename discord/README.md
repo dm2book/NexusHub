@@ -52,7 +52,11 @@ copy-paste Railway / Render / VPS guide. A `Procfile` is included.
 
 ---
 
-## 2. Server structure (10 categories · 49 channels)
+## 2. Server structure (12 categories · 55+ channels)
+
+Re-running `npm run setup` **enforces the whole layout**: category order,
+channel order & placement (old channels are moved/renamed, never duplicated),
+role order, voice permissions, user limits and the AFK channel.
 
 Access tiers: **public** (everyone) · **verified** (after onboarding) · **vip** ·
 **staff**. Read-only = members read, staff post.
@@ -74,7 +78,12 @@ Access tiers: **public** (everyone) · **verified** (after onboarding) · **vip*
 
 ### 💬 COMMUNITY — *verified*
 `introductions`, `general`, `gaming`, `screenshots-media`, `off-topic`,
-`lounge` (voice), `game-night` (voice).
+`suggestions` (live voting + staff decisions), `starboard`.
+
+### 🔊 VOICE — *verified*
+`🛋️ Lounge`, `🎮 Game Night`, `🎧 Duo` (max 2), `🎯 Squad` (max 5), `🎵 Music`,
+`💤 AFK` (auto-move after 5 min idle). Voice time earns XP: **5 XP/min**,
+capped at 2h per session.
 
 ### ⭐ REVIEWS — *public (read), verified (post)*
 `reviews` (auto-posted verified reviews), `proof-of-delivery` (real delivery
@@ -83,7 +92,11 @@ social proof before buying.
 
 ### 🎫 SUPPORT — *public*
 `open-a-ticket` (button panel), `faq` (read-only), `support-info` (hours/SLAs).
-Tickets are created as private channels in this category.
+
+### 🎫 TICKETS — *staff*
+Ticket channels are created here. Opening a ticket shows a **form** (order
+number + description), the bot posts the **live order status** instantly, and
+each member sees only their own ticket.
 
 ### 📅 EVENTS — *verified*
 `events` (announcement), `event-signup`, `events-stage` (voice).
@@ -171,7 +184,9 @@ resolve → transcript logged._
   + media (`screenshots-media`) keep people talking.
 - **Events** (tournaments/drops) and **Giveaways** (with VIP bonus entries) create
   recurring reasons to return — and giveaways are a powerful acquisition loop.
-- Voice (`lounge`, `game-night`, `events-stage`) deepens engagement.
+- Voice (the 🔊 VOICE hub + `events-stage`) deepens engagement — and pays XP.
+- Level roles (**Level 5 ⚡ / 10 🔥 / 20 💎 / 30 👑**) are granted automatically;
+  only the highest earned tier shows on the profile.
 - The bot greets, recommends and nudges users toward community + giveaways.
 
 ---
