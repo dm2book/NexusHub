@@ -15,7 +15,7 @@ import { listEnabledProviders } from '../services/oauthService.js';
 import { isEnabled as stripeEnabled, createCheckoutSession } from '../services/stripeService.js';
 import { publicStats } from '../services/publicStatsService.js';
 import { recordPageView } from '../services/trackingService.js';
-import { addReview, listReviews } from '../services/reviewsService.js';
+import { addReview, listReviews, addVerifiedReview } from '../services/reviewsService.js';
 import { verifyIngest, canonicalReview } from '../middleware/ingestSignature.js';
 import { audit } from '../services/auditService.js';
 import { ApiError, forbidden } from '../utils/errors.js';
@@ -228,6 +228,56 @@ router.get('/orders/:id/proof', asyncHandler(async (req, res) => {
   if (!order) throw new ApiError(404, 'Order not found');
   await assertOwnsOrder(req, order, req.query.email);
   res.json({ proof: await getOrderProof(order.id), status: order.status });
+}));
+
+// Guest review: any buyer can review a DELIVERED order by proving they know the
+// order number + the email it was placed with. Deduped per order (one review),
+// stored as a verified purchase — closes the review loop for non-Discord buyers.
+router.post('/track/:number/review',
+  rateLimit({ bucket: 'guest_review', windowMs: 60_000, max: 5 }),
+  asyncHandler(async (req, res) => {
+    const { email, stars, body, author } = z.object({
+      email: z.string().email(),
+      stars: z.number().int().min(1).max(5),
+      body: z.string().min(3).max(600),
+      author: z.string().max(60).optional(),
+    }).parse(req.body || {});
+    const order = await getOrderByNumber(req.params.number);
+    if (!order) throw new ApiError(404, 'Order not found');
+    if (order.email !== email.toLowerCase()) throw forbidden('Email does not match this order');
+    if (order.status !== 'completed') throw forbidden('You can review an order once it is delivered');
+    const result = await addVerifiedReview({
+      userId: order.userId || null, email: order.email, orderId: order.id,
+      author: (author || order.billing?.full_name?.split(/\s+/)[0] || 'Verified buyer').slice(0, 60),
+      stars, body, product: order.items?.[0]?.name || null,
+      city: order.billing?.city || null,
+    });
+    await audit({ action: 'review.create_guest', targetType: 'order', targetId: order.id,
+      metadata: { stars }, req });
+    res.status(201).json(result);
+  }));
+
+// Dynamic sitemap: static pages + every active product, always current.
+// vercel.json rewrites /sitemap.xml here (the static file is removed).
+router.get('/sitemap.xml', asyncHandler(async (_req, res) => {
+  const base = config.appUrl.replace(/\/$/, '');
+  const staticPages = ['', '/shop', '/reviews', '/how-it-works', '/faq', '/about',
+    '/contact', '/track', '/discord', '/payment-methods', '/refunds', '/trust'];
+  const products = await listProducts({ activeOnly: true });
+  const urls = [
+    ...staticPages.map((p) => ({ loc: `${base}${p}`, prio: p === '' ? '1.0' : '0.7' })),
+    ...products.map((p) => ({ loc: `${base}/product/${p.id}`, prio: '0.8', mod: p.updated_at })),
+  ];
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>\n` +
+    `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
+    urls.map((u) =>
+      `  <url><loc>${u.loc}</loc>` +
+      (u.mod ? `<lastmod>${String(u.mod).slice(0, 10)}</lastmod>` : '') +
+      `<priority>${u.prio}</priority></url>`).join('\n') +
+    `\n</urlset>`;
+  res.setHeader('Content-Type', 'application/xml');
+  res.setHeader('Cache-Control', 'public, max-age=3600');
+  res.send(xml);
 }));
 
 // Public tracking by order number (no PII beyond status timeline).

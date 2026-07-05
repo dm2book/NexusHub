@@ -217,10 +217,76 @@ export default function Track() {
             </div>
           )}
 
+          {result.status === 'completed' && <GuestReview number={result.number} t={t} />}
+
           <Timeline history={result.history} />
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * Guest review: rate a delivered order right on the track page. Verified
+ * server-side (order number + the email it was placed with) and deduped per
+ * order, so every review is a real purchase.
+ */
+function GuestReview({ number, t }) {
+  const toast = useToast();
+  const [stars, setStars] = useState(5);
+  const [body, setBody] = useState('');
+  const [email, setEmail] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState(false);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      const r = await api.post(`/api/track/${encodeURIComponent(number)}/review`, {
+        email: email.trim(), stars, body: body.trim(),
+      });
+      setDone(true);
+      toast.success(r.deduped
+        ? t('review.already', 'This order was already reviewed — thanks!')
+        : t('review.thanks', 'Thank you! Your review is live. 💜'));
+      feedback('success');
+    } catch (err) { toast.error(err.message); }
+    finally { setBusy(false); }
+  };
+
+  if (done) {
+    return (
+      <div className="rounded-2xl border border-violet-500/30 bg-violet-500/10 p-5 mb-6 text-center">
+        <div className="text-violet-200 font-semibold">💜 {t('review.thanksTitle', 'Thanks for your review!')}</div>
+        <p className="text-slate-400 text-sm mt-1">{t('review.thanksSub', 'It now appears on our reviews page and helps other buyers.')}</p>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={submit} className="rounded-2xl border border-white/10 bg-white/5 p-5 mb-6">
+      <div className="text-white font-semibold">{t('review.title', 'How was your order?')}</div>
+      <p className="text-slate-500 text-xs mt-0.5">{t('review.sub', 'Leave a verified review — takes 20 seconds.')}</p>
+      <div className="flex gap-1.5 mt-3">
+        {[1, 2, 3, 4, 5].map((n) => (
+          <button key={n} type="button" onClick={() => setStars(n)} aria-label={`${n} stars`}
+            className={`text-2xl transition-transform hover:scale-110 ${n <= stars ? 'grayscale-0' : 'grayscale opacity-40'}`}>⭐</button>
+        ))}
+      </div>
+      <textarea required minLength={3} maxLength={600} rows={2} value={body}
+        onChange={(e) => setBody(e.target.value)}
+        placeholder={t('review.placeholder', 'Fast delivery? Good price? Tell other buyers…')}
+        className="input mt-3 text-sm" />
+      <div className="flex flex-col sm:flex-row gap-2 mt-2">
+        <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
+          placeholder={t('review.email', 'Email used for this order (verification)')}
+          className="input text-sm flex-1" />
+        <button disabled={busy || body.trim().length < 3} className="btn-primary text-sm px-5">
+          {busy ? '…' : t('review.submit', 'Post review')}
+        </button>
+      </div>
+    </form>
   );
 }
 
