@@ -24,7 +24,7 @@ export default function Wishlist() {
   }, []);
 
   const items = (products || []).filter((p) => wl.has(p.id));
-  const onAdd = (p) => { add(p); toast.success(`${p.name} added to cart`); };
+  const onAdd = (p) => { add(p); toast.success(`${p.name} ${t('cart.addedToCart', 'added to cart')}`); };
 
   return (
     <div className="max-w-[1200px] mx-auto px-4 lg:px-8 py-12">

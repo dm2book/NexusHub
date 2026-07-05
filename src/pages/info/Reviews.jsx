@@ -3,33 +3,35 @@ import { Star, BadgeCheck } from 'lucide-react';
 import InfoShell from '../../components/InfoShell.jsx';
 import { useReviews } from '../../lib/useReviews.js';
 import { useStats } from '../../lib/useStats.js';
+import { useI18n } from '../../lib/i18n.jsx';
 
 export default function Reviews() {
   const reviews = useReviews();
   const stats = useStats();
+  const { t } = useI18n();
   const avgDelivery = stats.avgDeliverySeconds == null ? '—'
     : stats.avgDeliverySeconds < 60 ? `< ${Math.max(1, Math.round(stats.avgDeliverySeconds))}s`
     : `${Math.round(stats.avgDeliverySeconds / 60)}m`;
   const fmt = (n) => `${Number(n || 0).toLocaleString('en-US')}${Number(n || 0) >= 100 ? '+' : ''}`;
 
   return (
-    <InfoShell eyebrow="Loved by gamers" title="Customer reviews"
-      subtitle="Real feedback from verified buyers and our Discord community vouches." narrow={false}>
+    <InfoShell eyebrow={t('reviews.eyebrow', 'Loved by gamers')} title={t('reviews.title', 'Customer reviews')}
+      subtitle={t('reviews.sub', 'Real feedback from verified buyers and our Discord community vouches.')} narrow={false}>
       <div className="flex flex-wrap items-center justify-center gap-6 mb-10">
         {stats.reviews > 0 && (
           <>
             <div className="text-center">
               <div className="text-4xl font-display gradient-text">{stats.rating}/5</div>
               <div className="flex gap-0.5 justify-center text-amber-400 mt-1">{Array.from({ length: 5 }).map((_, i) => <Star key={i} size={16} fill="currentColor" />)}</div>
-              <div className="text-slate-500 text-sm mt-1">Based on {stats.reviews.toLocaleString('en-US')} reviews</div>
+              <div className="text-slate-500 text-sm mt-1">{t('home.basedOn', 'Based on {n} reviews', { n: stats.reviews.toLocaleString('en-US') })}</div>
             </div>
             <div className="h-12 w-px bg-white/10 hidden sm:block" />
           </>
         )}
         <div className="grid grid-cols-3 gap-6 text-center">
-          {[[fmt(stats.delivered), 'Delivered'],
-            [stats.successRate != null ? `${stats.successRate}%` : '100%', stats.successRate != null ? 'Fulfilled' : 'Protected'],
-            [avgDelivery, 'Avg. delivery']].map(([n, l]) => (
+          {[[fmt(stats.delivered), t('reviews.delivered', 'Delivered')],
+            [stats.successRate != null ? `${stats.successRate}%` : '100%', stats.successRate != null ? t('home.s.fulfilled', 'Fulfilled') : t('reviews.protected', 'Protected')],
+            [avgDelivery, t('reviews.avgDelivery', 'Avg. delivery')]].map(([n, l]) => (
             <div key={l}><div className="text-2xl font-display text-white">{n}</div><div className="text-slate-500 text-xs">{l}</div></div>
           ))}
         </div>
@@ -37,7 +39,7 @@ export default function Reviews() {
 
       {reviews.length === 0 && (
         <div className="max-w-md mx-auto text-center card p-8 text-slate-400">
-          No reviews yet — verified buyer reviews will appear here automatically after orders are delivered.
+          {t('reviews.none', 'No reviews yet — verified buyer reviews will appear here automatically after orders are delivered.')}
         </div>
       )}
 
@@ -56,8 +58,8 @@ export default function Reviews() {
                 </div>
                 <div className="text-slate-500 text-xs flex items-center gap-1">
                   {r.verified
-                    ? <span className="text-emerald-400 font-semibold">Verified buyer</span>
-                    : 'Verified'}{r.product ? ` · ${r.product}` : (!r.verified ? ' · Discord vouch' : '')}
+                    ? <span className="text-emerald-400 font-semibold">{t('product.verifiedBuyer', 'Verified buyer')}</span>
+                    : t('product.verifiedShort', 'Verified')}{r.product ? ` · ${r.product}` : (!r.verified ? ' · Discord vouch' : '')}
                   {r.city ? ` · ${r.city}` : ''}
                 </div>
               </div>
@@ -65,7 +67,7 @@ export default function Reviews() {
           </div>
         ))}
       </div>
-      <div className="text-center mt-10"><Link to="/shop" className="btn-primary px-7 py-3.5">Shop with confidence</Link></div>
+      <div className="text-center mt-10"><Link to="/shop" className="btn-primary px-7 py-3.5">{t('reviews.cta', 'Shop with confidence')}</Link></div>
     </InfoShell>
   );
 }

@@ -5,6 +5,7 @@ import { api } from '../lib/api.js';
 import { track } from '../lib/track.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
+import { useI18n } from '../lib/i18n.jsx';
 
 const isEmail = (s) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s);
 const OTP_LEN = 6;
@@ -23,6 +24,7 @@ function friendlyError(err) {
 export default function Login() {
   const { login, user } = useAuth();
   const toast = useToast();
+  const { t } = useI18n();
   const navigate = useNavigate();
   const location = useLocation();
   const dest = location.state?.from || '/account';
@@ -140,8 +142,8 @@ export default function Login() {
                style={{ backgroundImage: 'linear-gradient(135deg,#6366f1,#a855f7)' }}>
             <Zap size={26} className="text-white" />
           </div>
-          <h1 className="text-2xl text-white">Welcome to ForgeMarket</h1>
-          <p className="text-slate-400 text-sm mt-1">Sign in or create an account</p>
+          <h1 className="text-2xl text-white">{t('login.title', 'Welcome to ForgeMarket')}</h1>
+          <p className="text-slate-400 text-sm mt-1">{t('login.sub', 'Sign in or create an account')}</p>
         </div>
 
         {step === 'totp' ? (
@@ -150,9 +152,9 @@ export default function Login() {
               <div className="w-12 h-12 rounded-full bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center mb-3">
                 <ShieldCheck size={22} className="text-indigo-400" />
               </div>
-              <div className="text-white font-medium">Two-factor authentication</div>
+              <div className="text-white font-medium">{t('login.totp', 'Two-factor authentication')}</div>
               <p className="text-sm text-slate-400 mt-1">
-                Enter the 6-digit code from your <span className="text-white font-medium">authenticator app</span>.
+                {t('login.totpSub1', 'Enter the 6-digit code from your')} <span className="text-white font-medium">{t('login.totpApp', 'authenticator app')}</span>.
               </p>
             </div>
 
@@ -163,13 +165,13 @@ export default function Login() {
 
             <button type="button" onClick={() => { setStep('id'); setTotpTicket(null); setError(''); }}
               className="text-sm text-slate-400 hover:text-white w-full text-center">
-              Start over
+              {t('login.startOver', 'Start over')}
             </button>
           </div>
         ) : step === 'id' ? (
           <form onSubmit={start} className="space-y-4">
             <div>
-              <label className="label">Email or phone</label>
+              <label className="label">{t('login.idLabel', 'Email or phone')}</label>
               <div className="relative">
                 <AtSign size={16} className="absolute left-3.5 top-3.5 text-slate-500" />
                 <input required value={identifier} onChange={(e) => setIdentifier(e.target.value)}
@@ -177,13 +179,13 @@ export default function Login() {
                   autoComplete="username" autoFocus />
               </div>
               <p className="text-slate-500 text-xs mt-1.5">
-                {identifier.trim() === '' ? 'Use your email or phone number.'
-                  : idIsEmail ? 'We’ll email you a one-time code.' : 'We’ll text you a one-time code.'}
+                {identifier.trim() === '' ? t('login.idHint', 'Use your email or phone number.')
+                  : idIsEmail ? t('login.emailHint', 'We’ll email you a one-time code.') : t('login.smsHint', 'We’ll text you a one-time code.')}
               </p>
             </div>
             {error && <p className="text-sm text-red-300 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">{error}</p>}
             <button disabled={busy || !identifier.trim()} className="btn-primary w-full py-3">
-              {busy ? <><Loader2 size={18} className="animate-spin" /> Sending code…</> : <>Continue <ArrowRight size={16} /></>}
+              {busy ? <><Loader2 size={18} className="animate-spin" /> {t('login.sending', 'Sending code…')}</> : <>{t('login.continue', 'Continue')} <ArrowRight size={16} /></>}
             </button>
           </form>
         ) : (
@@ -194,10 +196,10 @@ export default function Login() {
                 <MailCheck size={22} className="text-emerald-400" />
               </div>
               <div className="text-white font-medium flex items-center gap-1.5">
-                <CheckCircle2 size={16} className="text-emerald-400" /> Verification code sent
+                <CheckCircle2 size={16} className="text-emerald-400" /> {t('login.codeSent', 'Verification code sent')}
               </div>
               <p className="text-sm text-slate-400 mt-1">
-                We sent a 6-digit code {channel === 'sms' ? 'by SMS' : 'by email'} to<br />
+                {t('login.weSent', 'We sent a 6-digit code')} {channel === 'sms' ? t('login.bySms', 'by SMS') : t('login.byEmail', 'by email')} {t('login.to', 'to')}<br />
                 <span className="text-white font-medium break-all">{identifier}</span>
               </p>
             </div>
@@ -208,22 +210,22 @@ export default function Login() {
 
             <label className="flex items-center justify-center gap-2 text-sm text-slate-300 cursor-pointer">
               <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
-              Trust this device — skip the code next time
+              {t('login.trust', 'Trust this device — skip the code next time')}
             </label>
 
-            {busy && <div className="flex items-center justify-center gap-2 text-sm text-slate-400"><Loader2 size={16} className="animate-spin" /> Verifying…</div>}
+            {busy && <div className="flex items-center justify-center gap-2 text-sm text-slate-400"><Loader2 size={16} className="animate-spin" /> {t('login.verifying', 'Verifying…')}</div>}
 
             <div className="flex items-center justify-between text-xs text-slate-500">
-              <span>{codeExpiry > 0 ? `Code expires in ${fmt(codeExpiry)}` : 'Code expired'}</span>
+              <span>{codeExpiry > 0 ? `${t('login.expiresIn', 'Code expires in')} ${fmt(codeExpiry)}` : t('login.expired', 'Code expired')}</span>
               <button type="button" onClick={resend} disabled={resendIn > 0 || busy}
                 className={`font-medium ${resendIn > 0 ? 'text-slate-600 cursor-not-allowed' : 'text-indigo-400 hover:text-indigo-300'}`}>
-                {resendIn > 0 ? `Resend in ${resendIn}s` : 'Resend code'}
+                {resendIn > 0 ? `${t('login.resendIn', 'Resend in')} ${resendIn}s` : t('login.resend', 'Resend code')}
               </button>
             </div>
 
             <button type="button" onClick={() => { setStep('id'); setError(''); }}
               className="text-sm text-slate-400 hover:text-white w-full text-center">
-              Use a different email or phone
+              {t('login.different', 'Use a different email or phone')}
             </button>
           </div>
         )}
@@ -232,23 +234,23 @@ export default function Login() {
           <>
             <div className="flex items-center gap-3 my-6">
               <div className="flex-1 h-px bg-white/10" />
-              <span className="text-xs text-slate-500 uppercase tracking-wider">or</span>
+              <span className="text-xs text-slate-500 uppercase tracking-wider">{t('login.or', 'or')}</span>
               <div className="flex-1 h-px bg-white/10" />
             </div>
             <div className="space-y-3">
               {providers.includes('google') && (
-                <a href={`${api.base}/api/auth/oauth/google/start`} className="btn-ghost w-full">Continue with Google</a>
+                <a href={`${api.base}/api/auth/oauth/google/start`} className="btn-ghost w-full">{t('login.google', 'Continue with Google')}</a>
               )}
               {providers.includes('discord') && (
                 <a href={`${api.base}/api/auth/oauth/discord/start`} className="btn w-full text-white" style={{ background: '#5865F2' }}>
-                  Continue with Discord
+                  {t('login.discord', 'Continue with Discord')}
                 </a>
               )}
             </div>
           </>
         )}
         <p className="text-xs text-slate-500 text-center mt-6">
-          No password needed — we use secure one-time codes.
+          {t('login.noPassword', 'No password needed — we use secure one-time codes.')}
         </p>
       </div>
     </div>
