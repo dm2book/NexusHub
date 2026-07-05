@@ -22,7 +22,7 @@ function friendlyError(err) {
 }
 
 export default function Login() {
-  const { login, user } = useAuth();
+  const { login, user, loading: authLoading } = useAuth();
   const toast = useToast();
   const { t } = useI18n();
   const navigate = useNavigate();
@@ -133,6 +133,20 @@ export default function Login() {
 
   const fmt = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
   const idIsEmail = isEmail(identifier.trim());
+
+  // While the silent sign-in ladder (session/trusted-device) is still running,
+  // don't show the form yet — otherwise a returning customer can request a code
+  // they'll never need, a moment before being auto-signed-in.
+  if (authLoading) {
+    return (
+      <div className="min-h-[80vh] flex items-center justify-center px-4 py-10">
+        <div className="flex flex-col items-center gap-3 text-slate-400">
+          <Loader2 size={28} className="animate-spin text-indigo-400" />
+          <p className="text-sm">{t('login.checking', 'Checking if you’re already signed in…')}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-[80vh] flex items-center justify-center px-4 py-10">
