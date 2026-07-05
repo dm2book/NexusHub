@@ -28,7 +28,9 @@ const TYPE = {
   announcement: ChannelType.GuildAnnouncement, forum: ChannelType.GuildForum,
 };
 
-const REPOST = /^(1|true|yes)$/i.test(process.env.REPOST || ''); // REPOST=1 → re-post all panels
+// REPOST=1 → re-post all panels. Trimmed because Windows' `set REPOST=1 && …`
+// includes the space before && in the value.
+const REPOST = /^(1|true|yes)$/i.test((process.env.REPOST || '').trim());
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 const resolvePerms = (arr = []) => arr.map((n) => P[n]).filter(Boolean);
