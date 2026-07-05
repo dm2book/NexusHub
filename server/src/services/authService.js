@@ -29,6 +29,20 @@ export function deviceLabel(ua = '') {
 // ── Email OTP ──────────────────────────────────────────────────────────────
 
 /**
+ * The login code as individual digit tiles — table-based with inline styles so
+ * it renders identically in Gmail, Outlook and Apple Mail. Passed to the
+ * login_otp template as {{otp.codeHtml}}.
+ */
+function otpDigitsHtml(code) {
+  const tile = (d) =>
+    `<td style="width:48px;height:60px;background:#1c1c30;border:1px solid #3d3d68;border-radius:12px;` +
+    `text-align:center;vertical-align:middle;font:800 28px/60px 'Courier New',Courier,monospace;color:#ffffff">${d}</td>`;
+  const gap = '<td style="width:9px;font-size:0;line-height:0">&nbsp;</td>';
+  return `<table role="presentation" cellpadding="0" cellspacing="0" align="center" style="margin:10px auto 14px"><tr>${
+    [...String(code)].map(tile).join(gap)}</tr></table>`;
+}
+
+/**
  * Create + email a one-time login code. Layered abuse protection:
  *  - per-email throttle (max 3 live codes / TTL window),
  *  - per-IP throttle (max 8 codes / TTL window across all emails),
@@ -78,7 +92,7 @@ export async function requestEmailOtp(email, ctx = {}) {
   // Deliver the code, but never let a mail failure break login: the code is
   // already stored, and the failure is recorded in email_log for diagnosis.
   await sendEmailAsync('login_otp', e, {
-    otp: { code, ttl: config.auth.otpTtlMinutes },
+    otp: { code, ttl: config.auth.otpTtlMinutes, codeHtml: otpDigitsHtml(code) },
     user: { name: e.split('@')[0] },
   });
   // Dev convenience: when email isn't actually delivered (no SMTP, non-prod),

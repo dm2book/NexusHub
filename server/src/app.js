@@ -12,7 +12,7 @@ import cors from 'cors';
 import { config } from './config/env.js';
 import { get } from './db/index.js';
 import { migrate } from './db/migrate.js';
-import { seed, isSeeded } from './db/seed.js';
+import { seed, isSeeded, syncEmailTemplates } from './db/seed.js';
 import { seedDemoCatalog } from './db/demoSeed.js';
 import { attachUser } from './middleware/auth.js';
 import { rateLimit } from './middleware/rateLimit.js';
@@ -34,6 +34,9 @@ export function ensureReady() {
     readyPromise = (async () => {
       await migrate();
       if (!(await isSeeded())) await seed();
+      // Roll out improved default email templates to existing databases
+      // (admin-customized templates are never touched).
+      else await syncEmailTemplates();
       // Zero-config: auto-fill the catalog whenever the shop is empty, so a fresh
       // deploy is never an empty store. (SEED_DEMO=true also forces a re-sync.)
       const { n } = await get('SELECT COUNT(*) AS n FROM products WHERE active = 1').catch(() => ({ n: 1 }));

@@ -109,11 +109,30 @@ export const DEFAULT_TEMPLATES = [
   {
     id: 'login_otp',
     name: 'Login Code',
-    subject: 'Your {{brand.name}} login code: {{otp.code}}',
+    subject: '{{otp.code}} is your {{brand.name}} login code',
     body_html: `
+      <h1 style="text-align:center">🔐 Your login code</h1>
+      <p style="text-align:center">Hi <strong>{{user.name}}</strong> — enter this code to sign in.
+      It works once and expires in <strong>{{otp.ttl}} minutes</strong>.</p>
+      {{otp.codeHtml}}
+      <p style="text-align:center;color:#8b93a7;font-size:13px">Typing on another device? The code is
+      <strong style="letter-spacing:2px">{{otp.code}}</strong></p>
+      <div class="notice">🛡️ <strong>Stay safe:</strong> {{brand.name}} will <strong>never</strong> ask
+      you for this code — not by email, DM or phone. Didn't try to sign in? You can safely ignore
+      this email; without the code nobody can access your account.</div>`,
+  },
+];
+
+/**
+ * Superseded default bodies, keyed by template id. When seeding an existing
+ * database we upgrade a template ONLY if its stored body still matches one of
+ * these — so improved defaults roll out everywhere except where an admin has
+ * customized the template.
+ */
+export const LEGACY_TEMPLATE_BODIES = {
+  login_otp: [`
       <h1>Your login code</h1>
       <p>Use this code to sign in. It expires in {{otp.ttl}} minutes.</p>
       <p class="code">{{otp.code}}</p>
-      <p>If you didn't request this, you can safely ignore this email.</p>`,
-  },
-];
+      <p>If you didn't request this, you can safely ignore this email.</p>`],
+};
