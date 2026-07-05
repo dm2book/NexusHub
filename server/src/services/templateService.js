@@ -52,6 +52,9 @@ export function wrapBranded(contentHtml, { preheader = '' } = {}) {
   .code{font:800 30px/1 'Courier New',monospace;letter-spacing:8px;color:#ffffff;
         background:linear-gradient(180deg,#1c1c2c,#17172a);border:1px solid #34345a;border-radius:14px;
         padding:20px;text-align:center;margin:4px 0 16px}
+  .notice{background:#181826;border:1px solid #2c2c48;border-left:3px solid #f5b324;border-radius:0 12px 12px 0;
+          padding:13px 16px;margin:6px 0 18px;color:#a8b0c2;font-size:13px;line-height:1.6}
+  .notice strong{color:#e5e7eb}
   .quote{border-left:3px solid ${color};background:#1a1a2c;border-radius:0 12px 12px 0;
          padding:14px 18px;margin:0 0 18px;color:#cbd1de;font-size:14px;line-height:1.6}
   .summary{width:100%;border-collapse:collapse;margin:2px 0 20px;font-size:14px}

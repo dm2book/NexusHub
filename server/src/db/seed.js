@@ -5,7 +5,7 @@
  */
 import { run, get, nowIso } from './index.js';
 import { migrate } from './migrate.js';
-import { DEFAULT_TEMPLATES } from '../services/defaultTemplates.js';
+import { DEFAULT_TEMPLATES, LEGACY_TEMPLATE_BODIES } from '../services/defaultTemplates.js';
 
 // Permission catalog. Granular so roles can be composed precisely.
 const PERMISSIONS = {
@@ -82,17 +82,33 @@ export async function seed() {
     }
   }
 
+  await syncEmailTemplates(at);
+
+  console.log(`Seed complete: ${Object.keys(ROLES).length} roles, ` +
+    `${Object.keys(PERMISSIONS).length} permissions, ${DEFAULT_TEMPLATES.length} templates.`);
+}
+
+/**
+ * Insert missing email templates and upgrade any whose stored body is an
+ * UNMODIFIED older default (see LEGACY_TEMPLATE_BODIES) — so improved defaults
+ * roll out to existing databases without ever touching admin-customized copies.
+ * Runs on every boot (cheap: one SELECT per template).
+ */
+export async function syncEmailTemplates(at = nowIso()) {
+  const normalize = (s) => String(s || '').replace(/\s+/g, ' ').trim();
   for (const t of DEFAULT_TEMPLATES) {
-    const exists = await get('SELECT id FROM email_templates WHERE id = @id', { id: t.id });
+    const exists = await get('SELECT id, body_html FROM email_templates WHERE id = @id', { id: t.id });
     if (!exists) {
       await run(`INSERT INTO email_templates (id, name, subject, body_html, enabled, updated_at)
                  VALUES (@id, @name, @subject, @body, 1, @at)`,
                 { id: t.id, name: t.name, subject: t.subject, body: t.body_html, at });
+    } else if ((LEGACY_TEMPLATE_BODIES[t.id] || []).some((old) => normalize(old) === normalize(exists.body_html))) {
+      await run(`UPDATE email_templates SET name = @name, subject = @subject, body_html = @body, updated_at = @at
+                 WHERE id = @id`,
+                { id: t.id, name: t.name, subject: t.subject, body: t.body_html, at });
+      console.log(`  · email template "${t.id}" upgraded to the new default`);
     }
   }
-
-  console.log(`Seed complete: ${Object.keys(ROLES).length} roles, ` +
-    `${Object.keys(PERMISSIONS).length} permissions, ${DEFAULT_TEMPLATES.length} templates.`);
 }
 
 /** True when core config has been seeded (used by lazy serverless bootstrap). */
