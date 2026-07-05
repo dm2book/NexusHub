@@ -75,8 +75,12 @@ export async function resolveTrustedDevice(token, ctx = {}) {
   if (!d || d.revoked_at) return null;
   if (new Date(d.expires_at) < new Date()) return null;
   if (!safeEqual(d.token_hash, sha256(secret))) return null;
-  await run('UPDATE trusted_devices SET last_used_at = @at, ip = COALESCE(@ip, ip) WHERE id = @id',
-    { at: nowIso(), ip: ctx.ip || null, id });
+  // Sliding expiry: an actively-used trusted device stays trusted — the
+  // 60-day window restarts on every successful use.
+  const slide = new Date(Date.now() + TRUST_DAYS * 86_400_000).toISOString();
+  await run(`UPDATE trusted_devices SET last_used_at = @at, ip = COALESCE(@ip, ip), expires_at = @exp
+       WHERE id = @id`,
+    { at: nowIso(), ip: ctx.ip || null, exp: slide, id });
   return d.user_id;
 }
 

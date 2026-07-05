@@ -29,7 +29,7 @@ import { attributeSignup } from '../services/affiliateService.js';
 import { audit } from '../services/auditService.js';
 import { sendEmailAsync } from '../services/emailService.js';
 import { notify } from '../services/notificationService.js';
-import { badRequest, tooMany } from '../utils/errors.js';
+import { badRequest, tooMany, unauthorized } from '../utils/errors.js';
 
 const DEVICE_COOKIE = 'fm_device';
 const isEmail = (s) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(s || ''));
@@ -179,6 +179,28 @@ router.post('/otp/verify', otpLimiter, asyncHandler(async (req, res) => {
     firstLogin: !!session.firstLogin,
   });
 }));
+
+// Silent device login: no identifier needed. If this browser carries a valid
+// trusted-device cookie (created after a full login where the user ticked
+// "Trust this device", incl. any 2FA), start a fresh session directly. This is
+// what keeps returning customers signed in even after their session expired.
+router.post('/device-login', rateLimit({ bucket: 'device_login', windowMs: 60_000, max: 10 }),
+  asyncHandler(async (req, res) => {
+    const deviceToken = req.cookies?.[DEVICE_COOKIE];
+    if (!deviceToken) throw unauthorized('No trusted device');
+    const ctx = ctxOf(req);
+    const userId = await resolveTrustedDevice(deviceToken, ctx);
+    if (!userId) throw unauthorized('No trusted device');
+    const user = await getUserById(userId);
+    if (!user || user.status !== 'active') throw unauthorized('No trusted device');
+
+    const session = await finalizeLogin(user, ctx);
+    await recordLoginAttempt({ userId: user.id, identifier: user.email, channel: 'trusted_device', success: true, ctx });
+    await audit({ actor: { id: user.id, email: user.email }, action: 'auth.login',
+      metadata: { method: 'trusted_device_auto' }, req });
+    setSessionCookie(res, session.refreshToken);
+    res.json({ accessToken: session.accessToken, user: await publicUser(user.id) });
+  }));
 
 // ── Two-factor authentication (TOTP / authenticator apps) ────────────────────
 

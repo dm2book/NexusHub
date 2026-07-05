@@ -19,8 +19,17 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     (async () => {
-      // Try existing access token, else attempt a refresh from the cookie.
+      // Silent sign-in ladder — a returning customer never sees a login screen:
+      //  1. access token in this tab (fast path)
+      //  2. refresh-session cookie (30 days, sliding)
+      //  3. trusted-device cookie (60 days, sliding) → brand-new session
       if (!getAccessToken()) await api.refresh().catch(() => {});
+      if (!getAccessToken()) {
+        try {
+          const { accessToken } = await api.post('/api/auth/device-login');
+          if (accessToken) setAccessToken(accessToken);
+        } catch { /* no trusted device — stay guest */ }
+      }
       if (getAccessToken()) await loadMe();
       setLoading(false);
     })();
