@@ -19,6 +19,7 @@ import CountUp from '../components/CountUp.jsx';
 import RecentlyDelivered from '../components/store/RecentlyDelivered.jsx';
 import CommandPalette from '../components/store/CommandPalette.jsx';
 import MobileTabBar from '../components/store/MobileTabBar.jsx';
+import AnnouncementBar from '../components/store/AnnouncementBar.jsx';
 import { SystemStatus } from '../components/store/StoreFooter.jsx';
 import { money } from '../lib/catalog.js';
 import { withFallback, SAMPLE_PRODUCTS } from '../lib/sampleCatalog.js';
@@ -155,6 +156,8 @@ export default function HomeStore() {
         .fm-rail::-webkit-scrollbar{height:0}
         .fm-head{font-weight:800;letter-spacing:-.02em}
       `}</style>
+
+      <AnnouncementBar />
 
       {/* ── Top nav ─────────────────────────────────────────────── */}
       <header className="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-slate-200/70">

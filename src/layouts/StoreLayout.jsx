@@ -5,6 +5,7 @@ import StoreFooter from '../components/store/StoreFooter.jsx';
 import RecentlyDelivered from '../components/store/RecentlyDelivered.jsx';
 import CommandPalette from '../components/store/CommandPalette.jsx';
 import MobileTabBar from '../components/store/MobileTabBar.jsx';
+import AnnouncementBar from '../components/store/AnnouncementBar.jsx';
 import { useReveal } from '../lib/useReveal.js';
 
 /**
@@ -25,6 +26,7 @@ export default function StoreLayout() {
 
   return (
     <div className="min-h-screen flex flex-col bg-[#f6f7fb]">
+      <AnnouncementBar />
       <StoreNav />
       <main key={pathname} className="theme-light flex-1 fm-page pb-20 lg:pb-0">
         <Outlet />

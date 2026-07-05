@@ -13,9 +13,16 @@ import products from './products.js';
 import support from './support.js';
 import social from './social.js';
 import monetization from './monetization.js';
+import { asyncHandler } from '../../middleware/error.js';
+import { launchChecks } from '../../services/launchCheckService.js';
 
 const router = Router();
 router.use(requireAuth, requireStaff);
+
+// Live "can I sell today?" readiness report for the admin dashboard.
+router.get('/launch-check', asyncHandler(async (_req, res) => {
+  res.json(await launchChecks());
+}));
 
 router.use('/orders', orders);
 router.use('/suppliers', suppliers);

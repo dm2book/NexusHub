@@ -734,7 +734,7 @@ async function handleCommand(i) {
       "`/rank` — your level & XP\n`/daily` — claim your daily XP (streaks!)\n`/leaderboard` — top members\n" +
       "`/close` — staff: close a ticket\n`/giveaway` — staff: start a giveaway\n`/reroll` — staff: reroll a winner\n" +
       "`/coupon` — staff: post a discount code\n`/flashsale` — staff: countdown deal in #deals\n" +
-      "`/digest` — staff: live store numbers\n`/stock` — staff: low-stock check\n" +
+      "`/digest` — staff: live store numbers\n`/stock` — staff: low-stock check\n`/launch` — staff: ready-to-sell check\n" +
       "`/announce` — staff: post an announcement\n`/serverinfo` — server stats\n" +
       "Buttons: verify in #verify, pick roles in #roles, open a ticket in #open-a-ticket." });
   }
@@ -749,6 +749,7 @@ async function handleCommand(i) {
   if (i.commandName === 'leaderboard') return leaderboardCmd(i);
   if (i.commandName === 'suggest') return postSuggestion(i);
   if (i.commandName === 'digest') return digestCmd(i);
+  if (i.commandName === 'launch') return launchCmd(i);
   if (i.commandName === 'stock') return stockCmd(i);
   if (i.commandName === 'coupon') return postCoupon(i);
   if (i.commandName === 'flashsale') return flashSale(i);
@@ -1232,6 +1233,22 @@ async function stockCmd(i) {
     .setTitle(low ? '🟠 Low stock' : '✅ Stock levels healthy')
     .setDescription(low || 'Every active product has enough pre-loaded codes.')
     .setFooter({ text: 'ForgeMarket · stock monitor' }).setTimestamp()] });
+}
+
+// /launch — staff: live "can I sell today?" readiness report from the store
+async function launchCmd(i) {
+  if (!isStaff(i.member)) return i.reply({ content: 'Staff only.', ephemeral: true });
+  await i.deferReply({ ephemeral: true });
+  const d = await fetchDigest();
+  if (!d?.launch) return i.editReply('Couldn’t reach the store — check FORGEMARKET_API_URL & REVIEW_INGEST_SECRET.');
+  const MARK = { ok: '✅', warn: '🟡', fail: '🔴' };
+  const lines = d.launch.checks.map((c) => `${MARK[c.status]} **${c.label}** — ${c.detail}`).join('\n');
+  return i.editReply({ embeds: [new EmbedBuilder()
+    .setColor(d.launch.ready ? 0x10b981 : 0xef4444)
+    .setTitle(d.launch.ready ? '🚀 Ready to sell' : '⛔ Not ready to sell yet')
+    .setDescription(`${lines}\n\n_${d.launch.summary}_`)
+    .setThumbnail(BRAND_ICON)
+    .setFooter({ text: 'ForgeMarket · live launch check' }).setTimestamp()] });
 }
 
 // ── Daily vouch spotlight → #general (social proof on autopilot) ─────────────

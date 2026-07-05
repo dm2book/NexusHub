@@ -24,7 +24,11 @@ export default function CheckoutSuccess() {
       <div className="relative max-w-lg mx-auto">
         <div className="fm-pop w-20 h-20 rounded-3xl mx-auto flex items-center justify-center mb-6 bg-emerald-500/15 border border-emerald-500/30"
           style={{ viewTransitionName: 'order-summary' }}>
-          <CheckCircle2 size={40} className="text-emerald-400" />
+          {/* Checkmark draws itself in — a small moment of delight on the happiest page. */}
+          <svg className="fm-check-draw" width="44" height="44" viewBox="0 0 64 64" fill="none" aria-hidden>
+            <circle cx="32" cy="32" r="29" stroke="#34d399" strokeWidth="4" strokeLinecap="round" />
+            <path d="M20 33 L29 42 L45 24" stroke="#34d399" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
         </div>
         <h1 className="text-3xl text-white">{t('success.title', 'Payment received 🎉')}</h1>
         <p className="text-slate-400 mt-3">
