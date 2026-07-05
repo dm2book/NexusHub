@@ -404,6 +404,10 @@ client.once(Events.ClientReady, (c) => {
 
   // Daily vouch spotlight → #general (checked hourly, posts once a day).
   setInterval(() => c.guilds.cache.forEach((g) => maybeVouchSpotlight(g)), 60 * 60_000);
+
+  // Site watchdog: every 15 min; alerts staff on downtime + recovery.
+  setInterval(() => c.guilds.cache.forEach((g) => checkSiteHealth(g)), 15 * 60_000);
+  setTimeout(() => c.guilds.cache.forEach((g) => checkSiteHealth(g)), 30_000);
   setTimeout(() => c.guilds.cache.forEach((g) => maybeVouchSpotlight(g)), 90_000);
 });
 
@@ -1131,6 +1135,34 @@ async function flashSale(i) {
   }, minutes * 60_000);
   leadLog(i.guild, `⚡ Flash sale started by <@${i.user.id}>: "${deal}" (${minutes} min${code ? `, code ${code.toUpperCase()}` : ''})`);
   return i.reply({ content: `Flash sale live in <#${ch.id}> — ends in **${minutes} min**.`, ephemeral: true });
+}
+
+// ── Site watchdog: page staff if the store API goes down ─────────────────────
+// Checked every 15 min; one alert per hour max, plus a recovery message the
+// moment it comes back — downtime should never go unnoticed.
+let siteWasDown = false;
+let lastDownAlert = 0;
+async function checkSiteHealth(guild) {
+  if (!FORGEMARKET_API_URL) return;
+  let ok = false;
+  try {
+    const res = await fetch(`${FORGEMARKET_API_URL.replace(/\/$/, '')}/api/health`, { signal: AbortSignal.timeout(15_000) });
+    ok = res.ok;
+  } catch { ok = false; }
+
+  const ch = findChannel(guild, 'mod-log') || findChannel(guild, 'staff-announcements');
+  if (!ok && (!siteWasDown || Date.now() - lastDownAlert > 60 * 60_000)) {
+    siteWasDown = true;
+    lastDownAlert = Date.now();
+    ch?.send({ content: '@here', allowedMentions: { parse: ['everyone'] },
+      embeds: [new EmbedBuilder().setColor(0xef4444).setTitle('🔴 Store API is DOWN')
+        .setDescription(`\`${FORGEMARKET_API_URL}/api/health\` is not responding.\nCustomers may not be able to order — check Vercel + Neon status.`)
+        .setTimestamp()] }).catch(() => {});
+  } else if (ok && siteWasDown) {
+    siteWasDown = false;
+    ch?.send({ embeds: [new EmbedBuilder().setColor(0x10b981).setTitle('🟢 Store API recovered')
+      .setDescription('Health checks are passing again.').setTimestamp()] }).catch(() => {});
+  }
 }
 
 // ── Staff digest: live store numbers via the signed digest endpoint ──────────

@@ -147,6 +147,26 @@ export async function postDropEvent(kind, data = {}) {
   await postWebhook(url, { embeds: [embed] });
 }
 
+/**
+ * Alert staff when the API throws an unhandled 500. Throttled to one alert per
+ * route per 5 minutes so an error storm can't flood the channel. Best-effort.
+ */
+const errorAlertAt = new Map(); // route -> last alert ts
+export async function postErrorAlert(route, message) {
+  const url = config.discord.stockWebhookUrl || config.discord.orderWebhookUrl;
+  if (!url) return;
+  const now = Date.now();
+  if (now - (errorAlertAt.get(route) || 0) < 5 * 60_000) return;
+  errorAlertAt.set(route, now);
+  await postWebhook(url, { embeds: [{
+    title: '🚨 API error (500)',
+    description: `**Route:** \`${route}\`\n**Error:** ${String(message || 'unknown').slice(0, 300)}\n\nCheck the Vercel function logs for the stack trace.`,
+    color: 0xef4444,
+    footer: { text: `${config.email.fromName} · error monitor` },
+    timestamp: new Date().toISOString(),
+  }] });
+}
+
 /** Ping staff that a product's pre-loaded code stock is running low. */
 export async function postStockAlert(product, remaining) {
   const url = config.discord.stockWebhookUrl || config.discord.orderWebhookUrl;

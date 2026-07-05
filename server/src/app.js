@@ -79,6 +79,13 @@ export function createApp({ lazyReady = false } = {}) {
     next();
   });
 
+  // Vercel rewrites /sitemap.xml to this function with the ORIGINAL path, so
+  // alias it onto the API route where the dynamic sitemap lives.
+  app.use((req, _res, next) => {
+    if (req.path === '/sitemap.xml') req.url = '/api/sitemap.xml';
+    next();
+  });
+
   // Health + scheduled maintenance — mounted before auth/rate-limit so uptime
   // monitors and Vercel Cron aren't throttled or require a session.
   app.use('/api', cronRoutes);

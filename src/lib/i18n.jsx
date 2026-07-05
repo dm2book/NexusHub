@@ -172,6 +172,17 @@ const NL = {
   'product.chooseAmount': 'Kies je hoeveelheid',
   'product.related': 'Vergelijkbare producten',
 
+  // Guest review (track page)
+  'review.title': 'Hoe was je bestelling?',
+  'review.sub': 'Laat een geverifieerde review achter — duurt 20 seconden.',
+  'review.placeholder': 'Snel geleverd? Goede prijs? Vertel het andere kopers…',
+  'review.email': 'E-mail van deze bestelling (ter verificatie)',
+  'review.submit': 'Review plaatsen',
+  'review.thanks': 'Dankjewel! Je review staat live. 💜',
+  'review.already': 'Deze bestelling is al beoordeeld — bedankt!',
+  'review.thanksTitle': 'Bedankt voor je review!',
+  'review.thanksSub': 'Hij staat nu op onze reviewpagina en helpt andere kopers.',
+
   // Checkout
   'checkout.title': 'Afrekenen',
   'checkout.back': 'Terug naar winkelwagen',
