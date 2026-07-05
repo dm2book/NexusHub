@@ -264,12 +264,16 @@ export async function refreshSession(refreshToken, ctx = {}) {
   if (!user || user.status !== 'active') throw unauthorized('Account unavailable');
 
   // Rotate: issue a brand-new refresh secret and update the row in place.
+  // Sliding expiry: every active refresh restarts the 30-day window, so a
+  // returning customer stays signed in indefinitely — only true inactivity
+  // (refreshTtlDays without a visit) ends the session.
   const newSecret = randomToken(32);
-  await run(`UPDATE sessions SET refresh_hash = @rh, last_used_at = @at,
+  const slide = new Date(Date.now() + config.auth.refreshTtlDays * 86_400_000).toISOString();
+  await run(`UPDATE sessions SET refresh_hash = @rh, last_used_at = @at, expires_at = @exp,
         rotated_count = COALESCE(rotated_count,0) + 1,
         ip = COALESCE(@ip, ip), user_agent = COALESCE(@ua, user_agent)
       WHERE id = @id`,
-      { rh: sha256(newSecret), at: nowIso(), ip: ctx.ip || null, ua: ctx.userAgent || null, id: sessionId });
+      { rh: sha256(newSecret), at: nowIso(), exp: slide, ip: ctx.ip || null, ua: ctx.userAgent || null, id: sessionId });
 
   return { accessToken: await signAccess(user, sessionId), refreshToken: `${sessionId}.${newSecret}` };
 }
