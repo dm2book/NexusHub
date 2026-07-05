@@ -6,6 +6,7 @@ import { verifyIngest } from '../middleware/ingestSignature.js';
 import { config } from '../config/env.js';
 import { overview, topProducts } from '../services/analyticsService.js';
 import { all } from '../db/index.js';
+import { launchChecks } from '../services/launchCheckService.js';
 
 const router = Router();
 
@@ -20,7 +21,7 @@ export const canonicalDigest = () => 'digest';
 router.post('/digest',
   verifyIngest(canonicalDigest)(config.discord.reviewIngestSecret),
   asyncHandler(async (_req, res) => {
-    const [week, top, lowStock, pending] = await Promise.all([
+    const [week, top, lowStock, pending, launch] = await Promise.all([
       overview({ days: 7 }),
       topProducts({ days: 7, limit: 5 }),
       // Products low on pre-loaded codes (same threshold as the alerts).
@@ -35,12 +36,14 @@ router.post('/digest',
             ORDER BY available ASC LIMIT 10`,
           { thr: config.discord.lowStockThreshold }),
       all(`SELECT COUNT(*) AS n FROM orders WHERE status = 'pending'`),
+      launchChecks(),
     ]);
     res.json({
       week,                      // revenue/orders/conversion for the last 7 days
       topProducts: top,
       lowStock: lowStock.map((r) => ({ id: r.id, name: r.name, available: Number(r.available) })),
       pendingOrders: Number(pending[0]?.n || 0),
+      launch,
     });
   }));
 
