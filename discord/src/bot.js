@@ -75,9 +75,17 @@ const SCAM = /(discord\.(gg|com\/invite)\/|free\s*nitro|steamcommunity\.com\/(gi
 
 const {
   DISCORD_TOKEN, ANTHROPIC_API_KEY, AI_MODEL = 'claude-sonnet-4-6',
-  FORGEMARKET_API_URL = '', STORE_URL = 'https://forgemarket-store.vercel.app',
   REVIEW_INGEST_SECRET = '',
 } = process.env;
+// URL envs, hardened: an EMPTY value in .env (`STORE_URL=`) must fall back to
+// the default just like a missing one, and a bare domain gets https:// added.
+const cleanUrl = (v, fallback = '') => {
+  let u = String(v || '').trim() || fallback;
+  if (u && !/^https?:\/\//i.test(u)) u = `https://${u}`;
+  return u.replace(/\/+$/, '');
+};
+const STORE_URL = cleanUrl(process.env.STORE_URL, 'https://forgemarket-store.vercel.app');
+const FORGEMARKET_API_URL = cleanUrl(process.env.FORGEMARKET_API_URL);
 
 // Push a /vouch to the website so it appears on the storefront reviews section.
 // Signed with HMAC-SHA256 (x-timestamp + x-signature) so the API can verify
