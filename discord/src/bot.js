@@ -118,7 +118,10 @@ const P = PermissionFlagsBits;
 const anthropic = ANTHROPIC_API_KEY ? new Anthropic({ apiKey: ANTHROPIC_API_KEY }) : null;
 
 // Brand assets, hosted by the storefront (public/discord/*).
-const BANNER = (n) => `${STORE_URL}/discord/banner-${n}.png`;
+// ?v=2 busts Discord's media-proxy cache: a panel posted while the site briefly
+// served no image (e.g. mid domain-switch) would otherwise keep showing the
+// stale/blank cached copy. Bump this whenever the banner artwork changes.
+const BANNER = (n) => `${STORE_URL}/discord/banner-${n}.png?v=2`;
 const BRAND_ICON = `${STORE_URL}/icon-512.png`;
 
 const client = new Client({
