@@ -33,9 +33,9 @@ export const config = {
   // redirects. In production we fall back to the live URL so emails/links work
   // with zero extra config (override with APP_URL if you use another domain).
   appUrl: env.APP_URL
-    || (isProd ? 'https://forgemarket-store.vercel.app' : 'http://localhost:3000'),
+    || (isProd ? 'https://forgemarket.nl' : 'http://localhost:3000'),
   apiUrl: env.API_URL
-    || (isProd ? 'https://forgemarket-store.vercel.app' : 'http://localhost:4000'),
+    || (isProd ? 'https://forgemarket.nl' : 'http://localhost:4000'),
 
   db: {
     // Postgres connection string. Different hosts/integrations expose it under

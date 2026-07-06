@@ -84,8 +84,10 @@ const cleanUrl = (v, fallback = '') => {
   if (u && !/^https?:\/\//i.test(u)) u = `https://${u}`;
   return u.replace(/\/+$/, '');
 };
-const STORE_URL = cleanUrl(process.env.STORE_URL, 'https://forgemarket-store.vercel.app');
-const FORGEMARKET_API_URL = cleanUrl(process.env.FORGEMARKET_API_URL);
+const STORE_URL = cleanUrl(process.env.STORE_URL, 'https://forgemarket.nl');
+// The store and its API live on the same domain, so default the API URL to the
+// store URL — /order, /digest and the live price list then work out of the box.
+const FORGEMARKET_API_URL = cleanUrl(process.env.FORGEMARKET_API_URL, STORE_URL);
 
 // Push a /vouch to the website so it appears on the storefront reviews section.
 // Signed with HMAC-SHA256 (x-timestamp + x-signature) so the API can verify

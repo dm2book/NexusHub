@@ -4,7 +4,7 @@ From "built" to "accepting real orders". Steps marked **(only you)** are dashboa
 actions I can't do for you. The code is all on **`main`** and Vercel **auto‑deploys
 every merge**, so there's nothing to "merge" — just set the config below.
 
-Live site: **https://forgemarket-store.vercel.app** · Vercel project: **forgemarket**
+Live site: **https://forgemarket.nl** · Vercel project: **forgemarket**
 
 ---
 
@@ -42,7 +42,7 @@ Customers pay → submit a transaction ID/screenshot → you confirm in **Admin 
 | `REVIEW_INGEST_SECRET` | a shared random string (same on both) |
 
 On the **bot** host (Railway) also set: `DISCORD_TOKEN`, `DISCORD_CLIENT_ID`,
-`DISCORD_GUILD_ID`, `FORGEMARKET_API_URL=https://forgemarket-store.vercel.app`,
+`DISCORD_GUILD_ID`, `FORGEMARKET_API_URL=https://forgemarket.nl`,
 and optionally `ANTHROPIC_API_KEY`. Then `/vouch` in Discord auto‑publishes (HMAC‑signed)
 to the site's reviews + Trust Center.
 
