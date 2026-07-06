@@ -234,7 +234,7 @@ export const LEVEL_ROLES = [
 // ── Onboarding & content ────────────────────────────────────────────────────
 export const MESSAGES = {
   welcome: (g) => ({
-    image: '{STORE_URL}/discord/banner-welcome.png',
+    image: '{STORE_URL}/discord/banner-welcome.png?v=2',
     color: 0x7c5cff,
     title: `Welcome to ${g} ⚡`,
     description:
@@ -248,7 +248,7 @@ export const MESSAGES = {
       "Instant delivery · buyer-protected · 24/7 support.",
   }),
   rules: {
-    image: '{STORE_URL}/discord/banner-rules.png',
+    image: '{STORE_URL}/discord/banner-rules.png?v=2',
     color: 0x94a3b8,
     title: '📜 Server Rules',
     description:
@@ -274,7 +274,7 @@ export const MESSAGES = {
       "👉 First step: verify in <#verify>.",
   },
   verify: {
-    image: '{STORE_URL}/discord/banner-verify.png',
+    image: '{STORE_URL}/discord/banner-verify.png?v=2',
     color: 0x22c55e,
     title: '✅ Verify to enter',
     description:
@@ -282,7 +282,7 @@ export const MESSAGES = {
       "marketplace, community, giveaways and support.\n\nThis keeps the community safe from bots and scammers.",
   },
   ticketPanel: {
-    image: '{STORE_URL}/discord/banner-support.png',
+    image: '{STORE_URL}/discord/banner-support.png?v=2',
     color: 0x3b82f6,
     title: '🎫 Open a support ticket',
     description:
@@ -294,7 +294,7 @@ export const MESSAGES = {
       "Average first response: **under 10 minutes** during open hours.",
   },
   products: {
-    image: '{STORE_URL}/discord/banner-products.png',
+    image: '{STORE_URL}/discord/banner-products.png?v=2',
     color: 0x6366f1,
     title: '🛒 The ForgeMarket catalog',
     description:
@@ -314,7 +314,7 @@ export const MESSAGES = {
       "Problem with an order? Open a ticket in <#open-a-ticket> — eligible orders are money-back guaranteed.",
   },
   deals: {
-    image: '{STORE_URL}/discord/banner-deals.png',
+    image: '{STORE_URL}/discord/banner-deals.png?v=2',
     color: 0xef4444,
     title: '🔥 Deals & bundles',
     description:
@@ -333,7 +333,7 @@ export const MESSAGES = {
       "Verify in <#verify>, then browse <#products>. Welcome aboard! 🎉",
   },
   supportInfo: {
-    image: '{STORE_URL}/discord/banner-support.png',
+    image: '{STORE_URL}/discord/banner-support.png?v=2',
     color: 0x3b82f6,
     title: '📋 How support works',
     description:
@@ -343,7 +343,7 @@ export const MESSAGES = {
       "**Safety:** our staff will **never DM you first** and never ask for passwords. Report anyone who does.",
   },
   reviewsIntro: {
-    image: '{STORE_URL}/discord/banner-vouches.png',
+    image: '{STORE_URL}/discord/banner-vouches.png?v=2',
     color: 0x22c55e,
     title: '⭐ Verified customer reviews',
     description:
@@ -356,7 +356,7 @@ export const MESSAGES = {
     description: "Real screenshots of completed, instant deliveries. Transparency builds trust. 🔒",
   },
   giveawaysIntro: {
-    image: '{STORE_URL}/discord/banner-giveaways.png',
+    image: '{STORE_URL}/discord/banner-giveaways.png?v=2',
     color: 0xa855f7,
     title: '🎉 Giveaways',
     description:
@@ -393,7 +393,7 @@ export const MESSAGES = {
       "We post here if anything is ever delayed. No news = all good.",
   },
   priceList: {
-    image: '{STORE_URL}/discord/banner-products.png',
+    image: '{STORE_URL}/discord/banner-products.png?v=2',
     color: 0x6366f1,
     title: '🏷️ Live price list',
     description:
@@ -404,7 +404,7 @@ export const MESSAGES = {
       "Prices may change — always check the shop for the live price 👇",
   },
   vouchersIntro: {
-    image: '{STORE_URL}/discord/banner-vouches.png',
+    image: '{STORE_URL}/discord/banner-vouches.png?v=2',
     color: 0x22c55e,
     title: '💚 Vouchers & vouches',
     description:
@@ -413,7 +413,7 @@ export const MESSAGES = {
       "Real customers only. Verified reviews are also posted in <#reviews>.",
   },
   discountCodes: {
-    image: '{STORE_URL}/discord/banner-deals.png',
+    image: '{STORE_URL}/discord/banner-deals.png?v=2',
     color: 0xec4899,
     title: '🏷️ Discount & voucher codes',
     description:
