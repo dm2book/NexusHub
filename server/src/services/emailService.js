@@ -28,14 +28,27 @@ function getTransport() {
  * which we record + log so the cause is never a mystery.
  */
 async function sendViaResend({ from, to, subject, html }) {
-  const res = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${config.email.resendApiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ from, to, subject, html }),
-  });
+  // Hard timeout: without it a slow/unreachable Resend call hangs the whole
+  // request until Vercel kills the function at maxDuration, and the client gets
+  // a non-JSON platform error page instead of a normal response.
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 10_000);
+  let res;
+  try {
+    res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${config.email.resendApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ from, to, subject, html }),
+      signal: ctrl.signal,
+    });
+  } catch (e) {
+    throw new Error(e.name === 'AbortError' ? 'Resend timed out after 10s' : `Resend request failed: ${e.message}`);
+  } finally {
+    clearTimeout(timer);
+  }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data?.message || data?.name || `Resend API error ${res.status}`);
   return { messageId: data?.id || null };
