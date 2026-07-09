@@ -324,14 +324,28 @@ async function syncPanelBanners(guild) {
   if (missing.length) console.log(`ℹ️  [panel-sync] no setup panel found in: ${missing.join(', ')} — run \`REPOST=1 npm run setup\` once to create them`);
 }
 
-// Startup self-check: are the brand banners actually reachable? If the store
-// deploy isn't live (or STORE_URL is wrong) this makes the cause obvious in logs.
+// Startup self-check: are the brand banners actually reachable AND actually
+// images? A stale/misconfigured site deploy answers /discord/banner-*.png with
+// the SPA's index.html (HTTP 200, but text/html) — Discord then shows a blank
+// embed. A plain HEAD 200 would hide that, so we GET and inspect the content
+// type: only a real image/* response counts as "live".
 async function checkBrandAssets() {
   try {
-    const res = await fetch(BANNER('welcome'), { method: 'HEAD' });
-    if (res.ok) console.log(`✅ Brand banners live at ${STORE_URL}/discord/`);
-    else console.warn(`⚠️  Banner check: ${BANNER('welcome')} → HTTP ${res.status}.\n   Panels/embeds will show WITHOUT images until the site serves them.\n   Fix: make sure the latest site deploy is live and STORE_URL (${STORE_URL}) is your real site URL.`);
-    return res.ok;
+    const res = await fetch(BANNER('welcome'));
+    const type = res.headers.get('content-type') || '';
+    if (res.ok && type.startsWith('image/')) {
+      console.log(`✅ Brand banners live at ${STORE_URL}/discord/`);
+      return true;
+    }
+    if (res.ok) {
+      console.warn(`⚠️  Banner check: ${BANNER('welcome')} returned ${type || 'non-image'} instead of an image.\n` +
+        `   Your site is serving its app HTML for that path — the banner files aren't in the live build.\n` +
+        `   Fix: deploy the LATEST site build to ${STORE_URL} (the banners live under public/discord/). ` +
+        'Panels will stay blank until then.');
+    } else {
+      console.warn(`⚠️  Banner check: ${BANNER('welcome')} → HTTP ${res.status}.\n   Panels/embeds will show WITHOUT images until the site serves them.\n   Fix: make sure the latest site deploy is live and STORE_URL (${STORE_URL}) is your real site URL.`);
+    }
+    return false;
   } catch (e) {
     console.warn(`⚠️  Banner check failed (${e.message}) — is STORE_URL correct? (${STORE_URL})`);
     return false;
