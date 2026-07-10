@@ -14,6 +14,7 @@ import { addVerifiedReview } from '../services/reviewsService.js';
 import { updateProfile, updatePreferences, publicUser } from '../services/userService.js';
 import { loyaltyFor } from '../services/loyaltyService.js';
 import { affiliateStats } from '../services/affiliateService.js';
+import { coinBalance, coinHistory, redeemReward, FORGE_SHOP } from '../services/forgeCoinService.js';
 import { getMembership } from '../services/membershipService.js';
 import { walletSummary, balanceOf } from '../services/walletService.js';
 import { redeemGiftCard } from '../services/giftCardService.js';
@@ -205,6 +206,20 @@ router.post('/orders/:id/refund-request', asyncHandler(async (req, res) => {
   const r = await support.requestRefund({ orderId: order.id, userId: req.user.id, reason });
   await audit({ actor: req.user, action: 'refund.request', targetType: 'order', targetId: order.id, req });
   res.status(201).json({ refundRequest: r });
+}));
+
+// ── Forge Coins + Forge Shop ─────────────────────────────────────────────────
+router.get('/coins', asyncHandler(async (req, res) => {
+  const [balance, history] = await Promise.all([
+    coinBalance(req.user.id), coinHistory(req.user.id),
+  ]);
+  res.json({ balance, history, shop: FORGE_SHOP });
+}));
+
+router.post('/coins/redeem', asyncHandler(async (req, res) => {
+  const { rewardId } = z.object({ rewardId: z.string().min(1) }).parse(req.body || {});
+  const result = await redeemReward(req.user.id, rewardId);
+  res.json({ ...result, balance: await coinBalance(req.user.id) });
 }));
 
 // ── Verified-buyer reviews ───────────────────────────────────────────────────
