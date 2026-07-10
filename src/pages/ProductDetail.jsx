@@ -51,6 +51,7 @@ export default function ProductDetail() {
   const [openFaq, setOpenFaq] = useState(0);
   const [recs, setRecs] = useState({ crossSell: [], upsell: [] });
   const [mysteryPool, setMysteryPool] = useState(null);
+  const [priceHist, setPriceHist] = useState([]);
   usePageMeta(product?.name || 'Product', product?.description || 'Instant digital delivery.');
   // Product structured data → rich results (price, rating) in Google.
   useJsonLd('product', product && {
@@ -99,6 +100,12 @@ export default function ProductDetail() {
   useEffect(() => {
     if (product?.kind !== 'mystery') { setMysteryPool(null); return; }
     api.get(`/api/products/${product.id}/mystery`).then((r) => setMysteryPool(r.rewards || [])).catch(() => setMysteryPool([]));
+  }, [product]);
+
+  // Price history for the chart.
+  useEffect(() => {
+    if (!product?.id || product.sample) { setPriceHist([]); return; }
+    api.get(`/api/products/${product.id}/price-history`).then((r) => setPriceHist(r.history || [])).catch(() => setPriceHist([]));
   }, [product]);
 
   if (notFound) {
@@ -272,6 +279,46 @@ export default function ProductDetail() {
           </div>
         </div>
       )}
+
+      {/* Price history */}
+      {priceHist.length >= 2 && (() => {
+        const prices = priceHist.map((h) => h.price);
+        const min = Math.min(...prices), max = Math.max(...prices), span = Math.max(1, max - min);
+        const W = 640, H = 120, pad = 6;
+        const pts = priceHist.map((h, i) => {
+          const x = pad + (i / (priceHist.length - 1)) * (W - 2 * pad);
+          const y = pad + (1 - (h.price - min) / span) * (H - 2 * pad);
+          return [x, y];
+        });
+        const line = pts.map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(' ');
+        const area = `${line} L${pts[pts.length - 1][0].toFixed(1)} ${H} L${pts[0][0].toFixed(1)} ${H} Z`;
+        const now = prices[prices.length - 1], lowest = min;
+        return (
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 sm:p-8 mt-14 shadow-sm">
+            <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+              <h2 className="text-xl font-extrabold text-slate-900">{t('price.history', 'Price history')}</h2>
+              <div className="flex items-center gap-4 text-sm">
+                <span className="text-slate-500">{t('price.now', 'Now')}: <b className="text-slate-900">{money(now, product.currency)}</b></span>
+                <span className="text-emerald-600">{t('price.lowest', 'Lowest')}: <b>{money(lowest, product.currency)}</b></span>
+              </div>
+            </div>
+            <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-32" preserveAspectRatio="none">
+              <defs>
+                <linearGradient id="ph-fill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#8b5cf6" stopOpacity="0.25" />
+                  <stop offset="100%" stopColor="#8b5cf6" stopOpacity="0" />
+                </linearGradient>
+              </defs>
+              <path d={area} fill="url(#ph-fill)" />
+              <path d={line} fill="none" stroke="#7c3aed" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+              <circle cx={pts[pts.length - 1][0]} cy={pts[pts.length - 1][1]} r="3.5" fill="#7c3aed" />
+            </svg>
+            {now <= lowest && (
+              <p className="text-emerald-600 text-sm font-semibold mt-2">🔥 {t('price.atLowest', 'This is the lowest price we’ve offered!')}</p>
+            )}
+          </div>
+        );
+      })()}
 
       {/* How this is delivered — category-specific, the #1 pre-purchase question */}
       {(() => {

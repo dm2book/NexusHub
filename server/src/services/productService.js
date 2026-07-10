@@ -64,6 +64,7 @@ export async function createProduct(p = {}) {
     stock: p.stock ?? null, active: p.active === false ? 0 : 1,
     meta: JSON.stringify(p.metadata || {}), at,
   });
+  await recordPricePoint(id, Math.round(p.price || 0), p.currency || 'EUR', at);
   const created = await getProduct(id);
   // Announce active new products in the community #drops-and-deals channel.
   // Skipped during bulk seeding (announce=false) to avoid flooding the channel.
@@ -87,5 +88,24 @@ export async function updateProduct(id, patch = {}) {
     active: patch.active != null ? (patch.active ? 1 : 0) : (cur.active ? 1 : 0),
     meta: JSON.stringify(patch.metadata ?? cur.metadata), at: nowIso(), id,
   });
+  // Snapshot the new price whenever it actually changed.
+  const newPrice = patch.price != null ? Math.round(patch.price) : cur.price;
+  if (newPrice !== cur.price) await recordPricePoint(id, newPrice, patch.currency ?? cur.currency);
   return getProduct(id);
+}
+
+/** Append a price snapshot (best-effort; never blocks a product write). */
+async function recordPricePoint(productId, price, currency = 'EUR', at = nowIso()) {
+  try {
+    await run(`INSERT INTO price_history (id, product_id, price, currency, created_at)
+               VALUES (@id, @p, @price, @cur, @at)`,
+      { id: newId('ph'), p: productId, price, cur: currency, at });
+  } catch { /* history is non-critical */ }
+}
+
+/** Price history for a product (oldest → newest), for the product-page chart. */
+export function priceHistory(productId, limit = 60) {
+  return all(
+    `SELECT price, currency, created_at AS at FROM price_history
+      WHERE product_id=@p ORDER BY created_at ASC LIMIT @l`, { p: productId, l: limit });
 }
