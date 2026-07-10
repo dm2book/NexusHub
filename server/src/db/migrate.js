@@ -6,19 +6,37 @@
 import { pool, run, all, nowIso } from './index.js';
 import { MIGRATIONS } from './migrations.js';
 
+const LOCK_ID = 778899;
+const allApplied = async () => {
+  const applied = new Set((await all('SELECT id FROM schema_migrations')).map((r) => r.id));
+  return MIGRATIONS.every((m) => applied.has(m.id));
+};
+
 export async function migrate() {
-  // Serverless can start several instances at once on a cold deploy. Take a
-  // cluster-wide advisory lock so only one process migrates at a time; the
-  // others wait, then see the schema already applied.
+  // Fast path — the common case on every serverless cold start. Check whether
+  // any migration is still pending WITHOUT taking the advisory lock. If the
+  // schema is already current we return immediately, so a cold start never
+  // blocks on a lock that a frozen sibling instance might be holding.
+  await run(`CREATE TABLE IF NOT EXISTS schema_migrations (
+    id TEXT PRIMARY KEY, applied_at TEXT NOT NULL)`);
+  if (await allApplied()) return 0;
+
+  // There is real work to do. Serialize with a NON-BLOCKING advisory lock: a
+  // blocking pg_advisory_lock is dangerous on serverless because Vercel freezes
+  // instances and Neon's pooler doesn't drop the session lock promptly, so
+  // other instances would hang the full 30s (→ 504s). If another instance is
+  // already migrating, poll for the schema to become ready instead of blocking.
   const lock = await pool.connect();
-  const LOCK_ID = 778899;
   try {
-    await lock.query('SELECT pg_advisory_lock($1)', [LOCK_ID]);
-    await run(`CREATE TABLE IF NOT EXISTS schema_migrations (
-      id TEXT PRIMARY KEY, applied_at TEXT NOT NULL)`);
+    let got = (await lock.query('SELECT pg_try_advisory_lock($1) AS ok', [LOCK_ID])).rows[0]?.ok;
+    for (let i = 0; !got && i < 20; i++) {
+      if (await allApplied()) return 0;            // another instance finished
+      await new Promise((r) => setTimeout(r, 500));
+      got = (await lock.query('SELECT pg_try_advisory_lock($1) AS ok', [LOCK_ID])).rows[0]?.ok;
+    }
+    if (!got) return 0; // couldn't get the lock in time — proceed; schema is likely ready
 
     const applied = new Set((await all('SELECT id FROM schema_migrations')).map((r) => r.id));
-
     let count = 0;
     for (const m of MIGRATIONS) {
       if (applied.has(m.id)) continue;

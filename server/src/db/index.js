@@ -37,6 +37,12 @@ function getPool() {
     // Vercel/Neon poolers terminate idle connections; keep the pool small.
     max: Number(process.env.PG_POOL_MAX || 5),
     ssl: config.db.ssl ? { rejectUnauthorized: false } : undefined,
+    // Never let a stuck connection or query burn the whole 30s serverless
+    // budget (→ a 504 "An error occurred", non-JSON). Fail fast with a clean
+    // error so the request can still respond normally.
+    connectionTimeoutMillis: 12_000,
+    statement_timeout: 25_000,
+    query_timeout: 25_000,
   });
   return _pool;
 }
