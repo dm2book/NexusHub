@@ -349,6 +349,25 @@ export default function HomeStore() {
             ))}
           </section>
 
+          {/* Ways to save & win — surface the engagement features */}
+          <section className="fm-reveal">
+            <h2 className="fm-head text-2xl mb-4">{tr('home.waysTitle', 'Save more & win big')}</h2>
+            <div className="grid sm:grid-cols-3 gap-4">
+              {[
+                { to: '/account/forge-shop', emoji: '🪙', grad: 'from-amber-400 to-rose-500', title: tr('home.wCoins', 'Forge Coins'), sub: tr('home.wCoinsSub', 'Earn 1 coin per €10 — spend on discount codes & giveaway boosts.') },
+                { to: '/shop', emoji: '🎁', grad: 'from-fuchsia-500 to-violet-600', title: tr('home.wMystery', 'Mystery boxes'), sub: tr('home.wMysterySub', 'Every box wins — real prizes, instant store credit, 1 free reroll.') },
+                { to: '/drops', emoji: '📅', grad: 'from-violet-500 to-indigo-600', title: tr('home.wDrops', 'Drop calendar'), sub: tr('home.wDropsSub', 'Restocks, launches & flash sales — never miss one.') },
+              ].map((c) => (
+                <Link key={c.to} to={c.to}
+                  className="group bg-white rounded-2xl border border-slate-200/70 shadow-sm p-5 hover:border-violet-300 hover:shadow-md transition">
+                  <div className={`w-12 h-12 rounded-xl grid place-items-center text-2xl bg-gradient-to-br ${c.grad} shadow-lg mb-3`}>{c.emoji}</div>
+                  <div className="font-bold text-slate-900 flex items-center gap-1">{c.title} <ArrowRight size={15} className="text-violet-500 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition" /></div>
+                  <p className="text-sm text-slate-500 mt-1">{c.sub}</p>
+                </Link>
+              ))}
+            </div>
+          </section>
+
           {/* Popular products */}
           <section className="fm-reveal">
             <div className="flex items-center justify-between mb-4">

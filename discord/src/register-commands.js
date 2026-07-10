@@ -20,6 +20,7 @@ const commands = [
     .addStringOption((o) => o.setName('product').setDescription('e.g. 1700 Robux, Nitro, Valorant').setRequired(true)),
   new SlashCommandBuilder().setName('delivery').setDescription('How a product is delivered (steps + what you need)')
     .addStringOption((o) => o.setName('product').setDescription('e.g. Robux, V-Bucks').setRequired(true)),
+  new SlashCommandBuilder().setName('drops').setDescription('See upcoming drops, restocks & sales'),
   new SlashCommandBuilder().setName('poll').setDescription('Start a quick poll (👍/👎 or up to 4 options)')
     .addStringOption((o) => o.setName('question').setDescription('The poll question').setRequired(true))
     .addStringOption((o) => o.setName('option1').setDescription('Option 1'))

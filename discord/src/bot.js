@@ -801,7 +801,7 @@ async function handleCommand(i) {
   if (i.commandName === 'help') {
     return i.reply({ ephemeral: true, content:
       "**Forge — your assistant**\n`/ask` — ask anything\n`/recommend` — product recommendation\n" +
-      "`/price` — look up a product's live price\n`/delivery` — how a product is delivered\n`/order` — check an order status\n" +
+      "`/price` — look up a product's live price\n`/delivery` — how a product is delivered\n`/drops` — upcoming drops & restocks\n`/order` — check an order status\n" +
       "`/vouch` — leave a vouch\n`/suggest` — suggest an idea\n`/poll` — start a quick poll\n" +
       "`/shop` — open the shop\n`/invite` — get the invite link\n`/stats` — server stats\n" +
       "`/rank` — your level & XP\n`/daily` — claim your daily XP (streaks!)\n`/leaderboard` — top members\n" +
@@ -815,6 +815,7 @@ async function handleCommand(i) {
   if (i.commandName === 'order') return lookupOrder(i);
   if (i.commandName === 'price') return priceCmd(i);
   if (i.commandName === 'delivery') return deliveryCmd(i);
+  if (i.commandName === 'drops') return dropsCmd(i);
   if (i.commandName === 'poll') return pollCmd(i);
   if (i.commandName === 'daily') return dailyCmd(i);
   if (i.commandName === 'vouch') return postVouch(i);
@@ -1206,6 +1207,30 @@ async function deliveryCmd(i) {
       { name: 'Good to know', value: d.notes.map((n) => `• ${n}`).join('\n').slice(0, 1024) })
     .setFooter({ text: 'ForgeMarket · safe & instant delivery' });
   return i.reply({ embeds: [e], ephemeral: true });
+}
+
+// ── /drops → upcoming drops from the store's drop calendar ───────────────────
+async function dropsCmd(i) {
+  await i.deferReply();
+  let drops = [];
+  try {
+    const res = await fetch(`${FORGEMARKET_API_URL}/api/drops`);
+    if (res.ok) drops = (await res.json()).drops || [];
+  } catch { /* offline */ }
+  const e = new EmbedBuilder().setColor(0x7c5cff).setTitle('📅 Upcoming drops')
+    .setThumbnail(BRAND_ICON).setImage(BANNER('deals'))
+    .setFooter({ text: 'ForgeMarket · turn on 🔔 Drops in #roles' });
+  if (!drops.length) {
+    e.setDescription(`No drops scheduled right now — check ${STORE_URL}/drops or watch this space. 👀`);
+  } else {
+    e.setDescription(drops.slice(0, 10).map((d) => {
+      const ts = Math.floor(new Date(d.startsAt).getTime() / 1000);
+      return `**${d.title}**${d.category ? ` · ${d.category}` : ''}\n<t:${ts}:F> · <t:${ts}:R>${d.note ? `\n_${d.note}_` : ''}`;
+    }).join('\n\n'));
+  }
+  const row = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setLabel('📅 Full calendar').setStyle(ButtonStyle.Link).setURL(`${STORE_URL}/drops`));
+  return i.editReply({ embeds: [e], components: [row] });
 }
 
 // ── /poll → quick reaction poll (up to 4 options) ────────────────────────────
