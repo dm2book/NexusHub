@@ -18,6 +18,17 @@ export default function OrderDetail() {
   const [reviewBody, setReviewBody] = useState('');
   const [reviewBusy, setReviewBusy] = useState(false);
   const [mystery, setMystery] = useState([]);
+  const [rerolling, setRerolling] = useState('');
+
+  const reroll = async (pullId) => {
+    setRerolling(pullId);
+    try {
+      const r = await api.post(`/api/account/orders/${id}/mystery/${pullId}/reroll`);
+      setMystery(r.pulls || []);
+      toast.success(r.improved ? `Nice! Upgraded to ${r.label}.` : `Rolled ${r.rolled} — you kept your ${r.label}.`);
+    } catch (e) { toast.error(e.message || 'Reroll failed.'); }
+    finally { setRerolling(''); }
+  };
 
   const load = useCallback(() => {
     api.get(`/api/account/orders/${id}`).then((r) => setOrder(r.order)).catch(() => {});
@@ -99,14 +110,22 @@ export default function OrderDetail() {
           style={{ backgroundImage: 'linear-gradient(120deg,#f59e0b,#f43f5e)' }}>
           <div className="flex items-center gap-2 font-bold text-lg mb-2">🎁 Your mystery box{mystery.length > 1 ? 'es' : ''}!</div>
           <div className="space-y-1.5">
-            {mystery.map((m, i) => (
-              <div key={i} className="flex items-center justify-between bg-white/15 rounded-lg px-3 py-2">
+            {mystery.map((m) => (
+              <div key={m.id} className="flex items-center justify-between gap-2 bg-white/15 rounded-lg px-3 py-2">
                 <span className="font-semibold">{m.label}</span>
-                {m.credit > 0 && <span className="text-sm font-bold bg-white/20 rounded-full px-2.5 py-0.5">+{money(m.credit)} credit</span>}
+                <div className="flex items-center gap-2 shrink-0">
+                  {m.credit > 0 && <span className="text-sm font-bold bg-white/20 rounded-full px-2.5 py-0.5">+{money(m.credit)} credit</span>}
+                  {!m.rerolledAt ? (
+                    <button onClick={() => reroll(m.id)} disabled={rerolling === m.id}
+                      className="text-xs font-bold bg-white text-rose-600 rounded-full px-3 py-1 hover:bg-white/90 transition disabled:opacity-60">
+                      {rerolling === m.id ? '…' : '🎲 Reroll'}
+                    </button>
+                  ) : <span className="text-[11px] text-white/70">rerolled</span>}
+                </div>
               </div>
             ))}
           </div>
-          <p className="text-white/85 text-xs mt-2.5">Store credit is added to your <Link to="/account/wallet" className="underline font-semibold">wallet</Link> automatically.</p>
+          <p className="text-white/85 text-xs mt-2.5">Risk-free reroll: 1× per box, you keep the higher prize. Credit lands in your <Link to="/account/wallet" className="underline font-semibold">wallet</Link> automatically.</p>
         </div>
       )}
 

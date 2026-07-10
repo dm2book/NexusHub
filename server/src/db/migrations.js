@@ -793,4 +793,11 @@ CREATE TABLE IF NOT EXISTS mystery_pulls (
 CREATE INDEX IF NOT EXISTS idx_mystery_pulls_order ON mystery_pulls(order_id);
 `,
   },
+  {
+    id: '014_mystery_reroll',
+    sql: `
+-- One free reroll per pull (box). Stamped when used so it can't be reused.
+ALTER TABLE mystery_pulls ADD COLUMN IF NOT EXISTS rerolled_at TEXT;
+`,
+  },
 ];

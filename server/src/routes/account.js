@@ -15,7 +15,7 @@ import { updateProfile, updatePreferences, publicUser } from '../services/userSe
 import { loyaltyFor } from '../services/loyaltyService.js';
 import { affiliateStats } from '../services/affiliateService.js';
 import { coinBalance, coinHistory, redeemReward, FORGE_SHOP } from '../services/forgeCoinService.js';
-import { pullsForOrder } from '../services/mysteryBoxService.js';
+import { pullsForOrder, rerollPull } from '../services/mysteryBoxService.js';
 import { getMembership } from '../services/membershipService.js';
 import { walletSummary, balanceOf } from '../services/walletService.js';
 import { redeemGiftCard } from '../services/giftCardService.js';
@@ -213,6 +213,13 @@ router.post('/orders/:id/refund-request', asyncHandler(async (req, res) => {
 router.get('/orders/:id/mystery', asyncHandler(async (req, res) => {
   await ownedOrder(req, req.params.id);
   res.json({ pulls: await pullsForOrder(req.params.id) });
+}));
+
+// Reroll one box once (risk-free — keep the higher prize).
+router.post('/orders/:id/mystery/:pullId/reroll', asyncHandler(async (req, res) => {
+  await ownedOrder(req, req.params.id);
+  const result = await rerollPull(req.user.id, req.params.id, req.params.pullId);
+  res.json({ ...result, pulls: await pullsForOrder(req.params.id) });
 }));
 
 // ── Forge Coins + Forge Shop ─────────────────────────────────────────────────
