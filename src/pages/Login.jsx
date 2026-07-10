@@ -319,7 +319,7 @@ function OtpInput({ onComplete, disabled }) {
         <input key={i} ref={(el) => (refs.current[i] = el)}
           value={v} onChange={(e) => onChange(i, e)} onKeyDown={(e) => onKeyDown(i, e)}
           disabled={disabled} inputMode="numeric" autoComplete="one-time-code" maxLength={1}
-          className="w-11 h-14 sm:w-12 rounded-xl bg-space-black/80 border border-white/10 text-white text-center text-2xl font-mono outline-none focus:border-primary focus:ring-2 focus:ring-primary/30 transition disabled:opacity-50" />
+          className="w-11 h-14 sm:w-12 rounded-xl bg-white border border-slate-300 text-slate-900 text-center text-2xl font-mono caret-violet-600 shadow-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/30 transition disabled:opacity-50" />
       ))}
     </div>
   );
