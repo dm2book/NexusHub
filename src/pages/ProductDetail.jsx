@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Minus, Plus, ShoppingCart, Zap, ShieldCheck, Clock, BadgeCheck,
-  Star, RefreshCw, Headphones, ChevronDown, Heart,
+  Star, RefreshCw, Headphones, ChevronDown, Heart, Truck, Info,
 } from 'lucide-react';
+import { deliveryInfo } from '../lib/deliveryInfo.js';
 import { api } from '../lib/api.js';
 import { useCart } from '../context/CartContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
@@ -41,7 +42,7 @@ export default function ProductDetail() {
   const navigate = useNavigate();
   const reviews = useReviews();
   const stats = useStats();
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const { has, toggle } = useWishlist();
   const [product, setProduct] = useState(null);
   const [all, setAll] = useState([]);
@@ -243,6 +244,49 @@ export default function ProductDetail() {
           </div>
         </div>
       </div>
+
+      {/* How this is delivered — category-specific, the #1 pre-purchase question */}
+      {(() => {
+        const d = deliveryInfo(product.category, lang);
+        return (
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 sm:p-8 mt-14 shadow-sm">
+            <div className="flex items-center gap-3 mb-4">
+              <span className="w-10 h-10 rounded-xl grid place-items-center text-white shrink-0"
+                style={{ backgroundImage: 'linear-gradient(135deg,#7c5cff,#a855f7)' }}>
+                <Truck size={18} />
+              </span>
+              <div>
+                <h2 className="text-xl font-extrabold text-slate-900">{t('product.howDelivered', 'How this is delivered')}</h2>
+                <p className="text-slate-500 text-sm">{d.method}</p>
+              </div>
+            </div>
+            <div className="grid md:grid-cols-2 gap-6 mt-5">
+              <div>
+                <div className="text-[11px] font-bold uppercase tracking-wider text-violet-600 mb-3">{t('product.steps', 'Steps')}</div>
+                <ol className="space-y-2.5">
+                  {d.steps.map((s, i) => (
+                    <li key={i} className="flex items-start gap-3 text-sm text-slate-700">
+                      <span className="w-6 h-6 rounded-full bg-violet-100 text-violet-700 text-xs font-bold grid place-items-center shrink-0 mt-0.5">{i + 1}</span>
+                      <span>{s}</span>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+              <div>
+                <div className="text-[11px] font-bold uppercase tracking-wider text-amber-600 mb-3">{t('product.goodToKnow', 'Good to know')}</div>
+                <ul className="space-y-2.5">
+                  {d.notes.map((n, i) => (
+                    <li key={i} className="flex items-start gap-2.5 text-sm text-slate-600">
+                      <Info size={15} className="text-amber-500 shrink-0 mt-0.5" />
+                      <span>{n}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Reviews + FAQ */}
       <div className="grid lg:grid-cols-2 gap-10 mt-16">

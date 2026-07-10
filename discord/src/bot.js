@@ -19,7 +19,10 @@ import {
   ModalBuilder, TextInputBuilder, TextInputStyle,
 } from 'discord.js';
 import Anthropic from '@anthropic-ai/sdk';
-import { FAQ, GAME_ROLES, NOTIFY_ROLES, LEVEL_ROLES } from './config.js';
+import { FAQ, GAME_ROLES, NOTIFY_ROLES, LEVEL_ROLES, DELIVERY_INFO } from './config.js';
+
+// Delivery explanation for a product category (falls back to a generic one).
+const deliveryFor = (category) => DELIVERY_INFO[category] || DELIVERY_INFO.default;
 
 const SELF_ROLES = [...GAME_ROLES, ...NOTIFY_ROLES];
 const STAFF_ROLE_NAMES = ['Owner', 'Admin', 'Moderator', 'Support'];
@@ -798,7 +801,7 @@ async function handleCommand(i) {
   if (i.commandName === 'help') {
     return i.reply({ ephemeral: true, content:
       "**Forge — your assistant**\n`/ask` — ask anything\n`/recommend` — product recommendation\n" +
-      "`/price` — look up a product's live price\n`/order` — check an order status\n" +
+      "`/price` — look up a product's live price\n`/delivery` — how a product is delivered\n`/order` — check an order status\n" +
       "`/vouch` — leave a vouch\n`/suggest` — suggest an idea\n`/poll` — start a quick poll\n" +
       "`/shop` — open the shop\n`/invite` — get the invite link\n`/stats` — server stats\n" +
       "`/rank` — your level & XP\n`/daily` — claim your daily XP (streaks!)\n`/leaderboard` — top members\n" +
@@ -811,6 +814,7 @@ async function handleCommand(i) {
   }
   if (i.commandName === 'order') return lookupOrder(i);
   if (i.commandName === 'price') return priceCmd(i);
+  if (i.commandName === 'delivery') return deliveryCmd(i);
   if (i.commandName === 'poll') return pollCmd(i);
   if (i.commandName === 'daily') return dailyCmd(i);
   if (i.commandName === 'vouch') return postVouch(i);
@@ -1170,15 +1174,38 @@ async function priceCmd(i) {
     return i.editReply(`No product matching **${q}** — see the full list in #price-list or at ${STORE_URL}/shop`);
   }
   const top = scored.slice(0, 5);
+  const best = top[0].p;
+  const d = deliveryFor(best.category);
   const e = new EmbedBuilder().setColor(0x6366f1)
-    .setTitle(`🏷️ ${top[0].p.name}`)
+    .setTitle(`🏷️ ${best.name}`)
     .setDescription(
-      `**${money(top[0].p.price, top[0].p.currency)}** · instant delivery\n[Buy now](${STORE_URL}/product/${top[0].p.id})` +
+      `**${money(best.price, best.currency)}** · instant delivery\n[Buy now](${STORE_URL}/product/${best.id})` +
       (top.length > 1
         ? `\n\n**Also matching:**\n${top.slice(1).map(({ p }) => `• ${p.name} — ${money(p.price, p.currency)}`).join('\n')}`
         : ''))
-    .setFooter({ text: 'Live prices from the store' });
+    .addFields({ name: '📦 How it’s delivered', value: d.method.slice(0, 1024) })
+    .setFooter({ text: 'Live prices from the store · use /delivery for full steps' });
   return i.editReply({ embeds: [e] });
+}
+
+// ── /delivery → full per-category delivery explanation ───────────────────────
+async function deliveryCmd(i) {
+  const q = (i.options.getString('product') || '').toLowerCase().trim();
+  // Match a category by keyword; default to Robux (our most-asked product).
+  const map = { robux: 'robux', roblox: 'robux', vbucks: 'v-bucks', 'v-bucks': 'v-bucks', fortnite: 'v-bucks' };
+  const key = Object.keys(map).find((k) => q.includes(k));
+  const category = key ? map[key] : (q || 'robux');
+  const d = deliveryFor(category);
+  const label = category === 'v-bucks' ? 'V-Bucks' : category === 'robux' ? 'Robux' : 'your order';
+  const e = new EmbedBuilder().setColor(0x7c5cff)
+    .setTitle(`📦 How ${label} is delivered`)
+    .setThumbnail(BRAND_ICON)
+    .setDescription(d.method)
+    .addFields(
+      { name: 'Steps', value: d.steps.map((s, n) => `**${n + 1}.** ${s}`).join('\n').slice(0, 1024) },
+      { name: 'Good to know', value: d.notes.map((n) => `• ${n}`).join('\n').slice(0, 1024) })
+    .setFooter({ text: 'ForgeMarket · safe & instant delivery' });
+  return i.reply({ embeds: [e], ephemeral: true });
 }
 
 // ── /poll → quick reaction poll (up to 4 options) ────────────────────────────

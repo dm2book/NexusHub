@@ -463,6 +463,49 @@ export const MESSAGES = {
   },
 };
 
+// Per-category delivery explanation — mirrors the site's product pages so the
+// answer to "how do I get it?" is consistent everywhere. Keyed by category;
+// anything else falls back to `default`.
+export const DELIVERY_INFO = {
+  robux: {
+    method: 'Sent straight to your Roblox account via the official Group Payout (“Roblox+”) method — no password or login needed, fully account-safe.',
+    steps: [
+      'Turn on 2-Step Verification (2FA) on your Roblox account — required before we can deliver.',
+      'Join our Roblox group — we send the link right after your order.',
+      'We pay the Robux out to your account. Done! 🎉',
+    ],
+    notes: [
+      'Max 5,000 R$ per account per day (Roblox rule). Bigger orders split across days — e.g. 10,000 R$ over 2 days.',
+      'Large orders can be delivered faster via 2 accounts: a colleague and I each complete part at the same time.',
+      'We never ask for your password.',
+    ],
+  },
+  'v-bucks': {
+    method: 'Delivered as an official V-Bucks gift card code you redeem yourself — works on every platform.',
+    steps: [
+      'Your code appears instantly in your dashboard and by email.',
+      'Redeem it in Fortnite / your Epic Games account.',
+      'Your V-Bucks show up right away. 🎮',
+    ],
+    notes: [
+      'Codes are region-based — match your account to the product’s region.',
+      'Keep your code private: a redeemed code can’t be refunded.',
+    ],
+  },
+  default: {
+    method: 'Delivered as an official code (or a direct top-up, depending on the product) — instant and account-safe.',
+    steps: [
+      'After payment your code / confirmation lands in your dashboard and email.',
+      'Follow the short redeem steps we include with it.',
+      'Enjoy — you’re all set. ✅',
+    ],
+    notes: [
+      'Any account requirements (2FA, region) are shown before checkout.',
+      'Stuck? Open a ticket — eligible orders are money-back guaranteed.',
+    ],
+  },
+};
+
 // FAQ — powers the #faq channel AND the AI fallback.
 export const FAQ = [
   { q: 'How fast is delivery?', a: 'Most top-ups are delivered automatically within seconds of payment. The code arrives in your dashboard and by email.' },
