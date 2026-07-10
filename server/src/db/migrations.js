@@ -816,4 +816,23 @@ CREATE TABLE IF NOT EXISTS drops (
 CREATE INDEX IF NOT EXISTS idx_drops_starts ON drops(starts_at);
 `,
   },
+  {
+    id: '016_price_history',
+    sql: `
+-- ── Price history — a snapshot every time a product's price changes ─────────
+CREATE TABLE IF NOT EXISTS price_history (
+  id          TEXT PRIMARY KEY,
+  product_id  TEXT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  price       INTEGER NOT NULL,
+  currency    TEXT NOT NULL DEFAULT 'EUR',
+  created_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_price_history_product ON price_history(product_id, created_at);
+
+-- Seed one baseline point per existing product so the chart isn't empty.
+INSERT INTO price_history (id, product_id, price, currency, created_at)
+SELECT 'ph_seed_' || id, id, price, currency, created_at FROM products
+ON CONFLICT (id) DO NOTHING;
+`,
+  },
 ];
