@@ -9,7 +9,7 @@ import { run, get, all, nowIso, tx } from '../db/index.js';
 import { newId } from '../utils/ids.js';
 import { badRequest } from '../utils/errors.js';
 
-export const TX_TYPES = ['referral', 'refund', 'grant', 'spend', 'adjustment'];
+export const TX_TYPES = ['referral', 'refund', 'grant', 'spend', 'adjustment', 'mystery_prize'];
 
 /** Current balance in cents (0 if no entries). */
 export async function balanceOf(userId) {

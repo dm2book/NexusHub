@@ -50,6 +50,7 @@ export default function ProductDetail() {
   const [notFound, setNotFound] = useState(false);
   const [openFaq, setOpenFaq] = useState(0);
   const [recs, setRecs] = useState({ crossSell: [], upsell: [] });
+  const [mysteryPool, setMysteryPool] = useState(null);
   usePageMeta(product?.name || 'Product', product?.description || 'Instant digital delivery.');
   // Product structured data → rich results (price, rating) in Google.
   useJsonLd('product', product && {
@@ -93,6 +94,12 @@ export default function ProductDetail() {
   // Record this visit in the customer's own recently-viewed history.
   const recentlyViewed = useRecentlyViewed();
   useEffect(() => { if (product && !product.sample) recordProductView(product); }, [product]);
+
+  // Mystery box: load the reward pool + odds to show "what's inside".
+  useEffect(() => {
+    if (product?.kind !== 'mystery') { setMysteryPool(null); return; }
+    api.get(`/api/products/${product.id}/mystery`).then((r) => setMysteryPool(r.rewards || [])).catch(() => setMysteryPool([]));
+  }, [product]);
 
   if (notFound) {
     return (
@@ -243,6 +250,28 @@ export default function ProductDetail() {
           </div>
         </div>
       </div>
+
+      {/* Mystery box — what's inside + real odds */}
+      {product.kind === 'mystery' && mysteryPool && mysteryPool.length > 0 && (
+        <div className="bg-white border border-amber-200 rounded-2xl p-6 sm:p-8 mt-14 shadow-sm">
+          <div className="flex items-center gap-3 mb-1">
+            <span className="w-10 h-10 rounded-xl grid place-items-center text-white shrink-0"
+              style={{ backgroundImage: 'linear-gradient(135deg,#f59e0b,#f43f5e)' }}>🎁</span>
+            <div>
+              <h2 className="text-xl font-extrabold text-slate-900">{t('mystery.whatsInside', 'What’s inside')}</h2>
+              <p className="text-slate-500 text-sm">{t('mystery.sub', 'Every box wins a real prize — here are the exact odds. Prizes pay out as store credit, instantly.')}</p>
+            </div>
+          </div>
+          <div className="grid sm:grid-cols-2 gap-2.5 mt-4">
+            {mysteryPool.map((r, i) => (
+              <div key={i} className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5">
+                <span className="text-sm font-semibold text-slate-800">{r.label}</span>
+                <span className="text-xs font-bold text-amber-600 bg-amber-100 rounded-full px-2.5 py-1">{r.odds}%</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* How this is delivered — category-specific, the #1 pre-purchase question */}
       {(() => {

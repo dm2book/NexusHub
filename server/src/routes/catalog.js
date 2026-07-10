@@ -5,6 +5,7 @@ import { config, manualPayMethods } from '../config/env.js';
 import { asyncHandler } from '../middleware/error.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 import { listProducts, getProduct, trendingProducts } from '../services/productService.js';
+import { getRewards as getMysteryRewards } from '../services/mysteryBoxService.js';
 import { evaluateCoupon } from '../services/couponService.js';
 import { recommendationsFor } from '../services/recommendationService.js';
 import { pricedBundles } from '../services/bundleService.js';
@@ -122,6 +123,19 @@ router.get('/products/:id', asyncHandler(async (req, res) => {
   const p = await getProduct(req.params.id);
   if (!p || !p.active) throw new ApiError(404, 'Product not found');
   res.json({ product: p });
+}));
+
+// Mystery-box reward pool with odds — shown on the product page so buyers see
+// exactly what's inside and the real chances (transparency = trust).
+router.get('/products/:id/mystery', asyncHandler(async (req, res) => {
+  const rewards = await getMysteryRewards(req.params.id);
+  const total = rewards.reduce((s, r) => s + Math.max(1, r.weight), 0) || 1;
+  res.json({
+    rewards: rewards.map((r) => ({
+      label: r.label, credit: r.credit,
+      odds: Math.round((Math.max(1, r.weight) / total) * 1000) / 10, // one decimal %
+    })),
+  });
 }));
 
 // Validate a discount code (checkout preview). Pass ?subtotal=cents for an exact

@@ -761,4 +761,36 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_forge_coins_earn_ref
   ON forge_coin_ledger(reason, ref) WHERE ref IS NOT NULL AND delta > 0;
 `,
   },
+  {
+    id: '013_mystery_boxes',
+    sql: `
+-- ── Mystery boxes — a paid 'giveaway' ───────────────────────────────────────
+-- A mystery box is a product with kind='mystery'. Its reward pool lives here;
+-- each row is a possible prize with a weight (relative odds) that pays out as
+-- store credit. On payment we roll one reward per unit and grant the credit.
+CREATE TABLE IF NOT EXISTS mystery_box_rewards (
+  id            TEXT PRIMARY KEY,
+  box_id        TEXT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  label         TEXT NOT NULL,
+  weight        INTEGER NOT NULL DEFAULT 1,
+  credit_cents  INTEGER NOT NULL DEFAULT 0,
+  created_at    TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_mystery_rewards_box ON mystery_box_rewards(box_id);
+
+-- What each buyer actually won (one row per unit), so it can be shown back on
+-- the order + kept for audit.
+CREATE TABLE IF NOT EXISTS mystery_pulls (
+  id            TEXT PRIMARY KEY,
+  order_id      TEXT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  order_item_id TEXT,
+  box_id        TEXT,
+  user_id       TEXT,
+  reward_label  TEXT NOT NULL,
+  credit_cents  INTEGER NOT NULL DEFAULT 0,
+  created_at    TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_mystery_pulls_order ON mystery_pulls(order_id);
+`,
+  },
 ];

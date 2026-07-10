@@ -5,6 +5,7 @@ import { asyncHandler } from '../../middleware/error.js';
 import { requirePermission } from '../../middleware/rbac.js';
 import { listProducts, getProduct, createProduct, updateProduct } from '../../services/productService.js';
 import { addProductCodes, availableCounts, availableCount } from '../../services/codeStockService.js';
+import { getRewards, setRewards } from '../../services/mysteryBoxService.js';
 import { audit } from '../../services/auditService.js';
 
 const router = Router();
@@ -50,6 +51,22 @@ router.patch('/:id', requirePermission('suppliers.manage'), asyncHandler(async (
   await audit({ actor: req.user, action: 'product.update', targetType: 'product',
     targetId: product.id, req });
   res.json({ product });
+}));
+
+// Mystery-box reward pool (for kind='mystery' products).
+router.get('/:id/mystery', requirePermission('orders.read'), asyncHandler(async (req, res) => {
+  res.json({ rewards: await getRewards(req.params.id) });
+}));
+router.put('/:id/mystery', requirePermission('suppliers.manage'), asyncHandler(async (req, res) => {
+  const { rewards } = z.object({
+    rewards: z.array(z.object({
+      label: z.string().min(1).max(80),
+      weight: z.number().int().min(1).max(100000),
+      credit: z.number().int().min(0).max(1_000_000),
+    })).max(40),
+  }).parse(req.body || {});
+  await audit({ actor: req.user, action: 'product.mystery_rewards', targetType: 'product', targetId: req.params.id, req });
+  res.json({ rewards: await setRewards(req.params.id, rewards) });
 }));
 
 export default router;

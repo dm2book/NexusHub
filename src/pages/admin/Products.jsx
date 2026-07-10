@@ -26,6 +26,7 @@ export default function AdminProducts() {
   const [form, setForm] = useState(BLANK);
   const [busy, setBusy] = useState(false);
   const [stock, setStock] = useState(null); // { p, codes } or null
+  const [rewards, setRewards] = useState(null); // mystery reward pool [{label,weight,creditEuro}]
 
   const addCodes = async () => {
     if (!stock?.codes.trim()) return;
@@ -52,6 +53,25 @@ export default function AdminProducts() {
       stock: p.stock ?? '', active: !!p.active, featured: !!p.featured,
       imageUrl: p.image || '',
     });
+    setRewards(null);
+    if (p.kind === 'mystery') {
+      api.get(`/api/admin/products/${p.id}/mystery`)
+        .then((r) => setRewards(r.rewards.map((x) => ({ label: x.label, weight: x.weight, creditEuro: (x.credit / 100).toFixed(2) }))))
+        .catch(() => setRewards([]));
+    }
+  };
+
+  const saveRewards = async () => {
+    setBusy(true);
+    try {
+      await api.put(`/api/admin/products/${editing.id}/mystery`, {
+        rewards: (rewards || []).filter((r) => r.label.trim()).map((r) => ({
+          label: r.label.trim(), weight: Math.max(1, parseInt(r.weight, 10) || 1),
+          credit: Math.max(0, Math.round(parseFloat(r.creditEuro || '0') * 100)),
+        })),
+      });
+      toast.success('Mystery rewards saved.');
+    } catch (err) { toast.error(err.message); } finally { setBusy(false); }
   };
 
   const save = async () => {
@@ -255,6 +275,45 @@ export default function AdminProducts() {
           <label className="flex items-center gap-2 text-sm text-slate-300">
             <input type="checkbox" checked={form.featured} onChange={(e) => setForm({ ...form, featured: e.target.checked })} /> Featured
           </label>
+          <label className="flex items-center gap-2 text-sm text-slate-300 sm:col-span-2">
+            <input type="checkbox" checked={form.kind === 'mystery'}
+              onChange={(e) => setForm({ ...form, kind: e.target.checked ? 'mystery' : 'digital' })} />
+            🎁 Mystery box (buyers win a random reward — set the pool below after saving)
+          </label>
+
+          {/* Mystery reward pool — only for saved mystery products */}
+          {form.kind === 'mystery' && editing !== 'new' && (
+            <div className="sm:col-span-2 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="text-sm font-bold text-amber-300">🎁 Reward pool</div>
+                <button type="button" onClick={() => setRewards([...(rewards || []), { label: '', weight: 10, creditEuro: '' }])}
+                  className="text-xs font-semibold text-amber-300 hover:text-amber-200">+ Add reward</button>
+              </div>
+              {rewards === null ? <p className="text-slate-500 text-sm">Loading…</p> : (
+                <>
+                  {rewards.length === 0 && <p className="text-slate-500 text-sm mb-2">No rewards yet — add a few. Weight = relative odds; credit = what the winner gets as store credit.</p>}
+                  <div className="space-y-2">
+                    {rewards.map((r, i) => (
+                      <div key={i} className="grid grid-cols-[1fr_70px_90px_auto] gap-2 items-center">
+                        <input className="input py-1.5 text-sm" placeholder="e.g. €50 JACKPOT" value={r.label}
+                          onChange={(e) => setRewards(rewards.map((x, j) => j === i ? { ...x, label: e.target.value } : x))} />
+                        <input className="input py-1.5 text-sm" type="number" min="1" placeholder="odds" value={r.weight}
+                          onChange={(e) => setRewards(rewards.map((x, j) => j === i ? { ...x, weight: e.target.value } : x))} />
+                        <input className="input py-1.5 text-sm" type="number" min="0" step="0.01" placeholder="€ credit" value={r.creditEuro}
+                          onChange={(e) => setRewards(rewards.map((x, j) => j === i ? { ...x, creditEuro: e.target.value } : x))} />
+                        <button type="button" onClick={() => setRewards(rewards.filter((_, j) => j !== i))} className="text-slate-500 hover:text-red-400 text-lg px-1">×</button>
+                      </div>
+                    ))}
+                  </div>
+                  <button type="button" onClick={saveRewards} disabled={busy}
+                    className="btn-primary mt-3 py-2 text-sm">Save rewards</button>
+                </>
+              )}
+            </div>
+          )}
+          {form.kind === 'mystery' && editing === 'new' && (
+            <p className="sm:col-span-2 text-xs text-amber-300/80">Save the product first, then reopen it to set the reward pool.</p>
+          )}
         </div>
       </Modal>
     </div>

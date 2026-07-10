@@ -15,6 +15,7 @@ import { updateProfile, updatePreferences, publicUser } from '../services/userSe
 import { loyaltyFor } from '../services/loyaltyService.js';
 import { affiliateStats } from '../services/affiliateService.js';
 import { coinBalance, coinHistory, redeemReward, FORGE_SHOP } from '../services/forgeCoinService.js';
+import { pullsForOrder } from '../services/mysteryBoxService.js';
 import { getMembership } from '../services/membershipService.js';
 import { walletSummary, balanceOf } from '../services/walletService.js';
 import { redeemGiftCard } from '../services/giftCardService.js';
@@ -206,6 +207,12 @@ router.post('/orders/:id/refund-request', asyncHandler(async (req, res) => {
   const r = await support.requestRefund({ orderId: order.id, userId: req.user.id, reason });
   await audit({ actor: req.user, action: 'refund.request', targetType: 'order', targetId: order.id, req });
   res.status(201).json({ refundRequest: r });
+}));
+
+// Mystery-box winnings for an owned order (shown on the order page).
+router.get('/orders/:id/mystery', asyncHandler(async (req, res) => {
+  await ownedOrder(req, req.params.id);
+  res.json({ pulls: await pullsForOrder(req.params.id) });
 }));
 
 // ── Forge Coins + Forge Shop ─────────────────────────────────────────────────
