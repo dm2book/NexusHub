@@ -206,6 +206,8 @@ const NL = {
   'product.new': 'Nieuw',
   'product.eta': 'Verwachte levering:',
   'product.etaAfter': 'na betaling',
+  'product.delivery': 'Levering:',
+  'product.asap': 'zo snel mogelijk',
   'product.upgrade': 'Upgrade',
   'product.getMore': 'Meer waarde met',
   'product.qty': 'Aantal',

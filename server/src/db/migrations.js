@@ -741,4 +741,24 @@ VALUES ('payment_reminder', 'Payment Reminder',
 ON CONFLICT (id) DO NOTHING;
 `,
   },
+  {
+    id: '012_forge_coins',
+    sql: `
+-- ── Forge Coins — a loyalty currency (€10 spent = 1 coin) ────────────────────
+-- Append-only ledger; a member's balance is SUM(delta). Positive rows are
+-- earned (on paid orders), negative rows are spent in the Forge Shop. The
+-- unique index makes earning idempotent per order (retries never double-award).
+CREATE TABLE IF NOT EXISTS forge_coin_ledger (
+  id          TEXT PRIMARY KEY,
+  user_id     TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  delta       INTEGER NOT NULL,
+  reason      TEXT NOT NULL,
+  ref         TEXT,
+  created_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_forge_coins_user ON forge_coin_ledger(user_id, created_at);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_forge_coins_earn_ref
+  ON forge_coin_ledger(reason, ref) WHERE ref IS NOT NULL AND delta > 0;
+`,
+  },
 ];

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Outlet, NavLink, Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   Zap, LayoutDashboard, ShoppingBag, Download, LifeBuoy,
-  Wallet, Bell, User, LogOut, Shield, Menu, Gift, Star,
+  Wallet, Bell, User, LogOut, Shield, Menu, Gift, Star, Coins,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 
@@ -10,6 +10,7 @@ const NAV = [
   { to: '/account', icon: LayoutDashboard, label: 'Overview', end: true },
   { to: '/account/orders', icon: ShoppingBag, label: 'Orders' },
   { to: '/account/wallet', icon: Wallet, label: 'Wallet' },
+  { to: '/account/forge-shop', icon: Coins, label: 'Forge Shop' },
   { to: '/account/referrals', icon: Gift, label: 'Referrals' },
   { to: '/account/rewards', icon: Star, label: 'Rewards' },
   { to: '/account/downloads', icon: Download, label: 'Downloads' },

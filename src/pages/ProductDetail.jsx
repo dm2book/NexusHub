@@ -108,7 +108,6 @@ export default function ProductDetail() {
   const related = all.filter((p) => p.id !== product.id && p.category === product.category).slice(0, 4);
   const crossSell = (recs.crossSell?.length ? recs.crossSell : related).slice(0, 4);
   const upsell = recs.upsell?.[0] || null;
-  const eta = stats.avgDeliverySeconds < 60 ? `~${Math.max(5, Math.round(stats.avgDeliverySeconds))} seconds` : `~${Math.round(stats.avgDeliverySeconds / 60)} min`;
   const wished = has(product.id);
 
   const addToCart = () => {
@@ -195,7 +194,7 @@ export default function ProductDetail() {
 
           {/* delivery estimate */}
           <div className="inline-flex items-center gap-2 mt-3 text-sm text-emerald-600 bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-3 py-1.5">
-            <Zap size={14} /> {t('product.eta', 'Estimated delivery:')} <b>{eta}</b> {t('product.etaAfter', 'after payment')}
+            <Zap size={14} /> {t('product.delivery', 'Delivery:')} <b>{t('product.asap', 'as fast as possible')}</b>
           </div>
 
           {/* Upsell: nudge to a bigger pack */}
