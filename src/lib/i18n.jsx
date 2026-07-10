@@ -208,6 +208,8 @@ const NL = {
   'product.etaAfter': 'na betaling',
   'product.delivery': 'Levering:',
   'product.asap': 'zo snel mogelijk',
+  'mystery.whatsInside': 'Wat zit erin',
+  'mystery.sub': 'Elke box wint een echte prijs — dit zijn de exacte kansen. Prijzen worden direct als store-credit uitbetaald.',
   'product.upgrade': 'Upgrade',
   'product.getMore': 'Meer waarde met',
   'product.qty': 'Aantal',
