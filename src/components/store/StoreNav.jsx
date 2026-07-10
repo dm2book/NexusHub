@@ -30,6 +30,7 @@ export default function StoreNav() {
   const NAV = [
     { label: t('nav.home', 'Home'), to: '/' },
     { label: t('nav.products', 'All Products'), to: '/shop' },
+    { label: t('nav.drops', 'Drops'), to: '/drops' },
     { label: t('nav.reviews', 'Reviews'), to: '/reviews' },
     { label: t('nav.how', 'How it works'), to: '/how-it-works' },
     { label: t('nav.support', 'Support'), to: '/contact' },

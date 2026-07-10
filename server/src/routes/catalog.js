@@ -6,6 +6,7 @@ import { asyncHandler } from '../middleware/error.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 import { listProducts, getProduct, trendingProducts } from '../services/productService.js';
 import { getRewards as getMysteryRewards } from '../services/mysteryBoxService.js';
+import { listUpcoming as listUpcomingDrops } from '../services/dropService.js';
 import { evaluateCoupon } from '../services/couponService.js';
 import { recommendationsFor } from '../services/recommendationService.js';
 import { pricedBundles } from '../services/bundleService.js';
@@ -123,6 +124,11 @@ router.get('/products/:id', asyncHandler(async (req, res) => {
   const p = await getProduct(req.params.id);
   if (!p || !p.active) throw new ApiError(404, 'Product not found');
   res.json({ product: p });
+}));
+
+// Upcoming drops (restocks / launches / sales) for the storefront calendar.
+router.get('/drops', asyncHandler(async (_req, res) => {
+  res.json({ drops: await listUpcomingDrops() });
 }));
 
 // Mystery-box reward pool with odds — shown on the product page so buyers see
