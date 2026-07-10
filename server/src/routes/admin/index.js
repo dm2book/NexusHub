@@ -15,6 +15,7 @@ import social from './social.js';
 import monetization from './monetization.js';
 import { asyncHandler } from '../../middleware/error.js';
 import { launchChecks } from '../../services/launchCheckService.js';
+import { get } from '../../db/index.js';
 
 const router = Router();
 router.use(requireAuth, requireStaff);
@@ -22,6 +23,19 @@ router.use(requireAuth, requireStaff);
 // Live "can I sell today?" readiness report for the admin dashboard.
 router.get('/launch-check', asyncHandler(async (_req, res) => {
   res.json(await launchChecks());
+}));
+
+// Action-item counts for the admin sidebar badges, so open tickets / pending
+// payments / orders awaiting fulfillment are visible at a glance instead of
+// hidden inside a page.
+router.get('/nav-counts', asyncHandler(async (_req, res) => {
+  const n = async (sql) => Number((await get(sql).catch(() => null))?.n || 0);
+  const [tickets, payments, fulfillment] = await Promise.all([
+    n(`SELECT COUNT(*) AS n FROM support_tickets WHERE status <> 'closed'`),
+    n(`SELECT COUNT(*) AS n FROM payment_proofs WHERE status = 'pending'`),
+    n(`SELECT COUNT(*) AS n FROM orders WHERE status = 'paid'`),
+  ]);
+  res.json({ tickets, payments, fulfillment });
 }));
 
 router.use('/orders', orders);

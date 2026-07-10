@@ -1,21 +1,22 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Outlet, NavLink, Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   Zap, BarChart3, ShoppingCart, Truck, PackageCheck, Package,
   Mail, ShieldAlert, LogOut, Store, LifeBuoy, Menu, X, Users, ShieldCheck, Activity, Gauge, Tag,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
+import { api } from '../lib/api.js';
 
 const NAV = [
   { to: '/admin', icon: BarChart3, label: 'Analytics', end: true, perm: 'analytics.read' },
   { to: '/admin/operations', icon: Gauge, label: 'Operations', perm: 'orders.read' },
   { to: '/admin/orders', icon: ShoppingCart, label: 'Orders', perm: 'orders.read' },
-  { to: '/admin/payments', icon: ShieldCheck, label: 'Payments', perm: 'orders.update' },
+  { to: '/admin/payments', icon: ShieldCheck, label: 'Payments', perm: 'orders.update', badge: 'payments' },
   { to: '/admin/products', icon: Package, label: 'Products', perm: 'orders.read' },
   { to: '/admin/users', icon: Users, label: 'Users', perm: 'users.read' },
-  { to: '/admin/fulfillment', icon: PackageCheck, label: 'Fulfillment', perm: 'fulfillment.manage' },
+  { to: '/admin/fulfillment', icon: PackageCheck, label: 'Fulfillment', perm: 'fulfillment.manage', badge: 'fulfillment' },
   { to: '/admin/suppliers', icon: Truck, label: 'Suppliers', perm: 'suppliers.read' },
-  { to: '/admin/support', icon: LifeBuoy, label: 'Support', perm: 'tickets.read' },
+  { to: '/admin/support', icon: LifeBuoy, label: 'Support', perm: 'tickets.read', badge: 'tickets' },
   { to: '/admin/social', icon: Activity, label: 'Social proof', perm: 'social.moderate' },
   { to: '/admin/monetization', icon: Tag, label: 'Monetization', perm: 'monetization.manage' },
   { to: '/admin/emails', icon: Mail, label: 'Emails', perm: 'emails.manage' },
@@ -27,8 +28,20 @@ export default function AdminLayout() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const [open, setOpen] = useState(false);
+  const [counts, setCounts] = useState({});
   const close = () => setOpen(false);
   const items = NAV.filter((n) => !n.perm || hasPermission(n.perm));
+
+  // Poll action-item counts (open tickets, pending payments, orders to fulfil)
+  // so the sidebar badges are always current — refetched on every navigation
+  // and every 60s.
+  useEffect(() => {
+    let alive = true;
+    const load = () => api.get('/api/admin/nav-counts').then((c) => alive && setCounts(c)).catch(() => {});
+    load();
+    const t = setInterval(load, 60_000);
+    return () => { alive = false; clearInterval(t); };
+  }, [pathname]);
 
   const Sidebar = ({ onNavigate = () => {} }) => (
     <>
@@ -43,13 +56,21 @@ export default function AdminLayout() {
         </div>
       </Link>
       <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-        {items.map(({ to, icon: Icon, label, end }) => (
-          <NavLink key={to} to={to} end={end} onClick={onNavigate}
-            className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition
-              ${isActive ? 'bg-gradient-to-r from-primary/25 to-fuchsia-500/10 text-white ring-1 ring-primary/30' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}>
-            <Icon size={18} /> {label}
-          </NavLink>
-        ))}
+        {items.map(({ to, icon: Icon, label, end, badge }) => {
+          const count = badge ? counts[badge] : 0;
+          return (
+            <NavLink key={to} to={to} end={end} onClick={onNavigate}
+              className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition
+                ${isActive ? 'bg-gradient-to-r from-primary/25 to-fuchsia-500/10 text-white ring-1 ring-primary/30' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}>
+              <Icon size={18} /> <span className="flex-1">{label}</span>
+              {count > 0 && (
+                <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-fuchsia-500 text-white text-[11px] font-bold grid place-items-center shadow-sm shadow-fuchsia-500/40">
+                  {count > 99 ? '99+' : count}
+                </span>
+              )}
+            </NavLink>
+          );
+        })}
       </nav>
       <div className="p-3 border-t border-white/5 space-y-1 shrink-0">
         <Link to="/" onClick={onNavigate} className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-slate-400 hover:bg-white/5">
