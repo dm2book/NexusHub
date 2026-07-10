@@ -468,11 +468,11 @@ export const MESSAGES = {
 // anything else falls back to `default`.
 export const DELIVERY_INFO = {
   robux: {
-    method: 'Sent straight to your Roblox account via the official Group Payout (“Roblox+”) method — no password or login needed, fully account-safe.',
+    method: 'Sent straight to your Roblox account via the official Roblox+ top-up method — no password or login needed, fully account-safe.',
     steps: [
       'Turn on 2-Step Verification (2FA) on your Roblox account — required before we can deliver.',
-      'Join our Roblox group — we send the link right after your order.',
-      'We pay the Robux out to your account. Done! 🎉',
+      'Send us your Roblox username (in your order or a support ticket).',
+      'We deliver the Robux to your account. Done! 🎉',
     ],
     notes: [
       'Max 5,000 R$ per account per day (Roblox rule). Bigger orders split across days — e.g. 10,000 R$ over 2 days.',

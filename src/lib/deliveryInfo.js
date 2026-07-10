@@ -9,11 +9,11 @@
 export const DELIVERY_INFO = {
   robux: {
     en: {
-      method: 'Sent straight to your Roblox account via the official Group Payout (“Roblox+”) method — no password or login needed, and fully account-safe.',
+      method: 'Sent straight to your Roblox account via the official Roblox+ top-up method — no password or login needed, and fully account-safe.',
       steps: [
         'Turn on 2-Step Verification (2FA) on your Roblox account — required before we can deliver.',
-        'Join our Roblox group — we send you the link right after your order.',
-        'We pay the Robux out to your account. Done! 🎉',
+        'Send us your Roblox username (in your order or a support ticket).',
+        'We deliver the Robux to your account. Done! 🎉',
       ],
       notes: [
         'Roblox allows a maximum of 5,000 R$ per account per day. Bigger orders are automatically split across days — e.g. 10,000 R$ arrives over 2 days.',
@@ -22,11 +22,11 @@ export const DELIVERY_INFO = {
       ],
     },
     nl: {
-      method: 'Rechtstreeks op je Roblox-account via de officiële Group Payout (“Roblox+”)-methode — geen wachtwoord of inloggen nodig, en 100% account-veilig.',
+      method: 'Rechtstreeks op je Roblox-account via de officiële Roblox+ top-up-methode — geen wachtwoord of inloggen nodig, en 100% account-veilig.',
       steps: [
         'Zet 2-staps-verificatie (2FA) aan op je Roblox-account — verplicht voordat we kunnen leveren.',
-        'Word lid van onze Roblox-groep — de link krijg je direct na je bestelling.',
-        'Wij storten de Robux op je account. Klaar! 🎉',
+        'Geef ons je Roblox-gebruikersnaam door (in je bestelling of via een ticket).',
+        'Wij leveren de Robux op je account. Klaar! 🎉',
       ],
       notes: [
         'Roblox staat maximaal 5.000 R$ per account per dag toe. Grotere bestellingen splitsen we automatisch over meerdere dagen — bijv. 10.000 R$ komt in 2 dagen binnen.',
