@@ -8,6 +8,17 @@ import { useToast } from '../../context/ToastContext.jsx';
 const BLANK = { name: '', sku: '', category: '', description: '', priceEuro: '', costEuro: '',
   kind: 'digital', stock: '', active: true, featured: false, imageUrl: '' };
 
+// Suggested sell price from a supplier cost (e.g. what you pay on Eldorado /
+// Eneba): a ~18% markup with a €2 minimum profit, rounded to a clean .99.
+// So €140 cost → €165, €10 cost → €12.99. Tune MARKUP/FLOOR to taste.
+const MARKUP = 0.18, FLOOR = 2;
+function suggestPrice(costEuro) {
+  const cost = parseFloat(costEuro);
+  if (!cost || cost <= 0) return null;
+  const raw = Math.max(cost + FLOOR, cost * (1 + MARKUP));
+  return Math.max(0.99, Math.ceil(raw) - 0.01).toFixed(2); // → clean .99 ending
+}
+
 export default function AdminProducts() {
   const toast = useToast();
   const [products, setProducts] = useState(null);
@@ -212,9 +223,17 @@ export default function AdminProducts() {
           <div><label className="label">Price (€)</label>
             <input type="number" step="0.01" min="0" className="input" value={form.priceEuro}
               onChange={(e) => setForm({ ...form, priceEuro: e.target.value })} placeholder="9.99" /></div>
-          <div><label className="label">Cost / supplier price (€)</label>
+          <div><label className="label">Cost / supplier price (€) — e.g. Eldorado / Eneba</label>
             <input type="number" step="0.01" min="0" className="input" value={form.costEuro}
-              onChange={(e) => setForm({ ...form, costEuro: e.target.value })} placeholder="for profit tracking" />
+              onChange={(e) => setForm({ ...form, costEuro: e.target.value })} placeholder="what you pay to buy it" />
+            {suggestPrice(form.costEuro) && (
+              <button type="button"
+                onClick={() => setForm({ ...form, priceEuro: suggestPrice(form.costEuro) })}
+                className="mt-1.5 inline-flex items-center gap-1.5 text-xs font-semibold text-violet-300 bg-violet-500/15 border border-violet-500/30 rounded-lg px-2.5 py-1 hover:bg-violet-500/25 transition">
+                💡 Suggest price: €{suggestPrice(form.costEuro)}
+                <span className="text-slate-400 font-normal">(+{Math.round(MARKUP * 100)}%, min €{FLOOR}) — apply</span>
+              </button>
+            )}
             {form.priceEuro && form.costEuro && (
               <p className="text-xs text-emerald-400 mt-1">
                 Margin: €{(parseFloat(form.priceEuro || 0) - parseFloat(form.costEuro || 0)).toFixed(2)}
