@@ -27,6 +27,7 @@ import { recordPurchaseEvent } from './socialProofService.js';
 import { balanceOf, debit, credit, hasOrderEntry } from './walletService.js';
 import { grantTierRewards } from './loyaltyService.js';
 import { awardCoinsForOrder } from './forgeCoinService.js';
+import { settleMysteryForOrder } from './mysteryBoxService.js';
 import { evaluateCoupon, recordCouponRedemption } from './couponService.js';
 import { bestBundleDiscount } from './bundleService.js';
 
@@ -237,6 +238,8 @@ export async function transitionOrder(orderId, to, ctx = {}) {
     if (updated.userId) grantTierRewards(updated.userId).catch((e) => console.error('[loyalty]', e.message));
     // Earn Forge Coins (€10 = 1 coin), idempotent per order.
     if (updated.userId) awardCoinsForOrder(updated).catch((e) => console.error('[coins]', e.message));
+    // Open any mystery boxes in the order → roll rewards, grant store credit.
+    if (updated.userId) settleMysteryForOrder(updated).catch((e) => console.error('[mystery]', e.message));
   }
   return updated;
 }

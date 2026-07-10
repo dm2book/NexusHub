@@ -17,11 +17,17 @@ export default function OrderDetail() {
   const [stars, setStars] = useState(5);
   const [reviewBody, setReviewBody] = useState('');
   const [reviewBusy, setReviewBusy] = useState(false);
+  const [mystery, setMystery] = useState([]);
 
   const load = useCallback(() => {
     api.get(`/api/account/orders/${id}`).then((r) => setOrder(r.order)).catch(() => {});
   }, [id]);
   useEffect(() => { load(); }, [load]);
+
+  // Mystery-box winnings (if any) for the reveal card.
+  useEffect(() => {
+    api.get(`/api/account/orders/${id}/mystery`).then((r) => setMystery(r.pulls || [])).catch(() => {});
+  }, [id]);
 
   // Whether this (delivered) order has already been reviewed.
   useEffect(() => {
@@ -86,6 +92,23 @@ export default function OrderDetail() {
           )}
         </div>
       </div>
+
+      {/* Mystery-box reveal */}
+      {mystery.length > 0 && (
+        <div className="rounded-2xl p-5 mb-6 text-white shadow-lg shadow-amber-500/20"
+          style={{ backgroundImage: 'linear-gradient(120deg,#f59e0b,#f43f5e)' }}>
+          <div className="flex items-center gap-2 font-bold text-lg mb-2">🎁 Your mystery box{mystery.length > 1 ? 'es' : ''}!</div>
+          <div className="space-y-1.5">
+            {mystery.map((m, i) => (
+              <div key={i} className="flex items-center justify-between bg-white/15 rounded-lg px-3 py-2">
+                <span className="font-semibold">{m.label}</span>
+                {m.credit > 0 && <span className="text-sm font-bold bg-white/20 rounded-full px-2.5 py-0.5">+{money(m.credit)} credit</span>}
+              </div>
+            ))}
+          </div>
+          <p className="text-white/85 text-xs mt-2.5">Store credit is added to your <Link to="/account/wallet" className="underline font-semibold">wallet</Link> automatically.</p>
+        </div>
+      )}
 
       <div className="grid md:grid-cols-3 gap-6">
         <div className="md:col-span-2 space-y-6">
