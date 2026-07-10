@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
   Tag, Gift, Package, Plus, Trash2, Eye, EyeOff, Power, Copy, Percent, Euro,
-  BarChart3, TrendingDown, Wallet,
+  BarChart3, TrendingDown, Wallet, CalendarDays,
 } from 'lucide-react';
 import { api } from '../../lib/api.js';
 import { money, date } from '../../lib/format.js';
@@ -12,6 +12,7 @@ const TABS = [
   { id: 'coupons', label: 'Coupons', icon: Tag },
   { id: 'giftcards', label: 'Gift cards', icon: Gift },
   { id: 'bundles', label: 'Bundles', icon: Package },
+  { id: 'drops', label: 'Drops', icon: CalendarDays },
   { id: 'report', label: 'Report', icon: BarChart3 },
 ];
 
@@ -43,7 +44,7 @@ export default function Monetization() {
             className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm border transition ${
               tab === t.id ? 'bg-primary/20 border-primary/40 text-white' : 'border-white/10 text-slate-400 hover:text-white'}`}>
             <t.icon size={15} /> {t.label}
-            {t.id !== 'report' && <span className="text-xs text-slate-500">{data[t.id === 'giftcards' ? 'giftCards' : t.id]?.length || 0}</span>}
+            {t.id !== 'report' && t.id !== 'drops' && <span className="text-xs text-slate-500">{data[t.id === 'giftcards' ? 'giftCards' : t.id]?.length || 0}</span>}
           </button>
         ))}
       </div>
@@ -51,7 +52,58 @@ export default function Monetization() {
       {tab === 'coupons' && <Coupons coupons={data.coupons} toast={toast} call={call} busy={busy} />}
       {tab === 'giftcards' && <GiftCards cards={data.giftCards} toast={toast} call={call} busy={busy} />}
       {tab === 'bundles' && <Bundles bundles={data.bundles} products={products} toast={toast} call={call} busy={busy} />}
+      {tab === 'drops' && <Drops toast={toast} />}
       {tab === 'report' && <Report toast={toast} />}
+    </div>
+  );
+}
+
+// ── Drop calendar ─────────────────────────────────────────────────────────────
+function Drops({ toast }) {
+  const [drops, setDrops] = useState(null);
+  const [f, setF] = useState({ title: '', category: '', note: '', startsAt: '' });
+  const load = () => api.get('/api/admin/drops').then((r) => setDrops(r.drops || [])).catch(() => setDrops([]));
+  useEffect(() => { load(); }, []);
+  const add = async () => {
+    if (!f.title.trim() || !f.startsAt) { toast.error('Title and date/time are required.'); return; }
+    try {
+      await api.post('/api/admin/drops', {
+        title: f.title.trim(), category: f.category.trim() || undefined,
+        note: f.note.trim() || undefined, startsAt: new Date(f.startsAt).toISOString(),
+      });
+      toast.success('Drop scheduled.');
+      setF({ title: '', category: '', note: '', startsAt: '' }); load();
+    } catch (e) { toast.error(e.message); }
+  };
+  const del = async (id) => { if (!confirm('Delete this drop?')) return; try { await api.del(`/api/admin/drops/${id}`); load(); } catch (e) { toast.error(e.message); } };
+  if (!drops) return <PageLoader />;
+  return (
+    <div className="space-y-5">
+      <div className="card p-4 grid sm:grid-cols-2 gap-3">
+        <div><label className="label">Title</label>
+          <input className="input" placeholder="e.g. Robux restock" value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} /></div>
+        <div><label className="label">When</label>
+          <input type="datetime-local" className="input" value={f.startsAt} onChange={(e) => setF({ ...f, startsAt: e.target.value })} /></div>
+        <div><label className="label">Category (optional)</label>
+          <input className="input" placeholder="robux, v-bucks…" value={f.category} onChange={(e) => setF({ ...f, category: e.target.value })} /></div>
+        <div><label className="label">Note (optional)</label>
+          <input className="input" placeholder="Big restock + 10% off" value={f.note} onChange={(e) => setF({ ...f, note: e.target.value })} /></div>
+        <div className="sm:col-span-2"><button onClick={add} className="btn-primary"><Plus size={16} /> Schedule drop</button></div>
+      </div>
+      {drops.length === 0 ? <div className="card p-8 text-center text-slate-400">No drops yet.</div> : (
+        <div className="space-y-2">
+          {drops.map((d) => (
+            <div key={d.id} className="card p-3 flex items-center gap-3">
+              <div className="text-sm text-white font-mono shrink-0">{date(d.startsAt)}</div>
+              <div className="min-w-0 flex-1">
+                <div className="text-white text-sm font-medium">{d.title} {d.category && <span className="text-slate-500 text-xs">· {d.category}</span>}</div>
+                {d.note && <div className="text-slate-400 text-xs">{d.note}</div>}
+              </div>
+              <button title="Delete" onClick={() => del(d.id)} className="text-slate-500 hover:text-red-400"><Trash2 size={16} /></button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -800,4 +800,20 @@ CREATE INDEX IF NOT EXISTS idx_mystery_pulls_order ON mystery_pulls(order_id);
 ALTER TABLE mystery_pulls ADD COLUMN IF NOT EXISTS rerolled_at TEXT;
 `,
   },
+  {
+    id: '015_drop_calendar',
+    sql: `
+-- ── Drop calendar — scheduled restocks / launches / sales ───────────────────
+CREATE TABLE IF NOT EXISTS drops (
+  id          TEXT PRIMARY KEY,
+  title       TEXT NOT NULL,
+  category    TEXT,
+  note        TEXT,
+  starts_at   TEXT NOT NULL,
+  created_by  TEXT,
+  created_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_drops_starts ON drops(starts_at);
+`,
+  },
 ];

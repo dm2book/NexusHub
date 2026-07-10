@@ -15,6 +15,8 @@ import social from './social.js';
 import monetization from './monetization.js';
 import { asyncHandler } from '../../middleware/error.js';
 import { launchChecks } from '../../services/launchCheckService.js';
+import { listAll as listAllDrops, createDrop, deleteDrop } from '../../services/dropService.js';
+import { z } from 'zod';
 import { get } from '../../db/index.js';
 
 const router = Router();
@@ -37,6 +39,19 @@ router.get('/nav-counts', asyncHandler(async (_req, res) => {
   ]);
   res.json({ tickets, payments, fulfillment });
 }));
+
+// Drop calendar management.
+router.get('/drops', asyncHandler(async (_req, res) => { res.json({ drops: await listAllDrops() }); }));
+router.post('/drops', asyncHandler(async (req, res) => {
+  const body = z.object({
+    title: z.string().min(1).max(120),
+    category: z.string().max(40).optional(),
+    note: z.string().max(300).optional(),
+    startsAt: z.string().min(1),
+  }).parse(req.body || {});
+  res.status(201).json({ drop: await createDrop(body, req.user.id) });
+}));
+router.delete('/drops/:id', asyncHandler(async (req, res) => { await deleteDrop(req.params.id); res.json({ ok: true }); }));
 
 router.use('/orders', orders);
 router.use('/suppliers', suppliers);
