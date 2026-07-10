@@ -154,6 +154,9 @@ const NL = {
   'shop.noMatchesSub': 'Probeer een andere categorie of zoekterm.',
 
   // Product page
+  'product.howDelivered': 'Hoe dit geleverd wordt',
+  'product.steps': 'Stappen',
+  'product.goodToKnow': 'Goed om te weten',
   'product.back': 'Terug naar shop',
   'product.addToCart': 'In winkelwagen',
   'product.buyNow': 'Direct kopen',
