@@ -1,7 +1,7 @@
 /** Public Discord community info + the bot's staff digest endpoint. */
 import { Router } from 'express';
 import { asyncHandler } from '../middleware/error.js';
-import { getServerInfo } from '../services/discordService.js';
+import { getServerInfo, claimOutbox, stampBotSeen } from '../services/discordService.js';
 import { verifyIngest } from '../middleware/ingestSignature.js';
 import { config } from '../config/env.js';
 import { overview, topProducts } from '../services/analyticsService.js';
@@ -13,6 +13,18 @@ const router = Router();
 router.get('/server', asyncHandler(async (_req, res) => {
   res.json({ server: await getServerInfo() });
 }));
+
+// Relay outbox: the bot polls this for queued events (sales pings, drops,
+// stock alerts, delivery DMs) so Discord automation needs NO Discord secrets
+// on the hosting side. Same HMAC scheme as the digest.
+export const canonicalOutbox = () => 'outbox';
+router.post('/outbox',
+  verifyIngest(canonicalOutbox)(config.discord.reviewIngestSecret),
+  asyncHandler(async (_req, res) => {
+    const events = await claimOutbox(20);
+    await stampBotSeen();
+    res.json({ events });
+  }));
 
 // Staff digest for the bot (/digest, /stock and the weekly Monday post).
 // Same HMAC scheme as review ingest; canonical string is the fixed word

@@ -835,4 +835,30 @@ SELECT 'ph_seed_' || id, id, price, currency, created_at FROM products
 ON CONFLICT (id) DO NOTHING;
 `,
   },
+  {
+    id: '017_discord_outbox',
+    sql: `
+-- ── Discord relay outbox ─────────────────────────────────────────────────────
+-- When no webhook/bot token is configured on the server, Discord events
+-- (sales pings, drops, stock alerts, delivery DMs) are queued here and the
+-- community bot pulls them over the signed /api/discord/outbox endpoint —
+-- zero Discord secrets needed on the hosting side.
+CREATE TABLE IF NOT EXISTS discord_outbox (
+  id            TEXT PRIMARY KEY,
+  kind          TEXT NOT NULL,
+  payload       TEXT NOT NULL,
+  created_at    TEXT NOT NULL,
+  delivered_at  TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_discord_outbox_pending
+  ON discord_outbox(created_at) WHERE delivered_at IS NULL;
+
+-- Tiny key/value store (first use: when the bot last polled the outbox).
+CREATE TABLE IF NOT EXISTS kv (
+  key         TEXT PRIMARY KEY,
+  value       TEXT NOT NULL,
+  updated_at  TEXT NOT NULL
+);
+`,
+  },
 ];

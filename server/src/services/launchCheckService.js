@@ -5,6 +5,7 @@
  */
 import { config, manualPayMethods } from '../config/env.js';
 import { get } from '../db/index.js';
+import { botSeenRecently } from './discordService.js';
 
 export async function launchChecks() {
   const checks = [];
@@ -56,11 +57,19 @@ export async function launchChecks() {
       ? 'Self-scheduling (runs with traffic) + Vercel Cron backup (CRON_SECRET set)'
       : 'Self-scheduling — reminders & cleanup run automatically with site traffic.');
 
-  // 6. Discord automation (optional but recommended).
+  // 6. Discord automation — direct (webhooks/bot token on the server) OR the
+  // relay: the community bot polls the signed outbox, so simply running the
+  // bot lights this up green with zero hosting-side Discord secrets.
   const d = config.discord;
   const bits = [d.botToken && 'bot', d.orderWebhookUrl && 'orders', d.dropsWebhookUrl && 'drops'].filter(Boolean);
-  add('discord', 'Discord automation', bits.length >= 2 ? 'ok' : 'warn',
-    bits.length ? `Configured: ${bits.join(', ')}` : 'No bot token or webhooks — delivery DMs, alerts and drops are off.');
+  const relayed = await botSeenRecently(24);
+  add('discord', 'Discord automation',
+    bits.length >= 2 || relayed ? 'ok' : 'warn',
+    relayed && !bits.length
+      ? 'Bot connected via relay — delivery DMs, sales pings, drops and alerts flow through your bot.'
+      : bits.length
+        ? `Configured: ${bits.join(', ')}${relayed ? ' + bot relay' : ''}`
+        : 'Start your Discord bot (npm start in discord/) — it connects automatically, no Vercel setup needed.');
 
   const failing = checks.filter((c) => c.status === 'fail').length;
   const warning = checks.filter((c) => c.status === 'warn').length;
