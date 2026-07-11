@@ -33,7 +33,7 @@ const productSchema = z.object({
   description: z.string().optional(),
   price: z.number().int().nonnegative(),
   currency: z.string().length(3).optional(),
-  kind: z.enum(['digital', 'physical']).optional(),
+  kind: z.enum(['digital', 'physical', 'mystery']).optional(),
   stock: z.number().int().nullable().optional(),
   active: z.boolean().optional(),
   metadata: z.record(z.any()).optional(),

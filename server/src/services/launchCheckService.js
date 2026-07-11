@@ -50,9 +50,11 @@ export async function launchChecks() {
   add('security', 'Auth secret', config.auth.jwtSecret.startsWith('dev-only') ? 'fail' : 'ok',
     config.auth.jwtSecret.startsWith('dev-only') ? 'JWT_SECRET is the dev default — set a long random value in Vercel.' : 'JWT_SECRET set');
 
-  // 5. Cron — abandoned-payment reminders + cleanup need the hourly cron.
-  add('cron', 'Maintenance cron', config.security.cronSecret ? 'ok' : 'warn',
-    config.security.cronSecret ? 'CRON_SECRET set (Vercel Cron hourly)' : 'CRON_SECRET missing — reminders/cleanup will not run in production.');
+  // 5. Maintenance — self-scheduling with traffic; Vercel Cron is an optional backup.
+  add('cron', 'Maintenance', 'ok',
+    config.security.cronSecret
+      ? 'Self-scheduling (runs with traffic) + Vercel Cron backup (CRON_SECRET set)'
+      : 'Self-scheduling — reminders & cleanup run automatically with site traffic.');
 
   // 6. Discord automation (optional but recommended).
   const d = config.discord;

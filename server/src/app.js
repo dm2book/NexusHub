@@ -14,9 +14,11 @@ import { get } from './db/index.js';
 import { migrate } from './db/migrate.js';
 import { seed, isSeeded, syncEmailTemplates } from './db/seed.js';
 import { seedDemoCatalog } from './db/demoSeed.js';
+import { seedStarterContent } from './db/starterContent.js';
 import { attachUser } from './middleware/auth.js';
 import { rateLimit } from './middleware/rateLimit.js';
 import { errorHandler, notFoundHandler } from './middleware/error.js';
+import { runMaintenance } from './services/maintenanceService.js';
 
 import authRoutes from './routes/auth.js';
 import cronRoutes from './routes/cron.js';
@@ -41,6 +43,9 @@ export function ensureReady() {
       // deploy is never an empty store. (SEED_DEMO=true also forces a re-sync.)
       const { n } = await get('SELECT COUNT(*) AS n FROM products WHERE active = 1').catch(() => ({ n: 1 }));
       if (config.seedDemo || Number(n) === 0) await seedDemoCatalog();
+      // Starter engagement content (one mystery box + one bundle) — created only
+      // when none exist, so it never overwrites anything the admin configured.
+      await seedStarterContent().catch(() => {});
     })().catch((err) => {
       readyPromise = null; // allow retry on next request
       throw err;
@@ -68,6 +73,23 @@ export function createApp({ lazyReady = false } = {}) {
       try { await ensureReady(); next(); } catch (err) { next(err); }
     });
   }
+
+  // Self-scheduling maintenance: piggyback on live traffic so OTP purges,
+  // stale-order cleanup and payment reminders run WITHOUT any external cron
+  // or CRON_SECRET setup. At most once per hour per warm instance, fired
+  // after the schema is ready and never blocking the request. Vercel Cron
+  // (when configured) still works as a belt-and-braces backup.
+  let lastMaintenanceAt = 0;
+  app.use((_req, _res, next) => {
+    const now = Date.now();
+    if (now - lastMaintenanceAt > 3_600_000) {
+      lastMaintenanceAt = now;
+      runMaintenance()
+        .then((s) => console.log('[maintenance:auto]', JSON.stringify(s)))
+        .catch((e) => console.error('[maintenance:auto]', e.message));
+    }
+    next();
+  });
 
   // Structured request logging → Vercel logs (method, path, status, duration).
   app.use((req, res, next) => {

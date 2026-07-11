@@ -35,7 +35,8 @@ router.get('/nav-counts', asyncHandler(async (_req, res) => {
   const [tickets, payments, fulfillment] = await Promise.all([
     n(`SELECT COUNT(*) AS n FROM support_tickets WHERE status <> 'closed'`),
     n(`SELECT COUNT(*) AS n FROM payment_proofs WHERE status = 'pending'`),
-    n(`SELECT COUNT(*) AS n FROM orders WHERE status = 'paid'`),
+    n(`SELECT COUNT(*) AS n FROM orders
+        WHERE status IN ('payment_received', 'processing', 'awaiting_fulfillment')`),
   ]);
   res.json({ tickets, payments, fulfillment });
 }));
