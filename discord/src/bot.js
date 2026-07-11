@@ -437,6 +437,10 @@ client.once(Events.ClientReady, (c) => {
   // Daily vouch spotlight → #general (checked hourly, posts once a day).
   setInterval(() => c.guilds.cache.forEach((g) => maybeVouchSpotlight(g)), 60 * 60_000);
 
+  // Relay the store's queued Discord events (sales, drops, alerts, DMs).
+  setInterval(() => pollOutbox(c), 60_000);
+  setTimeout(() => pollOutbox(c), 10_000);
+
   // Site watchdog: every 15 min; alerts staff on downtime + recovery.
   setInterval(() => c.guilds.cache.forEach((g) => checkSiteHealth(g)), 15 * 60_000);
   setTimeout(() => c.guilds.cache.forEach((g) => checkSiteHealth(g)), 30_000);
@@ -1108,6 +1112,45 @@ function leaderboardCmd(i) {
   const lines = top.map(([id, r], n) => `**${['🥇', '🥈', '🥉'][n] || `${n + 1}.`}** <@${id}> — Level ${r.lvl} · ${r.xp} XP`).join('\n') || 'No one has chatted yet — be the first!';
   const e = new EmbedBuilder().setColor(0xa855f7).setTitle('🏆 XP Leaderboard').setDescription(lines).setFooter({ text: 'Chat to earn XP' });
   return i.reply({ embeds: [e] });
+}
+
+// ── Outbox relay ──────────────────────────────────────────────────────────────
+// The store queues Discord events (sales pings, drops, stock alerts, delivery
+// DMs) when it has no webhooks/bot token of its own; we poll the signed
+// endpoint every 60s and post them. This is what makes 'Discord automation'
+// work with zero Vercel-side secrets.
+const OUTBOX_CHANNEL = { leads: ['leads', 'staff-announcements'], deals: ['deals', 'restocks', 'announcements'] };
+async function pollOutbox(c) {
+  if (!FORGEMARKET_API_URL || !REVIEW_INGEST_SECRET) return;
+  try {
+    const ts = String(Date.now());
+    const signature = createHmac('sha256', REVIEW_INGEST_SECRET).update(`${ts}.outbox`).digest('hex');
+    const res = await fetch(`${FORGEMARKET_API_URL.replace(/\/$/, '')}/api/discord/outbox`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-timestamp': ts, 'x-signature': signature },
+      body: '{}',
+    });
+    if (!res.ok) throw new Error(`outbox ${res.status}`);
+    const { events = [] } = await res.json();
+    for (const ev of events) {
+      try {
+        if (ev.channel === 'dm') {
+          const { discordUserId, ...body } = ev.body || {};
+          if (discordUserId) await c.users.send(discordUserId, body).catch(() => {});
+          continue;
+        }
+        const guild = c.guilds.cache.first();
+        if (!guild) continue;
+        const names = OUTBOX_CHANNEL[ev.channel] || ['leads'];
+        const ch = names.map((n) => findChannel(guild, n)).find(Boolean);
+        if (ch) await ch.send(ev.body).catch(() => {});
+      } catch (e) { console.error('[outbox] event failed:', e.message); }
+    }
+    if (events.length) console.log(`📮 [outbox] relayed ${events.length} store event(s)`);
+  } catch (e) {
+    // 404 = the store hasn't deployed the outbox yet; stay quiet about it.
+    if (!/outbox 404/.test(e.message)) console.error('[outbox]', e.message);
+  }
 }
 
 // ── Order status (shared by /order, ticket auto-lookup and the ticket form) ──

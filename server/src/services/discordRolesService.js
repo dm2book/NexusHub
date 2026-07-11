@@ -16,6 +16,7 @@
 import { config } from '../config/env.js';
 import { get } from '../db/index.js';
 import { TIERS, loyaltyFor } from './loyaltyService.js';
+import { relayDm } from './discordService.js';
 
 const API = 'https://discord.com/api/v10';
 
@@ -120,7 +121,7 @@ async function dmUser(uid, payload) {
  */
 export async function sendDeliveryDm(order) {
   try {
-    if (!config.discord.botToken || !order?.userId) return;
+    if (!order?.userId) return;
     const uid = await discordUidForUser(order.userId);
     if (!uid) return;
 
@@ -141,8 +142,11 @@ export async function sendDeliveryDm(order) {
       footer: { text: `${config.email.fromName} · instant delivery` },
       timestamp: new Date().toISOString(),
     };
-    await dmUser(uid, { embeds: [embed] });
-    console.log(`[discord] delivery DM sent to ${uid} for order ${order.number}`);
+    // Direct DM with a server-side bot token; otherwise relay via the outbox
+    // so the community bot (which has the token) sends it.
+    if (config.discord.botToken) await dmUser(uid, { embeds: [embed] });
+    else await relayDm(uid, { embeds: [embed] });
+    console.log(`[discord] delivery DM ${config.discord.botToken ? 'sent' : 'queued'} for ${uid} · order ${order.number}`);
   } catch (err) {
     // Common: user disallows DMs (50007) — never let that affect the order.
     console.error('[discord] delivery DM failed:', err.message);

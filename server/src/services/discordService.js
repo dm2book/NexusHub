@@ -12,9 +12,70 @@
  *   (DISCORD_STOCK_WEBHOOK_URL, falls back to the order webhook).
  */
 import { config } from '../config/env.js';
+import { run, get, all, nowIso } from '../db/index.js';
+import { newId } from '../utils/ids.js';
 
 let cache = { at: 0, data: null };
 const TTL_MS = 60_000;
+
+// ── Relay outbox ─────────────────────────────────────────────────────────────
+// No webhook/bot token on the server? Queue the event; the community bot polls
+// the signed /api/discord/outbox endpoint and posts it — so Discord automation
+// works with ZERO Discord secrets in the hosting environment.
+
+async function enqueueOutbox(channel, body) {
+  try {
+    await run(
+      `INSERT INTO discord_outbox (id, kind, payload, created_at) VALUES (@id, @k, @p, @at)`,
+      { id: newId('dox'), k: channel, p: JSON.stringify(body), at: nowIso() });
+    return true;
+  } catch (err) {
+    console.error('[discord] outbox enqueue failed:', err.message);
+    return false;
+  }
+}
+
+/** Direct webhook when configured, otherwise queue for the bot relay. */
+async function deliver(channel, url, body) {
+  if (url) return postWebhook(url, body);
+  return enqueueOutbox(channel, body);
+}
+
+/** Queue a DM for the bot relay (used when no bot token on the server). */
+export async function relayDm(discordUserId, body) {
+  return enqueueOutbox('dm', { discordUserId, ...body });
+}
+
+/** Bot relay: claim pending events (marks them delivered) + housekeeping. */
+export async function claimOutbox(limit = 20) {
+  const rows = await all(
+    `SELECT id, kind, payload FROM discord_outbox
+      WHERE delivered_at IS NULL ORDER BY created_at ASC LIMIT @l`, { l: limit });
+  if (rows.length) {
+    await run(`UPDATE discord_outbox SET delivered_at=@at WHERE id = ANY(@ids)`,
+      { at: nowIso(), ids: rows.map((r) => r.id) });
+  }
+  // Housekeeping: delivered events older than 14 days can go.
+  run(`DELETE FROM discord_outbox WHERE delivered_at IS NOT NULL AND delivered_at < @old`,
+    { old: new Date(Date.now() - 14 * 864e5).toISOString() }).catch(() => {});
+  return rows.map((r) => {
+    try { return { id: r.id, channel: r.kind, body: JSON.parse(r.payload) }; }
+    catch { return null; }
+  }).filter(Boolean);
+}
+
+/** Stamp/read when the bot last polled — powers the launch-check status. */
+export async function stampBotSeen() {
+  const at = nowIso();
+  await run(`INSERT INTO kv (key, value, updated_at) VALUES ('discord_bot_seen_at', @v, @v)
+             ON CONFLICT (key) DO UPDATE SET value=@v, updated_at=@v`, { v: at }).catch(() => {});
+}
+export async function botSeenRecently(hours = 24) {
+  try {
+    const r = await get(`SELECT value FROM kv WHERE key='discord_bot_seen_at'`);
+    return !!r && Date.now() - Date.parse(r.value) < hours * 3_600_000;
+  } catch { return false; }
+}
 
 export async function getServerInfo() {
   const base = {
@@ -55,7 +116,6 @@ const COLORS = { received: 0x6366f1, completed: 0x10b981, refunded: 0xec4899 };
 /** Post an order event embed to the configured Discord webhook (best-effort). */
 export async function postOrderEvent(order, event = 'received') {
   const url = config.discord.orderWebhookUrl;
-  if (!url) return;
   const title = {
     received: '🧾 New order received',
     completed: '✅ Order completed',
@@ -75,7 +135,7 @@ export async function postOrderEvent(order, event = 'received') {
     timestamp: new Date().toISOString(),
   };
 
-  await postWebhook(url, { embeds: [embed] });
+  await deliver('leads', url, { embeds: [embed] });
 }
 
 /** Fire a webhook payload; best-effort, logs and swallows every failure. */
@@ -104,7 +164,6 @@ const money = (cents, cur = 'EUR') =>
  */
 export async function postDropEvent(kind, data = {}) {
   const url = config.discord.dropsWebhookUrl;
-  if (!url) return;
   const shop = `${config.appUrl}/shop`;
   let embed;
   if (kind === 'product') {
@@ -144,7 +203,7 @@ export async function postDropEvent(kind, data = {}) {
   embed.thumbnail = { url: (kind === 'product' && data.image) ? data.image : `${config.appUrl}/icon-512.png` };
   embed.footer = { text: `${config.email.fromName} · drops & deals` };
   embed.timestamp = new Date().toISOString();
-  await postWebhook(url, { embeds: [embed] });
+  await deliver('deals', url, { embeds: [embed] });
 }
 
 /**
@@ -154,11 +213,10 @@ export async function postDropEvent(kind, data = {}) {
 const errorAlertAt = new Map(); // route -> last alert ts
 export async function postErrorAlert(route, message) {
   const url = config.discord.stockWebhookUrl || config.discord.orderWebhookUrl;
-  if (!url) return;
   const now = Date.now();
   if (now - (errorAlertAt.get(route) || 0) < 5 * 60_000) return;
   errorAlertAt.set(route, now);
-  await postWebhook(url, { embeds: [{
+  await deliver('leads', url, { embeds: [{
     title: '🚨 API error (500)',
     description: `**Route:** \`${route}\`\n**Error:** ${String(message || 'unknown').slice(0, 300)}\n\nCheck the Vercel function logs for the stack trace.`,
     color: 0xef4444,
@@ -170,7 +228,6 @@ export async function postErrorAlert(route, message) {
 /** Ping staff that a product's pre-loaded code stock is running low. */
 export async function postStockAlert(product, remaining) {
   const url = config.discord.stockWebhookUrl || config.discord.orderWebhookUrl;
-  if (!url) return;
   const embed = {
     title: remaining === 0 ? `🔴 OUT OF STOCK: ${product.name}` : `🟠 Low stock: ${product.name}`,
     description: `**${remaining}** code${remaining === 1 ? '' : 's'} left` +
@@ -180,5 +237,5 @@ export async function postStockAlert(product, remaining) {
     footer: { text: `${config.email.fromName} · stock monitor` },
     timestamp: new Date().toISOString(),
   };
-  await postWebhook(url, { embeds: [embed] });
+  await deliver('leads', url, { embeds: [embed] });
 }

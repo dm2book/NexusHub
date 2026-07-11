@@ -33,7 +33,9 @@ router.get('/launch-check', asyncHandler(async (_req, res) => {
 router.get('/nav-counts', asyncHandler(async (_req, res) => {
   const n = async (sql) => Number((await get(sql).catch(() => null))?.n || 0);
   const [tickets, payments, fulfillment] = await Promise.all([
-    n(`SELECT COUNT(*) AS n FROM support_tickets WHERE status <> 'closed'`),
+    // Only tickets the customer is waiting on ('pending' = waiting on customer,
+    // 'resolved'/'closed' = done) — so the badge clears when you resolve one.
+    n(`SELECT COUNT(*) AS n FROM support_tickets WHERE status = 'open'`),
     n(`SELECT COUNT(*) AS n FROM payment_proofs WHERE status = 'pending'`),
     n(`SELECT COUNT(*) AS n FROM orders
         WHERE status IN ('payment_received', 'processing', 'awaiting_fulfillment')`),
