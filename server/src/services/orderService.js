@@ -24,6 +24,7 @@ import { availableCount, claimCodes, checkLowStock } from './codeStockService.js
 import { memberDiscountPercent } from './membershipService.js';
 import { recordOrderCommission } from './affiliateService.js';
 import { recordPurchaseEvent } from './socialProofService.js';
+import { bustSocialCaches } from '../routes/social.js';
 import { balanceOf, debit, credit, hasOrderEntry } from './walletService.js';
 import { grantTierRewards } from './loyaltyService.js';
 import { awardCoinsForOrder } from './forgeCoinService.js';
@@ -206,6 +207,8 @@ export async function transitionOrder(orderId, to, ctx = {}) {
     await postOrderEvent(updated, 'completed').catch(() => {});
     // Capture a privacy-safe snapshot for the live social-proof feed (best-effort).
     await recordPurchaseEvent(updated).catch(() => {});
+    // Delivered count / live feed just changed → refresh the public stats now.
+    bustSocialCaches();
     // DM Discord-linked buyers their codes + a /vouch prompt (best-effort).
     await sendDeliveryDm(updated).catch(() => {});
   }

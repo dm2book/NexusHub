@@ -4,6 +4,7 @@
  */
 import { run, get, all, nowIso } from '../db/index.js';
 import { newId } from '../utils/ids.js';
+import { bustSocialCaches } from '../routes/social.js';
 
 /** Insert a review. De-dupes on external_id (the Discord message/user id). */
 export async function addReview({ author, avatarUrl, stars, body, product, source = 'discord', externalId }) {
@@ -20,6 +21,7 @@ export async function addReview({ author, avatarUrl, stars, body, product, sourc
      VALUES (@id, @author, @avatar, @stars, @body, @product, @source, @ext, 'visible', @at)`,
     { id, author: String(author || 'Anonymous').slice(0, 80), avatar: avatarUrl || null,
       stars: s, body: clean, product: product || null, source, ext: externalId || null, at: nowIso() });
+  bustSocialCaches(); // rating + review count changed → refresh public stats now
   return { id, deduped: false };
 }
 
@@ -41,6 +43,7 @@ export async function addVerifiedReview({ userId, email, orderId, author, stars,
     { id, author: String(author || 'Verified buyer').slice(0, 80), stars: s, body: clean,
       product: product || null, oid: orderId, uid: userId || null,
       email: email ? String(email).toLowerCase() : null, city: city || null, at: nowIso() });
+  bustSocialCaches(); // verified review just added → the average rating updates instantly
   return { id, deduped: false };
 }
 
