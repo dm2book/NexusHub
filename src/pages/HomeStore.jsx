@@ -32,7 +32,6 @@ const CATEGORIES = [
   { label: 'Robux', slug: 'robux', img: 'robux' },
   { label: 'V-Bucks', slug: 'v-bucks', img: 'v-bucks' },
   { label: 'Valorant Points', slug: 'valorant', img: 'valorant' },
-  { label: 'Fortnite Accounts', slug: 'v-bucks', letter: 'F', grad: 'from-violet-500 to-fuchsia-500' },
   { label: 'Gift Cards', slug: 'giftcard', img: 'giftcard' },
   { label: 'Steam Wallet', slug: 'steam', img: 'steam' },
   { label: 'PlayStation Store', slug: 'playstation', img: 'playstation' },
@@ -81,7 +80,9 @@ const fmtCount = (n) => `${Number(n || 0).toLocaleString('en-US')}${Number(n || 
 // All real (or honest service promises) — no fabricated metrics. The 2nd card
 // shows a real fulfilment rate once orders have finished, else a real guarantee.
 const statCards = (s, tr = (_k, en) => en) => [
-  { icon: Users, value: fmtCount(s.customers), label: tr('home.s.customers', 'Happy Customers'), color: 'text-violet-600 bg-violet-100' },
+  // "Happy customers" = people who actually LEFT A REVIEW — not just anyone
+  // who ordered. The number only exists once someone wrote one.
+  { icon: Users, value: fmtCount(s.reviews), label: tr('home.s.customers', 'Happy Customers'), color: 'text-violet-600 bg-violet-100' },
   s.successRate != null
     ? { icon: CheckCircle2, value: `${s.successRate}%`, label: tr('home.s.fulfilled', 'Fulfilled'), color: 'text-emerald-600 bg-emerald-100' }
     : { icon: ShieldCheck, value: '100%', label: tr('home.s.protected', 'Buyer protected'), color: 'text-emerald-600 bg-emerald-100' },
@@ -309,14 +310,14 @@ export default function HomeStore() {
                     {tr('home.viewAll', 'View All Products')}
                   </Link>
                 </div>
-                {stats.customers > 0 && (
+                {stats.reviews > 0 && (
                   <div className="flex items-center gap-3 mt-7">
                     <div className="flex -space-x-2.5">
                       {['#f472b6', '#60a5fa', '#34d399', '#fbbf24'].map((c, i) => (
                         <span key={i} className="w-9 h-9 rounded-full border-2 border-white" style={{ background: c }} />
                       ))}
                     </div>
-                    <div className="text-sm"><b className="fm-head">{fmtCount(stats.customers)}</b> <span className="text-slate-500">{tr('home.happy', 'Happy Customers')}</span></div>
+                    <div className="text-sm"><b className="fm-head">{fmtCount(stats.reviews)}</b> <span className="text-slate-500">{tr('home.happy', 'Happy Customers')}</span></div>
                   </div>
                 )}
               </div>

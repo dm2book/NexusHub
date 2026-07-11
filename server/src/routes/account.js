@@ -236,6 +236,19 @@ router.post('/coins/redeem', asyncHandler(async (req, res) => {
   res.json({ ...result, balance: await coinBalance(req.user.id) });
 }));
 
+// Completed orders that don't have a review yet — powers the "write a review"
+// box on the public Reviews page.
+router.get('/reviewable', asyncHandler(async (req, res) => {
+  const rows = await all(
+    `SELECT o.id, o.number,
+            (SELECT name FROM order_items WHERE order_id = o.id LIMIT 1) AS item
+       FROM orders o
+      WHERE o.user_id = @u AND o.status = 'completed'
+        AND NOT EXISTS (SELECT 1 FROM reviews r WHERE r.order_id = o.id)
+      ORDER BY o.created_at DESC LIMIT 10`, { u: req.user.id });
+  res.json({ orders: rows });
+}));
+
 // ── Verified-buyer reviews ───────────────────────────────────────────────────
 // Whether the current user has already reviewed this (owned) order.
 router.get('/orders/:id/review', asyncHandler(async (req, res) => {

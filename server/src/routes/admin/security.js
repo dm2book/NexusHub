@@ -7,6 +7,7 @@ import { all } from '../../db/index.js';
 import { listAuditLogs, audit } from '../../services/auditService.js';
 import { listFlaggedOrders } from '../../services/fraudService.js';
 import { publicUser, setUserRoles, getUserById } from '../../services/userService.js';
+import { grantCoins } from '../../services/forgeCoinService.js';
 import { grantMembership, cancelMembership } from '../../services/membershipService.js';
 import { addEntry, balanceOf, walletSummary } from '../../services/walletService.js';
 import { notify } from '../../services/notificationService.js';
@@ -74,6 +75,17 @@ router.post('/users/:id/membership', requirePermission('users.manage'),
     await audit({ actor: req.user, action: cancel ? 'membership.cancel' : 'membership.grant',
       targetType: 'user', targetId: req.params.id, metadata: { days }, req });
     res.json({ membership });
+  }));
+
+// Grant (or deduct) Forge Coins for a user.
+router.post('/users/:id/coins', requirePermission('users.manage'),
+  asyncHandler(async (req, res) => {
+    const { amount } = z.object({ amount: z.number().int().min(-1000).max(1000) }).parse(req.body || {});
+    if (!(await getUserById(req.params.id))) throw notFound('User not found');
+    const result = await grantCoins(req.params.id, amount, req.user.id);
+    await audit({ actor: req.user, action: 'coins.grant', targetType: 'user',
+      targetId: req.params.id, metadata: { amount }, req });
+    res.json(result);
   }));
 
 // A user's store-credit balance + recent ledger (admin view).

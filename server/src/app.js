@@ -13,7 +13,7 @@ import { config } from './config/env.js';
 import { get } from './db/index.js';
 import { migrate } from './db/migrate.js';
 import { seed, isSeeded, syncEmailTemplates } from './db/seed.js';
-import { seedDemoCatalog } from './db/demoSeed.js';
+import { seedDemoCatalog, syncCatalogImages } from './db/demoSeed.js';
 import { seedStarterContent } from './db/starterContent.js';
 import { attachUser } from './middleware/auth.js';
 import { rateLimit } from './middleware/rateLimit.js';
@@ -46,6 +46,8 @@ export function ensureReady() {
       // Starter engagement content (one mystery box + one bundle) — created only
       // when none exist, so it never overwrites anything the admin configured.
       await seedStarterContent().catch(() => {});
+      // Give every seeded product its own pack art (denomination cards).
+      await syncCatalogImages().catch(() => {});
     })().catch((err) => {
       readyPromise = null; // allow retry on next request
       throw err;

@@ -36,14 +36,24 @@ export function wrapBranded(contentHtml, { preheader = '' } = {}) {
 <meta name="color-scheme" content="dark">
 <meta name="supported-color-schemes" content="dark">
 <style>
-  body{margin:0;padding:0;background:#0a0a12;font-family:'Segoe UI',Arial,Helvetica,sans-serif;color:#e5e7eb;-webkit-text-size-adjust:100%}
-  .wrap{max-width:568px;margin:0 auto;padding:28px 16px}
-  .card{background:#13131d;border:1px solid #262638;border-radius:18px;overflow:hidden}
-  .head{background:linear-gradient(120deg,${color} 0%,#a855f7 55%,#d946ef 100%);padding:26px 30px}
-  .head-sub{font:400 12px/1.4 Arial,sans-serif;color:rgba(255,255,255,.85);padding-top:8px;letter-spacing:.4px}
-  .body{padding:32px 30px 12px}
-  h1{font-size:22px;line-height:1.3;color:#ffffff;margin:0 0 14px;font-weight:800;letter-spacing:-.3px}
-  p{font-size:14.5px;line-height:1.65;color:#b9bfcd;margin:0 0 15px}
+  body{margin:0;padding:0;background:#08080f;font-family:'Segoe UI',Arial,Helvetica,sans-serif;color:#e5e7eb;-webkit-text-size-adjust:100%}
+  .wrap{max-width:568px;margin:0 auto;padding:32px 16px}
+  .card{background:#12121c;border:1px solid #26263a;border-radius:22px;overflow:hidden}
+  .head{background:linear-gradient(120deg,${color} 0%,#a855f7 55%,#d946ef 100%);padding:30px 30px 26px;
+        background-image:radial-gradient(circle at 85% 20%,rgba(255,255,255,.22),transparent 45%),
+                         linear-gradient(rgba(255,255,255,.06) 1px,transparent 1px),
+                         linear-gradient(90deg,rgba(255,255,255,.06) 1px,transparent 1px),
+                         linear-gradient(120deg,${color} 0%,#a855f7 55%,#d946ef 100%);
+        background-size:auto,34px 34px,34px 34px,auto}
+  .head-sub{font:600 11.5px/1.4 Arial,sans-serif;color:rgba(255,255,255,.9);padding-top:9px;letter-spacing:1.6px;text-transform:uppercase}
+  .body{padding:34px 30px 12px}
+  h1{font-size:23px;line-height:1.3;color:#ffffff;margin:0 0 14px;font-weight:800;letter-spacing:-.3px}
+  p{font-size:14.5px;line-height:1.7;color:#b9bfcd;margin:0 0 15px}
+  .badge{width:64px;height:64px;border-radius:18px;background:linear-gradient(135deg,${color},#d946ef);
+         text-align:center;font-size:30px;line-height:64px;margin:2px auto 18px;
+         box-shadow:0 10px 30px rgba(124,92,255,.45)}
+  .pill-note{display:inline-block;font:700 12px/1 Arial,sans-serif;color:#c7d2fe;background:#1b1b30;
+             border:1px solid #34345c;border-radius:999px;padding:9px 16px;letter-spacing:.4px}
   strong{color:#fff}
   a{color:#a78bfa}
   a.btn{display:inline-block;background:linear-gradient(120deg,${color},#a855f7);color:#ffffff !important;text-decoration:none;
