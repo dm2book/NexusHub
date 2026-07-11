@@ -10,7 +10,7 @@ import { api } from '../lib/api.js';
 const NAV = [
   { to: '/admin', icon: BarChart3, label: 'Analytics', end: true, perm: 'analytics.read' },
   { to: '/admin/operations', icon: Gauge, label: 'Operations', perm: 'orders.read' },
-  { to: '/admin/orders', icon: ShoppingCart, label: 'Orders', perm: 'orders.read' },
+  { to: '/admin/orders', icon: ShoppingCart, label: 'Orders', perm: 'orders.read', badge: 'orders' },
   { to: '/admin/payments', icon: ShieldCheck, label: 'Payments', perm: 'orders.update', badge: 'payments' },
   { to: '/admin/products', icon: Package, label: 'Products', perm: 'orders.read' },
   { to: '/admin/users', icon: Users, label: 'Users', perm: 'users.read' },

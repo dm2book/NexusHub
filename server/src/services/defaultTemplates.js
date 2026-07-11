@@ -111,12 +111,14 @@ export const DEFAULT_TEMPLATES = [
     name: 'Login Code',
     subject: '{{otp.code}} is your {{brand.name}} login code',
     body_html: `
-      <h1 style="text-align:center">🔐 Your login code</h1>
-      <p style="text-align:center">Hi <strong>{{user.name}}</strong> — enter this code to sign in.
-      It works once and expires in <strong>{{otp.ttl}} minutes</strong>.</p>
+      <div class="badge">🔐</div>
+      <h1 style="text-align:center">Your login code</h1>
+      <p style="text-align:center;max-width:400px;margin-left:auto;margin-right:auto">Hey <strong>{{user.name}}</strong>,
+      welcome back! Enter this code on the login screen and you're in.</p>
       {{otp.codeHtml}}
+      <p style="text-align:center;margin:14px 0 6px"><span class="pill-note">⏱ Expires in {{otp.ttl}} minutes · one-time use</span></p>
       <p style="text-align:center;color:#8b93a7;font-size:13px">Typing on another device? The code is
-      <strong style="letter-spacing:2px">{{otp.code}}</strong></p>
+      <strong style="letter-spacing:2px;color:#e5e7eb">{{otp.code}}</strong></p>
       <div class="notice">🛡️ <strong>Stay safe:</strong> {{brand.name}} will <strong>never</strong> ask
       you for this code — not by email, DM or phone. Didn't try to sign in? You can safely ignore
       this email; without the code nobody can access your account.</div>`,
@@ -134,5 +136,14 @@ export const LEGACY_TEMPLATE_BODIES = {
       <h1>Your login code</h1>
       <p>Use this code to sign in. It expires in {{otp.ttl}} minutes.</p>
       <p class="code">{{otp.code}}</p>
-      <p>If you didn't request this, you can safely ignore this email.</p>`],
+      <p>If you didn't request this, you can safely ignore this email.</p>`, `
+      <h1 style="text-align:center">🔐 Your login code</h1>
+      <p style="text-align:center">Hi <strong>{{user.name}}</strong> — enter this code to sign in.
+      It works once and expires in <strong>{{otp.ttl}} minutes</strong>.</p>
+      {{otp.codeHtml}}
+      <p style="text-align:center;color:#8b93a7;font-size:13px">Typing on another device? The code is
+      <strong style="letter-spacing:2px">{{otp.code}}</strong></p>
+      <div class="notice">🛡️ <strong>Stay safe:</strong> {{brand.name}} will <strong>never</strong> ask
+      you for this code — not by email, DM or phone. Didn't try to sign in? You can safely ignore
+      this email; without the code nobody can access your account.</div>`],
 };

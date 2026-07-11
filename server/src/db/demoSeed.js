@@ -167,12 +167,38 @@ const CATS_WITH_ICON = ['robux', 'v-bucks', 'valorant', 'cod', 'genshin', 'brawl
   'xbox', 'nintendo', 'amazon', 'googleplay', 'itunes', 'giftcard', 'chest'];
 const iconFor = (cat) => CATS_WITH_ICON.includes(cat) ? `/products/icons/${cat}.png` : null;
 
+// Per-PACK art first (shows the denomination, e.g. "1,000 ROBUX" card), then
+// the category icon as a fallback — so every product gets its own visual.
+const imageFor = (p) => p.image || iconFor(p.category) || null;
+
+/**
+ * Keep product covers in sync on every boot: any seeded product whose stored
+ * image differs from the current best art gets updated. Cheap (one select per
+ * catalog SKU) and never touches products the admin created manually.
+ */
+export async function syncCatalogImages() {
+  let updated = 0;
+  for (const p of CATALOG) {
+    const img = imageFor(p);
+    if (!img) continue;
+    const existing = await get('SELECT id, metadata FROM products WHERE sku = @sku', { sku: p.sku });
+    if (!existing) continue;
+    const meta = parse(existing.metadata);
+    if (meta.image === img) continue;
+    meta.image = img;
+    await run('UPDATE products SET metadata = @m, updated_at = @at WHERE id = @id',
+      { m: JSON.stringify(meta), at: nowIso(), id: existing.id });
+    updated++;
+  }
+  if (updated) console.log(`[catalog] product art synced on ${updated} product(s)`);
+}
+
 export async function seedDemoCatalog() {
   await migrate();
   let created = 0;
   let updated = 0;
   for (const p of CATALOG) {
-    const img = iconFor(p.category) || p.image || null;
+    const img = imageFor(p);
     const existing = await get('SELECT id, metadata FROM products WHERE sku = @sku', { sku: p.sku });
     const at = nowIso();
 

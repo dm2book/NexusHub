@@ -32,15 +32,19 @@ router.get('/launch-check', asyncHandler(async (_req, res) => {
 // hidden inside a page.
 router.get('/nav-counts', asyncHandler(async (_req, res) => {
   const n = async (sql) => Number((await get(sql).catch(() => null))?.n || 0);
-  const [tickets, payments, fulfillment] = await Promise.all([
+  const [tickets, payments, orders, fulfillment] = await Promise.all([
     // Only tickets the customer is waiting on ('pending' = waiting on customer,
     // 'resolved'/'closed' = done) — so the badge clears when you resolve one.
     n(`SELECT COUNT(*) AS n FROM support_tickets WHERE status = 'open'`),
     n(`SELECT COUNT(*) AS n FROM payment_proofs WHERE status = 'pending'`),
+    // Paid orders that still need delivering → badge on the Orders page.
     n(`SELECT COUNT(*) AS n FROM orders
         WHERE status IN ('payment_received', 'processing', 'awaiting_fulfillment')`),
+    // Matches exactly what the Fulfillment page's manual queue shows.
+    n(`SELECT COUNT(*) AS n FROM fulfillment_requests
+        WHERE mode='manual' AND status IN ('pending','in_progress')`),
   ]);
-  res.json({ tickets, payments, fulfillment });
+  res.json({ tickets, payments, orders, fulfillment });
 }));
 
 // Drop calendar management.

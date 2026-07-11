@@ -39,6 +39,19 @@ export default function AdminUsers() {
     return () => clearTimeout(t);
   }, [search, load]);
 
+  const grantCoins = async (u) => {
+    const raw = prompt(`How many Forge Coins for ${u.email}? (negative deducts)`, '5');
+    if (raw == null) return;
+    const amount = parseInt(raw, 10);
+    if (!amount) { toast.error('Enter a non-zero whole number.'); return; }
+    setBusyId(u.id);
+    try {
+      const r = await api.post(`/api/admin/security/users/${u.id}/coins`, { amount });
+      toast.success(`${amount > 0 ? 'Gave' : 'Deducted'} ${Math.abs(amount)} coin(s) — balance is now ${r.balance}.`);
+    } catch (e) { toast.error(e.message); }
+    finally { setBusyId(null); }
+  };
+
   const grantPlus = async (u) => {
     setBusyId(u.id);
     try { await api.post(`/api/admin/security/users/${u.id}/membership`, { days: 30 }); toast.success(`Forge+ granted to ${u.email} (30 days).`); }
@@ -118,6 +131,10 @@ export default function AdminUsers() {
                 <button onClick={() => grantPlus(u)} title="Grant Forge+ (30 days)"
                   className="text-xs px-2.5 py-1 rounded-md border border-violet-500/30 bg-violet-500/10 text-violet-300 hover:bg-violet-500/20 inline-flex items-center gap-1">
                   <Gift size={11} /> Forge+
+                </button>
+                <button onClick={() => grantCoins(u)} title="Give Forge Coins"
+                  className="text-xs px-2.5 py-1 rounded-md border border-amber-500/30 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 inline-flex items-center gap-1">
+                  🪙 Coins
                 </button>
                 {roles.map((r) => {
                   const active = u.roles.includes(r.id);

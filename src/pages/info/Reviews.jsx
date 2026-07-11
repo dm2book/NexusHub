@@ -1,9 +1,83 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Star, BadgeCheck } from 'lucide-react';
+import { Star, BadgeCheck, PenLine } from 'lucide-react';
 import InfoShell from '../../components/InfoShell.jsx';
+import { api } from '../../lib/api.js';
+import { useAuth } from '../../context/AuthContext.jsx';
+import { useToast } from '../../context/ToastContext.jsx';
 import { useReviews } from '../../lib/useReviews.js';
 import { useStats } from '../../lib/useStats.js';
 import { useI18n } from '../../lib/i18n.jsx';
+
+/** "Write a review" — verified buyers pick one of their delivered orders. */
+function WriteReview({ t }) {
+  const { user } = useAuth();
+  const toast = useToast();
+  const [orders, setOrders] = useState(null);
+  const [orderId, setOrderId] = useState('');
+  const [stars, setStars] = useState(5);
+  const [body, setBody] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState(false);
+
+  useEffect(() => {
+    if (!user) { setOrders([]); return; }
+    api.get('/api/account/reviewable')
+      .then((r) => { setOrders(r.orders || []); setOrderId(r.orders?.[0]?.id || ''); })
+      .catch(() => setOrders([]));
+  }, [user]);
+
+  const submit = async () => {
+    if (body.trim().length < 3) { toast.error(t('reviews.wFew', 'Please write a few words.')); return; }
+    setBusy(true);
+    try {
+      await api.post(`/api/account/orders/${orderId}/review`, { stars, body: body.trim() });
+      toast.success(t('reviews.wThanks', 'Thanks — your verified review is live!'));
+      setDone(true);
+      setTimeout(() => window.location.reload(), 1200);
+    } catch (e) { toast.error(e.message); }
+    finally { setBusy(false); }
+  };
+
+  if (done) return null;
+  return (
+    <div className="max-w-xl mx-auto card p-6 mb-10">
+      <h3 className="text-white font-bold flex items-center gap-2 mb-1"><PenLine size={16} className="text-violet-400" /> {t('reviews.write', 'Write a review')}</h3>
+      {!user ? (
+        <p className="text-slate-400 text-sm">
+          {t('reviews.wLogin', 'Reviews come from real purchases only.')}{' '}
+          <Link to="/login" className="text-violet-400 hover:underline">{t('reviews.wLoginCta', 'Log in')}</Link>{' '}
+          {t('reviews.wLogin2', 'and once an order is delivered you can review it right here.')}
+        </p>
+      ) : orders === null ? (
+        <p className="text-slate-500 text-sm">…</p>
+      ) : orders.length === 0 ? (
+        <p className="text-slate-400 text-sm">
+          {t('reviews.wNone', 'No delivered orders to review yet — every review here is tied to a real purchase.')}{' '}
+          <Link to="/shop" className="text-violet-400 hover:underline">{t('reviews.wShop', 'Browse the shop')}</Link>
+        </p>
+      ) : (
+        <div className="space-y-3 mt-3">
+          <select value={orderId} onChange={(e) => setOrderId(e.target.value)} className="input w-full">
+            {orders.map((o) => <option key={o.id} value={o.id}>{o.number}{o.item ? ` — ${o.item}` : ''}</option>)}
+          </select>
+          <div className="flex gap-1">
+            {[1, 2, 3, 4, 5].map((n) => (
+              <button key={n} onClick={() => setStars(n)} aria-label={`${n} stars`}>
+                <Star size={22} className={n <= stars ? 'text-amber-400' : 'text-slate-600'} fill={n <= stars ? 'currentColor' : 'none'} />
+              </button>
+            ))}
+          </div>
+          <textarea rows={3} className="input w-full" placeholder={t('reviews.wPh', 'Tell other buyers about your experience…')}
+            value={body} onChange={(e) => setBody(e.target.value)} maxLength={600} />
+          <button onClick={submit} disabled={busy} className="btn-primary w-full py-2.5">
+            {busy ? '…' : t('reviews.wSubmit', 'Post verified review')}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function Reviews() {
   const reviews = useReviews();
@@ -36,6 +110,8 @@ export default function Reviews() {
           ))}
         </div>
       </div>
+
+      <WriteReview t={t} />
 
       {reviews.length === 0 && (
         <div className="max-w-md mx-auto text-center card p-8 text-slate-400">

@@ -52,6 +52,26 @@ export async function awardCoinsForOrder(order) {
   } catch { return 0; } // unique-index clash = already awarded
 }
 
+/** Admin: grant (or deduct) coins. Negative grants never take a balance below 0. */
+export async function grantCoins(userId, amount, grantedBy = null) {
+  const delta = Math.round(Number(amount));
+  if (!delta) throw badRequest('Amount must be a non-zero whole number.');
+  return tx(async () => {
+    if (delta < 0) {
+      const balance = await coinBalance(userId);
+      if (balance + delta < 0) throw badRequest(`Balance is ${balance} — can't deduct ${-delta}.`);
+    }
+    // ref stays NULL: the (reason,ref) unique index is for order-earn dedupe
+    // and would otherwise block a second grant by the same admin. Attribution
+    // lives in the audit log.
+    await run(
+      `INSERT INTO forge_coin_ledger (id, user_id, delta, reason, ref, created_at)
+       VALUES (@id, @u, @d, 'grant', NULL, @at)`,
+      { id: newId('coin'), u: userId, d: delta, at: nowIso() });
+    return { balance: await coinBalance(userId) };
+  });
+}
+
 /** Spend coins on a Forge Shop reward. Returns { reward, couponCode? }. */
 export async function redeemReward(userId, rewardId) {
   const reward = FORGE_SHOP.find((r) => r.id === rewardId);
