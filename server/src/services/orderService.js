@@ -242,7 +242,19 @@ export async function transitionOrder(orderId, to, ctx = {}) {
     // Earn Forge Coins (€10 = 1 coin), idempotent per order.
     if (updated.userId) awardCoinsForOrder(updated).catch((e) => console.error('[coins]', e.message));
     // Open any mystery boxes in the order → roll rewards, grant store credit.
-    if (updated.userId) settleMysteryForOrder(updated).catch((e) => console.error('[mystery]', e.message));
+    // A pure mystery-box order is fully delivered by that payout, so complete
+    // it right away instead of leaving it in the manual-fulfillment queue.
+    if (updated.userId) {
+      settleMysteryForOrder(updated).then(async (won) => {
+        if (!won.length) return;
+        const kinds = await Promise.all(updated.items.map((it) =>
+          get('SELECT kind FROM products WHERE id=@id', { id: it.product_id })));
+        if (kinds.length && kinds.every((k) => k?.kind === 'mystery')) {
+          await transitionOrder(orderId, 'completed',
+            { force: true, reason: 'Mystery box opened — prize paid out as store credit' });
+        }
+      }).catch((e) => console.error('[mystery]', e.message));
+    }
   }
   return updated;
 }

@@ -59,14 +59,17 @@ export async function redeemReward(userId, rewardId) {
   return tx(async () => {
     const balance = await coinBalance(userId);
     if (balance < reward.cost) throw badRequest(`Not enough Forge Coins — you need ${reward.cost}, you have ${balance}.`);
+    // For coupons, the generated code doubles as the ledger ref so the buyer
+    // can always find it back in their history (a toast is easy to miss).
+    const code = reward.kind === 'coupon'
+      ? `FORGE${Math.random().toString(36).slice(2, 7).toUpperCase()}` : null;
     // Debit first (inside the transaction) so concurrent redeems can't overspend.
     await run(
       `INSERT INTO forge_coin_ledger (id, user_id, delta, reason, ref, created_at)
        VALUES (@id, @u, @d, 'redeem', @ref, @at)`,
-      { id: newId('coin'), u: userId, d: -reward.cost, ref: reward.id, at: nowIso() });
+      { id: newId('coin'), u: userId, d: -reward.cost, ref: code || reward.id, at: nowIso() });
 
-    if (reward.kind === 'coupon') {
-      const code = `FORGE${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    if (code) {
       await createCoupon({
         code, kind: 'fixed', value: reward.value, perUserLimit: 1, maxRedemptions: 1,
         active: true, announce: false,

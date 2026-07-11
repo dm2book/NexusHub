@@ -84,20 +84,31 @@ export default function ForgeShop() {
           <p className="text-slate-500 text-sm">No coins yet — place an order to start earning.</p>
         ) : (
           <div className="divide-y divide-white/5">
-            {data.history.map((h, i) => (
-              <div key={i} className="flex items-center justify-between py-2.5 text-sm">
-                <div>
-                  <div className="text-slate-200">{REASON[h.reason] || h.reason}</div>
-                  <div className="text-slate-500 text-xs">{date(h.createdAt)}</div>
+            {data.history.map((h, i) => {
+              const code = h.reason === 'redeem' && /^FORGE[A-Z0-9]+$/.test(h.ref || '') ? h.ref : null;
+              return (
+                <div key={i} className="flex items-center justify-between gap-3 py-2.5 text-sm">
+                  <div className="min-w-0">
+                    <div className="text-slate-200">{REASON[h.reason] || h.reason}</div>
+                    <div className="text-slate-500 text-xs">{date(h.createdAt)}</div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {code && (
+                      <button onClick={() => copy(code)}
+                        className="inline-flex items-center gap-1.5 font-mono text-xs text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-lg px-2 py-1 hover:bg-amber-500/20 transition">
+                        {code} {copied === code ? <Check size={12} /> : <Copy size={12} />}
+                      </button>
+                    )}
+                    <span className={`font-bold ${h.delta > 0 ? 'text-emerald-400' : 'text-slate-400'}`}>{h.delta > 0 ? '+' : ''}{h.delta}</span>
+                  </div>
                 </div>
-                <span className={`font-bold ${h.delta > 0 ? 'text-emerald-400' : 'text-slate-400'}`}>{h.delta > 0 ? '+' : ''}{h.delta}</span>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
 
-      <p className="text-slate-500 text-xs">Redeemed a discount code? Find it under <b className="text-slate-400">Redeem</b> above — copy it and use it at checkout. Codes are single-use and tied to your account.</p>
+      <p className="text-slate-500 text-xs">Redeemed a discount code? It stays in your <b className="text-slate-400">History</b> above — copy it any time and use it at checkout. Codes are single-use.</p>
     </div>
   );
 }

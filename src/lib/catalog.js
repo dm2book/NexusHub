@@ -40,6 +40,7 @@ const MAP = {
   itunes: { icon: Smartphone, grad: 'from-pink-500 to-fuchsia-600', label: 'App Store & iTunes' },
   giftcard: { icon: Gift, grad: 'from-pink-500 to-rose-500', label: 'Gift Cards' },
   subscription: { icon: Ticket, grad: 'from-amber-500 to-orange-500', label: 'Subscriptions' },
+  mystery: { icon: Gift, grad: 'from-amber-400 to-rose-500', label: 'Mystery Box' },
 };
 
 export function categoryVisual(category) {
