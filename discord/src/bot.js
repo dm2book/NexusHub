@@ -1433,11 +1433,21 @@ let siteWasDown = false;
 let lastDownAlert = 0;
 async function checkSiteHealth(guild) {
   if (!FORGEMARKET_API_URL) return;
-  let ok = false;
-  try {
-    const res = await fetch(`${FORGEMARKET_API_URL.replace(/\/$/, '')}/api/health`, { signal: AbortSignal.timeout(15_000) });
-    ok = res.ok;
-  } catch { ok = false; }
+  const probe = async (timeoutMs) => {
+    try {
+      const res = await fetch(`${FORGEMARKET_API_URL.replace(/\/$/, '')}/api/health`,
+        { signal: AbortSignal.timeout(timeoutMs) });
+      return res.ok;
+    } catch { return false; }
+  };
+  // A serverless cold start + a sleeping Neon database can take 15-25s to wake
+  // — that's not an outage. Only alert when a RETRY (after 20s, with a longer
+  // timeout) also fails, so deploy/idle wake-ups never page staff.
+  let ok = await probe(15_000);
+  if (!ok) {
+    await new Promise((r) => setTimeout(r, 20_000));
+    ok = await probe(28_000);
+  }
 
   const ch = findChannel(guild, 'mod-log') || findChannel(guild, 'staff-announcements');
   if (!ok && (!siteWasDown || Date.now() - lastDownAlert > 60 * 60_000)) {
