@@ -59,6 +59,8 @@ const commands = [
     .addStringOption((o) => o.setName('code').setDescription('Optional checkout code, e.g. FLASH20')),
   new SlashCommandBuilder().setName('announce').setDescription('Staff: post an announcement')
     .addStringOption((o) => o.setName('message').setDescription('What to announce').setRequired(true)),
+  new SlashCommandBuilder().setName('clearpins').setDescription('Staff: delete all "pinned a message" notices across the server')
+    .addBooleanOption((o) => o.setName('here').setDescription('Only this channel (default: every channel)')),
   new SlashCommandBuilder().setName('serverinfo').setDescription('Show server statistics'),
 ].map((c) => c.toJSON());
 

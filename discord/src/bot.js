@@ -16,7 +16,7 @@ import { createHmac } from 'node:crypto';
 import {
   Client, GatewayIntentBits, Partials, Events, PermissionFlagsBits, ChannelType,
   EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, AttachmentBuilder,
-  ModalBuilder, TextInputBuilder, TextInputStyle,
+  ModalBuilder, TextInputBuilder, TextInputStyle, MessageType,
 } from 'discord.js';
 import Anthropic from '@anthropic-ai/sdk';
 import { FAQ, GAME_ROLES, NOTIFY_ROLES, LEVEL_ROLES, DELIVERY_INFO } from './config.js';
@@ -813,7 +813,7 @@ async function handleCommand(i) {
       "`/close` — staff: close a ticket\n`/giveaway` — staff: start a giveaway\n`/reroll` — staff: reroll a winner\n" +
       "`/coupon` — staff: post a discount code\n`/flashsale` — staff: countdown deal in #deals\n" +
       "`/digest` — staff: live store numbers\n`/stock` — staff: low-stock check\n`/launch` — staff: ready-to-sell check\n" +
-      "`/announce` — staff: post an announcement\n`/serverinfo` — server stats\n" +
+      "`/announce` — staff: post an announcement\n`/clearpins` — staff: wipe all “pinned a message” notices\n`/serverinfo` — server stats\n" +
       "Buttons: verify in #verify, pick roles in #roles, open a ticket in #open-a-ticket." });
   }
   if (i.commandName === 'order') return lookupOrder(i);
@@ -835,6 +835,7 @@ async function handleCommand(i) {
   if (i.commandName === 'coupon') return postCoupon(i);
   if (i.commandName === 'flashsale') return flashSale(i);
   if (i.commandName === 'announce') return postAnnounce(i);
+  if (i.commandName === 'clearpins') return clearPinsCmd(i);
   if (i.commandName === 'serverinfo') {
     const g = i.guild;
     const e = new EmbedBuilder().setColor(0x6366f1).setTitle(`📊 ${g.name}`)
@@ -1654,6 +1655,79 @@ async function postAnnounce(i) {
     .setDescription(message).setFooter({ text: `Posted by ${i.user.username}` }).setTimestamp();
   await ch.send({ content: '@everyone', embeds: [e], allowedMentions: { parse: ['everyone'] } }).catch(() => {});
   return i.reply({ content: `Announcement posted in <#${ch.id}>.`, ephemeral: true });
+}
+
+// ── /clearpins (staff) → wipe every "X pinned a message" system notice ────────
+// Discord posts a small "pinned a message to this channel" system message every
+// time something is pinned (our setup panels do this on boot). This deletes all
+// of them, in every text channel at once — handy after a resync.
+const PIN_NOTICE = MessageType.ChannelPinnedMessage; // system pin notification (6)
+
+async function purgePinNoticesIn(channel) {
+  let deleted = 0;
+  let before;
+  // Walk history in pages of 100; stop when a page comes back empty or we hit
+  // the safety cap (≈2000 messages) so a huge channel can't run forever.
+  for (let page = 0; page < 20; page++) {
+    const batch = await channel.messages.fetch({ limit: 100, ...(before ? { before } : {}) }).catch(() => null);
+    if (!batch || batch.size === 0) break;
+    before = batch.last().id;
+    for (const msg of batch.values()) {
+      if (msg.type !== PIN_NOTICE) continue;
+      // System messages can be any age, so delete them one by one (bulkDelete
+      // refuses messages older than 14 days).
+      if (await msg.delete().then(() => true).catch(() => false)) deleted++;
+    }
+  }
+  return deleted;
+}
+
+async function clearPinsCmd(i) {
+  if (!isStaff(i.member)) return i.reply({ content: 'Staff only.', ephemeral: true });
+  await i.deferReply({ ephemeral: true });
+  const onlyHere = i.options.getBoolean('here');
+  const me = i.guild.members.me;
+  const canManage = (ch) => ch.permissionsFor(me)?.has([
+    PermissionFlagsBits.ViewChannel,
+    PermissionFlagsBits.ReadMessageHistory,
+    PermissionFlagsBits.ManageMessages,
+  ]);
+
+  // Every text/announcement channel (or just this one), split into the ones we
+  // can manage and the ones we lack permission for — so we can tell the user
+  // exactly which channels were left untouched.
+  const candidates = onlyHere
+    ? [i.channel].filter((c) => c?.isTextBased?.())
+    : [...i.guild.channels.cache.values()].filter((c) =>
+        c.type === ChannelType.GuildText || c.type === ChannelType.GuildAnnouncement);
+  const targets = candidates.filter((c) => canManage(c));
+  const noPerms = candidates.length - targets.length; // excluded up front for missing perms
+
+  if (!targets.length) {
+    return i.editReply('I don’t have **Manage Messages** + **Read Message History** anywhere I can reach — give me those and try again.');
+  }
+
+  let total = 0;
+  let touched = 0;
+  let errored = 0;
+  for (const ch of targets) {
+    const n = await purgePinNoticesIn(ch).catch(() => -1);
+    if (n < 0) { errored++; continue; }
+    total += n;
+    if (n > 0) touched++;
+    await i.editReply(`🧹 Cleaning pin notices… **${total}** removed so far (${ch.name}).`).catch(() => {});
+  }
+
+  const skipped = noPerms + errored; // couldn't-manage + failed-mid-scan
+  const scope = onlyHere ? 'this channel' : `${targets.length} channel${targets.length === 1 ? '' : 's'}`;
+  const skipNote = skipped
+    ? `\n⚠️ Skipped ${skipped} channel${skipped === 1 ? '' : 's'} I couldn’t manage (need Manage Messages + Read Message History there).`
+    : '';
+  return i.editReply(
+    (total > 0
+      ? `✅ Removed **${total}** “pinned a message” notice${total === 1 ? '' : 's'} across ${touched} channel${touched === 1 ? '' : 's'} (scanned ${scope}).`
+      : `Nothing to clean — no pin notices found in ${scope}.`) + skipNote,
+  );
 }
 
 // ── /giveaway (staff) ─────────────────────────────────────────────────────────
