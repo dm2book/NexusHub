@@ -22,8 +22,28 @@ const BOX_ID = 'prd_starter_mystery_box';
 
 export async function seedStarterContent() {
   await dedupeMysteryBoxes().catch((e) => console.error('[starter] dedupe:', e.message));
+  await dedupeBundles().catch((e) => console.error('[starter] bundle dedupe:', e.message));
   await mysteryBox().catch((e) => console.error('[starter] mystery box:', e.message));
   await starterBundle().catch((e) => console.error('[starter] bundle:', e.message));
+}
+
+/**
+ * Heal the earlier bundle race: the old seeder created a random-id bundle per
+ * concurrent cold start, leaving N identical 'FPS Duo Pack' rows. Keep the
+ * oldest copy of any same-named bundle, delete the rest (bundles have no
+ * dependent rows, so plain DELETE is safe).
+ */
+async function dedupeBundles() {
+  const dupes = await all(
+    `SELECT id FROM bundles b
+      WHERE EXISTS (
+        SELECT 1 FROM bundles b2
+         WHERE b2.name = b.name
+           AND (b2.created_at, b2.id) < (b.created_at, b.id))`);
+  for (const d of dupes) {
+    await run('DELETE FROM bundles WHERE id=@id', { id: d.id });
+    console.log(`[starter] removed duplicate bundle ${d.id}`);
+  }
 }
 
 /** Heal the earlier race: keep the oldest 'Forge Mystery Box', remove extras. */
