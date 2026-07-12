@@ -8,7 +8,7 @@ import { z } from 'zod';
 import { asyncHandler } from '../middleware/error.js';
 import { requireAuth } from '../middleware/auth.js';
 import { run, get, all } from '../db/index.js';
-import { notFound, forbidden } from '../utils/errors.js';
+import { notFound, forbidden, badRequest } from '../utils/errors.js';
 import { listOrders, getOrder } from '../services/orderService.js';
 import { addVerifiedReview } from '../services/reviewsService.js';
 import { updateProfile, updatePreferences, publicUser } from '../services/userService.js';

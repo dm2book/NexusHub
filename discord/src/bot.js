@@ -808,7 +808,7 @@ async function handleCommand(i) {
       "`/price` — look up a product's live price\n`/delivery` — how a product is delivered\n`/drops` — upcoming drops & restocks\n`/order` — check an order status\n" +
       "`/vouch` — leave a vouch\n`/suggest` — suggest an idea\n`/poll` — start a quick poll\n" +
       "`/shop` — open the shop\n`/invite` — get the invite link\n`/stats` — server stats\n" +
-      "`/rank` — your level & XP\n`/daily` — claim your daily XP (streaks!)\n`/leaderboard` — top members\n" +
+      "`/rank` — your level & XP\n`/balance` — your Forge Coins & store credit\n`/daily` — claim your daily XP (streaks!)\n`/leaderboard` — top members\n" +
       "💬 Chat + 🔊 voice time both earn XP — level roles (5/10/20/30) are automatic.\n" +
       "`/close` — staff: close a ticket\n`/giveaway` — staff: start a giveaway\n`/reroll` — staff: reroll a winner\n" +
       "`/coupon` — staff: post a discount code\n`/flashsale` — staff: countdown deal in #deals\n" +
@@ -826,6 +826,7 @@ async function handleCommand(i) {
   if (i.commandName === 'giveaway') return startGiveaway(i);
   if (i.commandName === 'reroll') return rerollGiveaway(i);
   if (i.commandName === 'rank') return rankCmd(i);
+  if (i.commandName === 'balance') return balanceCmd(i);
   if (i.commandName === 'leaderboard') return leaderboardCmd(i);
   if (i.commandName === 'suggest') return postSuggestion(i);
   if (i.commandName === 'digest') return digestCmd(i);
@@ -1510,6 +1511,43 @@ function maybePostWeeklyDigest(guild) {
     saveMeta();
     ch.send({ embeds: [digestEmbed(d)] }).catch(() => {});
   });
+}
+
+// /balance — member self-service: Forge Coins + store credit + loyalty tier,
+// looked up via the signed balance endpoint (uid is bound into the signature).
+async function balanceCmd(i) {
+  await i.deferReply({ ephemeral: true });
+  if (!FORGEMARKET_API_URL || !REVIEW_INGEST_SECRET) {
+    return i.editReply('The store link isn’t configured yet — ask staff to set REVIEW_INGEST_SECRET.');
+  }
+  let d = null;
+  try {
+    const ts = String(Date.now());
+    const signature = createHmac('sha256', REVIEW_INGEST_SECRET)
+      .update(`${ts}.balance:${i.user.id}`).digest('hex');
+    const res = await fetch(`${FORGEMARKET_API_URL.replace(/\/$/, '')}/api/discord/balance`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-timestamp': ts, 'x-signature': signature },
+      body: JSON.stringify({ uid: i.user.id }),
+    });
+    if (res.ok) d = await res.json();
+  } catch (e) { console.error('[balance]', e.message); }
+  if (!d) return i.editReply('Couldn’t reach the store right now — try again in a minute.');
+  if (!d.linked) {
+    return i.editReply({ embeds: [new EmbedBuilder().setColor(0xf59e0b)
+      .setTitle('🔗 Link your Discord first')
+      .setDescription(`Sign in on the store with **Discord** and your balance shows up here.\n\n👉 ${STORE_URL}/login`)
+      .setFooter({ text: 'ForgeMarket · account link' })] });
+  }
+  return i.editReply({ embeds: [new EmbedBuilder().setColor(0x6366f1)
+    .setTitle('💰 Your ForgeMarket balance')
+    .setThumbnail(BRAND_ICON)
+    .addFields(
+      { name: '🪙 Forge Coins', value: String(d.coins ?? 0), inline: true },
+      { name: '💶 Store credit', value: money(d.creditCents || 0), inline: true },
+      { name: '🏅 Loyalty tier', value: d.tier || '—', inline: true })
+    .setDescription(`Spend coins in the [Forge Shop](${STORE_URL}/account/forge-shop) — store credit applies automatically at checkout.`)
+    .setFooter({ text: 'ForgeMarket · live from your account' }).setTimestamp()] });
 }
 
 // /digest + /stock — staff-only, on demand

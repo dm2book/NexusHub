@@ -73,15 +73,19 @@ export function pullsForOrder(orderId) {
  * used twice.
  */
 export async function rerollPull(userId, orderId, pullId) {
+  const pull = await get('SELECT * FROM mystery_pulls WHERE id=@id AND order_id=@o AND user_id=@u',
+    { id: pullId, o: orderId, u: userId });
+  if (!pull) throw badRequest('Prize not found.');
+  if (pull.rerolled_at) throw badRequest('You’ve already rerolled this box.');
+  // Validate the pool BEFORE claiming the one-time reroll — if an admin cleared
+  // the rewards we must fail without burning the buyer's free reroll.
+  const rewards = await getRewards(pull.box_id);
+  if (!rewards.length) throw badRequest('This box has no reward pool right now — try again later.');
   const claim = await run(
     `UPDATE mystery_pulls SET rerolled_at=@at
       WHERE id=@id AND order_id=@o AND user_id=@u AND rerolled_at IS NULL`,
     { at: nowIso(), id: pullId, o: orderId, u: userId });
-  const pull = await get('SELECT * FROM mystery_pulls WHERE id=@id AND order_id=@o AND user_id=@u',
-    { id: pullId, o: orderId, u: userId });
-  if (!pull) throw badRequest('Prize not found.');
   if (!claim.changes) throw badRequest('You’ve already rerolled this box.');
-  const rewards = await getRewards(pull.box_id);
   const rolled = roll(rewards, 1);
   const improved = rolled.credit > pull.credit_cents;
   if (improved) {

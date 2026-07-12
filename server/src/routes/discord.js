@@ -5,8 +5,11 @@ import { getServerInfo, claimOutbox, stampBotSeen } from '../services/discordSer
 import { verifyIngest } from '../middleware/ingestSignature.js';
 import { config } from '../config/env.js';
 import { overview, topProducts } from '../services/analyticsService.js';
-import { all } from '../db/index.js';
+import { all, get } from '../db/index.js';
 import { launchChecks } from '../services/launchCheckService.js';
+import { coinBalance } from '../services/forgeCoinService.js';
+import { balanceOf } from '../services/walletService.js';
+import { loyaltyFor } from '../services/loyaltyService.js';
 
 const router = Router();
 
@@ -24,6 +27,27 @@ router.post('/outbox',
     const events = await claimOutbox(20);
     await stampBotSeen();
     res.json({ events });
+  }));
+
+// Member balance for the bot's /saldo command: given a Discord user id, return
+// the linked account's Forge Coins, store credit and loyalty tier. The uid is
+// bound into the signature so a request can't be replayed for another member.
+export const canonicalBalance = (b = {}) => `balance:${b.uid || ''}`;
+router.post('/balance',
+  verifyIngest(canonicalBalance)(config.discord.reviewIngestSecret),
+  asyncHandler(async (req, res) => {
+    const uid = String(req.body?.uid || '').trim();
+    const acct = uid
+      ? await get(`SELECT user_id FROM oauth_accounts WHERE provider='discord' AND provider_uid=@uid LIMIT 1`, { uid })
+      : null;
+    if (!acct) return res.json({ linked: false });
+    const [coins, credit, loyalty] = await Promise.all([
+      coinBalance(acct.user_id), balanceOf(acct.user_id), loyaltyFor(acct.user_id),
+    ]);
+    res.json({
+      linked: true, coins, creditCents: credit,
+      tier: loyalty?.tierName || null, spentCents: loyalty?.xp ?? null,
+    });
   }));
 
 // Staff digest for the bot (/digest, /stock and the weekly Monday post).
