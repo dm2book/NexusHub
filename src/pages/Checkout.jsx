@@ -21,6 +21,7 @@ function payTarget(m, amountEur) {
 }
 
 export default function Checkout() {
+  const { t } = useI18n();
   const { items, subtotal, currency, clear } = useCart();
   const { user } = useAuth();
   const toast = useToast();

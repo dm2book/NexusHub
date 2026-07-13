@@ -2,15 +2,18 @@
  * Gift cards. Staff issue a code carrying store value; a customer redeems it and
  * the full balance is credited to their wallet (idempotent via a wallet tag).
  */
+import { randomInt } from 'node:crypto';
 import { run, get, all, nowIso, tx } from '../db/index.js';
 import { newId } from '../utils/ids.js';
 import { credit } from './walletService.js';
 import { badRequest, notFound } from '../utils/errors.js';
 
+// Crockford-ish alphabet (no look-alike chars). 32 symbols × 16 positions ≈ 10^24
+// possible codes — cryptographically random so codes can't be guessed/enumerated.
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 function makeCode() {
   let s = '';
-  for (let i = 0; i < 16; i++) s += ALPHABET[Math.floor((Date.now() * (i + 7) + i * 31) % ALPHABET.length)];
+  for (let i = 0; i < 16; i++) s += ALPHABET[randomInt(ALPHABET.length)];
   return `GIFT-${s.slice(0, 4)}-${s.slice(4, 8)}-${s.slice(8, 12)}-${s.slice(12, 16)}`;
 }
 const up = (c) => String(c || '').trim().toUpperCase();
