@@ -23,6 +23,8 @@ export default function LightProductCard({ product, onAdd }) {
   const img = product.image || iconFor(product.category);
   const navigate = useNavigate();
   const to = `/product/${product.id}`;
+  const onSale = product.compareAtPrice > product.price;
+  const discountPct = onSale ? Math.round((1 - product.price / product.compareAtPrice) * 100) : 0;
 
   // Open the product with a shared-element morph: the clicked card media becomes
   // the destination hero. Plain navigation on modifier/middle clicks.
@@ -38,9 +40,14 @@ export default function LightProductCard({ product, onAdd }) {
       <a href={to} onClick={openWithMorph}
         className="fm-card-media relative rounded-xl bg-slate-50 h-[150px] grid place-items-center mb-3"
         style={{ '--card-glow': `radial-gradient(circle, ${glowFor(product.category)}45, transparent 70%)` }}>
-        {product.featured && (
-          <span className="absolute top-2.5 left-2.5 z-10 text-[10px] font-bold text-amber-600 bg-amber-100 rounded-full px-2 py-0.5">★ Featured</span>
-        )}
+        <div className="absolute top-2.5 left-2.5 z-10 flex flex-col items-start gap-1">
+          {onSale && (
+            <span className="text-[10px] font-black text-white bg-rose-500 rounded-full px-2 py-0.5 shadow-sm">-{discountPct}%</span>
+          )}
+          {product.featured && (
+            <span className="text-[10px] font-bold text-amber-600 bg-amber-100 rounded-full px-2 py-0.5">★ Featured</span>
+          )}
+        </div>
         {typeof product.stock === 'number' && product.stock > 0 && product.stock <= 10 && (
           <span className="absolute top-2.5 right-2.5 z-10 text-[10px] font-bold text-red-600 bg-red-100 rounded-full px-2 py-0.5 animate-pulse">
             Only {product.stock} left
@@ -63,7 +70,12 @@ export default function LightProductCard({ product, onAdd }) {
       <div className="text-[11px] font-semibold uppercase tracking-wide text-violet-500">{v.label}</div>
       <Link to={to} className="font-bold text-[15px] text-slate-900 mt-0.5 hover:text-violet-600 line-clamp-2">{product.name}</Link>
       {product.description && <p className="text-[12.5px] text-slate-400 mt-1 line-clamp-2 flex-1">{product.description}</p>}
-      <div className="text-[12px] text-slate-400 mt-3">{t('home.from', 'From')} <span className="font-extrabold text-violet-600 text-[18px]">{money(product.price, product.currency)}</span></div>
+      <div className="text-[12px] text-slate-400 mt-3">
+        {t('home.from', 'From')} <span className="font-extrabold text-violet-600 text-[18px]">{money(product.price, product.currency)}</span>
+        {onSale && (
+          <span className="ml-2 text-slate-400 line-through font-semibold">{money(product.compareAtPrice, product.currency)}</span>
+        )}
+      </div>
       <div className="flex items-center gap-2 mt-3">
         <Link to={`/product/${product.id}`} className="flex-1 text-center text-sm font-semibold rounded-lg h-9 grid place-items-center hover:brightness-105 transition"
           style={{ backgroundImage: 'linear-gradient(135deg,#7c5cff,#a855f7)', color: '#fff' }}>{t('product.buyNow', 'Buy Now')}</Link>

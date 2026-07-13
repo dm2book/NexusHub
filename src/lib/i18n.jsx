@@ -160,6 +160,7 @@ const NL = {
   'product.back': 'Terug naar shop',
   'product.addToCart': 'In winkelwagen',
   'product.buyNow': 'Direct kopen',
+  'product.off': 'KORTING',
   'product.instant': 'Directe levering',
   'product.instantSub': 'Codes binnen seconden',
   'product.protected': 'Kopersbescherming',

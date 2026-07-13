@@ -6,7 +6,7 @@ import { PageLoader, EmptyState, Modal } from '../../components/ui.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
 
 const BLANK = { name: '', sku: '', category: '', description: '', priceEuro: '', costEuro: '',
-  kind: 'digital', stock: '', active: true, featured: false, imageUrl: '' };
+  compareAtEuro: '', kind: 'digital', stock: '', active: true, featured: false, imageUrl: '' };
 
 // Suggested sell price from a supplier cost (e.g. what you pay on Eldorado /
 // Eneba): a ~18% markup with a €2 minimum profit, rounded to a clean .99.
@@ -49,6 +49,7 @@ export default function AdminProducts() {
       name: p.name, sku: p.sku || '', category: p.category || '', description: p.description || '',
       priceEuro: (p.price / 100).toFixed(2),
       costEuro: p.metadata?.cost != null ? (p.metadata.cost / 100).toFixed(2) : '',
+      compareAtEuro: p.metadata?.compareAt != null ? (p.metadata.compareAt / 100).toFixed(2) : '',
       kind: p.kind || 'digital',
       stock: p.stock ?? '', active: !!p.active, featured: !!p.featured,
       imageUrl: p.image || '',
@@ -87,6 +88,7 @@ export default function AdminProducts() {
           featured: form.featured,
           image: form.imageUrl || undefined,
           cost: form.costEuro === '' ? undefined : Math.round(parseFloat(form.costEuro || '0') * 100),
+          compareAt: form.compareAtEuro === '' ? undefined : Math.round(parseFloat(form.compareAtEuro || '0') * 100),
         },
       };
       if (editing === 'new') await api.post('/api/admin/products', payload);
@@ -251,6 +253,13 @@ export default function AdminProducts() {
           <div><label className="label">Price (€)</label>
             <input type="number" step="0.01" min="0" className="input" value={form.priceEuro}
               onChange={(e) => setForm({ ...form, priceEuro: e.target.value })} placeholder="9.99" /></div>
+          <div><label className="label">Sale — original price (€)</label>
+            <input type="number" step="0.01" min="0" className="input" value={form.compareAtEuro}
+              onChange={(e) => setForm({ ...form, compareAtEuro: e.target.value })} placeholder="blank = no sale" />
+            {form.compareAtEuro && parseFloat(form.compareAtEuro) > parseFloat(form.priceEuro || '0') && (
+              <p className="text-xs text-rose-400 mt-1">Shows a crossed-out €{parseFloat(form.compareAtEuro).toFixed(2)} and a
+                −{Math.round((1 - parseFloat(form.priceEuro || '0') / parseFloat(form.compareAtEuro)) * 100)}% badge.</p>
+            )}</div>
           <div><label className="label">Cost / supplier price (€) — e.g. Eldorado / Eneba</label>
             <input type="number" step="0.01" min="0" className="input" value={form.costEuro}
               onChange={(e) => setForm({ ...form, costEuro: e.target.value })} placeholder="what you pay to buy it" />
