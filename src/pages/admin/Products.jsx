@@ -131,7 +131,10 @@ export default function AdminProducts() {
                       <span className="truncate">{p.name}</span>
                       {p.featured && <Star size={12} className="text-amber-400 fill-amber-400 shrink-0" />}
                     </div>
-                    <div className="text-slate-500 text-xs">{v.label} · {p.stock ?? '∞'} stock</div>
+                    <div className="text-slate-500 text-xs">
+                      {v.label}
+                      {p.kind !== 'mystery' && <> · <span className={p.codesAvailable ? 'text-emerald-400' : 'text-amber-400'}>🔑 {p.codesAvailable ?? 0} in stock</span></>}
+                    </div>
                   </div>
                   <div className="text-white font-medium shrink-0">{money(p.price, p.currency)}</div>
                 </div>
@@ -140,6 +143,9 @@ export default function AdminProducts() {
                     {p.active ? 'Active' : 'Hidden'}
                   </span>
                   <div className="flex-1" />
+                  {p.kind !== 'mystery' && (
+                    <button onClick={() => setStock({ p, codes: '' })} className="btn-ghost text-xs">🔑 Codes</button>
+                  )}
                   <button onClick={() => toggleActive(p)} className="btn-ghost text-xs">
                     {p.active ? <><EyeOff size={14} /> Hide</> : <><Eye size={14} /> Show</>}
                   </button>
@@ -191,10 +197,12 @@ export default function AdminProducts() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
-                        <button title="Auto-delivery code stock" onClick={() => { setStock({ p, codes: '' }); }}
-                          className="px-2 py-1 rounded-lg hover:bg-white/10 text-xs text-slate-300 inline-flex items-center gap-1">
-                          🔑 {p.codesAvailable ?? 0}
-                        </button>
+                        {p.kind !== 'mystery' && (
+                          <button title="Auto-delivery code stock — paste codes for instant delivery" onClick={() => { setStock({ p, codes: '' }); }}
+                            className={`px-2 py-1 rounded-lg hover:bg-white/10 text-xs inline-flex items-center gap-1 ${p.codesAvailable ? 'text-emerald-300' : 'text-amber-300'}`}>
+                            🔑 {p.codesAvailable ?? 0}
+                          </button>
+                        )}
                         <button title={p.active ? 'Hide' : 'Show'} onClick={() => toggleActive(p)}
                           className="p-2 rounded-lg hover:bg-white/10 text-slate-300">
                           {p.active ? <EyeOff size={15} /> : <Eye size={15} />}
@@ -260,9 +268,10 @@ export default function AdminProducts() {
                 {parseFloat(form.priceEuro) > 0 ? ` (${Math.round((1 - parseFloat(form.costEuro || 0) / parseFloat(form.priceEuro)) * 100)}%)` : ''}
               </p>
             )}</div>
-          <div><label className="label">Stock</label>
+          <div><label className="label">Stock cap</label>
             <input type="number" className="input" value={form.stock}
-              onChange={(e) => setForm({ ...form, stock: e.target.value })} placeholder="blank = unlimited" /></div>
+              onChange={(e) => setForm({ ...form, stock: e.target.value })} placeholder="blank = unlimited" />
+            <p className="text-xs text-slate-500 mt-1">Optional manual limit. For instant auto-delivery, use the <strong className="text-slate-300">🔑 Codes</strong> button on the product row to paste real codes.</p></div>
           <div className="sm:col-span-2"><label className="label">Image URL</label>
             <input className="input" value={form.imageUrl} placeholder="https://… (product photo)"
               onChange={(e) => setForm({ ...form, imageUrl: e.target.value })} /></div>
