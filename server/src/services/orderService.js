@@ -317,6 +317,44 @@ export async function sendPaymentReminders({ afterMinutes = 60, maxAgeHours = 72
   return sent;
 }
 
+/**
+ * Post-delivery review request: email a single "how was your order?" note for
+ * orders completed `afterHours` ago that don't yet have a review. One per order
+ * — review_request_sent_at is stamped BEFORE sending so a crash never duplicates
+ * it. Runs from maintenance. The link lands the buyer straight on the review
+ * widget for their order (works for guests too).
+ */
+export async function sendReviewRequests({ afterHours = 24, limit = 25 } = {}) {
+  const cutoff = new Date(Date.now() - afterHours * 3_600_000).toISOString();
+  const rows = await all(
+    `SELECT o.id FROM orders o
+      WHERE o.status = 'completed' AND o.review_request_sent_at IS NULL
+        AND NOT EXISTS (SELECT 1 FROM reviews r WHERE r.order_id = o.id)
+        AND EXISTS (SELECT 1 FROM order_status_history h
+                     WHERE h.order_id = o.id AND h.to_status = 'completed' AND h.created_at < @cutoff)
+      ORDER BY o.updated_at ASC LIMIT @limit`,
+    { cutoff, limit });
+
+  let sent = 0;
+  for (const row of rows) {
+    // Claim atomically; if another run got here first, skip.
+    const r = await run(
+      `UPDATE orders SET review_request_sent_at = @at
+        WHERE id = @id AND review_request_sent_at IS NULL AND status = 'completed'`,
+      { at: nowIso(), id: row.id });
+    if (!r?.changes) continue;
+    const order = await getOrder(row.id);
+    if (!order?.email) continue;
+    await sendEmailAsync('review_request', order.email, {
+      user: { name: order.billing?.full_name || order.email.split('@')[0] },
+      order: { number: order.number },
+      review: { url: `${config.appUrl}/track?number=${encodeURIComponent(order.number)}` },
+    });
+    sent++;
+  }
+  return sent;
+}
+
 export async function appendHistory(orderId, from, to, changedBy, reason) {
   await run(`INSERT INTO order_status_history (id, order_id, from_status, to_status, changed_by, reason, created_at)
        VALUES (@id, @oid, @from, @to, @by, @reason, @at)`,

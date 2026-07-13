@@ -861,4 +861,15 @@ CREATE TABLE IF NOT EXISTS kv (
 );
 `,
   },
+  {
+    id: '018_review_requests',
+    sql: `
+-- ── Post-delivery review request ────────────────────────────────────────────
+-- One "how was your order?" email per completed order, sent a while after
+-- delivery. Stamped so it is never sent twice (same pattern as reminders).
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS review_request_sent_at TEXT;
+CREATE INDEX IF NOT EXISTS idx_orders_review_request
+  ON orders (updated_at) WHERE status = 'completed' AND review_request_sent_at IS NULL;
+`,
+  },
 ];

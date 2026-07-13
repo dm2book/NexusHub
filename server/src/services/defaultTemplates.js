@@ -107,6 +107,20 @@ export const DEFAULT_TEMPLATES = [
       <p><a class="btn" href="{{order.url}}">View your order</a></p>`,
   },
   {
+    id: 'review_request',
+    name: 'Review Request',
+    subject: 'How was your order {{order.number}}? ⭐',
+    body_html: `
+      <div class="badge">⭐</div>
+      <h1 style="text-align:center">How did we do?</h1>
+      <p style="text-align:center;max-width:420px;margin-left:auto;margin-right:auto">Hi {{user.name}}, thanks again
+      for your order <strong>{{order.number}}</strong>! If everything arrived as expected, a quick review would
+      mean the world — it takes 20 seconds and helps other gamers buy with confidence.</p>
+      <p style="text-align:center"><a class="btn" href="{{review.url}}">Leave a quick review</a></p>
+      <p style="text-align:center;color:#8b93a7;font-size:13px">Something not right? Just reply to this email or open
+      a ticket in our Discord and we'll make it right.</p>`,
+  },
+  {
     id: 'gift_card',
     name: 'Gift Card',
     subject: 'You received a {{giftCard.amount}} {{brand.name}} gift card 🎁',
