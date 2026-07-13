@@ -29,6 +29,14 @@ const STAFF_ROLE_NAMES = ['Owner', 'Admin', 'Moderator', 'Support'];
 const isStaff = (member) => member?.permissions?.has?.(PermissionFlagsBits.ManageMessages)
   || member?.roles?.cache?.some((r) => STAFF_ROLE_NAMES.includes(r.name));
 
+// A support ticket, detected reliably by its topic (which survives the channel
+// being renamed to "✋-…" when staff claims it) — falling back to the name
+// prefix for the brief moment before the topic is cached. Used to exempt
+// tickets from auto-moderation and XP so a private support chat is never
+// policed or gamified.
+const isTicketChannel = (ch) =>
+  ch?.topic?.startsWith('ticket-owner:') || /(^|-)ticket-/.test(ch?.name || '');
+
 // Giveaway store — persisted to giveaways.json so active giveaways (and their
 // entries) survive a bot restart; timers are re-armed on boot.
 const GIVEAWAYS = new Map(); // messageId -> { prize, entries:Set, endsAt, channelId, msgId, winnersCount, hostId, guildId }
@@ -910,6 +918,10 @@ async function postSuggestion(i) {
   const text = i.options.getString('idea');
   const ch = findChannel(i.guild, 'suggestions');
   if (!ch) return i.reply({ content: 'No #suggestions channel — ask an admin to run setup.', ephemeral: true });
+  // ACK first: posting the embed + opening a thread is two Discord round-trips,
+  // which can blow past the 3s interaction deadline under load and throw
+  // "Unknown interaction" even though the suggestion was posted fine.
+  await i.deferReply({ ephemeral: true });
   const e = new EmbedBuilder().setColor(0x6366f1).setTitle('💡 New suggestion')
     .setDescription(text).setAuthor({ name: i.user.username, iconURL: i.user.displayAvatarURL() })
     .setFooter({ text: 'Vote below · staff review every idea' }).setTimestamp();
@@ -923,7 +935,7 @@ async function postSuggestion(i) {
   saveMeta();
   await msg.startThread({ name: `💡 ${text.slice(0, 80)}` }).catch(() => {});
   leadLog(i.guild, `💡 Suggestion from <@${i.user.id}>: "${text.slice(0, 120)}"`);
-  return i.reply({ content: `✅ Posted your suggestion in <#${ch.id}> — votes & staff review happen there!`, ephemeral: true });
+  return i.editReply({ content: `✅ Posted your suggestion in <#${ch.id}> — votes & staff review happen there!` });
 }
 
 async function voteSuggestion(i, dir) {
@@ -995,7 +1007,7 @@ client.on(Events.MessageCreate, async (m) => {
 // ── Auto-moderation: remove invites / scam promos (non-staff, outside tickets) ─
 client.on(Events.MessageCreate, async (m) => {
   if (m.author.bot || !m.guild) return;
-  if (m.channel.name?.startsWith('ticket-')) return;
+  if (isTicketChannel(m.channel)) return;
   if (isStaff(m.member)) return;
   if (!SCAM.test(m.content)) return;
   await m.delete().catch(() => {});
@@ -1056,7 +1068,7 @@ async function announceLevelUp(guild, user, member, lvl, fallbackCh) {
 // ── Leveling: award XP per message (60s cooldown), announce level-ups ─────────
 client.on(Events.MessageCreate, (m) => {
   if (m.author.bot || !m.guild) return;
-  if (m.channel.name?.startsWith('ticket-')) return;
+  if (isTicketChannel(m.channel)) return;
   const now = Date.now();
   if (now - (xpCooldown.get(m.author.id) || 0) < 60_000) return;
   xpCooldown.set(m.author.id, now);

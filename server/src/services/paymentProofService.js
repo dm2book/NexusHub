@@ -9,6 +9,7 @@
  * for already-paid/rapid-fire orders are flagged for the admin.
  */
 import { run, get, all, nowIso } from '../db/index.js';
+import { config } from '../config/env.js';
 import { newId } from '../utils/ids.js';
 import { getOrder, markPaymentReceived } from './orderService.js';
 import { notify } from './notificationService.js';
@@ -92,7 +93,7 @@ export async function confirmProof(proofId, ctx = {}) {
   await audit({ action: 'payment.proof_confirm', actor: ctx.user, targetType: 'order',
     targetId: proof.order_id, metadata: { proofId }, req: ctx.req });
   const order = await getOrder(proof.order_id);
-  if (order?.user_id) await notify(order.user_id, { type: 'order', title: 'Payment confirmed ✅',
+  if (order?.userId) await notify(order.userId, { type: 'order', title: 'Payment confirmed ✅',
     body: `We verified your payment for ${order.number}. Your order is being processed.`, link: `/account/orders/${order.id}` });
   return updated;
 }
@@ -114,9 +115,9 @@ export async function rejectProof(proofId, reason = '', ctx = {}) {
     sendEmailAsync('custom_message', order.email, {
       subject: `Payment not verified for ${order.number}`,
       message: `We couldn't verify your payment yet${reason ? `: ${reason}` : ''}. Please double-check the amount and reference and resubmit your proof.`,
-      order: { number: order.number, url: `${''}` },
+      order: { number: order.number, url: `${config.appUrl}/track` },
     });
-    if (order.user_id) await notify(order.user_id, { type: 'order', title: 'Payment needs attention',
+    if (order.userId) await notify(order.userId, { type: 'order', title: 'Payment needs attention',
       body: reason || 'We couldn’t verify your payment. Please resubmit.', link: `/account/orders/${order.id}` });
   }
   return { ok: true };
