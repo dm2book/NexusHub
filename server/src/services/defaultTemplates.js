@@ -107,6 +107,25 @@ export const DEFAULT_TEMPLATES = [
       <p><a class="btn" href="{{order.url}}">View your order</a></p>`,
   },
   {
+    id: 'gift_card',
+    name: 'Gift Card',
+    subject: 'You received a {{giftCard.amount}} {{brand.name}} gift card 🎁',
+    body_html: `
+      <div class="badge">🎁</div>
+      <h1 style="text-align:center">You've got a gift card!</h1>
+      <p style="text-align:center;max-width:420px;margin-left:auto;margin-right:auto">Someone sent you
+      <strong>{{giftCard.amount}}</strong> to spend at {{brand.name}} on Robux, V-Bucks, gift cards and more.</p>
+      <p class="code">{{giftCard.code}}</p>
+      <p style="text-align:center;margin:14px 0 6px"><span class="pill-note">💳 Worth {{giftCard.amount}} · redeem it in seconds</span></p>
+      {{giftCard.noteHtml}}
+      <p style="text-align:center"><a class="btn" href="{{app.url}}/account">Redeem your gift card</a></p>
+      <p style="text-align:center;color:#8b93a7;font-size:13px">Sign in (or create a free account), open
+      <strong>Wallet</strong> and paste the code above — the balance lands in your store credit and applies
+      automatically at checkout.</p>
+      <div class="notice">🔒 <strong>Keep this code private.</strong> Anyone with it can redeem the balance.
+      Redeemable once, on any order.</div>`,
+  },
+  {
     id: 'login_otp',
     name: 'Login Code',
     subject: '{{otp.code}} is your {{brand.name}} login code',
