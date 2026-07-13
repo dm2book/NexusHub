@@ -59,8 +59,9 @@ router.post('/gift-cards', asyncHandler(async (req, res) => {
     note: z.string().max(200).optional(), recipientEmail: z.string().email().optional(),
   }).parse(req.body);
   const card = await issueGiftCard(body, req.user.id);
-  await audit({ actor: req.user, action: 'giftcard.issue', targetType: 'gift_card', targetId: card.id, metadata: { amount: body.amount }, req });
-  res.status(201).json({ giftCard: card });
+  await audit({ actor: req.user, action: 'giftcard.issue', targetType: 'gift_card', targetId: card.id,
+    metadata: { amount: body.amount, emailedTo: card.emailedTo || null }, req });
+  res.status(201).json({ giftCard: card, emailedTo: card.emailedTo || null });
 }));
 router.patch('/gift-cards/:id', asyncHandler(async (req, res) => {
   const { status } = z.object({ status: z.enum(['active', 'disabled']) }).parse(req.body);

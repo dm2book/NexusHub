@@ -180,7 +180,9 @@ function GiftCards({ cards, toast, call }) {
       amount: Math.round(Number(f.amount) * 100),
       recipientEmail: f.recipientEmail.trim() || undefined, note: f.note.trim() || undefined,
     });
-    toast.success(`Issued ${r.giftCard.code}`);
+    toast.success(r.emailedTo
+      ? `Issued ${r.giftCard.code} — emailed to ${r.emailedTo} 📧`
+      : `Issued ${r.giftCard.code}${f.recipientEmail.trim() ? ' — but the email could not be sent' : ''}`);
     setF({ amount: '', recipientEmail: '', note: '' });
   });
   return (
@@ -189,10 +191,11 @@ function GiftCards({ cards, toast, call }) {
         <h3 className="text-white mb-4 flex items-center gap-2"><Plus size={16} /> Issue gift card</h3>
         <div className="grid sm:grid-cols-3 gap-3">
           <div><label className="label">Amount (€)</label><input className="input" type="number" value={f.amount} onChange={(e) => setF({ ...f, amount: e.target.value })} placeholder="25.00" /></div>
-          <div><label className="label">Recipient email</label><input className="input" value={f.recipientEmail} onChange={(e) => setF({ ...f, recipientEmail: e.target.value })} placeholder="optional" /></div>
-          <div><label className="label">Note</label><input className="input" value={f.note} onChange={(e) => setF({ ...f, note: e.target.value })} placeholder="optional" /></div>
+          <div><label className="label">Recipient email</label><input className="input" value={f.recipientEmail} onChange={(e) => setF({ ...f, recipientEmail: e.target.value })} placeholder="auto-emails the code" /></div>
+          <div><label className="label">Note</label><input className="input" value={f.note} onChange={(e) => setF({ ...f, note: e.target.value })} placeholder="optional message" /></div>
         </div>
-        <button onClick={issue} disabled={!f.amount} className="btn-primary mt-4">Issue gift card</button>
+        <p className="text-slate-500 text-xs mt-3">Fill in a recipient email and the code is emailed to them automatically with the branded gift-card template. Leave it blank to just generate a code you send yourself.</p>
+        <button onClick={issue} disabled={!f.amount} className="btn-primary mt-3">Issue gift card</button>
       </div>
 
       {cards.length === 0 ? <div className="card p-8 text-center text-slate-400">No gift cards yet.</div> : (

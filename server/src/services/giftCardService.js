@@ -6,6 +6,8 @@ import { randomInt } from 'node:crypto';
 import { run, get, all, nowIso, tx } from '../db/index.js';
 import { newId } from '../utils/ids.js';
 import { credit } from './walletService.js';
+import { sendEmail } from './emailService.js';
+import { formatMoney } from '../utils/money.js';
 import { badRequest, notFound } from '../utils/errors.js';
 
 // Crockford-ish alphabet (no look-alike chars). 32 symbols × 16 positions ≈ 10^24
@@ -28,14 +30,34 @@ const shape = (r) => r && ({
 export async function issueGiftCard({ amount, currency = 'EUR', note = null, recipientEmail = null }, issuedBy = null) {
   const cents = Math.round(Number(amount));
   if (!cents || cents < 1) throw badRequest('Enter a gift-card amount');
+  const rec = recipientEmail ? String(recipientEmail).trim().toLowerCase() : null;
   let code;
   for (let i = 0; i < 6; i++) { code = makeCode(); if (!(await get('SELECT id FROM gift_cards WHERE code=@c', { c: code }))) break; }
   const id = newId('gft');
   await run(
     `INSERT INTO gift_cards (id, code, initial_balance, balance, currency, status, note, recipient_email, issued_by, created_at)
      VALUES (@id, @code, @amt, @amt, @cur, 'active', @note, @rec, @by, @at)`,
-    { id, code, amt: cents, cur: currency, note, rec: recipientEmail ? String(recipientEmail).toLowerCase() : null, by: issuedBy, at: nowIso() });
-  return getGiftCard(id);
+    { id, code, amt: cents, cur: currency, note, rec, by: issuedBy, at: nowIso() });
+  const card = await getGiftCard(id);
+  // If a recipient email was given, deliver the code straight to their inbox
+  // with the branded gift-card template. Best-effort: a mail failure never
+  // undoes the (already valid) card — we just report emailed:false.
+  let emailedTo = null;
+  if (rec) {
+    try {
+      await sendEmail('gift_card', rec, {
+        giftCard: {
+          code: card.code,
+          amount: formatMoney(cents, currency),
+          noteHtml: note ? `<div class="quote">${String(note).replace(/[<>&]/g, '')}</div>` : '',
+        },
+      });
+      emailedTo = rec;
+    } catch (e) {
+      console.error('[giftcard] email failed:', e.message);
+    }
+  }
+  return { ...card, emailedTo };
 }
 
 export async function setGiftCardStatus(id, status) {
