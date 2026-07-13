@@ -176,7 +176,17 @@ export default function ProductDetail() {
             )}
           </div>
 
-          <div className="text-3xl font-semibold mt-4 gradient-text gradient-anim">{money(product.price, product.currency)}</div>
+          <div className="flex items-center gap-3 mt-4">
+            <span className="text-3xl font-semibold gradient-text gradient-anim">{money(product.price, product.currency)}</span>
+            {product.compareAtPrice > product.price && (
+              <>
+                <span className="text-xl text-slate-500 line-through">{money(product.compareAtPrice, product.currency)}</span>
+                <span className="text-xs font-black text-white bg-rose-500 rounded-full px-2.5 py-1">
+                  -{Math.round((1 - product.price / product.compareAtPrice) * 100)}% {t('product.off', 'OFF')}
+                </span>
+              </>
+            )}
+          </div>
 
           {/* Pack switcher — jump between sizes of the same category in one tap */}
           {related.length > 0 && (

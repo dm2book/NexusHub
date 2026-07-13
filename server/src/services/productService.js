@@ -8,10 +8,15 @@ const parse = (s) => { try { return JSON.parse(s || '{}'); } catch { return {}; 
 const hydrate = (r) => {
   if (!r) return r;
   const metadata = parse(r.metadata);
+  // A sale "was" price (in cents) lives in metadata.compareAt. Only surface it
+  // when it is genuinely higher than the current price, so a stale/invalid value
+  // can never render a fake discount.
+  const compareAt = Number(metadata.compareAt) || 0;
   return {
     ...r, metadata, active: !!r.active,
     featured: !!metadata.featured,
     image: metadata.image || null,
+    compareAtPrice: compareAt > r.price ? compareAt : null,
   };
 };
 
