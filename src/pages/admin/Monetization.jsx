@@ -230,6 +230,26 @@ function GiftCards({ cards, toast, call }) {
   );
 }
 
+// Live guidance so a reward is never priced "crazy". Members earn 1 coin per €10
+// spent, so cost×10 = the spend a customer needs to afford it.
+function PriceHint({ cost, couponKind, valueEuro, percent }) {
+  if (!(cost > 0)) return null;
+  const spend = cost * 10; // € a customer spends to earn `cost` coins
+  if (couponKind === 'percent') {
+    if (!(percent > 0)) return null;
+    return <p className="text-xs text-slate-500 mt-3">A customer spends <strong className="text-slate-300">€{spend}</strong> to afford this <strong className="text-slate-300">{percent}% off</strong> code.</p>;
+  }
+  if (!(valueEuro > 0)) return null;
+  const pct = (valueEuro / spend) * 100;
+  const tone = pct > 6 ? 'text-rose-400' : pct >= 2.5 ? 'text-emerald-400' : 'text-amber-400';
+  const verdict = pct > 6 ? '⚠️ very generous — eats your margin' : pct >= 2.5 ? '✓ healthy reward rate' : 'a bit stingy';
+  return (
+    <p className="text-xs mt-3 text-slate-500">
+      ≈ <strong className={tone}>{pct.toFixed(1)}% back</strong> — a customer spends <strong className="text-slate-300">€{spend}</strong> to afford €{valueEuro.toFixed(2)} off. <span className={tone}>{verdict}</span>
+    </p>
+  );
+}
+
 // ── Forge Shop items (bought with Forge Coins) ───────────────────────────────
 function ForgeShopItems({ items, toast, call }) {
   const [f, setF] = useState({ label: '', cost: '', couponKind: 'fixed', valueEuro: '', percent: '', blurb: '' });
@@ -263,6 +283,7 @@ function ForgeShopItems({ items, toast, call }) {
           )}
           <div className="sm:col-span-2"><label className="label">Short description (optional)</label><input className="input" value={f.blurb} onChange={(e) => setF({ ...f, blurb: e.target.value })} placeholder="€15 off any order" /></div>
         </div>
+        <PriceHint cost={Number(f.cost)} couponKind={f.couponKind} valueEuro={Number(f.valueEuro)} percent={Number(f.percent)} />
         <button onClick={add} disabled={!ready} className="btn-primary mt-4">Add reward</button>
       </div>
 
