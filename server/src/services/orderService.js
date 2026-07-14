@@ -259,11 +259,15 @@ export async function transitionOrder(orderId, to, ctx = {}) {
   return updated;
 }
 
-/** If every item has enough pre-loaded stock, claim codes and complete the order. */
+/** If every item has enough pre-loaded stock, claim codes and complete the order.
+ *  Products set to 'manual' delivery are never auto-dispensed — the whole order
+ *  is left in the queue for staff to deliver by hand, even if codes are in stock. */
 export async function autoDispenseFromStock(orderId, ctx = {}) {
   const order = await getOrder(orderId);
   if (!order || ['completed', 'refunded', 'cancelled'].includes(order.status)) return false;
   for (const it of order.items) {
+    const product = await getProduct(it.product_id);
+    if (product?.deliveryMode === 'manual') return false; // owner hand-delivers this product
     if (await availableCount(it.product_id) < it.quantity) return false; // not enough stock → leave for manual
   }
   const deliveries = [];

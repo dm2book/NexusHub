@@ -6,7 +6,7 @@ import { PageLoader, EmptyState, Modal } from '../../components/ui.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
 
 const BLANK = { name: '', sku: '', category: '', description: '', priceEuro: '', costEuro: '',
-  compareAtEuro: '', kind: 'digital', stock: '', active: true, featured: false, imageUrl: '' };
+  compareAtEuro: '', kind: 'digital', stock: '', deliveryMode: 'auto', active: true, featured: false, imageUrl: '' };
 
 // Suggested sell price from a supplier cost (e.g. what you pay on Eldorado /
 // Eneba): a ~18% markup with a €2 minimum profit, rounded to a clean .99.
@@ -50,6 +50,7 @@ export default function AdminProducts() {
       priceEuro: (p.price / 100).toFixed(2),
       costEuro: p.metadata?.cost != null ? (p.metadata.cost / 100).toFixed(2) : '',
       compareAtEuro: p.metadata?.compareAt != null ? (p.metadata.compareAt / 100).toFixed(2) : '',
+      deliveryMode: p.metadata?.deliveryMode === 'manual' ? 'manual' : 'auto',
       kind: p.kind || 'digital',
       stock: p.stock ?? '', active: !!p.active, featured: !!p.featured,
       imageUrl: p.image || '',
@@ -89,6 +90,7 @@ export default function AdminProducts() {
           image: form.imageUrl || undefined,
           cost: form.costEuro === '' ? undefined : Math.round(parseFloat(form.costEuro || '0') * 100),
           compareAt: form.compareAtEuro === '' ? undefined : Math.round(parseFloat(form.compareAtEuro || '0') * 100),
+          deliveryMode: form.deliveryMode === 'manual' ? 'manual' : undefined,
         },
       };
       if (editing === 'new') await api.post('/api/admin/products', payload);
@@ -135,7 +137,8 @@ export default function AdminProducts() {
                     </div>
                     <div className="text-slate-500 text-xs">
                       {v.label}
-                      {p.kind !== 'mystery' && <> · <span className={p.codesAvailable ? 'text-emerald-400' : 'text-amber-400'}>🔑 {p.codesAvailable ?? 0} in stock</span></>}
+                      {p.kind !== 'mystery' && <> · <span className={p.codesAvailable ? 'text-emerald-400' : 'text-amber-400'}>🔑 {p.codesAvailable ?? 0}</span></>}
+                      {p.kind !== 'mystery' && <> · {p.metadata?.deliveryMode === 'manual' ? '✋ Manual' : '🤖 Auto'}</>}
                     </div>
                   </div>
                   <div className="text-white font-medium shrink-0">{money(p.price, p.currency)}</div>
@@ -199,6 +202,9 @@ export default function AdminProducts() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
+                        {p.kind !== 'mystery' && p.metadata?.deliveryMode === 'manual' && (
+                          <span title="Manual delivery — you deliver each order by hand" className="text-xs text-amber-300 px-1.5 py-1">✋ Manual</span>
+                        )}
                         {p.kind !== 'mystery' && (
                           <button title="Auto-delivery code stock — paste codes for instant delivery" onClick={() => { setStock({ p, codes: '' }); }}
                             className={`px-2 py-1 rounded-lg hover:bg-white/10 text-xs inline-flex items-center gap-1 ${p.codesAvailable ? 'text-emerald-300' : 'text-amber-300'}`}>
@@ -281,6 +287,24 @@ export default function AdminProducts() {
             <input type="number" className="input" value={form.stock}
               onChange={(e) => setForm({ ...form, stock: e.target.value })} placeholder="blank = unlimited" />
             <p className="text-xs text-slate-500 mt-1">Optional manual limit. For instant auto-delivery, use the <strong className="text-slate-300">🔑 Codes</strong> button on the product row to paste real codes.</p></div>
+
+          {form.kind !== 'mystery' && (
+            <div className="sm:col-span-2">
+              <label className="label">Delivery</label>
+              <div className="grid grid-cols-2 gap-2">
+                <button type="button" onClick={() => setForm({ ...form, deliveryMode: 'auto' })}
+                  className={`rounded-xl border p-3 text-left text-sm transition ${form.deliveryMode !== 'manual' ? 'border-violet-500 bg-violet-500/10 text-white' : 'border-white/10 text-slate-400 hover:border-white/20'}`}>
+                  <div className="font-semibold">🤖 Automatic</div>
+                  <div className="text-xs mt-0.5 opacity-80">Pull a code from stock, e-mail it &amp; complete the order on payment.</div>
+                </button>
+                <button type="button" onClick={() => setForm({ ...form, deliveryMode: 'manual' })}
+                  className={`rounded-xl border p-3 text-left text-sm transition ${form.deliveryMode === 'manual' ? 'border-violet-500 bg-violet-500/10 text-white' : 'border-white/10 text-slate-400 hover:border-white/20'}`}>
+                  <div className="font-semibold">✋ Manual</div>
+                  <div className="text-xs mt-0.5 opacity-80">Never auto-deliver — you enter the code per order from the order page.</div>
+                </button>
+              </div>
+            </div>
+          )}
           <div className="sm:col-span-2"><label className="label">Image URL</label>
             <input className="input" value={form.imageUrl} placeholder="https://… (product photo)"
               onChange={(e) => setForm({ ...form, imageUrl: e.target.value })} /></div>
