@@ -14,12 +14,18 @@ import { createCoupon } from './couponService.js';
 export const COINS_PER_EURO_CENTS = 1000; // €10 = 1 coin
 
 /** The built-in Forge Shop catalog — what coins buy. Admin-added items (stored in
- *  forge_shop_items) are merged on top of these at read time. */
+ *  forge_shop_items) are merged on top of these at read time.
+ *
+ *  Pricing note: members earn 1 coin per €10 spent, so a reward costing N coins
+ *  represents €(N×10) of spend. These costs keep the effective payback around
+ *  3–3.5% (sustainable against the store's ~18% margin) — a big reward is a
+ *  little better value to reward saving up. Don't drop them below ~1.5 coins per
+ *  €1 of discount or you give margin away. */
 export const FORGE_SHOP = [
-  { id: 'coupon5', kind: 'coupon', cost: 3, value: 500, label: '€5 discount code', blurb: '€5 off your next order.' },
-  { id: 'coupon10', kind: 'coupon', cost: 5, value: 1000, label: '€10 discount code', blurb: '€10 off your next order.' },
-  { id: 'coupon25', kind: 'coupon', cost: 12, value: 2500, label: '€25 discount code', blurb: '€25 off any order — best value.' },
-  { id: 'boost', kind: 'boost', cost: 2, value: 1, label: 'Giveaway boost', blurb: '+1 bonus entry in this week’s giveaway (claim in Discord).' },
+  { id: 'coupon5', kind: 'coupon', cost: 15, value: 500, label: '€5 discount code', blurb: '€5 off your next order.' },
+  { id: 'coupon10', kind: 'coupon', cost: 28, value: 1000, label: '€10 discount code', blurb: '€10 off your next order — saves you a coin.' },
+  { id: 'coupon25', kind: 'coupon', cost: 65, value: 2500, label: '€25 discount code', blurb: '€25 off any order — best value.' },
+  { id: 'boost', kind: 'boost', cost: 8, value: 1, label: 'Giveaway boost', blurb: '+1 bonus entry in this week’s giveaway (claim in Discord).' },
 ];
 
 /** Admin-managed Forge Shop items, shaped like FORGE_SHOP entries. */
