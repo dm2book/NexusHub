@@ -6,10 +6,34 @@ import { requirePermission } from '../../middleware/rbac.js';
 import { all, get, run, nowIso } from '../../db/index.js';
 import { renderTemplate, baseContext } from '../../services/templateService.js';
 import { sendEmail } from '../../services/emailService.js';
+import { sendBroadcast, broadcastAudienceCount, recentBroadcasts } from '../../services/broadcastService.js';
 import { audit } from '../../services/auditService.js';
 import { notFound } from '../../utils/errors.js';
 
 const router = Router();
+
+// ── Customer broadcast (newsletter / announcement) ──────────────────────────
+router.get('/broadcast/audience', requirePermission('emails.manage'), asyncHandler(async (_req, res) => {
+  res.json({ audience: await broadcastAudienceCount(), recent: await recentBroadcasts() });
+}));
+
+router.post('/broadcast', requirePermission('emails.manage'), asyncHandler(async (req, res) => {
+  const { subject, message } = z.object({
+    subject: z.string().min(2).max(200),
+    message: z.string().min(2).max(20000),
+  }).parse(req.body);
+  // Plain-text message → simple paragraphs; a couple of safe inline tags allowed.
+  const innerHtml = `<h1>${escapeHtml(subject)}</h1>` +
+    escapeHtml(message).split(/\n{2,}/).map((p) => `<p>${p.replace(/\n/g, '<br>')}</p>`).join('');
+  const summary = await sendBroadcast({ subject, innerHtml });
+  await audit({ actor: req.user, action: 'email.broadcast', metadata: { subject, ...summary }, req });
+  res.json(summary);
+}));
+
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, (c) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
 
 router.get('/', requirePermission('emails.manage'), asyncHandler(async (_req, res) => {
   res.json({ templates: await all('SELECT * FROM email_templates ORDER BY name') });

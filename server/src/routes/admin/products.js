@@ -53,6 +53,36 @@ router.patch('/:id', requirePermission('suppliers.manage'), asyncHandler(async (
   res.json({ product });
 }));
 
+// Bulk action across many products at once — activate/hide, feature, or switch
+// delivery mode (auto/manual) for a whole selection in one call. Metadata keys
+// are merged so unrelated settings (sale price, cost, image) are preserved.
+router.post('/bulk', requirePermission('suppliers.manage'), asyncHandler(async (req, res) => {
+  const { ids, action, value } = z.object({
+    ids: z.array(z.string()).min(1).max(500),
+    action: z.enum(['active', 'featured', 'deliveryMode']),
+    value: z.union([z.boolean(), z.enum(['auto', 'manual'])]),
+  }).parse(req.body);
+
+  let updated = 0;
+  for (const id of ids) {
+    const p = await getProduct(id);
+    if (!p) continue;
+    if (action === 'active') {
+      await updateProduct(id, { active: !!value });
+    } else if (action === 'featured') {
+      await updateProduct(id, { metadata: { ...p.metadata, featured: !!value } });
+    } else if (action === 'deliveryMode') {
+      const metadata = { ...p.metadata };
+      if (value === 'manual') metadata.deliveryMode = 'manual';
+      else delete metadata.deliveryMode; // 'auto' is the default → keep metadata clean
+      await updateProduct(id, { metadata });
+    }
+    updated++;
+  }
+  await audit({ actor: req.user, action: 'product.bulk_update', metadata: { action, value, count: updated }, req });
+  res.json({ updated });
+}));
+
 // Mystery-box reward pool (for kind='mystery' products).
 router.get('/:id/mystery', requirePermission('orders.read'), asyncHandler(async (req, res) => {
   res.json({ rewards: await getRewards(req.params.id) });
