@@ -27,6 +27,17 @@ export default function AdminProducts() {
   const [busy, setBusy] = useState(false);
   const [stock, setStock] = useState(null); // { p, codes } or null
   const [rewards, setRewards] = useState(null); // mystery reward pool [{label,weight,creditEuro}]
+  const [sel, setSel] = useState(() => new Set()); // selected product ids for bulk actions
+
+  const toggleSel = (id) => setSel((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const bulk = async (action, value) => {
+    setBusy(true);
+    try {
+      const r = await api.post('/api/admin/products/bulk', { ids: [...sel], action, value });
+      toast.success(`Updated ${r.updated} product(s).`);
+      setSel(new Set()); load();
+    } catch (err) { toast.error(err.message); } finally { setBusy(false); }
+  };
 
   const addCodes = async () => {
     if (!stock?.codes.trim()) return;
@@ -114,6 +125,22 @@ export default function AdminProducts() {
       </div>
       <p className="text-slate-400 text-sm mb-6">Manage your catalog. Featured items get highlighted on the storefront.</p>
 
+      {sel.size > 0 && (
+        <div className="card p-3 mb-4 flex flex-wrap items-center gap-2 border border-violet-500/30 bg-violet-500/5">
+          <span className="text-sm text-white font-semibold mr-1">{sel.size} selected</span>
+          <button disabled={busy} onClick={() => bulk('deliveryMode', 'auto')} className="btn-ghost text-xs">🤖 Automatic</button>
+          <button disabled={busy} onClick={() => bulk('deliveryMode', 'manual')} className="btn-ghost text-xs">✋ Manual</button>
+          <span className="w-px h-5 bg-white/10 mx-1" />
+          <button disabled={busy} onClick={() => bulk('featured', true)} className="btn-ghost text-xs">★ Feature</button>
+          <button disabled={busy} onClick={() => bulk('featured', false)} className="btn-ghost text-xs">Unfeature</button>
+          <span className="w-px h-5 bg-white/10 mx-1" />
+          <button disabled={busy} onClick={() => bulk('active', true)} className="btn-ghost text-xs">👁 Show</button>
+          <button disabled={busy} onClick={() => bulk('active', false)} className="btn-ghost text-xs">🚫 Hide</button>
+          <div className="flex-1" />
+          <button onClick={() => setSel(new Set())} className="btn-ghost text-xs">Clear</button>
+        </div>
+      )}
+
       {products.length === 0 ? (
         <EmptyState icon={Package} title="No products yet"
           hint="Add your first product, or run the demo seeder (npm run seed:demo)."
@@ -125,8 +152,10 @@ export default function AdminProducts() {
           {products.map((p) => {
             const v = categoryVisual(p.category); const Icon = v.icon;
             return (
-              <div key={p.id} className="card p-4">
+              <div key={p.id} className={`card p-4 ${sel.has(p.id) ? 'ring-1 ring-violet-500/40' : ''}`}>
                 <div className="flex items-center gap-3">
+                  <input type="checkbox" aria-label={`Select ${p.name}`} className="shrink-0"
+                    checked={sel.has(p.id)} onChange={() => toggleSel(p.id)} />
                   <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${v.grad} flex items-center justify-center shrink-0`}>
                     <Icon size={18} className="text-white" />
                   </div>
@@ -166,6 +195,11 @@ export default function AdminProducts() {
           <table className="w-full text-sm min-w-[760px]">
             <thead className="text-left text-slate-400 border-b border-white/5">
               <tr>
+                <th className="px-4 py-3 w-8">
+                  <input type="checkbox" aria-label="Select all"
+                    checked={products.length > 0 && sel.size === products.length}
+                    onChange={(e) => setSel(e.target.checked ? new Set(products.map((p) => p.id)) : new Set())} />
+                </th>
                 <th className="px-4 py-3 font-medium">Product</th>
                 <th className="px-4 py-3 font-medium">Category</th>
                 <th className="px-4 py-3 font-medium">Price</th>
@@ -178,7 +212,11 @@ export default function AdminProducts() {
               {products.map((p) => {
                 const v = categoryVisual(p.category); const Icon = v.icon;
                 return (
-                  <tr key={p.id} className="hover:bg-white/5">
+                  <tr key={p.id} className={`hover:bg-white/5 ${sel.has(p.id) ? 'bg-violet-500/5' : ''}`}>
+                    <td className="px-4 py-3">
+                      <input type="checkbox" aria-label={`Select ${p.name}`}
+                        checked={sel.has(p.id)} onChange={() => toggleSel(p.id)} />
+                    </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         <div className={`w-9 h-9 rounded-lg bg-gradient-to-br ${v.grad} flex items-center justify-center shrink-0`}>

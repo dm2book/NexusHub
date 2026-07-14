@@ -11,7 +11,7 @@ import nodemailer from 'nodemailer';
 import { config } from '../config/env.js';
 import { get, run, nowIso } from '../db/index.js';
 import { newId } from '../utils/ids.js';
-import { renderTemplate, baseContext } from './templateService.js';
+import { renderTemplate, renderTokens, wrapBranded, baseContext } from './templateService.js';
 
 let transporter = null;
 function getTransport() {
@@ -116,5 +116,40 @@ export async function sendEmailAsync(eventKey, to, context = {}) {
     await sendEmail(eventKey, to, context);
   } catch (err) {
     console.error(`[email] ${eventKey} -> ${to} failed:`, err.message);
+  }
+}
+
+/**
+ * Send ad-hoc content (not a stored template) — used by the customer broadcast.
+ * `subject` and `innerHtml` may use {{tokens}} resolved from `context` (e.g.
+ * {{user.name}}); the content is wrapped in the branded shell. Every send is
+ * logged to email_log under the given `logTag`. Throws on failure so the caller
+ * can count it.
+ */
+export async function sendRawEmail({ to, subject, innerHtml, context = {}, logTag = 'broadcast' }) {
+  const id = newId('eml');
+  const at = nowIso();
+  const ctx = baseContext(context);
+  const subj = renderTokens(subject, ctx);
+  const html = wrapBranded(renderTokens(innerHtml, ctx), { preheader: subj });
+  const from = `${config.email.fromName} <${config.email.fromAddress}>`;
+  try {
+    let info; let status;
+    if (config.email.resendApiKey) {
+      info = await sendViaResend({ from, to, subject: subj, html });
+      status = 'sent';
+    } else {
+      info = await getTransport().sendMail({ from, to, subject: subj, html });
+      status = config.email.smtpUrl ? 'sent' : 'recorded';
+    }
+    await run(`INSERT INTO email_log (id, template_id, to_email, subject, status, provider_ref, created_at)
+         VALUES (@id, @t, @to, @subj, @st, @ref, @at)`,
+        { id, t: logTag, to, subj, st: status, ref: info.messageId || null, at });
+    return { id, status };
+  } catch (err) {
+    await run(`INSERT INTO email_log (id, template_id, to_email, subject, status, error, created_at)
+         VALUES (@id, @t, @to, @subj, 'failed', @err, @at)`,
+        { id, t: logTag, to, subj, err: err.message, at });
+    throw err;
   }
 }
