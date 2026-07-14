@@ -891,4 +891,20 @@ CREATE TABLE IF NOT EXISTS forge_shop_items (
 CREATE INDEX IF NOT EXISTS idx_forge_shop_active ON forge_shop_items (active, created_at);
 `,
   },
+  {
+    id: '020_saved_carts',
+    sql: `
+-- ── Abandoned-cart recovery ─────────────────────────────────────────────────
+-- Signed-in shoppers' carts are mirrored here so they survive devices and power
+-- a single "you left items behind" reminder email. reminded_at is stamped when
+-- a reminder goes out; a fresh change (updated_at > reminded_at) re-arms it.
+CREATE TABLE IF NOT EXISTS saved_carts (
+  user_id      TEXT PRIMARY KEY,
+  items        TEXT NOT NULL DEFAULT '[]',
+  updated_at   TEXT NOT NULL,
+  reminded_at  TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_saved_carts_reminder ON saved_carts (updated_at);
+`,
+  },
 ];

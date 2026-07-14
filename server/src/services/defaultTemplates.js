@@ -107,6 +107,20 @@ export const DEFAULT_TEMPLATES = [
       <p><a class="btn" href="{{order.url}}">View your order</a></p>`,
   },
   {
+    id: 'cart_reminder',
+    name: 'Abandoned Cart',
+    subject: 'You left something in your cart 🛒',
+    body_html: `
+      <div class="badge">🛒</div>
+      <h1 style="text-align:center">Still thinking it over?</h1>
+      <p style="text-align:center;max-width:420px;margin-left:auto;margin-right:auto">Hi {{user.name}}, you left these
+      in your cart at {{brand.name}}. They're still here — grab them before they're gone.</p>
+      {{cart.itemsHtml}}
+      <p style="text-align:center"><a class="btn" href="{{cart.url}}">Complete your order</a></p>
+      <p style="text-align:center;color:#8b93a7;font-size:13px">Instant delivery, buyer-protected. Questions? Just reply
+      to this email or open a ticket in our Discord.</p>`,
+  },
+  {
     id: 'review_request',
     name: 'Review Request',
     subject: 'How was your order {{order.number}}? ⭐',

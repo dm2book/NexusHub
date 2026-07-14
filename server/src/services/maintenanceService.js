@@ -5,12 +5,13 @@
  */
 import { run, get, all, nowIso } from '../db/index.js';
 import { transitionOrder, sendPaymentReminders, sendReviewRequests } from './orderService.js';
+import { sendCartReminders } from './cartService.js';
 
 const HOURS = (n) => new Date(Date.now() - n * 3_600_000).toISOString();
 const DAYS = (n) => new Date(Date.now() - n * 86_400_000).toISOString();
 
 export async function runMaintenance() {
-  const summary = { otpPurged: 0, sessionsExpired: 0, ordersCancelled: 0, remindersSent: 0, reviewRequestsSent: 0, at: nowIso() };
+  const summary = { otpPurged: 0, sessionsExpired: 0, ordersCancelled: 0, remindersSent: 0, reviewRequestsSent: 0, cartRemindersSent: 0, at: nowIso() };
 
   // 1. Purge OTP codes that are long expired / already consumed (keep table small).
   try {
@@ -49,6 +50,12 @@ export async function runMaintenance() {
   try {
     summary.reviewRequestsSent = await sendReviewRequests({ afterHours: 24 });
   } catch (e) { summary.reviewError = e.message; }
+
+  // 6. Abandoned-cart recovery: one reminder per idle cart (has items, no order
+  //    placed since, not already reminded for this cart version).
+  try {
+    summary.cartRemindersSent = await sendCartReminders({ afterHours: 4 });
+  } catch (e) { summary.cartError = e.message; }
 
   return summary;
 }
