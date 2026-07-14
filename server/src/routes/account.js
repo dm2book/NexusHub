@@ -14,7 +14,7 @@ import { addVerifiedReview } from '../services/reviewsService.js';
 import { updateProfile, updatePreferences, publicUser } from '../services/userService.js';
 import { loyaltyFor } from '../services/loyaltyService.js';
 import { affiliateStats } from '../services/affiliateService.js';
-import { coinBalance, coinHistory, redeemReward, FORGE_SHOP } from '../services/forgeCoinService.js';
+import { coinBalance, coinHistory, redeemReward, forgeShopCatalog } from '../services/forgeCoinService.js';
 import { pullsForOrder, rerollPull } from '../services/mysteryBoxService.js';
 import { getMembership } from '../services/membershipService.js';
 import { walletSummary, balanceOf } from '../services/walletService.js';
@@ -224,10 +224,10 @@ router.post('/orders/:id/mystery/:pullId/reroll', asyncHandler(async (req, res) 
 
 // ── Forge Coins + Forge Shop ─────────────────────────────────────────────────
 router.get('/coins', asyncHandler(async (req, res) => {
-  const [balance, history] = await Promise.all([
-    coinBalance(req.user.id), coinHistory(req.user.id),
+  const [balance, history, shop] = await Promise.all([
+    coinBalance(req.user.id), coinHistory(req.user.id), forgeShopCatalog(),
   ]);
-  res.json({ balance, history, shop: FORGE_SHOP });
+  res.json({ balance, history, shop });
 }));
 
 router.post('/coins/redeem', asyncHandler(async (req, res) => {

@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
   Tag, Gift, Package, Plus, Trash2, Eye, EyeOff, Power, Copy, Percent, Euro,
-  BarChart3, TrendingDown, Wallet, CalendarDays,
+  BarChart3, TrendingDown, Wallet, CalendarDays, Coins,
 } from 'lucide-react';
 import { api } from '../../lib/api.js';
 import { money, date } from '../../lib/format.js';
@@ -12,6 +12,7 @@ const TABS = [
   { id: 'coupons', label: 'Coupons', icon: Tag },
   { id: 'giftcards', label: 'Gift cards', icon: Gift },
   { id: 'bundles', label: 'Bundles', icon: Package },
+  { id: 'forgeShop', label: 'Forge Shop', icon: Coins },
   { id: 'drops', label: 'Drops', icon: CalendarDays },
   { id: 'report', label: 'Report', icon: BarChart3 },
 ];
@@ -52,6 +53,7 @@ export default function Monetization() {
       {tab === 'coupons' && <Coupons coupons={data.coupons} toast={toast} call={call} busy={busy} />}
       {tab === 'giftcards' && <GiftCards cards={data.giftCards} toast={toast} call={call} busy={busy} />}
       {tab === 'bundles' && <Bundles bundles={data.bundles} products={products} toast={toast} call={call} busy={busy} />}
+      {tab === 'forgeShop' && <ForgeShopItems items={data.forgeShop} toast={toast} call={call} busy={busy} />}
       {tab === 'drops' && <Drops toast={toast} />}
       {tab === 'report' && <Report toast={toast} />}
     </div>
@@ -220,6 +222,68 @@ function GiftCards({ cards, toast, call }) {
                   {g.status === 'active' ? <Eye size={15} /> : <EyeOff size={15} />}
                 </button>
               )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Forge Shop items (bought with Forge Coins) ───────────────────────────────
+function ForgeShopItems({ items, toast, call }) {
+  const [f, setF] = useState({ label: '', cost: '', couponKind: 'fixed', valueEuro: '', percent: '', blurb: '' });
+  const add = () => call(async () => {
+    const value = f.couponKind === 'percent' ? Math.round(Number(f.percent)) : Math.round(Number(f.valueEuro) * 100);
+    await api.post('/api/admin/monetization/forge-shop', {
+      label: f.label.trim(), blurb: f.blurb.trim() || undefined,
+      cost: Math.round(Number(f.cost)), couponKind: f.couponKind, value,
+    });
+    toast.success('Forge Shop reward added.');
+    setF({ label: '', cost: '', couponKind: 'fixed', valueEuro: '', percent: '', blurb: '' });
+  });
+  const ready = f.label.trim() && Number(f.cost) > 0 && (f.couponKind === 'percent' ? Number(f.percent) > 0 : Number(f.valueEuro) > 0);
+  return (
+    <div className="space-y-5">
+      <div className="card p-5">
+        <h3 className="text-white mb-1 flex items-center gap-2"><Plus size={16} /> Add a Forge Shop reward</h3>
+        <p className="text-slate-500 text-sm mb-4">Members buy it with Forge Coins and get a personal single-use discount code.</p>
+        <div className="grid sm:grid-cols-2 gap-3">
+          <div><label className="label">Name</label><input className="input" value={f.label} onChange={(e) => setF({ ...f, label: e.target.value })} placeholder="e.g. €15 discount code" /></div>
+          <div><label className="label">Cost (Forge Coins)</label><input className="input" type="number" min="1" value={f.cost} onChange={(e) => setF({ ...f, cost: e.target.value })} placeholder="8" /></div>
+          <div><label className="label">Discount type</label>
+            <select className="input" value={f.couponKind} onChange={(e) => setF({ ...f, couponKind: e.target.value })}>
+              <option value="fixed">€ off (fixed)</option>
+              <option value="percent">% off</option>
+            </select></div>
+          {f.couponKind === 'percent' ? (
+            <div><label className="label">Percent off</label><input className="input" type="number" min="1" max="90" value={f.percent} onChange={(e) => setF({ ...f, percent: e.target.value })} placeholder="15" /></div>
+          ) : (
+            <div><label className="label">Value (€)</label><input className="input" type="number" min="0.01" step="0.01" value={f.valueEuro} onChange={(e) => setF({ ...f, valueEuro: e.target.value })} placeholder="15.00" /></div>
+          )}
+          <div className="sm:col-span-2"><label className="label">Short description (optional)</label><input className="input" value={f.blurb} onChange={(e) => setF({ ...f, blurb: e.target.value })} placeholder="€15 off any order" /></div>
+        </div>
+        <button onClick={add} disabled={!ready} className="btn-primary mt-4">Add reward</button>
+      </div>
+
+      {(!items || items.length === 0) ? (
+        <div className="card p-8 text-center text-slate-400">No custom rewards yet — the built-in €5/€10/€25 codes are always available in the shop.</div>
+      ) : (
+        <div className="card divide-y divide-white/5">
+          {items.map((it) => (
+            <div key={it.id} className={`flex items-center gap-3 px-5 py-3.5 ${it.active ? '' : 'opacity-50'}`}>
+              <span className="w-9 h-9 rounded-xl grid place-items-center bg-amber-500/10 text-amber-300 shrink-0"><Coins size={15} /></span>
+              <div className="min-w-0 flex-1">
+                <div className="text-white text-sm">{it.label}</div>
+                <div className="text-slate-500 text-xs mt-0.5">
+                  🪙 {it.cost} coins → {it.coupon_kind === 'percent' ? `${it.value}% off` : money(it.value, 'EUR')}
+                  {it.blurb ? ` · ${it.blurb}` : ''}{it.active ? '' : ' · hidden'}
+                </div>
+              </div>
+              <button title={it.active ? 'Hide' : 'Show'} onClick={() => call(() => api.patch(`/api/admin/monetization/forge-shop/${it.id}`, { active: !it.active }))}
+                className="p-2 rounded-lg hover:bg-white/10 text-slate-300">{it.active ? <Eye size={15} /> : <EyeOff size={15} />}</button>
+              <button title="Delete" onClick={() => call(() => api.del(`/api/admin/monetization/forge-shop/${it.id}`))}
+                className="p-2 rounded-lg hover:bg-white/10 text-red-300"><Trash2 size={15} /></button>
             </div>
           ))}
         </div>
