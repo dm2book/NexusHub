@@ -17,6 +17,7 @@ import { affiliateStats } from '../services/affiliateService.js';
 import { coinBalance, coinHistory, redeemReward, forgeShopCatalog } from '../services/forgeCoinService.js';
 import { pullsForOrder, rerollPull } from '../services/mysteryBoxService.js';
 import { getMembership } from '../services/membershipService.js';
+import { saveCart, getCart } from '../services/cartService.js';
 import { walletSummary, balanceOf } from '../services/walletService.js';
 import { redeemGiftCard } from '../services/giftCardService.js';
 import { requestPhoneOtp } from '../services/authService.js';
@@ -55,6 +56,15 @@ router.get('/rewards', asyncHandler(async (req, res) => {
     getMembership(req.user.id),
   ]);
   res.json({ loyalty, affiliate, membership });
+}));
+
+// ── Saved cart (mirrors the storefront cart for logged-in shoppers) ──────────
+router.get('/cart', asyncHandler(async (req, res) => {
+  res.json({ items: await getCart(req.user.id) });
+}));
+router.put('/cart', asyncHandler(async (req, res) => {
+  const { items } = z.object({ items: z.array(z.any()).max(50) }).parse(req.body || {});
+  res.json({ items: await saveCart(req.user.id, items) });
 }));
 
 // ── Wallet / store credit ────────────────────────────────────────────────────
