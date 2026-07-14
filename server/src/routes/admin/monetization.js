@@ -8,6 +8,7 @@ import { notFound } from '../../utils/errors.js';
 import { listCoupons, createCoupon, updateCoupon, deleteCoupon } from '../../services/couponService.js';
 import { listGiftCards, issueGiftCard, setGiftCardStatus } from '../../services/giftCardService.js';
 import { listBundles, createBundle, updateBundle, deleteBundle } from '../../services/bundleService.js';
+import { listAllShopItems, createShopItem, setShopItemActive, deleteShopItem } from '../../services/forgeCoinService.js';
 import { monetizationReport } from '../../services/analyticsService.js';
 
 const router = Router();
@@ -20,8 +21,34 @@ router.get('/report', asyncHandler(async (req, res) => {
 
 // Everything on one screen.
 router.get('/', asyncHandler(async (_req, res) => {
-  const [coupons, giftCards, bundles] = await Promise.all([listCoupons(), listGiftCards(), listBundles()]);
-  res.json({ coupons, giftCards, bundles });
+  const [coupons, giftCards, bundles, forgeShop] = await Promise.all([
+    listCoupons(), listGiftCards(), listBundles(), listAllShopItems()]);
+  res.json({ coupons, giftCards, bundles, forgeShop });
+}));
+
+// ── Forge Shop items (bought with Forge Coins) ───────────────────────────────
+router.post('/forge-shop', asyncHandler(async (req, res) => {
+  const body = z.object({
+    label: z.string().min(2).max(80),
+    blurb: z.string().max(160).optional(),
+    cost: z.number().int().positive().max(100000),
+    couponKind: z.enum(['fixed', 'percent']).optional(),
+    value: z.number().int().positive(),
+  }).parse(req.body);
+  const item = await createShopItem(body);
+  await audit({ actor: req.user, action: 'forgeshop.create', targetType: 'forge_shop_item', targetId: item.id, metadata: { cost: body.cost }, req });
+  res.status(201).json({ item });
+}));
+
+router.patch('/forge-shop/:id', asyncHandler(async (req, res) => {
+  const { active } = z.object({ active: z.boolean() }).parse(req.body);
+  res.json({ item: await setShopItemActive(req.params.id, active) });
+}));
+
+router.delete('/forge-shop/:id', asyncHandler(async (req, res) => {
+  if (!(await deleteShopItem(req.params.id))) throw notFound('Item not found');
+  await audit({ actor: req.user, action: 'forgeshop.delete', targetType: 'forge_shop_item', targetId: req.params.id, req });
+  res.json({ ok: true });
 }));
 
 // ── Coupons ──────────────────────────────────────────────────────────────────

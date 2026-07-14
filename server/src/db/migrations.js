@@ -872,4 +872,23 @@ CREATE INDEX IF NOT EXISTS idx_orders_review_request
   ON orders (updated_at) WHERE status = 'completed' AND review_request_sent_at IS NULL;
 `,
   },
+  {
+    id: '019_forge_shop_items',
+    sql: `
+-- ── Admin-managed Forge Shop rewards ────────────────────────────────────────
+-- Custom discount codes the owner adds; members buy them with Forge Coins and a
+-- personal single-use coupon is generated. Sits alongside the built-in rewards.
+CREATE TABLE IF NOT EXISTS forge_shop_items (
+  id           TEXT PRIMARY KEY,
+  label        TEXT NOT NULL,
+  blurb        TEXT,
+  cost         INTEGER NOT NULL,          -- price in Forge Coins
+  coupon_kind  TEXT NOT NULL DEFAULT 'fixed', -- 'fixed' (cents) | 'percent'
+  value        INTEGER NOT NULL,          -- cents for fixed, percent for percent
+  active       INTEGER NOT NULL DEFAULT 1,
+  created_at   TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_forge_shop_active ON forge_shop_items (active, created_at);
+`,
+  },
 ];
