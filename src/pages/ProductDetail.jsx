@@ -188,6 +188,12 @@ export default function ProductDetail() {
             )}
           </div>
 
+          {product.stockLeft > 0 && (
+            <div className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-red-600 bg-red-50 border border-red-200 rounded-full px-3 py-1">
+              🔥 {product.stockLeft === 1 ? t('card.lastOne', 'Last one!') : t('product.almostGone', 'Almost sold out — only {n} left', { n: product.stockLeft })}
+            </div>
+          )}
+
           {/* Pack switcher — jump between sizes of the same category in one tap */}
           {related.length > 0 && (
             <div className="mt-5">

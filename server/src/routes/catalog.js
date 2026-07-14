@@ -5,6 +5,7 @@ import { config, manualPayMethods } from '../config/env.js';
 import { asyncHandler } from '../middleware/error.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 import { listProducts, getProduct, trendingProducts, priceHistory } from '../services/productService.js';
+import { availableCounts, availableCount } from '../services/codeStockService.js';
 import { getRewards as getMysteryRewards } from '../services/mysteryBoxService.js';
 import { listUpcoming as listUpcomingDrops } from '../services/dropService.js';
 import { evaluateCoupon } from '../services/couponService.js';
@@ -107,8 +108,17 @@ async function assertOwnsOrder(req, order, email) {
   if (!owns) throw forbidden('This order is not yours');
 }
 
+// Only surface a "left" count for products that actually sell from finite code
+// stock (auto delivery). This keeps "almost sold out" honest — manual/made-to-
+// order products, and auto products with plenty of stock, show nothing.
+const LOW_STOCK = 6;
+const stockLeftFor = (product, count) =>
+  (product.deliveryMode === 'auto' && count > 0 && count <= LOW_STOCK) ? count : null;
+
 router.get('/products', asyncHandler(async (_req, res) => {
-  res.json({ products: await listProducts({ activeOnly: true }) });
+  const products = await listProducts({ activeOnly: true });
+  const counts = await availableCounts(products.map((p) => p.id));
+  res.json({ products: products.map((p) => ({ ...p, stockLeft: stockLeftFor(p, counts[p.id] || 0) })) });
 }));
 
 // Trending products (most-sold recently). Registered before /products/:id.
@@ -123,7 +133,7 @@ router.get('/products/trending', asyncHandler(async (_req, res) => {
 router.get('/products/:id', asyncHandler(async (req, res) => {
   const p = await getProduct(req.params.id);
   if (!p || !p.active) throw new ApiError(404, 'Product not found');
-  res.json({ product: p });
+  res.json({ product: { ...p, stockLeft: stockLeftFor(p, await availableCount(p.id)) } });
 }));
 
 // Price history for the product-page chart.

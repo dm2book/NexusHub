@@ -48,9 +48,9 @@ export default function LightProductCard({ product, onAdd }) {
             <span className="text-[10px] font-bold text-amber-600 bg-amber-100 rounded-full px-2 py-0.5">★ Featured</span>
           )}
         </div>
-        {typeof product.stock === 'number' && product.stock > 0 && product.stock <= 10 && (
+        {product.stockLeft > 0 && (
           <span className="absolute top-2.5 right-2.5 z-10 text-[10px] font-bold text-red-600 bg-red-100 rounded-full px-2 py-0.5 animate-pulse">
-            Only {product.stock} left
+            {product.stockLeft === 1 ? t('card.lastOne', 'Last one!') : t('card.onlyLeft', 'Only {n} left', { n: product.stockLeft })}
           </span>
         )}
         {product.sold > 20 && (
