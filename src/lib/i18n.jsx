@@ -95,6 +95,8 @@ const NL = {
   // Product card
   'card.from': 'Vanaf',
   'card.instant': 'Direct',
+  'card.lastOne': 'Laatste!',
+  'card.onlyLeft': 'Nog {n} op voorraad',
 
   // Mobile tab bar
   'tab.home': 'Home',
@@ -161,6 +163,7 @@ const NL = {
   'product.addToCart': 'In winkelwagen',
   'product.buyNow': 'Direct kopen',
   'product.off': 'KORTING',
+  'product.almostGone': 'Bijna uitverkocht — nog {n}',
   'product.instant': 'Directe levering',
   'product.instantSub': 'Codes binnen seconden',
   'product.protected': 'Kopersbescherming',
