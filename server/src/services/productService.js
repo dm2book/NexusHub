@@ -17,6 +17,9 @@ const hydrate = (r) => {
     featured: !!metadata.featured,
     image: metadata.image || null,
     compareAtPrice: compareAt > r.price ? compareAt : null,
+    // How paid orders for this product are delivered: 'auto' pulls a code from
+    // stock instantly; 'manual' always waits for staff to deliver by hand.
+    deliveryMode: metadata.deliveryMode === 'manual' ? 'manual' : 'auto',
   };
 };
 
