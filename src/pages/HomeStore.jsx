@@ -77,8 +77,15 @@ const TRUST = [
 
 // Real counts only — append "+" once the number is large enough to round.
 const fmtCount = (n) => `${Number(n || 0).toLocaleString('en-US')}${Number(n || 0) >= 100 ? '+' : ''}`;
+// Real average delivery time → a short human string, or null when there are no
+// completed orders yet (so we never fake an "instant" claim).
+const fmtDelivery = (s) => (s == null ? null
+  : s < 90 ? `${Math.max(1, Math.round(s))}s`
+  : s < 5400 ? `${Math.round(s / 60)} min`
+  : `${Math.round(s / 3600)}h`);
 // All real (or honest service promises) — no fabricated metrics. The 2nd card
-// shows a real fulfilment rate once orders have finished, else a real guarantee.
+// shows a real fulfilment rate once orders have finished, else a real guarantee;
+// the 4th shows the real average delivery time once we have one, else 24/7 support.
 const statCards = (s, tr = (_k, en) => en) => [
   // "Happy customers" = people who actually LEFT A REVIEW — not just anyone
   // who ordered. The number only exists once someone wrote one.
@@ -87,7 +94,9 @@ const statCards = (s, tr = (_k, en) => en) => [
     ? { icon: CheckCircle2, value: `${s.successRate}%`, label: tr('home.s.fulfilled', 'Fulfilled'), color: 'text-emerald-600 bg-emerald-100' }
     : { icon: ShieldCheck, value: '100%', label: tr('home.s.protected', 'Buyer protected'), color: 'text-emerald-600 bg-emerald-100' },
   { icon: ShoppingCart, value: fmtCount(s.delivered), label: tr('home.s.delivered', 'Orders Delivered'), color: 'text-blue-600 bg-blue-100' },
-  { icon: Headphones, value: '24/7', label: tr('home.s.support', 'Customer Support'), color: 'text-amber-600 bg-amber-100' },
+  s.avgDeliverySeconds != null
+    ? { icon: Clock, value: fmtDelivery(s.avgDeliverySeconds), label: tr('home.s.avgDelivery', 'Avg. delivery'), color: 'text-amber-600 bg-amber-100' }
+    : { icon: Headphones, value: '24/7', label: tr('home.s.support', 'Customer Support'), color: 'text-amber-600 bg-amber-100' },
 ];
 
 export default function HomeStore() {

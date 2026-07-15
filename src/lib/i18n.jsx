@@ -91,6 +91,7 @@ const NL = {
   'home.s.protected': 'Kopersbescherming',
   'home.s.delivered': 'Bestellingen geleverd',
   'home.s.support': 'Klantenservice',
+  'home.s.avgDelivery': 'Gem. levertijd',
 
   // Product card
   'card.from': 'Vanaf',

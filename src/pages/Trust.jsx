@@ -52,13 +52,24 @@ export default function Trust() {
         <p className="text-slate-500 mt-3 max-w-xl mx-auto">Real numbers, real guarantees. Here's exactly how we keep every order safe, fast and protected.</p>
       </div>
 
-      {/* Live stats (real) */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-12">
-        <Stat icon={CheckCircle2} value={fmt(stats.delivered)} label="Orders delivered" color="text-violet-600 bg-violet-100" />
-        <Stat icon={Clock} value={avgDelivery} label="Average delivery" color="text-emerald-600 bg-emerald-100" />
-        <Stat icon={Star} value={stats.reviews > 0 ? `${stats.rating}/5` : '—'} label={stats.reviews > 0 ? `${stats.reviews.toLocaleString('en-US')} reviews` : 'No reviews yet'} color="text-amber-600 bg-amber-100" />
-        <Stat icon={Users} value={stats.discordMembers > 0 ? stats.discordMembers.toLocaleString('en-US') : '24/7'} label={stats.discordMembers > 0 ? 'Discord members' : 'Community support'} color="text-blue-600 bg-blue-100" />
-      </div>
+      {/* Live stats (real only — cards without data hide themselves) */}
+      {(() => {
+        const cards = [
+          { icon: CheckCircle2, value: fmt(stats.delivered), label: 'Orders delivered', color: 'text-violet-600 bg-violet-100' },
+          { icon: Clock, value: avgDelivery, label: 'Average delivery', color: 'text-emerald-600 bg-emerald-100' },
+          // Real fulfilment success rate — only once orders have finished.
+          stats.successRate != null
+            ? { icon: ShieldCheck, value: `${stats.successRate}%`, label: 'Successfully delivered', color: 'text-emerald-600 bg-emerald-100' }
+            : null,
+          { icon: Star, value: stats.reviews > 0 ? `${stats.rating}/5` : '—', label: stats.reviews > 0 ? `${stats.reviews.toLocaleString('en-US')} reviews` : 'No reviews yet', color: 'text-amber-600 bg-amber-100' },
+          { icon: Users, value: stats.discordMembers > 0 ? stats.discordMembers.toLocaleString('en-US') : '24/7', label: stats.discordMembers > 0 ? 'Discord members' : 'Community support', color: 'text-blue-600 bg-blue-100' },
+        ].filter(Boolean);
+        return (
+          <div className={`grid grid-cols-2 ${cards.length >= 5 ? 'lg:grid-cols-5' : 'lg:grid-cols-4'} gap-4 mb-12`}>
+            {cards.map((c) => <Stat key={c.label} icon={c.icon} value={c.value} label={c.label} color={c.color} />)}
+          </div>
+        );
+      })()}
 
       {/* Live, database-backed activity (hides itself until there's real data) */}
       <LiveActivity />
