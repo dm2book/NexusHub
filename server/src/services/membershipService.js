@@ -5,11 +5,14 @@
  */
 import { run, get, nowIso } from '../db/index.js';
 
+export const MEMBERSHIP_DAYS = 30;
+
 export const FORGE_PLUS = {
   id: 'forge_plus',
   name: 'Forge+',
   discountPercent: 5,
-  priceCents: 499,        // €4.99 / month (informational; billing handled manually)
+  priceCents: 499,        // €4.99 / month, payable instantly with store credit
+  coinPrice: 40,          // …or with Forge Coins (loyalty perk; tune to taste)
   perks: [
     '5% off every order',
     'Priority support queue',
