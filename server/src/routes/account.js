@@ -14,11 +14,11 @@ import { addVerifiedReview } from '../services/reviewsService.js';
 import { updateProfile, updatePreferences, publicUser } from '../services/userService.js';
 import { loyaltyFor } from '../services/loyaltyService.js';
 import { affiliateStats } from '../services/affiliateService.js';
-import { coinBalance, coinHistory, redeemReward, forgeShopCatalog } from '../services/forgeCoinService.js';
+import { coinBalance, coinHistory, redeemReward, forgeShopCatalog, spendCoins } from '../services/forgeCoinService.js';
 import { pullsForOrder, rerollPull } from '../services/mysteryBoxService.js';
-import { getMembership } from '../services/membershipService.js';
+import { getMembership, grantMembership, FORGE_PLUS, MEMBERSHIP_DAYS } from '../services/membershipService.js';
 import { saveCart, getCart } from '../services/cartService.js';
-import { walletSummary, balanceOf } from '../services/walletService.js';
+import { walletSummary, balanceOf, debit } from '../services/walletService.js';
 import { redeemGiftCard } from '../services/giftCardService.js';
 import { requestPhoneOtp } from '../services/authService.js';
 import { normalizePhone, isValidPhone } from '../services/smsService.js';
@@ -50,12 +50,36 @@ function dedupe(orders) {
 
 // ── Rewards: loyalty tier, affiliate program, Forge+ membership ──────────────
 router.get('/rewards', asyncHandler(async (req, res) => {
-  const [loyalty, affiliate, membership] = await Promise.all([
+  const [loyalty, affiliate, membership, walletBalance, coins] = await Promise.all([
     loyaltyFor(req.user.id),
     affiliateStats(req.user.id, req.user.email),
     getMembership(req.user.id),
+    balanceOf(req.user.id),
+    coinBalance(req.user.id),
   ]);
-  res.json({ loyalty, affiliate, membership });
+  res.json({ loyalty, affiliate, membership, walletBalance, coins });
+}));
+
+// Buy / extend Forge+ (30 days) with store credit or Forge Coins — instant, no
+// external payment needed. grantMembership extends from the current expiry, so
+// buying again stacks another 30 days.
+router.post('/membership/purchase', asyncHandler(async (req, res) => {
+  const { method } = z.object({ method: z.enum(['credit', 'coins']) }).parse(req.body || {});
+  const uid = req.user.id;
+  if (method === 'credit') {
+    await debit(uid, FORGE_PLUS.priceCents, 'spend', `${FORGE_PLUS.name} membership (${MEMBERSHIP_DAYS} days)`);
+  } else {
+    await spendCoins(uid, FORGE_PLUS.coinPrice, 'membership', 'forge_plus');
+  }
+  const membership = await grantMembership(uid, MEMBERSHIP_DAYS);
+  await audit({ actor: req.user, action: 'membership.purchase', targetType: 'user', targetId: uid,
+    metadata: { method }, req });
+  await notif.notify(uid, {
+    type: 'system', title: `${FORGE_PLUS.name} is active 👑`,
+    body: `You now get ${FORGE_PLUS.discountPercent}% off every order. Enjoy!`,
+    link: '/account/rewards',
+  }).catch(() => {});
+  res.json({ membership });
 }));
 
 // ── Saved cart (mirrors the storefront cart for logged-in shoppers) ──────────

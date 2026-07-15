@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Gift, Crown, Copy, Users, Wallet, Star, Check, Zap } from 'lucide-react';
+import { Gift, Crown, Copy, Users, Wallet, Star, Check, Zap, Coins } from 'lucide-react';
 import { api } from '../../lib/api.js';
 import { money, date } from '../../lib/format.js';
-import { PageLoader } from '../../components/ui.jsx';
+import { PageLoader, Modal } from '../../components/ui.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
 
 const TIER_COLORS = { bronze: '#cd7f32', silver: '#9ca3af', gold: '#f59e0b', platinum: '#a78bfa' };
@@ -10,14 +10,29 @@ const TIER_COLORS = { bronze: '#cd7f32', silver: '#9ca3af', gold: '#f59e0b', pla
 export default function Rewards() {
   const toast = useToast();
   const [data, setData] = useState(null);
+  const [buyOpen, setBuyOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
 
-  useEffect(() => { api.get('/api/account/rewards').then(setData).catch(() => setData(false)); }, []);
+  const load = () => api.get('/api/account/rewards').then(setData).catch(() => setData(false));
+  useEffect(() => { load(); }, []);
   if (data === null) return <PageLoader />;
   if (!data) return <div className="card p-8 text-slate-400">Couldn’t load rewards.</div>;
 
-  const { loyalty, affiliate, membership } = data;
+  const { loyalty, affiliate, membership, walletBalance = 0, coins = 0 } = data;
+  const plan = membership.plan;
   const refLink = `${window.location.origin}/?ref=${affiliate.code}`;
   const copy = (t, msg) => { navigator.clipboard?.writeText(t); toast.success(msg); };
+
+  const buy = async (method) => {
+    setBusy(true);
+    try {
+      await api.post('/api/account/membership/purchase', { method });
+      toast.success(`${plan.name} activated — ${plan.discountPercent}% off every order! 👑`);
+      setBuyOpen(false); load();
+    } catch (err) { toast.error(err.message); } finally { setBusy(false); }
+  };
+  const canCredit = walletBalance >= plan.priceCents;
+  const canCoins = coins >= plan.coinPrice;
 
   return (
     <div className="max-w-3xl space-y-6">
@@ -64,10 +79,38 @@ export default function Rewards() {
             <div key={p} className="flex items-center gap-2 text-sm text-slate-300"><Check size={14} className="text-emerald-400 shrink-0" /> {p}</div>
           ))}
         </div>
-        {!membership.active && (
-          <p className="text-slate-500 text-sm mt-4">Forge+ is {money(membership.plan.priceCents, 'EUR')}/month. Open a ticket in Discord to activate it — you’ll get {membership.plan.discountPercent}% off every order instantly.</p>
-        )}
+        <div className="flex items-center justify-between mt-4 pt-4 border-t border-white/5">
+          <p className="text-slate-500 text-sm">
+            {money(plan.priceCents, 'EUR')}/month or {plan.coinPrice} Forge Coins · instant activation.
+          </p>
+          <button onClick={() => setBuyOpen(true)} className="btn-primary text-sm">
+            <Crown size={15} /> {membership.active ? 'Extend Forge+' : 'Get Forge+'}
+          </button>
+        </div>
       </div>
+
+      <Modal open={buyOpen} onClose={() => setBuyOpen(false)} title={`${membership.active ? 'Extend' : 'Get'} ${plan.name} — 30 days`}>
+        <p className="text-slate-400 text-sm mb-4">{plan.discountPercent}% off every order, priority support & fulfillment, early access to drops. Pick how you’d like to pay — it’s instant.</p>
+        <div className="space-y-3">
+          <button disabled={busy || !canCredit} onClick={() => buy('credit')}
+            className={`w-full flex items-center justify-between rounded-xl border p-4 text-left transition ${canCredit ? 'border-white/10 hover:border-violet-500/50' : 'border-white/5 opacity-50 cursor-not-allowed'}`}>
+            <span className="flex items-center gap-3"><Wallet size={18} className="text-indigo-300" />
+              <span><span className="text-white font-semibold">Store credit</span><span className="block text-xs text-slate-500">Balance: {money(walletBalance, 'EUR')}</span></span>
+            </span>
+            <span className="text-white font-semibold">{money(plan.priceCents, 'EUR')}</span>
+          </button>
+          <button disabled={busy || !canCoins} onClick={() => buy('coins')}
+            className={`w-full flex items-center justify-between rounded-xl border p-4 text-left transition ${canCoins ? 'border-white/10 hover:border-violet-500/50' : 'border-white/5 opacity-50 cursor-not-allowed'}`}>
+            <span className="flex items-center gap-3"><Coins size={18} className="text-amber-300" />
+              <span><span className="text-white font-semibold">Forge Coins</span><span className="block text-xs text-slate-500">You have {coins} coins</span></span>
+            </span>
+            <span className="text-white font-semibold">🪙 {plan.coinPrice}</span>
+          </button>
+        </div>
+        {!canCredit && !canCoins && (
+          <p className="text-amber-400/80 text-xs mt-3">Not enough store credit or coins yet — earn coins by ordering, or top up your wallet with a gift card.</p>
+        )}
+      </Modal>
 
       {/* Affiliate */}
       <div className="card p-6">

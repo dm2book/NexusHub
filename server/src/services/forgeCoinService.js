@@ -82,6 +82,24 @@ export async function awardCoinsForOrder(order) {
   } catch { return 0; } // unique-index clash = already awarded
 }
 
+/**
+ * Spend coins on something other than a Forge Shop reward (e.g. a Forge+
+ * membership). Debits inside a transaction so concurrent spends can't overspend.
+ */
+export async function spendCoins(userId, amount, reason = 'spend', ref = null) {
+  const cost = Math.round(Number(amount));
+  if (!(cost > 0)) throw badRequest('Invalid coin amount.');
+  return tx(async () => {
+    const balance = await coinBalance(userId);
+    if (balance < cost) throw badRequest(`Not enough Forge Coins — you need ${cost}, you have ${balance}.`);
+    await run(
+      `INSERT INTO forge_coin_ledger (id, user_id, delta, reason, ref, created_at)
+       VALUES (@id, @u, @d, @reason, @ref, @at)`,
+      { id: newId('coin'), u: userId, d: -cost, reason, ref, at: nowIso() });
+    return { balance: await coinBalance(userId) };
+  });
+}
+
 /** Admin: grant (or deduct) coins. Negative grants never take a balance below 0. */
 export async function grantCoins(userId, amount, grantedBy = null) {
   const delta = Math.round(Number(amount));
