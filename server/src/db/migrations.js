@@ -907,4 +907,12 @@ CREATE TABLE IF NOT EXISTS saved_carts (
 CREATE INDEX IF NOT EXISTS idx_saved_carts_reminder ON saved_carts (updated_at);
 `,
   },
+  {
+    id: '021_supplier_listing_url',
+    sql: `
+-- The exact supplier listing to buy from (e.g. an Eldorado URL). Passed to the
+-- connector at fulfilment time alongside the SKU + quantity.
+ALTER TABLE supplier_products ADD COLUMN IF NOT EXISTS supplier_url TEXT;
+`,
+  },
 ];

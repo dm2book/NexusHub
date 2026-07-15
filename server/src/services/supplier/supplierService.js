@@ -59,16 +59,17 @@ export async function testSupplier(id) {
   return createConnector(s).testConnection();
 }
 
-/** Link a supplier catalog item to one of our products. */
-export async function mapSupplierProduct({ supplierId, productId, supplierSku, cost, priority = 100 } = {}) {
+/** Link a supplier catalog item to one of our products (with the exact listing
+ *  URL to buy from, e.g. an Eldorado link). */
+export async function mapSupplierProduct({ supplierId, productId, supplierSku, supplierUrl = null, cost, priority = 100 } = {}) {
   if (!(await getSupplier(supplierId))) throw notFound('Supplier not found');
   await run(`INSERT INTO supplier_products
-        (id, supplier_id, product_id, supplier_sku, cost, priority, last_synced_at)
-       VALUES (@id, @sup, @prod, @sku, @cost, @prio, @at)
+        (id, supplier_id, product_id, supplier_sku, supplier_url, cost, priority, last_synced_at)
+       VALUES (@id, @sup, @prod, @sku, @url, @cost, @prio, @at)
        ON CONFLICT(supplier_id, supplier_sku)
-       DO UPDATE SET product_id=@prod, cost=@cost, priority=@prio`,
+       DO UPDATE SET product_id=@prod, supplier_url=@url, cost=@cost, priority=@prio`,
       { id: newId('sprd'), sup: supplierId, prod: productId, sku: supplierSku,
-        cost: cost ?? null, prio: priority, at: nowIso() });
+        url: supplierUrl || null, cost: cost ?? null, prio: priority, at: nowIso() });
   return get('SELECT * FROM supplier_products WHERE supplier_id=@s AND supplier_sku=@k',
              { s: supplierId, k: supplierSku });
 }

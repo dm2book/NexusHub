@@ -6,7 +6,7 @@
 import { run, get, all, nowIso } from '../db/index.js';
 import { transitionOrder, sendPaymentReminders, sendReviewRequests } from './orderService.js';
 import { sendCartReminders } from './cartService.js';
-import { retryPendingFulfillments } from './fulfillmentService.js';
+import { retryPendingFulfillments, drainSupplierQueue } from './fulfillmentService.js';
 
 const HOURS = (n) => new Date(Date.now() - n * 3_600_000).toISOString();
 const DAYS = (n) => new Date(Date.now() - n * 86_400_000).toISOString();
@@ -63,6 +63,12 @@ export async function runMaintenance() {
   try {
     summary.fulfillmentsRetried = await retryPendingFulfillments({ limit: 25 });
   } catch (e) { summary.fulfillmentError = e.message; }
+
+  // 8. Drain the serial supplier queue (safety net if a payment-time drain was
+  //    interrupted): buys + delivers pending paid orders one at a time.
+  try {
+    summary.supplierQueue = (await drainSupplierQueue({ actorId: 'system' })).processed || 0;
+  } catch (e) { summary.supplierQueueError = e.message; }
 
   return summary;
 }
