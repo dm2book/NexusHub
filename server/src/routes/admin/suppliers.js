@@ -68,6 +68,11 @@ router.post('/:id/test', requirePermission('suppliers.read'), asyncHandler(async
 }));
 
 // Map a supplier catalog item to one of our products.
+router.get('/:id/products', requirePermission('suppliers.read'),
+  asyncHandler(async (req, res) => {
+    res.json({ mappings: await suppliers.listSupplierProducts(req.params.id) });
+  }));
+
 router.post('/:id/products', requirePermission('suppliers.manage'),
   asyncHandler(async (req, res) => {
     const body = z.object({
@@ -77,6 +82,8 @@ router.post('/:id/products', requirePermission('suppliers.manage'),
       priority: z.number().int().optional(),
     }).parse(req.body);
     const mapping = await suppliers.mapSupplierProduct({ supplierId: req.params.id, ...body });
+    await audit({ actor: req.user, action: 'supplier.map_product', targetType: 'supplier',
+      targetId: req.params.id, metadata: { productId: body.productId, sku: body.supplierSku }, req });
     res.status(201).json({ mapping });
   }));
 

@@ -73,6 +73,16 @@ export async function mapSupplierProduct({ supplierId, productId, supplierSku, c
              { s: supplierId, k: supplierSku });
 }
 
+/** All product mappings for a supplier, with our product name for the admin UI. */
+export function listSupplierProducts(supplierId) {
+  return all(
+    `SELECT sp.*, p.name AS product_name, p.price AS product_price
+       FROM supplier_products sp
+       LEFT JOIN products p ON p.id = sp.product_id
+      WHERE sp.supplier_id = @s ORDER BY sp.priority ASC, sp.last_synced_at DESC NULLS LAST`,
+    { s: supplierId });
+}
+
 /**
  * Run a sync against a supplier. `syncType` ∈ inventory | price | status | full.
  * Returns the recorded supplier_sync_runs row.

@@ -234,9 +234,18 @@ export async function transitionOrder(orderId, to, ctx = {}) {
       link: `/account/orders/${orderId}`,
     });
   }
-  // Once paid, auto-deliver from code stock if every item is in stock (best-effort).
+  // Once paid, auto-deliver from code stock if every item is in stock; if not,
+  // fall through to supplier auto-fulfillment (hands-off). Only engages when a
+  // supplier integration actually covers an item — otherwise the order waits in
+  // the manual queue exactly as before.
   if (to === 'payment_received') {
-    autoDispenseFromStock(orderId, ctx).catch((e) => console.error('[autodispense]', e.message));
+    autoDispenseFromStock(orderId, ctx)
+      .then(async (delivered) => {
+        if (delivered) return;
+        const { autoFulfillFromSuppliers } = await import('./fulfillmentService.js');
+        await autoFulfillFromSuppliers(orderId, ctx);
+      })
+      .catch((e) => console.error('[autodispense]', e.message));
     // Paid spend may push the buyer into a new loyalty tier → grant its bonus.
     if (updated.userId) grantTierRewards(updated.userId).catch((e) => console.error('[loyalty]', e.message));
     // Earn Forge Coins (€10 = 1 coin), idempotent per order.

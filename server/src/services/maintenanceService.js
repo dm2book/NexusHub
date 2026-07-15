@@ -6,12 +6,13 @@
 import { run, get, all, nowIso } from '../db/index.js';
 import { transitionOrder, sendPaymentReminders, sendReviewRequests } from './orderService.js';
 import { sendCartReminders } from './cartService.js';
+import { retryPendingFulfillments } from './fulfillmentService.js';
 
 const HOURS = (n) => new Date(Date.now() - n * 3_600_000).toISOString();
 const DAYS = (n) => new Date(Date.now() - n * 86_400_000).toISOString();
 
 export async function runMaintenance() {
-  const summary = { otpPurged: 0, sessionsExpired: 0, ordersCancelled: 0, remindersSent: 0, reviewRequestsSent: 0, cartRemindersSent: 0, at: nowIso() };
+  const summary = { otpPurged: 0, sessionsExpired: 0, ordersCancelled: 0, remindersSent: 0, reviewRequestsSent: 0, cartRemindersSent: 0, fulfillmentsRetried: 0, at: nowIso() };
 
   // 1. Purge OTP codes that are long expired / already consumed (keep table small).
   try {
@@ -56,6 +57,12 @@ export async function runMaintenance() {
   try {
     summary.cartRemindersSent = await sendCartReminders({ afterHours: 4 });
   } catch (e) { summary.cartError = e.message; }
+
+  // 7. Re-poll async supplier fulfilments that returned a reference and are
+  //    still in progress, so they complete without a manual nudge.
+  try {
+    summary.fulfillmentsRetried = await retryPendingFulfillments({ limit: 25 });
+  } catch (e) { summary.fulfillmentError = e.message; }
 
   return summary;
 }
