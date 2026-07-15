@@ -211,3 +211,57 @@ export function listManualQueue() {
                WHERE fr.mode='manual' AND fr.status IN ('pending','in_progress')
                ORDER BY fr.created_at ASC`);
 }
+
+/**
+ * Auto-fulfil a paid order from a supplier integration — the "hands-off" path.
+ * Called after local code-stock dispensing fails (no stock). It ONLY engages a
+ * supplier when at least one item resolves to an active connector that
+ * `supportsFulfillment`; otherwise it leaves the order for manual staff
+ * fulfilment (unchanged behaviour). Safety rails:
+ *   - idempotent: skips if the order already has fulfillment_requests;
+ *   - margin guard: never auto-buys an item where supplier cost ≥ our price;
+ *   - a supplier configured with autoDeliver:false won't resolve (shadow/off).
+ * Returns true if supplier fulfilment was kicked off.
+ */
+export async function autoFulfillFromSuppliers(orderId, ctx = {}) {
+  const order = await getOrder(orderId);
+  if (!order || ['completed', 'refunded', 'cancelled'].includes(order.status)) return false;
+  // Idempotency: another pass already opened fulfilment for this order.
+  const existing = await get('SELECT id FROM fulfillment_requests WHERE order_id=@o LIMIT 1', { o: orderId });
+  if (existing) return false;
+
+  let anySupplier = false;
+  for (const item of order.items) {
+    const resolved = item.product_id ? await resolveFulfillmentSupplier(item.product_id) : null;
+    if (!resolved) continue;
+    anySupplier = true;
+    // Margin guard: refuse to auto-source at a loss (cost known and ≥ our price).
+    const cost = resolved.supplierProduct?.cost;
+    if (cost != null && cost >= item.unit_price) {
+      await logFulfillment('skipped', { orderId, actor: 'system',
+        detail: { reason: 'supplier cost >= price', item: item.id, cost, price: item.unit_price } });
+      return false; // leave the whole order for manual review
+    }
+  }
+  if (!anySupplier) return false; // nothing to auto-source → manual/admin as before
+
+  await fulfillOrder(orderId, { ...ctx, actorId: ctx.actorId || 'system' });
+  return true;
+}
+
+/**
+ * Re-poll supplier fulfilments that are still in progress (async suppliers that
+ * return a reference and complete later). Runs from maintenance.
+ */
+export async function retryPendingFulfillments({ limit = 25 } = {}) {
+  const rows = await all(
+    `SELECT id FROM fulfillment_requests
+      WHERE mode='auto' AND status='in_progress' AND external_ref IS NOT NULL
+      ORDER BY updated_at ASC LIMIT @l`, { l: limit });
+  let refreshed = 0;
+  for (const r of rows) {
+    try { await refreshFulfillment(r.id, { actorId: 'system' }); refreshed++; }
+    catch (e) { console.error('[fulfillment:retry]', e.message); }
+  }
+  return refreshed;
+}
