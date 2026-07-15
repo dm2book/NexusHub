@@ -85,6 +85,7 @@ async function runAutoFulfillment(order, item, { supplier, supplierProduct }, ct
       orderNumber: order.number,
       supplierSku: supplierProduct.supplier_sku,
       supplierUrl: supplierProduct.supplier_url || null, // exact listing to buy from
+      cost: supplierProduct.cost ?? null,                // our buy price (cents) — some APIs require it
       quantity: item.quantity,
       customerEmail: order.email,
       metadata: item.metadata,
