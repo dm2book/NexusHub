@@ -30,24 +30,48 @@ import socialRoutes from './routes/social.js';
 import adminRoutes from './routes/admin/index.js';
 
 let readyPromise = null;
-/** Run migrations + (idempotent) seed exactly once per process. */
+/**
+ * Best-effort upkeep that is NOT required to serve a request correctly, so it
+ * runs once in the background after boot instead of blocking the first request.
+ * On a cold serverless start this is the difference between a ~100-query stall
+ * and serving immediately: template upgrades, starter content and per-product
+ * art backfill all happen a beat later without the user waiting on them.
+ */
+let upkeepStarted = false;
+function startBackgroundUpkeep(wasSeeded) {
+  if (upkeepStarted) return;
+  upkeepStarted = true;
+  Promise.resolve().then(async () => {
+    const t = Date.now();
+    try {
+      // Upgrade improved default email templates on already-seeded databases.
+      // (A brand-new DB already got them synchronously via seed().)
+      if (wasSeeded) await syncEmailTemplates();
+      await seedStarterContent();
+      await syncCatalogImages();
+      console.log('[boot] background upkeep done in', Date.now() - t, 'ms');
+    } catch (e) { console.error('[boot] background upkeep:', e.message); }
+  });
+}
+
+/**
+ * Run migrations + (idempotent) seed exactly once per process. Only the work
+ * that a request truly depends on is awaited (schema exists; an empty catalog is
+ * filled); everything else is deferred to background upkeep so a cold start
+ * doesn't make the first request wait.
+ */
 export function ensureReady() {
   if (!readyPromise) {
     readyPromise = (async () => {
       await migrate();
-      if (!(await isSeeded())) await seed();
-      // Roll out improved default email templates to existing databases
-      // (admin-customized templates are never touched).
-      else await syncEmailTemplates();
-      // Zero-config: auto-fill the catalog whenever the shop is empty, so a fresh
-      // deploy is never an empty store. (SEED_DEMO=true also forces a re-sync.)
+      const seeded = await isSeeded();
+      if (!seeded) await seed(); // empty DB needs roles/permissions/templates before serving
+      // Zero-config: an empty shop must have products before we serve it, else
+      // the storefront is blank. An already-stocked store skips this entirely.
       const { n } = await get('SELECT COUNT(*) AS n FROM products WHERE active = 1').catch(() => ({ n: 1 }));
       if (config.seedDemo || Number(n) === 0) await seedDemoCatalog();
-      // Starter engagement content (one mystery box + one bundle) — created only
-      // when none exist, so it never overwrites anything the admin configured.
-      await seedStarterContent().catch(() => {});
-      // Give every seeded product its own pack art (denomination cards).
-      await syncCatalogImages().catch(() => {});
+      // Non-critical upkeep runs AFTER we're ready to serve.
+      startBackgroundUpkeep(seeded);
     })().catch((err) => {
       readyPromise = null; // allow retry on next request
       throw err;
