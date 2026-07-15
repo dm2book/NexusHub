@@ -83,6 +83,8 @@ export class EldoradoConnector extends SupplierConnector {
       method: 'POST',
       body: {
         offerId: req.supplierSku,
+        // The exact listing to buy from, when provided (e.g. an Eldorado URL).
+        listingUrl: req.supplierUrl || undefined,
         quantity: req.quantity || 1,
         // Delivery target depends on the product (game username, email, etc.).
         deliveryDetails: req.deliveryDetails || req.metadata || {},

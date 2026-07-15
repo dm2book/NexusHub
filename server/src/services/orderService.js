@@ -242,8 +242,10 @@ export async function transitionOrder(orderId, to, ctx = {}) {
     autoDispenseFromStock(orderId, ctx)
       .then(async (delivered) => {
         if (delivered) return;
-        const { autoFulfillFromSuppliers } = await import('./fulfillmentService.js');
-        await autoFulfillFromSuppliers(orderId, ctx);
+        // Not in local stock → hand off to the serial supplier queue, which
+        // buys + delivers paid orders one at a time, oldest first.
+        const { drainSupplierQueue } = await import('./fulfillmentService.js');
+        await drainSupplierQueue(ctx);
       })
       .catch((e) => console.error('[autodispense]', e.message));
     // Paid spend may push the buyer into a new loyalty tier → grant its bonus.

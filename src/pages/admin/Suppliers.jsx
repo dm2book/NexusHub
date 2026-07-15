@@ -26,7 +26,7 @@ export default function Suppliers() {
   const [mapFor, setMapFor] = useState(null);      // supplier being mapped
   const [products, setProducts] = useState([]);
   const [mappings, setMappings] = useState([]);
-  const [mapForm, setMapForm] = useState({ productId: '', supplierSku: '', costEuro: '', priority: '100' });
+  const [mapForm, setMapForm] = useState({ productId: '', supplierSku: '', supplierUrl: '', costEuro: '', priority: '100' });
 
   const load = () => {
     api.get('/api/admin/suppliers').then((r) => setSuppliers(r.suppliers)).catch(() => setSuppliers([]));
@@ -61,21 +61,22 @@ export default function Suppliers() {
   };
 
   const openMap = async (s) => {
-    setMapFor(s); setMapForm({ productId: '', supplierSku: '', costEuro: '', priority: '100' });
+    setMapFor(s); setMapForm({ productId: '', supplierSku: '', supplierUrl: '', costEuro: '', priority: '100' });
     if (!products.length) api.get('/api/admin/products').then((r) => setProducts(r.products || [])).catch(() => {});
     api.get(`/api/admin/suppliers/${s.id}/products`).then((r) => setMappings(r.mappings || [])).catch(() => setMappings([]));
   };
   const addMapping = async () => {
-    if (!mapForm.productId || !mapForm.supplierSku.trim()) { toast.error('Pick a product and enter the supplier SKU.'); return; }
+    if (!mapForm.productId || !mapForm.supplierSku.trim()) { toast.error('Pick a product and enter the supplier SKU/ID.'); return; }
     setBusy(true);
     try {
       await api.post(`/api/admin/suppliers/${mapFor.id}/products`, {
         productId: mapForm.productId, supplierSku: mapForm.supplierSku.trim(),
+        supplierUrl: mapForm.supplierUrl.trim() || undefined,
         cost: mapForm.costEuro === '' ? undefined : Math.round(parseFloat(mapForm.costEuro) * 100),
         priority: Number(mapForm.priority) || 100,
       });
-      toast.success('Product mapped — orders for it can now auto-fulfil.');
-      setMapForm({ ...mapForm, supplierSku: '', costEuro: '' });
+      toast.success('Product mapped — paid orders for it are auto-sourced, one at a time.');
+      setMapForm({ ...mapForm, supplierSku: '', supplierUrl: '', costEuro: '' });
       const r = await api.get(`/api/admin/suppliers/${mapFor.id}/products`); setMappings(r.mappings || []);
     } catch (err) { toast.error(err.message); } finally { setBusy(false); }
   };
@@ -197,8 +198,10 @@ export default function Suppliers() {
               <option value="">Select a product…</option>
               {products.map((p) => <option key={p.id} value={p.id}>{p.name} — {money(p.price, p.currency)}</option>)}
             </select></div>
-          <div><label className="label">Supplier SKU</label>
+          <div><label className="label">Supplier SKU / offer ID</label>
             <input className="input" value={mapForm.supplierSku} onChange={(e) => setMapForm({ ...mapForm, supplierSku: e.target.value })} placeholder="e.g. ELD-ROBUX-1000" /></div>
+          <div className="sm:col-span-2"><label className="label">Listing URL (e.g. Eldorado link)</label>
+            <input className="input" value={mapForm.supplierUrl} onChange={(e) => setMapForm({ ...mapForm, supplierUrl: e.target.value })} placeholder="https://www.eldorado.gg/robux/…" /></div>
           <div><label className="label">Your cost (€)</label>
             <input type="number" step="0.01" min="0" className="input" value={mapForm.costEuro} onChange={(e) => setMapForm({ ...mapForm, costEuro: e.target.value })} placeholder="what you pay" /></div>
           <div><label className="label">Priority</label>
@@ -220,6 +223,7 @@ export default function Suppliers() {
                       {m.cost != null && m.product_price != null && m.cost >= m.product_price ? ' · ⚠️ no margin' : ''}
                       · prio {m.priority} · stock {m.available_stock ?? '—'}
                     </div>
+                    {m.supplier_url && <a href={m.supplier_url} target="_blank" rel="noreferrer" className="text-indigo-300 text-xs hover:underline truncate block">🔗 {m.supplier_url}</a>}
                   </div>
                 </div>
               ))}

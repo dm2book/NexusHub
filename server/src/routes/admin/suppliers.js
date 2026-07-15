@@ -78,6 +78,7 @@ router.post('/:id/products', requirePermission('suppliers.manage'),
     const body = z.object({
       productId: z.string(),
       supplierSku: z.string(),
+      supplierUrl: z.string().url().max(500).optional(),
       cost: z.number().int().optional(),
       priority: z.number().int().optional(),
     }).parse(req.body);

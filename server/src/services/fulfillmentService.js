@@ -84,6 +84,7 @@ async function runAutoFulfillment(order, item, { supplier, supplierProduct }, ct
     const result = await connector.createFulfillment({
       orderNumber: order.number,
       supplierSku: supplierProduct.supplier_sku,
+      supplierUrl: supplierProduct.supplier_url || null, // exact listing to buy from
       quantity: item.quantity,
       customerEmail: order.email,
       metadata: item.metadata,
@@ -247,6 +248,78 @@ export async function autoFulfillFromSuppliers(orderId, ctx = {}) {
 
   await fulfillOrder(orderId, { ...ctx, actorId: ctx.actorId || 'system' });
   return true;
+}
+
+// ── Serial supplier queue ────────────────────────────────────────────────────
+// The owner wants orders sourced from suppliers ONE AT A TIME, oldest first:
+// finish buying + delivering one paid order before starting the next. We hold a
+// short DB lease (kv row with a TTL) so only one worker drains at a time, even
+// across serverless instances, and process orders strictly in sequence.
+const QUEUE_LOCK = 'supplier_queue_lock';
+
+async function acquireLease(ttlMs = 5 * 60_000) {
+  const now = Date.now();
+  const token = newId('lease');
+  // Win when there's no lease, or the current one has expired (crashed worker).
+  const r = await run(
+    `INSERT INTO kv (key, value, updated_at) VALUES (@k, @v, @at)
+       ON CONFLICT (key) DO UPDATE SET value=@v, updated_at=@at
+       WHERE kv.updated_at < @cutoff`,
+    { k: QUEUE_LOCK, v: token, at: new Date(now).toISOString(),
+      cutoff: new Date(now - ttlMs).toISOString() });
+  return r?.changes ? token : null;
+}
+async function releaseLease(token) {
+  await run('DELETE FROM kv WHERE key=@k AND value=@v', { k: QUEUE_LOCK, v: token }).catch(() => {});
+}
+
+/** The oldest paid order that maps to a supplier and hasn't been fulfilled yet.
+ *  `skip` holds ids already attempted this drain (e.g. margin-guarded / no-op),
+ *  so the queue advances instead of looping on an order that opens no request. */
+async function nextSupplierOrder(skip = new Set()) {
+  const rows = await all(
+    `SELECT o.id FROM orders o
+      WHERE o.status IN ('payment_received','processing')
+        AND NOT EXISTS (SELECT 1 FROM fulfillment_requests fr WHERE fr.order_id = o.id)
+      ORDER BY o.created_at ASC LIMIT 50`);
+  for (const r of rows) {
+    if (skip.has(r.id)) continue;
+    const order = await getOrder(r.id);
+    if (!order) continue;
+    for (const it of order.items) {
+      if (it.product_id && await resolveFulfillmentSupplier(it.product_id)) return r.id;
+    }
+  }
+  return null;
+}
+
+/**
+ * Drain the supplier queue serially: process paid orders one after another,
+ * oldest first, buying + delivering each fully before the next. Only one worker
+ * runs at a time (lease); bounded per call so it fits a serverless budget — the
+ * next trigger (a new payment or the maintenance tick) continues where it left
+ * off. Triggered on payment and from maintenance.
+ */
+export async function drainSupplierQueue(ctx = {}, { maxOrders = 25, budgetMs = 25_000 } = {}) {
+  const token = await acquireLease();
+  if (!token) return { skipped: true }; // another worker owns the queue → stay serial
+  const start = Date.now();
+  const attempted = new Set();
+  let processed = 0;
+  try {
+    while (attempted.size < maxOrders && Date.now() - start < budgetMs) {
+      const id = await nextSupplierOrder(attempted);
+      if (!id) break;
+      attempted.add(id); // mark before working so a no-op (margin guard) advances
+      // Fully source + deliver THIS one order before looking at the next.
+      const did = await autoFulfillFromSuppliers(id, { ...ctx, actorId: ctx.actorId || 'system' })
+        .catch((e) => { console.error('[supplier-queue]', id, e.message); return false; });
+      if (did) processed++;
+    }
+  } finally {
+    await releaseLease(token);
+  }
+  return { processed };
 }
 
 /**
