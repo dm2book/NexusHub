@@ -23,7 +23,9 @@
 import { createHash } from 'node:crypto';
 import { SupplierConnector } from './SupplierConnector.js';
 
-const DEFAULT_BASE = 'https://api.g2a.com/v3';
+// Base host only — every request path below already carries its /v3 prefix, so
+// keeping /v3 here too would double it (https://api.g2a.com/v3/v3/order → 404).
+const DEFAULT_BASE = 'https://api.g2a.com';
 const safeJson = (t) => { try { return JSON.parse(t); } catch { return null; } };
 
 export class G2AConnector extends SupplierConnector {
@@ -80,10 +82,14 @@ export class G2AConnector extends SupplierConnector {
       return { status: 'in_progress', externalRef: null, deliveries: [], raw: { manual: true } };
     }
     const currency = this.config.currency || 'EUR';
-    const maxPrice = req.cost != null ? Math.round(req.cost) / 100 : undefined; // never buy above our cost
+    const qty = Math.max(1, Number(req.quantity) || 1);
+    // max_price caps the WHOLE order line (qty × unit cost) so a multi-unit buy
+    // is not rejected by a single-unit cap, while still never exceeding our cost.
+    const maxPrice = req.cost != null ? (Math.round(req.cost) * qty) / 100 : undefined;
     const added = await this.#request('/v3/order', {
       method: 'POST',
-      body: { product_id: String(req.supplierSku), currency, ...(maxPrice != null ? { max_price: maxPrice } : {}) },
+      body: { product_id: String(req.supplierSku), currency, quantity: qty,
+        ...(maxPrice != null ? { max_price: maxPrice } : {}) },
     });
     const orderId = String(added?.order_id ?? added?.orderId ?? '');
     if (!orderId) throw new Error('G2A: order added but no order_id returned');
@@ -103,8 +109,14 @@ export class G2AConnector extends SupplierConnector {
     } catch { /* details may be briefly unavailable right after pay */ }
     try {
       const keyResp = await this.#request(`/v3/order/key/${encodeURIComponent(externalRef)}`);
-      const key = keyResp?.key || keyResp?.data?.key;
-      if (key) return { status: 'fulfilled', externalRef, deliveries: [{ type: 'code', content: String(key) }] };
+      // Accept a single key or a list (multi-unit orders return several).
+      const rawKeys = Array.isArray(keyResp?.keys) ? keyResp.keys
+        : Array.isArray(keyResp?.data) ? keyResp.data
+        : [keyResp?.key ?? keyResp?.data?.key];
+      const deliveries = rawKeys
+        .map((k) => ({ type: 'code', content: String((k && k.key) || k || '') }))
+        .filter((d) => d.content);
+      if (deliveries.length) return { status: 'fulfilled', externalRef, deliveries };
     } catch { /* key not issued yet */ }
     return { status: 'in_progress', externalRef };
   }

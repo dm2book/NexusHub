@@ -58,6 +58,15 @@ export async function coinBalance(userId) {
   return Number(r?.n || 0);
 }
 
+/** Serialize concurrent spends for a user by locking their user row inside the
+ *  current transaction (Postgres forbids FOR UPDATE with an aggregate, so we
+ *  lock here, THEN sum). Mirrors walletService — without it two concurrent
+ *  spends could both pass the balance check and overspend into a negative
+ *  balance (free rewards / free membership). */
+async function lockUser(userId) {
+  await get('SELECT id FROM users WHERE id=@u FOR UPDATE', { u: userId });
+}
+
 /** Recent ledger entries for the account page. */
 export function coinHistory(userId, limit = 20) {
   return all(
@@ -90,6 +99,7 @@ export async function spendCoins(userId, amount, reason = 'spend', ref = null) {
   const cost = Math.round(Number(amount));
   if (!(cost > 0)) throw badRequest('Invalid coin amount.');
   return tx(async () => {
+    await lockUser(userId);
     const balance = await coinBalance(userId);
     if (balance < cost) throw badRequest(`Not enough Forge Coins — you need ${cost}, you have ${balance}.`);
     await run(
@@ -106,6 +116,7 @@ export async function grantCoins(userId, amount, grantedBy = null) {
   if (!delta) throw badRequest('Amount must be a non-zero whole number.');
   return tx(async () => {
     if (delta < 0) {
+      await lockUser(userId);
       const balance = await coinBalance(userId);
       if (balance + delta < 0) throw badRequest(`Balance is ${balance} — can't deduct ${-delta}.`);
     }
@@ -125,6 +136,7 @@ export async function redeemReward(userId, rewardId) {
   const reward = await findReward(rewardId);
   if (!reward) throw badRequest('Unknown reward.');
   return tx(async () => {
+    await lockUser(userId);
     const balance = await coinBalance(userId);
     if (balance < reward.cost) throw badRequest(`Not enough Forge Coins — you need ${reward.cost}, you have ${balance}.`);
     // For coupons, the generated code doubles as the ledger ref so the buyer

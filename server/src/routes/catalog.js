@@ -229,7 +229,11 @@ router.post('/orders/:id/checkout', rateLimit({ bucket: 'pay', windowMs: 60_000,
 // Demo payment — marks an order paid without a real PSP, gated by DEMO_PAYMENTS.
 router.post('/orders/:id/pay', rateLimit({ bucket: 'pay', windowMs: 60_000, max: 30 }),
   asyncHandler(async (req, res) => {
-    if (!config.payments.demoMode) throw new ApiError(404, 'Not found');
+    // Demo self-pay is a dev convenience only. Refuse it whenever a real payment
+    // method is configured — otherwise a live deploy that forgot NODE_ENV would
+    // let any buyer mark their own order paid and auto-receive stock.
+    const realPaymentConfigured = manualPayMethods().length > 0 || !!config.payments.stripe.secretKey;
+    if (!config.payments.demoMode || realPaymentConfigured) throw new ApiError(404, 'Not found');
     const order = await getOrder(req.params.id);
     if (!order) throw new ApiError(404, 'Order not found');
     const { email } = z.object({ email: z.string().email().optional() }).parse(req.body || {});
@@ -248,7 +252,8 @@ router.post('/orders/:id/proof', rateLimit({ bucket: 'proof', windowMs: 60_000, 
     const body = z.object({
       method: z.string().max(20).optional(),
       transactionId: z.string().max(120).optional(),
-      screenshotUrl: z.string().url().max(500).optional(),
+      screenshotUrl: z.string().url().max(500)
+        .refine((u) => /^https?:\/\//i.test(u), 'Link must be a http(s) URL').optional(),
       note: z.string().max(300).optional(),
       email: z.string().email().optional(),
     }).parse(req.body || {});

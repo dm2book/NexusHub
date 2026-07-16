@@ -131,7 +131,10 @@ export default function Checkout() {
   // ── Manual payment instructions (after order placed) ──
   if (placed) {
     const m = methods.find((x) => x.id === methodId) || methods[0];
-    const pt = m ? payTarget(m, amountEur) : null;
+    // Use the server order's authoritative total — the cart was just cleared, so
+    // the live cart-derived `amountEur` would read €0.00 here.
+    const payEur = ((placed.total ?? 0) / 100).toFixed(2);
+    const pt = m ? payTarget(m, payEur) : null;
     return (
       <div className="section py-12 max-w-xl">
         <div className="card p-8 text-center">
@@ -140,7 +143,7 @@ export default function Checkout() {
           <p className="text-slate-400 mt-2">{t('checkout.orderWord', 'Order')} <span className="font-mono text-white">{placed.number}</span> {t('checkout.reserved', 'is reserved. Pay the amount below and we’ll confirm it (usually within minutes).')}</p>
 
           <div className="glass rounded-2xl p-5 mt-6 text-left">
-            <div className="flex items-center justify-between"><span className="text-slate-400 text-sm">{t('checkout.amount', 'Amount')}</span><span className="text-2xl text-white font-semibold">€{amountEur}</span></div>
+            <div className="flex items-center justify-between"><span className="text-slate-400 text-sm">{t('checkout.amount', 'Amount')}</span><span className="text-2xl text-white font-semibold">€{payEur}</span></div>
             <div className="flex items-center justify-between mt-3">
               <span className="text-slate-400 text-sm">{t('checkout.reference', 'Reference (put in the note)')}</span>
               <button onClick={() => { navigator.clipboard?.writeText(placed.number); toast.success(t('track.copied', 'Reference copied')); }}
@@ -160,7 +163,7 @@ export default function Checkout() {
           {pt && (
             <div className="mt-5">
               {pt.href
-                ? <a href={pt.href} target="_blank" rel="noreferrer" className="btn-primary w-full py-3.5 text-base"><ExternalLink size={18} /> {t('checkout.payWith', 'Pay')} €{amountEur} {t('checkout.with', 'with')} {m.label}</a>
+                ? <a href={pt.href} target="_blank" rel="noreferrer" className="btn-primary w-full py-3.5 text-base"><ExternalLink size={18} /> {t('checkout.payWith', 'Pay')} €{payEur} {t('checkout.with', 'with')} {m.label}</a>
                 : <div className="glass rounded-xl p-4 text-white">{pt.label}</div>}
               <p className="text-slate-500 text-xs mt-3">{note || t('checkout.noteDefault', 'After paying, your order is confirmed within minutes during open hours.')}</p>
             </div>

@@ -7,7 +7,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { asyncHandler } from '../middleware/error.js';
 import { requireAuth } from '../middleware/auth.js';
-import { run, get, all } from '../db/index.js';
+import { run, get, all, tx } from '../db/index.js';
 import { notFound, forbidden, badRequest } from '../utils/errors.js';
 import { listOrders, getOrder } from '../services/orderService.js';
 import { addVerifiedReview } from '../services/reviewsService.js';
@@ -66,12 +66,17 @@ router.get('/rewards', asyncHandler(async (req, res) => {
 router.post('/membership/purchase', asyncHandler(async (req, res) => {
   const { method } = z.object({ method: z.enum(['credit', 'coins']) }).parse(req.body || {});
   const uid = req.user.id;
-  if (method === 'credit') {
-    await debit(uid, FORGE_PLUS.priceCents, 'spend', `${FORGE_PLUS.name} membership (${MEMBERSHIP_DAYS} days)`);
-  } else {
-    await spendCoins(uid, FORGE_PLUS.coinPrice, 'membership', 'forge_plus');
-  }
-  const membership = await grantMembership(uid, MEMBERSHIP_DAYS);
+  // Charge and grant in ONE transaction (tx is re-entrant, so the debit/spend
+  // and grantMembership share it): if the grant fails the charge rolls back, and
+  // if the charge fails the grant never runs. No "charged without membership".
+  const membership = await tx(async () => {
+    if (method === 'credit') {
+      await debit(uid, FORGE_PLUS.priceCents, 'spend', `${FORGE_PLUS.name} membership (${MEMBERSHIP_DAYS} days)`);
+    } else {
+      await spendCoins(uid, FORGE_PLUS.coinPrice, 'membership', 'forge_plus');
+    }
+    return grantMembership(uid, MEMBERSHIP_DAYS);
+  });
   await audit({ actor: req.user, action: 'membership.purchase', targetType: 'user', targetId: uid,
     metadata: { method }, req });
   await notif.notify(uid, {

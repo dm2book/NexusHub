@@ -27,7 +27,13 @@ export async function submitProof(orderId, input = {}, ctx = {}) {
   if (['refunded', 'cancelled'].includes(order.status)) throw badRequest('This order is closed.');
 
   const transactionId = String(input.transactionId || '').trim().slice(0, 120) || null;
-  const screenshotUrl = String(input.screenshotUrl || '').trim().slice(0, 500) || null;
+  let screenshotUrl = String(input.screenshotUrl || '').trim().slice(0, 500) || null;
+  // Only accept http(s) links. zod's .url() also passes javascript:/data: URIs,
+  // which would become a stored-XSS payload when an admin clicks the link in the
+  // verification queue — reject anything that isn't a real web URL.
+  if (screenshotUrl && !/^https?:\/\//i.test(screenshotUrl)) {
+    throw badRequest('The screenshot link must be a http(s) URL.');
+  }
   if (!transactionId && !screenshotUrl) {
     throw badRequest('Add a transaction ID or a screenshot link as proof.');
   }
@@ -42,7 +48,7 @@ export async function submitProof(orderId, input = {}, ctx = {}) {
     if (dup) flags.push('duplicate_transaction_id');
   }
   const prior = await get(`SELECT COUNT(*) AS n FROM payment_proofs WHERE order_id=@o`, { o: orderId });
-  if (Number(prior?.n || 0) >= 2) flags.push('multiple_submissions');
+  if (Number(prior?.n || 0) >= 1) flags.push('multiple_submissions'); // this is the 2nd+ proof for the order
 
   const id = newId('ppf');
   const at = nowIso();
@@ -84,8 +90,14 @@ export async function confirmProof(proofId, ctx = {}) {
   if (!proof) throw notFound('Proof not found');
   if (proof.status !== 'pending') throw badRequest('This proof was already reviewed.');
 
-  await run(`UPDATE payment_proofs SET status='confirmed', reviewed_by=@by, reviewed_at=@at WHERE id=@id`,
+  // Atomically claim the proof: only the caller whose UPDATE actually flips the
+  // row from 'pending' proceeds to mark the order paid. A second click / second
+  // admin gets changes=0 and stops here — no double markPaymentReceived, and
+  // (with the atomic order transition) no double delivery.
+  const claim = await run(
+    `UPDATE payment_proofs SET status='confirmed', reviewed_by=@by, reviewed_at=@at WHERE id=@id AND status='pending'`,
     { by: ctx.user?.id || 'admin', at: nowIso(), id: proofId });
+  if (!claim?.changes) throw badRequest('This proof was already reviewed.');
 
   const updated = await markPaymentReceived(proof.order_id, proof.transaction_id || `proof_${proofId}`,
     { actorId: ctx.user?.id || 'admin', reason: 'Payment proof verified' });

@@ -232,16 +232,28 @@ export async function autoFulfillFromSuppliers(orderId, ctx = {}) {
   const existing = await get('SELECT id FROM fulfillment_requests WHERE order_id=@o LIMIT 1', { o: orderId });
   if (existing) return false;
 
+  // Revenue actually collected for this order, after coupon/member/bundle
+  // discounts but counting store credit (that was real money paid earlier). We
+  // pro-rate it back onto each line so the margin guard compares supplier cost
+  // to what the buyer effectively paid for THAT item — not the list price.
+  const subtotal = Number(order.subtotal || 0);
+  const revenue = Number(order.total || 0) + Number(order.billing?.creditApplied || 0);
+  const revenueRatio = subtotal > 0 ? revenue / subtotal : 0;
+
   let anySupplier = false;
   for (const item of order.items) {
     const resolved = item.product_id ? await resolveFulfillmentSupplier(item.product_id) : null;
     if (!resolved) continue;
     anySupplier = true;
-    // Margin guard: refuse to auto-source at a loss (cost known and ≥ our price).
+    // Margin guard: refuse to auto-source at a loss. Effective per-unit revenue
+    // reflects the discounts the buyer used. An UNKNOWN supplier cost (null) is
+    // treated as "don't auto-buy" — we never fire an uncapped purchase blind.
     const cost = resolved.supplierProduct?.cost;
-    if (cost != null && cost >= item.unit_price) {
+    const effectiveUnit = Math.round(Number(item.unit_price) * revenueRatio);
+    if (cost == null || cost >= effectiveUnit) {
       await logFulfillment('skipped', { orderId, actor: 'system',
-        detail: { reason: 'supplier cost >= price', item: item.id, cost, price: item.unit_price } });
+        detail: { reason: cost == null ? 'supplier cost unknown' : 'supplier cost >= effective revenue',
+          item: item.id, cost, listPrice: item.unit_price, effectiveUnit } });
       return false; // leave the whole order for manual review
     }
   }

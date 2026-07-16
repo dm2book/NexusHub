@@ -98,6 +98,11 @@ export class KinguinConnector extends SupplierConnector {
       const deliveries = arr
         .map((k) => ({ type: k.type && /image/i.test(k.type) ? 'image' : 'code', content: k.serial || k.key || '' }))
         .filter((d) => d.content);
+      // NEVER mark fulfilled without an actual key: a transient error on the
+      // /keys call would otherwise complete the order with no code delivered
+      // (we paid the supplier, the buyer gets nothing). Stay in_progress so the
+      // maintenance sweep re-polls until the real serials arrive.
+      if (!deliveries.length) return { status: 'in_progress', externalRef, raw: order };
       return { status: 'fulfilled', externalRef, deliveries, raw: order };
     }
     if (['canceled', 'cancelled', 'refunded', 'failed'].includes(status)) {
