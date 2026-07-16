@@ -192,11 +192,19 @@ export async function transitionOrder(orderId, to, ctx = {}) {
   if (to === 'payment_received') paymentSet = ", payment_status='paid'";
   if (to === 'refunded') paymentSet = ", payment_status='refunded'";
 
-  await tx(async () => {
-    await run(`UPDATE orders SET status=@status, updated_at=@at${paymentSet} WHERE id=@id`,
-        { status: to, at: nowIso(), id: orderId });
+  // Atomic guard: the UPDATE only fires when the row is still in its observed
+  // status. Concurrent callers (two admins confirming payment, a PSP webhook
+  // racing a manual confirm, a double-clicked button) that lose the race get
+  // changes=0 and return WITHOUT re-running the side-effects below — so an order
+  // can never be dispensed / emailed / completed twice.
+  const moved = await tx(async () => {
+    const r = await run(`UPDATE orders SET status=@status, updated_at=@at${paymentSet} WHERE id=@id AND status=@from`,
+        { status: to, at: nowIso(), id: orderId, from: order.status });
+    if (!r?.changes) return false;
     await appendHistory(orderId, order.status, to, ctx.actorId || 'system', ctx.reason);
+    return true;
   });
+  if (!moved) return getOrder(orderId); // another transition already moved this order
 
   const updated = await getOrder(orderId);
   const emailEvent = STATUS_EMAIL[to];

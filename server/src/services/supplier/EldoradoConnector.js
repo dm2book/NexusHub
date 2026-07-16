@@ -116,7 +116,7 @@ export class EldoradoConnector extends SupplierConnector {
   #mapOrder(o) {
     const raw = o || {};
     const s = String(raw.status || raw.state || '').toLowerCase();
-    const status = ['delivered', 'completed', 'fulfilled', 'success'].includes(s) ? 'fulfilled'
+    let status = ['delivered', 'completed', 'fulfilled', 'success'].includes(s) ? 'fulfilled'
       : ['failed', 'cancelled', 'canceled', 'refunded', 'error'].includes(s) ? 'failed'
       : 'in_progress';
     const codes = raw.deliveries || raw.codes || raw.items || [];
@@ -124,7 +124,10 @@ export class EldoradoConnector extends SupplierConnector {
       type: c.type || 'code',
       content: c.content || c.code || c.value || String(c),
       filename: c.filename,
-    }));
+    })).filter((d) => d.content);
+    // A "completed" status with no codes attached is not a real delivery — keep
+    // it in_progress so we re-poll rather than completing the order empty-handed.
+    if (status === 'fulfilled' && !deliveries.length) status = 'in_progress';
     return { status, externalRef: String(raw.id ?? raw.orderId ?? ''), deliveries, raw };
   }
 }
