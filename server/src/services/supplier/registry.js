@@ -9,6 +9,7 @@ import { CsvConnector } from './CsvConnector.js';
 import { ManualConnector } from './ManualConnector.js';
 import { EldoradoConnector } from './EldoradoConnector.js';
 import { KinguinConnector } from './KinguinConnector.js';
+import { G2AConnector } from './G2AConnector.js';
 
 const REGISTRY = new Map();
 
@@ -22,6 +23,7 @@ registerConnector(CsvConnector);
 registerConnector(ManualConnector);
 registerConnector(EldoradoConnector);
 registerConnector(KinguinConnector);
+registerConnector(G2AConnector);
 
 export function availableKinds() {
   return [...REGISTRY.keys()];

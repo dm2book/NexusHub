@@ -11,6 +11,7 @@ const KIND_HINT = {
   manual: 'No connection — catalog curated in-app, fulfillment routed to the manual queue.',
   eldorado: 'Eldorado.gg has no public BUYER API — you cannot auto-buy others’ listings. config: { apiKey, autoDeliver }',
   kinguin: 'Real auto-buy: config: { apiKey:"<kinguin key>", autoDeliver:true }. Map product → kinguinId; paid orders are purchased & keys delivered automatically.',
+  g2a: 'Real auto-buy: config: { apiHash, email, apiKey, currency:"EUR", autoDeliver:true }. Map product → G2A product_id; buy price is capped at your cost.',
 };
 
 const fmtSecs = (s) => (s == null ? '—' : s < 60 ? `${s}s` : s < 3600 ? `${Math.round(s / 60)}m` : `${Math.round(s / 3600)}h`);
@@ -176,6 +177,7 @@ export default function Suppliers() {
             <select className="input" value={form.connectorKind}
               onChange={(e) => setForm({ ...form, connectorKind: e.target.value })}>
               <option value="kinguin">Kinguin (auto-buy)</option>
+              <option value="g2a">G2A (auto-buy)</option>
               <option value="api">API</option>
               <option value="csv">CSV</option>
               <option value="eldorado">Eldorado</option>
