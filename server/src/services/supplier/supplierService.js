@@ -194,7 +194,11 @@ export async function resolveFulfillmentSupplier(productId) {
     const okStock = sp.available_stock == null || sp.available_stock > 0;
     if (okStatus && okStock) {
       const supplier = await getSupplier(sp.supplier_id);
-      const connector = createConnector(supplier);
+      // A supplier row with an unknown/removed connector kind must not abort the
+      // whole queue for every order — skip it and try the next mapping.
+      let connector;
+      try { connector = createConnector(supplier); }
+      catch (e) { console.error('[supplier] unusable connector', supplier?.connector_kind, e.message); continue; }
       if (connector.supportsFulfillment) return { supplier, supplierProduct: sp };
     }
   }

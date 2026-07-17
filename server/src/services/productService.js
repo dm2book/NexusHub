@@ -20,6 +20,10 @@ const hydrate = (r) => {
     // How paid orders for this product are delivered: 'auto' pulls a code from
     // stock instantly; 'manual' always waits for staff to deliver by hand.
     deliveryMode: metadata.deliveryMode === 'manual' ? 'manual' : 'auto',
+    // Optional label for a delivery target the buyer must supply at checkout
+    // (e.g. "Roblox username" for a Robux top-up). Empty = nothing extra asked.
+    deliveryField: typeof metadata.deliveryField === 'string' && metadata.deliveryField.trim()
+      ? metadata.deliveryField.trim().slice(0, 60) : null,
   };
 };
 

@@ -40,6 +40,8 @@ export default function Checkout() {
   const [creditBalance, setCreditBalance] = useState(0); // store credit (cents)
   const [useCredit, setUseCredit] = useState(false);
   const [bundles, setBundles] = useState([]);
+  const [deliveryFields, setDeliveryFields] = useState({}); // productId → label (e.g. "Roblox username")
+  const [deliveryDetail, setDeliveryDetail] = useState('');
 
   // Best matching bundle: all of its products are in the cart.
   const inCart = new Set(items.map((i) => i.id));
@@ -74,6 +76,18 @@ export default function Checkout() {
   }, [user]);
   useEffect(() => { api.get('/api/bundles').then((r) => setBundles(r.bundles || [])).catch(() => {}); }, []);
   useEffect(() => {
+    api.get('/api/products').then((r) => {
+      const m = {};
+      (r.products || []).forEach((p) => { if (p.deliveryField) m[p.id] = p.deliveryField; });
+      setDeliveryFields(m);
+    }).catch(() => {});
+  }, []);
+
+  // Distinct delivery-target labels for the items in the cart (e.g. a Robux
+  // top-up asks for the buyer's Roblox username). Shown only when needed.
+  const deliveryLabels = [...new Set(items.map((i) => deliveryFields[i.id]).filter(Boolean))];
+  const needsDelivery = deliveryLabels.length > 0;
+  useEffect(() => {
     api.get('/api/config').then((c) => {
       setProvider(c.paymentProvider);
       setMethods(c.paymentMethods || []);
@@ -101,7 +115,8 @@ export default function Checkout() {
       const { order } = await api.post('/api/orders', {
         email,
         items: items.map((i) => ({ productId: i.id, quantity: i.qty })),
-        billing: { full_name: fullName, city, email },
+        billing: { full_name: fullName, city, email,
+          ...(needsDelivery ? { deliveryDetails: deliveryDetail, deliveryLabel: deliveryLabels.join(' / ') } : {}) },
         currency,
         coupon: coupon?.code,
         useCredit: creditToApply || undefined,
@@ -207,6 +222,14 @@ export default function Checkout() {
                   <input value={city} onChange={(e) => setCity(e.target.value)} className="input" placeholder={t('checkout.optional', 'Optional')} />
                 </div>
               </div>
+              {needsDelivery && (
+                <div>
+                  <label className="label">{deliveryLabels.join(' / ')} <span className="text-indigo-400">*</span></label>
+                  <input required value={deliveryDetail} onChange={(e) => setDeliveryDetail(e.target.value)}
+                    className="input" placeholder={t('checkout.deliveryPh', 'Where should we deliver? e.g. your in-game username')} />
+                  <p className="text-slate-500 text-xs mt-1">{t('checkout.deliveryHint', 'We deliver this order to this target — double-check it.')}</p>
+                </div>
+              )}
             </div>
             {!user && (
               <p className="text-slate-500 text-sm mt-4">

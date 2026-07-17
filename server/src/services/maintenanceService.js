@@ -6,7 +6,7 @@
 import { run, get, all, nowIso } from '../db/index.js';
 import { transitionOrder, sendPaymentReminders, sendReviewRequests } from './orderService.js';
 import { sendCartReminders } from './cartService.js';
-import { retryPendingFulfillments, drainSupplierQueue } from './fulfillmentService.js';
+import { retryPendingFulfillments, drainSupplierQueue, sweepUnfulfilledPaidOrders } from './fulfillmentService.js';
 
 const HOURS = (n) => new Date(Date.now() - n * 3_600_000).toISOString();
 const DAYS = (n) => new Date(Date.now() - n * 86_400_000).toISOString();
@@ -69,6 +69,13 @@ export async function runMaintenance() {
   try {
     summary.supplierQueue = (await drainSupplierQueue({ actorId: 'system' })).processed || 0;
   } catch (e) { summary.supplierQueueError = e.message; }
+
+  // 9. Backfill: any paid order still without a fulfillment request (no stock,
+  //    no auto-supplier — e.g. a P2P top-up) is queued for hand delivery so it
+  //    surfaces in the manual queue instead of sitting invisible.
+  try {
+    summary.manualQueued = await sweepUnfulfilledPaidOrders({ limit: 50 });
+  } catch (e) { summary.manualQueueError = e.message; }
 
   return summary;
 }
