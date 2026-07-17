@@ -6,7 +6,7 @@ import { PageLoader, EmptyState, Modal } from '../../components/ui.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
 
 const BLANK = { name: '', sku: '', category: '', description: '', priceEuro: '', costEuro: '',
-  compareAtEuro: '', kind: 'digital', stock: '', deliveryMode: 'auto', active: true, featured: false, imageUrl: '' };
+  compareAtEuro: '', kind: 'digital', stock: '', deliveryMode: 'auto', deliveryField: '', active: true, featured: false, imageUrl: '' };
 
 // Suggested sell price from a supplier cost (e.g. what you pay on Eldorado /
 // Eneba): a ~18% markup with a €2 minimum profit, rounded to a clean .99.
@@ -62,6 +62,7 @@ export default function AdminProducts() {
       costEuro: p.metadata?.cost != null ? (p.metadata.cost / 100).toFixed(2) : '',
       compareAtEuro: p.metadata?.compareAt != null ? (p.metadata.compareAt / 100).toFixed(2) : '',
       deliveryMode: p.metadata?.deliveryMode === 'manual' ? 'manual' : 'auto',
+      deliveryField: p.metadata?.deliveryField || '',
       kind: p.kind || 'digital',
       stock: p.stock ?? '', active: !!p.active, featured: !!p.featured,
       imageUrl: p.image || '',
@@ -102,6 +103,7 @@ export default function AdminProducts() {
           cost: form.costEuro === '' ? undefined : Math.round(parseFloat(form.costEuro || '0') * 100),
           compareAt: form.compareAtEuro === '' ? undefined : Math.round(parseFloat(form.compareAtEuro || '0') * 100),
           deliveryMode: form.deliveryMode === 'manual' ? 'manual' : undefined,
+          deliveryField: form.deliveryField?.trim() || undefined,
         },
       };
       if (editing === 'new') await api.post('/api/admin/products', payload);
@@ -340,6 +342,13 @@ export default function AdminProducts() {
                   <div className="font-semibold">✋ Manual</div>
                   <div className="text-xs mt-0.5 opacity-80">Never auto-deliver — you enter the code per order from the order page.</div>
                 </button>
+              </div>
+              <div className="mt-3">
+                <label className="label">Ask buyer at checkout (optional)</label>
+                <input className="input" value={form.deliveryField} maxLength={60}
+                  onChange={(e) => setForm({ ...form, deliveryField: e.target.value })}
+                  placeholder="e.g. Roblox username — leave blank for none" />
+                <p className="text-xs text-slate-500 mt-1">For top-ups that need a target. The buyer must fill this in, and it shows in the fulfillment queue so you know where to deliver.</p>
               </div>
             </div>
           )}

@@ -205,13 +205,83 @@ export async function listFulfillmentLogs(orderId) {
   return rows.map((r) => ({ ...r, detail: parse(r.detail) }));
 }
 
-export function listManualQueue() {
-  return all(`SELECT fr.*, o.number AS order_number, o.email AS customer, oi.name AS item_name
+export async function listManualQueue() {
+  const rows = await all(`SELECT fr.*, o.number AS order_number, o.email AS customer,
+                 o.billing AS billing, oi.name AS item_name, oi.quantity AS quantity,
+                 oi.unit_price AS unit_price, oi.metadata AS item_metadata,
+                 (SELECT sp.supplier_url FROM supplier_products sp
+                    WHERE sp.product_id = oi.product_id AND sp.supplier_url IS NOT NULL
+                    ORDER BY sp.priority ASC LIMIT 1) AS supplier_url
                 FROM fulfillment_requests fr
                 JOIN orders o ON o.id = fr.order_id
                 LEFT JOIN order_items oi ON oi.id = fr.order_item_id
                WHERE fr.mode='manual' AND fr.status IN ('pending','in_progress')
                ORDER BY fr.created_at ASC`);
+  // Surface everything the owner needs to fulfil by hand in one glance: the
+  // exact listing to buy from, how many, and where to send it (the buyer's
+  // delivery target, captured at checkout).
+  return rows.map((r) => {
+    const billing = parse(r.billing) || {};
+    const itemMeta = parse(r.item_metadata) || {};
+    const { billing: _b, item_metadata: _m, ...rest } = r;
+    return {
+      ...rest,
+      supplierUrl: r.supplier_url || null,
+      deliveryDetails: billing.deliveryDetails || itemMeta.deliveryDetails || null,
+      deliveryLabel: billing.deliveryLabel || itemMeta.deliveryLabel || null,
+    };
+  });
+}
+
+/**
+ * Ensure a paid order that can't be delivered automatically becomes visible for
+ * hand-delivery. Opens a manual fulfillment request per item when the order has
+ * NO fulfillment requests yet and no item resolves to an auto supplier (so the
+ * serial queue isn't already going to buy it). Idempotent — safe to re-run.
+ * This closes the gap where a paid order with no stock and no auto-supplier
+ * (e.g. a P2P Robux/V-Bucks top-up) would otherwise sit invisible.
+ */
+export async function ensureManualFulfillment(orderId, ctx = {}) {
+  let order = await getOrder(orderId);
+  if (!order || ['completed', 'refunded', 'cancelled'].includes(order.status)) return false;
+  const existing = await get('SELECT id FROM fulfillment_requests WHERE order_id=@o LIMIT 1', { o: orderId });
+  if (existing) return false; // already handled (auto in-flight or manual queued)
+  for (const item of order.items) {
+    if (item.product_id && await resolveFulfillmentSupplier(item.product_id)) return false; // queue owns it
+  }
+  // Advance the order into awaiting_fulfillment (same path fulfillOrder walks) so
+  // that completing the manual request can legally transition it to completed.
+  if (order.status === 'payment_received') {
+    await transitionOrder(orderId, 'processing', { actorId: ctx.actorId || 'system', reason: 'Begin fulfillment' });
+    order = await getOrder(orderId);
+  }
+  if (order.status === 'processing' && canTransition('processing', 'awaiting_fulfillment')) {
+    await transitionOrder(orderId, 'awaiting_fulfillment', { actorId: ctx.actorId || 'system', reason: 'Awaiting manual fulfillment' });
+    order = await getOrder(orderId);
+  }
+  for (const item of order.items) await openManualFulfillment(order, item, ctx);
+  await logFulfillment('manual_queued', { orderId, actor: ctx.actorId || 'system',
+    detail: { reason: 'paid order, no stock/auto-supplier — queued for hand delivery', items: order.items.length } });
+  return true;
+}
+
+/**
+ * Backfill sweep (maintenance): find paid orders that have been sitting without
+ * any fulfillment request and queue them for manual delivery. Backstop for the
+ * payment-time call, and for orders paid before this path existed.
+ */
+export async function sweepUnfulfilledPaidOrders({ limit = 50 } = {}) {
+  const rows = await all(
+    `SELECT o.id FROM orders o
+      WHERE o.status IN ('payment_received','processing','awaiting_fulfillment')
+        AND NOT EXISTS (SELECT 1 FROM fulfillment_requests fr WHERE fr.order_id = o.id)
+      ORDER BY o.created_at ASC LIMIT @l`, { l: limit });
+  let queued = 0;
+  for (const r of rows) {
+    try { if (await ensureManualFulfillment(r.id, { actorId: 'system' })) queued++; }
+    catch (e) { console.error('[fulfillment:sweep]', e.message); }
+  }
+  return queued;
 }
 
 /**

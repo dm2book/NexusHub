@@ -110,6 +110,10 @@ export async function createOrder(input, ctx = {}) {
   }
   const total = Math.max(0, afterDiscount - creditApplied);
   const billing = { ...(input.billing || {}) };
+  // Delivery target the buyer supplied for a hand-delivered/P2P item (e.g. their
+  // in-game username) — bounded, and surfaced to the owner in the manual queue.
+  if (billing.deliveryDetails) billing.deliveryDetails = String(billing.deliveryDetails).trim().slice(0, 200);
+  if (billing.deliveryLabel) billing.deliveryLabel = String(billing.deliveryLabel).trim().slice(0, 60);
   if (couponCode) { billing.coupon = couponCode; billing.discount = couponDiscount; }
   if (memberDiscount) { billing.memberDiscount = memberDiscount; billing.memberPercent = memberPercent; }
   if (bundleDiscount) { billing.bundle = bundle.bundle?.name; billing.bundleDiscount = bundleDiscount; }
@@ -252,8 +256,11 @@ export async function transitionOrder(orderId, to, ctx = {}) {
         if (delivered) return;
         // Not in local stock → hand off to the serial supplier queue, which
         // buys + delivers paid orders one at a time, oldest first.
-        const { drainSupplierQueue } = await import('./fulfillmentService.js');
+        const { drainSupplierQueue, ensureManualFulfillment } = await import('./fulfillmentService.js');
         await drainSupplierQueue(ctx);
+        // Still nothing auto (no stock, no auto-supplier, e.g. a P2P top-up)?
+        // Queue it for hand delivery so it never sits invisible.
+        await ensureManualFulfillment(orderId, ctx);
       })
       .catch((e) => console.error('[autodispense]', e.message));
     // Paid spend may push the buyer into a new loyalty tier → grant its bonus.
