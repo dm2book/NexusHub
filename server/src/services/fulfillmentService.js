@@ -242,26 +242,33 @@ export async function listManualQueue() {
  * (e.g. a P2P Robux/V-Bucks top-up) would otherwise sit invisible.
  */
 export async function ensureManualFulfillment(orderId, ctx = {}) {
-  let order = await getOrder(orderId);
+  const order = await getOrder(orderId);
   if (!order || ['completed', 'refunded', 'cancelled'].includes(order.status)) return false;
   const existing = await get('SELECT id FROM fulfillment_requests WHERE order_id=@o LIMIT 1', { o: orderId });
   if (existing) return false; // already handled (auto in-flight or manual queued)
   for (const item of order.items) {
     if (item.product_id && await resolveFulfillmentSupplier(item.product_id)) return false; // queue owns it
   }
-  // Advance the order into awaiting_fulfillment (same path fulfillOrder walks) so
-  // that completing the manual request can legally transition it to completed.
+  return queueForHandDelivery(order, ctx);
+}
+
+/** Open manual fulfillment requests for every item of a paid order, advancing
+ *  its status along the same path fulfillOrder walks so completing the request
+ *  can legally complete the order. Idempotent via the existing-request check. */
+async function queueForHandDelivery(order, ctx = {}) {
+  const existing = await get('SELECT id FROM fulfillment_requests WHERE order_id=@o LIMIT 1', { o: order.id });
+  if (existing) return false;
   if (order.status === 'payment_received') {
-    await transitionOrder(orderId, 'processing', { actorId: ctx.actorId || 'system', reason: 'Begin fulfillment' });
-    order = await getOrder(orderId);
+    await transitionOrder(order.id, 'processing', { actorId: ctx.actorId || 'system', reason: 'Begin fulfillment' });
+    order = await getOrder(order.id);
   }
   if (order.status === 'processing' && canTransition('processing', 'awaiting_fulfillment')) {
-    await transitionOrder(orderId, 'awaiting_fulfillment', { actorId: ctx.actorId || 'system', reason: 'Awaiting manual fulfillment' });
-    order = await getOrder(orderId);
+    await transitionOrder(order.id, 'awaiting_fulfillment', { actorId: ctx.actorId || 'system', reason: 'Awaiting manual fulfillment' });
+    order = await getOrder(order.id);
   }
   for (const item of order.items) await openManualFulfillment(order, item, ctx);
-  await logFulfillment('manual_queued', { orderId, actor: ctx.actorId || 'system',
-    detail: { reason: 'paid order, no stock/auto-supplier — queued for hand delivery', items: order.items.length } });
+  await logFulfillment('manual_queued', { orderId: order.id, actor: ctx.actorId || 'system',
+    detail: { reason: 'not auto-deliverable — queued for hand delivery', items: order.items.length } });
   return true;
 }
 
@@ -324,7 +331,11 @@ export async function autoFulfillFromSuppliers(orderId, ctx = {}) {
       await logFulfillment('skipped', { orderId, actor: 'system',
         detail: { reason: cost == null ? 'supplier cost unknown' : 'supplier cost >= effective revenue',
           item: item.id, cost, listPrice: item.unit_price, effectiveUnit } });
-      return false; // leave the whole order for manual review
+      // Don't leave the order invisible: put it in the manual queue so the
+      // owner reviews it (buy anyway / refund) — and so the serial drain stops
+      // re-picking it every run (it now has a fulfillment request).
+      await queueForHandDelivery(order, { ...ctx, actorId: ctx.actorId || 'system' });
+      return false;
     }
   }
   if (!anySupplier) return false; // nothing to auto-source → manual/admin as before

@@ -66,7 +66,9 @@ async function restoreGiveaways(c) {
       endGiveaway(guild, g.msgId, msg);
     };
     if (msLeft === 0) finish();               // ended while offline → resolve now
-    else setTimeout(finish, msLeft);          // re-arm the timer
+    // Cap re-armed timers below the 32-bit overflow (~24.8 days) — a longer
+    // wait is re-armed again on the next restart, never fired early.
+    else setTimeout(finish, Math.min(msLeft, 20160 * 60_000));
     console.log(`[giveaway] restored "${g.prize}" (${Math.round(msLeft / 60000)} min left, ${(g.entries || []).length} entries)`);
   }
 }
@@ -118,7 +120,7 @@ async function pushReviewToSite({ author, avatarUrl, stars, body, externalId }) 
         'content-type': 'application/json',
         'x-timestamp': ts,
         'x-signature': signature,
-        'x-ingest-secret': REVIEW_INGEST_SECRET, // legacy fallback during rollout
+        // Signed path only — never send the raw shared secret over the wire.
       },
       body: JSON.stringify(payload),
     });
@@ -163,10 +165,14 @@ async function getProducts() {
   if (!FORGEMARKET_API_URL) return [];
   if (Date.now() - catalogCache.at < 60_000) return catalogCache.items;
   try {
-    const res = await fetch(`${FORGEMARKET_API_URL}/api/products`);
+    // Hard timeout: a *hanging* (not refusing) API would otherwise stall every
+    // /price, /ask and price-list refresh for minutes and pile up sockets.
+    const res = await fetch(`${FORGEMARKET_API_URL}/api/products`, { signal: AbortSignal.timeout(8000) });
     const data = await res.json();
     catalogCache = { at: Date.now(), items: data.products || [] };
-  } catch { /* keep stale */ }
+  } catch {
+    catalogCache.at = Date.now(); // keep stale items, but back off for a minute
+  }
   return catalogCache.items;
 }
 
@@ -264,16 +270,22 @@ async function updatePriceList(guild) {
 
     const byCat = {};
     for (const p of products) (byCat[p.category || 'other'] ||= []).push(p);
-    const fields = Object.entries(byCat)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .slice(0, 24) // Discord embed cap: 25 fields
-      .map(([cat, list]) => ({
-        name: `🎮 ${cat.replace(/-/g, ' ').replace(/\b\w/g, (m) => m.toUpperCase())}`,
-        value: list
-          .sort((a, b) => a.price - b.price)
-          .map((p) => `${p.name} — **${money(p.price, p.currency)}**`)
-          .join('\n').slice(0, 1024),
-      }));
+    // Discord caps embeds at 25 fields AND 6000 chars total — exceed either and
+    // the send/edit throws, silently freezing the "live" list. Stop adding
+    // fields once we near the total budget.
+    let totalChars = 0;
+    const fields = [];
+    for (const [cat, list] of Object.entries(byCat).sort(([a], [b]) => a.localeCompare(b))) {
+      if (fields.length >= 24) break;
+      const name = `🎮 ${cat.replace(/-/g, ' ').replace(/\b\w/g, (m) => m.toUpperCase())}`;
+      const value = list
+        .sort((a, b) => a.price - b.price)
+        .map((p) => `${p.name} — **${money(p.price, p.currency)}**`)
+        .join('\n').slice(0, 1024);
+      if (totalChars + name.length + value.length > 5300) break;
+      totalChars += name.length + value.length;
+      fields.push({ name, value });
+    }
 
     const embed = new EmbedBuilder().setColor(0x6366f1)
       .setTitle('🏷️ Live price list')
@@ -567,7 +579,7 @@ async function handleButton(i) {
 const TICKET_LABEL = { order: '🛒 Order issue', payment: '💳 Payment', partner: '🤝 Partnership', other: '❓ Other' };
 async function openTicketModal(i, type) {
   // One open ticket per member — check BEFORE showing the form.
-  const existing = i.guild.channels.cache.find((c) => c.topic?.includes(`ticket-owner:${i.user.id}`));
+  const existing = i.guild.channels.cache.find((c) => c.topic?.includes(`ticket-owner:${i.user.id} `));
   if (existing) return i.reply({ content: `You already have an open ticket: <#${existing.id}>`, ephemeral: true });
 
   const modal = new ModalBuilder().setCustomId(`tmodal:${type}`).setTitle(TICKET_LABEL[type] || '🎫 Support');
@@ -654,7 +666,7 @@ async function openTicket(i, type, { orderNumber = '', details = '' } = {}) {
     (c) => c.type === ChannelType.GuildCategory && c.name === '🎫 TICKETS') || support?.parent;
 
   // One open ticket per member.
-  const existing = i.guild.channels.cache.find((c) => c.topic?.includes(`ticket-owner:${i.user.id}`));
+  const existing = i.guild.channels.cache.find((c) => c.topic?.includes(`ticket-owner:${i.user.id} `));
   if (existing) return i.editReply(`You already have an open ticket: <#${existing.id}>`);
 
   const staffRoles = ['Support', 'Admin', 'Moderator'].map((n) => findRole(i.guild, n)).filter(Boolean);
@@ -1192,20 +1204,30 @@ async function lookupOrder(i) {
 }
 
 // ── /vouch → posts to #vouchers ───────────────────────────────────────────────
+const vouchLastAt = new Map(); // userId → ts of their last vouch (anti-spam)
 async function postVouch(i) {
   const message = i.options.getString('message');
   const stars = Math.min(5, Math.max(1, i.options.getInteger('stars') || 5));
+  // One vouch per user per hour — keeps #vouchers and the site honest.
+  const last = vouchLastAt.get(i.user.id) || 0;
+  if (Date.now() - last < 3_600_000) {
+    return i.reply({ content: 'You already vouched recently — thank you! You can vouch again in a bit. 💚', ephemeral: true });
+  }
+  vouchLastAt.set(i.user.id, Date.now());
   const ch = findChannel(i.guild, 'vouchers');
   const e = new EmbedBuilder().setColor(0x22c55e)
     .setAuthor({ name: i.user.username, iconURL: i.user.displayAvatarURL() })
     .setDescription(`${'⭐'.repeat(stars)}\n\n${message}`)
     .setFooter({ text: 'Community vouch' }).setTimestamp();
   if (ch) await ch.send({ embeds: [e] }).catch(() => {});
-  // Mirror the vouch onto the website's reviews section.
+  // Mirror the vouch onto the website's reviews section. externalId is keyed to
+  // the USER (not the interaction), so the server-side dedup allows at most one
+  // site review per Discord member — repeat /vouch spam can never flood the
+  // storefront with fake ratings.
   pushReviewToSite({
     author: i.user.username,
     avatarUrl: i.user.displayAvatarURL({ extension: 'png', size: 128 }),
-    stars, body: message, externalId: `vouch:${i.user.id}:${i.id}`,
+    stars, body: message, externalId: `vouch:${i.user.id}`,
   });
   return i.reply({ content: 'Thanks for the vouch! 💚 Posted in #vouchers **and** on the website.', ephemeral: true });
 }
@@ -1746,7 +1768,9 @@ async function clearPinsCmd(i) {
 async function startGiveaway(i) {
   if (!isStaff(i.member)) return i.reply({ content: 'Only staff can start giveaways.', ephemeral: true });
   const prize = i.options.getString('prize');
-  const minutes = i.options.getInteger('minutes') || 10;
+  // Clamp to 1 min – 14 days: a huge value overflows Node's 32-bit timer (the
+  // giveaway would "end" after 1ms), a negative one ends it instantly.
+  const minutes = Math.min(20160, Math.max(1, i.options.getInteger('minutes') || 10));
   const winnersCount = Math.max(1, i.options.getInteger('winners') || 1);
   await i.reply({ content: `Starting a giveaway for **${prize}** (${minutes} min, ${winnersCount} winner${winnersCount > 1 ? 's' : ''})…`, ephemeral: true });
   const endsAt = Date.now() + minutes * 60_000;
