@@ -30,7 +30,25 @@ export function AuthProvider({ children }) {
           if (accessToken) setAccessToken(accessToken);
         } catch { /* no trusted device — stay guest */ }
       }
-      if (getAccessToken()) await loadMe();
+      if (getAccessToken()) {
+        try {
+          const { user } = await api.get('/api/auth/me');
+          setUser(user);
+        } catch {
+          // Stale/expired token in storage: clear it and retry the ladder
+          // (refresh cookie, then trusted device) instead of rendering the
+          // returning customer as a guest on every reload.
+          setAccessToken(null);
+          await api.refresh().catch(() => {});
+          if (!getAccessToken()) {
+            try {
+              const { accessToken } = await api.post('/api/auth/device-login');
+              if (accessToken) setAccessToken(accessToken);
+            } catch { /* stay guest */ }
+          }
+          if (getAccessToken()) await loadMe();
+        }
+      }
       setLoading(false);
     })();
   }, [loadMe]);

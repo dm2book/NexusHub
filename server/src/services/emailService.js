@@ -9,7 +9,7 @@
  */
 import nodemailer from 'nodemailer';
 import { config } from '../config/env.js';
-import { get, run, nowIso } from '../db/index.js';
+import { get, all, run, nowIso } from '../db/index.js';
 import { newId } from '../utils/ids.js';
 import { renderTemplate, renderTokens, wrapBranded, baseContext } from './templateService.js';
 
@@ -117,6 +117,37 @@ export async function sendEmailAsync(eventKey, to, context = {}) {
   } catch (err) {
     console.error(`[email] ${eventKey} -> ${to} failed:`, err.message);
   }
+}
+
+/**
+ * Retry recently-failed transactional emails (maintenance sweep). The full
+ * render context is persisted with every log row, so a transient provider
+ * failure (Resend timeout, network blip) no longer means a customer never
+ * gets their codes. Bounded: at most `maxAttempts` rows per template+recipient
+ * in the window, so a permanently-broken address ages out instead of looping.
+ */
+export async function retryFailedEmails({ limit = 20, maxAgeHours = 24, maxAttempts = 4 } = {}) {
+  const cut = new Date(Date.now() - maxAgeHours * 3_600_000).toISOString();
+  const rows = await all(
+    `SELECT id, template_id, to_email, context FROM email_log
+      WHERE status = 'failed' AND created_at > @cut AND context IS NOT NULL
+        AND error NOT IN ('template disabled', 'template missing')
+      ORDER BY created_at ASC LIMIT @l`, { cut, l: limit });
+  let resent = 0;
+  for (const r of rows) {
+    const prior = await get(
+      `SELECT COUNT(*) AS n FROM email_log WHERE template_id=@t AND to_email=@to AND created_at > @cut`,
+      { t: r.template_id, to: r.to_email, cut });
+    if (Number(prior?.n || 0) >= maxAttempts) continue; // give up on this recipient
+    // Claim atomically so a concurrent cron run can't double-send.
+    const claim = await run(`UPDATE email_log SET status='retried' WHERE id=@id AND status='failed'`, { id: r.id });
+    if (!claim?.changes) continue;
+    try {
+      await sendEmail(r.template_id, r.to_email, JSON.parse(r.context || '{}'));
+      resent++;
+    } catch { /* outcome already recorded as a fresh log row by sendEmail */ }
+  }
+  return resent;
 }
 
 /**
