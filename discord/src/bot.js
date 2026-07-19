@@ -127,6 +127,50 @@ async function pushReviewToSite({ author, avatarUrl, stars, body, externalId }) 
   } catch (e) { console.error('[review->site]', e?.message || e); }
 }
 
+// ── Permanent invite ─────────────────────────────────────────────────────────
+// Default Discord invites expire after 7 days; a dead link on the storefront
+// silently kills sign-ups. On boot (and daily) we make sure a NON-expiring
+// invite exists (maxAge 0, unlimited uses) and push it to the site, which
+// serves it everywhere an invite is shown.
+const FALLBACK_INVITE = process.env.DISCORD_INVITE_URL || 'https://discord.gg/vNcfgDbVd';
+let PERMANENT_INVITE = null;
+
+async function ensurePermanentInvite(guild) {
+  try {
+    let invite = null;
+    // Prefer an existing permanent invite (needs Manage Server to list them).
+    try {
+      const invites = await guild.invites.fetch();
+      invite = invites.find((i) => i.maxAge === 0 && i.maxUses === 0) || null;
+    } catch { /* no Manage Server perm — we'll create our own below */ }
+    if (!invite) {
+      // Create one on the most public channel the bot can invite from.
+      const chans = ['welcome', 'rules', 'general'];
+      const target = chans.map((n) => findChannel(guild, n)).find((ch) =>
+        ch?.isTextBased?.() && ch.permissionsFor(guild.members.me)?.has(P.CreateInstantInvite))
+        || guild.channels.cache.find((ch) =>
+          ch.type === ChannelType.GuildText && ch.permissionsFor(guild.members.me)?.has(P.CreateInstantInvite));
+      if (!target) { console.warn('[invite] no channel with Create Invite permission'); return; }
+      invite = await target.createInvite({ maxAge: 0, maxUses: 0, unique: false,
+        reason: 'Permanent storefront invite (never expires)' });
+    }
+    PERMANENT_INVITE = invite.url;
+    // Push the live link to the site (HMAC-signed; URL bound into the signature).
+    if (FORGEMARKET_API_URL && REVIEW_INGEST_SECRET) {
+      const ts = String(Date.now());
+      const signature = createHmac('sha256', REVIEW_INGEST_SECRET)
+        .update(`${ts}.invite:${invite.url}`).digest('hex');
+      await fetch(`${FORGEMARKET_API_URL.replace(/\/$/, '')}/api/discord/invite`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-timestamp': ts, 'x-signature': signature },
+        body: JSON.stringify({ url: invite.url }),
+        signal: AbortSignal.timeout(8000),
+      }).catch((e) => console.error('[invite->site]', e?.message));
+    }
+    console.log(`[invite] permanent invite ready: ${invite.url}`);
+  } catch (e) { console.error('[invite]', e?.message || e); }
+}
+
 const P = PermissionFlagsBits;
 const anthropic = ANTHROPIC_API_KEY ? new Anthropic({ apiKey: ANTHROPIC_API_KEY }) : null;
 
@@ -460,6 +504,12 @@ client.once(Events.ClientReady, (c) => {
   // Relay the store's queued Discord events (sales, drops, alerts, DMs).
   setInterval(() => pollOutbox(c), 60_000);
   setTimeout(() => pollOutbox(c), 10_000);
+
+  // Keep a never-expiring invite alive + mirrored on the site (re-checked daily
+  // so even a manually-deleted invite heals itself within a day).
+  const invites = () => c.guilds.cache.forEach((g) => ensurePermanentInvite(g));
+  setTimeout(invites, 20_000); // after channel caches warm up
+  setInterval(invites, 24 * 60 * 60_000);
 
   // Site watchdog: every 15 min; alerts staff on downtime + recovery.
   setInterval(() => c.guilds.cache.forEach((g) => checkSiteHealth(g)), 15 * 60_000);
@@ -881,7 +931,7 @@ async function handleCommand(i) {
     return i.reply({ ephemeral: true, content: `🛍️ Browse the shop: ${STORE_URL}/shop` });
   }
   if (i.commandName === 'invite') {
-    return i.reply({ ephemeral: true, content: '📨 Invite friends with this link: https://discord.gg/vNcfgDbVd' });
+    return i.reply({ ephemeral: true, content: `📨 Invite friends with this link: ${PERMANENT_INVITE || FALLBACK_INVITE}` });
   }
   if (i.commandName === 'stats') {
     const g = i.guild;
