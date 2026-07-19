@@ -1,0 +1,59 @@
+# ForgeMarket CI — runs on every PR and push to main.
+# Gates: frontend build, Discord-bot syntax, and the full server e2e suite
+# (payments, coins, supplier auto-buy, queue, connectors, invite) against a
+# real Postgres — so money-critical logic can't regress unnoticed.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            server/package-lock.json
+
+      - name: Install frontend deps
+        run: npm ci
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Install server deps
+        run: npm ci
+        working-directory: server
+
+      - name: Discord bot syntax check
+        run: |
+          node --check discord/src/bot.js
+          node --check discord/src/register-commands.js
+
+      - name: Server e2e suites (fresh Postgres DB per suite)
+        run: npm test
+        working-directory: server
+        env:
+          PG_ADMIN_URL: postgres://postgres:postgres@127.0.0.1:5432/postgres

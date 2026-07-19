@@ -157,6 +157,31 @@ export async function postOrderEvent(order, event = 'received') {
   await deliver('leads', url, { embeds: [embed] });
 }
 
+/**
+ * Ping staff the moment a customer submits payment proof — manual (Tikkie/
+ * PayPal) orders deliver only as fast as the owner confirms them, so an instant
+ * heads-up in the staff channel is the difference between minutes and hours.
+ * Best-effort: a Discord hiccup never blocks the proof submission.
+ */
+export async function postPaymentProofAlert(order, proof = {}) {
+  const flags = Array.isArray(proof.flags) ? proof.flags : [];
+  const embed = {
+    title: '💸 Payment proof submitted — verify now',
+    color: flags.length ? 0xf59e0b : 0x10b981, // amber when fraud flags, green otherwise
+    fields: [
+      { name: 'Order', value: `\`${order.number}\``, inline: true },
+      { name: 'Amount', value: money(order.total, order.currency), inline: true },
+      { name: 'Method', value: proof.method || 'manual', inline: true },
+      ...(proof.transactionId ? [{ name: 'Transaction ID', value: `\`${String(proof.transactionId).slice(0, 100)}\`` }] : []),
+      ...(flags.length ? [{ name: '⚠️ Flags', value: flags.join(', ') }] : []),
+      { name: 'Review', value: `${config.appUrl}/admin/payments` },
+    ],
+    footer: { text: config.email.fromName },
+    timestamp: new Date().toISOString(),
+  };
+  await deliver('leads', config.discord.orderWebhookUrl, { embeds: [embed] });
+}
+
 /** Fire a webhook payload; best-effort, logs and swallows every failure. */
 async function postWebhook(url, payload) {
   if (!url) return false;
