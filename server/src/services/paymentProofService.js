@@ -13,6 +13,7 @@ import { config } from '../config/env.js';
 import { newId } from '../utils/ids.js';
 import { getOrder, markPaymentReceived } from './orderService.js';
 import { notify } from './notificationService.js';
+import { postPaymentProofAlert } from './discordService.js';
 import { audit } from './auditService.js';
 import { sendEmailAsync } from './emailService.js';
 import { badRequest, notFound } from '../utils/errors.js';
@@ -61,6 +62,11 @@ export async function submitProof(orderId, input = {}, ctx = {}) {
 
   await audit({ action: 'payment.proof_submit', actor: ctx.user || { email: order.email },
     targetType: 'order', targetId: orderId, metadata: { transactionId, flags }, req: ctx.req });
+
+  // Instant staff heads-up in Discord: manual payments deliver only as fast as
+  // the owner confirms them. Best-effort — never blocks the submission.
+  postPaymentProofAlert(order, { method: input.method, transactionId, flags })
+    .catch((e) => console.error('[proof-alert]', e.message));
 
   return { id, status: 'pending', flags };
 }

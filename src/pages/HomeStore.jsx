@@ -171,7 +171,7 @@ export default function HomeStore() {
 
       {/* ── Top nav ─────────────────────────────────────────────── */}
       <header className="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-slate-200/70">
-        <div className="max-w-[1400px] mx-auto px-4 lg:px-8 h-[68px] flex items-center gap-6">
+        <div className="max-w-[1400px] mx-auto px-4 lg:px-8 h-[68px] flex items-center gap-3 sm:gap-6">
           <Link to="/" className="flex items-center gap-2.5 shrink-0">
             <span className="w-9 h-9 rounded-xl flex items-center justify-center text-white shadow-lg shadow-violet-500/30"
               style={{ backgroundImage: 'linear-gradient(135deg,#7c5cff,#a855f7)' }}>
@@ -224,9 +224,9 @@ export default function HomeStore() {
             <Link to="/login" className="hidden sm:inline-flex text-[15px] font-medium text-slate-600 hover:text-slate-900">{tr('nav.login', 'Log in')}</Link>
           )}
           {!user && (
-            <Link to="/login" className="inline-flex items-center gap-1.5 text-white text-[15px] font-semibold rounded-xl px-4 h-10 shadow-lg shadow-violet-500/30 hover:brightness-105 transition"
+            <Link to="/login" className="inline-flex items-center gap-1.5 text-white text-[15px] font-semibold rounded-xl px-3.5 sm:px-4 h-10 shrink-0 shadow-lg shadow-violet-500/30 hover:brightness-105 transition"
               style={{ backgroundImage: 'linear-gradient(135deg,#7c5cff,#a855f7)' }}>
-              {tr('nav.signup', 'Sign Up')} <ArrowRight size={16} />
+              {tr('nav.signup', 'Sign Up')} <span className="hidden sm:inline-flex"><ArrowRight size={16} /></span>
             </Link>
           )}
         </div>

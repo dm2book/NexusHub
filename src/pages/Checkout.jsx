@@ -379,15 +379,17 @@ function CheckoutSteps({ current = 1 }) {
       {steps.map((s, i) => {
         const done = i < current, active = i === current;
         return (
-          <div key={s} className="flex items-center flex-1 last:flex-none">
+          <div key={s} className="flex items-center flex-1 last:flex-none min-w-0">
             <div className="flex items-center gap-2">
               <span className={`w-7 h-7 rounded-full grid place-items-center text-xs font-semibold shrink-0 ${
                 done ? 'bg-emerald-500 text-white' : active ? 'bg-primary text-white' : 'bg-white/10 text-slate-400'}`}>
                 {done ? '✓' : i + 1}
               </span>
-              <span className={`text-sm ${active ? 'text-white font-medium' : done ? 'text-slate-300' : 'text-slate-500'}`}>{s}</span>
+              {/* On phones only the ACTIVE step keeps its label — four full labels
+                  plus connectors don't fit 390px and pushed the page sideways. */}
+              <span className={`text-sm whitespace-nowrap ${active ? 'text-white font-medium' : done ? 'text-slate-300 hidden sm:inline' : 'text-slate-500 hidden sm:inline'}`}>{s}</span>
             </div>
-            {i < steps.length - 1 && <div className={`flex-1 h-px mx-3 ${done ? 'bg-emerald-500/50' : 'bg-white/10'}`} />}
+            {i < steps.length - 1 && <div className={`flex-1 h-px mx-2 sm:mx-3 ${done ? 'bg-emerald-500/50' : 'bg-white/10'}`} />}
           </div>
         );
       })}
