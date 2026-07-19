@@ -8,8 +8,10 @@ import { useI18n } from '../../lib/i18n.jsx';
 export default function Drops() {
   const { t, lang } = useI18n();
   const [drops, setDrops] = useState(null);
+  const [invite, setInvite] = useState(null); // live (never-expiring) invite from the API
 
   useEffect(() => { api.get('/api/drops').then((r) => setDrops(r.drops || [])).catch(() => setDrops([])); }, []);
+  useEffect(() => { api.get('/api/discord/server').then((r) => setInvite(r.server?.inviteUrl || null)).catch(() => {}); }, []);
 
   const fmt = (iso) => {
     const d = new Date(iso);
@@ -30,7 +32,7 @@ export default function Drops() {
           <div className="text-center py-12">
             <CalendarDays size={40} className="text-slate-600 mx-auto mb-3" />
             <p className="text-slate-400">{t('drops.empty', 'No drops scheduled right now — check back soon, or turn on alerts in our Discord.')}</p>
-            <a href="https://discord.gg/vNcfgDbVd" target="_blank" rel="noreferrer"
+            <a href={invite || 'https://discord.gg/vNcfgDbVd'} target="_blank" rel="noreferrer"
               className="btn-primary inline-flex mt-5"><Bell size={16} /> {t('drops.notify', 'Get drop alerts on Discord')}</a>
           </div>
         ) : (

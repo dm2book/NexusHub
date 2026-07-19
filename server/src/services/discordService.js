@@ -77,12 +77,31 @@ export async function botSeenRecently(hours = 24) {
   } catch { return false; }
 }
 
+// ── Live invite link ─────────────────────────────────────────────────────────
+// Discord invites created with default settings expire after 7 days — a dead
+// invite on the storefront silently kills community sign-ups. The bot creates a
+// PERMANENT invite (maxAge 0) on boot and pushes it here; everything that shows
+// an invite reads this live value first, then falls back to the env-configured
+// link.
+export async function setLiveInviteUrl(url) {
+  await run(`INSERT INTO kv (key, value, updated_at) VALUES ('discord_invite_url', @v, @at)
+             ON CONFLICT (key) DO UPDATE SET value=@v, updated_at=@at`,
+    { v: url, at: new Date().toISOString() });
+}
+export async function getLiveInviteUrl() {
+  try {
+    const r = await get(`SELECT value FROM kv WHERE key='discord_invite_url'`);
+    return r?.value || config.discord.inviteUrl || null;
+  } catch { return config.discord.inviteUrl || null; }
+}
+
 export async function getServerInfo() {
   const base = {
     configured: !!config.discord.guildId,
     name: config.discord.serverName,
     tagline: config.discord.tagline,
-    inviteUrl: config.discord.inviteUrl || null,
+    // Bot-maintained permanent invite first; env-configured link as fallback.
+    inviteUrl: await getLiveInviteUrl(),
     online: null,
     memberPreview: [],
   };

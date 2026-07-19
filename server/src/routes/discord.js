@@ -1,7 +1,7 @@
 /** Public Discord community info + the bot's staff digest endpoint. */
 import { Router } from 'express';
 import { asyncHandler } from '../middleware/error.js';
-import { getServerInfo, claimOutbox, stampBotSeen } from '../services/discordService.js';
+import { getServerInfo, claimOutbox, stampBotSeen, setLiveInviteUrl } from '../services/discordService.js';
 import { verifyIngest } from '../middleware/ingestSignature.js';
 import { config } from '../config/env.js';
 import { overview, topProducts } from '../services/analyticsService.js';
@@ -48,6 +48,22 @@ router.post('/balance',
       linked: true, coins, creditCents: credit,
       tier: loyalty?.tierName || null, spentCents: loyalty?.xp ?? null,
     });
+  }));
+
+// The bot maintains a PERMANENT server invite (maxAge 0) and pushes it here so
+// the storefront never shows an expired link. The URL is bound into the HMAC
+// signature, and only real Discord invite URLs are accepted.
+export const canonicalInvite = (b = {}) => `invite:${b.url || ''}`;
+router.post('/invite',
+  verifyIngest(canonicalInvite)(config.discord.reviewIngestSecret),
+  asyncHandler(async (req, res) => {
+    const url = String(req.body?.url || '').trim();
+    if (!/^https:\/\/(discord\.gg|discord\.com\/invite)\/[\w-]+$/.test(url)) {
+      return res.status(400).json({ error: 'Not a Discord invite URL' });
+    }
+    await setLiveInviteUrl(url);
+    await stampBotSeen();
+    res.json({ ok: true });
   }));
 
 // Staff digest for the bot (/digest, /stock and the weekly Monday post).
