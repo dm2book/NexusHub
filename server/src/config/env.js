@@ -204,9 +204,10 @@ export function assertProductionConfig() {
   if (missing.length) {
     throw new Error(`Refusing to start in production without: ${missing.join(', ')}`);
   }
-  // SMTP is optional: without it, emails are still rendered and recorded in the
-  // email_log table (nothing is dropped). Warn so it's not a silent surprise.
-  if (!config.email.smtpUrl) {
-    console.warn('[config] SMTP_URL not set — emails will be recorded to email_log, not delivered.');
+  // Email delivery is optional: without Resend or SMTP, emails are rendered and
+  // recorded in email_log (nothing is dropped). Warn so it's not a silent
+  // surprise — but not when Resend is configured (that path delivers fine).
+  if (!config.email.resendApiKey && !config.email.smtpUrl) {
+    console.warn('[config] No RESEND_API_KEY or SMTP_URL — emails will be recorded to email_log, not delivered.');
   }
 }

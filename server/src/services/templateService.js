@@ -10,11 +10,20 @@
  */
 import { config } from '../config/env.js';
 
-/** Replace {{a.b}} tokens from a flat/nested context. Unknown tokens → ''. */
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) =>
+  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+/** Replace {{a.b}} tokens from a flat/nested context. Unknown tokens → ''.
+ *  Values are HTML-escaped UNLESS the token name ends in `Html` (itemsHtml,
+ *  deliveriesHtml, …) — those are built server-side with their own escaping.
+ *  Without this, customer-controlled fields (e.g. billing.full_name → user.name)
+ *  would inject raw HTML into branded emails sent from our verified domain,
+ *  turning checkout into a phishing relay to any address. */
 export function renderTokens(str, ctx) {
   return String(str).replace(/\{\{\s*([\w.]+)\s*\}\}/g, (_, pathExpr) => {
     const val = pathExpr.split('.').reduce((o, k) => (o == null ? undefined : o[k]), ctx);
-    return val == null ? '' : String(val);
+    if (val == null) return '';
+    return /Html$/.test(pathExpr.split('.').pop()) ? String(val) : esc(String(val));
   });
 }
 

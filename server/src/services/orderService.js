@@ -110,6 +110,9 @@ export async function createOrder(input, ctx = {}) {
   }
   const total = Math.max(0, afterDiscount - creditApplied);
   const billing = { ...(input.billing || {}) };
+  // Bound the free-text billing fields (they flow into emails and admin views).
+  if (billing.full_name) billing.full_name = String(billing.full_name).trim().slice(0, 80);
+  if (billing.city) billing.city = String(billing.city).trim().slice(0, 80);
   // Delivery target the buyer supplied for a hand-delivered/P2P item (e.g. their
   // in-game username) — bounded, and surfaced to the owner in the manual queue.
   if (billing.deliveryDetails) billing.deliveryDetails = String(billing.deliveryDetails).trim().slice(0, 200);
@@ -179,6 +182,19 @@ export async function deliverOrder(orderId, deliveries = [], ctx = {}) {
     await run(`INSERT INTO deliveries (id, order_id, order_item_id, type, content, created_at)
          VALUES (@id, @oid, @iid, @type, @c, @at)`,
         { id: newId('dlv'), oid: orderId, iid: d.orderItemId || null, type: d.type || 'code', c: content, at: nowIso() });
+  }
+  // Already completed (e.g. staff sends a replacement code)? The transition
+  // below would early-return and the customer would never be emailed the new
+  // code — send the delivery email explicitly instead.
+  if (order.status === 'completed' && deliveries.length) {
+    const fresh = await getOrder(orderId);
+    await sendEmailAsync('order_completed', fresh.email, emailContext(fresh, ctx));
+    if (fresh.userId) {
+      await notify(fresh.userId, { type: 'delivery', title: `Order ${fresh.number}: new delivery`,
+        body: 'A new code was added to your order — check your email and dashboard.',
+        link: `/account/orders/${orderId}` }).catch(() => {});
+    }
+    return fresh;
   }
   // Force-complete from any state — staff is explicitly fulfilling the order.
   return transitionOrder(orderId, 'completed', { ...ctx, force: true, reason: ctx.reason || 'Delivered by staff' });

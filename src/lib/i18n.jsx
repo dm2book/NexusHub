@@ -296,6 +296,8 @@ const NL = {
   'checkout.demo2': '.',
   'checkout.noPay1': 'Betaling is nog niet ingesteld — je bestelling wordt geplaatst als',
   'checkout.couponPh': 'Kortingscode',
+  'checkout.deliveryPh': 'Waar leveren we? Bijv. je in-game gebruikersnaam',
+  'checkout.deliveryHint': 'We leveren deze bestelling op dit doel — controleer het goed.',
   'checkout.apply': 'Toepassen',
   'checkout.useCredit': 'Winkeltegoed gebruiken',
   'checkout.available': 'beschikbaar',

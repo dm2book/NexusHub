@@ -17,23 +17,32 @@ export function CartProvider({ children }) {
 
   // On login, pull the server-saved cart so it follows the shopper across
   // devices; only restore when the local cart is empty (never clobber a cart
-  // they're actively building).
+  // they're actively building). The functional update reads the CURRENT cart,
+  // not the closure from when the request started — an item added while the
+  // GET was in flight is never replaced by an old server cart.
   const restoredFor = useRef(null);
+  const [syncReady, setSyncReady] = useState(false);
   useEffect(() => {
-    if (!user?.id || restoredFor.current === user.id) return;
+    if (!user?.id) { setSyncReady(false); return; }
+    if (restoredFor.current === user.id) return;
     restoredFor.current = user.id;
     api.get('/api/account/cart').then((r) => {
-      if (Array.isArray(r.items) && r.items.length && items.length === 0) setItems(r.items);
-    }).catch(() => {});
-  }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+      if (Array.isArray(r.items) && r.items.length) {
+        setItems((cur) => (cur.length ? cur : r.items));
+      }
+    }).catch(() => {})
+      // Only start mirroring AFTER the restore settled — otherwise a slow cold
+      // start lets the 900ms mirror PUT an empty local cart over the saved one.
+      .finally(() => setSyncReady(true));
+  }, [user?.id]);
 
   // Mirror the cart to the server (debounced) so an abandoned cart can be
-  // recovered. Only while signed in; guests stay purely local.
+  // recovered. Only while signed in and after restore; guests stay purely local.
   useEffect(() => {
-    if (!user?.id) return;
+    if (!user?.id || !syncReady) return;
     const t = setTimeout(() => { api.put('/api/account/cart', { items }).catch(() => {}); }, 900);
     return () => clearTimeout(t);
-  }, [items, user?.id]);
+  }, [items, user?.id, syncReady]);
 
   const add = (product, qty = 1) => {
     setItems((cur) => {

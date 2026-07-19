@@ -33,7 +33,7 @@ const commands = [
     .addIntegerOption((o) => o.setName('stars').setDescription('1–5 stars').setMinValue(1).setMaxValue(5)),
   new SlashCommandBuilder().setName('giveaway').setDescription('Staff: start a giveaway')
     .addStringOption((o) => o.setName('prize').setDescription('What are you giving away?').setRequired(true))
-    .addIntegerOption((o) => o.setName('minutes').setDescription('Duration in minutes (default 10)'))
+    .addIntegerOption((o) => o.setName('minutes').setDescription('Duration in minutes (default 10, max 14 days)').setMinValue(1).setMaxValue(20160))
     .addIntegerOption((o) => o.setName('winners').setDescription('Number of winners (default 1)')),
   new SlashCommandBuilder().setName('reroll').setDescription('Staff: reroll a giveaway winner')
     .addStringOption((o) => o.setName('message_id').setDescription('The giveaway message ID').setRequired(true)),

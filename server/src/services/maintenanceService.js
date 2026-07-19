@@ -7,6 +7,7 @@ import { run, get, all, nowIso } from '../db/index.js';
 import { transitionOrder, sendPaymentReminders, sendReviewRequests } from './orderService.js';
 import { sendCartReminders } from './cartService.js';
 import { retryPendingFulfillments, drainSupplierQueue, sweepUnfulfilledPaidOrders } from './fulfillmentService.js';
+import { retryFailedEmails } from './emailService.js';
 
 const HOURS = (n) => new Date(Date.now() - n * 3_600_000).toISOString();
 const DAYS = (n) => new Date(Date.now() - n * 86_400_000).toISOString();
@@ -76,6 +77,12 @@ export async function runMaintenance() {
   try {
     summary.manualQueued = await sweepUnfulfilledPaidOrders({ limit: 50 });
   } catch (e) { summary.manualQueueError = e.message; }
+
+  // 10. Re-send transactional emails that failed on a transient provider error
+  //     (their full render context is persisted with the log row).
+  try {
+    summary.emailsRetried = await retryFailedEmails({ limit: 20 });
+  } catch (e) { summary.emailRetryError = e.message; }
 
   return summary;
 }
