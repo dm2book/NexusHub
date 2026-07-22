@@ -40,8 +40,10 @@ export default function Checkout() {
   const [creditBalance, setCreditBalance] = useState(0); // store credit (cents)
   const [useCredit, setUseCredit] = useState(false);
   const [bundles, setBundles] = useState([]);
-  const [deliveryFields, setDeliveryFields] = useState({}); // productId → label (e.g. "Roblox username")
+  const [deliveryFields, setDeliveryFields] = useState({});   // productId → label (e.g. "Roblox username")
+  const [deliveryChoices, setDeliveryChoices] = useState({}); // productId → offers a code/account choice
   const [deliveryDetail, setDeliveryDetail] = useState('');
+  const [deliveryMethod, setDeliveryMethod] = useState('code'); // 'code' | 'account' (buyer's pick)
 
   // Best matching bundle: all of its products are in the cart.
   const inCart = new Set(items.map((i) => i.id));
@@ -77,16 +79,25 @@ export default function Checkout() {
   useEffect(() => { api.get('/api/bundles').then((r) => setBundles(r.bundles || [])).catch(() => {}); }, []);
   useEffect(() => {
     api.get('/api/products').then((r) => {
-      const m = {};
-      (r.products || []).forEach((p) => { if (p.deliveryField) m[p.id] = p.deliveryField; });
-      setDeliveryFields(m);
+      const m = {}, choices = {};
+      (r.products || []).forEach((p) => {
+        if (p.deliveryField) m[p.id] = p.deliveryField;
+        if (p.deliveryChoice) choices[p.id] = true;
+      });
+      setDeliveryFields(m); setDeliveryChoices(choices);
     }).catch(() => {});
   }, []);
 
-  // Distinct delivery-target labels for the items in the cart (e.g. a Robux
-  // top-up asks for the buyer's Roblox username). Shown only when needed.
+  // Delivery target labels for cart items (e.g. a Robux top-up asks for the
+  // buyer's Roblox username).
   const deliveryLabels = [...new Set(items.map((i) => deliveryFields[i.id]).filter(Boolean))];
-  const needsDelivery = deliveryLabels.length > 0;
+  // A product offers a CHOICE (code vs account) or REQUIRES account delivery.
+  const offersChoice = items.some((i) => deliveryChoices[i.id]);
+  const requiresAccount = items.some((i) => deliveryFields[i.id] && !deliveryChoices[i.id]);
+  // Effective method: forced to account for pure top-up products, otherwise the
+  // buyer's pick (defaults to a gift code).
+  const method = requiresAccount ? 'account' : (offersChoice ? deliveryMethod : 'code');
+  const needsTarget = method === 'account' && deliveryLabels.length > 0;
   useEffect(() => {
     api.get('/api/config').then((c) => {
       setProvider(c.paymentProvider);
@@ -116,7 +127,8 @@ export default function Checkout() {
         email,
         items: items.map((i) => ({ productId: i.id, quantity: i.qty })),
         billing: { full_name: fullName, city, email,
-          ...(needsDelivery ? { deliveryDetails: deliveryDetail, deliveryLabel: deliveryLabels.join(' / ') } : {}) },
+          deliveryMethod: method,
+          ...(needsTarget ? { deliveryDetails: deliveryDetail, deliveryLabel: deliveryLabels.join(' / ') } : {}) },
         currency,
         coupon: coupon?.code,
         useCredit: creditToApply || undefined,
@@ -222,7 +234,24 @@ export default function Checkout() {
                   <input value={city} onChange={(e) => setCity(e.target.value)} className="input" placeholder={t('checkout.optional', 'Optional')} />
                 </div>
               </div>
-              {needsDelivery && (
+              {offersChoice && !requiresAccount && (
+                <div>
+                  <label className="label">{t('checkout.deliveryChoose', 'How do you want it delivered?')}</label>
+                  <div className="grid sm:grid-cols-2 gap-2.5">
+                    <button type="button" onClick={() => setDeliveryMethod('code')}
+                      className={`rounded-xl border p-3.5 text-left transition ${method === 'code' ? 'border-primary bg-primary/10' : 'border-white/10 hover:border-white/25'}`}>
+                      <div className="text-white font-medium text-sm">📧 {t('checkout.deliveryCode', 'Gift code')}</div>
+                      <div className="text-slate-500 text-xs mt-0.5">{t('checkout.deliveryCodeSub', 'Emailed to you to redeem yourself')}</div>
+                    </button>
+                    <button type="button" onClick={() => setDeliveryMethod('account')}
+                      className={`rounded-xl border p-3.5 text-left transition ${method === 'account' ? 'border-primary bg-primary/10' : 'border-white/10 hover:border-white/25'}`}>
+                      <div className="text-white font-medium text-sm">⚡ {t('checkout.deliveryAccount', 'Direct to my account')}</div>
+                      <div className="text-slate-500 text-xs mt-0.5">{t('checkout.deliveryAccountSub', 'We top up your account for you')}</div>
+                    </button>
+                  </div>
+                </div>
+              )}
+              {needsTarget && (
                 <div>
                   <label className="label">{deliveryLabels.join(' / ')} <span className="text-indigo-400">*</span></label>
                   <input required value={deliveryDetail} onChange={(e) => setDeliveryDetail(e.target.value)}

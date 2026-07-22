@@ -15,6 +15,7 @@ import { formatMoney } from '../utils/money.js';
 import { config, manualPayMethods } from '../config/env.js';
 import { badRequest, notFound, conflict } from '../utils/errors.js';
 import { sendEmailAsync } from './emailService.js';
+import { renderTemplate, baseContext } from './templateService.js';
 import { notify } from './notificationService.js';
 import { scoreOrder } from './fraudService.js';
 import { getProduct } from './productService.js';
@@ -113,10 +114,21 @@ export async function createOrder(input, ctx = {}) {
   // Bound the free-text billing fields (they flow into emails and admin views).
   if (billing.full_name) billing.full_name = String(billing.full_name).trim().slice(0, 80);
   if (billing.city) billing.city = String(billing.city).trim().slice(0, 80);
+  // How the buyer wants this order delivered: 'code' = emailed gift code, 'account'
+  // = we top up their account directly (needs a target). A supplied target implies
+  // account delivery unless the buyer explicitly chose a code (backward compatible
+  // with the pre-choice checkout that only sent the target).
+  const suppliedTarget = !!String(billing.deliveryDetails || '').trim();
+  billing.deliveryMethod = billing.deliveryMethod === 'account' ? 'account'
+    : billing.deliveryMethod === 'code' ? 'code'
+    : (suppliedTarget ? 'account' : 'code');
   // Delivery target the buyer supplied for a hand-delivered/P2P item (e.g. their
   // in-game username) — bounded, and surfaced to the owner in the manual queue.
   if (billing.deliveryDetails) billing.deliveryDetails = String(billing.deliveryDetails).trim().slice(0, 200);
   if (billing.deliveryLabel) billing.deliveryLabel = String(billing.deliveryLabel).trim().slice(0, 60);
+  // A plain gift-code order carries no account target — drop any stray value so
+  // the fulfillment queue never shows a phantom "deliver to" on a code order.
+  if (billing.deliveryMethod !== 'account') { delete billing.deliveryDetails; delete billing.deliveryLabel; }
   if (couponCode) { billing.coupon = couponCode; billing.discount = couponDiscount; }
   if (memberDiscount) { billing.memberDiscount = memberDiscount; billing.memberPercent = memberPercent; }
   if (bundleDiscount) { billing.bundle = bundle.bundle?.name; billing.bundleDiscount = bundleDiscount; }
@@ -307,6 +319,8 @@ export async function transitionOrder(orderId, to, ctx = {}) {
 export async function autoDispenseFromStock(orderId, ctx = {}) {
   const order = await getOrder(orderId);
   if (!order || ['completed', 'refunded', 'cancelled'].includes(order.status)) return false;
+  // Direct account top-up is always hand-delivered — never auto-dispense a code.
+  if (order.billing?.deliveryMethod === 'account') return false;
   for (const it of order.items) {
     const product = await getProduct(it.product_id);
     if (product?.deliveryMode === 'manual') return false; // owner hand-delivers this product
@@ -591,26 +605,67 @@ function paymentInstructionsHtml(order) {
     `<table class="summary"><tbody>${rows}</tbody></table>`;
 }
 
-function itemsHtml(order) {
-  if (!order.items?.length) return '';
-  const rows = order.items.map((i) =>
-    `<tr><td>${escapeHtml(i.name)} × ${i.quantity}</td>` +
-    `<td class="r">${formatMoney(i.unit_price * i.quantity, order.currency)}</td></tr>`).join('');
-  return `<table class="summary"><tbody>${rows}` +
-    `<tr class="tot"><td>Total</td><td class="r">${formatMoney(order.total, order.currency)}</td></tr>` +
-    `</tbody></table>`;
+/** The hero block of the completion email: a green "delivered to your account"
+ *  confirmation for direct top-ups, otherwise premium copyable code cards. All
+ *  styles are inline so it renders intact even where a client strips <style>. */
+function deliveryHtml(order) {
+  // Direct account top-up → reassuring confirmation, no code to show.
+  if (order.billing?.deliveryMethod === 'account' && order.billing?.deliveryDetails) {
+    const label = escapeHtml(order.billing.deliveryLabel || 'Your account');
+    const target = escapeHtml(order.billing.deliveryDetails);
+    return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 8px">
+      <tr><td style="background:#0e1f19;border:1px solid #1f5140;border-radius:16px;padding:20px 22px">
+        <div style="font:800 15px/1.3 'Segoe UI',Arial,sans-serif;color:#34d399">⚡ Delivered straight to your account</div>
+        <div style="font:400 13.5px/1.6 'Segoe UI',Arial,sans-serif;color:#9fb8ad;margin:6px 0 12px">Topped up and ready to play — no code to redeem.</div>
+        <div style="font:600 11px/1 Arial,sans-serif;color:#6f8f83;text-transform:uppercase;letter-spacing:1.2px;margin:0 0 5px">${label}</div>
+        <div style="font:700 18px/1.3 'Courier New',monospace;color:#eafff6;background:#0a1712;border:1px solid #1f5140;border-radius:10px;padding:12px 16px;word-break:break-all">${target}</div>
+      </td></tr></table>`;
+  }
+  // Gift-code / key delivery → one premium card per delivered item.
+  if (!order.deliveries?.length) return '';
+  return order.deliveries.map((d) => {
+    const label = escapeHtml((d.type || 'code').toUpperCase());
+    const value = d.content ? escapeHtml(d.content) : (d.filename ? escapeHtml(d.filename) : '—');
+    return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 10px">
+      <tr><td style="height:4px;background:linear-gradient(90deg,#7c5cff,#d946ef);border-radius:14px 14px 0 0;font-size:0;line-height:0">&nbsp;</td></tr>
+      <tr><td style="background:#17172a;border:1px solid #34345a;border-top:0;border-radius:0 0 14px 14px;padding:16px 18px 18px">
+        <div style="font:700 11px/1 Arial,sans-serif;color:#8b8fa3;text-transform:uppercase;letter-spacing:1.4px;margin:0 0 9px">${label}</div>
+        <div style="font:800 24px/1.25 'Courier New',monospace;letter-spacing:4px;color:#ffffff;word-break:break-all">${value}</div>
+      </td></tr></table>`;
+  }).join('');
 }
 
-/** Render delivered digital goods (codes/keys/messages) for the completion email. */
-function deliveriesHtml(order) {
-  if (!order.deliveries?.length) return '';
-  const items = order.deliveries.map((d) => {
-    const label = (d.type || 'code').toUpperCase();
-    const value = d.content ? escapeHtml(d.content) : (d.filename ? escapeHtml(d.filename) : '—');
-    return `<div style="margin:0 0 8px"><div style="font-size:11px;text-transform:uppercase;` +
-      `letter-spacing:1px;color:#8b8fa3">${label}</div><div class="code">${value}</div></div>`;
-  }).join('');
-  return `<p style="margin:0 0 6px">Your items:</p>${items}`;
+/** Order breakdown for the emails: subtotal, each discount, store credit, total.
+ *  Without this the line-item (list price) and the final total look mismatched
+ *  whenever a coupon/member/bundle discount or store credit was applied. */
+function summaryHtml(order) {
+  const cur = order.currency;
+  const b = order.billing || {};
+  const money = (c) => escapeHtml(formatMoney(c, cur));
+  const rows = [];
+  for (const i of order.items || []) {
+    rows.push(`<tr><td style="padding:9px 0;border-bottom:1px solid #24243a;color:#cbd1de;font-size:14px">${escapeHtml(i.name)} <span style="color:#8b8fa3">× ${i.quantity}</span></td>` +
+      `<td style="padding:9px 0;border-bottom:1px solid #24243a;color:#fff;font-size:14px;text-align:right;white-space:nowrap">${money(i.unit_price * i.quantity)}</td></tr>`);
+  }
+  const line = (label, cents, neg = false) => `<tr><td style="padding:8px 0;border-bottom:1px solid #24243a;color:#9aa3b8;font-size:13.5px">${label}</td>` +
+    `<td style="padding:8px 0;border-bottom:1px solid #24243a;font-size:13.5px;text-align:right;white-space:nowrap;color:${neg ? '#34d399' : '#cbd1de'}">${neg ? '−' : ''}${money(cents)}</td></tr>`;
+  const couponDiscount = Number(b.discount || 0);
+  const memberDiscount = Number(b.memberDiscount || 0);
+  const bundleDiscount = Number(b.bundleDiscount || 0);
+  const credit = Number(b.creditApplied || 0);
+  const extras = [];
+  if (order.subtotal != null && (couponDiscount || memberDiscount || bundleDiscount || credit)) {
+    extras.push(line('Subtotal', order.subtotal));
+    if (couponDiscount) extras.push(line(`Coupon${b.coupon ? ` (${escapeHtml(b.coupon)})` : ''}`, couponDiscount, true));
+    if (memberDiscount) extras.push(line(`Forge+ discount${b.memberPercent ? ` (${b.memberPercent}%)` : ''}`, memberDiscount, true));
+    if (bundleDiscount) extras.push(line(`Bundle${b.bundle ? ` (${escapeHtml(b.bundle)})` : ''}`, bundleDiscount, true));
+    if (credit) extras.push(line('Store credit', credit, true));
+  }
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:2px 0 20px">` +
+    `<tbody>${rows.join('')}${extras.join('')}` +
+    `<tr><td style="padding:13px 0 0;border-top:2px solid #34345a;color:#fff;font-weight:800;font-size:15px">Total</td>` +
+    `<td style="padding:13px 0 0;border-top:2px solid #34345a;color:#fff;font-weight:800;font-size:15px;text-align:right;white-space:nowrap">${money(order.total)}</td></tr>` +
+    `</tbody></table>`;
 }
 
 function escapeHtml(s) {
@@ -625,8 +680,12 @@ function emailContext(order, ctx = {}) {
       number: order.number,
       total: order.totalFormatted,
       status: order.statusLabel,
-      itemsHtml: itemsHtml(order),
-      deliveriesHtml: deliveriesHtml(order),
+      // `itemsHtml` now renders the FULL breakdown (subtotal, discounts, credit,
+      // total) so the line-item price and the final total never look mismatched.
+      itemsHtml: summaryHtml(order),
+      summaryHtml: summaryHtml(order),
+      deliveryHtml: deliveryHtml(order),
+      deliveriesHtml: deliveryHtml(order), // back-compat alias for older templates
       paymentHtml: paymentInstructionsHtml(order),
       url: `${config.appUrl}/account/orders/${order.id}`,
     },
@@ -634,4 +693,13 @@ function emailContext(order, ctx = {}) {
       ? { amount: formatMoney(ctx.refundAmount, order.currency) }
       : { amount: order.totalFormatted },
   };
+}
+
+/** Render a transactional order email to { subject, html } — used by previews
+ *  and tests to verify the real rendered output without sending anything. */
+export async function renderOrderEmail(orderId, eventKey = 'order_completed', ctx = {}) {
+  const order = await getOrder(orderId);
+  const tpl = await get('SELECT * FROM email_templates WHERE id = @id', { id: eventKey });
+  if (!order || !tpl) return null;
+  return renderTemplate(tpl, baseContext(emailContext(order, ctx)));
 }
