@@ -7,6 +7,7 @@ import { listProducts, getProduct, createProduct, updateProduct } from '../../se
 import { addProductCodes, availableCounts, availableCount } from '../../services/codeStockService.js';
 import { getRewards, setRewards } from '../../services/mysteryBoxService.js';
 import { audit } from '../../services/auditService.js';
+import { badRequest } from '../../utils/errors.js';
 
 const router = Router();
 
@@ -59,9 +60,27 @@ router.patch('/:id', requirePermission('suppliers.manage'), asyncHandler(async (
 router.post('/bulk', requirePermission('suppliers.manage'), asyncHandler(async (req, res) => {
   const { ids, action, value } = z.object({
     ids: z.array(z.string()).min(1).max(500),
-    action: z.enum(['active', 'featured', 'deliveryMode']),
-    value: z.union([z.boolean(), z.enum(['auto', 'manual'])]),
+    action: z.enum(['active', 'featured', 'deliveryMode', 'image']),
+    value: z.union([z.boolean(), z.enum(['auto', 'manual']), z.string()]),
   }).parse(req.body);
+
+  // Set (or clear) the same product image across a whole selection — e.g. one
+  // logo for every Robux / V-Bucks variant at once. Only real http(s) URLs.
+  if (action === 'image') {
+    const url = String(value || '').trim();
+    if (url && !/^https?:\/\/.+/i.test(url)) throw badRequest('Image must be a http(s) URL');
+    let updated = 0;
+    for (const id of ids) {
+      const p = await getProduct(id);
+      if (!p) continue;
+      const metadata = { ...p.metadata };
+      if (url) metadata.image = url; else delete metadata.image;
+      await updateProduct(id, { metadata });
+      updated++;
+    }
+    await audit({ actor: req.user, action: 'product.bulk_update', metadata: { action, count: updated }, req });
+    return res.json({ updated });
+  }
 
   let updated = 0;
   for (const id of ids) {
