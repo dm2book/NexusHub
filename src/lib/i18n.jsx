@@ -214,7 +214,7 @@ const NL = {
   'product.delivery': 'Levering:',
   'product.asap': 'zo snel mogelijk',
   'mystery.whatsInside': 'Wat zit erin',
-  'mystery.sub': 'Elke box wint een echte prijs — dit zijn de exacte kansen. Prijzen worden direct als store-credit uitbetaald.',
+  'mystery.sub': 'Elke box wint een echte prijs — het kan elk van deze zijn. Prijzen worden direct als store-credit uitbetaald. De kansen? Dat is de verrassing. 🤫',
   'home.waysTitle': 'Meer besparen & winnen',
   'home.wCoins': 'Forge Coins',
   'home.wCoinsSub': 'Verdien 1 coin per €10 — besteed aan kortingscodes & giveaway-boosts.',
