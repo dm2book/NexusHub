@@ -18,7 +18,9 @@ export default {
         'accent-cyan': '#22d3ee',
       },
       fontFamily: {
-        'orbitron': ['Orbitron', 'sans-serif'],
+        'display': ['Space Grotesk', 'Inter', 'sans-serif'],
+        'grotesk': ['Space Grotesk', 'Inter', 'sans-serif'],
+        'orbitron': ['Space Grotesk', 'Inter', 'sans-serif'], // legacy alias → new display font
         'inter': ['Inter', 'sans-serif'],
         'rajdhani': ['Rajdhani', 'sans-serif'],
       },
