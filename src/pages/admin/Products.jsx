@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Package, Plus, Pencil, Star, Eye, EyeOff } from 'lucide-react';
+import { Package, Plus, Pencil, Star, Eye, EyeOff, Search, Image as ImageIcon } from 'lucide-react';
 import { api } from '../../lib/api.js';
 import { money, categoryVisual } from '../../lib/catalog.js';
 import { PageLoader, EmptyState, Modal } from '../../components/ui.jsx';
@@ -28,6 +28,8 @@ export default function AdminProducts() {
   const [stock, setStock] = useState(null); // { p, codes } or null
   const [rewards, setRewards] = useState(null); // mystery reward pool [{label,weight,creditEuro}]
   const [sel, setSel] = useState(() => new Set()); // selected product ids for bulk actions
+  const [q, setQ] = useState('');            // search / filter query
+  const [bulkImg, setBulkImg] = useState(''); // image URL to apply to the selection
 
   const toggleSel = (id) => setSel((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const bulk = async (action, value) => {
@@ -35,7 +37,7 @@ export default function AdminProducts() {
     try {
       const r = await api.post('/api/admin/products/bulk', { ids: [...sel], action, value });
       toast.success(`Updated ${r.updated} product(s).`);
-      setSel(new Set()); load();
+      setSel(new Set()); setBulkImg(""); load();
     } catch (err) { toast.error(err.message); } finally { setBusy(false); }
   };
 
@@ -121,13 +123,34 @@ export default function AdminProducts() {
     catch (err) { toast.error(err.message); }
   };
 
+  // Search across name / category / SKU. "Select all" then acts on the matches,
+  // so you can e.g. type "robux", select all, and set one image for the lot.
+  const needle = q.trim().toLowerCase();
+  const filtered = needle
+    ? products.filter((p) => `${p.name} ${p.category || ''} ${p.sku || ''}`.toLowerCase().includes(needle))
+    : products;
+  const selectAllMatches = () => setSel(new Set(filtered.map((p) => p.id)));
+
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
         <h1 className="text-2xl text-white">Products</h1>
         <button onClick={openNew} className="btn-primary text-sm"><Plus size={16} /> New product</button>
       </div>
-      <p className="text-slate-400 text-sm mb-6">Manage your catalog. Featured items get highlighted on the storefront.</p>
+      <p className="text-slate-400 text-sm mb-4">Manage your catalog. Featured items get highlighted on the storefront.</p>
+
+      {/* Search + quick select-all-matches */}
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+          <input value={q} onChange={(e) => setQ(e.target.value)} className="input pl-9"
+            placeholder="Search products — e.g. robux, v-bucks, valorant…" />
+        </div>
+        <span className="text-xs text-slate-500">{filtered.length} shown</span>
+        {filtered.length > 0 && (
+          <button onClick={selectAllMatches} className="btn-ghost text-xs whitespace-nowrap">Select all {needle ? 'matches' : ''} ({filtered.length})</button>
+        )}
+      </div>
 
       {sel.size > 0 && (
         <div className="card p-3 mb-4 flex flex-wrap items-center gap-2 border border-violet-500/30 bg-violet-500/5">
@@ -142,6 +165,14 @@ export default function AdminProducts() {
           <button disabled={busy} onClick={() => bulk('active', false)} className="btn-ghost text-xs">🚫 Hide</button>
           <div className="flex-1" />
           <button onClick={() => setSel(new Set())} className="btn-ghost text-xs">Clear</button>
+          {/* Set ONE image across every selected product (e.g. all Robux variants). */}
+          <div className="w-full flex items-center gap-2 mt-1 pt-2 border-t border-white/10">
+            <ImageIcon size={15} className="text-violet-300 shrink-0" />
+            <input value={bulkImg} onChange={(e) => setBulkImg(e.target.value)}
+              className="input py-1.5 text-sm flex-1" placeholder="Image URL for all selected — https://…" />
+            <button disabled={busy || !bulkImg.trim()} onClick={() => bulk('image', bulkImg.trim())}
+              className="btn-primary text-xs whitespace-nowrap">Apply to {sel.size}</button>
+          </div>
         </div>
       )}
 
@@ -153,7 +184,7 @@ export default function AdminProducts() {
        <>
         {/* Mobile: cards */}
         <div className="space-y-3 lg:hidden">
-          {products.map((p) => {
+          {filtered.map((p) => {
             const v = categoryVisual(p.category); const Icon = v.icon;
             return (
               <div key={p.id} className={`card p-4 ${sel.has(p.id) ? 'ring-1 ring-violet-500/40' : ''}`}>
@@ -201,8 +232,8 @@ export default function AdminProducts() {
               <tr>
                 <th className="px-4 py-3 w-8">
                   <input type="checkbox" aria-label="Select all"
-                    checked={products.length > 0 && sel.size === products.length}
-                    onChange={(e) => setSel(e.target.checked ? new Set(products.map((p) => p.id)) : new Set())} />
+                    checked={filtered.length > 0 && filtered.every((p) => sel.has(p.id))}
+                    onChange={(e) => setSel(e.target.checked ? new Set(filtered.map((p) => p.id)) : new Set())} />
                 </th>
                 <th className="px-4 py-3 font-medium">Product</th>
                 <th className="px-4 py-3 font-medium">Category</th>
@@ -213,7 +244,7 @@ export default function AdminProducts() {
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
-              {products.map((p) => {
+              {filtered.map((p) => {
                 const v = categoryVisual(p.category); const Icon = v.icon;
                 return (
                   <tr key={p.id} className={`hover:bg-white/5 ${sel.has(p.id) ? 'bg-violet-500/5' : ''}`}>
