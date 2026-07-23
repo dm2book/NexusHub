@@ -95,6 +95,25 @@ h1, h2, h3, .font-display { font-family: 'Space Grotesk', 'Inter', sans-serif; l
 .bg-grid { background-image: theme('backgroundImage.grid-pattern'); background-size: 44px 44px; }
 .orb { position: absolute; border-radius: 9999px; filter: blur(80px); pointer-events: none; }
 
+/* Logo plinth — a consistent premium tray behind any product image, so mixed
+   logos (transparent PNGs, badge-style marks) all read as one cohesive set. */
+.fm-logo-plinth {
+  position: relative;
+  background:
+    radial-gradient(115% 85% at 50% 8%, rgba(124,92,255,.12), transparent 60%),
+    linear-gradient(180deg, #ffffff 0%, #eef1f8 100%);
+  border: 1px solid rgba(15, 23, 42, .07);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.9), inset 0 -14px 26px rgba(15,23,42,.035);
+}
+.fm-logo-plinth::after { /* soft glow disc behind the logo */
+  content: ''; position: absolute; left: 50%; top: 46%; width: 62%; aspect-ratio: 1;
+  transform: translate(-50%,-50%); border-radius: 9999px;
+  background: radial-gradient(circle, rgba(124,92,255,.16), transparent 70%);
+  filter: blur(10px); pointer-events: none;
+}
+.fm-logo { position: relative; object-fit: contain; filter: drop-shadow(0 10px 16px rgba(15,23,42,.22)); }
+.theme-light .fm-logo-plinth, :root:not(.theme-light) .fm-logo-plinth { } /* both themes share the light tray */
+
 /* Skeleton shimmer */
 .skeleton {
   background: linear-gradient(90deg, #15151f 25%, #20202e 37%, #15151f 63%);
