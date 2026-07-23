@@ -38,7 +38,7 @@ export default function LightProductCard({ product, onAdd }) {
   return (
     <div className="group bg-white rounded-2xl border border-slate-200/70 shadow-sm fm-lift p-4 flex flex-col">
       <a href={to} onClick={openWithMorph}
-        className="fm-card-media relative rounded-xl bg-slate-50 h-[150px] grid place-items-center mb-3"
+        className="fm-card-media fm-logo-plinth relative rounded-xl h-[150px] grid place-items-center mb-3"
         style={{ '--card-glow': `radial-gradient(circle, ${glowFor(product.category)}45, transparent 70%)` }}>
         <div className="absolute top-2.5 left-2.5 z-10 flex flex-col items-start gap-1">
           {onSale && (
@@ -60,7 +60,7 @@ export default function LightProductCard({ product, onAdd }) {
           <Zap size={10} className="fill-current" /> {t('card.instant', 'Instant')}
         </span>
         {img ? (
-          <img data-morph src={img} alt={product.name} className="w-24 h-24 object-contain drop-shadow-md group-hover:scale-105 transition-transform" />
+          <img data-morph src={img} alt={product.name} className="fm-logo w-[92px] h-[92px] group-hover:scale-105 transition-transform" />
         ) : (
           <div data-morph className={`w-20 h-20 rounded-2xl bg-gradient-to-br ${v.grad} grid place-items-center`}>
             <Icon size={34} className="text-white" />
