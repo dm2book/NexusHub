@@ -86,7 +86,7 @@ export const config = {
     // enabled in Discord → Server Settings → Widget).
     guildId: env.DISCORD_GUILD_ID || '',
     // Invite link for the Join button. Falls back to the official server invite.
-    inviteUrl: env.DISCORD_INVITE_URL || 'https://discord.gg/vNcfgDbVd',
+    inviteUrl: env.DISCORD_INVITE_URL || 'https://discord.gg/CrAfqENsSV',
     // Bot token — lets the API grant Discord roles (Verified vs VIP) to buyers who
     // signed in with Discord. Optional; role automation is skipped without it.
     botToken: env.DISCORD_BOT_TOKEN || '',

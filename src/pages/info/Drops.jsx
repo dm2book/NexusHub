@@ -32,7 +32,7 @@ export default function Drops() {
           <div className="text-center py-12">
             <CalendarDays size={40} className="text-slate-600 mx-auto mb-3" />
             <p className="text-slate-400">{t('drops.empty', 'No drops scheduled right now — check back soon, or turn on alerts in our Discord.')}</p>
-            <a href={invite || 'https://discord.gg/vNcfgDbVd'} target="_blank" rel="noreferrer"
+            <a href={invite || 'https://discord.gg/CrAfqENsSV'} target="_blank" rel="noreferrer"
               className="btn-primary inline-flex mt-5"><Bell size={16} /> {t('drops.notify', 'Get drop alerts on Discord')}</a>
           </div>
         ) : (
