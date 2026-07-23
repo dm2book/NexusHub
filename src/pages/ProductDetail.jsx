@@ -274,7 +274,7 @@ export default function ProductDetail() {
         </div>
       </div>
 
-      {/* Mystery box — what's inside + real odds */}
+      {/* Mystery box — possible prizes (the odds stay a mystery on purpose) */}
       {product.kind === 'mystery' && mysteryPool && mysteryPool.length > 0 && (
         <div className="bg-white border border-amber-200 rounded-2xl p-6 sm:p-8 mt-14 shadow-sm">
           <div className="flex items-center gap-3 mb-1">
@@ -282,14 +282,14 @@ export default function ProductDetail() {
               style={{ backgroundImage: 'linear-gradient(135deg,#f59e0b,#f43f5e)' }}>🎁</span>
             <div>
               <h2 className="text-xl font-extrabold text-slate-900">{t('mystery.whatsInside', 'What’s inside')}</h2>
-              <p className="text-slate-500 text-sm">{t('mystery.sub', 'Every box wins a real prize — here are the exact odds. Prizes pay out as store credit, instantly.')}</p>
+              <p className="text-slate-500 text-sm">{t('mystery.sub', 'Every box wins a real prize — could be any of these. Prizes pay out as store credit, instantly. The odds? That’s the mystery. 🤫')}</p>
             </div>
           </div>
           <div className="grid sm:grid-cols-2 gap-2.5 mt-4">
             {mysteryPool.map((r, i) => (
-              <div key={i} className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5">
+              <div key={i} className="flex items-center gap-2.5 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5">
+                <span className="text-amber-500 shrink-0">🎁</span>
                 <span className="text-sm font-semibold text-slate-800">{r.label}</span>
-                <span className="text-xs font-bold text-amber-600 bg-amber-100 rounded-full px-2.5 py-1">{r.odds}%</span>
               </div>
             ))}
           </div>

@@ -146,16 +146,13 @@ router.get('/drops', asyncHandler(async (_req, res) => {
   res.json({ drops: await listUpcomingDrops() });
 }));
 
-// Mystery-box reward pool with odds — shown on the product page so buyers see
-// exactly what's inside and the real chances (transparency = trust).
+// Mystery-box reward pool — shown on the product page so buyers see what
+// prizes are possible, but NOT the odds: the chances stay a mystery on purpose
+// (weights are never exposed to the client, not even via devtools).
 router.get('/products/:id/mystery', asyncHandler(async (req, res) => {
   const rewards = await getMysteryRewards(req.params.id);
-  const total = rewards.reduce((s, r) => s + Math.max(1, r.weight), 0) || 1;
   res.json({
-    rewards: rewards.map((r) => ({
-      label: r.label, credit: r.credit,
-      odds: Math.round((Math.max(1, r.weight) / total) * 1000) / 10, // one decimal %
-    })),
+    rewards: rewards.map((r) => ({ label: r.label, credit: r.credit })),
   });
 }));
 
