@@ -132,7 +132,7 @@ async function pushReviewToSite({ author, avatarUrl, stars, body, externalId }) 
 // silently kills sign-ups. On boot (and daily) we make sure a NON-expiring
 // invite exists (maxAge 0, unlimited uses) and push it to the site, which
 // serves it everywhere an invite is shown.
-const FALLBACK_INVITE = process.env.DISCORD_INVITE_URL || 'https://discord.gg/vNcfgDbVd';
+const FALLBACK_INVITE = process.env.DISCORD_INVITE_URL || 'https://discord.gg/CrAfqENsSV';
 let PERMANENT_INVITE = null;
 
 async function ensurePermanentInvite(guild) {
