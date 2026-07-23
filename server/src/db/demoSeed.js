@@ -184,7 +184,9 @@ export async function syncCatalogImages() {
     const existing = await get('SELECT id, metadata FROM products WHERE sku = @sku', { sku: p.sku });
     if (!existing) continue;
     const meta = parse(existing.metadata);
-    if (meta.image === img) continue;
+    // Backfill only: never overwrite an image the owner set in the admin (clear
+    // the Image URL field to fall back to the default icon on the next boot).
+    if (meta.image) continue;
     meta.image = img;
     await run('UPDATE products SET metadata = @m, updated_at = @at WHERE id = @id',
       { m: JSON.stringify(meta), at: nowIso(), id: existing.id });
@@ -203,10 +205,11 @@ export async function seedDemoCatalog() {
     const at = nowIso();
 
     if (existing) {
-      // Keep the premium 3D icon in sync (also backfills missing covers).
+      // Backfill the default cover ONLY when the product has no image — never
+      // clobber an image the owner set in the admin.
       const meta = parse(existing.metadata);
       let dirty = false;
-      if (img && meta.image !== img) { meta.image = img; dirty = true; }
+      if (img && !meta.image) { meta.image = img; dirty = true; }
       if (dirty) {
         await run('UPDATE products SET metadata = @m, updated_at = @at WHERE id = @id',
           { m: JSON.stringify(meta), at, id: existing.id });
