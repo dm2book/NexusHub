@@ -34,7 +34,7 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-h1, h2, h3, .font-display { font-family: 'Space Grotesk', 'Inter', sans-serif; letter-spacing: -0.02em; }
+h1, h2, h3, .font-display { font-family: 'Bricolage Grotesque', 'Inter', sans-serif; letter-spacing: -0.02em; }
 
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: #070710; }
