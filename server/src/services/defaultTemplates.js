@@ -75,14 +75,26 @@ export const DEFAULT_TEMPLATES = [
   {
     id: 'order_completed',
     name: 'Order Completed',
-    subject: 'Your order {{order.number}} is complete 🎁',
+    subject: 'Your order {{order.number}} is ready 🎮',
+    // Premium, fully inline-styled (survives clients that strip <style>). The
+    // delivery hero + order breakdown are injected server-side.
     body_html: `
-      <h1>Order complete!</h1>
-      <p>Hi {{user.name}}, your order <strong>{{order.number}}</strong> is done — here
-      are your items. Keep this email safe.</p>
-      {{order.deliveriesHtml}}
-      {{order.itemsHtml}}
-      <p><a class="btn" href="{{order.url}}">View in your dashboard</a></p>`,
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 22px"><tr>
+        <td style="padding:0 8px 0 0"><span style="display:inline-block;padding:6px 13px;background-color:#0e1f18;border:1px solid #145c43;border-radius:999px;color:#34d399;font-size:12px;font-weight:700;font-family:'Segoe UI',Arial,sans-serif">● Delivered</span></td>
+        <td><span style="display:inline-block;padding:6px 13px;background-color:#181826;border:1px solid #34345a;border-radius:999px;color:#9aa3b8;font-size:12px;font-weight:600;font-family:'Segoe UI',Arial,sans-serif">Order {{order.number}}</span></td>
+      </tr></table>
+      <div style="font:800 29px/1.15 'Segoe UI',Arial,sans-serif;color:#ffffff;letter-spacing:-.4px">Your loot is ready 🎮</div>
+      <div style="font:400 15px/1.6 'Segoe UI',Arial,sans-serif;color:#b9bfcd;padding-top:10px">Hi {{user.name}} — payment cleared and everything below is yours. Grab it, jump in, and go win. 🚀</div>
+      <div style="padding-top:22px">{{order.deliveryHtml}}</div>
+      <div style="height:1px;font-size:0;line-height:1px;background-color:#26263a;margin:26px 0 20px">&nbsp;</div>
+      <div style="font:700 11px/1 'Segoe UI',Arial,sans-serif;letter-spacing:1.4px;text-transform:uppercase;color:#8b8fa3;padding-bottom:12px">Order summary</div>
+      {{order.summaryHtml}}
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0 4px"><tr>
+        <td align="center" style="border-radius:12px;background-color:#7c5cff;background-image:linear-gradient(120deg,#7c5cff 0%,#a855f7 55%,#d946ef 100%)">
+          <a href="{{order.url}}" style="display:block;padding:15px 24px;font:700 16px/1 'Segoe UI',Arial,sans-serif;color:#ffffff;text-decoration:none">View in your dashboard</a>
+        </td>
+      </tr></table>
+      <div style="font:400 13px/1.6 'Segoe UI',Arial,sans-serif;color:#8b8fa3;text-align:center;padding-top:16px">Something not right? Just reply to this email or open a ticket in our Discord — real humans, fast. 💬</div>`,
   },
   {
     id: 'refund_issued',
@@ -179,6 +191,13 @@ export const DEFAULT_TEMPLATES = [
  * customized the template.
  */
 export const LEGACY_TEMPLATE_BODIES = {
+  order_completed: [`
+      <h1>Order complete!</h1>
+      <p>Hi {{user.name}}, your order <strong>{{order.number}}</strong> is done — here
+      are your items. Keep this email safe.</p>
+      {{order.deliveriesHtml}}
+      {{order.itemsHtml}}
+      <p><a class="btn" href="{{order.url}}">View in your dashboard</a></p>`],
   login_otp: [`
       <h1>Your login code</h1>
       <p>Use this code to sign in. It expires in {{otp.ttl}} minutes.</p>

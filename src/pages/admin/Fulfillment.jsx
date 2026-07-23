@@ -47,6 +47,9 @@ export default function Fulfillment() {
                   <div className="flex items-center gap-2 flex-wrap">
                     <Link to={`/admin/orders/${r.order_id}`} className="text-indigo-400 font-mono text-sm">{r.order_number}</Link>
                     <span className="text-white text-sm font-medium">{r.quantity > 1 ? `${r.quantity}× ` : ''}{r.item_name || 'Item'}</span>
+                    {r.deliveryMethod === 'account'
+                      ? <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300">⚡ Account top-up</span>
+                      : <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-300">📧 Gift code</span>}
                   </div>
                   <div className="text-slate-500 text-xs mt-0.5">{r.customer} · {date(r.created_at)}</div>
                   {r.deliveryDetails && (
@@ -98,17 +101,25 @@ export default function Fulfillment() {
                 )}
               </div>
             )}
-            <div><label className="label">Delivery type</label>
-              <select className="input" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
-                <option value="code">Code</option>
-                <option value="license">License</option>
-                <option value="message">Message</option>
-                <option value="file">File reference</option>
-              </select></div>
-            <div><label className="label">Content</label>
-              <textarea rows={3} className="input font-mono" value={form.content}
-                onChange={(e) => setForm({ ...form, content: e.target.value })}
-                placeholder="e.g. XXXX-YYYY-ZZZZ" /></div>
+            {active.deliveryMethod === 'account' ? (
+              <div className="rounded-xl bg-emerald-500/5 border border-emerald-500/20 p-3 text-sm text-slate-300">
+                ⚡ This is a <strong className="text-white">direct account top-up</strong>. Top up the account above, then click <strong className="text-white">Deliver</strong> to confirm — no code needed. (You can add a note below.)
+              </div>
+            ) : (
+              <>
+                <div><label className="label">Delivery type</label>
+                  <select className="input" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
+                    <option value="code">Code</option>
+                    <option value="license">License</option>
+                    <option value="message">Message</option>
+                    <option value="file">File reference</option>
+                  </select></div>
+                <div><label className="label">Content</label>
+                  <textarea rows={3} className="input font-mono" value={form.content}
+                    onChange={(e) => setForm({ ...form, content: e.target.value })}
+                    placeholder="e.g. XXXX-YYYY-ZZZZ" /></div>
+              </>
+            )}
             <div><label className="label">Internal note (optional)</label>
               <input className="input" value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} /></div>
           </div>

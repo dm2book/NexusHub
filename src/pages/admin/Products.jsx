@@ -6,7 +6,7 @@ import { PageLoader, EmptyState, Modal } from '../../components/ui.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
 
 const BLANK = { name: '', sku: '', category: '', description: '', priceEuro: '', costEuro: '',
-  compareAtEuro: '', kind: 'digital', stock: '', deliveryMode: 'auto', deliveryField: '', active: true, featured: false, imageUrl: '' };
+  compareAtEuro: '', kind: 'digital', stock: '', deliveryMode: 'auto', deliveryField: '', deliveryChoice: false, active: true, featured: false, imageUrl: '' };
 
 // Suggested sell price from a supplier cost (e.g. what you pay on Eldorado /
 // Eneba): a ~18% markup with a €2 minimum profit, rounded to a clean .99.
@@ -63,6 +63,7 @@ export default function AdminProducts() {
       compareAtEuro: p.metadata?.compareAt != null ? (p.metadata.compareAt / 100).toFixed(2) : '',
       deliveryMode: p.metadata?.deliveryMode === 'manual' ? 'manual' : 'auto',
       deliveryField: p.metadata?.deliveryField || '',
+      deliveryChoice: p.metadata?.deliveryChoice === true,
       kind: p.kind || 'digital',
       stock: p.stock ?? '', active: !!p.active, featured: !!p.featured,
       imageUrl: p.image || '',
@@ -104,6 +105,7 @@ export default function AdminProducts() {
           compareAt: form.compareAtEuro === '' ? undefined : Math.round(parseFloat(form.compareAtEuro || '0') * 100),
           deliveryMode: form.deliveryMode === 'manual' ? 'manual' : undefined,
           deliveryField: form.deliveryField?.trim() || undefined,
+          deliveryChoice: (form.deliveryChoice && form.deliveryField?.trim()) ? true : undefined,
         },
       };
       if (editing === 'new') await api.post('/api/admin/products', payload);
@@ -349,6 +351,15 @@ export default function AdminProducts() {
                   onChange={(e) => setForm({ ...form, deliveryField: e.target.value })}
                   placeholder="e.g. Roblox username — leave blank for none" />
                 <p className="text-xs text-slate-500 mt-1">For top-ups that need a target. The buyer must fill this in, and it shows in the fulfillment queue so you know where to deliver.</p>
+                {form.deliveryField?.trim() && (
+                  <label className="flex items-start gap-2 mt-3 text-sm text-slate-300 cursor-pointer">
+                    <input type="checkbox" className="mt-0.5" checked={!!form.deliveryChoice}
+                      onChange={(e) => setForm({ ...form, deliveryChoice: e.target.checked })} />
+                    <span>Let the buyer choose: <strong className="text-white">gift code</strong> (emailed) <strong className="text-white">or</strong> direct top-up to their account.
+                      <span className="block text-xs text-slate-500 mt-0.5">On = they pick at checkout (username only asked for a top-up). Off = the field above is always required (pure top-up product).</span>
+                    </span>
+                  </label>
+                )}
               </div>
             </div>
           )}

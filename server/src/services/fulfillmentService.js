@@ -227,6 +227,8 @@ export async function listManualQueue() {
     return {
       ...rest,
       supplierUrl: r.supplier_url || null,
+      // 'account' = top up the buyer's account directly; 'code' = send a code.
+      deliveryMethod: billing.deliveryMethod === 'account' ? 'account' : 'code',
       deliveryDetails: billing.deliveryDetails || itemMeta.deliveryDetails || null,
       deliveryLabel: billing.deliveryLabel || itemMeta.deliveryLabel || null,
     };

@@ -24,6 +24,12 @@ const hydrate = (r) => {
     // (e.g. "Roblox username" for a Robux top-up). Empty = nothing extra asked.
     deliveryField: typeof metadata.deliveryField === 'string' && metadata.deliveryField.trim()
       ? metadata.deliveryField.trim().slice(0, 60) : null,
+    // When true, the buyer CHOOSES at checkout between a gift code (emailed) and
+    // a direct top-up to their account (they supply deliveryField). Requires a
+    // deliveryField label. When false but deliveryField is set, the account
+    // target is always required (pure top-up product, no choice).
+    deliveryChoice: metadata.deliveryChoice === true
+      && typeof metadata.deliveryField === 'string' && !!metadata.deliveryField.trim(),
   };
 };
 
