@@ -90,7 +90,9 @@ export function createApp({ lazyReady = false } = {}) {
   // Stripe webhook needs the raw body for signature verification — mount it
   // BEFORE the JSON parser.
   app.use('/api/payments/stripe/webhook', express.raw({ type: '*/*' }));
-  app.use(express.json({ limit: '1mb' }));
+  // 3mb so a (base64) product image an admin uploads fits — the image guard
+  // (isSafeImageValue) still caps the actual data URI below this.
+  app.use(express.json({ limit: '3mb' }));
   app.use(cookieParser());
 
   // On serverless, make sure the schema exists before handling API traffic.

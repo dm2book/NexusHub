@@ -8,7 +8,7 @@ import { badRequest } from './errors.js';
 // Raster data URIs only (an <img> renders these inertly). SVG is intentionally
 // excluded — it can carry scripts. Capped so an upload can't bloat a DB row.
 const DATA_IMAGE_RE = /^data:image\/(png|jpe?g|webp|gif|avif);base64,[a-z0-9+/=\s]+$/i;
-const MAX_DATA_URI = 3_000_000; // ~3 MB of base64 → ~2.2 MB image
+const MAX_DATA_URI = 2_500_000; // stays under the 3mb JSON body limit (with room for other fields)
 
 /** True for values we allow as a product image `src`. */
 export function isSafeImageValue(value) {
