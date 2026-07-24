@@ -55,4 +55,9 @@ export const money = (cents, cur = 'EUR') =>
 // "V BUCKS" all match. Used by the storefront search and the admin filter.
 export const normalizeSearch = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
 
+// Owner-supplied artwork (an upload or a pasted link) vs. a built-in asset
+// under /products/. Custom images may carry their own background, so we render
+// them with a blurred backdrop instead of the bare logo-on-plinth treatment.
+export const isCustomImage = (src) => !!src && !String(src).startsWith('/products/');
+
 export { CreditCard };
