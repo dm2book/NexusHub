@@ -3,7 +3,7 @@
  * data-URI we can store straight on the product (the site has no blob store).
  * The image is downscaled and re-encoded so a phone photo doesn't bloat the DB.
  */
-export function fileToDataUrl(file, { max = 640, quality = 0.85 } = {}) {
+export function fileToDataUrl(file, { max = 600, maxBytes = 700_000 } = {}) {
   return new Promise((resolve, reject) => {
     if (!file) return reject(new Error('No file selected.'));
     if (!/^image\//.test(file.type)) return reject(new Error('Please choose an image file.'));
@@ -19,10 +19,26 @@ export function fileToDataUrl(file, { max = 640, quality = 0.85 } = {}) {
       const ctx = canvas.getContext('2d');
       if (!ctx) return reject(new Error('Could not process that image.'));
       ctx.drawImage(img, 0, 0, w, h);
-      // JPEG for photos (small); PNG keeps transparency for logos.
-      const asJpeg = /jpe?g/i.test(file.type);
+
+      // Keep PNG only if the image really uses transparency (logos); otherwise
+      // JPEG — far smaller for photos, so the upload stays under the API limit.
+      let hasAlpha = false;
       try {
-        resolve(canvas.toDataURL(asJpeg ? 'image/jpeg' : 'image/png', quality));
+        const px = ctx.getImageData(0, 0, w, h).data;
+        for (let i = 3; i < px.length; i += 4) { if (px[i] < 250) { hasAlpha = true; break; } }
+      } catch { hasAlpha = false; }
+
+      try {
+        let out;
+        if (hasAlpha) {
+          out = canvas.toDataURL('image/png');
+        } else {
+          let q = 0.85;
+          out = canvas.toDataURL('image/jpeg', q);
+          while (out.length > maxBytes && q > 0.4) { q -= 0.12; out = canvas.toDataURL('image/jpeg', q); }
+        }
+        if (out.length > 2_400_000) return reject(new Error('That image is too large — please try a smaller one.'));
+        resolve(out);
       } catch (err) { reject(new Error('Could not process that image.')); }
     };
     img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Could not read that image.')); };
