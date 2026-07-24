@@ -9,6 +9,7 @@ import { api } from '../lib/api.js';
 import { useCart } from '../context/CartContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { categoryVisual, money } from '../lib/catalog.js';
+import { iconFor } from '../lib/sampleCatalog.js';
 import { SAMPLE_PRODUCTS, withFallback } from '../lib/sampleCatalog.js';
 import { PageLoader } from '../components/ui.jsx';
 import LightProductCard from '../components/store/LightProductCard.jsx';
@@ -52,6 +53,7 @@ export default function ProductDetail() {
   const [recs, setRecs] = useState({ crossSell: [], upsell: [] });
   const [mysteryPool, setMysteryPool] = useState(null);
   const [priceHist, setPriceHist] = useState([]);
+  const [heroBroken, setHeroBroken] = useState(false); // product image failed to load
   usePageMeta(product?.name || 'Product', product?.description || 'Instant digital delivery.');
   // Product structured data → rich results (price, rating) in Google.
   useJsonLd('product', product && {
@@ -81,7 +83,7 @@ export default function ProductDetail() {
   });
 
   useEffect(() => {
-    setProduct(null); setQty(1); setNotFound(false); setRecs({ crossSell: [], upsell: [] });
+    setProduct(null); setQty(1); setNotFound(false); setRecs({ crossSell: [], upsell: [] }); setHeroBroken(false);
     api.get(`/api/products/${id}`)
       .then((r) => setProduct(r.product))
       .catch(() => {
@@ -141,8 +143,17 @@ export default function ProductDetail() {
         <Tilt max={6} className="h-80 lg:h-[420px]">
         <div style={{ viewTransitionName: 'product-hero' }}
           className={`shine-host group relative rounded-3xl bg-gradient-to-br ${grad} h-full overflow-hidden animate-fade-in ${product.featured ? 'ring-featured' : ''}`}>
-          {product.image ? (
-            <img data-pd-media src={product.image} alt={product.name} className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+          {product.image && !heroBroken ? (
+            <img data-pd-media src={product.image} alt={product.name} onError={() => setHeroBroken(true)}
+              className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+          ) : iconFor(product.category) ? (
+            // Image missing/broken → show the category logo centred on the gradient
+            // (never the ugly broken-image icon).
+            <>
+              <div className="absolute inset-0 bg-grid opacity-25" />
+              <img src={iconFor(product.category)} alt={product.name}
+                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[46%] max-w-[220px] object-contain drop-shadow-2xl group-hover:scale-105 transition-transform duration-700" />
+            </>
           ) : (
             <>
               <div className="absolute inset-0 bg-grid opacity-30" />

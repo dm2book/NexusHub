@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ShoppingCart, Zap } from 'lucide-react';
 import { categoryVisual, money } from '../../lib/catalog.js';
@@ -20,7 +21,9 @@ export default function LightProductCard({ product, onAdd }) {
   const { t } = useI18n();
   const v = categoryVisual(product.category);
   const Icon = v.icon;
-  const img = product.image || iconFor(product.category);
+  const [imgBroken, setImgBroken] = useState(false);
+  // A broken product image falls back to the category logo, never a broken icon.
+  const img = (!imgBroken && product.image) ? product.image : iconFor(product.category);
   const navigate = useNavigate();
   const to = `/product/${product.id}`;
   const onSale = product.compareAtPrice > product.price;
@@ -60,7 +63,8 @@ export default function LightProductCard({ product, onAdd }) {
           <Zap size={10} className="fill-current" /> {t('card.instant', 'Instant')}
         </span>
         {img ? (
-          <img data-morph src={img} alt={product.name} className="fm-logo w-[92px] h-[92px] group-hover:scale-105 transition-transform" />
+          <img data-morph src={img} alt={product.name} onError={() => setImgBroken(true)}
+            className="fm-logo w-[92px] h-[92px] group-hover:scale-105 transition-transform" />
         ) : (
           <div data-morph className={`w-20 h-20 rounded-2xl bg-gradient-to-br ${v.grad} grid place-items-center`}>
             <Icon size={34} className="text-white" />

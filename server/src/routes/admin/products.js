@@ -7,9 +7,15 @@ import { listProducts, getProduct, createProduct, updateProduct } from '../../se
 import { addProductCodes, availableCounts, availableCount } from '../../services/codeStockService.js';
 import { getRewards, setRewards } from '../../services/mysteryBoxService.js';
 import { audit } from '../../services/auditService.js';
-import { badRequest } from '../../utils/errors.js';
+import { assertSafeImageValue, resolveImageUrl } from '../../utils/imageUrl.js';
 
 const router = Router();
+
+// Reject an unsafe image before it reaches the DB (create/patch/bulk all share this).
+const guardImage = (metadata) => {
+  const img = metadata?.image;
+  if (img != null && img !== '') assertSafeImageValue(img);
+};
 
 router.get('/', requirePermission('orders.read'), asyncHandler(async (_req, res) => {
   const products = await listProducts();
@@ -41,17 +47,29 @@ const productSchema = z.object({
 });
 
 router.post('/', requirePermission('suppliers.manage'), asyncHandler(async (req, res) => {
-  const product = await createProduct(productSchema.parse(req.body));
+  const body = productSchema.parse(req.body);
+  guardImage(body.metadata);
+  const product = await createProduct(body);
   await audit({ actor: req.user, action: 'product.create', targetType: 'product',
     targetId: product.id, req });
   res.status(201).json({ product });
 }));
 
 router.patch('/:id', requirePermission('suppliers.manage'), asyncHandler(async (req, res) => {
-  const product = await updateProduct(req.params.id, productSchema.partial().parse(req.body));
+  const body = productSchema.partial().parse(req.body);
+  guardImage(body.metadata);
+  const product = await updateProduct(req.params.id, body);
   await audit({ actor: req.user, action: 'product.update', targetType: 'product',
     targetId: product.id, req });
   res.json({ product });
+}));
+
+// Turn a page link (Pinterest pin, tweet, article…) into the direct image URL
+// behind it, so the owner can paste "the link" instead of hunting for the raw
+// image. Already-direct image links pass straight through.
+router.post('/resolve-image', requirePermission('suppliers.manage'), asyncHandler(async (req, res) => {
+  const { url } = z.object({ url: z.string().min(1).max(2000) }).parse(req.body);
+  res.json({ url: await resolveImageUrl(url) });
 }));
 
 // Bulk action across many products at once — activate/hide, feature, or switch
@@ -65,10 +83,10 @@ router.post('/bulk', requirePermission('suppliers.manage'), asyncHandler(async (
   }).parse(req.body);
 
   // Set (or clear) the same product image across a whole selection — e.g. one
-  // logo for every Robux / V-Bucks variant at once. Only real http(s) URLs.
+  // logo for every Robux / V-Bucks variant at once. Accepts a link or upload.
   if (action === 'image') {
     const url = String(value || '').trim();
-    if (url && !/^https?:\/\/.+/i.test(url)) throw badRequest('Image must be a http(s) URL');
+    if (url) assertSafeImageValue(url);
     let updated = 0;
     for (const id of ids) {
       const p = await getProduct(id);

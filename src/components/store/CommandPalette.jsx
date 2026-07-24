@@ -4,7 +4,7 @@ import {
   Search, PackageSearch, ShoppingCart, Wallet, Star, LifeBuoy, ArrowRight, CornerDownLeft,
 } from 'lucide-react';
 import { api } from '../../lib/api.js';
-import { money } from '../../lib/catalog.js';
+import { money, normalizeSearch } from '../../lib/catalog.js';
 import { iconFor, SAMPLE_PRODUCTS, withFallback } from '../../lib/sampleCatalog.js';
 import { useCart } from '../../context/CartContext.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
@@ -63,21 +63,22 @@ export default function CommandPalette() {
   }, [open]);
 
   // Rank: prefix match on name > word match > category/description match.
+  // Matching ignores case, spaces and punctuation, so "vbucks" finds "V-Bucks".
   const results = useMemo(() => {
-    const term = q.trim().toLowerCase();
+    const term = normalizeSearch(q);
     const score = (p) => {
-      const name = (p.name || '').toLowerCase();
       if (!term) return p.featured ? 2 : 1;
+      const name = normalizeSearch(p.name);
       if (name.startsWith(term)) return 100;
-      if (name.split(/\s+/).some((w) => w.startsWith(term))) return 60;
+      if ((p.name || '').split(/\s+/).some((w) => normalizeSearch(w).startsWith(term))) return 60;
       if (name.includes(term)) return 40;
-      if ((p.category || '').toLowerCase().includes(term)) return 20;
-      if ((p.description || '').toLowerCase().includes(term)) return 10;
+      if (normalizeSearch(p.category).includes(term)) return 20;
+      if (normalizeSearch(p.description).includes(term)) return 10;
       return 0;
     };
     const prods = products.map((p) => ({ p, s: score(p) })).filter((x) => x.s > 0)
       .sort((a, b) => b.s - a.s).slice(0, 7).map((x) => x.p);
-    const acts = ACTIONS.filter((a) => !term || a.label.toLowerCase().includes(term) || a.kw.includes(term));
+    const acts = ACTIONS.filter((a) => !term || normalizeSearch(a.label).includes(term) || normalizeSearch(a.kw).includes(term));
     return { prods, acts };
   }, [q, products]);
 
