@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" fill="none">
+
+  <defs><radialGradient id="amazon-sh1" cx="0.5" cy="0.5" r="0.5">
+    <stop offset="0" stop-color="#0b1220" stop-opacity="0.4"/>
+    <stop offset="0.6" stop-color="#0b1220" stop-opacity="0.16000000000000003"/>
+    <stop offset="1" stop-color="#0b1220" stop-opacity="0"/>
+  </radialGradient></defs>
+  <ellipse cx="256" cy="388" rx="118" ry="24" fill="url(#amazon-sh1)"/>
+  <defs>
+    <linearGradient id="amazon-g2" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#f6c084"/>
+      <stop offset="0.5" stop-color="#f0932b"/>
+      <stop offset="1" stop-color="#c07622"/>
+    </linearGradient>
+    <clipPath id="amazon-c3"><path d="M196 126H316A52 52 0 0 1 368 178V298A52 52 0 0 1 316 350H196A52 52 0 0 1 144 298V178A52 52 0 0 1 196 126Z"/></clipPath>
+    <radialGradient id="amazon-p4" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.72"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <defs><path id="amazon-s5" d="M196 126H316A52 52 0 0 1 368 178V298A52 52 0 0 1 316 350H196A52 52 0 0 1 144 298V178A52 52 0 0 1 196 126Z"/></defs><use href="#amazon-s5" y="26" fill="#6c4213"/><use href="#amazon-s5" y="25" fill="#6f4413"/><use href="#amazon-s5" y="24" fill="#714514"/><use href="#amazon-s5" y="23" fill="#744714"/><use href="#amazon-s5" y="22" fill="#764815"/><use href="#amazon-s5" y="21" fill="#794a15"/><use href="#amazon-s5" y="20" fill="#7b4b16"/><use href="#amazon-s5" y="19" fill="#7e4d16"/><use href="#amazon-s5" y="18" fill="#804e17"/><use href="#amazon-s5" y="17" fill="#835017"/><use href="#amazon-s5" y="16" fill="#855118"/><use href="#amazon-s5" y="15" fill="#885318"/><use href="#amazon-s5" y="14" fill="#8a5419"/><use href="#amazon-s5" y="13" fill="#8d5619"/><use href="#amazon-s5" y="12" fill="#8f5819"/><use href="#amazon-s5" y="11" fill="#92591a"/><use href="#amazon-s5" y="10" fill="#945b1a"/><use href="#amazon-s5" y="9" fill="#975c1b"/><use href="#amazon-s5" y="8" fill="#995e1b"/><use href="#amazon-s5" y="7" fill="#9c5f1c"/><use href="#amazon-s5" y="6" fill="#9e611c"/><use href="#amazon-s5" y="5" fill="#a1621d"/><use href="#amazon-s5" y="4" fill="#a3641d"/><use href="#amazon-s5" y="3" fill="#a6651e"/><use href="#amazon-s5" y="2" fill="#a8671e"/><use href="#amazon-s5" y="1" fill="#ab681f"/>
+  <path d="M196 126H316A52 52 0 0 1 368 178V298A52 52 0 0 1 316 350H196A52 52 0 0 1 144 298V178A52 52 0 0 1 196 126Z" fill="url(#amazon-g2)"/>
+  <path d="M196 126H316A52 52 0 0 1 368 178V298A52 52 0 0 1 316 350H196A52 52 0 0 1 144 298V178A52 52 0 0 1 196 126Z" fill="none" stroke="#f8cea0" stroke-opacity="0.75" stroke-width="3"/>
+  <g clip-path="url(#amazon-c3)"><ellipse cx="216" cy="172" rx="96" ry="54"
+      fill="url(#amazon-p4)" transform="rotate(-24 216 172)"/></g><g fill="none" stroke="#fff6e9" stroke-width="13" stroke-linecap="round" stroke-linejoin="round" opacity="0.95">
+    <path d="M200 194h22l16 74h58l18 -52h-84"/>
+  </g><g fill="#fff6e9" opacity="0.95">
+    <circle cx="252" cy="290" r="12"/><circle cx="298" cy="290" r="12"/></g>
+</svg>

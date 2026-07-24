@@ -102,13 +102,14 @@ export default function Shop() {
           style={{ backgroundImage: 'linear-gradient(120deg,#7c5cff,#a855f7)' }}>
           {(() => {
             // Prefer the logo the owner set for this category, then their own
-            // product artwork, then the built-in category icon.
-            const img = category && (categoryLogos[category] || visible.find((p) => p.image)?.image || iconFor(category));
-            return img ? (
+            // product artwork, then the built-in category icon. With no category
+            // selected the whole catalogue gets its own piece of art.
+            const img = category
+              ? (categoryLogos[category] || visible.find((p) => p.image)?.image || iconFor(category))
+              : '/products/icons/chest.svg';
+            return (
               <img src={img} alt="" aria-hidden
-                className="absolute right-8 inset-y-0 my-auto w-24 h-24 object-contain drop-shadow-2xl fm-float hidden sm:block" />
-            ) : (
-              <span aria-hidden className="absolute right-9 inset-y-0 my-auto h-fit text-6xl drop-shadow-2xl fm-float hidden sm:block">🛒</span>
+                className="fm-hero-art right-8 inset-y-0 my-auto w-28 h-28 object-contain drop-shadow-2xl fm-float hidden sm:block" />
             );
           })()}
           <h1 className="text-3xl font-extrabold tracking-tight" style={{ color: '#fff' }}>

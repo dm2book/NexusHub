@@ -525,7 +525,12 @@ h1, h2, h3, .font-display { font-family: 'Bricolage Grotesque', 'Inter', sans-se
   background: radial-gradient(circle, rgba(255,255,255,.28), transparent 65%);
   filter: blur(6px);
 }
+/* Lift the panel content above the ::before/::after overlays. Children that
+   place themselves (the floating hero art) opt out via .fm-hero-art — without
+   it this rule overrides their Tailwind `absolute` and they collapse into the
+   text flow, overlapping the heading. */
 .fm-hero-brand > * { position: relative; z-index: 1; }
+.fm-hero-brand > .fm-hero-art { position: absolute; z-index: 1; }
 
 @media (prefers-reduced-motion: reduce) {
   .fm-cart-pop { animation: none !important; }

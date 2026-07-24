@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" fill="none">
+
+  <defs><radialGradient id="steam-sh1" cx="0.5" cy="0.5" r="0.5">
+    <stop offset="0" stop-color="#0b1220" stop-opacity="0.4"/>
+    <stop offset="0.6" stop-color="#0b1220" stop-opacity="0.16000000000000003"/>
+    <stop offset="1" stop-color="#0b1220" stop-opacity="0"/>
+  </radialGradient></defs>
+  <ellipse cx="256" cy="388" rx="118" ry="24" fill="url(#steam-sh1)"/>
+  <defs>
+    <linearGradient id="steam-g2" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#838d9b"/>
+      <stop offset="0.5" stop-color="#2a3b52"/>
+      <stop offset="1" stop-color="#222f42"/>
+    </linearGradient>
+    <clipPath id="steam-c3"><path d="M196 126H316A52 52 0 0 1 368 178V298A52 52 0 0 1 316 350H196A52 52 0 0 1 144 298V178A52 52 0 0 1 196 126Z"/></clipPath>
+    <radialGradient id="steam-p4" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.72"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <defs><path id="steam-s5" d="M196 126H316A52 52 0 0 1 368 178V298A52 52 0 0 1 316 350H196A52 52 0 0 1 144 298V178A52 52 0 0 1 196 126Z"/></defs><use href="#steam-s5" y="26" fill="#131b25"/><use href="#steam-s5" y="25" fill="#131c26"/><use href="#steam-s5" y="24" fill="#141c27"/><use href="#steam-s5" y="23" fill="#141d28"/><use href="#steam-s5" y="22" fill="#151d28"/><use href="#steam-s5" y="21" fill="#151e29"/><use href="#steam-s5" y="20" fill="#161e2a"/><use href="#steam-s5" y="19" fill="#161f2b"/><use href="#steam-s5" y="18" fill="#16202c"/><use href="#steam-s5" y="17" fill="#17202d"/><use href="#steam-s5" y="16" fill="#17212d"/><use href="#steam-s5" y="15" fill="#18212e"/><use href="#steam-s5" y="14" fill="#18222f"/><use href="#steam-s5" y="13" fill="#192330"/><use href="#steam-s5" y="12" fill="#192331"/><use href="#steam-s5" y="11" fill="#192432"/><use href="#steam-s5" y="10" fill="#1a2433"/><use href="#steam-s5" y="9" fill="#1a2533"/><use href="#steam-s5" y="8" fill="#1b2534"/><use href="#steam-s5" y="7" fill="#1b2635"/><use href="#steam-s5" y="6" fill="#1b2736"/><use href="#steam-s5" y="5" fill="#1c2737"/><use href="#steam-s5" y="4" fill="#1c2838"/><use href="#steam-s5" y="3" fill="#1d2838"/><use href="#steam-s5" y="2" fill="#1d2939"/><use href="#steam-s5" y="1" fill="#1e293a"/>
+  <path d="M196 126H316A52 52 0 0 1 368 178V298A52 52 0 0 1 316 350H196A52 52 0 0 1 144 298V178A52 52 0 0 1 196 126Z" fill="url(#steam-g2)"/>
+  <path d="M196 126H316A52 52 0 0 1 368 178V298A52 52 0 0 1 316 350H196A52 52 0 0 1 144 298V178A52 52 0 0 1 196 126Z" fill="none" stroke="#9fa7b1" stroke-opacity="0.75" stroke-width="3"/>
+  <g clip-path="url(#steam-c3)"><ellipse cx="216" cy="172" rx="96" ry="54"
+      fill="url(#steam-p4)" transform="rotate(-24 216 172)"/></g><g opacity="0.95">
+    <circle cx="262" cy="212" r="40" fill="none" stroke="#e8eef7" stroke-width="12"/>
+    <circle cx="262" cy="212" r="15" fill="#e8eef7"/>
+    <circle cx="212" cy="282" r="26" fill="#e8eef7"/>
+    <path d="M226 268L262 212" stroke="#e8eef7" stroke-width="10" stroke-linecap="round"/>
+  </g>
+</svg>
