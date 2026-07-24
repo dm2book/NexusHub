@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" fill="none">
+
+  <defs><radialGradient id="minecraft-sh1" cx="0.5" cy="0.5" r="0.5">
+    <stop offset="0" stop-color="#0b1220" stop-opacity="0.4"/>
+    <stop offset="0.6" stop-color="#0b1220" stop-opacity="0.16000000000000003"/>
+    <stop offset="1" stop-color="#0b1220" stop-opacity="0"/>
+  </radialGradient></defs>
+  <ellipse cx="256" cy="388" rx="116" ry="24" fill="url(#minecraft-sh1)"/>
+    <path d="M138 182L256 244L256 350L138 288Z" fill="#7a5a3a"/>
+    <path d="M374 182L256 244L256 350L374 288Z" fill="#96703f"/>
+    <path d="M256 120L374 182L256 244L138 182Z" fill="#6fbf4a"/>
+    <path d="M256 120L374 182L256 244L138 182Z" fill="#fff" opacity="0.12"/>
+</svg>

@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" fill="none">
+
+  <defs><radialGradient id="coin-sh1" cx="0.5" cy="0.5" r="0.5">
+    <stop offset="0" stop-color="#0b1220" stop-opacity="0.4"/>
+    <stop offset="0.6" stop-color="#0b1220" stop-opacity="0.16000000000000003"/>
+    <stop offset="1" stop-color="#0b1220" stop-opacity="0"/>
+  </radialGradient></defs>
+  <ellipse cx="256" cy="388" rx="132" ry="26" fill="url(#coin-sh1)"/>
+  <defs>
+    <linearGradient id="coin-g2" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#e1c784"/>
+      <stop offset="0.5" stop-color="#cc9e2b"/>
+      <stop offset="1" stop-color="#a37e22"/>
+    </linearGradient>
+    <clipPath id="coin-c3"><path d="M98 296a70 70 0 1 0 140 0a70 70 0 1 0 -140 0Z"/></clipPath>
+    <radialGradient id="coin-p4" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.72"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <defs><path id="coin-s5" d="M98 296a70 70 0 1 0 140 0a70 70 0 1 0 -140 0Z"/></defs><use href="#coin-s5" y="20" fill="#5c4713"/><use href="#coin-s5" y="19" fill="#5f4914"/><use href="#coin-s5" y="18" fill="#624b14"/><use href="#coin-s5" y="17" fill="#644d15"/><use href="#coin-s5" y="16" fill="#675015"/><use href="#coin-s5" y="15" fill="#6a5216"/><use href="#coin-s5" y="14" fill="#6d5417"/><use href="#coin-s5" y="13" fill="#6f5617"/><use href="#coin-s5" y="12" fill="#725818"/><use href="#coin-s5" y="11" fill="#755a18"/><use href="#coin-s5" y="10" fill="#785d19"/><use href="#coin-s5" y="9" fill="#7a5f1a"/><use href="#coin-s5" y="8" fill="#7d611a"/><use href="#coin-s5" y="7" fill="#80631b"/><use href="#coin-s5" y="6" fill="#83651b"/><use href="#coin-s5" y="5" fill="#85671c"/><use href="#coin-s5" y="4" fill="#88691d"/><use href="#coin-s5" y="3" fill="#8b6c1d"/><use href="#coin-s5" y="2" fill="#8e6e1e"/><use href="#coin-s5" y="1" fill="#90701e"/>
+  <path d="M98 296a70 70 0 1 0 140 0a70 70 0 1 0 -140 0Z" fill="url(#coin-g2)"/>
+  <path d="M98 296a70 70 0 1 0 140 0a70 70 0 1 0 -140 0Z" fill="none" stroke="#e8d3a0" stroke-opacity="0.75" stroke-width="3"/>
+  
+  <defs>
+    <linearGradient id="coin-g6" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#d9c182"/>
+      <stop offset="0.5" stop-color="#be9428"/>
+      <stop offset="1" stop-color="#987620"/>
+    </linearGradient>
+    <clipPath id="coin-c7"><path d="M288 304a58 58 0 1 0 116 0a58 58 0 1 0 -116 0Z"/></clipPath>
+    <radialGradient id="coin-p8" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.72"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <defs><path id="coin-s9" d="M288 304a58 58 0 1 0 116 0a58 58 0 1 0 -116 0Z"/></defs><use href="#coin-s9" y="16" fill="#554312"/><use href="#coin-s9" y="15" fill="#584613"/><use href="#coin-s9" y="14" fill="#5c4813"/><use href="#coin-s9" y="13" fill="#5f4b14"/><use href="#coin-s9" y="12" fill="#624d15"/><use href="#coin-s9" y="11" fill="#655015"/><use href="#coin-s9" y="10" fill="#695216"/><use href="#coin-s9" y="9" fill="#6c5517"/><use href="#coin-s9" y="8" fill="#6f5718"/><use href="#coin-s9" y="7" fill="#725a18"/><use href="#coin-s9" y="6" fill="#765c19"/><use href="#coin-s9" y="5" fill="#795f1a"/><use href="#coin-s9" y="4" fill="#7c611a"/><use href="#coin-s9" y="3" fill="#7f641b"/><use href="#coin-s9" y="2" fill="#83661c"/><use href="#coin-s9" y="1" fill="#86691c"/>
+  <path d="M288 304a58 58 0 1 0 116 0a58 58 0 1 0 -116 0Z" fill="url(#coin-g6)"/>
+  <path d="M288 304a58 58 0 1 0 116 0a58 58 0 1 0 -116 0Z" fill="none" stroke="#e2cf9e" stroke-opacity="0.75" stroke-width="3"/>
+  
+  <defs>
+    <linearGradient id="coin-g10" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#f2d488"/>
+      <stop offset="0.5" stop-color="#e8b431"/>
+      <stop offset="1" stop-color="#ba9027"/>
+    </linearGradient>
+    <clipPath id="coin-c11"><path d="M138 238a118 118 0 1 0 236 0a118 118 0 1 0 -236 0Z"/></clipPath>
+    <radialGradient id="coin-p12" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.72"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <defs><path id="coin-s13" d="M138 238a118 118 0 1 0 236 0a118 118 0 1 0 -236 0Z"/></defs><use href="#coin-s13" y="30" fill="#685116"/><use href="#coin-s13" y="29" fill="#6a5316"/><use href="#coin-s13" y="28" fill="#6c5417"/><use href="#coin-s13" y="27" fill="#6e5617"/><use href="#coin-s13" y="26" fill="#705818"/><use href="#coin-s13" y="25" fill="#735918"/><use href="#coin-s13" y="24" fill="#755b19"/><use href="#coin-s13" y="23" fill="#775c19"/><use href="#coin-s13" y="22" fill="#795e19"/><use href="#coin-s13" y="21" fill="#7b601a"/><use href="#coin-s13" y="20" fill="#7d611a"/><use href="#coin-s13" y="19" fill="#7f631b"/><use href="#coin-s13" y="18" fill="#81651b"/><use href="#coin-s13" y="17" fill="#83661c"/><use href="#coin-s13" y="16" fill="#85681c"/><use href="#coin-s13" y="15" fill="#886a1d"/><use href="#coin-s13" y="14" fill="#8a6b1d"/><use href="#coin-s13" y="13" fill="#8c6d1d"/><use href="#coin-s13" y="12" fill="#8e6e1e"/><use href="#coin-s13" y="11" fill="#90701e"/><use href="#coin-s13" y="10" fill="#92721f"/><use href="#coin-s13" y="9" fill="#94731f"/><use href="#coin-s13" y="8" fill="#967520"/><use href="#coin-s13" y="7" fill="#987720"/><use href="#coin-s13" y="6" fill="#9a7820"/><use href="#coin-s13" y="5" fill="#9d7a21"/><use href="#coin-s13" y="4" fill="#9f7b21"/><use href="#coin-s13" y="3" fill="#a17d22"/><use href="#coin-s13" y="2" fill="#a37f22"/><use href="#coin-s13" y="1" fill="#a58023"/>
+  <path d="M138 238a118 118 0 1 0 236 0a118 118 0 1 0 -236 0Z" fill="url(#coin-g10)"/>
+  <path d="M138 238a118 118 0 1 0 236 0a118 118 0 1 0 -236 0Z" fill="none" stroke="#f5dda2" stroke-opacity="0.75" stroke-width="3"/>
+  <g clip-path="url(#coin-c11)"><ellipse cx="216" cy="172" rx="96" ry="54"
+      fill="url(#coin-p12)" transform="rotate(-24 216 172)"/></g><path d="M158 238a98 98 0 1 0 196 0a98 98 0 1 0 -196 0Z" fill="none" stroke="#f1d283" stroke-opacity="0.55" stroke-width="5"/><path d="M198 296L242 180L270 180L314 296L278 296L256 234L234 296Z" fill="#fff8e0" opacity="0.95"/>
+</svg>

@@ -25,7 +25,7 @@ import { money } from '../lib/catalog.js';
 import { withFallback, SAMPLE_PRODUCTS } from '../lib/sampleCatalog.js';
 import { useCategoryLogos } from '../lib/useCategoryLogos.js';
 
-const ICON = (n) => `/products/icons/${n}.png`;
+const ICON = (n) => `/products/icons/${n}.svg`;
 
 /* ── Left sidebar categories (matches the reference order) ─────────────── */
 const CATEGORIES = [

@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" fill="none">
+
+  <defs><radialGradient id="itunes-sh1" cx="0.5" cy="0.5" r="0.5">
+    <stop offset="0" stop-color="#0b1220" stop-opacity="0.4"/>
+    <stop offset="0.6" stop-color="#0b1220" stop-opacity="0.16000000000000003"/>
+    <stop offset="1" stop-color="#0b1220" stop-opacity="0"/>
+  </radialGradient></defs>
+  <ellipse cx="256" cy="388" rx="118" ry="24" fill="url(#itunes-sh1)"/>
+  <defs>
+    <linearGradient id="itunes-g2" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#e997c6"/>
+      <stop offset="0.5" stop-color="#d94c9c"/>
+      <stop offset="1" stop-color="#ae3d7d"/>
+    </linearGradient>
+    <clipPath id="itunes-c3"><path d="M196 126H316A52 52 0 0 1 368 178V298A52 52 0 0 1 316 350H196A52 52 0 0 1 144 298V178A52 52 0 0 1 196 126Z"/></clipPath>
+    <radialGradient id="itunes-p4" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.72"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <defs><path id="itunes-s5" d="M196 126H316A52 52 0 0 1 368 178V298A52 52 0 0 1 316 350H196A52 52 0 0 1 144 298V178A52 52 0 0 1 196 126Z"/></defs><use href="#itunes-s5" y="26" fill="#622246"/><use href="#itunes-s5" y="25" fill="#642348"/><use href="#itunes-s5" y="24" fill="#662449"/><use href="#itunes-s5" y="23" fill="#69244b"/><use href="#itunes-s5" y="22" fill="#6b254c"/><use href="#itunes-s5" y="21" fill="#6d264e"/><use href="#itunes-s5" y="20" fill="#6f2750"/><use href="#itunes-s5" y="19" fill="#722851"/><use href="#itunes-s5" y="18" fill="#742853"/><use href="#itunes-s5" y="17" fill="#762955"/><use href="#itunes-s5" y="16" fill="#782a56"/><use href="#itunes-s5" y="15" fill="#7b2b58"/><use href="#itunes-s5" y="14" fill="#7d2c59"/><use href="#itunes-s5" y="13" fill="#7f2d5b"/><use href="#itunes-s5" y="12" fill="#812d5d"/><use href="#itunes-s5" y="11" fill="#832e5e"/><use href="#itunes-s5" y="10" fill="#862f60"/><use href="#itunes-s5" y="9" fill="#883061"/><use href="#itunes-s5" y="8" fill="#8a3163"/><use href="#itunes-s5" y="7" fill="#8c3165"/><use href="#itunes-s5" y="6" fill="#8f3266"/><use href="#itunes-s5" y="5" fill="#913368"/><use href="#itunes-s5" y="4" fill="#93346a"/><use href="#itunes-s5" y="3" fill="#95356b"/><use href="#itunes-s5" y="2" fill="#98356d"/><use href="#itunes-s5" y="1" fill="#9a366e"/>
+  <path d="M196 126H316A52 52 0 0 1 368 178V298A52 52 0 0 1 316 350H196A52 52 0 0 1 144 298V178A52 52 0 0 1 196 126Z" fill="url(#itunes-g2)"/>
+  <path d="M196 126H316A52 52 0 0 1 368 178V298A52 52 0 0 1 316 350H196A52 52 0 0 1 144 298V178A52 52 0 0 1 196 126Z" fill="none" stroke="#eeaed2" stroke-opacity="0.75" stroke-width="3"/>
+  <g clip-path="url(#itunes-c3)"><ellipse cx="216" cy="172" rx="96" ry="54"
+      fill="url(#itunes-p4)" transform="rotate(-24 216 172)"/></g><g fill="#ffe9f5" opacity="0.95">
+    <rect x="264" y="176" width="16" height="94" rx="8"/>
+    <path d="M264 176q46 -11 58 -21v34q-12 10 -58 21Z"/>
+    <ellipse cx="244" cy="270" rx="30" ry="24"/>
+  </g>
+</svg>

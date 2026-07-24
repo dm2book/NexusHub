@@ -106,7 +106,7 @@ const CATS_WITH_ICON = ['robux', 'v-bucks', 'valorant', 'cod', 'genshin', 'brawl
   'pokemongo', 'discord-nitro', 'spotify', 'netflix', 'gamepass', 'steam', 'playstation',
   'xbox', 'nintendo', 'amazon', 'googleplay', 'itunes', 'giftcard', 'chest', 'wildrift', 'wow'];
 export const CATEGORY_ICON = Object.fromEntries(CATS_WITH_ICON.map((c) => [c, c]));
-export const iconFor = (category) => CATEGORY_ICON[category] ? `/products/icons/${CATEGORY_ICON[category]}.png` : null;
+export const iconFor = (category) => CATEGORY_ICON[category] ? `/products/icons/${CATEGORY_ICON[category]}.svg` : null;
 
 export const SAMPLE_PRODUCTS = P.map(([sku, name, category, price, featured, pack, description]) => ({
   id: sku.toLowerCase(),

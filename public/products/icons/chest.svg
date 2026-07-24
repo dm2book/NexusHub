@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" fill="none">
+
+  <defs><radialGradient id="chest-sh1" cx="0.5" cy="0.5" r="0.5">
+    <stop offset="0" stop-color="#0b1220" stop-opacity="0.4"/>
+    <stop offset="0.6" stop-color="#0b1220" stop-opacity="0.16000000000000003"/>
+    <stop offset="1" stop-color="#0b1220" stop-opacity="0"/>
+  </radialGradient></defs>
+  <ellipse cx="256" cy="388" rx="118" ry="24" fill="url(#chest-sh1)"/>
+  <defs>
+    <linearGradient id="chest-g2" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#d3ae86"/>
+      <stop offset="0.5" stop-color="#b3742f"/>
+      <stop offset="1" stop-color="#8f5d26"/>
+    </linearGradient>
+    <clipPath id="chest-c3"><path d="M165 220H347A16 16 0 0 1 363 236V336A16 16 0 0 1 347 352H165A16 16 0 0 1 149 336V236A16 16 0 0 1 165 220Z"/></clipPath>
+    <radialGradient id="chest-p4" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.72"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <defs><path id="chest-s5" d="M165 220H347A16 16 0 0 1 363 236V336A16 16 0 0 1 347 352H165A16 16 0 0 1 149 336V236A16 16 0 0 1 165 220Z"/></defs><use href="#chest-s5" y="24" fill="#513415"/><use href="#chest-s5" y="23" fill="#533516"/><use href="#chest-s5" y="22" fill="#553716"/><use href="#chest-s5" y="21" fill="#573817"/><use href="#chest-s5" y="20" fill="#593917"/><use href="#chest-s5" y="19" fill="#5b3b18"/><use href="#chest-s5" y="18" fill="#5d3c18"/><use href="#chest-s5" y="17" fill="#5f3d19"/><use href="#chest-s5" y="16" fill="#613f19"/><use href="#chest-s5" y="15" fill="#63401a"/><use href="#chest-s5" y="14" fill="#65411a"/><use href="#chest-s5" y="13" fill="#67431b"/><use href="#chest-s5" y="12" fill="#69441c"/><use href="#chest-s5" y="11" fill="#6b451c"/><use href="#chest-s5" y="10" fill="#6d471d"/><use href="#chest-s5" y="9" fill="#6f481d"/><use href="#chest-s5" y="8" fill="#71491e"/><use href="#chest-s5" y="7" fill="#734b1e"/><use href="#chest-s5" y="6" fill="#754c1f"/><use href="#chest-s5" y="5" fill="#774d1f"/><use href="#chest-s5" y="4" fill="#794f20"/><use href="#chest-s5" y="3" fill="#7b5020"/><use href="#chest-s5" y="2" fill="#7d5121"/><use href="#chest-s5" y="1" fill="#7f5321"/>
+  <path d="M165 220H347A16 16 0 0 1 363 236V336A16 16 0 0 1 347 352H165A16 16 0 0 1 149 336V236A16 16 0 0 1 165 220Z" fill="url(#chest-g2)"/>
+  <path d="M165 220H347A16 16 0 0 1 363 236V336A16 16 0 0 1 347 352H165A16 16 0 0 1 149 336V236A16 16 0 0 1 165 220Z" fill="none" stroke="#ddc0a1" stroke-opacity="0.75" stroke-width="3"/>
+  <g clip-path="url(#chest-c3)"><ellipse cx="216" cy="172" rx="96" ry="54"
+      fill="url(#chest-p4)" transform="rotate(-24 216 172)"/></g>
+  <defs>
+    <linearGradient id="chest-g6" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#edcb8e"/>
+      <stop offset="0.5" stop-color="#e0a63c"/>
+      <stop offset="1" stop-color="#b38530"/>
+    </linearGradient>
+    <clipPath id="chest-c7"><path d="M149 220a107 107 0 0 1 214 0Z"/></clipPath>
+    <radialGradient id="chest-p8" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.72"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <defs><path id="chest-s9" d="M149 220a107 107 0 0 1 214 0Z"/></defs><use href="#chest-s9" y="18" fill="#654b1b"/><use href="#chest-s9" y="17" fill="#684e1c"/><use href="#chest-s9" y="16" fill="#6c501d"/><use href="#chest-s9" y="15" fill="#6f531e"/><use href="#chest-s9" y="14" fill="#72551f"/><use href="#chest-s9" y="13" fill="#76581f"/><use href="#chest-s9" y="12" fill="#795a20"/><use href="#chest-s9" y="11" fill="#7c5d21"/><use href="#chest-s9" y="10" fill="#805f22"/><use href="#chest-s9" y="9" fill="#836223"/><use href="#chest-s9" y="8" fill="#866424"/><use href="#chest-s9" y="7" fill="#8a6725"/><use href="#chest-s9" y="6" fill="#8d6926"/><use href="#chest-s9" y="5" fill="#906c27"/><use href="#chest-s9" y="4" fill="#946e27"/><use href="#chest-s9" y="3" fill="#977128"/><use href="#chest-s9" y="2" fill="#9a7329"/><use href="#chest-s9" y="1" fill="#9e762a"/>
+  <path d="M149 220a107 107 0 0 1 214 0Z" fill="url(#chest-g6)"/>
+  <path d="M149 220a107 107 0 0 1 214 0Z" fill="none" stroke="#f1d7a7" stroke-opacity="0.75" stroke-width="3"/>
+  <rect x="236" y="206" width="40" height="62" rx="10" fill="#eece94"/>
+    <circle cx="256" cy="236" r="10" fill="#5a3a18"/>
+</svg>

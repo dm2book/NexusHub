@@ -165,7 +165,7 @@ const CATS_WITH_ICON = ['robux', 'v-bucks', 'valorant', 'cod', 'genshin', 'brawl
   'clash', 'clashroyale', 'league', 'freefire', 'pubg', 'mlbb', 'eafc', 'gta', 'minecraft',
   'pokemongo', 'discord-nitro', 'spotify', 'netflix', 'gamepass', 'steam', 'playstation',
   'xbox', 'nintendo', 'amazon', 'googleplay', 'itunes', 'giftcard', 'chest'];
-const iconFor = (cat) => CATS_WITH_ICON.includes(cat) ? `/products/icons/${cat}.png` : null;
+const iconFor = (cat) => CATS_WITH_ICON.includes(cat) ? `/products/icons/${cat}.svg` : null;
 
 // Per-PACK art first (shows the denomination, e.g. "1,000 ROBUX" card), then
 // the category icon as a fallback — so every product gets its own visual.
@@ -177,6 +177,16 @@ const imageFor = (p) => p.image || iconFor(p.category) || null;
  * catalog SKU) and never touches products the admin created manually.
  */
 export async function syncCatalogImages() {
+  // The built-in category icons moved from .png to .svg. Repoint any product
+  // still stored against the old path so it doesn't render a broken image.
+  // Targets only our own icon path, so owner uploads/links are left alone.
+  const moved = await run(
+    `UPDATE products
+        SET metadata = regexp_replace(metadata, '("image"\\s*:\\s*"/products/icons/[^"]+)\\.png"', '\\1.svg"'),
+            updated_at = @at
+      WHERE metadata LIKE '%/products/icons/%.png%'`, { at: nowIso() }).catch(() => null);
+  if (moved?.changes) console.log(`[catalog] icon paths migrated to svg on ${moved.changes} product(s)`);
+
   let updated = 0;
   for (const p of CATALOG) {
     const img = imageFor(p);

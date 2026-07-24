@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" fill="none">
+
+  <defs><radialGradient id="gta-sh1" cx="0.5" cy="0.5" r="0.5">
+    <stop offset="0" stop-color="#0b1220" stop-opacity="0.4"/>
+    <stop offset="0.6" stop-color="#0b1220" stop-opacity="0.16000000000000003"/>
+    <stop offset="1" stop-color="#0b1220" stop-opacity="0"/>
+  </radialGradient></defs>
+  <ellipse cx="256" cy="388" rx="124" ry="24" fill="url(#gta-sh1)"/>
+  <defs>
+    <linearGradient id="gta-g2" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#8fb29b"/>
+      <stop offset="0.5" stop-color="#3e7a53"/>
+      <stop offset="1" stop-color="#326242"/>
+    </linearGradient>
+    <clipPath id="gta-c3"><path d="M171 134H341A16 16 0 0 1 357 150V250A16 16 0 0 1 341 266H171A16 16 0 0 1 155 250V150A16 16 0 0 1 171 134Z"/></clipPath>
+    <radialGradient id="gta-p4" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.72"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <defs><path id="gta-s5" d="M171 134H341A16 16 0 0 1 357 150V250A16 16 0 0 1 341 266H171A16 16 0 0 1 155 250V150A16 16 0 0 1 171 134Z"/></defs><use href="#gta-s5" y="14" fill="#1c3725"/><use href="#gta-s5" y="13" fill="#1d3927"/><use href="#gta-s5" y="12" fill="#1e3c28"/><use href="#gta-s5" y="11" fill="#203e2a"/><use href="#gta-s5" y="10" fill="#21402c"/><use href="#gta-s5" y="9" fill="#22432d"/><use href="#gta-s5" y="8" fill="#23452f"/><use href="#gta-s5" y="7" fill="#254831"/><use href="#gta-s5" y="6" fill="#264a32"/><use href="#gta-s5" y="5" fill="#274c34"/><use href="#gta-s5" y="4" fill="#284f35"/><use href="#gta-s5" y="3" fill="#295137"/><use href="#gta-s5" y="2" fill="#2b5339"/><use href="#gta-s5" y="1" fill="#2c563a"/>
+  <path d="M171 134H341A16 16 0 0 1 357 150V250A16 16 0 0 1 341 266H171A16 16 0 0 1 155 250V150A16 16 0 0 1 171 134Z" fill="url(#gta-g2)"/>
+  <path d="M171 134H341A16 16 0 0 1 357 150V250A16 16 0 0 1 341 266H171A16 16 0 0 1 155 250V150A16 16 0 0 1 171 134Z" fill="none" stroke="#a8c3b2" stroke-opacity="0.75" stroke-width="3"/>
+  
+  <defs>
+    <linearGradient id="gta-g6" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#99c6a9"/>
+      <stop offset="0.5" stop-color="#4f9c6b"/>
+      <stop offset="1" stop-color="#3f7d56"/>
+    </linearGradient>
+    <clipPath id="gta-c7"><path d="M151 164H361A18 18 0 0 1 379 182V294A18 18 0 0 1 361 312H151A18 18 0 0 1 133 294V182A18 18 0 0 1 151 164Z"/></clipPath>
+    <radialGradient id="gta-p8" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.72"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <defs><path id="gta-s9" d="M151 164H361A18 18 0 0 1 379 182V294A18 18 0 0 1 361 312H151A18 18 0 0 1 133 294V182A18 18 0 0 1 151 164Z"/></defs><use href="#gta-s9" y="24" fill="#244630"/><use href="#gta-s9" y="23" fill="#254831"/><use href="#gta-s9" y="22" fill="#264a32"/><use href="#gta-s9" y="21" fill="#274b34"/><use href="#gta-s9" y="20" fill="#284d35"/><use href="#gta-s9" y="19" fill="#284f36"/><use href="#gta-s9" y="18" fill="#295137"/><use href="#gta-s9" y="17" fill="#2a5238"/><use href="#gta-s9" y="16" fill="#2b543a"/><use href="#gta-s9" y="15" fill="#2c563b"/><use href="#gta-s9" y="14" fill="#2d583c"/><use href="#gta-s9" y="13" fill="#2e593d"/><use href="#gta-s9" y="12" fill="#2f5b3f"/><use href="#gta-s9" y="11" fill="#2f5d40"/><use href="#gta-s9" y="10" fill="#305f41"/><use href="#gta-s9" y="9" fill="#316042"/><use href="#gta-s9" y="8" fill="#326243"/><use href="#gta-s9" y="7" fill="#336445"/><use href="#gta-s9" y="6" fill="#346646"/><use href="#gta-s9" y="5" fill="#356747"/><use href="#gta-s9" y="4" fill="#366948"/><use href="#gta-s9" y="3" fill="#366b49"/><use href="#gta-s9" y="2" fill="#376d4b"/><use href="#gta-s9" y="1" fill="#386e4c"/>
+  <path d="M151 164H361A18 18 0 0 1 379 182V294A18 18 0 0 1 361 312H151A18 18 0 0 1 133 294V182A18 18 0 0 1 151 164Z" fill="url(#gta-g6)"/>
+  <path d="M151 164H361A18 18 0 0 1 379 182V294A18 18 0 0 1 361 312H151A18 18 0 0 1 133 294V182A18 18 0 0 1 151 164Z" fill="none" stroke="#b0d2bc" stroke-opacity="0.75" stroke-width="3"/>
+  <g clip-path="url(#gta-c7)"><ellipse cx="216" cy="172" rx="96" ry="54"
+      fill="url(#gta-p8)" transform="rotate(-24 216 172)"/></g><circle cx="256" cy="238" r="40" fill="none" stroke="#f4e9c8" stroke-width="12" opacity="0.92"/>
+    <circle cx="256" cy="238" r="18" fill="#f4e9c8" opacity="0.92"/>
+    <g fill="#f4e9c8" opacity="0.6">
+      <circle cx="167" cy="196" r="10"/>
+      <circle cx="345" cy="280" r="10"/>
+    </g>
+</svg>
