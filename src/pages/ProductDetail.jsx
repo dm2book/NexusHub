@@ -8,7 +8,7 @@ import { deliveryInfo } from '../lib/deliveryInfo.js';
 import { api } from '../lib/api.js';
 import { useCart } from '../context/CartContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
-import { categoryVisual, money } from '../lib/catalog.js';
+import { categoryVisual, money, isCustomImage } from '../lib/catalog.js';
 import { iconFor } from '../lib/sampleCatalog.js';
 import { SAMPLE_PRODUCTS, withFallback } from '../lib/sampleCatalog.js';
 import { PageLoader } from '../components/ui.jsx';
@@ -144,8 +144,19 @@ export default function ProductDetail() {
         <div style={{ viewTransitionName: 'product-hero' }}
           className={`shine-host group relative rounded-3xl bg-gradient-to-br ${grad} h-full overflow-hidden animate-fade-in ${product.featured ? 'ring-featured' : ''}`}>
           {product.image && !heroBroken ? (
-            <img data-pd-media src={product.image} alt={product.name} onError={() => setHeroBroken(true)}
-              className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+            isCustomImage(product.image) ? (
+              // Owner-supplied artwork: blurred fill behind + the full image on
+              // top, so a logo with its own background sits cleanly (no crop).
+              <>
+                <img src={product.image} alt="" aria-hidden="true"
+                  className="absolute inset-0 w-full h-full object-cover scale-125 blur-3xl opacity-90" />
+                <img data-pd-media src={product.image} alt={product.name} onError={() => setHeroBroken(true)}
+                  className="absolute inset-0 w-full h-full object-contain p-8 drop-shadow-2xl transition-transform duration-700 group-hover:scale-105" />
+              </>
+            ) : (
+              <img data-pd-media src={product.image} alt={product.name} onError={() => setHeroBroken(true)}
+                className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+            )
           ) : iconFor(product.category) ? (
             // Image missing/broken → show the category logo centred on the gradient
             // (never the ugly broken-image icon).
