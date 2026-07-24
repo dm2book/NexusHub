@@ -98,12 +98,17 @@ export default function Shop() {
       <main className="flex-1 min-w-0">
         <div className="fm-hero-brand rounded-2xl p-7 mb-6 text-white shadow-lg shadow-violet-500/20"
           style={{ backgroundImage: 'linear-gradient(120deg,#7c5cff,#a855f7)' }}>
-          {(() => { const img = category && iconFor(category); return img ? (
-            <img src={img} alt="" aria-hidden
-              className="absolute right-8 inset-y-0 my-auto w-24 h-24 object-contain drop-shadow-2xl fm-float hidden sm:block" />
-          ) : (
-            <span aria-hidden className="absolute right-9 inset-y-0 my-auto h-fit text-6xl drop-shadow-2xl fm-float hidden sm:block">🛒</span>
-          ); })()}
+          {(() => {
+            // Prefer the owner's own product artwork for this category (first
+            // product that has an image), then the built-in category icon.
+            const img = category && ((visible.find((p) => p.image)?.image) || iconFor(category));
+            return img ? (
+              <img src={img} alt="" aria-hidden
+                className="absolute right-8 inset-y-0 my-auto w-24 h-24 object-contain drop-shadow-2xl fm-float hidden sm:block" />
+            ) : (
+              <span aria-hidden className="absolute right-9 inset-y-0 my-auto h-fit text-6xl drop-shadow-2xl fm-float hidden sm:block">🛒</span>
+            );
+          })()}
           <h1 className="text-3xl font-extrabold tracking-tight" style={{ color: '#fff' }}>
             {category ? categoryVisual(category).label : t('shop.all', 'All Products')}
           </h1>

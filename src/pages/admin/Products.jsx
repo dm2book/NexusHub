@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Package, Plus, Pencil, Star, Eye, EyeOff, Search, Image as ImageIcon, Upload, Loader2, X } from 'lucide-react';
+import { Package, Plus, Pencil, Star, Eye, EyeOff, Search, Image as ImageIcon, Upload, Loader2, X, Scissors } from 'lucide-react';
 import { api } from '../../lib/api.js';
 import { money, categoryVisual, normalizeSearch } from '../../lib/catalog.js';
-import { fileToDataUrl, imageLabel } from '../../lib/imageUpload.js';
+import { fileToDataUrl, removeSolidBackground, imageLabel } from '../../lib/imageUpload.js';
 import { PageLoader, EmptyState, Modal } from '../../components/ui.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
 
@@ -43,12 +43,31 @@ export default function AdminProducts() {
     } catch (err) { toast.error(err.message); } finally { setBusy(false); }
   };
 
-  // Upload an image straight from the owner's device → inline data URI.
+  // Upload an image straight from the owner's device → inline data URI. A flat
+  // (e.g. white) background is auto-removed so the artwork blends on the card.
   const uploadImage = async (file, set) => {
     if (!file) return;
     setImgBusy(true);
-    try { set(await fileToDataUrl(file)); }
+    try {
+      let data = await fileToDataUrl(file);
+      try { const stripped = await removeSolidBackground(data); if (stripped) data = stripped; } catch { /* keep original */ }
+      set(data);
+    }
     catch (err) { toast.error(err.message); }
+    finally { setImgBusy(false); }
+  };
+
+  // Manually strip a flat background off the image already on the product
+  // (for images uploaded before auto-removal existed).
+  const stripBackground = async () => {
+    const cur = form.imageUrl?.trim();
+    if (!cur) return;
+    setImgBusy(true);
+    try {
+      const out = await removeSolidBackground(cur);
+      if (out) { setForm((f) => ({ ...f, imageUrl: out })); toast.success('Background removed.'); }
+      else toast.error('No flat background found to remove.');
+    } catch (err) { toast.error(err.message); }
     finally { setImgBusy(false); }
   };
 
@@ -462,7 +481,13 @@ export default function AdminProducts() {
                   onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; uploadImage(f, (v) => setForm((s) => ({ ...s, imageUrl: v }))); }} />
               </label>
             </div>
-            <p className="text-xs text-slate-500 mt-1">Paste any image or page link (Pinterest included), or upload one from your device.</p>
+            {form.imageUrl && (
+              <button type="button" onClick={stripBackground} disabled={imgBusy}
+                className="btn-ghost text-xs mt-2 flex items-center gap-1.5 disabled:opacity-50">
+                <Scissors size={13} /> Remove background
+              </button>
+            )}
+            <p className="text-xs text-slate-500 mt-1">Paste any image or page link (Pinterest included), or upload one from your device. A flat background is removed automatically.</p>
           </div>
           <div className="sm:col-span-2"><label className="label">Description</label>
             <textarea rows={3} className="input" value={form.description}
