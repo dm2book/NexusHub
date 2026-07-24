@@ -30,15 +30,15 @@ const ICON = iconPath;
 /* ── Left sidebar categories (matches the reference order) ─────────────── */
 const CATEGORIES = [
   { label: 'All Products', slug: '', node: <LayoutGrid size={18} className="text-violet-600" /> },
+  { label: 'Gift Cards', slug: 'giftcard', img: 'giftcard' },
   { label: 'Robux', slug: 'robux', img: 'robux' },
   { label: 'V-Bucks', slug: 'v-bucks', img: 'v-bucks' },
   { label: 'Valorant Points', slug: 'valorant', img: 'valorant' },
-  { label: 'Gift Cards', slug: 'giftcard', img: 'giftcard' },
-  { label: 'Steam Wallet', slug: 'steam', img: 'steam' },
-  { label: 'PlayStation Store', slug: 'playstation', img: 'playstation' },
-  { label: 'Xbox Gift Card', slug: 'xbox', img: 'xbox' },
+  { label: 'CoD Points', slug: 'cod', img: 'cod' },
+  { label: 'EA FC / FIFA', slug: 'eafc', img: 'eafc' },
+  { label: 'Brawl Stars', slug: 'brawl', img: 'brawl' },
+  { label: 'Clash of Clans', slug: 'clash', img: 'clash' },
   { label: 'Discord Nitro', slug: 'discord-nitro', img: 'discord-nitro' },
-  { label: 'iTunes', slug: 'itunes', img: 'itunes' },
 ];
 
 /* ── Popular category tiles — prices/data are resolved from the REAL catalog
@@ -47,11 +47,11 @@ const POPULAR_TILES = [
   { name: 'Robux', img: 'robux', slug: 'robux' },
   { name: 'V-Bucks', img: 'v-bucks', slug: 'v-bucks' },
   { name: 'Valorant Points', img: 'valorant', slug: 'valorant', popular: true },
+  { name: 'Gift Cards', img: 'giftcard', slug: 'giftcard' },
   { name: 'Discord Nitro', img: 'discord-nitro', slug: 'discord-nitro' },
-  { name: 'Steam Wallet', img: 'steam', slug: 'steam' },
-  { name: 'PlayStation Store', img: 'playstation', slug: 'playstation' },
-  { name: 'Xbox Gift Card', img: 'xbox', slug: 'xbox' },
   { name: 'CoD Points', img: 'cod', slug: 'cod' },
+  { name: 'EA FC / FIFA', img: 'eafc', slug: 'eafc' },
+  { name: 'Brawl Stars', img: 'brawl', slug: 'brawl' },
 ];
 
 const NAV = [
@@ -173,7 +173,7 @@ export default function HomeStore() {
 
       {/* ── Top nav ─────────────────────────────────────────────── */}
       <header className="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-slate-200/70">
-        <div className="max-w-[1400px] mx-auto px-4 lg:px-8 h-[68px] flex items-center gap-3 sm:gap-6">
+        <div className="max-w-[1400px] 2xl:max-w-[1560px] mx-auto px-4 lg:px-8 h-[68px] flex items-center gap-3 sm:gap-6">
           <Link to="/" className="flex items-center gap-2.5 shrink-0">
             <span className="w-9 h-9 rounded-xl flex items-center justify-center text-white shadow-lg shadow-violet-500/30"
               style={{ backgroundImage: 'linear-gradient(135deg,#7c5cff,#a855f7)' }}>
@@ -235,7 +235,7 @@ export default function HomeStore() {
       </header>
 
       {/* ── Body: sidebar + main ────────────────────────────────── */}
-      <div className="max-w-[1400px] mx-auto px-4 lg:px-8 py-6 flex gap-6 items-start">
+      <div className="max-w-[1400px] 2xl:max-w-[1560px] mx-auto px-4 lg:px-8 py-6 flex gap-6 items-start">
         {/* Sidebar */}
         <aside className="hidden lg:block w-[248px] shrink-0 sticky top-[84px] space-y-4">
           <div className="bg-white rounded-2xl border border-slate-200/70 p-3 shadow-sm">
@@ -300,7 +300,9 @@ export default function HomeStore() {
         <main className="flex-1 min-w-0 space-y-6">
           {/* Hero */}
           <section className="relative overflow-hidden rounded-3xl bg-white border border-slate-200/70 shadow-sm px-6 sm:px-10 py-9">
-            <div className="grid lg:grid-cols-[1.05fr_1fr] gap-8 items-center">
+            {/* On xl the feature cards get their own column instead of floating
+                over the artwork, which used to bury the right-hand logos. */}
+            <div className="grid lg:grid-cols-[1.05fr_1fr] 2xl:grid-cols-[1.1fr_1fr_206px] gap-8 2xl:gap-6 items-center">
               <div>
                 <span className="inline-flex items-center gap-2 text-[13px] font-semibold text-violet-700 bg-violet-100 rounded-full px-3 py-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-violet-500" /> {tr('home.badge', '#1 Trusted Marketplace')}
@@ -335,19 +337,19 @@ export default function HomeStore() {
 
               {/* 3D render */}
               <HeroRender />
-            </div>
 
-            {/* right feature cards (overlay on lg) */}
-            <div className="hidden xl:flex flex-col gap-2.5 absolute top-8 right-8 w-[210px]">
-              {HERO_FEATURES.map((f) => (
-                <div key={f.title} className="flex items-center gap-3 bg-white/95 backdrop-blur border border-slate-200/70 rounded-2xl px-3.5 py-2.5 shadow-md">
-                  <span className={`w-9 h-9 rounded-xl grid place-items-center ${f.color}`}><f.icon size={17} /></span>
-                  <div className="leading-tight">
-                    <div className="text-[13px] font-semibold">{tr(`home.f.${f.key}`, f.title)}</div>
-                    <div className="text-[11px] text-slate-400">{tr(`home.f.${f.key}Sub`, f.sub)}</div>
+              {/* feature cards — their own column once the layout is wide enough */}
+              <div className="hidden 2xl:flex flex-col gap-2.5">
+                {HERO_FEATURES.map((f) => (
+                  <div key={f.title} className="flex items-center gap-3 bg-white/95 backdrop-blur border border-slate-200/70 rounded-2xl px-3.5 py-2.5 shadow-md transition hover:shadow-lg hover:-translate-y-0.5">
+                    <span className={`w-9 h-9 rounded-xl grid place-items-center shrink-0 ${f.color}`}><f.icon size={17} /></span>
+                    <div className="leading-tight min-w-0">
+                      <div className="text-[13px] font-semibold">{tr(`home.f.${f.key}`, f.title)}</div>
+                      <div className="text-[11px] text-slate-400">{tr(`home.f.${f.key}Sub`, f.sub)}</div>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </section>
 
@@ -398,7 +400,7 @@ export default function HomeStore() {
                     </div>
                     <h3 className="font-bold text-[15px]">{p.name}</h3>
                     <p className="text-[12.5px] text-slate-400 mt-0.5">{tr('home.packs', '{n} packs available', { n: p.count })}</p>
-                    <div className="text-[12px] text-slate-400 mt-2">{tr('home.from', 'From')} <span className="fm-head text-violet-600 text-[17px]">{money(p.from, p.currency)}</span></div>
+                    <div className="text-[12px] text-slate-400 mt-2">{tr('home.from', 'From')} <span className="fm-num text-violet-600 text-[17px]">{money(p.from, p.currency)}</span></div>
                     <div className="flex items-center gap-2 mt-3">
                       <Link to={`/shop?category=${p.slug}`} className="flex-1 text-center text-white text-sm font-semibold rounded-lg h-9 grid place-items-center hover:brightness-105 transition"
                         style={{ backgroundImage: 'linear-gradient(135deg,#7c5cff,#a855f7)' }}>{tr('product.buyNow', 'Buy Now')}</Link>

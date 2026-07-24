@@ -34,7 +34,25 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-h1, h2, h3, .font-display { font-family: 'Bricolage Grotesque', 'Inter', sans-serif; letter-spacing: -0.02em; }
+/* ── Type roles ───────────────────────────────────────────────────────────
+   Four families, each with one job, so the page has a voice instead of a
+   single flat font:
+     Bricolage Grotesque — display: headings, brand, card titles
+     Inter               — reading: body copy, UI
+     Space Grotesk       — numbers: prices and stats, tabular so digits line up
+     Rajdhani            — small uppercase labels (.label, badges)
+   NOTE: .fm-head is used throughout the markup but was never defined, so the
+   brand mark, prices and stat figures were silently rendering as body text. */
+h1, h2, h3, .font-display, .fm-head {
+  font-family: 'Bricolage Grotesque', 'Inter', sans-serif;
+  letter-spacing: -0.02em;
+}
+.fm-num {
+  font-family: 'Space Grotesk', 'Bricolage Grotesque', 'Inter', sans-serif;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.015em;
+  font-weight: 700;
+}
 
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: #070710; }

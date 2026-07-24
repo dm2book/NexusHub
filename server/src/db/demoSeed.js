@@ -108,15 +108,15 @@ const CATALOG = [
     image: '/products/nitro.svg', description: 'A full year of Discord Nitro.' },
 
   // ── Gift cards (face value + small margin; not on Eldorado) ──────────────
-  { sku: 'STEAM-10', name: 'Steam Wallet €10', category: 'steam', price: 1199,
+  { sku: 'STEAM-10', name: 'Steam Wallet €10', category: 'giftcard', price: 1199,
     image: '/products/steam.svg', description: 'Add €10 to your Steam Wallet via redeem code.' },
-  { sku: 'STEAM-25', name: 'Steam Wallet €25', category: 'steam', price: 2699,
+  { sku: 'STEAM-25', name: 'Steam Wallet €25', category: 'giftcard', price: 2699,
     image: '/products/steam.svg', description: 'Add €25 to your Steam Wallet via redeem code.' },
-  { sku: 'STEAM-50', name: 'Steam Wallet €50', category: 'steam', price: 5199,
+  { sku: 'STEAM-50', name: 'Steam Wallet €50', category: 'giftcard', price: 5199,
     image: '/products/steam.svg', description: 'Add €50 to your Steam Wallet via redeem code.' },
-  { sku: 'PSN-25', name: 'PlayStation Store €25', category: 'playstation', price: 2699,
+  { sku: 'PSN-25', name: 'PlayStation Store €25', category: 'giftcard', price: 2699,
     image: '/products/playstation.svg', description: 'PSN gift card for games, DLC and PS Plus.' },
-  { sku: 'XBOX-25', name: 'Xbox Gift Card €25', category: 'xbox', price: 2699,
+  { sku: 'XBOX-25', name: 'Xbox Gift Card €25', category: 'giftcard', price: 2699,
     image: '/products/xbox.svg', description: 'Spend on games and add-ons across Xbox & PC.' },
 
   // ── More games (no per-pack art yet → storefront shows a category tile) ───
@@ -148,14 +148,19 @@ const CATALOG = [
 
   // ── Subscriptions ────────────────────────────────────────────────────────
   { sku: 'SPOTIFY-3M', name: 'Spotify Premium — 3 Months', category: 'spotify', price: 2499, description: 'Ad-free music, offline listening and better quality.' },
-  { sku: 'NETFLIX-25', name: 'Netflix Gift Card €25', category: 'netflix', price: 2599, featured: true, description: 'Redeemable towards any Netflix plan.' },
+  { sku: 'NETFLIX-25', name: 'Netflix Gift Card €25', category: 'giftcard', price: 2599, featured: true,
+    image: '/products/icons/netflix.svg', description: 'Redeemable towards any Netflix plan.' },
   { sku: 'GAMEPASS-3M', name: 'Xbox Game Pass Ultimate — 3 Months', category: 'gamepass', price: 3499, featured: true, description: '100+ games, EA Play and online multiplayer.' },
 
   // ── More gift cards ──────────────────────────────────────────────────────
-  { sku: 'NINTENDO-25', name: 'Nintendo eShop €25', category: 'nintendo', price: 2699, description: 'Switch games, DLC and Nintendo Switch Online.' },
-  { sku: 'AMAZON-25', name: 'Amazon Gift Card €25', category: 'amazon', price: 2599, description: 'Spend on millions of products on Amazon.' },
-  { sku: 'GPLAY-25', name: 'Google Play €25', category: 'googleplay', price: 2599, description: 'Apps, games and in-app purchases on Android.' },
-  { sku: 'ITUNES-25', name: 'App Store & iTunes €25', category: 'itunes', price: 2599, description: 'Apps, games, music and iCloud storage on Apple.' },
+  { sku: 'NINTENDO-25', name: 'Nintendo eShop €25', category: 'giftcard', price: 2699,
+    image: '/products/icons/nintendo.svg', description: 'Switch games, DLC and Nintendo Switch Online.' },
+  { sku: 'AMAZON-25', name: 'Amazon Gift Card €25', category: 'giftcard', price: 2599,
+    image: '/products/icons/amazon.svg', description: 'Spend on millions of products on Amazon.' },
+  { sku: 'GPLAY-25', name: 'Google Play €25', category: 'giftcard', price: 2599,
+    image: '/products/icons/googleplay.svg', description: 'Apps, games and in-app purchases on Android.' },
+  { sku: 'ITUNES-25', name: 'App Store & iTunes €25', category: 'giftcard', price: 2599,
+    image: '/products/icons/itunes.svg', description: 'Apps, games, music and iCloud storage on Apple.' },
 ];
 
 const parse = (s) => { try { return JSON.parse(s || '{}'); } catch { return {}; } };
@@ -181,7 +186,19 @@ const imageFor = (p) => p.image || iconFor(p.category) || null;
  * image differs from the current best art gets updated. Cheap (one select per
  * catalog SKU) and never touches products the admin created manually.
  */
+// Store credit / gift cards used to sit in a category each — nine of them with
+// a single product. They now share one 'giftcard' category; each product keeps
+// its own brand art, so grouping them doesn't flatten them to one icon.
+const GIFTCARD_SKUS = CATALOG.filter((p) => p.category === 'giftcard').map((p) => p.sku);
+
 export async function syncCatalogImages() {
+  // Move any of those products still sitting in their old single-brand category.
+  const moved = await run(
+    `UPDATE products SET category = 'giftcard', updated_at = @at
+      WHERE sku = ANY(@skus) AND category <> 'giftcard'`,
+    { at: nowIso(), skus: GIFTCARD_SKUS }).catch(() => null);
+  if (moved?.changes) console.log(`[catalog] ${moved.changes} product(s) regrouped under giftcard`);
+
   // Built-in icons are a mix of raster brand art (.png) and generated 3D icons
   // (.svg), and a category can switch between the two. Repoint any product
   // stored against the wrong extension so it never renders a broken image.

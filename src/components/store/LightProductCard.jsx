@@ -89,9 +89,9 @@ export default function LightProductCard({ product, onAdd }) {
       <Link to={to} className="font-bold text-[15px] text-slate-900 mt-0.5 hover:text-violet-600 line-clamp-2">{product.name}</Link>
       {product.description && <p className="text-[12.5px] text-slate-400 mt-1 line-clamp-2 flex-1">{product.description}</p>}
       <div className="text-[12px] text-slate-400 mt-3">
-        {t('home.from', 'From')} <span className="font-extrabold text-violet-600 text-[18px]">{money(product.price, product.currency)}</span>
+        {t('home.from', 'From')} <span className="fm-num text-violet-600 text-[18px]">{money(product.price, product.currency)}</span>
         {onSale && (
-          <span className="ml-2 text-slate-400 line-through font-semibold">{money(product.compareAtPrice, product.currency)}</span>
+          <span className="ml-2 text-slate-400 line-through fm-num text-[13px]">{money(product.compareAtPrice, product.currency)}</span>
         )}
       </div>
       <div className="flex items-center gap-2 mt-3">
