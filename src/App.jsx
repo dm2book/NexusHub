@@ -64,6 +64,7 @@ const AdminSecurity = lazy(() => import('./pages/admin/Security.jsx'));
 const AdminSocialProof = lazy(() => import('./pages/admin/SocialProof.jsx'));
 const AdminOperations = lazy(() => import('./pages/admin/Operations.jsx'));
 const AdminMonetization = lazy(() => import('./pages/admin/Monetization.jsx'));
+const AdminCategories = lazy(() => import('./pages/admin/Categories.jsx'));
 
 export default function App() {
   usePageViews();   // anonymous, privacy-friendly visitor analytics
@@ -126,6 +127,7 @@ export default function App() {
           <Route path="/admin/orders/:id" element={<AdminOrderDetail />} />
           <Route path="/admin/payments" element={<AdminPayments />} />
           <Route path="/admin/products" element={<AdminProducts />} />
+          <Route path="/admin/categories" element={<AdminCategories />} />
           <Route path="/admin/users" element={<AdminUsers />} />
           <Route path="/admin/suppliers" element={<AdminSuppliers />} />
           <Route path="/admin/fulfillment" element={<AdminFulfillment />} />

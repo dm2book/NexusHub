@@ -23,6 +23,7 @@ import AnnouncementBar from '../components/store/AnnouncementBar.jsx';
 import { SystemStatus } from '../components/store/StoreFooter.jsx';
 import { money } from '../lib/catalog.js';
 import { withFallback, SAMPLE_PRODUCTS } from '../lib/sampleCatalog.js';
+import { useCategoryLogos } from '../lib/useCategoryLogos.js';
 
 const ICON = (n) => `/products/icons/${n}.png`;
 
@@ -105,6 +106,7 @@ export default function HomeStore() {
   const { t: tr } = useI18n();
   const stats = useStats();
   const reviews = useReviews();
+  const categoryLogos = useCategoryLogos(); // owner-set logos (Admin → Categories)
   useReveal();
   useEffect(() => {
     const ref = new URLSearchParams(window.location.search).get('ref');
@@ -246,7 +248,7 @@ export default function HomeStore() {
                   <span className="w-7 h-7 grid place-items-center shrink-0">
                     {c.node || (c.letter
                       ? <span className={`w-7 h-7 rounded-lg bg-gradient-to-br ${c.grad} grid place-items-center text-white text-xs font-bold`}>{c.letter}</span>
-                      : <img src={ICON(c.img)} alt="" className="w-7 h-7 object-contain" />)}
+                      : <img src={categoryLogos[c.slug] || ICON(c.img)} alt="" className="w-7 h-7 object-contain" />)}
                   </span>
                   {c.slug ? c.label : tr('shop.all', c.label)}
                 </Link>
@@ -392,7 +394,7 @@ export default function HomeStore() {
                   <div key={p.name} className="snap-start shrink-0 w-[230px] bg-white rounded-2xl border border-slate-200/70 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all p-4">
                     <div className="fm-logo-plinth rounded-xl h-[150px] grid place-items-center mb-3">
                       {p.popular && <span className="absolute top-2.5 right-2.5 z-10 text-[10px] font-bold text-violet-700 bg-violet-100 rounded-full px-2 py-0.5">Popular</span>}
-                      <img src={ICON(p.img)} alt={p.name} className="fm-logo w-[92px] h-[92px]" />
+                      <img src={categoryLogos[p.slug] || ICON(p.img)} alt={p.name} className="fm-logo w-[92px] h-[92px]" />
                     </div>
                     <h3 className="font-bold text-[15px]">{p.name}</h3>
                     <p className="text-[12.5px] text-slate-400 mt-0.5">{tr('home.packs', '{n} packs available', { n: p.count })}</p>

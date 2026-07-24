@@ -13,6 +13,7 @@ import products from './products.js';
 import support from './support.js';
 import social from './social.js';
 import monetization from './monetization.js';
+import categories from './categories.js';
 import { asyncHandler } from '../../middleware/error.js';
 import { launchChecks } from '../../services/launchCheckService.js';
 import { listAll as listAllDrops, createDrop, deleteDrop } from '../../services/dropService.js';
@@ -70,5 +71,6 @@ router.use('/products', products);
 router.use('/support', support);
 router.use('/social', social);
 router.use('/monetization', monetization);
+router.use('/categories', categories);
 
 export default router;

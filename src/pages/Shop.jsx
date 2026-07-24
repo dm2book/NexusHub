@@ -6,6 +6,7 @@ import { useCart } from '../context/CartContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { categoryVisual, normalizeSearch } from '../lib/catalog.js';
 import { withFallback, iconFor } from '../lib/sampleCatalog.js';
+import { useCategoryLogos, logoFor } from '../lib/useCategoryLogos.js';
 import LightProductCard from '../components/store/LightProductCard.jsx';
 import { SkeletonCard } from '../components/ui.jsx';
 import BundlesShowcase from '../components/store/BundlesShowcase.jsx';
@@ -29,6 +30,7 @@ export default function Shop() {
   const [products, setProducts] = useState(null);
   const [search, setSearch] = useState(() => new URLSearchParams(window.location.search).get('search') || '');
   const [sort, setSort] = useState('popular');
+  const categoryLogos = useCategoryLogos(); // owner-set logos (Admin → Categories)
   const category = params.get('category') || '';
   usePageMeta('Shop', 'Browse game currency, gift cards and subscriptions — instant delivery.');
 
@@ -78,7 +80,7 @@ export default function Shop() {
               {t('shop.all', 'All Products')}
             </button>
             {categories.map((c) => {
-              const v = categoryVisual(c); const img = iconFor(c); const Icon = v.icon;
+              const v = categoryVisual(c); const img = logoFor(categoryLogos, c); const Icon = v.icon;
               return (
                 <button key={c} onClick={() => setCategory(c)}
                   className={`w-full flex items-center gap-3 px-2.5 py-2 rounded-xl text-[14.5px] font-medium transition ${category === c ? 'bg-violet-50 text-violet-700' : 'text-slate-600 hover:bg-slate-50'}`}>
@@ -99,9 +101,9 @@ export default function Shop() {
         <div className="fm-hero-brand rounded-2xl p-7 mb-6 text-white shadow-lg shadow-violet-500/20"
           style={{ backgroundImage: 'linear-gradient(120deg,#7c5cff,#a855f7)' }}>
           {(() => {
-            // Prefer the owner's own product artwork for this category (first
-            // product that has an image), then the built-in category icon.
-            const img = category && ((visible.find((p) => p.image)?.image) || iconFor(category));
+            // Prefer the logo the owner set for this category, then their own
+            // product artwork, then the built-in category icon.
+            const img = category && (categoryLogos[category] || visible.find((p) => p.image)?.image || iconFor(category));
             return img ? (
               <img src={img} alt="" aria-hidden
                 className="absolute right-8 inset-y-0 my-auto w-24 h-24 object-contain drop-shadow-2xl fm-float hidden sm:block" />
