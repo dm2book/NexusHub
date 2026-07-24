@@ -4,7 +4,7 @@ import { Search, SlidersHorizontal, PackageX, LayoutGrid } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { useCart } from '../context/CartContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
-import { categoryVisual } from '../lib/catalog.js';
+import { categoryVisual, normalizeSearch } from '../lib/catalog.js';
 import { withFallback, iconFor } from '../lib/sampleCatalog.js';
 import LightProductCard from '../components/store/LightProductCard.jsx';
 import { SkeletonCard } from '../components/ui.jsx';
@@ -44,9 +44,13 @@ export default function Shop() {
   const visible = useMemo(() => {
     let list = (products || []).slice();
     if (category) list = list.filter((p) => (p.category || '') === category);
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      list = list.filter((p) => p.name.toLowerCase().includes(q) || (p.description || '').toLowerCase().includes(q));
+    const q = normalizeSearch(search);
+    if (q) {
+      // Match on name / category / description, ignoring case + punctuation
+      // (so "vbucks" finds "V-Bucks").
+      list = list.filter((p) => normalizeSearch(p.name).includes(q)
+        || normalizeSearch(p.category).includes(q)
+        || normalizeSearch(p.description).includes(q));
     }
     return list.sort(SORTS[sort].fn);
   }, [products, category, search, sort]);

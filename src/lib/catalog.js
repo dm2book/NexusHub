@@ -51,4 +51,8 @@ export function categoryVisual(category) {
 export const money = (cents, cur = 'EUR') =>
   new Intl.NumberFormat('en-IE', { style: 'currency', currency: cur }).format((cents || 0) / 100);
 
+// Fold a search string down to letters+digits so "vbucks", "V-Bucks" and
+// "V BUCKS" all match. Used by the storefront search and the admin filter.
+export const normalizeSearch = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+
 export { CreditCard };

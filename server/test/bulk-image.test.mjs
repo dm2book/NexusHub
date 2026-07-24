@@ -53,6 +53,13 @@ const bad = await fetch(`${base}/api/admin/products/bulk`, {
   method: 'POST', headers: auth, body: JSON.stringify({ ids: [b.id], action: 'image', value: 'javascript:alert(1)' }) });
 ok('non-http image URL is rejected', bad.status === 400, `status=${bad.status}`);
 
+// An uploaded image (raster data URI) is accepted and stored.
+const dataUri = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+const up = await fetch(`${base}/api/admin/products/bulk`, {
+  method: 'POST', headers: auth, body: JSON.stringify({ ids: [c.id], action: 'image', value: dataUri }) });
+ok('uploaded data-URI image is accepted', up.status === 200, `status=${up.status}`);
+ok('product C stored the uploaded image', (await getProduct(c.id)).image === dataUri);
+
 srv.close();
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

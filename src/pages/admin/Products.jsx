@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Package, Plus, Pencil, Star, Eye, EyeOff, Search, Image as ImageIcon } from 'lucide-react';
+import { Package, Plus, Pencil, Star, Eye, EyeOff, Search, Image as ImageIcon, Upload, Loader2, X } from 'lucide-react';
 import { api } from '../../lib/api.js';
-import { money, categoryVisual } from '../../lib/catalog.js';
+import { money, categoryVisual, normalizeSearch } from '../../lib/catalog.js';
+import { fileToDataUrl, imageLabel } from '../../lib/imageUpload.js';
 import { PageLoader, EmptyState, Modal } from '../../components/ui.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
 
@@ -29,7 +30,8 @@ export default function AdminProducts() {
   const [rewards, setRewards] = useState(null); // mystery reward pool [{label,weight,creditEuro}]
   const [sel, setSel] = useState(() => new Set()); // selected product ids for bulk actions
   const [q, setQ] = useState('');            // search / filter query
-  const [bulkImg, setBulkImg] = useState(''); // image URL to apply to the selection
+  const [bulkImg, setBulkImg] = useState(''); // image URL/upload to apply to the selection
+  const [imgBusy, setImgBusy] = useState(false);   // uploading/resolving the form image
 
   const toggleSel = (id) => setSel((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const bulk = async (action, value) => {
@@ -39,6 +41,28 @@ export default function AdminProducts() {
       toast.success(`Updated ${r.updated} product(s).`);
       setSel(new Set()); setBulkImg(""); load();
     } catch (err) { toast.error(err.message); } finally { setBusy(false); }
+  };
+
+  // Upload an image straight from the owner's device → inline data URI.
+  const uploadImage = async (file, set) => {
+    if (!file) return;
+    setImgBusy(true);
+    try { set(await fileToDataUrl(file)); }
+    catch (err) { toast.error(err.message); }
+    finally { setImgBusy(false); }
+  };
+
+  // Turn a pasted page link (e.g. a Pinterest pin) into its real image URL.
+  const resolveFormImage = async () => {
+    const url = form.imageUrl?.trim();
+    if (!url || url.startsWith('data:') || url.startsWith('/')) return;
+    if (/\.(png|jpe?g|webp|gif|avif|svg)(\?|#|$)/i.test(url)) return; // already a direct image
+    setImgBusy(true);
+    try {
+      const r = await api.post('/api/admin/products/resolve-image', { url });
+      if (r.url && r.url !== url) { setForm((f) => ({ ...f, imageUrl: r.url })); toast.success('Found the image on that link.'); }
+    } catch (err) { toast.error(err.message); }
+    finally { setImgBusy(false); }
   };
 
   const addCodes = async () => {
@@ -123,11 +147,12 @@ export default function AdminProducts() {
     catch (err) { toast.error(err.message); }
   };
 
-  // Search across name / category / SKU. "Select all" then acts on the matches,
-  // so you can e.g. type "robux", select all, and set one image for the lot.
-  const needle = q.trim().toLowerCase();
+  // Search across name / category / SKU, ignoring case + punctuation so
+  // "vbucks" matches "V-Bucks". "Select all" then acts on the matches, so you
+  // can e.g. type "robux", select all, and set one image for the lot.
+  const needle = normalizeSearch(q);
   const filtered = needle
-    ? products.filter((p) => `${p.name} ${p.category || ''} ${p.sku || ''}`.toLowerCase().includes(needle))
+    ? products.filter((p) => normalizeSearch(`${p.name} ${p.category || ''} ${p.sku || ''}`).includes(needle))
     : products;
   const selectAllMatches = () => setSel(new Set(filtered.map((p) => p.id)));
 
@@ -168,8 +193,20 @@ export default function AdminProducts() {
           {/* Set ONE image across every selected product (e.g. all Robux variants). */}
           <div className="w-full flex items-center gap-2 mt-1 pt-2 border-t border-white/10">
             <ImageIcon size={15} className="text-violet-300 shrink-0" />
-            <input value={bulkImg} onChange={(e) => setBulkImg(e.target.value)}
-              className="input py-1.5 text-sm flex-1" placeholder="Image URL for all selected — https://…" />
+            {bulkImg.startsWith('data:') ? (
+              <div className="input py-1.5 text-sm flex-1 flex items-center justify-between text-slate-300">
+                <span className="flex items-center gap-1.5"><img src={bulkImg} alt="" className="w-5 h-5 object-contain rounded" /> Uploaded image ready</span>
+                <button type="button" onClick={() => setBulkImg('')} className="text-slate-500 hover:text-red-400"><X size={14} /></button>
+              </div>
+            ) : (
+              <input value={bulkImg} onChange={(e) => setBulkImg(e.target.value)}
+                className="input py-1.5 text-sm flex-1" placeholder="Image link for all selected — https://…" />
+            )}
+            <label className={`btn-ghost text-xs whitespace-nowrap cursor-pointer flex items-center gap-1 ${imgBusy ? 'opacity-60 pointer-events-none' : ''}`}>
+              {imgBusy ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />} Upload
+              <input type="file" accept="image/*" className="hidden"
+                onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; uploadImage(f, setBulkImg); }} />
+            </label>
             <button disabled={busy || !bulkImg.trim()} onClick={() => bulk('image', bulkImg.trim())}
               className="btn-primary text-xs whitespace-nowrap">Apply to {sel.size}</button>
           </div>
@@ -394,9 +431,31 @@ export default function AdminProducts() {
               </div>
             </div>
           )}
-          <div className="sm:col-span-2"><label className="label">Image URL</label>
-            <input className="input" value={form.imageUrl} placeholder="https://… (product photo)"
-              onChange={(e) => setForm({ ...form, imageUrl: e.target.value })} /></div>
+          <div className="sm:col-span-2">
+            <label className="label">Product image</label>
+            <div className="flex items-center gap-2">
+              <div className="w-11 h-11 rounded-lg bg-slate-800 border border-slate-700 grid place-items-center overflow-hidden shrink-0">
+                {form.imageUrl
+                  ? <img src={form.imageUrl} alt="" className="w-full h-full object-contain" />
+                  : <ImageIcon size={16} className="text-slate-500" />}
+              </div>
+              {form.imageUrl?.startsWith('data:') ? (
+                <div className="input flex-1 flex items-center justify-between text-sm text-slate-300">
+                  <span className="flex items-center gap-1.5"><ImageIcon size={14} className="text-violet-300" /> {imageLabel(form.imageUrl)}</span>
+                  <button type="button" onClick={() => setForm({ ...form, imageUrl: '' })} className="text-slate-500 hover:text-red-400"><X size={14} /></button>
+                </div>
+              ) : (
+                <input className="input flex-1" value={form.imageUrl} placeholder="Paste a link (Pinterest works) — https://…"
+                  onChange={(e) => setForm({ ...form, imageUrl: e.target.value })} onBlur={resolveFormImage} />
+              )}
+              <label className={`btn-ghost text-sm whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${imgBusy ? 'opacity-60 pointer-events-none' : ''}`}>
+                {imgBusy ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />} Upload
+                <input type="file" accept="image/*" className="hidden"
+                  onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; uploadImage(f, (v) => setForm((s) => ({ ...s, imageUrl: v }))); }} />
+              </label>
+            </div>
+            <p className="text-xs text-slate-500 mt-1">Paste any image or page link (Pinterest included), or upload one from your device.</p>
+          </div>
           <div className="sm:col-span-2"><label className="label">Description</label>
             <textarea rows={3} className="input" value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
