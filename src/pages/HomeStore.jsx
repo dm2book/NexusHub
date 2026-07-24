@@ -497,41 +497,52 @@ export default function HomeStore() {
 /* Each asset sits in a `.fm-px` parallax layer (`--d` = depth) that drifts on
    scroll, while the inner image keeps its idle float — two independent layers so
    they never fight for `transform`. */
-function PxAsset({ icon, depth, float = 'fm-float', size = 'w-24 h-24', pos, delay = '0s', z = '' }) {
+function PxAsset({ icon, depth, float = 'fm-float', size = 'w-24 h-24', pos, delay = '0s', z = '', halo }) {
   return (
     <div className={`fm-px absolute ${pos} ${z}`} style={{ '--d': depth }}>
-      <img src={ICON(icon)} alt="" className={`${size} object-contain drop-shadow-xl ${float}`} style={{ animationDelay: delay }} />
+      <span className="fm-hero-item" style={{ '--halo': halo }}>
+        <img src={ICON(icon)} alt="" className={`${size} object-contain drop-shadow-xl ${float}`} style={{ animationDelay: delay }} />
+      </span>
     </div>
   );
 }
+
+// Brand-tinted halo colour per logo — makes any PNG pop on the hero.
+const HALO = {
+  'v-bucks': 'rgba(56,132,255,.55)', robux: 'rgba(16,185,129,.5)', steam: 'rgba(56,132,255,.42)',
+  valorant: 'rgba(244,63,94,.5)', xbox: 'rgba(16,185,129,.48)', playstation: 'rgba(37,99,235,.52)',
+  'discord-nitro': 'rgba(99,102,241,.55)', giftcard: 'rgba(168,85,247,.5)',
+};
 
 function HeroRender() {
   const ref = useRef(null);
   useParallax(ref);
   return (
-    <div ref={ref} className="relative h-[300px] sm:h-[340px]">
-      {/* glow */}
-      <div className="fm-px absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] rounded-full blur-3xl" style={{ '--d': 0.03, background: 'radial-gradient(circle, rgba(124,92,255,.35), transparent 65%)' }} />
-      {/* podium */}
-      <div className="absolute left-1/2 bottom-6 -translate-x-1/2 w-[260px] h-[40px] rounded-[50%]"
-        style={{ background: 'radial-gradient(ellipse at center, rgba(168,85,247,.35), transparent 70%)' }} />
+    <div ref={ref} className="relative h-[320px] sm:h-[360px]">
+      {/* ambient glow */}
+      <div className="fm-px absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[340px] h-[340px] rounded-full blur-3xl" style={{ '--d': 0.03, background: 'radial-gradient(circle, rgba(124,92,255,.4), transparent 66%)' }} />
+      {/* podium reflection */}
+      <div className="absolute left-1/2 bottom-4 -translate-x-1/2 w-[300px] h-[46px] rounded-[50%]"
+        style={{ background: 'radial-gradient(ellipse at center, rgba(168,85,247,.4), transparent 70%)' }} />
       {/* sparkles (deepest layer — drift the most) */}
-      {[['12%', '18%'], ['82%', '24%'], ['68%', '8%'], ['22%', '70%'], ['88%', '62%']].map(([l, t], i) => (
+      {[['12%', '16%'], ['84%', '22%'], ['66%', '6%'], ['20%', '72%'], ['90%', '60%'], ['48%', '90%']].map(([l, t], i) => (
         <div key={i} className="fm-px absolute" style={{ left: l, top: t, '--d': 0.16 + (i % 3) * 0.04 }}>
           <Sparkles size={i % 2 ? 16 : 12} className="text-violet-400/70 fm-float2" style={{ animationDelay: `${i * 0.4}s` }} />
         </div>
       ))}
       {/* center V-Bucks (foreground — drifts least, feels closest) */}
       <div className="fm-px absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10" style={{ '--d': 0.04 }}>
-        <img src={ICON('v-bucks')} alt="" className="w-36 h-36 object-contain drop-shadow-2xl fm-float" />
+        <span className="fm-hero-item" style={{ '--halo': HALO['v-bucks'] }}>
+          <img src={ICON('v-bucks')} alt="" className="w-[150px] h-[150px] object-contain drop-shadow-2xl fm-float" />
+        </span>
       </div>
-      {/* surrounding (mid layers) */}
-      <PxAsset icon="robux" depth={0.1} float="fm-float2" pos="left-[6%] top-[26%]" delay=".3s" />
-      <PxAsset icon="steam" depth={0.12} size="w-20 h-20" pos="left-[20%] top-[2%]" delay=".6s" />
-      <PxAsset icon="valorant" depth={0.13} size="w-20 h-20" pos="left-[10%] bottom-[10%]" delay=".9s" />
-      <PxAsset icon="xbox" depth={0.11} float="fm-float2" size="w-20 h-20" pos="right-[20%] bottom-[6%]" delay=".2s" />
-      <PxAsset icon="playstation" depth={0.09} pos="right-[5%] top-[34%]" delay=".5s" />
-      <PxAsset icon="discord-nitro" depth={0.14} float="fm-float2" size="w-16 h-16" pos="right-[26%] top-[6%]" delay=".8s" />
+      {/* surrounding cluster (mid layers, varied float + rotation) */}
+      <PxAsset icon="robux"         depth={0.10} float="fm-float2" size="w-28 h-28" pos="left-[4%] top-[24%]"    delay=".3s" halo={HALO.robux} />
+      <PxAsset icon="steam"         depth={0.12} float="fm-float3" size="w-[84px] h-[84px]" pos="left-[22%] top-[0%]" delay=".6s" halo={HALO.steam} />
+      <PxAsset icon="valorant"      depth={0.13} float="fm-float"  size="w-[84px] h-[84px]" pos="left-[8%] bottom-[8%]" delay=".9s" halo={HALO.valorant} />
+      <PxAsset icon="xbox"          depth={0.11} float="fm-float2" size="w-[84px] h-[84px]" pos="right-[18%] bottom-[4%]" delay=".2s" halo={HALO.xbox} />
+      <PxAsset icon="playstation"   depth={0.09} float="fm-float3" size="w-28 h-28" pos="right-[3%] top-[32%]"  delay=".5s" halo={HALO.playstation} />
+      <PxAsset icon="discord-nitro" depth={0.14} float="fm-float"  size="w-[68px] h-[68px]" pos="right-[24%] top-[4%]" delay=".8s" halo={HALO['discord-nitro']} />
     </div>
   );
 }

@@ -311,8 +311,22 @@ h1, h2, h3, .font-display { font-family: 'Bricolage Grotesque', 'Inter', sans-se
 .fm-blob { animation: fmBlob 14s ease-in-out infinite; will-change: transform; }
 
 /* Idle float for hero assets (the inner image; the parallax layer wraps it). */
-@keyframes fmFloat  { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
-@keyframes fmFloat2 { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-7px) translateX(2px); } }
+@keyframes fmFloat  { 0%,100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(-15px) rotate(-2.5deg); } }
+@keyframes fmFloat2 { 0%,100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(-11px) translateX(3px) rotate(2.5deg); } }
+@keyframes fmFloat3 { 0%,100% { transform: translateY(-4px) rotate(1.5deg); } 50% { transform: translateY(10px) rotate(-1.5deg); } }
+.fm-float3 { animation: fmFloat3 7.2s ease-in-out infinite; will-change: transform; }
+
+/* Soft coloured halo behind each floating hero logo (the mockup's signature
+   glow). The logo bobs inside its steady halo. --halo sets the colour. */
+.fm-hero-item { position: relative; display: inline-block; }
+.fm-hero-item::before {
+  content: ''; position: absolute; inset: -20%; border-radius: 9999px; z-index: 0;
+  background: radial-gradient(circle, var(--halo, rgba(124,92,255,.5)), transparent 66%);
+  filter: blur(7px); animation: fmHalo 6s ease-in-out infinite;
+}
+.fm-hero-item > img { position: relative; z-index: 1; }
+@keyframes fmHalo { 0%,100% { opacity: .78; transform: scale(1); } 50% { opacity: 1; transform: scale(1.08); } }
+@media (prefers-reduced-motion: reduce) { .fm-float3, .fm-hero-item::before { animation: none !important; } }
 .fm-float  { animation: fmFloat 5s ease-in-out infinite; will-change: transform; }
 .fm-float2 { animation: fmFloat2 6.5s ease-in-out infinite; will-change: transform; }
 @media (prefers-reduced-motion: reduce) { .fm-float, .fm-float2 { animation: none !important; } }
