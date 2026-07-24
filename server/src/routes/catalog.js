@@ -18,6 +18,7 @@ import { listEnabledProviders } from '../services/oauthService.js';
 import { isEnabled as stripeEnabled, createCheckoutSession } from '../services/stripeService.js';
 import { publicStats } from '../services/publicStatsService.js';
 import { recordPageView } from '../services/trackingService.js';
+import { getCategoryLogos } from '../services/settingsService.js';
 import { addReview, listReviews, addVerifiedReview } from '../services/reviewsService.js';
 import { verifyIngest, canonicalReview } from '../middleware/ingestSignature.js';
 import { audit } from '../services/auditService.js';
@@ -88,7 +89,9 @@ const paymentProvider = () =>
   manual.length ? 'manual' : stripeEnabled() ? 'stripe' : config.payments.demoMode ? 'demo' : 'none';
 
 // Public runtime config the SPA can read (feature flags, enabled providers).
-router.get('/config', (_req, res) => {
+router.get('/config', asyncHandler(async (_req, res) => {
+  // Owner-set per-category logos (best-effort — never fail config on a DB hiccup).
+  const categoryLogos = await getCategoryLogos().catch(() => ({}));
   res.json({
     paymentProvider: paymentProvider(),
     demoPayments: config.payments.demoMode,
@@ -98,8 +101,9 @@ router.get('/config', (_req, res) => {
     oauthProviders: listEnabledProviders(),
     discordEnabled: !!config.discord.inviteUrl || !!config.discord.guildId,
     brand: config.email.fromName,
+    categoryLogos,
   });
-});
+}));
 
 // Helper: confirm the requester owns the order (account holder or guest email).
 async function assertOwnsOrder(req, order, email) {
