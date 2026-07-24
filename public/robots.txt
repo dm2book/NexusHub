@@ -3,4 +3,4 @@ Allow: /
 Disallow: /account
 Disallow: /admin
 
-Sitemap: https://forgemarket-store.vercel.app/sitemap.xml
+Sitemap: https://forgemarket.nl/sitemap.xml

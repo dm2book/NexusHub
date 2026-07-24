@@ -228,9 +228,13 @@ export default function AdminProducts() {
                 <div className="flex items-center gap-3">
                   <input type="checkbox" aria-label={`Select ${p.name}`} className="shrink-0"
                     checked={sel.has(p.id)} onChange={() => toggleSel(p.id)} />
-                  <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${v.grad} flex items-center justify-center shrink-0`}>
-                    <Icon size={18} className="text-white" />
-                  </div>
+                  {p.image ? (
+                    <img src={p.image} alt="" className="w-10 h-10 rounded-lg object-contain bg-white/5 border border-white/10 shrink-0" />
+                  ) : (
+                    <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${v.grad} flex items-center justify-center shrink-0`}>
+                      <Icon size={18} className="text-white" />
+                    </div>
+                  )}
                   <div className="flex-1 min-w-0">
                     <div className="text-white flex items-center gap-1.5">
                       <span className="truncate">{p.name}</span>
@@ -291,9 +295,13 @@ export default function AdminProducts() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
-                        <div className={`w-9 h-9 rounded-lg bg-gradient-to-br ${v.grad} flex items-center justify-center shrink-0`}>
-                          <Icon size={16} className="text-white" />
-                        </div>
+                        {p.image ? (
+                          <img src={p.image} alt="" className="w-9 h-9 rounded-lg object-contain bg-white/5 border border-white/10 shrink-0" />
+                        ) : (
+                          <div className={`w-9 h-9 rounded-lg bg-gradient-to-br ${v.grad} flex items-center justify-center shrink-0`}>
+                            <Icon size={16} className="text-white" />
+                          </div>
+                        )}
                         <div>
                           <div className="text-white flex items-center gap-1.5">
                             {p.name}{p.featured && <Star size={12} className="text-amber-400 fill-amber-400" />}
