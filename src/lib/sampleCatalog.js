@@ -106,7 +106,13 @@ const CATS_WITH_ICON = ['robux', 'v-bucks', 'valorant', 'cod', 'genshin', 'brawl
   'pokemongo', 'discord-nitro', 'spotify', 'netflix', 'gamepass', 'steam', 'playstation',
   'xbox', 'nintendo', 'amazon', 'googleplay', 'itunes', 'giftcard', 'chest', 'wildrift', 'wow'];
 export const CATEGORY_ICON = Object.fromEntries(CATS_WITH_ICON.map((c) => [c, c]));
-export const iconFor = (category) => CATEGORY_ICON[category] ? `/products/icons/${CATEGORY_ICON[category]}.svg` : null;
+// Categories using the owner's own brand artwork (raster). The rest use the
+// generated 3D icons, which are SVG — so the extension differs per category.
+export const RASTER_ICONS = new Set(['robux', 'v-bucks', 'valorant', 'discord-nitro', 'steam',
+  'giftcard', 'playstation', 'xbox', 'cod', 'eafc']);
+/** Path to the built-in icon for a category name (not the file's own slug). */
+export const iconPath = (name) => `/products/icons/${name}.${RASTER_ICONS.has(name) ? 'png' : 'svg'}`;
+export const iconFor = (category) => (CATEGORY_ICON[category] ? iconPath(CATEGORY_ICON[category]) : null);
 
 export const SAMPLE_PRODUCTS = P.map(([sku, name, category, price, featured, pack, description]) => ({
   id: sku.toLowerCase(),

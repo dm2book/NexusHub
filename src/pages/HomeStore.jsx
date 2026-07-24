@@ -22,10 +22,10 @@ import MobileTabBar from '../components/store/MobileTabBar.jsx';
 import AnnouncementBar from '../components/store/AnnouncementBar.jsx';
 import { SystemStatus } from '../components/store/StoreFooter.jsx';
 import { money } from '../lib/catalog.js';
-import { withFallback, SAMPLE_PRODUCTS } from '../lib/sampleCatalog.js';
+import { withFallback, SAMPLE_PRODUCTS, iconPath } from '../lib/sampleCatalog.js';
 import { useCategoryLogos } from '../lib/useCategoryLogos.js';
 
-const ICON = (n) => `/products/icons/${n}.svg`;
+const ICON = iconPath;
 
 /* ── Left sidebar categories (matches the reference order) ─────────────── */
 const CATEGORIES = [

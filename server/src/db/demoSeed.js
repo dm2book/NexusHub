@@ -165,7 +165,12 @@ const CATS_WITH_ICON = ['robux', 'v-bucks', 'valorant', 'cod', 'genshin', 'brawl
   'clash', 'clashroyale', 'league', 'freefire', 'pubg', 'mlbb', 'eafc', 'gta', 'minecraft',
   'pokemongo', 'discord-nitro', 'spotify', 'netflix', 'gamepass', 'steam', 'playstation',
   'xbox', 'nintendo', 'amazon', 'googleplay', 'itunes', 'giftcard', 'chest'];
-const iconFor = (cat) => CATS_WITH_ICON.includes(cat) ? `/products/icons/${cat}.svg` : null;
+// Categories using the owner's own brand artwork are raster; the generated 3D
+// icons are SVG — keep in sync with RASTER_ICONS in src/lib/sampleCatalog.js.
+const RASTER_ICONS = ['robux', 'v-bucks', 'valorant', 'discord-nitro', 'steam',
+  'giftcard', 'playstation', 'xbox', 'cod', 'eafc'];
+const iconFor = (cat) => (CATS_WITH_ICON.includes(cat)
+  ? `/products/icons/${cat}.${RASTER_ICONS.includes(cat) ? 'png' : 'svg'}` : null);
 
 // Per-PACK art first (shows the denomination, e.g. "1,000 ROBUX" card), then
 // the category icon as a fallback — so every product gets its own visual.
@@ -177,15 +182,22 @@ const imageFor = (p) => p.image || iconFor(p.category) || null;
  * catalog SKU) and never touches products the admin created manually.
  */
 export async function syncCatalogImages() {
-  // The built-in category icons moved from .png to .svg. Repoint any product
-  // still stored against the old path so it doesn't render a broken image.
-  // Targets only our own icon path, so owner uploads/links are left alone.
-  const moved = await run(
-    `UPDATE products
-        SET metadata = regexp_replace(metadata, '("image"\\s*:\\s*"/products/icons/[^"]+)\\.png"', '\\1.svg"'),
-            updated_at = @at
-      WHERE metadata LIKE '%/products/icons/%.png%'`, { at: nowIso() }).catch(() => null);
-  if (moved?.changes) console.log(`[catalog] icon paths migrated to svg on ${moved.changes} product(s)`);
+  // Built-in icons are a mix of raster brand art (.png) and generated 3D icons
+  // (.svg), and a category can switch between the two. Repoint any product
+  // stored against the wrong extension so it never renders a broken image.
+  // Only rewrites our own icon paths — owner uploads and links are untouched.
+  let repointed = 0;
+  for (const cat of CATS_WITH_ICON) {
+    const right = iconFor(cat);
+    if (!right) continue;
+    const wrong = right.endsWith('.png') ? right.replace(/\.png$/, '.svg') : right.replace(/\.svg$/, '.png');
+    const r = await run(
+      `UPDATE products SET metadata = REPLACE(metadata, @wrong, @right), updated_at = @at
+        WHERE metadata LIKE @like`,
+      { wrong, right, at: nowIso(), like: `%${wrong}%` }).catch(() => null);
+    repointed += r?.changes || 0;
+  }
+  if (repointed) console.log(`[catalog] icon paths repointed on ${repointed} product(s)`);
 
   let updated = 0;
   for (const p of CATALOG) {
