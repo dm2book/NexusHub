@@ -25,6 +25,7 @@ const ACTIONS = [
 ];
 
 let productCache = null;
+let productCacheAt = 0; // so catalog edits show up without a full reload
 
 export default function CommandPalette() {
   const { t } = useI18n();
@@ -50,15 +51,17 @@ export default function CommandPalette() {
     return () => { window.removeEventListener('keydown', onKey); window.removeEventListener('forge:cmdk', onOpen); };
   }, []);
 
-  // Load the catalog once, on first open.
+  // Load the catalog on open, refreshing when the cache is older than a minute
+  // so recent catalog edits (new images, prices) show up without a full reload.
   useEffect(() => {
     if (!open) return;
     setQ(''); setSel(0);
     setTimeout(() => inputRef.current?.focus(), 30);
-    if (!productCache) {
+    const fresh = productCache && (Date.now() - productCacheAt < 60_000);
+    if (!fresh) {
       api.get('/api/products')
-        .then((r) => { productCache = withFallback(r.products); setProducts(productCache); })
-        .catch(() => { productCache = SAMPLE_PRODUCTS; setProducts(productCache); });
+        .then((r) => { productCache = withFallback(r.products); productCacheAt = Date.now(); setProducts(productCache); })
+        .catch(() => { if (!productCache) { productCache = SAMPLE_PRODUCTS; setProducts(productCache); } });
     }
   }, [open]);
 
