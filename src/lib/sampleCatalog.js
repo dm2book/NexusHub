@@ -86,18 +86,18 @@ const P = [
   ['NITRO-1M', 'Discord Nitro — 1 Month', 'discord-nitro', 899, false, null, 'Full Nitro for a month: HD streaming, emojis, boosts.'],
   ['NITRO-1Y', 'Discord Nitro — 1 Year', 'discord-nitro', 8499, true, null, 'A full year of Discord Nitro.'],
   ['SPOTIFY-3M', 'Spotify Premium — 3 Months', 'spotify', 2499, false, null, 'Ad-free music, offline listening and better quality.'],
-  ['NETFLIX-25', 'Netflix Gift Card €25', 'netflix', 2599, true, null, 'Redeemable towards any Netflix plan.'],
+  ['NETFLIX-25', 'Netflix Gift Card €25', 'giftcard', 2599, true, null, 'Redeemable towards any Netflix plan.'],
   ['GAMEPASS-3M', 'Xbox Game Pass Ultimate — 3 Months', 'gamepass', 3499, true, null, '100+ games, EA Play and online multiplayer.'],
   // Gift cards & wallets
-  ['STEAM-10', 'Steam Wallet €10', 'steam', 1199, false, null, 'Add €10 to your Steam Wallet via redeem code.'],
-  ['STEAM-25', 'Steam Wallet €25', 'steam', 2699, false, null, 'Add €25 to your Steam Wallet via redeem code.'],
-  ['STEAM-50', 'Steam Wallet €50', 'steam', 5199, false, null, 'Add €50 to your Steam Wallet via redeem code.'],
-  ['PSN-25', 'PlayStation Store €25', 'playstation', 2699, false, null, 'PSN gift card for games, DLC and PS Plus.'],
-  ['XBOX-25', 'Xbox Gift Card €25', 'xbox', 2699, false, null, 'Spend on games and add-ons across Xbox & PC.'],
-  ['NINTENDO-25', 'Nintendo eShop €25', 'nintendo', 2699, false, null, 'Switch games, DLC and Nintendo Switch Online.'],
-  ['AMAZON-25', 'Amazon Gift Card €25', 'amazon', 2599, false, null, 'Spend on millions of products on Amazon.'],
-  ['GPLAY-25', 'Google Play €25', 'googleplay', 2599, false, null, 'Apps, games and in-app purchases on Android.'],
-  ['ITUNES-25', 'App Store & iTunes €25', 'itunes', 2599, false, null, 'Apps, games, music and iCloud storage on Apple.'],
+  ['STEAM-10', 'Steam Wallet €10', 'giftcard', 1199, false, null, 'Add €10 to your Steam Wallet via redeem code.'],
+  ['STEAM-25', 'Steam Wallet €25', 'giftcard', 2699, false, null, 'Add €25 to your Steam Wallet via redeem code.'],
+  ['STEAM-50', 'Steam Wallet €50', 'giftcard', 5199, false, null, 'Add €50 to your Steam Wallet via redeem code.'],
+  ['PSN-25', 'PlayStation Store €25', 'giftcard', 2699, false, null, 'PSN gift card for games, DLC and PS Plus.'],
+  ['XBOX-25', 'Xbox Gift Card €25', 'giftcard', 2699, false, null, 'Spend on games and add-ons across Xbox & PC.'],
+  ['NINTENDO-25', 'Nintendo eShop €25', 'giftcard', 2699, false, null, 'Switch games, DLC and Nintendo Switch Online.'],
+  ['AMAZON-25', 'Amazon Gift Card €25', 'giftcard', 2599, false, null, 'Spend on millions of products on Amazon.'],
+  ['GPLAY-25', 'Google Play €25', 'giftcard', 2599, false, null, 'Apps, games and in-app purchases on Android.'],
+  ['ITUNES-25', 'App Store & iTunes €25', 'giftcard', 2599, false, null, 'Apps, games, music and iCloud storage on Apple.'],
 ];
 
 // Premium 3D icon tiles (public/products/icons) — one unique icon per category.
@@ -114,6 +114,15 @@ export const RASTER_ICONS = new Set(['robux', 'v-bucks', 'valorant', 'discord-ni
 export const iconPath = (name) => `/products/icons/${name}.${RASTER_ICONS.has(name) ? 'png' : 'svg'}`;
 export const iconFor = (category) => (CATEGORY_ICON[category] ? iconPath(CATEGORY_ICON[category]) : null);
 
+// Products whose own brand differs from their category — the gift cards all
+// live under 'giftcard' but should still show Steam, PlayStation, Xbox, …
+const BRAND_ICON = {
+  'STEAM-10': 'steam', 'STEAM-25': 'steam', 'STEAM-50': 'steam',
+  'PSN-25': 'playstation', 'XBOX-25': 'xbox', 'NINTENDO-25': 'nintendo',
+  'AMAZON-25': 'amazon', 'GPLAY-25': 'googleplay', 'ITUNES-25': 'itunes',
+  'NETFLIX-25': 'netflix',
+};
+
 export const SAMPLE_PRODUCTS = P.map(([sku, name, category, price, featured, pack, description]) => ({
   id: sku.toLowerCase(),
   sku,
@@ -123,8 +132,9 @@ export const SAMPLE_PRODUCTS = P.map(([sku, name, category, price, featured, pac
   currency: 'EUR',
   description,
   featured,
-  // Premium 3D icon for the category; null → card renders a gradient + lucide icon.
-  image: iconFor(category),
+  // Gift cards share one category but keep their own brand mark; everything
+  // else uses its category icon. null → gradient + lucide icon on the card.
+  image: BRAND_ICON[sku] ? iconPath(BRAND_ICON[sku]) : iconFor(category),
   sample: true,
 }));
 

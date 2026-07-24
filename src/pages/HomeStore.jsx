@@ -30,15 +30,15 @@ const ICON = iconPath;
 /* ── Left sidebar categories (matches the reference order) ─────────────── */
 const CATEGORIES = [
   { label: 'All Products', slug: '', node: <LayoutGrid size={18} className="text-violet-600" /> },
+  { label: 'Gift Cards', slug: 'giftcard', img: 'giftcard' },
   { label: 'Robux', slug: 'robux', img: 'robux' },
   { label: 'V-Bucks', slug: 'v-bucks', img: 'v-bucks' },
   { label: 'Valorant Points', slug: 'valorant', img: 'valorant' },
-  { label: 'Gift Cards', slug: 'giftcard', img: 'giftcard' },
-  { label: 'Steam Wallet', slug: 'steam', img: 'steam' },
-  { label: 'PlayStation Store', slug: 'playstation', img: 'playstation' },
-  { label: 'Xbox Gift Card', slug: 'xbox', img: 'xbox' },
+  { label: 'CoD Points', slug: 'cod', img: 'cod' },
+  { label: 'EA FC / FIFA', slug: 'eafc', img: 'eafc' },
+  { label: 'Brawl Stars', slug: 'brawl', img: 'brawl' },
+  { label: 'Clash of Clans', slug: 'clash', img: 'clash' },
   { label: 'Discord Nitro', slug: 'discord-nitro', img: 'discord-nitro' },
-  { label: 'iTunes', slug: 'itunes', img: 'itunes' },
 ];
 
 /* ── Popular category tiles — prices/data are resolved from the REAL catalog
@@ -47,11 +47,11 @@ const POPULAR_TILES = [
   { name: 'Robux', img: 'robux', slug: 'robux' },
   { name: 'V-Bucks', img: 'v-bucks', slug: 'v-bucks' },
   { name: 'Valorant Points', img: 'valorant', slug: 'valorant', popular: true },
+  { name: 'Gift Cards', img: 'giftcard', slug: 'giftcard' },
   { name: 'Discord Nitro', img: 'discord-nitro', slug: 'discord-nitro' },
-  { name: 'Steam Wallet', img: 'steam', slug: 'steam' },
-  { name: 'PlayStation Store', img: 'playstation', slug: 'playstation' },
-  { name: 'Xbox Gift Card', img: 'xbox', slug: 'xbox' },
   { name: 'CoD Points', img: 'cod', slug: 'cod' },
+  { name: 'EA FC / FIFA', img: 'eafc', slug: 'eafc' },
+  { name: 'Brawl Stars', img: 'brawl', slug: 'brawl' },
 ];
 
 const NAV = [
