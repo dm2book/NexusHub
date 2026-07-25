@@ -208,7 +208,7 @@ export default function Checkout() {
   }
 
   return (
-    <div className="section py-12">
+    <div className="section py-12 pb-28 lg:pb-12">
       <h1 className="text-3xl text-white mb-6">{t('checkout.title', 'Checkout')}</h1>
 
       {/* Progress indicator */}
@@ -222,16 +222,19 @@ export default function Checkout() {
               <div>
                 <label className="label">{t('checkout.email', 'Email (delivery + receipt)')}</label>
                 <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
+                  autoComplete="email" inputMode="email" autoCapitalize="off" autoCorrect="off" spellCheck={false}
                   className="input" placeholder="you@example.com" />
               </div>
               <div className="grid sm:grid-cols-2 gap-4">
                 <div>
                   <label className="label">{t('checkout.name', 'Full name')}</label>
-                  <input value={fullName} onChange={(e) => setFullName(e.target.value)} className="input" placeholder={t('checkout.optional', 'Optional')} />
+                  <input value={fullName} onChange={(e) => setFullName(e.target.value)} autoComplete="name"
+                    className="input" placeholder={t('checkout.optional', 'Optional')} />
                 </div>
                 <div>
                   <label className="label">{t('checkout.city', 'City')}</label>
-                  <input value={city} onChange={(e) => setCity(e.target.value)} className="input" placeholder={t('checkout.optional', 'Optional')} />
+                  <input value={city} onChange={(e) => setCity(e.target.value)} autoComplete="address-level2"
+                    className="input" placeholder={t('checkout.optional', 'Optional')} />
                 </div>
               </div>
               {offersChoice && !requiresAccount && (
@@ -255,6 +258,7 @@ export default function Checkout() {
                 <div>
                   <label className="label">{deliveryLabels.join(' / ')} <span className="text-indigo-400">*</span></label>
                   <input required value={deliveryDetail} onChange={(e) => setDeliveryDetail(e.target.value)}
+                    autoCapitalize="off" autoCorrect="off" spellCheck={false} autoComplete="off"
                     className="input" placeholder={t('checkout.deliveryPh', 'Where should we deliver? e.g. your in-game username')} />
                   <p className="text-slate-500 text-xs mt-1">{t('checkout.deliveryHint', 'We deliver this order to this target — double-check it.')}</p>
                 </div>
@@ -308,7 +312,8 @@ export default function Checkout() {
           {/* Coupon */}
           <div className="flex gap-2 mb-4">
             <input value={couponInput} onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
-              placeholder={t('checkout.couponPh', 'Discount code')} className="input py-2 text-sm" />
+              autoCapitalize="characters" autoCorrect="off" spellCheck={false} autoComplete="off"
+              placeholder={t('checkout.couponPh', 'Discount code')} className="input py-2 text-base" />
             <button type="button" onClick={applyCoupon} className="btn-ghost px-4 text-sm">{t('checkout.apply', 'Apply')}</button>
           </div>
           {/* Store credit */}
@@ -346,6 +351,21 @@ export default function Checkout() {
               <li className="flex items-center gap-1.5"><CheckCircle2 size={11} className="text-emerald-400 shrink-0" /> {t('checkout.p3', 'Fraud-screened & encrypted checkout')}</li>
             </ul>
           </div>
+        </div>
+
+        {/* Sticky pay bar — on a phone the real button is far below the fold. */}
+        <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur border-t border-slate-200 px-4 py-3 flex items-center gap-3"
+          style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}>
+          <div className="min-w-0">
+            <div className="text-[11px] text-slate-500">{t('cart.total', 'Total')}</div>
+            <div className="text-lg fm-num text-violet-600 leading-tight">{money(grandTotal, currency)}</div>
+          </div>
+          <button type="submit" disabled={busy} className="btn-primary flex-1 py-3 fm-tap">
+            {busy ? <Loader2 size={18} className="animate-spin" />
+              : provider === 'stripe' ? <>{t('checkout.payCard', 'Pay with card')}</>
+              : provider === 'manual' ? <>{t('checkout.placePay', 'Place order & pay')}</>
+              : <>{t('checkout.placeOrder', 'Place order')}</>}
+          </button>
         </div>
       </form>
     </div>
