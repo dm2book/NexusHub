@@ -32,8 +32,9 @@ export const DEFAULT_TEMPLATES = [
       order <strong>{{order.number}}</strong> (total <strong>{{order.total}}</strong>).</p>
       {{order.itemsHtml}}
       {{order.paymentHtml}}
-      <p>Once your payment is confirmed we deliver instantly to your account & email.
-      You can follow the status any time:</p>
+      <p>As soon as we confirm your payment we deliver. Items we have in stock are
+      sent automatically; anything else we deliver by hand, usually within a few hours.
+      Follow the status here — no account needed:</p>
       <p><a class="btn" href="{{order.url}}">Track your order</a></p>
       <p>Need help? Just reply to this email or open a ticket in our Discord.</p>`,
   },
@@ -91,7 +92,7 @@ export const DEFAULT_TEMPLATES = [
       {{order.summaryHtml}}
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0 4px"><tr>
         <td align="center" style="border-radius:12px;background-color:#7c5cff;background-image:linear-gradient(120deg,#7c5cff 0%,#a855f7 55%,#d946ef 100%)">
-          <a href="{{order.url}}" style="display:block;padding:15px 24px;font:700 16px/1 'Segoe UI',Arial,sans-serif;color:#ffffff;text-decoration:none">View in your dashboard</a>
+          <a href="{{order.url}}" style="display:block;padding:15px 24px;font:700 16px/1 'Segoe UI',Arial,sans-serif;color:#ffffff;text-decoration:none">View your order</a>
         </td>
       </tr></table>
       <div style="font:400 13px/1.6 'Segoe UI',Arial,sans-serif;color:#8b8fa3;text-align:center;padding-top:16px">Something not right? Just reply to this email or open a ticket in our Discord — real humans, fast. 💬</div>`,
@@ -129,7 +130,7 @@ export const DEFAULT_TEMPLATES = [
       in your cart at {{brand.name}}. They're still here — grab them before they're gone.</p>
       {{cart.itemsHtml}}
       <p style="text-align:center"><a class="btn" href="{{cart.url}}">Complete your order</a></p>
-      <p style="text-align:center;color:#8b93a7;font-size:13px">Instant delivery, buyer-protected. Questions? Just reply
+      <p style="text-align:center;color:#8b93a7;font-size:13px">No account needed, no hidden fees. Questions? Just reply
       to this email or open a ticket in our Discord.</p>`,
   },
   {
@@ -197,7 +198,45 @@ export const LEGACY_TEMPLATE_BODIES = {
       are your items. Keep this email safe.</p>
       {{order.deliveriesHtml}}
       {{order.itemsHtml}}
-      <p><a class="btn" href="{{order.url}}">View in your dashboard</a></p>`],
+      <p><a class="btn" href="{{order.url}}">View in your dashboard</a></p>`, `
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 22px"><tr>
+        <td style="padding:0 8px 0 0"><span style="display:inline-block;padding:6px 13px;background-color:#0e1f18;border:1px solid #145c43;border-radius:999px;color:#34d399;font-size:12px;font-weight:700;font-family:'Segoe UI',Arial,sans-serif">● Delivered</span></td>
+        <td><span style="display:inline-block;padding:6px 13px;background-color:#181826;border:1px solid #34345a;border-radius:999px;color:#9aa3b8;font-size:12px;font-weight:600;font-family:'Segoe UI',Arial,sans-serif">Order {{order.number}}</span></td>
+      </tr></table>
+      <div style="font:800 29px/1.15 'Segoe UI',Arial,sans-serif;color:#ffffff;letter-spacing:-.4px">Your loot is ready 🎮</div>
+      <div style="font:400 15px/1.6 'Segoe UI',Arial,sans-serif;color:#b9bfcd;padding-top:10px">Hi {{user.name}} — payment cleared and everything below is yours. Grab it, jump in, and go win. 🚀</div>
+      <div style="padding-top:22px">{{order.deliveryHtml}}</div>
+      <div style="height:1px;font-size:0;line-height:1px;background-color:#26263a;margin:26px 0 20px">&nbsp;</div>
+      <div style="font:700 11px/1 'Segoe UI',Arial,sans-serif;letter-spacing:1.4px;text-transform:uppercase;color:#8b8fa3;padding-bottom:12px">Order summary</div>
+      {{order.summaryHtml}}
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0 4px"><tr>
+        <td align="center" style="border-radius:12px;background-color:#7c5cff;background-image:linear-gradient(120deg,#7c5cff 0%,#a855f7 55%,#d946ef 100%)">
+          <a href="{{order.url}}" style="display:block;padding:15px 24px;font:700 16px/1 'Segoe UI',Arial,sans-serif;color:#ffffff;text-decoration:none">View in your dashboard</a>
+        </td>
+      </tr></table>
+      <div style="font:400 13px/1.6 'Segoe UI',Arial,sans-serif;color:#8b8fa3;text-align:center;padding-top:16px">Something not right? Just reply to this email or open a ticket in our Discord — real humans, fast. 💬</div>`],
+  // Both of these promised instant delivery and buyer protection — the exact
+  // claims the storefront stopped making. An email that over-promises does the
+  // same damage as a homepage that does.
+  order_received: [`
+      <h1>Thank you for your order! 🎉</h1>
+      <p>Hi {{user.name}}, thanks for shopping with {{brand.name}}! We've received
+      order <strong>{{order.number}}</strong> (total <strong>{{order.total}}</strong>).</p>
+      {{order.itemsHtml}}
+      {{order.paymentHtml}}
+      <p>Once your payment is confirmed we deliver instantly to your account & email.
+      You can follow the status any time:</p>
+      <p><a class="btn" href="{{order.url}}">Track your order</a></p>
+      <p>Need help? Just reply to this email or open a ticket in our Discord.</p>`],
+  cart_reminder: [`
+      <div class="badge">🛒</div>
+      <h1 style="text-align:center">Still thinking it over?</h1>
+      <p style="text-align:center;max-width:420px;margin-left:auto;margin-right:auto">Hi {{user.name}}, you left these
+      in your cart at {{brand.name}}. They're still here — grab them before they're gone.</p>
+      {{cart.itemsHtml}}
+      <p style="text-align:center"><a class="btn" href="{{cart.url}}">Complete your order</a></p>
+      <p style="text-align:center;color:#8b93a7;font-size:13px">Instant delivery, buyer-protected. Questions? Just reply
+      to this email or open a ticket in our Discord.</p>`],
   login_otp: [`
       <h1>Your login code</h1>
       <p>Use this code to sign in. It expires in {{otp.ttl}} minutes.</p>

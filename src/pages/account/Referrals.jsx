@@ -19,7 +19,7 @@ export default function Referrals() {
   const refLink = `${window.location.origin}/?ref=${a.code}`;
   const copy = (text, label) => { navigator.clipboard?.writeText(text); setCopied(true); toast.success(label); setTimeout(() => setCopied(false), 1500); };
   const share = async () => {
-    if (navigator.share) { try { await navigator.share({ title: 'ForgeMarket', text: 'Get game currency & gift cards, delivered instantly:', url: refLink }); } catch { /* cancelled */ } }
+    if (navigator.share) { try { await navigator.share({ title: 'ForgeMarket', text: 'Get game currency & gift cards without the hassle:', url: refLink }); } catch { /* cancelled */ } }
     else copy(refLink, 'Referral link copied');
   };
 

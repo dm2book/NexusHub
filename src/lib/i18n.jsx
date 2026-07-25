@@ -25,7 +25,7 @@ const NL = {
   'nav.account': 'Account',
 
   // Footer
-  'footer.tagline': 'Dé marketplace voor digitale producten — direct geleverd, realtime te volgen.',
+  'footer.tagline': 'Dé marketplace voor digitale producten — eerlijke prijzen, echte support, elke bestelling te volgen.',
   'footer.discord': '💬 Join onze Discord',
   'footer.shop': 'Winkel',
   'footer.company': 'Bedrijf',
@@ -43,15 +43,15 @@ const NL = {
   'footer.refunds': 'Terugbetalingsbeleid',
   'footer.terms': 'Voorwaarden',
   'footer.privacy': 'Privacy',
-  'footer.rights': 'Directe digitale levering',
+  'footer.rights': 'Digitale producten voor gamers',
   'status.ok': '● Alle systemen operationeel',
   'status.degraded': '● Gedeeltelijke storing — bestellingen kunnen vertraagd zijn',
 
   // Home
-  'home.badge': 'Directe levering · Kopersbescherming',
+  'home.badge': 'Kopersbescherming · Echte support',
   'home.h1a': 'Alles wat je nodig hebt,',
   'home.h1b': 'op één plek.',
-  'home.sub': 'Koop Robux, V-Bucks, Valorant Points en meer — direct geleverd. Snelle levering, veilige betalingen, 24/7 support.',
+  'home.sub': 'Robux, V-Bucks, Valorant Points en meer. Op voorraad gaat automatisch — de rest leveren we met de hand, meestal binnen een paar uur.',
   'home.shopNow': 'Shop nu',
   'home.shopNowBig': 'Shop nu',
   'home.viewAll': 'Bekijk alle producten',
@@ -142,7 +142,7 @@ const NL = {
   // Shop
   'shop.browseCategories': 'CATEGORIEËN',
   'shop.all': 'Alle producten',
-  'shop.tagline': 'Digitale producten, direct geleverd in je inbox & dashboard.',
+  'shop.tagline': 'Digitale producten, geleverd in je inbox & dashboard.',
   'shop.trending': 'Nu populair',
   'shop.loading': 'Laden…',
   'shop.search': 'Zoek producten…',
@@ -282,6 +282,8 @@ const NL = {
   'checkout.with': 'met',
   'checkout.noteDefault': 'Na betaling wordt je bestelling binnen minuten bevestigd tijdens openingstijden.',
   'checkout.keepShopping': 'Verder winkelen',
+  'checkout.followTitle': 'Volg je bestelling — zonder account',
+  'checkout.followSub': 'Deze pagina ververst zichzelf zodra we je betaling bevestigen. We hebben de link ook gemaild naar',
   'checkout.tip': 'Tip:',
   'checkout.tipSignIn': 'log in',
   'checkout.tipRest': 'om deze bestelling in je dashboard te zien.',

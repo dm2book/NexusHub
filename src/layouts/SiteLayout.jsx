@@ -116,7 +116,7 @@ export default function SiteLayout() {
               </div>
               <span className="font-display text-white">ForgeMarket</span>
             </Link>
-            <p className="text-slate-500 text-sm">The marketplace for digital goods — delivered instantly, tracked in real time.</p>
+            <p className="text-slate-500 text-sm">The marketplace for digital goods — fair prices, real support, every order tracked.</p>
             <a href="/discord" className="inline-flex items-center gap-2 mt-4 text-sm text-indigo-300 hover:text-indigo-200">
               <MessageCircle size={16} /> Join our Discord
             </a>

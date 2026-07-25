@@ -115,7 +115,7 @@ export default function Shop() {
           <h1 className="text-3xl font-extrabold tracking-tight" style={{ color: '#fff' }}>
             {category ? categoryVisual(category).label : t('shop.all', 'All Products')}
           </h1>
-          <p className="text-white/85 mt-1.5">{t('shop.tagline', 'Digital goods, delivered instantly to your inbox & dashboard.')}</p>
+          <p className="text-white/85 mt-1.5">{t('shop.tagline', 'Digital goods, delivered to your inbox & dashboard.')}</p>
           <div className="flex flex-wrap items-center gap-2 mt-4">
             <span className="text-[11.5px] font-semibold bg-white/15 border border-white/25 rounded-full px-2.5 py-1">⚡ {t('product.instant', 'Instant delivery')}</span>
             <span className="text-[11.5px] font-semibold bg-white/15 border border-white/25 rounded-full px-2.5 py-1">🛡 {t('product.protected', 'Buyer protected')}</span>

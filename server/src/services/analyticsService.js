@@ -233,3 +233,100 @@ export async function retentionMetrics() {
     },
   };
 }
+
+/**
+ * Does chasing an abandoned payment actually work?
+ *
+ * Two recovery emails run on the maintenance cron — one for orders that were
+ * placed but never paid, one for carts that were filled but never ordered. Both
+ * were shipped without any way to see what they bring in, which makes them
+ * impossible to tune (send earlier? send twice? change the copy?).
+ *
+ * What the numbers mean, precisely:
+ *  · payment reminders — the SAME order later reaching a paid status. Direct
+ *    attribution: that specific order was unpaid when we mailed and is paid now.
+ *  · cart reminders — a paid order from that customer within `windowHours` of
+ *    the email. Correlation, not proof, so it is labelled as such in the UI and
+ *    kept in its own bucket.
+ *
+ * Rates are null (never 0) when nothing was sent yet — "0% recovered" reads as
+ * failure when the truth is simply "no data".
+ */
+export async function recoveryMetrics({ days = 30, windowHours = 72 } = {}) {
+  const since = new Date(Date.now() - days * 86_400_000).toISOString();
+  const rate = (n, d) => (d > 0 ? Math.round((n / d) * 1000) / 10 : null);
+
+  const pay = await get(`
+    SELECT COUNT(*) AS sent,
+           COUNT(*) FILTER (WHERE paid) AS recovered,
+           COALESCE(SUM(total) FILTER (WHERE paid), 0) AS recovered_cents,
+           COUNT(*) FILTER (WHERE NOT paid AND status = 'pending') AS still_waiting,
+           COUNT(*) FILTER (WHERE NOT paid AND status <> 'pending') AS lost
+      FROM (
+        SELECT o.id, o.total, o.status,
+               EXISTS (SELECT 1 FROM order_status_history h
+                        WHERE h.order_id = o.id
+                          AND h.to_status IN ('payment_received','processing','awaiting_fulfillment','completed')
+                          AND h.created_at > o.reminder_sent_at) AS paid
+          FROM orders o
+         WHERE o.reminder_sent_at IS NOT NULL AND o.reminder_sent_at > @since) t`,
+    { since });
+
+  // Unpaid orders old enough to have been mailed but with no reminder stamped —
+  // i.e. money the cron is leaving on the table. Surfaces a broken cron loudly.
+  const missed = await get(`
+    SELECT COUNT(*) AS n, COALESCE(SUM(total),0) AS cents
+      FROM orders
+     WHERE status = 'pending' AND reminder_sent_at IS NULL
+       AND created_at > @since AND created_at < @cutoff`,
+    { since, cutoff: new Date(Date.now() - 2 * 3_600_000).toISOString() });
+
+  let cart = { sent: 0, recovered: 0, recovered_cents: 0 };
+  try {
+    cart = await get(`
+      SELECT COUNT(*) AS sent,
+             COUNT(*) FILTER (WHERE cents > 0) AS recovered,
+             COALESCE(SUM(cents), 0) AS recovered_cents
+        FROM (
+          SELECT COALESCE((SELECT SUM(o.total) FROM orders o
+                            WHERE o.user_id = sc.user_id AND ${PAID.replace(/status/g, 'o.status')}
+                              AND o.created_at > sc.reminded_at
+                              AND o.created_at < @window), 0) AS cents
+            FROM saved_carts sc
+           WHERE sc.reminded_at IS NOT NULL AND sc.reminded_at > @since) t`,
+      { since, window: new Date(Date.now() + windowHours * 3_600_000).toISOString() });
+  } catch { /* saved_carts may not exist on very old databases */ }
+
+  const paySent = Number(pay?.sent || 0);
+  const payRecovered = Number(pay?.recovered || 0);
+  const payCents = Number(pay?.recovered_cents || 0);
+  const cartSent = Number(cart?.sent || 0);
+  const cartRecovered = Number(cart?.recovered || 0);
+  const cartCents = Number(cart?.recovered_cents || 0);
+
+  return {
+    rangeDays: days,
+    windowHours,
+    paymentReminders: {
+      sent: paySent,
+      recovered: payRecovered,
+      recoveryRate: rate(payRecovered, paySent),
+      stillWaiting: Number(pay?.still_waiting || 0),
+      lost: Number(pay?.lost || 0),
+      recoveredRevenue: payCents,
+      recoveredRevenueFormatted: formatMoney(payCents),
+      notSentYet: Number(missed?.n || 0),
+      notSentValue: Number(missed?.cents || 0),
+      notSentValueFormatted: formatMoney(Number(missed?.cents || 0)),
+    },
+    cartReminders: {
+      sent: cartSent,
+      recovered: cartRecovered,
+      recoveryRate: rate(cartRecovered, cartSent),
+      recoveredRevenue: cartCents,
+      recoveredRevenueFormatted: formatMoney(cartCents),
+    },
+    totalRecovered: payCents + cartCents,
+    totalRecoveredFormatted: formatMoney(payCents + cartCents),
+  };
+}

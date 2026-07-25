@@ -52,7 +52,7 @@ export default function StoreFooter() {
             <span className="text-lg font-extrabold tracking-tight text-slate-900">ForgeMarket</span>
           </Link>
           <p className="text-slate-500 text-sm mt-4 leading-relaxed">
-            {t('footer.tagline', 'The marketplace for digital goods — delivered instantly, tracked in real time.')}
+            {t('footer.tagline', 'The marketplace for digital goods — fair prices, real support, every order tracked.')}
           </p>
           <Link to="/discord" className="inline-flex items-center gap-2 mt-4 text-sm font-semibold text-violet-600 hover:text-violet-700">
             {t('footer.discord', '💬 Join our Discord')}
@@ -71,7 +71,7 @@ export default function StoreFooter() {
       </div>
       <div className="border-t border-slate-200/70">
         <div className="max-w-[1400px] mx-auto px-4 lg:px-8 py-5 flex flex-wrap items-center justify-between gap-3 text-sm text-slate-400">
-          <span>© {new Date().getFullYear()} ForgeMarket · {t('footer.rights', 'Instant digital goods')}</span>
+          <span>© {new Date().getFullYear()} ForgeMarket · {t('footer.rights', 'Digital goods for gamers')}</span>
           <SystemStatus />
         </div>
       </div>

@@ -673,6 +673,21 @@ function escapeHtml(s) {
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
+/**
+ * Where this customer can actually see their order.
+ *
+ * The dashboard requires an account. Most orders are placed as a guest, so
+ * pointing every email at /account/orders/<id> sent the majority of buyers to a
+ * login wall right when they wanted to know where their code was. Guests get the
+ * public track page pre-filled with their order number instead — same status,
+ * same live updates, no account.
+ */
+export function orderUrlFor(order) {
+  return order?.userId
+    ? `${config.appUrl}/account/orders/${order.id}`
+    : `${config.appUrl}/track?number=${encodeURIComponent(order?.number || '')}`;
+}
+
 function emailContext(order, ctx = {}) {
   return {
     user: { name: order.billing?.full_name || order.email.split('@')[0] },
@@ -687,7 +702,7 @@ function emailContext(order, ctx = {}) {
       deliveryHtml: deliveryHtml(order),
       deliveriesHtml: deliveryHtml(order), // back-compat alias for older templates
       paymentHtml: paymentInstructionsHtml(order),
-      url: `${config.appUrl}/account/orders/${order.id}`,
+      url: orderUrlFor(order),
     },
     refund: ctx.refundAmount != null
       ? { amount: formatMoney(ctx.refundAmount, order.currency) }

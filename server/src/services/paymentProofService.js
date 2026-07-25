@@ -11,7 +11,7 @@
 import { run, get, all, nowIso } from '../db/index.js';
 import { config } from '../config/env.js';
 import { newId } from '../utils/ids.js';
-import { getOrder, markPaymentReceived } from './orderService.js';
+import { getOrder, markPaymentReceived, orderUrlFor } from './orderService.js';
 import { notify } from './notificationService.js';
 import { postPaymentProofAlert } from './discordService.js';
 import { audit } from './auditService.js';
@@ -139,7 +139,9 @@ export async function rejectProof(proofId, reason = '', ctx = {}) {
     sendEmailAsync('custom_message', order.email, {
       subject: `Payment not verified for ${order.number}`,
       message: `We couldn't verify your payment yet${reason ? `: ${reason}` : ''}. Please double-check the amount and reference and resubmit your proof.`,
-      order: { number: order.number, url: `${config.appUrl}/track` },
+      // Pre-filled track link: a rejected proof is exactly the moment the buyer
+      // must not have to hunt for their own order number.
+      order: { number: order.number, url: orderUrlFor(order) },
     });
     if (order.userId) await notify(order.userId, { type: 'order', title: 'Payment needs attention',
       body: reason || 'We couldn’t verify your payment. Please resubmit.', link: `/account/orders/${order.id}` });
