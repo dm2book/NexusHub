@@ -75,9 +75,16 @@ export default function AdminPayments() {
                   )}
                   {p.note && <p className="text-slate-400 text-sm mt-2 italic">“{p.note}”</p>}
                   {p.screenshotUrl && (
-                    <a href={p.screenshotUrl} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1.5 text-sm text-indigo-300 hover:text-indigo-200">
-                      <ExternalLink size={13} /> View payment screenshot
-                    </a>
+                    p.screenshotUrl.startsWith('data:') ? (
+                      // Uploaded from a phone. Browsers block target=_blank on a
+                      // data: URI, so show it inline instead of linking out.
+                      <img src={p.screenshotUrl} alt="Payment screenshot"
+                        className="mt-2 max-h-56 rounded-lg border border-white/10" />
+                    ) : (
+                      <a href={p.screenshotUrl} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1.5 text-sm text-indigo-300 hover:text-indigo-200">
+                        <ExternalLink size={13} /> View payment screenshot
+                      </a>
+                    )
                   )}
                 </div>
                 <div className="flex gap-2 shrink-0">

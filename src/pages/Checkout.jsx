@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Lock, ShieldCheck, Loader2, ShoppingBag, ExternalLink, Copy, CheckCircle2, Wallet } from 'lucide-react';
 import { api } from '../lib/api.js';
+import { fileToDataUrl } from '../lib/imageUpload.js';
 import { useI18n } from '../lib/i18n.jsx';
 import { useCart } from '../context/CartContext.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -30,6 +31,10 @@ export default function Checkout() {
   const [fullName, setFullName] = useState('');
   const [city, setCity] = useState('');
   const [busy, setBusy] = useState(false);
+  // EU distance-selling: digital goods keep a 14-day withdrawal right unless the
+  // buyer explicitly asks for immediate delivery and acknowledges losing it.
+  // Without this every code sold is refundable on demand.
+  const [consent, setConsent] = useState(false);
   const [provider, setProvider] = useState('none');     // stripe | demo | manual | none
   const [methods, setMethods] = useState([]);
   const [note, setNote] = useState('');
@@ -336,7 +341,12 @@ export default function Checkout() {
             {creditToApply > 0 && <div className="flex justify-between text-sm text-indigo-300"><span>{t('checkout.credit', 'Store credit')}</span><span>−{money(creditToApply, currency)}</span></div>}
             <div className="flex justify-between text-lg pt-1"><span className="text-slate-300">{t('cart.total', 'Total')}</span><span className="text-white font-semibold">{money(grandTotal, currency)}</span></div>
           </div>
-          <button disabled={busy} className="btn-primary w-full py-3">
+          <label className="flex items-start gap-2.5 mb-3 text-[12.5px] text-slate-400 cursor-pointer">
+            <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)}
+              className="mt-0.5 shrink-0 w-4 h-4 accent-violet-600" />
+            <span>{t('checkout.consent', 'I want my order delivered immediately and I understand I lose my 14-day right of withdrawal once it has been delivered.')}</span>
+          </label>
+          <button disabled={busy || !consent} className="btn-primary w-full py-3">
             {busy ? <Loader2 size={18} className="animate-spin" />
               : provider === 'stripe' ? <>{t('checkout.payCard', 'Pay with card')}</>
               : provider === 'manual' ? <>{t('checkout.placePay', 'Place order & pay')}</>
@@ -360,7 +370,7 @@ export default function Checkout() {
             <div className="text-[11px] text-slate-500">{t('cart.total', 'Total')}</div>
             <div className="text-lg fm-num text-violet-600 leading-tight">{money(grandTotal, currency)}</div>
           </div>
-          <button type="submit" disabled={busy} className="btn-primary flex-1 py-3 fm-tap">
+          <button type="submit" disabled={busy || !consent} className="btn-primary flex-1 py-3 fm-tap">
             {busy ? <Loader2 size={18} className="animate-spin" />
               : provider === 'stripe' ? <>{t('checkout.payCard', 'Pay with card')}</>
               : provider === 'manual' ? <>{t('checkout.placePay', 'Place order & pay')}</>
@@ -378,6 +388,7 @@ function PaymentProofForm({ orderId, email, method }) {
   const { t } = useI18n();
   const [txn, setTxn] = useState('');
   const [shot, setShot] = useState('');
+  const [shotBusy, setShotBusy] = useState(false);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
   const [err, setErr] = useState('');
@@ -409,7 +420,32 @@ function PaymentProofForm({ orderId, email, method }) {
       <p className="text-slate-400 text-sm mb-3">{t('proof.sub', 'Paste your payment reference / transaction ID (and optionally a screenshot link). This speeds up verification a lot.')}</p>
       <div className="space-y-2.5">
         <input value={txn} onChange={(e) => setTxn(e.target.value)} className="input" placeholder={t('proof.txnPh', 'Transaction ID / payment reference')} />
-        <input value={shot} onChange={(e) => setShot(e.target.value)} className="input" placeholder={t('proof.shotPh', 'Screenshot link (optional) — e.g. imgur / drive')} />
+        {shot.startsWith('data:') ? (
+          <div className="input flex items-center justify-between gap-2">
+            <span className="flex items-center gap-2 text-sm text-slate-300">
+              <img src={shot} alt="" className="w-8 h-8 rounded object-cover" /> {t('proof.attached', 'Screenshot attached')}
+            </span>
+            <button type="button" onClick={() => setShot('')} className="text-slate-500 hover:text-red-400 text-sm">✕</button>
+          </div>
+        ) : (
+          <div className="flex gap-2">
+            <input value={shot} onChange={(e) => setShot(e.target.value)} className="input flex-1"
+              placeholder={t('proof.shotPh', 'Screenshot link (optional)')} />
+            {/* Buyers pay on a phone — the receipt is already in their camera roll. */}
+            <label className={`btn-ghost text-sm whitespace-nowrap cursor-pointer ${shotBusy ? 'opacity-60 pointer-events-none' : ''}`}>
+              {shotBusy ? '…' : t('proof.upload', 'Upload')}
+              <input type="file" accept="image/*" className="hidden"
+                onChange={async (e) => {
+                  const f = e.target.files?.[0]; e.target.value = '';
+                  if (!f) return;
+                  setShotBusy(true);
+                  try { setShot(await fileToDataUrl(f, { max: 900, maxBytes: 900_000 })); }
+                  catch (er) { setErr(er.message); }
+                  finally { setShotBusy(false); }
+                }} />
+            </label>
+          </div>
+        )}
         {err && <p className="text-red-300 text-xs">{err}</p>}
         <button onClick={submit} disabled={busy} className="btn-primary w-full py-3">
           {busy ? <Loader2 size={18} className="animate-spin" /> : <>{t('proof.submit', 'I’ve paid — submit for verification')}</>}

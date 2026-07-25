@@ -17,6 +17,7 @@ import { postPaymentProofAlert } from './discordService.js';
 import { audit } from './auditService.js';
 import { sendEmailAsync } from './emailService.js';
 import { badRequest, notFound } from '../utils/errors.js';
+import { isSafeImageValue } from '../utils/imageUrl.js';
 
 const PAID = ['payment_received', 'processing', 'awaiting_fulfillment', 'completed'];
 
@@ -28,15 +29,20 @@ export async function submitProof(orderId, input = {}, ctx = {}) {
   if (['refunded', 'cancelled'].includes(order.status)) throw badRequest('This order is closed.');
 
   const transactionId = String(input.transactionId || '').trim().slice(0, 120) || null;
-  let screenshotUrl = String(input.screenshotUrl || '').trim().slice(0, 500) || null;
-  // Only accept http(s) links. zod's .url() also passes javascript:/data: URIs,
-  // which would become a stored-XSS payload when an admin clicks the link in the
-  // verification queue — reject anything that isn't a real web URL.
-  if (screenshotUrl && !/^https?:\/\//i.test(screenshotUrl)) {
-    throw badRequest('The screenshot link must be a http(s) URL.');
+  const rawShot = String(input.screenshotUrl || '').trim();
+  // Buyers pay on a phone and have the receipt in their camera roll, so an
+  // uploaded image is accepted as well as a link. isSafeImageValue permits only
+  // http(s) links and RASTER data URIs — never svg/html/javascript, which would
+  // otherwise become a stored-XSS payload in the admin verification queue.
+  // A pasted link stays short; an upload is a data URI, so don't truncate it.
+  let screenshotUrl = rawShot
+    ? (rawShot.startsWith('data:') ? rawShot : rawShot.slice(0, 500))
+    : null;
+  if (screenshotUrl && !isSafeImageValue(screenshotUrl)) {
+    throw badRequest('Add a http(s) link or upload an image (PNG/JPG) as proof.');
   }
   if (!transactionId && !screenshotUrl) {
-    throw badRequest('Add a transaction ID or a screenshot link as proof.');
+    throw badRequest('Add a transaction ID or a screenshot as proof.');
   }
 
   // Fraud signals for the reviewer.
