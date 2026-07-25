@@ -89,7 +89,7 @@ export const CATEGORIES = [
   {
     name: '👋 WELCOME', access: 'public',
     channels: [
-      { name: 'welcome', type: 'text', readOnly: true, topic: 'Welcome to ForgeMarket — instant, trusted game top-ups. Start here 👇' },
+      { name: 'welcome', type: 'text', readOnly: true, topic: 'Welcome to ForgeMarket — game top-ups and gift cards. Start here 👇' },
       { name: 'start-here', type: 'text', readOnly: true, topic: 'A 30-second guide to the server: verify, browse, buy, get support.' },
       { name: 'rules', type: 'text', readOnly: true, topic: 'The rules. Be cool, no scams, no spam. Breaking them = removal.' },
       { name: 'verify', type: 'text', readOnly: true, topic: 'Tap the button to verify and unlock the community.' },
@@ -108,11 +108,11 @@ export const CATEGORIES = [
   {
     name: '🛒 MARKETPLACE', access: 'verified',
     channels: [
-      { name: 'products', type: 'text', readOnly: true, topic: 'Browse the catalog. Every order is instant + buyer-protected → {STORE_URL}' },
+      { name: 'products', type: 'text', readOnly: true, topic: 'Browse the catalog — fair prices, money back if it never arrives → {STORE_URL}' },
       { name: 'price-list', type: 'text', readOnly: true, topic: 'Live prices for our most popular top-ups.' },
       { name: 'deals', type: 'text', readOnly: true, topic: 'Limited-time deals and bundle prices.' },
-      { name: 'ask-the-bot', type: 'text', slowmode: 3, topic: 'Ask our AI assistant anything — get product recommendations & help in seconds.' },
-      { name: 'how-to-buy', type: 'text', readOnly: true, topic: 'Step-by-step: how to order and receive your code instantly.' },
+      { name: 'ask-the-bot', type: 'text', slowmode: 3, topic: 'Ask our assistant anything — product recommendations, prices and order help.' },
+      { name: 'how-to-buy', type: 'text', readOnly: true, topic: 'Step-by-step: how to order, how to pay, and when your code arrives.' },
     ],
   },
   {
@@ -238,14 +238,14 @@ export const MESSAGES = {
     color: 0x7c5cff,
     title: `Welcome to ${g} ⚡`,
     description:
-      "**The premium marketplace for game top-ups — delivered in seconds.**\n\n" +
+      "**Game top-ups and gift cards, without the hassle.**\n\n" +
       "Robux • V-Bucks • Valorant • CoD • Genshin • Apex • gift cards & more.\n\n" +
       "**Get started:**\n" +
       "1️⃣ Read the <#rules>\n" +
       "2️⃣ Verify in <#verify> to unlock the server\n" +
       "3️⃣ Browse <#products> or ask in <#ask-the-bot>\n" +
       "4️⃣ Need help? <#open-a-ticket>\n\n" +
-      "Instant delivery · buyer-protected · 24/7 support.",
+      "Money back if it doesn't arrive · real human support · no account needed to buy.",
   }),
   rules: {
     image: '{STORE_URL}/discord/banner-rules.png?v=2',
@@ -264,13 +264,15 @@ export const MESSAGES = {
   startHere: {
     title: '🚀 Start Here',
     description:
-      "**What is ForgeMarket?** Instant, trusted game currency & gift cards.\n\n" +
+      "**What is ForgeMarket?** Game currency and gift cards — Robux, V-Bucks, Valorant, Steam and more.\n\n" +
       "**How it works:**\n" +
-      "• Browse <#products> or get a recommendation in <#ask-the-bot>\n" +
-      "• Buy on the website — pay securely\n" +
-      "• Your code is delivered **instantly** to your dashboard + email\n" +
-      "• Issues? Open a ticket in <#open-a-ticket>\n\n" +
-      "**Why trust us?** Verified reviews in <#reviews>, real <#proof-of-delivery>, and a money-back guarantee.\n\n" +
+      "• Browse <#products> or ask in <#ask-the-bot>\n" +
+      "• Order on the website — no account needed\n" +
+      "• Pay with your order number as the reference\n" +
+      "• We confirm the payment and send your code by email\n" +
+      "• Track it any time with `/order` or on the site\n\n" +
+      "**Why trust us?** Reviews in <#reviews> are tied to real orders, <#proof-of-delivery> shows actual deliveries, " +
+      "and you get your money back if something never arrives.\n\n" +
       "👉 First step: verify in <#verify>.",
   },
   verify: {
@@ -291,27 +293,29 @@ export const MESSAGES = {
       "💳 **Payment** — checkout or refund\n" +
       "🤝 **Partnership** — collab / affiliate\n" +
       "❓ **Other** — anything else\n\n" +
-      "Average first response: **under 10 minutes** during open hours.",
+      "We answer as fast as we can during the day — and every ticket gets a real person, not a bot.",
   },
   products: {
     image: '{STORE_URL}/discord/banner-products.png?v=2',
     color: 0x6366f1,
     title: '🛒 The ForgeMarket catalog',
     description:
-      "Game currency, top-ups, gift cards and subscriptions — **delivered in seconds**, " +
-      "buyer-protected, with verified reviews.\n\n" +
+      "Game currency, top-ups, gift cards and subscriptions — fair prices, real support, " +
+      "and reviews tied to real orders.\n\n" +
       "**Popular:** Robux • V-Bucks • Valorant VP • CoD Points • Apex Coins • Genshin • Brawl Stars • Clash of Clans\n\n" +
       "Not sure what you need? Ask in <#ask-the-bot> and our assistant will recommend the right pack.\n\n" +
       "👇 Tap **Browse the shop** to see live prices.",
   },
   howToBuy: {
-    title: '💳 How to buy (it takes ~30 seconds)',
+    title: '💳 How to buy',
     description:
-      "**1.** Open the shop and pick your pack.\n" +
-      "**2.** Check out securely (card payment).\n" +
-      "**3.** Your code is delivered **instantly** to your dashboard **and** email.\n" +
-      "**4.** Redeem in-game. Done! 🎮\n\n" +
-      "Problem with an order? Open a ticket in <#open-a-ticket> — eligible orders are money-back guaranteed.",
+      "**1.** Open the shop and pick your pack — no account needed.\n" +
+      "**2.** Place the order and you'll see the amount plus a **reference** (your order number).\n" +
+      "**3.** Pay with that reference. Put it in the payment description — it's how we match your payment to your order.\n" +
+      "**4.** We confirm the payment. In-stock items are sent automatically; the rest we deliver by hand, usually within a few hours.\n" +
+      "**5.** Your code arrives by email, with instructions for redeeming it.\n\n" +
+      "Check your status any time with `/order <number>` or on the site — no login required.\n" +
+      "Something wrong? Open a ticket in <#open-a-ticket>. If an order never arrives, you get your money back.",
   },
   deals: {
     image: '{STORE_URL}/discord/banner-deals.png?v=2',
@@ -325,11 +329,11 @@ export const MESSAGES = {
   announcement: {
     title: '📢 Welcome to ForgeMarket — we’re live!',
     description:
-      "The fastest, most trusted place to top up your favourite games. ⚡\n\n" +
-      "• **Instant delivery** on every order\n" +
-      "• **Buyer protection** + money-back guarantee\n" +
-      "• **Verified reviews** and real proof of delivery\n" +
-      "• **24/7 support** right here on Discord\n\n" +
+      "Top up your favourite games without the hassle. ⚡\n\n" +
+      "• **In stock? Sent automatically.** Everything else delivered by hand, usually within a few hours\n" +
+      "• **Money back** if an order never arrives\n" +
+      "• **Reviews tied to real orders** and real proof of delivery\n" +
+      "• **A real person** answering tickets right here on Discord\n\n" +
       "Verify in <#verify>, then browse <#products>. Welcome aboard! 🎉",
   },
   supportInfo: {
@@ -337,7 +341,7 @@ export const MESSAGES = {
     color: 0x3b82f6,
     title: '📋 How support works',
     description:
-      "**Open hours:** every day, with fast responses (avg. under 10 min).\n" +
+      "**Open hours:** every day. We're one small team, so replies come fast during the day and can wait until morning at night.\n" +
       "**Order issues:** open a ticket in <#open-a-ticket> with your order number.\n" +
       "**Refunds:** request from your order page or via a ticket — approved refunds go to your original method.\n" +
       "**Safety:** our staff will **never DM you first** and never ask for passwords. Report anyone who does.",
@@ -353,7 +357,7 @@ export const MESSAGES = {
   },
   proofIntro: {
     title: '📸 Proof of delivery',
-    description: "Real screenshots of completed, instant deliveries. Transparency builds trust. 🔒",
+    description: "Real screenshots of completed deliveries. Transparency builds trust. 🔒",
   },
   giveawaysIntro: {
     image: '{STORE_URL}/discord/banner-giveaways.png?v=2',
@@ -389,7 +393,7 @@ export const MESSAGES = {
   status: {
     title: '🟢 Status — all systems operational',
     description:
-      "**Store:** online ✅\n**Instant delivery:** operational ✅\n**Payments:** operational ✅\n\n" +
+      "**Store:** online ✅\n**Deliveries:** running ✅\n**Payments:** being confirmed as normal ✅\n\n" +
       "We post here if anything is ever delayed. No news = all good.",
   },
   priceList: {
@@ -483,7 +487,7 @@ export const DELIVERY_INFO = {
   'v-bucks': {
     method: 'Delivered as an official V-Bucks gift card code you redeem yourself — works on every platform.',
     steps: [
-      'Your code appears instantly in your dashboard and by email.',
+      'Your code arrives by email once your payment is confirmed.',
       'Redeem it in Fortnite / your Epic Games account.',
       'Your V-Bucks show up right away. 🎮',
     ],
@@ -493,9 +497,9 @@ export const DELIVERY_INFO = {
     ],
   },
   default: {
-    method: 'Delivered as an official code (or a direct top-up, depending on the product) — instant and account-safe.',
+    method: 'Delivered as an official code, or topped up straight onto your account — depending on the product.',
     steps: [
-      'After payment your code / confirmation lands in your dashboard and email.',
+      'Once your payment is confirmed, your code or confirmation arrives by email.',
       'Follow the short redeem steps we include with it.',
       'Enjoy — you’re all set. ✅',
     ],
@@ -508,10 +512,10 @@ export const DELIVERY_INFO = {
 
 // FAQ — powers the #faq channel AND the AI fallback.
 export const FAQ = [
-  { q: 'How fast is delivery?', a: 'Most top-ups are delivered automatically within seconds of payment. The code arrives in your dashboard and by email.' },
-  { q: 'Is it safe / legit?', a: 'Yes — encrypted checkout, automated fraud screening, buyer protection and verified reviews. Staff never DM you first.' },
-  { q: 'What payment methods can I use?', a: 'Secure card payments at checkout. More methods are added over time.' },
-  { q: 'I didn’t get my code — what now?', a: 'Open a ticket in #open-a-ticket with your order number. We resolve delivery issues fast, and eligible orders are money-back guaranteed.' },
+  { q: 'How fast is delivery?', a: 'Items we have in stock are sent automatically once your payment is confirmed. Anything we buy in for you is delivered by hand, usually within a few hours during the day. Either way the code arrives by email.' },
+  { q: 'Is it safe / legit?', a: 'Encrypted checkout, automated fraud screening, reviews tied to real orders, and your money back if an order never arrives. Staff never DM you first.' },
+  { q: 'What payment methods can I use?', a: 'You pay by bank transfer or payment link, using your order number as the reference. We confirm every payment by hand — usually within minutes during the day. More automatic methods are coming.' },
+  { q: 'I didn’t get my code — what now?', a: 'First check spam. Then run `/order <your number>` to see the live status. Still nothing? Open a ticket in #open-a-ticket with your order number — if it never arrives you get your money back.' },
   { q: 'Can I get a refund?', a: 'Yes, request a refund from your order page or via a ticket. Approved refunds go back to your original payment method.' },
   { q: 'How do I become a VIP?', a: 'VIP is granted to loyal customers — keep buying and stay active. VIPs get early drops, exclusive channels and better giveaway odds.' },
   { q: 'How do giveaways work?', a: 'We host giveaways in #giveaways. React/enter to participate; winners are posted in #winners. VIPs get bonus entries.' },

@@ -20,6 +20,7 @@ import {
 } from 'discord.js';
 import Anthropic from '@anthropic-ai/sdk';
 import { FAQ, GAME_ROLES, NOTIFY_ROLES, LEVEL_ROLES, DELIVERY_INFO } from './config.js';
+import { orderStatusView } from './orderStatus.js';
 
 // Delivery explanation for a product category (falls back to a generic one).
 const deliveryFor = (category) => DELIVERY_INFO[category] || DELIVERY_INFO.default;
@@ -244,7 +245,8 @@ async function askAI(question, products) {
         "- Recommend ONLY products from the catalog below. Never invent prices or items.\n" +
         "- If the request is vague, ask ONE qualifying question (game, amount, budget).\n" +
         "- For order/payment problems, tell them to open a ticket in #open-a-ticket.\n" +
-        "- Mention instant delivery, buyer protection and verified reviews when relevant.\n" +
+        "- Be honest about delivery: in-stock items go out automatically, the rest is delivered by hand within a few hours.\n" +
+        "- Mention money-back-if-undelivered and real-order reviews when relevant. Never promise instant delivery.\n" +
         `- The store is at ${STORE_URL}. Encourage joining giveaways/community when natural.\n\n` +
         `FAQ:\n${FAQ.map((f) => `Q: ${f.q}\nA: ${f.a}`).join('\n')}\n\n` +
         `CATALOG:\n${catalog}`,
@@ -269,7 +271,7 @@ function ruleBasedAnswer(q, products) {
   const hit = FAQ.find((f) => f.q.toLowerCase().split(' ').some((w) => w.length > 4 && t.includes(w)));
   if (hit) return `**${hit.q}**\n${hit.a}`;
   const match = products.find((p) => t.includes(p.category) || t.includes(p.name.toLowerCase().split(' ')[0]));
-  if (match) return `Check out **${match.name}** — ${money(match.price, match.currency)}, instant delivery. Browse more at ${STORE_URL}/shop 🎮`;
+  if (match) return `Check out **${match.name}** — ${money(match.price, match.currency)}. Browse more at ${STORE_URL}/shop 🎮`;
   return `I can help with top-ups, prices, delivery and orders! Tell me the game and amount, browse ${STORE_URL}/shop, or open a ticket in #open-a-ticket for order help.`;
 }
 
@@ -335,7 +337,7 @@ async function updatePriceList(guild) {
       .setTitle('🏷️ Live price list')
       .setThumbnail(BRAND_ICON)
       .setImage(BANNER('products'))
-      .setDescription('Prices sync automatically from the store — always current. Instant delivery on everything.')
+      .setDescription('Prices sync automatically from the store, so this list is always current.')
       .addFields(fields)
       .setFooter({ text: 'ForgeMarket · auto-updated every 10 min' })
       .setTimestamp();
@@ -531,8 +533,8 @@ client.on(Events.GuildMemberAdd, async (member) => {
       "🎫 Need help? **#open-a-ticket**\n\n" +
       "🛡️ **Stay safe:** our staff will **NEVER** DM you first, never ask for your password, " +
       "and we only sell via the official store link in the server. Anyone else is a scammer — report them in #open-a-ticket.\n\n" +
-      "Instant delivery · buyer-protected · 24/7 support.")
-    .setFooter({ text: 'ForgeMarket · instant game top-ups' });
+      "Money back if it never arrives · a real person on support · no account needed to buy.")
+    .setFooter({ text: 'ForgeMarket · game top-ups & gift cards' });
   const dmButtons = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setLabel('🛍️ Open the shop').setStyle(ButtonStyle.Link).setURL(`${STORE_URL}/shop`),
     new ButtonBuilder().setLabel('📦 Track an order').setStyle(ButtonStyle.Link).setURL(`${STORE_URL}/track`));
@@ -873,18 +875,44 @@ async function rateSupport(i, stars) {
 
 async function handleCommand(i) {
   if (i.commandName === 'help') {
-    return i.reply({ ephemeral: true, content:
-      "**Forge — your assistant**\n`/ask` — ask anything\n`/recommend` — product recommendation\n" +
-      "`/price` — look up a product's live price\n`/delivery` — how a product is delivered\n`/drops` — upcoming drops & restocks\n`/order` — check an order status\n" +
-      "`/vouch` — leave a vouch\n`/suggest` — suggest an idea\n`/poll` — start a quick poll\n" +
-      "`/shop` — open the shop\n`/invite` — get the invite link\n`/stats` — server stats\n" +
-      "`/rank` — your level & XP\n`/balance` — your Forge Coins & store credit\n`/daily` — claim your daily XP (streaks!)\n`/leaderboard` — top members\n" +
-      "💬 Chat + 🔊 voice time both earn XP — level roles (5/10/20/30) are automatic.\n" +
-      "`/close` — staff: close a ticket\n`/giveaway` — staff: start a giveaway\n`/reroll` — staff: reroll a winner\n" +
-      "`/coupon` — staff: post a discount code\n`/flashsale` — staff: countdown deal in #deals\n" +
-      "`/digest` — staff: live store numbers\n`/stock` — staff: low-stock check\n`/launch` — staff: ready-to-sell check\n" +
-      "`/announce` — staff: post an announcement\n`/clearpins` — staff: wipe all “pinned a message” notices\n`/serverinfo` — server stats\n" +
-      "Buttons: verify in #verify, pick roles in #roles, open a ticket in #open-a-ticket." });
+    // Buyers first, and only staff see the staff block — a shopper asking for
+    // help should not have to read past /flashsale and /clearpins to find
+    // "where is my order?".
+    const e = new EmbedBuilder().setColor(0x6366f1)
+      .setAuthor({ name: 'ForgeMarket — what I can do', iconURL: BRAND_ICON })
+      .setDescription('Everything below is a slash command: type `/` and pick it.')
+      .addFields(
+        { name: '📦 Your order',
+          value: '`/order` — live status of an order (works without an account)\n' +
+                 '`/delivery` — how a product is delivered and redeemed\n' +
+                 '`/price` — current price of any product' },
+        { name: '🛒 Shopping',
+          value: '`/ask` — ask me anything about products or prices\n' +
+                 '`/shop` — open the store\n' +
+                 '`/drops` — upcoming drops & restocks' },
+        { name: '💬 Community',
+          value: '`/vouch` — leave a vouch after a purchase\n' +
+                 '`/suggest` — suggest an idea (the server votes)\n' +
+                 '`/rank` · `/daily` · `/leaderboard` — XP, streaks and the top members\n' +
+                 '`/balance` — your Forge Coins & store credit\n' +
+                 '`/poll` · `/invite` · `/stats` · `/serverinfo`' },
+        { name: '🆘 Something wrong?',
+          value: 'Open a ticket in **#open-a-ticket** with your order number — a real person answers. ' +
+                 'If an order never arrives, you get your money back.\n\n' +
+                 '🛡️ Staff will **never** DM you first and never ask for your password.' },
+      )
+      .setFooter({ text: 'Chat and voice both earn XP — level roles are automatic' });
+    if (isStaff(i.member)) {
+      e.addFields({ name: '🛠️ Staff only',
+        value: '`/close` · `/giveaway` · `/reroll` · `/coupon` · `/flashsale`\n' +
+               '`/digest` — live store numbers · `/stock` — low stock · `/launch` — ready-to-sell check\n' +
+               '`/announce` · `/clearpins`' });
+    }
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setLabel('Open the shop').setStyle(ButtonStyle.Link).setURL(`${STORE_URL}/shop`),
+      new ButtonBuilder().setLabel('Track an order').setStyle(ButtonStyle.Link).setURL(`${STORE_URL}/track`),
+    );
+    return i.reply({ ephemeral: true, embeds: [e], components: [row] });
   }
   if (i.commandName === 'order') return lookupOrder(i);
   if (i.commandName === 'price') return priceCmd(i);
@@ -1235,12 +1263,12 @@ async function orderStatusEmbed(num) {
   try {
     const res = await fetch(`${FORGEMARKET_API_URL}/api/track/${encodeURIComponent(num)}`);
     if (!res.ok) return null;
-    const o = await res.json();
-    const hist = (o.history || []).slice(-6).map((h) =>
-      `• ${h.to || h.to_status} — ${new Date(h.at || h.created_at).toLocaleString()}`).join('\n') || '—';
-    return new EmbedBuilder().setColor(0x6366f1).setTitle(`📦 Order ${o.number}`)
-      .setDescription(`**Status:** ${o.statusLabel || o.status}\n\n**Latest updates:**\n${hist}`)
-      .setFooter({ text: 'Live from the store' });
+    const v = orderStatusView(await res.json(), { money });
+    return new EmbedBuilder().setColor(v.color)
+      .setAuthor({ name: v.author, iconURL: BRAND_ICON })
+      .setTitle(v.title).setDescription(v.description || null)
+      .addFields(...v.fields)
+      .setFooter({ text: 'Live from the store' }).setTimestamp();
   } catch { return null; }
 }
 
@@ -1249,8 +1277,17 @@ async function lookupOrder(i) {
   const num = i.options.getString('number').trim();
   if (!FORGEMARKET_API_URL) return i.editReply('Order lookup isn’t configured yet.');
   const e = await orderStatusEmbed(num);
-  if (!e) return i.editReply(`No order found for \`${num}\`. Check the number or open a ticket in #open-a-ticket.`);
-  return i.editReply({ embeds: [e] });
+  if (!e) {
+    return i.editReply(`No order found for \`${num}\`. Order numbers look like \`FM-2026-XXXXXXXX\` — ` +
+      'check the confirmation email, or open a ticket in #open-a-ticket and we’ll look it up for you.');
+  }
+  // The track page is the live version of this embed and needs no account, so
+  // the buyer never has to come back and re-run the command to refresh.
+  const row = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setLabel('Live status page').setStyle(ButtonStyle.Link)
+      .setURL(`${STORE_URL}/track?number=${encodeURIComponent(num)}`),
+  );
+  return i.editReply({ embeds: [e], components: [row] });
 }
 
 // ── /vouch → posts to #vouchers ───────────────────────────────────────────────
@@ -1309,7 +1346,7 @@ async function priceCmd(i) {
   const e = new EmbedBuilder().setColor(0x6366f1)
     .setTitle(`🏷️ ${best.name}`)
     .setDescription(
-      `**${money(best.price, best.currency)}** · instant delivery\n[Buy now](${STORE_URL}/product/${best.id})` +
+      `**${money(best.price, best.currency)}**\n[Buy now](${STORE_URL}/product/${best.id})` +
       (top.length > 1
         ? `\n\n**Also matching:**\n${top.slice(1).map(({ p }) => `• ${p.name} — ${money(p.price, p.currency)}`).join('\n')}`
         : ''))
@@ -1334,7 +1371,7 @@ async function deliveryCmd(i) {
     .addFields(
       { name: 'Steps', value: d.steps.map((s, n) => `**${n + 1}.** ${s}`).join('\n').slice(0, 1024) },
       { name: 'Good to know', value: d.notes.map((n) => `• ${n}`).join('\n').slice(0, 1024) })
-    .setFooter({ text: 'ForgeMarket · safe & instant delivery' });
+    .setFooter({ text: 'ForgeMarket · money back if it never arrives' });
   return i.reply({ embeds: [e], ephemeral: true });
 }
 
@@ -1492,7 +1529,7 @@ async function flashSale(i) {
     .setDescription(
       `**${deal}**\n\n` +
       (code ? `Use code **\`${code.toUpperCase()}\`** at checkout.\n` : '') +
-      `🛒 ${STORE_URL}/shop — instant delivery\n\n` +
+      `🛒 ${STORE_URL}/shop\n\n` +
       `⏳ Ends <t:${endsAt}:R> (at <t:${endsAt}:t>)`)
     .setFooter({ text: 'ForgeMarket · limited time' }).setTimestamp();
   const msg = await ch.send({

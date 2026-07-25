@@ -27,10 +27,45 @@ export function renderTokens(str, ctx) {
   });
 }
 
+/**
+ * Per-email identity.
+ *
+ * Every mail used to carry the same purple header and the same three pills
+ * ("Instant delivery · Buyer protected · 24/7 support"), so a login code, a
+ * refund and a delivery were indistinguishable in an inbox — and two of those
+ * pills were claims the storefront no longer makes.
+ *
+ * Each template now gets an accent, an eyebrow line that says what the mail IS,
+ * and a footer strip that only makes promises that hold for THAT mail. `pills`
+ * of [] renders no strip at all — a security code is not a place for marketing.
+ */
+export const EMAIL_THEMES = {
+  account_created:   { accent: '#7c5cff', accent2: '#a855f7', eyebrow: 'Account created',   pills: ['🔐 No password to remember', '💬 Support on Discord'] },
+  order_received:    { accent: '#f5b324', accent2: '#fb923c', eyebrow: 'Order received',    pills: ['🧾 Reference = your order number', '🛡 Money back if undelivered'] },
+  payment_reminder:  { accent: '#f5b324', accent2: '#f97316', eyebrow: 'Waiting for payment', pills: ['⏳ Still reserved for you', '🛡 Money back if undelivered'] },
+  payment_confirmed: { accent: '#34d399', accent2: '#10b981', eyebrow: 'Payment confirmed', pills: ['✅ Payment received', '📦 Preparing your order'] },
+  order_processing:  { accent: '#38bdf8', accent2: '#6366f1', eyebrow: 'Order in progress', pills: ['📦 Being prepared', '💬 Support on Discord'] },
+  order_completed:   { accent: '#34d399', accent2: '#10b981', eyebrow: 'Delivered',         pills: ['🛡 Money back if undelivered', '💬 Something wrong? Reply'] },
+  refund_issued:     { accent: '#a855f7', accent2: '#d946ef', eyebrow: 'Refund issued',     pills: ['↩️ Refund on its way'] },
+  custom_message:    { accent: '#7c5cff', accent2: '#a855f7', eyebrow: 'Message from support', pills: ['💬 Just reply to reach a human'] },
+  cart_reminder:     { accent: '#7c5cff', accent2: '#d946ef', eyebrow: 'Still in your cart', pills: ['🛒 No account needed', '💸 No hidden fees'] },
+  review_request:    { accent: '#f59e0b', accent2: '#f97316', eyebrow: 'How did we do?',    pills: ['⭐ Takes 20 seconds'] },
+  gift_card:         { accent: '#d946ef', accent2: '#a855f7', eyebrow: 'Gift card',         pills: ['🎁 Never expires unused'] },
+  // Security mail: no marketing, no distractions, nothing to click by mistake.
+  login_otp:         { accent: '#64748b', accent2: '#475569', eyebrow: 'Security code',     pills: [] },
+};
+
+const DEFAULT_THEME = { accent: null, eyebrow: 'Digital goods for gamers', pills: [] };
+
 /** Wrap rendered content in the premium branded layout. */
-export function wrapBranded(contentHtml, { preheader = '' } = {}) {
+export function wrapBranded(contentHtml, { preheader = '', theme = DEFAULT_THEME } = {}) {
   const brand = config.email.fromName;
-  const color = config.email.brandColor;
+  // The accent tints the header, the button and the rules — so the mail's
+  // purpose is readable before a single word is.
+  const color = theme.accent || config.email.brandColor;
+  const color2 = theme.accent2 || '#a855f7';
+  const pills = theme.pills || [];
+  const eyebrow = theme.eyebrow || DEFAULT_THEME.eyebrow;
   const year = new Date().getFullYear();
   const logo = config.email.logoUrl
     ? `<img src="${config.email.logoUrl}" alt="${brand}" height="34" style="display:block;border:0" />`
@@ -48,30 +83,30 @@ export function wrapBranded(contentHtml, { preheader = '' } = {}) {
   body{margin:0;padding:0;background:#08080f;font-family:'Segoe UI',Arial,Helvetica,sans-serif;color:#e5e7eb;-webkit-text-size-adjust:100%}
   .wrap{max-width:568px;margin:0 auto;padding:32px 16px}
   .card{background:#12121c;border:1px solid #26263a;border-radius:22px;overflow:hidden}
-  .head{background:linear-gradient(120deg,${color} 0%,#a855f7 55%,#d946ef 100%);padding:30px 30px 26px;
+  .head{background:linear-gradient(120deg,${color} 0%,${color2} 100%);padding:30px 30px 26px;
         background-image:radial-gradient(circle at 85% 20%,rgba(255,255,255,.22),transparent 45%),
                          linear-gradient(rgba(255,255,255,.06) 1px,transparent 1px),
                          linear-gradient(90deg,rgba(255,255,255,.06) 1px,transparent 1px),
-                         linear-gradient(120deg,${color} 0%,#a855f7 55%,#d946ef 100%);
+                         linear-gradient(120deg,${color} 0%,${color2} 100%);
         background-size:auto,34px 34px,34px 34px,auto}
   .head-sub{font:600 11.5px/1.4 Arial,sans-serif;color:rgba(255,255,255,.9);padding-top:9px;letter-spacing:1.6px;text-transform:uppercase}
   .body{padding:34px 30px 12px}
   h1{font-size:23px;line-height:1.3;color:#ffffff;margin:0 0 14px;font-weight:800;letter-spacing:-.3px}
   p{font-size:14.5px;line-height:1.7;color:#b9bfcd;margin:0 0 15px}
-  .badge{width:64px;height:64px;border-radius:18px;background:linear-gradient(135deg,${color},#d946ef);
+  .badge{width:64px;height:64px;border-radius:18px;background:linear-gradient(135deg,${color},${color2});
          text-align:center;font-size:30px;line-height:64px;margin:2px auto 18px;
-         box-shadow:0 10px 30px rgba(124,92,255,.45)}
+         box-shadow:0 10px 26px rgba(0,0,0,.5)}
   .pill-note{display:inline-block;font:700 12px/1 Arial,sans-serif;color:#c7d2fe;background:#1b1b30;
              border:1px solid #34345c;border-radius:999px;padding:9px 16px;letter-spacing:.4px}
   strong{color:#fff}
   a{color:#a78bfa}
-  a.btn{display:inline-block;background:linear-gradient(120deg,${color},#a855f7);color:#ffffff !important;text-decoration:none;
+  a.btn{display:inline-block;background:linear-gradient(120deg,${color},${color2});color:#ffffff !important;text-decoration:none;
         padding:14px 30px;border-radius:12px;font-weight:700;font-size:15px;margin:8px 0 20px;
-        box-shadow:0 6px 20px rgba(124,92,255,.35)}
+        box-shadow:0 6px 18px rgba(0,0,0,.45)}
   .code{font:800 30px/1 'Courier New',monospace;letter-spacing:8px;color:#ffffff;
         background:linear-gradient(180deg,#1c1c2c,#17172a);border:1px solid #34345a;border-radius:14px;
         padding:20px;text-align:center;margin:4px 0 16px}
-  .notice{background:#181826;border:1px solid #2c2c48;border-left:3px solid #f5b324;border-radius:0 12px 12px 0;
+  .notice{background:#181826;border:1px solid #2c2c48;border-left:3px solid ${color};border-radius:0 12px 12px 0;
           padding:13px 16px;margin:6px 0 18px;color:#a8b0c2;font-size:13px;line-height:1.6}
   .notice strong{color:#e5e7eb}
   .quote{border-left:3px solid ${color};background:#1a1a2c;border-radius:0 12px 12px 0;
@@ -93,19 +128,17 @@ export function wrapBranded(contentHtml, { preheader = '' } = {}) {
 <div class="wrap">
   <div class="card">
     <div class="head">${logo}
-      <div class="head-sub">Instant digital goods · delivered in seconds</div>
+      <div class="head-sub">${esc(eyebrow)}</div>
     </div>
     <div class="body">${contentHtml}</div>
-    <div style="padding:0 30px">
-      <div class="pill-row">
-        <span class="pill">⚡ Instant delivery</span><span class="pill">🛡 Buyer protected</span><span class="pill">💬 24/7 support</span>
-      </div>
+    ${pills.length ? `<div style="padding:0 30px">
+      <div class="pill-row">${pills.map((p) => `<span class="pill">${esc(p)}</span>`).join('')}</div>
       <div class="divider"></div>
-    </div>
+    </div>` : `<div style="padding:0 30px"><div class="divider"></div></div>`}
     <div class="foot">
       You're receiving this because you have a ${brand} account or placed an order.<br><br>
       <a href="${config.appUrl}/track">Track order</a> &nbsp;·&nbsp;
-      <a href="${config.appUrl}/contact">Support</a> &nbsp;·&nbsp;
+      <a href="${config.appUrl}/discord">Discord support</a> &nbsp;·&nbsp;
       <a href="${config.appUrl}/account/settings">Email settings</a><br><br>
       © ${year} ${brand} — <a href="${config.appUrl}">${config.appUrl.replace(/^https?:\/\//, '')}</a>
     </div>
@@ -129,5 +162,6 @@ export function renderTemplate(template, ctx) {
   const inner = renderTokens(template.body_html, ctx);
   // First line of text content doubles as the hidden inbox preview (preheader).
   const preheader = inner.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 110);
-  return { subject, html: wrapBranded(inner, { preheader }) };
+  const theme = EMAIL_THEMES[template.id] || DEFAULT_THEME;
+  return { subject, html: wrapBranded(inner, { preheader, theme }) };
 }
