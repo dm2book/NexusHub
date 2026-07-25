@@ -9,8 +9,10 @@ import { categoryVisual, money } from '../lib/catalog.js';
 import { iconFor } from '../lib/sampleCatalog.js';
 import { navigateWithTransition } from '../lib/viewTransition.js';
 import LightProductCard from '../components/store/LightProductCard.jsx';
+import { usePageMeta } from '../lib/useMeta.js';
 
 export default function Cart() {
+  usePageMeta('Your cart', 'Review the items in your cart before checking out.');
   const { items, setQty, remove, subtotal, currency, add } = useCart();
   const { t } = useI18n();
   const navigate = useNavigate();

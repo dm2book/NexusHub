@@ -2,7 +2,7 @@ import { useEffect, useState, useRef, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Search, ShoppingCart, Zap, ShieldCheck, Headphones, Tag, Star, ArrowRight,
-  Plus, LayoutGrid, Users, CheckCircle2, Clock, MessageCircle, ChevronRight, Sparkles, Shield,
+  Plus, LayoutGrid, Users, CheckCircle2, Clock, MessageCircle, ChevronRight, Sparkles, Shield, Menu, X,
 } from 'lucide-react';
 import { useCart } from '../context/CartContext.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -24,6 +24,7 @@ import { SystemStatus } from '../components/store/StoreFooter.jsx';
 import { money } from '../lib/catalog.js';
 import { withFallback, SAMPLE_PRODUCTS, iconPath } from '../lib/sampleCatalog.js';
 import { useCategoryLogos } from '../lib/useCategoryLogos.js';
+import { SUPPORT_EMAIL } from '../lib/support.js';
 
 const ICON = iconPath;
 
@@ -84,21 +85,30 @@ const fmtDelivery = (s) => (s == null ? null
   : s < 90 ? `${Math.max(1, Math.round(s))}s`
   : s < 5400 ? `${Math.round(s / 60)} min`
   : `${Math.round(s / 3600)}h`);
-// All real (or honest service promises) — no fabricated metrics. The 2nd card
-// shows a real fulfilment rate once orders have finished, else a real guarantee;
-// the 4th shows the real average delivery time once we have one, else 24/7 support.
-const statCards = (s, tr = (_k, en) => en) => [
-  // "Happy customers" = people who actually LEFT A REVIEW — not just anyone
-  // who ordered. The number only exists once someone wrote one.
-  { icon: Users, value: fmtCount(s.reviews), label: tr('home.s.customers', 'Happy Customers'), color: 'text-violet-600 bg-violet-100' },
-  s.successRate != null
-    ? { icon: CheckCircle2, value: `${s.successRate}%`, label: tr('home.s.fulfilled', 'Fulfilled'), color: 'text-emerald-600 bg-emerald-100' }
-    : { icon: ShieldCheck, value: '100%', label: tr('home.s.protected', 'Buyer protected'), color: 'text-emerald-600 bg-emerald-100' },
-  { icon: ShoppingCart, value: fmtCount(s.delivered), label: tr('home.s.delivered', 'Orders Delivered'), color: 'text-blue-600 bg-blue-100' },
-  s.avgDeliverySeconds != null
-    ? { icon: Clock, value: fmtDelivery(s.avgDeliverySeconds), label: tr('home.s.avgDelivery', 'Avg. delivery'), color: 'text-amber-600 bg-amber-100' }
-    : { icon: Headphones, value: '24/7', label: tr('home.s.support', 'Customer Support'), color: 'text-amber-600 bg-amber-100' },
-];
+// No fabricated metrics. `count: true` marks a real measured number, which may
+// animate up from zero; fixed claims must NEVER animate, because counting up
+// "100%" and "24/7" renders "0% Buyer protected" and "0/7 Customer Support" on
+// first paint — the exact opposite of the claim.
+// A zero is worse than silence: "0 Happy Customers" tells a first-time visitor
+// that nobody has ever bought here. So a count is only shown once it is real,
+// and the block is topped up with guarantees that are true on day one.
+const statCards = (s, tr = (_k, en) => en) => {
+  const real = [];
+  // "Happy customers" = people who actually LEFT A REVIEW — not just anyone who ordered.
+  if (s.reviews > 0) real.push({ icon: Users, value: fmtCount(s.reviews), count: true, label: tr('home.s.customers', 'Happy Customers'), color: 'text-violet-600 bg-violet-100' });
+  if (s.delivered > 0) real.push({ icon: ShoppingCart, value: fmtCount(s.delivered), count: true, label: tr('home.s.delivered', 'Orders Delivered'), color: 'text-blue-600 bg-blue-100' });
+  if (s.successRate != null) real.push({ icon: CheckCircle2, value: `${s.successRate}%`, count: true, label: tr('home.s.fulfilled', 'Fulfilled'), color: 'text-emerald-600 bg-emerald-100' });
+  if (s.avgDeliverySeconds != null) real.push({ icon: Clock, value: fmtDelivery(s.avgDeliverySeconds), label: tr('home.s.avgDelivery', 'Avg. delivery'), color: 'text-amber-600 bg-amber-100' });
+
+  // Promises that hold from the first order — never animated, never a count.
+  const promises = [
+    { icon: ShieldCheck, value: tr('home.s.moneyBack', 'Money back'), label: tr('home.s.ifUndelivered', 'If undelivered'), color: 'text-emerald-600 bg-emerald-100' },
+    { icon: Zap, value: tr('home.s.inStock', 'In stock'), label: tr('home.s.instantCodes', 'Delivered instantly'), color: 'text-violet-600 bg-violet-100' },
+    { icon: MessageCircle, value: 'Discord', label: tr('home.s.realSupport', 'Real human support'), color: 'text-blue-600 bg-blue-100' },
+    { icon: Tag, value: tr('home.s.noHidden', 'No fees'), label: tr('home.s.priceYouSee', 'The price you see'), color: 'text-amber-600 bg-amber-100' },
+  ];
+  return [...real, ...promises].slice(0, 4);
+};
 
 export default function HomeStore() {
   const { count, add } = useCart();
@@ -137,9 +147,14 @@ export default function HomeStore() {
     ],
   });
   const [announcement, setAnnouncement] = useState('');
+  // The homepage renders its own header, which had no mobile menu at all —
+  // How it works, Reviews, Drops and Support were unreachable from '/'.
+  const [menuOpen, setMenuOpen] = useState(false);
   useEffect(() => { api.get('/api/config').then((c) => setAnnouncement(c.announcement || '')).catch(() => {}); }, []);
   const railRef = useRef(null);
   const STATS = statCards(stats, tr);
+  // Real reviews only — an empty testimonial card costs more trust than it earns.
+  const hasReviews = reviews.length > 0;
 
   const scrollRail = () => railRef.current?.scrollBy({ left: 320, behavior: 'smooth' });
 
@@ -174,6 +189,11 @@ export default function HomeStore() {
       {/* ── Top nav ─────────────────────────────────────────────── */}
       <header className="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-slate-200/70">
         <div className="max-w-[1400px] 2xl:max-w-[1560px] mx-auto px-4 lg:px-8 h-[68px] flex items-center gap-3 sm:gap-6">
+          <button onClick={() => setMenuOpen((v) => !v)} aria-label={tr('nav.menu', 'Menu')} aria-expanded={menuOpen}
+            className="lg:hidden w-10 h-10 -ml-1 rounded-xl hover:bg-slate-100 grid place-items-center text-slate-700">
+            {menuOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
+
           <Link to="/" className="flex items-center gap-2.5 shrink-0">
             <span className="w-9 h-9 rounded-xl flex items-center justify-center text-white shadow-lg shadow-violet-500/30"
               style={{ backgroundImage: 'linear-gradient(135deg,#7c5cff,#a855f7)' }}>
@@ -232,6 +252,40 @@ export default function HomeStore() {
             </Link>
           )}
         </div>
+        {/* Mobile menu — the pages below were otherwise unreachable from '/'. */}
+        {menuOpen && (
+          <div className="lg:hidden border-t border-slate-200/70 bg-white px-4 py-3 fm-page">
+            <nav className="space-y-0.5">
+              {NAV.map((n) => (
+                <Link key={n.label} to={n.to} onClick={() => setMenuOpen(false)}
+                  className="flex items-center justify-between px-2.5 py-3 rounded-xl text-[15px] font-medium text-slate-700 hover:bg-slate-50">
+                  {tr(n.key, n.label)} <ChevronRight size={16} className="text-slate-300" />
+                </Link>
+              ))}
+            </nav>
+            <div className="mt-3 pt-3 border-t border-slate-100">
+              <p className="text-[11px] font-bold tracking-wider text-slate-400 px-2.5 pb-1.5">
+                {tr('shop.browseCategories', 'BROWSE CATEGORIES')}
+              </p>
+              <div className="grid grid-cols-2 gap-1">
+                {CATEGORIES.filter((c) => c.slug).map((c) => (
+                  <Link key={c.slug} to={`/shop?category=${c.slug}`} onClick={() => setMenuOpen(false)}
+                    className="flex items-center gap-2.5 px-2.5 py-2.5 rounded-xl text-[14px] font-medium text-slate-600 hover:bg-slate-50">
+                    <img src={categoryLogos[c.slug] || ICON(c.img)} alt="" className="w-6 h-6 object-contain shrink-0" />
+                    <span className="truncate">{c.label}</span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+            <div className="mt-3 pt-3 border-t border-slate-100 flex items-center gap-2">
+              <LangSwitch />
+              <Link to={user ? '/account' : '/login'} onClick={() => setMenuOpen(false)}
+                className="ml-auto text-[15px] font-medium text-slate-600">
+                {user ? tr('nav.account', 'Account') : tr('nav.login', 'Log in')}
+              </Link>
+            </div>
+          </div>
+        )}
       </header>
 
       {/* ── Body: sidebar + main ────────────────────────────────── */}
@@ -305,7 +359,7 @@ export default function HomeStore() {
             <div className="grid lg:grid-cols-[1.05fr_1fr] 2xl:grid-cols-[1.1fr_1fr_206px] gap-8 2xl:gap-6 items-center">
               <div>
                 <span className="inline-flex items-center gap-2 text-[13px] font-semibold text-violet-700 bg-violet-100 rounded-full px-3 py-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-violet-500" /> {tr('home.badge', '#1 Trusted Marketplace')}
+                  <span className="w-1.5 h-1.5 rounded-full bg-violet-500" /> {tr('home.badge', 'Instant delivery · Buyer protected')}
                 </span>
                 <h1 className="fm-head text-[40px] sm:text-[52px] leading-[1.05] mt-5">
                   {tr('home.h1a', 'Everything You Need,')}<br />
@@ -353,6 +407,36 @@ export default function HomeStore() {
             </div>
           </section>
 
+          {/* How it works — a manual-payment store has to answer "what happens
+              after I pay?" before it asks for money. */}
+          <section className="fm-reveal">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="fm-head text-2xl">{tr('home.howTitle', 'How it works')}</h2>
+              <Link to="/how-it-works" className="text-sm font-semibold text-violet-600 hover:text-violet-700 inline-flex items-center gap-1">
+                {tr('home.howMore', 'More detail')} <ChevronRight size={15} />
+              </Link>
+            </div>
+            <div className="grid sm:grid-cols-3 gap-4">
+              {[
+                { n: '1', icon: LayoutGrid, title: tr('home.h1t', 'Pick your top-up'),
+                  sub: tr('home.h1s', 'Choose the amount you want. No account needed — you can check out as a guest.') },
+                { n: '2', icon: Tag, title: tr('home.h2t', 'Pay with the reference shown'),
+                  sub: tr('home.h2s', 'You get the exact amount and a payment reference right after checkout. Copy both into your bank app.') },
+                { n: '3', icon: Zap, title: tr('home.h3t', 'Get your code'),
+                  sub: tr('home.h3s', 'In stock? Sent automatically once your payment is confirmed. Otherwise delivered by hand, usually within a few hours.') },
+              ].map((c) => (
+                <div key={c.n} className="bg-white rounded-2xl border border-slate-200/70 shadow-sm p-5">
+                  <div className="flex items-center gap-2.5 mb-2">
+                    <span className="w-8 h-8 rounded-lg bg-violet-100 text-violet-700 grid place-items-center fm-num text-sm">{c.n}</span>
+                    <c.icon size={17} className="text-violet-500" />
+                  </div>
+                  <div className="font-bold text-slate-900">{c.title}</div>
+                  <p className="text-sm text-slate-500 mt-1 leading-relaxed">{c.sub}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+
           {/* Trust bar */}
           <section className="bg-white rounded-2xl border border-slate-200/70 shadow-sm grid grid-cols-2 lg:grid-cols-4 divide-x divide-y lg:divide-y-0 divide-slate-100">
             {TRUST.map((t) => (
@@ -361,25 +445,6 @@ export default function HomeStore() {
                 <div><div className="font-semibold text-[15px]">{tr(`home.f.${t.key}`, t.title)}</div><div className="text-[12.5px] text-slate-400">{tr(`home.f.${t.key}Sub`, t.sub)}</div></div>
               </div>
             ))}
-          </section>
-
-          {/* Ways to save & win — surface the engagement features */}
-          <section className="fm-reveal">
-            <h2 className="fm-head text-2xl mb-4">{tr('home.waysTitle', 'Save more & win big')}</h2>
-            <div className="grid sm:grid-cols-3 gap-4">
-              {[
-                { to: '/account/forge-shop', emoji: '🪙', grad: 'from-amber-400 to-rose-500', title: tr('home.wCoins', 'Forge Coins'), sub: tr('home.wCoinsSub', 'Earn 1 coin per €10 — spend on discount codes & giveaway boosts.') },
-                { to: '/shop', emoji: '🎁', grad: 'from-fuchsia-500 to-violet-600', title: tr('home.wMystery', 'Mystery boxes'), sub: tr('home.wMysterySub', 'Every box wins — real prizes, instant store credit, 1 free reroll.') },
-                { to: '/drops', emoji: '📅', grad: 'from-violet-500 to-indigo-600', title: tr('home.wDrops', 'Drop calendar'), sub: tr('home.wDropsSub', 'Restocks, launches & flash sales — never miss one.') },
-              ].map((c) => (
-                <Link key={c.to} to={c.to}
-                  className="group bg-white rounded-2xl border border-slate-200/70 shadow-sm p-5 hover:border-violet-300 hover:shadow-md transition">
-                  <div className={`w-12 h-12 rounded-xl grid place-items-center text-2xl bg-gradient-to-br ${c.grad} shadow-lg mb-3`}>{c.emoji}</div>
-                  <div className="font-bold text-slate-900 flex items-center gap-1">{c.title} <ArrowRight size={15} className="text-violet-500 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition" /></div>
-                  <p className="text-sm text-slate-500 mt-1">{c.sub}</p>
-                </Link>
-              ))}
-            </div>
           </section>
 
           {/* Popular products */}
@@ -421,18 +486,19 @@ export default function HomeStore() {
           </section>
 
           {/* Bottom: stats + reviews + discord */}
-          <section className="grid lg:grid-cols-3 gap-5 fm-reveal">
+          <section className={`grid gap-5 fm-reveal ${hasReviews ? 'lg:grid-cols-3' : 'lg:grid-cols-2'}`}>
             {/* Stats */}
             <div className="bg-white rounded-2xl border border-slate-200/70 shadow-sm p-5 grid grid-cols-2 gap-4 fm-lift">
               {STATS.map((st) => (
                 <div key={st.label} className="flex items-center gap-3">
                   <span className={`w-11 h-11 rounded-xl grid place-items-center ${st.color}`}><st.icon size={20} /></span>
-                  <div><div className="fm-head text-lg leading-none"><CountUp value={st.value} /></div><div className="text-[12px] text-slate-400 mt-1">{st.label}</div></div>
+                  <div><div className="fm-head text-lg leading-none"><CountUp value={st.value} animate={!!st.count} /></div><div className="text-[12px] text-slate-400 mt-1">{st.label}</div></div>
                 </div>
               ))}
             </div>
 
-            {/* Reviews */}
+            {/* Reviews — only once real ones exist */}
+            {hasReviews && (
             <div className="bg-white rounded-2xl border border-slate-200/70 shadow-sm p-5 fm-lift">
               <div className="font-bold mb-3">{tr('home.reviewsTitle', 'What Our Customers Say')}</div>
               {stats.reviews > 0 && (
@@ -452,10 +518,9 @@ export default function HomeStore() {
                     </div>
                   ))}
                 </div>
-              ) : (
-                <p className="text-[13px] text-slate-400">{tr('home.beFirst', 'Be the first to leave a verified review after your purchase.')}</p>
-              )}
+              ) : null}
             </div>
+            )}
 
             {/* Discord */}
             <div className="fm-hero-brand rounded-2xl p-6 text-white shadow-lg shadow-indigo-500/20 flex flex-col fm-lift"
@@ -472,6 +537,49 @@ export default function HomeStore() {
               <Link to="/discord" className="mt-4 inline-flex items-center justify-center gap-2 bg-white text-indigo-600 font-semibold text-sm rounded-xl h-11 hover:bg-indigo-50 transition">
                 {tr('home.joinBtn', 'Join Discord')} <ArrowRight size={16} />
               </Link>
+            </div>
+          </section>
+
+          {/* Who you're buying from — an anonymous seller taking bank transfers
+              is the exact scam pattern this audience has been burned by. No
+              company is claimed here, because there isn't one registered yet. */}
+          <section className="fm-reveal bg-white rounded-2xl border border-slate-200/70 shadow-sm p-5 sm:p-6">
+            <h2 className="fm-head text-xl mb-1.5">{tr('home.whoTitle', 'Questions before you buy?')}</h2>
+            <p className="text-[14.5px] text-slate-500 leading-relaxed max-w-2xl">
+              {tr('home.whoSub', 'ForgeMarket is a small store run from the Netherlands — not a faceless website. If anything about your order goes wrong, you get a real person, and you get your money back if we cannot deliver.')}
+            </p>
+            <div className="flex flex-wrap items-center gap-2.5 mt-4">
+              <a href="/discord" className="inline-flex items-center gap-2 text-white text-sm font-semibold rounded-xl px-4 h-11 shadow-lg shadow-violet-500/30 hover:brightness-105 transition"
+                style={{ backgroundImage: 'linear-gradient(135deg,#5865F2,#7c5cff)' }}>
+                <MessageCircle size={16} /> {tr('home.whoDiscord', 'Ask us on Discord')}
+              </a>
+              {SUPPORT_EMAIL && (
+                <a href={`mailto:${SUPPORT_EMAIL}`} className="inline-flex items-center gap-2 text-sm font-semibold rounded-xl px-4 h-11 border border-slate-200 text-slate-700 hover:bg-slate-50 transition">
+                  {SUPPORT_EMAIL}
+                </a>
+              )}
+              <Link to="/refunds" className="inline-flex items-center gap-2 text-sm font-semibold rounded-xl px-4 h-11 border border-slate-200 text-slate-700 hover:bg-slate-50 transition">
+                <ShieldCheck size={16} /> {tr('home.whoRefunds', 'Refund policy')}
+              </Link>
+            </div>
+          </section>
+
+          {/* Ways to save & win — surface the engagement features */}
+          <section className="fm-reveal">
+            <h2 className="fm-head text-2xl mb-4">{tr('home.waysTitle', 'Save more & win big')}</h2>
+            <div className="grid sm:grid-cols-3 gap-4">
+              {[
+                { to: '/account/forge-shop', emoji: '🪙', grad: 'from-amber-400 to-rose-500', title: tr('home.wCoins', 'Forge Coins'), sub: tr('home.wCoinsSub', 'Earn 1 coin per €10 — spend on discount codes & giveaway boosts.') },
+                { to: '/shop', emoji: '🎁', grad: 'from-fuchsia-500 to-violet-600', title: tr('home.wMystery', 'Mystery boxes'), sub: tr('home.wMysterySub', 'Every box wins — real prizes, instant store credit, 1 free reroll.') },
+                { to: '/drops', emoji: '📅', grad: 'from-violet-500 to-indigo-600', title: tr('home.wDrops', 'Drop calendar'), sub: tr('home.wDropsSub', 'Restocks, launches & flash sales — never miss one.') },
+              ].map((c) => (
+                <Link key={c.to} to={c.to}
+                  className="group bg-white rounded-2xl border border-slate-200/70 shadow-sm p-5 hover:border-violet-300 hover:shadow-md transition">
+                  <div className={`w-12 h-12 rounded-xl grid place-items-center text-2xl bg-gradient-to-br ${c.grad} shadow-lg mb-3`}>{c.emoji}</div>
+                  <div className="font-bold text-slate-900 flex items-center gap-1">{c.title} <ArrowRight size={15} className="text-violet-500 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition" /></div>
+                  <p className="text-sm text-slate-500 mt-1">{c.sub}</p>
+                </Link>
+              ))}
             </div>
           </section>
 

@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { Zap, ShieldCheck, Headphones, Globe, Rocket } from 'lucide-react';
 import InfoShell from '../../components/InfoShell.jsx';
 import { useI18n } from '../../lib/i18n.jsx';
+import { usePageMeta } from '../../lib/useMeta.js';
 
 const VALUES = [
   { icon: Zap, key: 'speed', title: 'Speed', text: 'Automated fulfillment means most orders are delivered in seconds.' },
@@ -11,6 +12,7 @@ const VALUES = [
 ];
 
 export default function About() {
+  usePageMeta('About ForgeMarket', 'Who runs ForgeMarket, how orders are delivered, and how to reach a real person if something goes wrong.');
   const { t } = useI18n();
   return (
     <InfoShell eyebrow={t('about.eyebrow', 'About us')} title={t('about.title', 'Digital goods, done right')}

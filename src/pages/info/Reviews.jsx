@@ -8,6 +8,7 @@ import { useToast } from '../../context/ToastContext.jsx';
 import { useReviews } from '../../lib/useReviews.js';
 import { useStats } from '../../lib/useStats.js';
 import { useI18n } from '../../lib/i18n.jsx';
+import { usePageMeta } from '../../lib/useMeta.js';
 
 /** "Write a review" — verified buyers pick one of their delivered orders. */
 function WriteReview({ t }) {
@@ -80,6 +81,7 @@ function WriteReview({ t }) {
 }
 
 export default function Reviews() {
+  usePageMeta('Customer reviews', 'Reviews from real ForgeMarket orders, plus community vouches from our Discord.');
   const reviews = useReviews();
   const stats = useStats();
   const { t } = useI18n();
@@ -129,13 +131,16 @@ export default function Reviews() {
                 ? <img src={r.avatarUrl} alt="" className="w-9 h-9 rounded-full object-cover" />
                 : <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-fuchsia-500 flex items-center justify-center text-white text-sm font-semibold">{(r.author || '?')[0]}</div>}
               <div>
+                {/* The checkmark means "we matched this to a delivered order".
+                    A Discord vouch has no order behind it, so it gets neither
+                    the badge nor the word "verified". */}
                 <div className="text-white text-sm flex items-center gap-1">
-                  {r.author} <BadgeCheck size={13} className="text-emerald-400" />
+                  {r.author} {r.verified && <BadgeCheck size={13} className="text-emerald-400" />}
                 </div>
                 <div className="text-slate-500 text-xs flex items-center gap-1">
                   {r.verified
                     ? <span className="text-emerald-400 font-semibold">{t('product.verifiedBuyer', 'Verified buyer')}</span>
-                    : t('product.verifiedShort', 'Verified')}{r.product ? ` · ${r.product}` : (!r.verified ? ' · Discord vouch' : '')}
+                    : t('reviews.discordVouch', 'Discord vouch')}{r.product ? ` · ${r.product}` : ''}
                   {r.city ? ` · ${r.city}` : ''}
                 </div>
               </div>

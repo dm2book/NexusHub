@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import InfoShell from '../../components/InfoShell.jsx';
 import { useI18n } from '../../lib/i18n.jsx';
+import { usePageMeta } from '../../lib/useMeta.js';
 
 // Full EN + NL content sets — one language per render, never mixed.
 const CONTENT = {
@@ -46,6 +47,7 @@ const CONTENT = {
 };
 
 export default function Faq() {
+  usePageMeta('FAQ — delivery, payment & refunds', 'How fast delivery is, how paying works, what happens if an order does not arrive, and how refunds are handled.');
   const { lang } = useI18n();
   const L = CONTENT[lang] || CONTENT.en;
   return (

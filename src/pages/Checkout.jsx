@@ -2,12 +2,14 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Lock, ShieldCheck, Loader2, ShoppingBag, ExternalLink, Copy, CheckCircle2, Wallet } from 'lucide-react';
 import { api } from '../lib/api.js';
+import { fileToDataUrl } from '../lib/imageUpload.js';
 import { useI18n } from '../lib/i18n.jsx';
 import { useCart } from '../context/CartContext.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { money } from '../lib/catalog.js';
 import { EmptyState } from '../components/ui.jsx';
+import { usePageMeta } from '../lib/useMeta.js';
 
 const METHOD_ICON = { tikkie: '🟢', revolut: '⚫', paypal: '🔵' };
 
@@ -21,6 +23,7 @@ function payTarget(m, amountEur) {
 }
 
 export default function Checkout() {
+  usePageMeta('Checkout', 'Complete your order — guest checkout, no account needed.');
   const { t } = useI18n();
   const { items, subtotal, currency, clear } = useCart();
   const { user } = useAuth();
@@ -30,6 +33,10 @@ export default function Checkout() {
   const [fullName, setFullName] = useState('');
   const [city, setCity] = useState('');
   const [busy, setBusy] = useState(false);
+  // EU distance-selling: digital goods keep a 14-day withdrawal right unless the
+  // buyer explicitly asks for immediate delivery and acknowledges losing it.
+  // Without this every code sold is refundable on demand.
+  const [consent, setConsent] = useState(false);
   const [provider, setProvider] = useState('none');     // stripe | demo | manual | none
   const [methods, setMethods] = useState([]);
   const [note, setNote] = useState('');
@@ -208,7 +215,7 @@ export default function Checkout() {
   }
 
   return (
-    <div className="section py-12">
+    <div className="section py-12 pb-28 lg:pb-12">
       <h1 className="text-3xl text-white mb-6">{t('checkout.title', 'Checkout')}</h1>
 
       {/* Progress indicator */}
@@ -222,16 +229,19 @@ export default function Checkout() {
               <div>
                 <label className="label">{t('checkout.email', 'Email (delivery + receipt)')}</label>
                 <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
+                  autoComplete="email" inputMode="email" autoCapitalize="off" autoCorrect="off" spellCheck={false}
                   className="input" placeholder="you@example.com" />
               </div>
               <div className="grid sm:grid-cols-2 gap-4">
                 <div>
                   <label className="label">{t('checkout.name', 'Full name')}</label>
-                  <input value={fullName} onChange={(e) => setFullName(e.target.value)} className="input" placeholder={t('checkout.optional', 'Optional')} />
+                  <input value={fullName} onChange={(e) => setFullName(e.target.value)} autoComplete="name"
+                    className="input" placeholder={t('checkout.optional', 'Optional')} />
                 </div>
                 <div>
                   <label className="label">{t('checkout.city', 'City')}</label>
-                  <input value={city} onChange={(e) => setCity(e.target.value)} className="input" placeholder={t('checkout.optional', 'Optional')} />
+                  <input value={city} onChange={(e) => setCity(e.target.value)} autoComplete="address-level2"
+                    className="input" placeholder={t('checkout.optional', 'Optional')} />
                 </div>
               </div>
               {offersChoice && !requiresAccount && (
@@ -255,6 +265,7 @@ export default function Checkout() {
                 <div>
                   <label className="label">{deliveryLabels.join(' / ')} <span className="text-indigo-400">*</span></label>
                   <input required value={deliveryDetail} onChange={(e) => setDeliveryDetail(e.target.value)}
+                    autoCapitalize="off" autoCorrect="off" spellCheck={false} autoComplete="off"
                     className="input" placeholder={t('checkout.deliveryPh', 'Where should we deliver? e.g. your in-game username')} />
                   <p className="text-slate-500 text-xs mt-1">{t('checkout.deliveryHint', 'We deliver this order to this target — double-check it.')}</p>
                 </div>
@@ -308,7 +319,8 @@ export default function Checkout() {
           {/* Coupon */}
           <div className="flex gap-2 mb-4">
             <input value={couponInput} onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
-              placeholder={t('checkout.couponPh', 'Discount code')} className="input py-2 text-sm" />
+              autoCapitalize="characters" autoCorrect="off" spellCheck={false} autoComplete="off"
+              placeholder={t('checkout.couponPh', 'Discount code')} className="input py-2 text-base" />
             <button type="button" onClick={applyCoupon} className="btn-ghost px-4 text-sm">{t('checkout.apply', 'Apply')}</button>
           </div>
           {/* Store credit */}
@@ -331,7 +343,12 @@ export default function Checkout() {
             {creditToApply > 0 && <div className="flex justify-between text-sm text-indigo-300"><span>{t('checkout.credit', 'Store credit')}</span><span>−{money(creditToApply, currency)}</span></div>}
             <div className="flex justify-between text-lg pt-1"><span className="text-slate-300">{t('cart.total', 'Total')}</span><span className="text-white font-semibold">{money(grandTotal, currency)}</span></div>
           </div>
-          <button disabled={busy} className="btn-primary w-full py-3">
+          <label className="flex items-start gap-2.5 mb-3 text-[12.5px] text-slate-400 cursor-pointer">
+            <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)}
+              className="mt-0.5 shrink-0 w-4 h-4 accent-violet-600" />
+            <span>{t('checkout.consent', 'I want my order delivered immediately and I understand I lose my 14-day right of withdrawal once it has been delivered.')}</span>
+          </label>
+          <button disabled={busy || !consent} className="btn-primary w-full py-3">
             {busy ? <Loader2 size={18} className="animate-spin" />
               : provider === 'stripe' ? <>{t('checkout.payCard', 'Pay with card')}</>
               : provider === 'manual' ? <>{t('checkout.placePay', 'Place order & pay')}</>
@@ -342,10 +359,25 @@ export default function Checkout() {
             <div className="flex items-center gap-2 text-emerald-300 text-sm font-medium"><ShieldCheck size={15} /> {t('checkout.protection', 'Buyer protection')}</div>
             <ul className="mt-1.5 space-y-1 text-xs text-slate-400">
               <li className="flex items-center gap-1.5"><CheckCircle2 size={11} className="text-emerald-400 shrink-0" /> {t('checkout.p1', 'Money-back guarantee if undelivered')}</li>
-              <li className="flex items-center gap-1.5"><CheckCircle2 size={11} className="text-emerald-400 shrink-0" /> {t('checkout.p2', 'Instant, automated delivery')}</li>
+              <li className="flex items-center gap-1.5"><CheckCircle2 size={11} className="text-emerald-400 shrink-0" /> {t('checkout.p2', 'Sent as soon as your payment is confirmed')}</li>
               <li className="flex items-center gap-1.5"><CheckCircle2 size={11} className="text-emerald-400 shrink-0" /> {t('checkout.p3', 'Fraud-screened & encrypted checkout')}</li>
             </ul>
           </div>
+        </div>
+
+        {/* Sticky pay bar — on a phone the real button is far below the fold. */}
+        <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur border-t border-slate-200 px-4 py-3 flex items-center gap-3"
+          style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}>
+          <div className="min-w-0">
+            <div className="text-[11px] text-slate-500">{t('cart.total', 'Total')}</div>
+            <div className="text-lg fm-num text-violet-600 leading-tight">{money(grandTotal, currency)}</div>
+          </div>
+          <button type="submit" disabled={busy || !consent} className="btn-primary flex-1 py-3 fm-tap">
+            {busy ? <Loader2 size={18} className="animate-spin" />
+              : provider === 'stripe' ? <>{t('checkout.payCard', 'Pay with card')}</>
+              : provider === 'manual' ? <>{t('checkout.placePay', 'Place order & pay')}</>
+              : <>{t('checkout.placeOrder', 'Place order')}</>}
+          </button>
         </div>
       </form>
     </div>
@@ -358,6 +390,7 @@ function PaymentProofForm({ orderId, email, method }) {
   const { t } = useI18n();
   const [txn, setTxn] = useState('');
   const [shot, setShot] = useState('');
+  const [shotBusy, setShotBusy] = useState(false);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
   const [err, setErr] = useState('');
@@ -389,7 +422,32 @@ function PaymentProofForm({ orderId, email, method }) {
       <p className="text-slate-400 text-sm mb-3">{t('proof.sub', 'Paste your payment reference / transaction ID (and optionally a screenshot link). This speeds up verification a lot.')}</p>
       <div className="space-y-2.5">
         <input value={txn} onChange={(e) => setTxn(e.target.value)} className="input" placeholder={t('proof.txnPh', 'Transaction ID / payment reference')} />
-        <input value={shot} onChange={(e) => setShot(e.target.value)} className="input" placeholder={t('proof.shotPh', 'Screenshot link (optional) — e.g. imgur / drive')} />
+        {shot.startsWith('data:') ? (
+          <div className="input flex items-center justify-between gap-2">
+            <span className="flex items-center gap-2 text-sm text-slate-300">
+              <img src={shot} alt="" className="w-8 h-8 rounded object-cover" /> {t('proof.attached', 'Screenshot attached')}
+            </span>
+            <button type="button" onClick={() => setShot('')} className="text-slate-500 hover:text-red-400 text-sm">✕</button>
+          </div>
+        ) : (
+          <div className="flex gap-2">
+            <input value={shot} onChange={(e) => setShot(e.target.value)} className="input flex-1"
+              placeholder={t('proof.shotPh', 'Screenshot link (optional)')} />
+            {/* Buyers pay on a phone — the receipt is already in their camera roll. */}
+            <label className={`btn-ghost text-sm whitespace-nowrap cursor-pointer ${shotBusy ? 'opacity-60 pointer-events-none' : ''}`}>
+              {shotBusy ? '…' : t('proof.upload', 'Upload')}
+              <input type="file" accept="image/*" className="hidden"
+                onChange={async (e) => {
+                  const f = e.target.files?.[0]; e.target.value = '';
+                  if (!f) return;
+                  setShotBusy(true);
+                  try { setShot(await fileToDataUrl(f, { max: 900, maxBytes: 900_000 })); }
+                  catch (er) { setErr(er.message); }
+                  finally { setShotBusy(false); }
+                }} />
+            </label>
+          </div>
+        )}
         {err && <p className="text-red-300 text-xs">{err}</p>}
         <button onClick={submit} disabled={busy} className="btn-primary w-full py-3">
           {busy ? <Loader2 size={18} className="animate-spin" /> : <>{t('proof.submit', 'I’ve paid — submit for verification')}</>}

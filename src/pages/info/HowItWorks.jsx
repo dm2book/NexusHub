@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { Wallet, CreditCard, PackageCheck, ShieldCheck, Zap, Headphones } from 'lucide-react';
 import InfoShell from '../../components/InfoShell.jsx';
 import { useI18n } from '../../lib/i18n.jsx';
+import { usePageMeta } from '../../lib/useMeta.js';
 
 // Full EN + NL content sets — the page renders one language, never a mix.
 const CONTENT = {
@@ -38,6 +39,7 @@ const CONTENT = {
 };
 
 export default function HowItWorks() {
+  usePageMeta('How it works — order to delivery', 'Pick your item, pay by bank transfer with the reference shown, and get your code once the payment is confirmed.');
   const { lang } = useI18n();
   const L = CONTENT[lang] || CONTENT.en;
   return (

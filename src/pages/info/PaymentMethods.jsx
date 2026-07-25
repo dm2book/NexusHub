@@ -4,6 +4,7 @@ import { Zap, ShieldCheck, Clock, BadgeCheck } from 'lucide-react';
 import { api } from '../../lib/api.js';
 import InfoShell from '../../components/InfoShell.jsx';
 import { useI18n } from '../../lib/i18n.jsx';
+import { usePageMeta } from '../../lib/useMeta.js';
 
 const META = {
   tikkie: { icon: '🟢', name: 'Tikkie', blurb: 'Pay in seconds with a Tikkie payment request — ideal in the Netherlands.' },
@@ -18,6 +19,7 @@ const STEPS = [
 ];
 
 export default function PaymentMethods() {
+  usePageMeta('Payment methods', 'Which payment methods ForgeMarket accepts, how to pay, and how your payment is confirmed.');
   const { t, lang } = useI18n();
   const [methods, setMethods] = useState(null);
   useEffect(() => { api.get('/api/config').then((c) => setMethods(c.paymentMethods || [])).catch(() => setMethods([])); }, []);

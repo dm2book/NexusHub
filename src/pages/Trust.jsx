@@ -9,10 +9,10 @@ import { usePageMeta } from '../lib/useMeta.js';
 import LiveActivity from '../components/store/LiveActivity.jsx';
 
 const GUARANTEES = [
-  { icon: Zap, title: 'Instant, automated delivery', text: 'Most orders are delivered in seconds straight to your email and dashboard — fully automated, 24/7.' },
+  { icon: Zap, title: 'Fast, tracked delivery', text: 'Items we hold in stock are sent automatically the moment your payment is confirmed. Everything else is delivered by hand, and you can follow the status of your order at any time.' },
   { icon: Lock, title: 'Secure by design', text: 'Passwordless login, encrypted sessions with one-time-use refresh tokens, and continuous fraud screening on every order.' },
   { icon: RotateCcw, title: 'Money-back guarantee', text: "If we can't deliver your order, you get a full refund — no questions asked. Eligible orders are buyer-protected." },
-  { icon: BadgeCheck, title: 'Verified reviews only', text: 'Every review is tied to a real, completed purchase and auto-published from our Discord community vouches.' },
+  { icon: BadgeCheck, title: 'Reviews you can check', text: 'Reviews marked "Verified buyer" are tied to a real, completed order. Community vouches from our Discord are shown separately and never carry that badge.' },
 ];
 
 const FAQ = [
@@ -48,7 +48,7 @@ export default function Trust() {
         <span className="inline-flex items-center gap-2 text-[13px] font-semibold text-violet-700 bg-violet-100 rounded-full px-3 py-1.5">
           <ShieldCheck size={14} /> Trust Center
         </span>
-        <h1 className="text-4xl font-extrabold text-slate-900 mt-4">Why thousands buy with confidence</h1>
+        <h1 className="text-4xl font-extrabold text-slate-900 mt-4">How your purchase is protected</h1>
         <p className="text-slate-500 mt-3 max-w-xl mx-auto">Real numbers, real guarantees. Here's exactly how we keep every order safe, fast and protected.</p>
       </div>
 

@@ -6,8 +6,11 @@ import { useAuth } from '../../context/AuthContext.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
 import InfoShell from '../../components/InfoShell.jsx';
 import { useI18n } from '../../lib/i18n.jsx';
+import { usePageMeta } from '../../lib/useMeta.js';
+import { SUPPORT_EMAIL } from '../../lib/support.js';
 
 export default function Contact() {
+  usePageMeta('Contact & support', 'Get help with an order, a payment or a delivery. Reach us on Discord or by email — we answer every message.');
   const { user } = useAuth();
   const toast = useToast();
   const { t } = useI18n();
@@ -32,14 +35,25 @@ export default function Contact() {
         <div className="space-y-4">
           <ContactCard icon={LifeBuoy} title={t('contact.ticket', 'Support ticket')} text={t('contact.ticketSub', 'Best for order issues. Tracked in your dashboard.')} />
           <ContactCard icon={MessageCircle} title="Discord" text={t('contact.discordSub', 'Join the community for quick help and updates.')} cta={<Link to="/discord" className="text-indigo-400 text-sm">{t('contact.openDiscord', 'Open Discord →')}</Link>} />
-          <ContactCard icon={Mail} title="E-mail" text={t('contact.emailSub', 'Prefer email? Reach the team anytime.')} />
+          {/* Only shown once a real address exists — an email card with no email
+              in it is worse than no card. */}
+          {SUPPORT_EMAIL && (
+            <ContactCard icon={Mail} title="E-mail" text={SUPPORT_EMAIL}
+              cta={<a href={`mailto:${SUPPORT_EMAIL}`} className="text-indigo-400 text-sm">{t('contact.sendEmail', 'Send an email →')}</a>} />
+          )}
         </div>
 
         <div className="lg:col-span-2 card p-7">
           {!user ? (
             <div className="text-center py-10">
               <p className="text-slate-300">{t('contact.signInFirst', 'Sign in to open a tracked support ticket.')}</p>
-              <Link to="/login" className="btn-primary mt-5 inline-flex">{t('nav.login', 'Sign in')}</Link>
+              {/* Someone deciding whether to buy has no account yet — give them a
+                  route that does not require making one. */}
+              <p className="text-slate-400 text-sm mt-2">{t('contact.noAccount', 'No account? Ask us on Discord — you get an answer from a real person.')}</p>
+              <div className="flex flex-wrap items-center justify-center gap-2.5 mt-5">
+                <Link to="/discord" className="btn-primary inline-flex"><MessageCircle size={16} /> {t('contact.openDiscordShort', 'Ask on Discord')}</Link>
+                <Link to="/login" className="btn-ghost inline-flex">{t('nav.login', 'Sign in')}</Link>
+              </div>
             </div>
           ) : done ? (
             <div className="text-center py-10">

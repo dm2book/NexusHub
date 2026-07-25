@@ -11,6 +11,7 @@ import { useToast } from '../context/ToastContext.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { feedback } from '../lib/feedback.js';
 import Confetti from '../components/Confetti.jsx';
+import { usePageMeta } from '../lib/useMeta.js';
 
 const METHOD_ICON = { tikkie: '🟢', revolut: '⚫', paypal: '🔵' };
 function payHref(m, eur) {
@@ -35,6 +36,7 @@ const stepIndex = (status) => {
 };
 
 export default function Track() {
+  usePageMeta('Track your order', 'Enter your order number to see its status, payment details and delivery.');
   const [params] = useSearchParams();
   const toast = useToast();
   const { t } = useI18n();

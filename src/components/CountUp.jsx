@@ -5,14 +5,19 @@ import { useEffect, useRef, useState } from 'react';
  * `prefix`/`suffix` wrap the value; `decimals` controls precision. Non-numeric
  * values (e.g. "24/7") are rendered as-is.
  */
-export default function CountUp({ value, duration = 1400, className = '' }) {
+export default function CountUp({ value, duration = 1400, className = '', animate = true }) {
   const ref = useRef(null);
   const started = useRef(false);
   const [display, setDisplay] = useState(null);
 
-  // Parse "50k+", "52,340+", "< 30s", "4.9/5", "24/7" → { prefix, num, suffix }
+  // Parse "50k+", "52,340+", "< 30s" → { prefix, num, suffix }
   const m = String(value).match(/^(\D*)([\d.,]+)(.*)$/);
-  const isNum = !!m;
+  // Only ever animate a real measured count. Ratios like "24/7" and "4.9/5" are
+  // fixed claims, not counts — animating them renders "0/7" and "0/5" on first
+  // paint, which says the opposite of what the label promises. `animate={false}`
+  // lets the caller pin any other constant (e.g. a "100%" guarantee) too.
+  const isRatio = /\//.test(String(value));
+  const isNum = !!m && animate && !isRatio;
   const num = isNum ? parseFloat(m[2].replace(/,/g, '')) : 0;
   const decimals = isNum && m[2].includes('.') ? 1 : 0;
   const grouped = isNum && m[2].includes(',');

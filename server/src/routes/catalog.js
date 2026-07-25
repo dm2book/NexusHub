@@ -118,11 +118,19 @@ async function assertOwnsOrder(req, order, email) {
 const LOW_STOCK = 6;
 const stockLeftFor = (product, count) =>
   (product.deliveryMode === 'auto' && count > 0 && count <= LOW_STOCK) ? count : null;
+// True only when a code is sitting in stock right now and the product is set to
+// auto-deliver — i.e. the one case where "instant" is a promise we can keep.
+// Everything else is fulfilled by hand and must say so.
+const instantFor = (product, count) => product.deliveryMode === 'auto' && count > 0;
 
 router.get('/products', asyncHandler(async (_req, res) => {
   const products = await listProducts({ activeOnly: true });
   const counts = await availableCounts(products.map((p) => p.id));
-  res.json({ products: products.map((p) => ({ ...p, stockLeft: stockLeftFor(p, counts[p.id] || 0) })) });
+  res.json({ products: products.map((p) => ({
+    ...p,
+    stockLeft: stockLeftFor(p, counts[p.id] || 0),
+    instant: instantFor(p, counts[p.id] || 0),
+  })) });
 }));
 
 // Trending products (most-sold recently). Registered before /products/:id.
@@ -137,7 +145,8 @@ router.get('/products/trending', asyncHandler(async (_req, res) => {
 router.get('/products/:id', asyncHandler(async (req, res) => {
   const p = await getProduct(req.params.id);
   if (!p || !p.active) throw new ApiError(404, 'Product not found');
-  res.json({ product: { ...p, stockLeft: stockLeftFor(p, await availableCount(p.id)) } });
+  const count = await availableCount(p.id);
+  res.json({ product: { ...p, stockLeft: stockLeftFor(p, count), instant: instantFor(p, count) } });
 }));
 
 // Price history for the product-page chart.
