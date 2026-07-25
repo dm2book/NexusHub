@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { TrendingUp, ShoppingCart, Percent, Users, Trophy, Rocket, CheckCircle2, AlertTriangle, XCircle, ChevronDown } from 'lucide-react';
+import { TrendingUp, ShoppingCart, Percent, Users, Trophy, Rocket, CheckCircle2, AlertTriangle, XCircle, ChevronDown, MailCheck } from 'lucide-react';
 import { api } from '../../lib/api.js';
 import { money } from '../../lib/format.js';
 import { PageLoader } from '../../components/ui.jsx';
@@ -65,12 +65,14 @@ export default function Analytics() {
   const [clv, setClv] = useState(null);
   const [top, setTop] = useState(null);
   const [ret, setRet] = useState(null);
+  const [rec, setRec] = useState(null);
 
   useEffect(() => {
     api.get('/api/admin/analytics/overview?days=30').then(setData).catch(() => {});
     api.get('/api/admin/analytics/clv').then(setClv).catch(() => {});
     api.get('/api/admin/analytics/top-products').then((r) => setTop(r.products)).catch(() => {});
     api.get('/api/admin/analytics/retention').then(setRet).catch(() => {});
+    api.get('/api/admin/analytics/recovery?days=30').then(setRec).catch(() => {});
   }, []);
 
   if (!data) return <PageLoader />;
@@ -171,6 +173,9 @@ export default function Analytics() {
         </div>
       )}
 
+      {/* Abandoned-payment recovery — what the reminder emails actually bring back */}
+      {rec && <RecoveryCard rec={rec} />}
+
       {/* Product performance */}
       <div className="card p-6 mt-6">
         <h3 className="text-white mb-4 flex items-center gap-2"><Trophy size={16} className="text-amber-400" /> Product performance (90 days)</h3>
@@ -201,6 +206,74 @@ export default function Analytics() {
           ))}
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Recovery reporting. Two rules here, both deliberate:
+ *  · a rate of null means nothing was sent yet — show "no data yet", never 0%,
+ *    which would read as "the emails don't work".
+ *  · cart recovery is correlation (an order within the attribution window), so
+ *    it says so on the card instead of being blended into one hero number.
+ */
+function RecoveryCard({ rec }) {
+  const p = rec.paymentReminders;
+  const c = rec.cartReminders;
+  const pct = (v) => (v == null ? 'no data yet' : `${v}%`);
+
+  return (
+    <div className="card p-6 mt-6">
+      <h3 className="text-white mb-1 flex items-center gap-2">
+        <MailCheck size={16} className="text-emerald-400" /> Recovered after abandoning ({rec.rangeDays} days)
+      </h3>
+      <p className="text-slate-500 text-xs mb-5">
+        What the automatic reminder emails bring back. Money that would otherwise have been lost.
+      </p>
+
+      <div className="grid sm:grid-cols-3 gap-4 mb-6">
+        <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/25 p-4">
+          <div className="text-emerald-300 text-xs font-semibold uppercase tracking-wide">Revenue recovered</div>
+          <div className="text-2xl text-white font-semibold mt-1">{rec.totalRecoveredFormatted}</div>
+          <div className="text-slate-400 text-xs mt-1">{p.recovered + c.recovered} orders</div>
+        </div>
+        <div className="rounded-xl bg-white/5 border border-white/10 p-4">
+          <div className="text-slate-300 text-xs font-semibold uppercase tracking-wide">Unpaid orders chased</div>
+          <div className="text-2xl text-white font-semibold mt-1">{pct(p.recoveryRate)}</div>
+          <div className="text-slate-400 text-xs mt-1">{p.recovered} of {p.sent} paid after the email</div>
+        </div>
+        <div className="rounded-xl bg-white/5 border border-white/10 p-4">
+          <div className="text-slate-300 text-xs font-semibold uppercase tracking-wide">Abandoned carts chased</div>
+          <div className="text-2xl text-white font-semibold mt-1">{pct(c.recoveryRate)}</div>
+          <div className="text-slate-400 text-xs mt-1">ordered within {rec.windowHours}h of the email</div>
+        </div>
+      </div>
+
+      <div className="grid sm:grid-cols-2 gap-x-8">
+        <div>
+          <Row label="Payment reminders sent" value={p.sent} />
+          <Row label="→ paid afterwards" value={p.recovered} accent="text-emerald-300" />
+          <Row label="→ still waiting" value={p.stillWaiting} accent="text-amber-300" />
+          <Row label="→ cancelled / expired" value={p.lost} accent="text-slate-400" />
+        </div>
+        <div>
+          <Row label="Recovered from unpaid orders" value={p.recoveredRevenueFormatted} accent="text-emerald-300" />
+          <Row label="Recovered from carts" value={c.recoveredRevenueFormatted} accent="text-emerald-300" />
+          <Row label="Cart reminders sent" value={c.sent} />
+        </div>
+      </div>
+
+      {/* A stalled cron is invisible until you look for unpaid orders that never
+          got their email — so put it right here, with the money attached. */}
+      {p.notSentYet > 0 && (
+        <div className="mt-5 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 flex items-start gap-3">
+          <AlertTriangle size={17} className="text-amber-300 shrink-0 mt-0.5" />
+          <div className="text-sm">
+            <span className="text-amber-200 font-semibold">{p.notSentYet} unpaid {p.notSentYet === 1 ? 'order has' : 'orders have'} had no reminder yet</span>
+            <span className="text-slate-300"> — {p.notSentValueFormatted} not being chased. The reminder runs on the hourly cron; if this number keeps growing, the cron is not running.</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

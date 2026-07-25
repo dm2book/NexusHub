@@ -9,7 +9,7 @@ import { asyncHandler } from '../../middleware/error.js';
 import { requirePermission } from '../../middleware/rbac.js';
 import {
   listOrders, getOrder, transitionOrder, markPaymentReceived, setOrderNotes, deliverOrder,
-  exportOrdersCsv,
+  exportOrdersCsv, orderUrlFor,
 } from '../../services/orderService.js';
 import { fulfillOrder, listFulfillment, listFulfillmentLogs } from '../../services/fulfillmentService.js';
 import * as analytics from '../../services/analyticsService.js';
@@ -17,7 +17,6 @@ import { listPendingProofs, confirmProof, rejectProof } from '../../services/pay
 import { sendEmail } from '../../services/emailService.js';
 import { notify } from '../../services/notificationService.js';
 import { audit } from '../../services/auditService.js';
-import { config } from '../../config/env.js';
 import { notFound } from '../../utils/errors.js';
 
 const router = Router();
@@ -185,7 +184,7 @@ router.post('/:id/contact', requirePermission('orders.contact'),
       subject,
       message,
       order: { number: order.number, total: order.totalFormatted, status: order.statusLabel,
-        url: `${config.appUrl}/account/orders/${order.id}` },
+        url: orderUrlFor(order) },
     }).catch(() => {});
     if (order.userId) {
       await notify(order.userId, { type: 'support', title: subject, body: message,

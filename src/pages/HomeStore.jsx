@@ -359,14 +359,14 @@ export default function HomeStore() {
             <div className="grid lg:grid-cols-[1.05fr_1fr] 2xl:grid-cols-[1.1fr_1fr_206px] gap-8 2xl:gap-6 items-center">
               <div>
                 <span className="inline-flex items-center gap-2 text-[13px] font-semibold text-violet-700 bg-violet-100 rounded-full px-3 py-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-violet-500" /> {tr('home.badge', 'Instant delivery · Buyer protected')}
+                  <span className="w-1.5 h-1.5 rounded-full bg-violet-500" /> {tr('home.badge', 'Buyer protected · Real human support')}
                 </span>
                 <h1 className="fm-head text-[40px] sm:text-[52px] leading-[1.05] mt-5">
                   {tr('home.h1a', 'Everything You Need,')}<br />
                   <span className="fm-gradient-text">{tr('home.h1b', 'All in One Place.')}</span>
                 </h1>
                 <p className="text-slate-500 text-[16px] mt-5 max-w-lg leading-relaxed">
-                  {tr('home.sub', 'Get Robux, V-Bucks, Valorant Points and more instantly. Fast delivery, secure payments, 24/7 support.')}
+                  {tr('home.sub', 'Robux, V-Bucks, Valorant Points and more. In stock is sent automatically — everything else by hand, usually within a few hours.')}
                 </p>
                 <div className="flex flex-wrap items-center gap-3 mt-7">
                   <Link to="/shop" className="inline-flex items-center gap-2 text-white font-semibold rounded-xl px-6 h-12 shadow-lg shadow-violet-500/30 hover:brightness-105 transition"
@@ -594,7 +594,7 @@ export default function HomeStore() {
               <Link to="/terms" className="hover:text-slate-700">{tr('footer.terms', 'Terms')}</Link>
               <Link to="/privacy" className="hover:text-slate-700">{tr('footer.privacy', 'Privacy')}</Link>
             </div>
-            © {new Date().getFullYear()} ForgeMarket · {tr('footer.rights', 'Instant digital goods')} · <SystemStatus />
+            © {new Date().getFullYear()} ForgeMarket · {tr('footer.rights', 'Digital goods for gamers')} · <SystemStatus />
           </footer>
         </main>
       </div>

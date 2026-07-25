@@ -32,4 +32,10 @@ router.get('/retention', asyncHandler(async (_req, res) => {
   res.json(await analytics.retentionMetrics());
 }));
 
+router.get('/recovery', asyncHandler(async (req, res) => {
+  res.json(await analytics.recoveryMetrics({
+    days: Math.min(Number(req.query.days) || 30, 365),
+  }));
+}));
+
 export default router;

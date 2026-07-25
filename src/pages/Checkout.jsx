@@ -205,8 +205,18 @@ export default function Checkout() {
 
           <PaymentProofForm orderId={placed.id} email={email} method={methodId} />
 
-          <div className="flex gap-3 mt-5">
-            <Link to={user ? `/account/orders/${placed.id}` : `/track?number=${placed.number}`} className="btn-ghost flex-1 py-3"><CheckCircle2 size={18} /> {t('footer.track', 'Track order')}</Link>
+          {/* The status page is the one link a buyer needs afterwards, and it
+              works without an account. Say that it is also in their inbox, so
+              closing this tab never feels like losing the order. */}
+          <div className="mt-6 rounded-xl border border-white/10 bg-white/5 p-4 text-left">
+            <div className="text-white text-sm font-semibold">{t('checkout.followTitle', 'Follow your order — no account needed')}</div>
+            <p className="text-slate-400 text-[13px] mt-1">
+              {t('checkout.followSub', 'This link updates by itself the moment we confirm your payment. We also emailed it to')} <span className="text-slate-200">{email}</span>.
+            </p>
+            <Link to={user ? `/account/orders/${placed.id}` : `/track?number=${placed.number}`}
+              className="btn-primary w-full mt-3 py-3"><CheckCircle2 size={18} /> {t('footer.track', 'Track order')}</Link>
+          </div>
+          <div className="flex gap-3 mt-3">
             <Link to="/shop" className="btn-ghost flex-1 py-3">{t('checkout.keepShopping', 'Keep shopping')}</Link>
           </div>
         </div>
