@@ -8,6 +8,7 @@ import { useToast } from '../../context/ToastContext.jsx';
 import { useReviews } from '../../lib/useReviews.js';
 import { useStats } from '../../lib/useStats.js';
 import { useI18n } from '../../lib/i18n.jsx';
+import { usePageMeta } from '../../lib/useMeta.js';
 
 /** "Write a review" — verified buyers pick one of their delivered orders. */
 function WriteReview({ t }) {
@@ -80,6 +81,7 @@ function WriteReview({ t }) {
 }
 
 export default function Reviews() {
+  usePageMeta('Customer reviews', 'Reviews from real ForgeMarket orders, plus community vouches from our Discord.');
   const reviews = useReviews();
   const stats = useStats();
   const { t } = useI18n();

@@ -1,4 +1,5 @@
 import InfoShell, { Prose } from '../../components/InfoShell.jsx';
+import { usePageMeta } from '../../lib/useMeta.js';
 
 const TERMS = (
   <Prose>
@@ -42,6 +43,7 @@ const PRIVACY = (
 );
 
 export default function Legal({ kind }) {
+  usePageMeta('Terms & privacy', 'The terms you agree to when ordering, and how your personal data is handled.');
   const isTerms = kind === 'terms';
   return (
     <InfoShell eyebrow="Legal" title={isTerms ? 'Terms of Service' : 'Privacy Policy'}

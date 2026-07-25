@@ -6,6 +6,7 @@ import { track } from '../lib/track.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { useI18n } from '../lib/i18n.jsx';
+import { usePageMeta } from '../lib/useMeta.js';
 
 const isEmail = (s) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s);
 const OTP_LEN = 6;
@@ -22,6 +23,7 @@ function friendlyError(err) {
 }
 
 export default function Login() {
+  usePageMeta('Log in', 'Sign in to ForgeMarket to see your orders, store credit and rewards.');
   const { login, user, loading: authLoading } = useAuth();
   const toast = useToast();
   const { t } = useI18n();

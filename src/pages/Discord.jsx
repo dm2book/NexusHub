@@ -6,6 +6,7 @@ import {
 import { api } from '../lib/api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { SectionHeading } from '../components/ui.jsx';
+import { usePageMeta } from '../lib/useMeta.js';
 
 const CHANNELS = [
   { group: 'INFORMATION', icon: Megaphone, items: ['welcome', 'rules', 'announcements', 'faq'] },
@@ -34,6 +35,7 @@ const PERKS = [
 const STATUS_COLOR = { online: '#23a55a', idle: '#f0b232', dnd: '#f23f43', offline: '#80848e' };
 
 export default function Discord() {
+  usePageMeta('Join our Discord', 'Support, restock alerts, giveaways and community vouches.');
   const { user } = useAuth();
   const [server, setServer] = useState(null);
 

@@ -4,8 +4,10 @@ import { CalendarDays, Bell, Tag } from 'lucide-react';
 import InfoShell from '../../components/InfoShell.jsx';
 import { api } from '../../lib/api.js';
 import { useI18n } from '../../lib/i18n.jsx';
+import { usePageMeta } from '../../lib/useMeta.js';
 
 export default function Drops() {
+  usePageMeta('Drops & restocks', 'Upcoming restocks, launches and flash sales on Robux, V-Bucks, Valorant Points and gift cards.');
   const { t, lang } = useI18n();
   const [drops, setDrops] = useState(null);
   const [invite, setInvite] = useState(null); // live (never-expiring) invite from the API

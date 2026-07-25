@@ -9,6 +9,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { money } from '../lib/catalog.js';
 import { EmptyState } from '../components/ui.jsx';
+import { usePageMeta } from '../lib/useMeta.js';
 
 const METHOD_ICON = { tikkie: '🟢', revolut: '⚫', paypal: '🔵' };
 
@@ -22,6 +23,7 @@ function payTarget(m, amountEur) {
 }
 
 export default function Checkout() {
+  usePageMeta('Checkout', 'Complete your order — guest checkout, no account needed.');
   const { t } = useI18n();
   const { items, subtotal, currency, clear } = useCart();
   const { user } = useAuth();

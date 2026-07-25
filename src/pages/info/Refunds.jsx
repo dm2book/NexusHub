@@ -1,8 +1,10 @@
 import { Link } from 'react-router-dom';
 import InfoShell, { Prose } from '../../components/InfoShell.jsx';
 import { useI18n } from '../../lib/i18n.jsx';
+import { usePageMeta } from '../../lib/useMeta.js';
 
 export default function Refunds() {
+  usePageMeta('Refund policy', 'When you get your money back, what is covered, and how to request a refund on a digital order.');
   const { lang, t } = useI18n();
   const nl = lang === 'nl';
   return (

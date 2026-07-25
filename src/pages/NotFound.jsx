@@ -1,6 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { Home, ShoppingBag, Search, LifeBuoy } from 'lucide-react';
+import { usePageMeta } from '../lib/useMeta.js';
 
 const POPULAR = [
   ['Robux', '/shop?category=robux'], ['V-Bucks', '/shop?category=v-bucks'],
@@ -9,6 +10,7 @@ const POPULAR = [
 ];
 
 export default function NotFound() {
+  usePageMeta('Page not found', 'That page does not exist. Browse all products instead.');
   const navigate = useNavigate();
   const [q, setQ] = useState('');
   const search = (e) => {

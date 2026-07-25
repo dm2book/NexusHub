@@ -24,6 +24,7 @@ import { SystemStatus } from '../components/store/StoreFooter.jsx';
 import { money } from '../lib/catalog.js';
 import { withFallback, SAMPLE_PRODUCTS, iconPath } from '../lib/sampleCatalog.js';
 import { useCategoryLogos } from '../lib/useCategoryLogos.js';
+import { SUPPORT_EMAIL } from '../lib/support.js';
 
 const ICON = iconPath;
 
@@ -406,6 +407,36 @@ export default function HomeStore() {
             </div>
           </section>
 
+          {/* How it works — a manual-payment store has to answer "what happens
+              after I pay?" before it asks for money. */}
+          <section className="fm-reveal">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="fm-head text-2xl">{tr('home.howTitle', 'How it works')}</h2>
+              <Link to="/how-it-works" className="text-sm font-semibold text-violet-600 hover:text-violet-700 inline-flex items-center gap-1">
+                {tr('home.howMore', 'More detail')} <ChevronRight size={15} />
+              </Link>
+            </div>
+            <div className="grid sm:grid-cols-3 gap-4">
+              {[
+                { n: '1', icon: LayoutGrid, title: tr('home.h1t', 'Pick your top-up'),
+                  sub: tr('home.h1s', 'Choose the amount you want. No account needed — you can check out as a guest.') },
+                { n: '2', icon: Tag, title: tr('home.h2t', 'Pay with the reference shown'),
+                  sub: tr('home.h2s', 'You get the exact amount and a payment reference right after checkout. Copy both into your bank app.') },
+                { n: '3', icon: Zap, title: tr('home.h3t', 'Get your code'),
+                  sub: tr('home.h3s', 'In stock? Sent automatically once your payment is confirmed. Otherwise delivered by hand, usually within a few hours.') },
+              ].map((c) => (
+                <div key={c.n} className="bg-white rounded-2xl border border-slate-200/70 shadow-sm p-5">
+                  <div className="flex items-center gap-2.5 mb-2">
+                    <span className="w-8 h-8 rounded-lg bg-violet-100 text-violet-700 grid place-items-center fm-num text-sm">{c.n}</span>
+                    <c.icon size={17} className="text-violet-500" />
+                  </div>
+                  <div className="font-bold text-slate-900">{c.title}</div>
+                  <p className="text-sm text-slate-500 mt-1 leading-relaxed">{c.sub}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+
           {/* Trust bar */}
           <section className="bg-white rounded-2xl border border-slate-200/70 shadow-sm grid grid-cols-2 lg:grid-cols-4 divide-x divide-y lg:divide-y-0 divide-slate-100">
             {TRUST.map((t) => (
@@ -414,25 +445,6 @@ export default function HomeStore() {
                 <div><div className="font-semibold text-[15px]">{tr(`home.f.${t.key}`, t.title)}</div><div className="text-[12.5px] text-slate-400">{tr(`home.f.${t.key}Sub`, t.sub)}</div></div>
               </div>
             ))}
-          </section>
-
-          {/* Ways to save & win — surface the engagement features */}
-          <section className="fm-reveal">
-            <h2 className="fm-head text-2xl mb-4">{tr('home.waysTitle', 'Save more & win big')}</h2>
-            <div className="grid sm:grid-cols-3 gap-4">
-              {[
-                { to: '/account/forge-shop', emoji: '🪙', grad: 'from-amber-400 to-rose-500', title: tr('home.wCoins', 'Forge Coins'), sub: tr('home.wCoinsSub', 'Earn 1 coin per €10 — spend on discount codes & giveaway boosts.') },
-                { to: '/shop', emoji: '🎁', grad: 'from-fuchsia-500 to-violet-600', title: tr('home.wMystery', 'Mystery boxes'), sub: tr('home.wMysterySub', 'Every box wins — real prizes, instant store credit, 1 free reroll.') },
-                { to: '/drops', emoji: '📅', grad: 'from-violet-500 to-indigo-600', title: tr('home.wDrops', 'Drop calendar'), sub: tr('home.wDropsSub', 'Restocks, launches & flash sales — never miss one.') },
-              ].map((c) => (
-                <Link key={c.to} to={c.to}
-                  className="group bg-white rounded-2xl border border-slate-200/70 shadow-sm p-5 hover:border-violet-300 hover:shadow-md transition">
-                  <div className={`w-12 h-12 rounded-xl grid place-items-center text-2xl bg-gradient-to-br ${c.grad} shadow-lg mb-3`}>{c.emoji}</div>
-                  <div className="font-bold text-slate-900 flex items-center gap-1">{c.title} <ArrowRight size={15} className="text-violet-500 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition" /></div>
-                  <p className="text-sm text-slate-500 mt-1">{c.sub}</p>
-                </Link>
-              ))}
-            </div>
           </section>
 
           {/* Popular products */}
@@ -525,6 +537,49 @@ export default function HomeStore() {
               <Link to="/discord" className="mt-4 inline-flex items-center justify-center gap-2 bg-white text-indigo-600 font-semibold text-sm rounded-xl h-11 hover:bg-indigo-50 transition">
                 {tr('home.joinBtn', 'Join Discord')} <ArrowRight size={16} />
               </Link>
+            </div>
+          </section>
+
+          {/* Who you're buying from — an anonymous seller taking bank transfers
+              is the exact scam pattern this audience has been burned by. No
+              company is claimed here, because there isn't one registered yet. */}
+          <section className="fm-reveal bg-white rounded-2xl border border-slate-200/70 shadow-sm p-5 sm:p-6">
+            <h2 className="fm-head text-xl mb-1.5">{tr('home.whoTitle', 'Questions before you buy?')}</h2>
+            <p className="text-[14.5px] text-slate-500 leading-relaxed max-w-2xl">
+              {tr('home.whoSub', 'ForgeMarket is a small store run from the Netherlands — not a faceless website. If anything about your order goes wrong, you get a real person, and you get your money back if we cannot deliver.')}
+            </p>
+            <div className="flex flex-wrap items-center gap-2.5 mt-4">
+              <a href="/discord" className="inline-flex items-center gap-2 text-white text-sm font-semibold rounded-xl px-4 h-11 shadow-lg shadow-violet-500/30 hover:brightness-105 transition"
+                style={{ backgroundImage: 'linear-gradient(135deg,#5865F2,#7c5cff)' }}>
+                <MessageCircle size={16} /> {tr('home.whoDiscord', 'Ask us on Discord')}
+              </a>
+              {SUPPORT_EMAIL && (
+                <a href={`mailto:${SUPPORT_EMAIL}`} className="inline-flex items-center gap-2 text-sm font-semibold rounded-xl px-4 h-11 border border-slate-200 text-slate-700 hover:bg-slate-50 transition">
+                  {SUPPORT_EMAIL}
+                </a>
+              )}
+              <Link to="/refunds" className="inline-flex items-center gap-2 text-sm font-semibold rounded-xl px-4 h-11 border border-slate-200 text-slate-700 hover:bg-slate-50 transition">
+                <ShieldCheck size={16} /> {tr('home.whoRefunds', 'Refund policy')}
+              </Link>
+            </div>
+          </section>
+
+          {/* Ways to save & win — surface the engagement features */}
+          <section className="fm-reveal">
+            <h2 className="fm-head text-2xl mb-4">{tr('home.waysTitle', 'Save more & win big')}</h2>
+            <div className="grid sm:grid-cols-3 gap-4">
+              {[
+                { to: '/account/forge-shop', emoji: '🪙', grad: 'from-amber-400 to-rose-500', title: tr('home.wCoins', 'Forge Coins'), sub: tr('home.wCoinsSub', 'Earn 1 coin per €10 — spend on discount codes & giveaway boosts.') },
+                { to: '/shop', emoji: '🎁', grad: 'from-fuchsia-500 to-violet-600', title: tr('home.wMystery', 'Mystery boxes'), sub: tr('home.wMysterySub', 'Every box wins — real prizes, instant store credit, 1 free reroll.') },
+                { to: '/drops', emoji: '📅', grad: 'from-violet-500 to-indigo-600', title: tr('home.wDrops', 'Drop calendar'), sub: tr('home.wDropsSub', 'Restocks, launches & flash sales — never miss one.') },
+              ].map((c) => (
+                <Link key={c.to} to={c.to}
+                  className="group bg-white rounded-2xl border border-slate-200/70 shadow-sm p-5 hover:border-violet-300 hover:shadow-md transition">
+                  <div className={`w-12 h-12 rounded-xl grid place-items-center text-2xl bg-gradient-to-br ${c.grad} shadow-lg mb-3`}>{c.emoji}</div>
+                  <div className="font-bold text-slate-900 flex items-center gap-1">{c.title} <ArrowRight size={15} className="text-violet-500 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition" /></div>
+                  <p className="text-sm text-slate-500 mt-1">{c.sub}</p>
+                </Link>
+              ))}
             </div>
           </section>
 
