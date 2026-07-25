@@ -22,18 +22,26 @@ import { recordProductView, useRecentlyViewed } from '../lib/recentlyViewed.js';
 import { flyToCart } from '../lib/flyToCart.js';
 import Tilt from '../components/Tilt.jsx';
 
-const TRUST = [
-  { icon: Zap, key: 'instant', title: 'Instant delivery', sub: 'Codes in seconds' },
-  { icon: ShieldCheck, key: 'protected', title: 'Buyer protected', sub: 'Money-back guarantee' },
-  { icon: BadgeCheck, key: 'verified', title: 'Verified reviews', sub: 'Real purchases only' },
-  { icon: Headphones, key: 'support', title: '24/7 support', sub: 'Always here to help' },
+// The delivery badge is decided per product from real stock, not asserted for
+// every listing: only an auto-delivery product with a code in stock can honestly
+// claim "instant". The rest are hand-delivered and say so.
+const trustBadges = (instant) => [
+  instant
+    ? { icon: Zap, key: 'instant', title: 'In stock — instant', sub: 'Sent the moment payment clears' }
+    : { icon: Clock, key: 'handDelivered', title: 'Delivered by hand', sub: 'Usually within a few hours' },
+  { icon: ShieldCheck, key: 'protected', title: 'Buyer protected', sub: 'Money back if undelivered' },
+  { icon: BadgeCheck, key: 'verified', title: 'Verified reviews', sub: 'Tied to real orders' },
+  { icon: Headphones, key: 'support', title: 'Support via Discord', sub: 'Real person, not a bot' },
 ];
 
+// Answers a manual-payment store can actually stand behind. The old copy said
+// payment was confirmed "within minutes" around the clock and that delivery was
+// automatic for most orders — neither is true while confirmation is done by hand.
 const FAQ = [
-  ['How fast will I get it?', 'Most orders are delivered automatically within seconds of your payment being confirmed — straight to your email and account dashboard.', 'speed'],
-  ['How do I pay?', 'Securely via Tikkie, Revolut or PayPal. You submit your transaction reference and we confirm it, usually within minutes.', 'pay'],
-  ['Is it safe?', 'Yes — every order is buyer-protected and money-back guaranteed. We use passwordless login and fraud screening on every order.', 'safe'],
-  ['What if it doesn’t arrive?', 'Open a ticket from your dashboard or our Discord — we resolve delivery issues fast, and eligible orders are fully refundable.', 'arrive'],
+  ['How fast will I get it?', 'If the item is in stock it is sent automatically as soon as your payment is confirmed. Everything else is delivered by hand, normally within a few hours. You can follow the status of your order on the Track page at any time.', 'speed'],
+  ['How do I pay?', 'You pay by bank transfer using the amount and reference shown after checkout. Your payment is checked by a person, so it is confirmed fastest during the day — if you order late at night it may be handled the next morning.', 'pay'],
+  ['Is it safe?', 'Your order is money-back guaranteed: if we cannot deliver it, you get a full refund. Login is passwordless, and your payment details are never stored on this site.', 'safe'],
+  ['What if it doesn’t arrive?', 'Message us on Discord or reply to your order email. If we cannot deliver, you are refunded in full — see the Refund Policy for exactly what is covered.', 'arrive'],
 ];
 
 export default function ProductDetail() {
@@ -286,7 +294,7 @@ export default function ProductDetail() {
 
           {/* trust badges */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-8">
-            {TRUST.map(({ icon: I, title, sub, key }) => (
+            {trustBadges(!!product.instant).map(({ icon: I, title, sub, key }) => (
               <div key={title} className="glass rounded-xl p-3 text-center">
                 <I size={18} className="text-indigo-300 mx-auto mb-1.5" />
                 <div className="text-xs text-white font-medium">{t(`product.${key}`, title)}</div>

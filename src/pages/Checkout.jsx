@@ -342,7 +342,7 @@ export default function Checkout() {
             <div className="flex items-center gap-2 text-emerald-300 text-sm font-medium"><ShieldCheck size={15} /> {t('checkout.protection', 'Buyer protection')}</div>
             <ul className="mt-1.5 space-y-1 text-xs text-slate-400">
               <li className="flex items-center gap-1.5"><CheckCircle2 size={11} className="text-emerald-400 shrink-0" /> {t('checkout.p1', 'Money-back guarantee if undelivered')}</li>
-              <li className="flex items-center gap-1.5"><CheckCircle2 size={11} className="text-emerald-400 shrink-0" /> {t('checkout.p2', 'Instant, automated delivery')}</li>
+              <li className="flex items-center gap-1.5"><CheckCircle2 size={11} className="text-emerald-400 shrink-0" /> {t('checkout.p2', 'Sent as soon as your payment is confirmed')}</li>
               <li className="flex items-center gap-1.5"><CheckCircle2 size={11} className="text-emerald-400 shrink-0" /> {t('checkout.p3', 'Fraud-screened & encrypted checkout')}</li>
             </ul>
           </div>
