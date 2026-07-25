@@ -84,21 +84,30 @@ const fmtDelivery = (s) => (s == null ? null
   : s < 90 ? `${Math.max(1, Math.round(s))}s`
   : s < 5400 ? `${Math.round(s / 60)} min`
   : `${Math.round(s / 3600)}h`);
-// All real (or honest service promises) — no fabricated metrics. The 2nd card
-// shows a real fulfilment rate once orders have finished, else a real guarantee;
-// the 4th shows the real average delivery time once we have one, else 24/7 support.
-const statCards = (s, tr = (_k, en) => en) => [
-  // "Happy customers" = people who actually LEFT A REVIEW — not just anyone
-  // who ordered. The number only exists once someone wrote one.
-  { icon: Users, value: fmtCount(s.reviews), label: tr('home.s.customers', 'Happy Customers'), color: 'text-violet-600 bg-violet-100' },
-  s.successRate != null
-    ? { icon: CheckCircle2, value: `${s.successRate}%`, label: tr('home.s.fulfilled', 'Fulfilled'), color: 'text-emerald-600 bg-emerald-100' }
-    : { icon: ShieldCheck, value: '100%', label: tr('home.s.protected', 'Buyer protected'), color: 'text-emerald-600 bg-emerald-100' },
-  { icon: ShoppingCart, value: fmtCount(s.delivered), label: tr('home.s.delivered', 'Orders Delivered'), color: 'text-blue-600 bg-blue-100' },
-  s.avgDeliverySeconds != null
-    ? { icon: Clock, value: fmtDelivery(s.avgDeliverySeconds), label: tr('home.s.avgDelivery', 'Avg. delivery'), color: 'text-amber-600 bg-amber-100' }
-    : { icon: Headphones, value: '24/7', label: tr('home.s.support', 'Customer Support'), color: 'text-amber-600 bg-amber-100' },
-];
+// No fabricated metrics. `count: true` marks a real measured number, which may
+// animate up from zero; fixed claims must NEVER animate, because counting up
+// "100%" and "24/7" renders "0% Buyer protected" and "0/7 Customer Support" on
+// first paint — the exact opposite of the claim.
+// A zero is worse than silence: "0 Happy Customers" tells a first-time visitor
+// that nobody has ever bought here. So a count is only shown once it is real,
+// and the block is topped up with guarantees that are true on day one.
+const statCards = (s, tr = (_k, en) => en) => {
+  const real = [];
+  // "Happy customers" = people who actually LEFT A REVIEW — not just anyone who ordered.
+  if (s.reviews > 0) real.push({ icon: Users, value: fmtCount(s.reviews), count: true, label: tr('home.s.customers', 'Happy Customers'), color: 'text-violet-600 bg-violet-100' });
+  if (s.delivered > 0) real.push({ icon: ShoppingCart, value: fmtCount(s.delivered), count: true, label: tr('home.s.delivered', 'Orders Delivered'), color: 'text-blue-600 bg-blue-100' });
+  if (s.successRate != null) real.push({ icon: CheckCircle2, value: `${s.successRate}%`, count: true, label: tr('home.s.fulfilled', 'Fulfilled'), color: 'text-emerald-600 bg-emerald-100' });
+  if (s.avgDeliverySeconds != null) real.push({ icon: Clock, value: fmtDelivery(s.avgDeliverySeconds), label: tr('home.s.avgDelivery', 'Avg. delivery'), color: 'text-amber-600 bg-amber-100' });
+
+  // Promises that hold from the first order — never animated, never a count.
+  const promises = [
+    { icon: ShieldCheck, value: tr('home.s.moneyBack', 'Money back'), label: tr('home.s.ifUndelivered', 'If undelivered'), color: 'text-emerald-600 bg-emerald-100' },
+    { icon: Zap, value: tr('home.s.inStock', 'In stock'), label: tr('home.s.instantCodes', 'Delivered instantly'), color: 'text-violet-600 bg-violet-100' },
+    { icon: MessageCircle, value: 'Discord', label: tr('home.s.realSupport', 'Real human support'), color: 'text-blue-600 bg-blue-100' },
+    { icon: Tag, value: tr('home.s.noHidden', 'No fees'), label: tr('home.s.priceYouSee', 'The price you see'), color: 'text-amber-600 bg-amber-100' },
+  ];
+  return [...real, ...promises].slice(0, 4);
+};
 
 export default function HomeStore() {
   const { count, add } = useCart();
@@ -140,6 +149,8 @@ export default function HomeStore() {
   useEffect(() => { api.get('/api/config').then((c) => setAnnouncement(c.announcement || '')).catch(() => {}); }, []);
   const railRef = useRef(null);
   const STATS = statCards(stats, tr);
+  // Real reviews only — an empty testimonial card costs more trust than it earns.
+  const hasReviews = reviews.length > 0;
 
   const scrollRail = () => railRef.current?.scrollBy({ left: 320, behavior: 'smooth' });
 
@@ -305,7 +316,7 @@ export default function HomeStore() {
             <div className="grid lg:grid-cols-[1.05fr_1fr] 2xl:grid-cols-[1.1fr_1fr_206px] gap-8 2xl:gap-6 items-center">
               <div>
                 <span className="inline-flex items-center gap-2 text-[13px] font-semibold text-violet-700 bg-violet-100 rounded-full px-3 py-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-violet-500" /> {tr('home.badge', '#1 Trusted Marketplace')}
+                  <span className="w-1.5 h-1.5 rounded-full bg-violet-500" /> {tr('home.badge', 'Instant delivery · Buyer protected')}
                 </span>
                 <h1 className="fm-head text-[40px] sm:text-[52px] leading-[1.05] mt-5">
                   {tr('home.h1a', 'Everything You Need,')}<br />
@@ -421,18 +432,19 @@ export default function HomeStore() {
           </section>
 
           {/* Bottom: stats + reviews + discord */}
-          <section className="grid lg:grid-cols-3 gap-5 fm-reveal">
+          <section className={`grid gap-5 fm-reveal ${hasReviews ? 'lg:grid-cols-3' : 'lg:grid-cols-2'}`}>
             {/* Stats */}
             <div className="bg-white rounded-2xl border border-slate-200/70 shadow-sm p-5 grid grid-cols-2 gap-4 fm-lift">
               {STATS.map((st) => (
                 <div key={st.label} className="flex items-center gap-3">
                   <span className={`w-11 h-11 rounded-xl grid place-items-center ${st.color}`}><st.icon size={20} /></span>
-                  <div><div className="fm-head text-lg leading-none"><CountUp value={st.value} /></div><div className="text-[12px] text-slate-400 mt-1">{st.label}</div></div>
+                  <div><div className="fm-head text-lg leading-none"><CountUp value={st.value} animate={!!st.count} /></div><div className="text-[12px] text-slate-400 mt-1">{st.label}</div></div>
                 </div>
               ))}
             </div>
 
-            {/* Reviews */}
+            {/* Reviews — only once real ones exist */}
+            {hasReviews && (
             <div className="bg-white rounded-2xl border border-slate-200/70 shadow-sm p-5 fm-lift">
               <div className="font-bold mb-3">{tr('home.reviewsTitle', 'What Our Customers Say')}</div>
               {stats.reviews > 0 && (
@@ -452,10 +464,9 @@ export default function HomeStore() {
                     </div>
                   ))}
                 </div>
-              ) : (
-                <p className="text-[13px] text-slate-400">{tr('home.beFirst', 'Be the first to leave a verified review after your purchase.')}</p>
-              )}
+              ) : null}
             </div>
+            )}
 
             {/* Discord */}
             <div className="fm-hero-brand rounded-2xl p-6 text-white shadow-lg shadow-indigo-500/20 flex flex-col fm-lift"

@@ -130,7 +130,8 @@ export default function ProductDetail() {
     flyToCart(document.querySelector('[data-pd-media]'));
     add(product, qty); toast.success(`${qty}× ${product.name} ${t('cart.addedToCart', 'added to cart')}`);
   };
-  const buyNow = () => { add(product, qty); navigate('/cart'); };
+  // Straight to checkout — the cart is a dead screen on the highest-intent click.
+  const buyNow = () => { add(product, qty); navigate('/checkout'); };
 
   return (
     <div className="section pt-10 pb-28 lg:pb-10">
@@ -187,9 +188,13 @@ export default function ProductDetail() {
 
           {/* rating + stock */}
           <div className="flex items-center gap-3 mt-3 text-sm">
-            <span className="flex items-center gap-1 text-amber-400">
-              {Array.from({ length: 5 }).map((_, i) => <Star key={i} size={14} fill="currentColor" />)}
-            </span>
+            {stats.reviews > 0 && (
+              <span className="flex items-center gap-1 text-amber-400">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <Star key={i} size={14} fill={i < Math.round(stats.rating || 0) ? 'currentColor' : 'none'} />
+                ))}
+              </span>
+            )}
             {stats.reviews > 0
               ? <span className="text-slate-400">{stats.rating} · {stats.reviews.toLocaleString('en-US')} {t('product.reviewsWord', 'reviews')}</span>
               : <span className="text-slate-400">{t('product.new', 'New')}</span>}
@@ -413,7 +418,9 @@ export default function ProductDetail() {
               style={{ backgroundImage: 'linear-gradient(120deg,#7c5cff,#a855f7)' }}>
               <div className="text-5xl font-extrabold leading-none drop-shadow">{stats.rating}</div>
               <div>
-                <div className="flex text-amber-300">{Array.from({ length: 5 }).map((_, i) => <Star key={i} size={16} fill="currentColor" />)}</div>
+                <div className="flex text-amber-300">{Array.from({ length: 5 }).map((_, i) => (
+                  <Star key={i} size={16} fill={i < Math.round(stats.rating || 0) ? 'currentColor' : 'none'} />
+                ))}</div>
                 <div className="text-white/85 text-sm mt-1">
                   {stats.reviews.toLocaleString('en-US')} {t('product.verifiedCount', 'verified reviews')}
                 </div>

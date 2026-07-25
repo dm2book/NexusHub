@@ -48,7 +48,7 @@ export default function Trust() {
         <span className="inline-flex items-center gap-2 text-[13px] font-semibold text-violet-700 bg-violet-100 rounded-full px-3 py-1.5">
           <ShieldCheck size={14} /> Trust Center
         </span>
-        <h1 className="text-4xl font-extrabold text-slate-900 mt-4">Why thousands buy with confidence</h1>
+        <h1 className="text-4xl font-extrabold text-slate-900 mt-4">How your purchase is protected</h1>
         <p className="text-slate-500 mt-3 max-w-xl mx-auto">Real numbers, real guarantees. Here's exactly how we keep every order safe, fast and protected.</p>
       </div>
 

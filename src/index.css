@@ -281,7 +281,14 @@ h1, h2, h3, .font-display, .fm-head {
 .theme-light .prose, .theme-light .prose p, .theme-light .prose li { color:#475569; }
 .theme-light .prose h1, .theme-light .prose h2, .theme-light .prose h3 { color:#0f172a; }
 .theme-light .prose a { color:#7c3aed; }
+/* Dark-theme content would be white-on-white here, so white text is flipped to
+   near-black. That must NOT reach elements carrying their own coloured
+   background: the primary CTA sits on the purple gradient and was rendering
+   near-black text on it (every "Buy now" / "Browse shop" on the storefront). */
 .theme-light .text-white { color:#0f172a; }
+.theme-light .btn-primary,
+.theme-light .btn-primary:hover,
+.theme-light [style*="gradient"].text-white { color:#fff; }
 .theme-light .text-slate-200 { color:#334155; }
 .theme-light .text-slate-300 { color:#475569; }
 .theme-light .text-slate-400 { color:#64748b; }

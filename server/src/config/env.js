@@ -201,6 +201,9 @@ export function assertProductionConfig() {
   const missing = [];
   if (config.auth.jwtSecret.startsWith('dev-only')) missing.push('JWT_SECRET');
   if (!config.db.url) missing.push('DATABASE_URL (or POSTGRES_URL)');
+  // Demo payments mark orders paid without any money arriving. Shipping that
+  // live would hand out codes for free, so it is a hard failure, not a warning.
+  if (config.payments.demoMode) missing.push('DEMO_PAYMENTS=false (demo mode marks orders paid without payment)');
   if (missing.length) {
     throw new Error(`Refusing to start in production without: ${missing.join(', ')}`);
   }

@@ -48,7 +48,7 @@ const NL = {
   'status.degraded': '● Gedeeltelijke storing — bestellingen kunnen vertraagd zijn',
 
   // Home
-  'home.badge': '#1 vertrouwde marketplace',
+  'home.badge': 'Directe levering · Kopersbescherming',
   'home.h1a': 'Alles wat je nodig hebt,',
   'home.h1b': 'op één plek.',
   'home.sub': 'Koop Robux, V-Bucks, Valorant Points en meer — direct geleverd. Snelle levering, veilige betalingen, 24/7 support.',
