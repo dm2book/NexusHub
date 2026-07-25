@@ -56,22 +56,32 @@ export const DEFAULT_TEMPLATES = [
   {
     id: 'payment_confirmed',
     name: 'Payment Confirmed',
-    subject: 'Payment confirmed for {{order.number}}',
+    subject: 'Payment confirmed for {{order.number}} ✅',
     body_html: `
       <h1>Payment received ✅</h1>
-      <p>We've confirmed payment for order <strong>{{order.number}}</strong>.
-      We're preparing your order now.</p>
-      <p><a class="btn" href="{{order.url}}">View order status</a></p>`,
+      <p>Hi {{user.name}}, we matched your payment to order <strong>{{order.number}}</strong>.
+      Nothing left for you to do — we're preparing it now.</p>
+      {{order.summaryHtml}}
+      <p><strong>What happens next:</strong> items we have in stock are sent automatically
+      within minutes. Anything we buy in for you is delivered by hand, usually within a few
+      hours during the day. Either way the code lands in this same inbox.</p>
+      <p><a class="btn" href="{{order.url}}">Follow your order</a></p>
+      <p style="color:#8b93a7;font-size:13px">That page updates by itself — no account needed,
+      no refreshing. Questions in the meantime? Just reply to this email.</p>`,
   },
   {
     id: 'order_processing',
     name: 'Order Processing',
-    subject: 'Your order {{order.number}} is being processed',
+    subject: 'Your order {{order.number}} is being prepared',
     body_html: `
       <h1>We're on it 🔧</h1>
-      <p>Order <strong>{{order.number}}</strong> is now being processed and will
-      move to fulfillment shortly.</p>
-      <p><a class="btn" href="{{order.url}}">Track in real time</a></p>`,
+      <p>Hi {{user.name}}, order <strong>{{order.number}}</strong> is being prepared right now.</p>
+      {{order.summaryHtml}}
+      <p>This status means we're getting your items ready by hand. It usually takes a few hours
+      during the day; if it lands outside our active hours it goes out first thing after.</p>
+      <p><a class="btn" href="{{order.url}}">Follow your order</a></p>
+      <p style="color:#8b93a7;font-size:13px">Taking longer than you expected? Reply to this email
+      or open a ticket in our Discord — a real person answers, and we'd rather hear from you early.</p>`,
   },
   {
     id: 'order_completed',
@@ -87,6 +97,7 @@ export const DEFAULT_TEMPLATES = [
       <div style="font:800 29px/1.15 'Segoe UI',Arial,sans-serif;color:#ffffff;letter-spacing:-.4px">Your loot is ready 🎮</div>
       <div style="font:400 15px/1.6 'Segoe UI',Arial,sans-serif;color:#b9bfcd;padding-top:10px">Hi {{user.name}} — payment cleared and everything below is yours. Grab it, jump in, and go win. 🚀</div>
       <div style="padding-top:22px">{{order.deliveryHtml}}</div>
+      {{order.redeemHtml}}
       <div style="height:1px;font-size:0;line-height:1px;background-color:#26263a;margin:26px 0 20px">&nbsp;</div>
       <div style="font:700 11px/1 'Segoe UI',Arial,sans-serif;letter-spacing:1.4px;text-transform:uppercase;color:#8b8fa3;padding-bottom:12px">Order summary</div>
       {{order.summaryHtml}}
@@ -100,24 +111,30 @@ export const DEFAULT_TEMPLATES = [
   {
     id: 'refund_issued',
     name: 'Refund Issued',
-    subject: 'Refund issued for {{order.number}}',
+    subject: 'Refund issued for {{order.number}} — {{refund.amount}}',
     body_html: `
-      <h1>Your refund is on the way</h1>
-      <p>We've issued a refund of <strong>{{refund.amount}}</strong> for order
-      <strong>{{order.number}}</strong>. It may take a few business days to
-      appear on your statement.</p>
-      <p><a class="btn" href="{{order.url}}">View order</a></p>`,
+      <h1>Your refund is on the way ↩️</h1>
+      <p>Hi {{user.name}}, we've refunded <strong>{{refund.amount}}</strong> for order
+      <strong>{{order.number}}</strong>.</p>
+      {{order.summaryHtml}}
+      <p><strong>When you'll see it:</strong> bank transfers usually land within 1–3 working days.
+      It comes back to the account you paid from. If you paid with store credit, that part is
+      already back in your balance and ready to use.</p>
+      <p><a class="btn" href="{{order.url}}">View this order</a></p>
+      <p style="color:#8b93a7;font-size:13px">Not what you expected, or nothing arrived after
+      three working days? Reply to this email with your order number and we'll chase it.</p>`,
   },
   {
     id: 'custom_message',
     name: 'Message from Support',
-    subject: 'A message about your order {{order.number}}',
+    subject: '{{subject}} — order {{order.number}}',
     body_html: `
       <h1>{{subject}}</h1>
-      <p>Hi {{user.name}}, our team sent you a message regarding order
-      <strong>{{order.number}}</strong>:</p>
+      <p>Hi {{user.name}}, this is about your order <strong>{{order.number}}</strong>:</p>
       <div class="quote">{{message}}</div>
-      <p><a class="btn" href="{{order.url}}">View your order</a></p>`,
+      <p><a class="btn" href="{{order.url}}">View your order</a></p>
+      <p style="color:#8b93a7;font-size:13px">You can reply straight to this email — it reaches
+      the same person who sent it. Prefer chat? Our Discord ticket is linked at the bottom.</p>`,
   },
   {
     id: 'cart_reminder',
@@ -214,6 +231,22 @@ export const LEGACY_TEMPLATE_BODIES = {
           <a href="{{order.url}}" style="display:block;padding:15px 24px;font:700 16px/1 'Segoe UI',Arial,sans-serif;color:#ffffff;text-decoration:none">View in your dashboard</a>
         </td>
       </tr></table>
+      <div style="font:400 13px/1.6 'Segoe UI',Arial,sans-serif;color:#8b8fa3;text-align:center;padding-top:16px">Something not right? Just reply to this email or open a ticket in our Discord — real humans, fast. 💬</div>`, `
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 22px"><tr>
+        <td style="padding:0 8px 0 0"><span style="display:inline-block;padding:6px 13px;background-color:#0e1f18;border:1px solid #145c43;border-radius:999px;color:#34d399;font-size:12px;font-weight:700;font-family:'Segoe UI',Arial,sans-serif">● Delivered</span></td>
+        <td><span style="display:inline-block;padding:6px 13px;background-color:#181826;border:1px solid #34345a;border-radius:999px;color:#9aa3b8;font-size:12px;font-weight:600;font-family:'Segoe UI',Arial,sans-serif">Order {{order.number}}</span></td>
+      </tr></table>
+      <div style="font:800 29px/1.15 'Segoe UI',Arial,sans-serif;color:#ffffff;letter-spacing:-.4px">Your loot is ready 🎮</div>
+      <div style="font:400 15px/1.6 'Segoe UI',Arial,sans-serif;color:#b9bfcd;padding-top:10px">Hi {{user.name}} — payment cleared and everything below is yours. Grab it, jump in, and go win. 🚀</div>
+      <div style="padding-top:22px">{{order.deliveryHtml}}</div>
+      <div style="height:1px;font-size:0;line-height:1px;background-color:#26263a;margin:26px 0 20px">&nbsp;</div>
+      <div style="font:700 11px/1 'Segoe UI',Arial,sans-serif;letter-spacing:1.4px;text-transform:uppercase;color:#8b8fa3;padding-bottom:12px">Order summary</div>
+      {{order.summaryHtml}}
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0 4px"><tr>
+        <td align="center" style="border-radius:12px;background-color:#7c5cff;background-image:linear-gradient(120deg,#7c5cff 0%,#a855f7 55%,#d946ef 100%)">
+          <a href="{{order.url}}" style="display:block;padding:15px 24px;font:700 16px/1 'Segoe UI',Arial,sans-serif;color:#ffffff;text-decoration:none">View your order</a>
+        </td>
+      </tr></table>
       <div style="font:400 13px/1.6 'Segoe UI',Arial,sans-serif;color:#8b8fa3;text-align:center;padding-top:16px">Something not right? Just reply to this email or open a ticket in our Discord — real humans, fast. 💬</div>`],
   // Both of these promised instant delivery and buyer protection — the exact
   // claims the storefront stopped making. An email that over-promises does the
@@ -228,6 +261,30 @@ export const LEGACY_TEMPLATE_BODIES = {
       You can follow the status any time:</p>
       <p><a class="btn" href="{{order.url}}">Track your order</a></p>
       <p>Need help? Just reply to this email or open a ticket in our Discord.</p>`],
+  // Superseded by copy that says what happens next and when — the originals were
+  // two lines and a button, which is where "where is my order?" tickets start.
+  payment_confirmed: [`
+      <h1>Payment received ✅</h1>
+      <p>We've confirmed payment for order <strong>{{order.number}}</strong>.
+      We're preparing your order now.</p>
+      <p><a class="btn" href="{{order.url}}">View order status</a></p>`],
+  order_processing: [`
+      <h1>We're on it 🔧</h1>
+      <p>Order <strong>{{order.number}}</strong> is now being processed and will
+      move to fulfillment shortly.</p>
+      <p><a class="btn" href="{{order.url}}">Track in real time</a></p>`],
+  refund_issued: [`
+      <h1>Your refund is on the way</h1>
+      <p>We've issued a refund of <strong>{{refund.amount}}</strong> for order
+      <strong>{{order.number}}</strong>. It may take a few business days to
+      appear on your statement.</p>
+      <p><a class="btn" href="{{order.url}}">View order</a></p>`],
+  custom_message: [`
+      <h1>{{subject}}</h1>
+      <p>Hi {{user.name}}, our team sent you a message regarding order
+      <strong>{{order.number}}</strong>:</p>
+      <div class="quote">{{message}}</div>
+      <p><a class="btn" href="{{order.url}}">View your order</a></p>`],
   cart_reminder: [`
       <div class="badge">🛒</div>
       <h1 style="text-align:center">Still thinking it over?</h1>

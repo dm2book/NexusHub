@@ -87,7 +87,11 @@ export async function createOrder(input, ctx = {}) {
     subtotal += unit * qty;
     lineItems.push({
       id: newId('oit'), product_id: product.id, name: product.name,
-      quantity: qty, unit_price: unit, metadata: li.metadata || {},
+      quantity: qty, unit_price: unit,
+      // Snapshot the category: the delivery email picks its redeem instructions
+      // from it, and it must stay correct even if the product is later re-filed
+      // or deleted. Client-supplied metadata never overrides it.
+      metadata: { ...(li.metadata || {}), category: product.category },
     });
   }
   // Apply a discount coupon if one was supplied and is valid (DB-backed; server
@@ -443,6 +447,14 @@ async function hydrate(row) {
     all('SELECT * FROM order_status_history WHERE order_id=@id ORDER BY created_at ASC', { id: row.id }),
     all('SELECT * FROM deliveries WHERE order_id=@id', { id: row.id }),
   ]);
+  // Orders placed before the category snapshot existed still need their redeem
+  // instructions, so fall back to the product's current category.
+  const missing = items.filter((i) => i.product_id && !parse(i.metadata)?.category);
+  const backfill = {};
+  for (const id of [...new Set(missing.map((i) => i.product_id))]) {
+    const p = await get('SELECT category FROM products WHERE id=@id', { id }).catch(() => null);
+    if (p?.category) backfill[id] = p.category;
+  }
   return {
     id: row.id, number: row.number, userId: row.user_id, email: row.email,
     status: row.status, statusLabel: labelFor(row.status),
@@ -451,7 +463,11 @@ async function hydrate(row) {
     paymentStatus: row.payment_status, paymentRef: row.payment_ref,
     billing: parse(row.billing), fraudScore: row.fraud_score, fraudStatus: row.fraud_status,
     notes: row.notes,
-    items: items.map((i) => ({ ...i, metadata: parse(i.metadata) })),
+    items: items.map((i) => {
+      const metadata = parse(i.metadata) || {};
+      if (!metadata.category && backfill[i.product_id]) metadata.category = backfill[i.product_id];
+      return { ...i, metadata };
+    }),
     history, deliveries,
     createdAt: row.created_at, updatedAt: row.updated_at,
   };
@@ -605,6 +621,67 @@ function paymentInstructionsHtml(order) {
     `<table class="summary"><tbody>${rows}</tbody></table>`;
 }
 
+/**
+ * How to actually use what we just delivered — per product category.
+ *
+ * A delivered code with no instructions is a support ticket waiting to happen:
+ * Robux, V-Bucks, Valorant Points, Nitro and a Steam gift card are each redeemed
+ * somewhere completely different, and a 14-year-old buying their first top-up
+ * does not know where. Keyed by the product's own category, so the steps a buyer
+ * gets always match what they bought.
+ *
+ * `where` is the screen to go to; `steps` are the clicks. Deliberately short —
+ * this sits under the code, it is not a manual.
+ */
+const REDEEM_STEPS = {
+  robux: { icon: '🎮', title: 'How to redeem your Robux code', where: 'roblox.com/redeem',
+    steps: ['Sign in to Roblox and open <strong>roblox.com/redeem</strong>.', 'Paste the code above and press <strong>Redeem</strong>.', 'The Robux land in the account you are signed in to — double-check it is the right one.'] },
+  'v-bucks': { icon: '🪂', title: 'How to redeem your V-Bucks code', where: 'fortnite.com/vbuckscard',
+    steps: ['Open <strong>fortnite.com/vbuckscard</strong> and sign in to your Epic account.', 'Enter the code above and confirm.', 'V-Bucks are shared across every platform on that Epic account.'] },
+  valorant: { icon: '🎯', title: 'How to redeem your Valorant code', where: 'the in-game store',
+    steps: ['Open Valorant and go to the <strong>Store</strong>.', 'Choose <strong>Redeem code</strong> (or redeem on the Riot website).', 'Points appear in your wallet straight away.'] },
+  'discord-nitro': { icon: '💜', title: 'How to redeem your Nitro code', where: 'discord.com/billing/promotions',
+    steps: ['Open <strong>discord.com/billing/promotions</strong> while signed in.', 'Paste the code and confirm.', 'Nitro activates on that Discord account immediately.'] },
+  giftcard: { icon: '🎁', title: 'How to redeem your gift card', where: 'the store it belongs to',
+    steps: ['Open the store the card is for (Steam, PlayStation, Xbox, …) and sign in.', 'Find <strong>Redeem code</strong> / <strong>Add funds</strong> and paste the code above.', 'The balance is added to that account — it cannot be moved afterwards.'] },
+  gamepass: { icon: '🕹', title: 'How to redeem your Game Pass code', where: 'redeem.microsoft.com',
+    steps: ['Open <strong>redeem.microsoft.com</strong> and sign in with your Microsoft account.', 'Enter the code and confirm.', 'Game Pass activates on that account — check it is the one you play on.'] },
+  spotify: { icon: '🎧', title: 'How to redeem your Spotify code', where: 'spotify.com/redeem',
+    steps: ['Open <strong>spotify.com/redeem</strong> and sign in.', 'Paste the code and confirm.', 'Premium is applied to that Spotify account.'] },
+  minecraft: { icon: '⛏', title: 'How to redeem your Minecraft code', where: 'minecraft.net/redeem',
+    steps: ['Open <strong>minecraft.net/redeem</strong> and sign in.', 'Enter the code and confirm.', 'The purchase is tied to that Microsoft account.'] },
+};
+
+/** Generic fallback for categories with no dedicated recipe (mobile games etc.). */
+const REDEEM_FALLBACK = { icon: '📩', title: 'How to use your code', where: 'the game or store it belongs to',
+  steps: ['Open the game or store this top-up is for and sign in.', 'Find <strong>Redeem code</strong> in the shop or account settings and paste the code above.', 'Stuck? Reply to this email with a screenshot and we will walk you through it.'] };
+
+function redeemHtml(order) {
+  // Account top-ups have nothing to redeem — we already did it for them.
+  if (order.billing?.deliveryMethod === 'account' && order.billing?.deliveryDetails) return '';
+  if (!order.deliveries?.length) return '';
+
+  // One block per distinct category in the order, so a mixed order (Robux +
+  // a Steam card) explains both instead of guessing at one.
+  const cats = [...new Set((order.items || []).map((i) => String(i.metadata?.category || i.category || '').toLowerCase()).filter(Boolean))];
+  const recipes = cats.map((c) => REDEEM_STEPS[c]).filter(Boolean);
+  const list = recipes.length ? recipes : [REDEEM_FALLBACK];
+
+  return list.map((r) => `
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:14px 0 0">
+      <tr><td style="background-color:#141426;border:1px solid #2c2c48;border-radius:14px;padding:16px 18px">
+        <div style="font:700 14px/1.3 'Segoe UI',Arial,sans-serif;color:#ffffff">${r.icon} ${escapeHtml(r.title)}</div>
+        <div style="font:400 12.5px/1.6 'Segoe UI',Arial,sans-serif;color:#8b8fa3;padding-top:3px">Redeem at ${escapeHtml(r.where)}</div>
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:11px">
+          ${r.steps.map((s, n) => `<tr>
+            <td valign="top" style="padding:3px 9px 3px 0"><span style="display:inline-block;width:19px;height:19px;background-color:#26264a;border-radius:999px;color:#c7d2fe;font:700 11px/19px Arial,sans-serif;text-align:center">${n + 1}</span></td>
+            <td style="padding:3px 0;font:400 13.5px/1.55 'Segoe UI',Arial,sans-serif;color:#b9bfcd">${s}</td>
+          </tr>`).join('')}
+        </table>
+      </td></tr>
+    </table>`).join('');
+}
+
 /** The hero block of the completion email: a green "delivered to your account"
  *  confirmation for direct top-ups, otherwise premium copyable code cards. All
  *  styles are inline so it renders intact even where a client strips <style>. */
@@ -701,6 +778,7 @@ function emailContext(order, ctx = {}) {
       summaryHtml: summaryHtml(order),
       deliveryHtml: deliveryHtml(order),
       deliveriesHtml: deliveryHtml(order), // back-compat alias for older templates
+      redeemHtml: redeemHtml(order),
       paymentHtml: paymentInstructionsHtml(order),
       url: orderUrlFor(order),
     },
