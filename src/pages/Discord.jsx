@@ -17,13 +17,13 @@ const CHANNELS = [
   { group: 'SUPPORT', icon: Ticket, items: ['create-ticket', 'support-chat'] },
 ];
 
-const ROLES = [
-  { name: 'Owner', icon: Crown, color: '#f59e0b', desc: 'Full control' },
-  { name: 'Admin', icon: Shield, color: '#ef4444', desc: 'Management access' },
-  { name: 'Moderator', icon: Wrench, color: '#3b82f6', desc: 'Community oversight' },
-  { name: 'Support', icon: Headphones, color: '#10b981', desc: 'Ticket handling' },
-  { name: 'VIP', icon: Sparkles, color: '#a855f7', desc: 'Premium perks' },
-  { name: 'Customer', icon: Tag, color: '#64748b', desc: 'Verified buyer' },
+const roles = (t) => [
+  { name: 'Owner', icon: Crown, color: '#f59e0b', desc: t('discord.rOwner', 'Full control') },
+  { name: 'Admin', icon: Shield, color: '#ef4444', desc: t('discord.rAdmin', 'Management access') },
+  { name: 'Moderator', icon: Wrench, color: '#3b82f6', desc: t('discord.rMod', 'Keeps the server in order') },
+  { name: 'Support', icon: Headphones, color: '#10b981', desc: t('discord.rSupport', 'Handles your tickets') },
+  { name: 'VIP', icon: Sparkles, color: '#a855f7', desc: t('discord.rVip', 'Perks for regulars') },
+  { name: 'Customer', icon: Tag, color: '#64748b', desc: t('discord.rCustomer', 'Verified buyer') },
 ];
 
 const perks = (t) => [
@@ -39,7 +39,7 @@ const STATUS_COLOR = { online: '#23a55a', idle: '#f0b232', dnd: '#f23f43', offli
 
 export default function Discord() {
   const { t } = useI18n();
-  usePageMeta('Join our Discord', 'Support, restock alerts, giveaways and community vouches.');
+  usePageMeta('ForgeMarket Support on Discord', 'Get help with an order, follow restocks and giveaways, and read buyer vouches.');
   const { user } = useAuth();
   const [server, setServer] = useState(null);
   // Offering "link my account" when Discord login isn't configured sends the
@@ -57,8 +57,8 @@ export default function Discord() {
   const invite = server?.inviteUrl || 'https://discord.gg/CrAfqENsSV';
   const JoinBtn = ({ className = '' }) => (
     invite
-      ? <a href={invite} target="_blank" rel="noreferrer" className={`btn-primary ${className}`} style={{ background: 'linear-gradient(120deg,#5865F2,#a855f7)' }}><MessageCircle size={18} /> Join the server</a>
-      : <span className={`btn-ghost cursor-default ${className}`} title="Invite link not configured yet"><MessageCircle size={18} /> Invite coming soon</span>
+      ? <a href={invite} target="_blank" rel="noreferrer" className={`btn-primary ${className}`} style={{ background: 'linear-gradient(120deg,#5865F2,#a855f7)' }}><MessageCircle size={18} /> {t('discord.join', 'Join ForgeMarket Support')}</a>
+      : <span className={`btn-ghost cursor-default ${className}`} title="Invite link not configured yet"><MessageCircle size={18} /> {t('discord.soon', 'Invite coming soon')}</span>
   );
 
   return (
@@ -72,10 +72,10 @@ export default function Discord() {
                style={{ background: 'linear-gradient(135deg,#5865F2,#a855f7)' }}>
             <MessageCircle size={38} className="text-white" />
           </div>
-          <span className="eyebrow">Community</span>
-          <h1 className="text-4xl sm:text-6xl text-white mt-5">{server?.name || 'ForgeMarket Community'}</h1>
+          <span className="eyebrow">{t('discord.eyebrow', 'Support')}</span>
+          <h1 className="text-4xl sm:text-6xl text-white mt-5">{server?.name || 'ForgeMarket Support'}</h1>
           <p className="text-slate-400 text-lg mt-4 max-w-2xl mx-auto">
-            {server?.tagline || 'Drops, giveaways, support and vouches — all in one place.'}
+            {server?.tagline || t('discord.tagline', 'Order help, delivery updates, drops and giveaways — all in one place.')}
           </p>
 
           {/* live stats */}
@@ -86,10 +86,10 @@ export default function Discord() {
                   <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60 animate-pulse-ring" />
                   <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-400" />
                 </span>
-                {server.online.toLocaleString()} online now
+                {server.online.toLocaleString()} {t('discord.onlineNow', 'online now')}
               </span>
             )}
-            <span className="glass rounded-full px-4 py-2 text-sm text-slate-300">Free to join</span>
+            <span className="glass rounded-full px-4 py-2 text-sm text-slate-300">{t('discord.free', 'Free to join')}</span>
           </div>
 
           <div className="mt-8 flex items-center justify-center gap-4">
@@ -108,7 +108,7 @@ export default function Discord() {
                 <img key={i} src={m.avatar} alt={m.name} title={m.name}
                   className="w-10 h-10 rounded-full border-2 border-space-black object-cover" />
               ))}
-              <span className="pl-5 text-slate-500 text-sm">and many more…</span>
+              <span className="pl-5 text-slate-500 text-sm">{t('discord.andMore', 'and many more…')}</span>
             </div>
           )}
         </div>
@@ -116,7 +116,7 @@ export default function Discord() {
 
       {/* Channels */}
       <section className="section py-14">
-        <SectionHeading eyebrow="Inside the server" title="Channels for everything" center />
+        <SectionHeading eyebrow={t('discord.inside', 'Inside the server')} title={t('discord.channels', 'A channel for everything')} center />
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {CHANNELS.map(({ group, icon: Icon, items }) => (
             <div key={group} className="card p-5">
@@ -137,9 +137,9 @@ export default function Discord() {
 
       {/* Roles */}
       <section className="section py-14">
-        <SectionHeading eyebrow="Hierarchy" title="Roles & ranks" center />
+        <SectionHeading eyebrow={t('discord.hierarchy', 'Who’s who')} title={t('discord.rolesTitle', 'Roles & ranks')} center />
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {ROLES.map(({ name, icon: Icon, color, desc }) => (
+          {roles(t).map(({ name, icon: Icon, color, desc }) => (
             <div key={name} className="card p-5 flex items-center gap-4 hover:border-primary/30 transition">
               <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0"
                    style={{ background: `${color}22`, border: `1px solid ${color}55` }}>
@@ -158,7 +158,7 @@ export default function Discord() {
       <section className="section py-14">
         <div className="grid lg:grid-cols-2 gap-6 items-stretch">
           <div className="card p-8">
-            <h3 className="text-2xl text-white mb-5">Why join?</h3>
+            <h3 className="text-2xl text-white mb-5">{t('discord.why', 'Why join?')}</h3>
             <ul className="space-y-3">
               {perks(t).map((p) => (
                 <li key={p} className="flex items-start gap-3 text-slate-300">
@@ -171,7 +171,7 @@ export default function Discord() {
                style={{ backgroundImage: 'linear-gradient(120deg, rgba(88,101,242,.3), rgba(168,85,247,.2))' }}>
             <div className="orb w-60 h-60 -top-20 right-0" style={{ background: 'rgba(88,101,242,.5)' }} />
             <div className="relative">
-              <h3 className="text-3xl text-white">Ready to jump in?</h3>
+              <h3 className="text-3xl text-white">{t('discord.ready', 'Need a hand?')}</h3>
               <p className="text-slate-300 mt-3">{canLink
                 ? t('discord.joinSub', 'Free to join, and you can link your ForgeMarket account for verified roles.')
                 : t('discord.joinSubPlain', 'Free to join — ask a question, catch a drop, or leave a vouch after your order.')}</p>

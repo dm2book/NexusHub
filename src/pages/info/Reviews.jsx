@@ -81,7 +81,7 @@ function WriteReview({ t }) {
 }
 
 export default function Reviews() {
-  usePageMeta('Customer reviews', 'Reviews from real ForgeMarket orders, plus community vouches from our Discord.');
+  usePageMeta('Customer reviews', 'Reviews from real ForgeMarket orders, plus vouches from ForgeMarket Support on Discord.');
   const reviews = useReviews();
   const stats = useStats();
   const { t } = useI18n();
@@ -92,7 +92,7 @@ export default function Reviews() {
 
   return (
     <InfoShell eyebrow={t('reviews.eyebrow', 'Loved by gamers')} title={t('reviews.title', 'Customer reviews')}
-      subtitle={t('reviews.sub', 'Real feedback from verified buyers and our Discord community vouches.')} narrow={false}>
+      subtitle={t('reviews.sub', 'Real feedback from verified buyers, plus vouches left in ForgeMarket Support.')} narrow={false}>
       <div className="flex flex-wrap items-center justify-center gap-6 mb-10">
         {stats.reviews > 0 && (
           <>

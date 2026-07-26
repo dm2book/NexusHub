@@ -29,7 +29,7 @@ export default function About() {
       <div className="card p-8 text-center max-w-2xl mx-auto">
         <Rocket className="mx-auto text-indigo-300 mb-4" size={32} />
         <h2 className="text-2xl text-white">{t('about.ready', 'Ready to get started?')}</h2>
-        <p className="text-slate-400 mt-2">{t('about.readySub', 'Browse the shop or join our community on Discord.')}</p>
+        <p className="text-slate-400 mt-2">{t('about.readySub', 'Browse the shop, or reach ForgeMarket Support on Discord.')}</p>
         <div className="flex justify-center gap-3 mt-6">
           <Link to="/shop" className="btn-primary">{t('home.shopNow', 'Shop now')}</Link>
           <Link to="/discord" className="btn-ghost">{t('home.joinBtn', 'Join Discord')}</Link>

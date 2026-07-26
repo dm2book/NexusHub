@@ -118,7 +118,7 @@ export default function SiteLayout() {
             </Link>
             <p className="text-slate-500 text-sm">The marketplace for digital goods — fair prices, real support, every order tracked.</p>
             <a href="/discord" className="inline-flex items-center gap-2 mt-4 text-sm text-indigo-300 hover:text-indigo-200">
-              <MessageCircle size={16} /> Join our Discord
+              <MessageCircle size={16} /> ForgeMarket Support on Discord
             </a>
           </div>
           <FooterCol title="Shop" links={[['All products', '/shop'], ['Wishlist', '/wishlist'], ['Track order', '/track'], ['Payment methods', '/payment-methods']]} />
