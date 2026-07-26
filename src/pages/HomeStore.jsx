@@ -536,8 +536,8 @@ export default function HomeStore() {
             <div className="fm-hero-brand rounded-2xl p-6 text-white shadow-lg shadow-indigo-500/20 flex flex-col fm-lift"
               style={{ backgroundImage: 'linear-gradient(150deg,#6366f1,#8b5cf6)' }}>
               <span className="w-12 h-12 rounded-2xl bg-white/15 grid place-items-center mb-4"><MessageCircle size={24} /></span>
-              <div className="fm-head text-xl">{tr('home.joinDiscord', 'Join Our Discord')}</div>
-              <p className="text-white/85 text-sm mt-2 leading-relaxed flex-1">{tr('home.discordSub', 'Get support, updates and exclusive giveaways!')}</p>
+              <div className="fm-head text-xl">{tr('home.joinDiscord', 'ForgeMarket Support')}</div>
+              <p className="text-white/85 text-sm mt-2 leading-relaxed flex-1">{tr('home.discordSub', 'Reach a real person on Discord — plus restock alerts, deals and giveaways.')}</p>
               {stats.discordMembers > 0 && (
                 <div className="flex items-center gap-2 mt-3 text-white/90 text-sm">
                   <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />

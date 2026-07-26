@@ -80,8 +80,8 @@ export const config = {
 
   discord: {
     // Server name shown on the community page (always present).
-    serverName: env.DISCORD_SERVER_NAME || 'ForgeMarket Community',
-    tagline: env.DISCORD_TAGLINE || 'Drops, giveaways, support & vouches.',
+    serverName: env.DISCORD_SERVER_NAME || 'ForgeMarket Support',
+    tagline: env.DISCORD_TAGLINE || 'Order help, delivery updates, drops & giveaways.',
     // Guild id enables live stats via the public widget.json (widget must be
     // enabled in Discord → Server Settings → Widget).
     guildId: env.DISCORD_GUILD_ID || '',

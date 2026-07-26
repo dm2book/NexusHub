@@ -73,7 +73,7 @@ export default function Trust() {
             ? { icon: ShieldCheck, value: `${stats.successRate}%`, label: t('trust.sSuccess', 'Successfully delivered'), color: 'text-emerald-600 bg-emerald-100' }
             : null,
           { icon: Star, value: stats.reviews > 0 ? `${stats.rating}/5` : '—', label: stats.reviews > 0 ? `${stats.reviews.toLocaleString('en-US')} ${t('trust.sReviews', 'reviews')}` : t('trust.sNoReviews', 'No reviews yet'), color: 'text-amber-600 bg-amber-100' },
-          { icon: Users, value: stats.discordMembers > 0 ? stats.discordMembers.toLocaleString('en-US') : '24/7', label: stats.discordMembers > 0 ? t('trust.sMembers', 'Discord members') : t('trust.sCommunity', 'Community support'), color: 'text-blue-600 bg-blue-100' },
+          { icon: Users, value: stats.discordMembers > 0 ? stats.discordMembers.toLocaleString('en-US') : '24/7', label: stats.discordMembers > 0 ? t('trust.sMembers', 'Discord members') : t('trust.sCommunity', 'Support on Discord'), color: 'text-blue-600 bg-blue-100' },
         ].filter(Boolean);
         return (
           <div className={`grid grid-cols-2 ${cards.length >= 5 ? 'lg:grid-cols-5' : 'lg:grid-cols-4'} gap-4 mb-12`}>
@@ -107,9 +107,9 @@ export default function Trust() {
           <h3 className="text-xl font-extrabold">
             {stats.discordMembers > 0
               ? `${stats.discordMembers.toLocaleString('en-US')} ${t('trust.membersVouch', 'members can vouch for us')}`
-              : t('trust.joinVouch', 'Join a community that can vouch for us')}
+              : t('trust.joinVouch', 'Ask real buyers before you buy')}
           </h3>
-          <p className="text-white/85 text-sm mt-1">{t('trust.discordSub', 'Public reviews, proof of delivery and a community you can ask before you buy.')}</p>
+          <p className="text-white/85 text-sm mt-1">{t('trust.discordSub', 'Public reviews, proof of delivery, and buyers you can ask before you spend a cent.')}</p>
         </div>
         <Link to="/discord" className="inline-flex items-center justify-center gap-2 bg-white text-indigo-600 font-semibold text-sm rounded-xl h-11 px-6 hover:bg-indigo-50 transition shrink-0">
           {t('trust.joinDiscord', 'Join Discord')} <ArrowRight size={16} />

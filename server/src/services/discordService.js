@@ -99,7 +99,11 @@ export async function getServerInfo() {
   const base = {
     configured: !!config.discord.guildId,
     name: config.discord.serverName,
-    tagline: config.discord.tagline,
+    // Only send a tagline the owner actually wrote. Handing the built-in
+    // English default to the storefront left a Dutch page with one English
+    // line in it — the storefront has a translated fallback and can use it
+    // whenever there is nothing custom to show.
+    tagline: process.env.DISCORD_TAGLINE ? config.discord.tagline : null,
     // Bot-maintained permanent invite first; env-configured link as fallback.
     inviteUrl: await getLiveInviteUrl(),
     online: null,

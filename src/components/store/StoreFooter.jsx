@@ -55,7 +55,7 @@ export default function StoreFooter() {
             {t('footer.tagline', 'The marketplace for digital goods — fair prices, real support, every order tracked.')}
           </p>
           <Link to="/discord" className="inline-flex items-center gap-2 mt-4 text-sm font-semibold text-violet-600 hover:text-violet-700">
-            {t('footer.discord', '💬 Join our Discord')}
+            {t('footer.discord', '💬 ForgeMarket Support on Discord')}
           </Link>
         </div>
         {COLS.map((c) => (
