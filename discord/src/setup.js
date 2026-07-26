@@ -33,6 +33,10 @@ const TYPE = {
 // REPOST=1 → re-post all panels. Trimmed because Windows' `set REPOST=1 && …`
 // includes the space before && in the value.
 const REPOST = /^(1|true|yes)$/i.test((process.env.REPOST || '').trim());
+// Delete blueprint leftovers that are provably empty. On by default: an empty
+// room costs the server its credibility and loses nothing when removed.
+// PRUNE=off / PRUNE=0 turns it into a report.
+const PRUNE = !/^(0|false|off|no)$/i.test((process.env.PRUNE || '').trim());
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 const resolvePerms = (arr = []) => arr.map((n) => P[n]).filter(Boolean);
@@ -382,24 +386,56 @@ client.once('ready', async () => {
     console.log(`\n✅ Setup complete. Panels posted now: ${posted}. ${REPOST ? '(REPOST mode)' : 'Run with REPOST=1 to re-post all.'}`);
 
     // Channels that exist on the server but are no longer in the blueprint.
-    // setup.js never deletes anything — a channel can hold history and pins that
-    // are not ours to throw away — so it reports them instead. Empty leftovers
-    // are exactly what makes a small server look abandoned.
+    //
+    // An empty leftover room is exactly what makes a small server look
+    // abandoned, so those are deleted. Anything carrying real conversation is
+    // NOT ours to throw away — it is reported instead, with its message count,
+    // so the owner decides. PRUNE=off skips the whole step.
     try {
       const wanted = new Set(CATEGORIES.flatMap((c) => c.channels)
         .flatMap((c) => [c.name, ...(c.aka || [])]));
       const ours = new Set(CATEGORIES.map((c) => c.name));
-      const strays = guild.channels.cache.filter((c) => {
+      const strays = [...guild.channels.cache.values()].filter((c) => {
         if (c.type === ChannelType.GuildCategory) return !ours.has(c.name) && c.name !== '📊 SERVER STATS';
         if (c.parent && !ours.has(c.parent.name)) return false;      // in someone else's category
         if (c.parent?.name === '🎫 TICKETS') return false;            // live tickets
         return !wanted.has(c.name);
       });
-      if (strays.size) {
-        console.log(`\nℹ️  ${strays.size} channel(s) exist here but are not in the blueprint:`);
+
+      if (strays.length && PRUNE) {
+        console.log(`\n🧹 ${strays.length} channel(s) are no longer in the blueprint:`);
+        const kept = [];
+        // Delete children before their category, or the category refuses to go.
+        for (const c of strays.sort((a, b) => (a.type === ChannelType.GuildCategory ? 1 : 0) - (b.type === ChannelType.GuildCategory ? 1 : 0))) {
+          try {
+            if (c.type === ChannelType.GuildCategory) {
+              if (c.children?.cache?.size) { kept.push(`${c.name} (still has channels)`); continue; }
+              await c.delete('ForgeMarket setup: category no longer in the blueprint');
+              console.log(`   ✂ deleted category ${c.name}`);
+              continue;
+            }
+            if (c.type === ChannelType.GuildVoice) {
+              if (c.members?.size) { kept.push(`#${c.name} (people in it)`); continue; }
+              await c.delete('ForgeMarket setup: voice channel no longer in the blueprint');
+              console.log(`   ✂ deleted #${c.name}`);
+              continue;
+            }
+            // Text: only when nobody has actually talked in it. Bot panels and
+            // join notices do not count as conversation.
+            const msgs = await c.messages.fetch({ limit: 20 }).catch(() => null);
+            const human = msgs ? [...msgs.values()].filter((m) => !m.author.bot && m.type !== 6) : [];
+            if (human.length) { kept.push(`#${c.name} (${human.length}+ real messages)`); continue; }
+            await c.delete('ForgeMarket setup: empty channel no longer in the blueprint');
+            console.log(`   ✂ deleted #${c.name} (was empty)`);
+          } catch (e) { kept.push(`#${c.name} (${e.message})`); }
+        }
+        if (kept.length) {
+          console.log('\n   Left alone — these hold real messages, delete them yourself if you want them gone:');
+          kept.forEach((k) => console.log(`   · ${k}`));
+        }
+      } else if (strays.length) {
+        console.log(`\nℹ️  ${strays.length} channel(s) exist here but are not in the blueprint (PRUNE=off, nothing deleted):`);
         strays.forEach((c) => console.log(`   · ${c.type === ChannelType.GuildCategory ? '' : '#'}${c.name}`));
-        console.log('   Nothing was deleted. Empty ones are worth removing by hand — a room');
-        console.log('   nobody has posted in reads as an abandoned shop.');
       }
     } catch (e) { console.log(`   ! stray-channel check failed: ${e.message}`); }
 
