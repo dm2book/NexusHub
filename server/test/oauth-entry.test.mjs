@@ -105,7 +105,7 @@ console.log('\n— And when it IS configured, the guard gets out of the way —'
   });
   const loc = (child.stdout || '').split('\n').find((l) => l.startsWith('LOCATION='))?.slice(9) || '';
   ok('a configured provider goes to the provider, not to /login',
-    loc.startsWith('https://discord.com/api/oauth2/authorize'), loc || child.stderr?.slice(-300));
+    loc.startsWith('https://discord.com/api/oauth2/authorize'), loc || child.stderr?.slice(0, 700));
   ok('carrying our client id', /client_id=test-client-id/.test(loc), loc);
   ok('and a state to verify on the way back', /[?&]state=[^&]+/.test(loc), loc);
 }
