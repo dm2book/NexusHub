@@ -16,6 +16,7 @@ import { config, manualPayMethods } from '../config/env.js';
 import { badRequest, notFound, conflict } from '../utils/errors.js';
 import { sendEmailAsync } from './emailService.js';
 import { validatePayLink } from '../utils/payLink.js';
+import { payMethodsFor } from '../utils/payMethodUrl.js';
 import { renderTemplate, baseContext } from './templateService.js';
 import { notify } from './notificationService.js';
 import { scoreOrder } from './fraudService.js';
@@ -508,6 +509,11 @@ async function hydrate(row) {
     // Per-order payment link with the exact amount already in it, when the
     // owner has pasted one. Public on purpose: the buyer needs to click it.
     payLink: row.pay_link || null, payLinkAt: row.pay_link_at || null,
+    // Resolved once, on the server: each configured method with the amount (and
+    // where the provider allows it, the reference) already in the URL.
+    payMethods: payMethodsFor(manualPayMethods(), {
+      total: row.total, currency: row.currency, number: row.number,
+    }),
     items: items.map((i) => {
       const metadata = parse(i.metadata) || {};
       if (!metadata.category && backfill[i.product_id]) metadata.category = backfill[i.product_id];
@@ -665,14 +671,15 @@ function paymentInstructionsHtml(order) {
       `<a href="${escapeHtml(order.payLink)}">${escapeHtml(String(order.payLink).replace(/^https?:\/\//, '').slice(0, 60))}</a>` +
       `</div>`
     : '';
-  const eur = (order.total / 100).toFixed(2);
-  const rows = methods.map((m) => {
+  const rows = payMethodsFor(methods, order).map((m) => {
     if (m.kind === 'email') {
-      return `<tr><td><strong>${m.label}</strong></td><td class="r">Send ${amt} to ${escapeHtml(m.target)} (Friends &amp; Family)</td></tr>`;
+      return `<tr><td><strong>${m.label}</strong></td><td class="r">Send ${amt} to ${escapeHtml(m.target)}</td></tr>`;
     }
-    let url = /^https?:\/\//.test(m.target) ? m.target : `https://${m.target}`;
-    if (m.id === 'paypal' && /paypal\.me/i.test(url)) url = `${url.replace(/\/$/, '')}/${eur}EUR`;
-    return `<tr><td><strong>${m.label}</strong></td><td class="r"><a href="${url}">${escapeHtml(url.replace(/^https?:\/\//, ''))}</a></td></tr>`;
+    // Saying which links already carry the amount is the difference between a
+    // buyer tapping once and a buyer typing a number wrong.
+    const note = m.prefilled ? ' <span style="color:#34d399">· amount filled in</span>' : '';
+    return `<tr><td><strong>${m.label}</strong>${note}</td><td class="r">` +
+      `<a href="${m.url}">${escapeHtml(String(m.url).replace(/^https?:\/\//, ''))}</a></td></tr>`;
   }).join('');
   if (!methods.length) return exact;   // only the exact-amount link to show
   return exact +

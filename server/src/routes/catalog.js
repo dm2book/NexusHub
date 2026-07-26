@@ -393,6 +393,9 @@ router.get('/track/:number', asyncHandler(async (req, res) => {
     // it; the buyer's page polls, so it appears without a refresh. Only while
     // the order is unpaid — a pay button on a paid order invites paying twice.
     payLink: order.status === 'pending' ? (order.payLink || null) : null,
+    // Resolved server-side with the amount already in each URL where the
+    // provider supports it, so the page never has to build a payment link.
+    payMethods: order.status === 'pending' ? order.payMethods : [],
     updatedAt: order.updatedAt,
   });
 }));
