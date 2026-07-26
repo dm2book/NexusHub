@@ -76,11 +76,17 @@ console.log('\n— Production without a provider: refuse, do not pretend —');
     // NODE_ENV=production without TWILIO_* — exactly what runs on Vercel today.
     env: { ...process.env, NODE_ENV: 'production', LOG_LEVEL: 'silent',
       TWILIO_ACCOUNT_SID: '', TWILIO_AUTH_TOKEN: '', TWILIO_FROM: '',
-      JWT_SECRET: 'x'.repeat(48), ADMIN_EMAILS: 'a@b.c' },
+      JWT_SECRET: 'x'.repeat(48), ADMIN_EMAILS: 'a@b.c',
+      // NODE_ENV=production also flips DATABASE_SSL on, and the throwaway
+      // Postgres these suites run against speaks plain TCP. Only the config
+      // under test should be production-like — not the transport.
+      DATABASE_SSL: 'false' },
     encoding: 'utf8',
   });
   const line = (child.stdout || '').split('\n').find((l) => l.startsWith('RESULT='));
-  ok('the production probe ran', !!line, (child.stderr || '').slice(-400));
+  // Head, not tail: node prints the actual error message first and the stack
+  // last, and a stack without its message says nothing about what went wrong.
+  ok('the production probe ran', !!line, (child.stderr || '').slice(0, 700));
   const out = line ? JSON.parse(line.slice(7)) : {};
 
   ok('a phone number is refused, not accepted', out.phoneStatus === 400, `status=${out.phoneStatus}`);
@@ -115,13 +121,17 @@ console.log('\n— With a provider configured, nothing is blocked —');
   `], {
     env: { ...process.env, NODE_ENV: 'production', LOG_LEVEL: 'silent',
       TWILIO_ACCOUNT_SID: 'ACtest', TWILIO_AUTH_TOKEN: 'tok', TWILIO_FROM: 'ForgeMarket',
-      JWT_SECRET: 'x'.repeat(48), ADMIN_EMAILS: 'a@b.c' },
+      JWT_SECRET: 'x'.repeat(48), ADMIN_EMAILS: 'a@b.c',
+      // NODE_ENV=production also flips DATABASE_SSL on, and the throwaway
+      // Postgres these suites run against speaks plain TCP. Only the config
+      // under test should be production-like — not the transport.
+      DATABASE_SSL: 'false' },
     encoding: 'utf8',
   });
   const line = (child.stdout || '').split('\n').find((l) => l.startsWith('RESULT='));
   const providers = line ? JSON.parse(line.slice(7)) : {};
   ok('sms is offered again the moment credentials exist',
-    (providers.channels || []).includes('sms'), line || (child.stderr || '').slice(-300));
+    (providers.channels || []).includes('sms'), line || (child.stderr || '').slice(0, 700));
   ok('and email is still there alongside it', (providers.channels || []).includes('email'));
 }
 
