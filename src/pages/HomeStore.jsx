@@ -470,7 +470,7 @@ export default function HomeStore() {
                 {popular.map((p) => (
                   <div key={p.name} className="snap-start shrink-0 w-[230px] bg-white rounded-2xl border border-slate-200/70 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all p-4">
                     <div className="fm-logo-plinth rounded-xl h-[150px] grid place-items-center mb-3">
-                      {p.popular && <span className="absolute top-2.5 right-2.5 z-10 text-[10px] font-bold text-violet-700 bg-violet-100 rounded-full px-2 py-0.5">Popular</span>}
+                      {p.popular && <span className="absolute top-2.5 right-2.5 z-10 text-[10px] font-bold text-violet-700 bg-violet-100 rounded-full px-2 py-0.5">{tr('card.popular', 'Popular')}</span>}
                       <img src={categoryLogos[p.slug] || ICON(p.img)} alt={p.name} className="fm-logo w-[92px] h-[92px]" />
                     </div>
                     <h3 className="font-bold text-[15px]">{p.name}</h3>

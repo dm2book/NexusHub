@@ -63,6 +63,12 @@ jobs:
           node discord/test/server-blueprint.test.mjs
           node discord/test/scam-guard.test.mjs
 
+      # Language coverage is a static check on the source, so it runs without a
+      # database or a browser.
+      - name: Translation coverage
+        run: node test/i18n-coverage.test.mjs
+        working-directory: server
+
       - name: Server e2e suites (fresh Postgres DB per suite)
         run: npm test
         working-directory: server

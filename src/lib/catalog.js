@@ -61,3 +61,49 @@ export const normalizeSearch = (s) => String(s || '').toLowerCase().replace(/[^a
 export const isCustomImage = (src) => !!src && !String(src).startsWith('/products/');
 
 export { CreditCard };
+
+/**
+ * The product description in the active language.
+ *
+ * The API sends both: `description` (as typed / English) and `descriptionNl`.
+ * Rendering `description` directly is what left the whole shop in English after
+ * switching to Dutch.
+ */
+export function productDescription(product, lang) {
+  if (!product) return '';
+  if (lang !== 'nl') return product.description || '';
+  if (product.descriptionNl) return product.descriptionNl;
+  // Products served by the API always carry descriptionNl. This covers the
+  // client-side sample catalogue (used before the API answers, and as a
+  // fallback when it cannot), which would otherwise show English on a Dutch
+  // page. Mirrors server/src/services/productCopy.js.
+  const name = String(product.name || '').trim();
+  if (!name) return product.description || '';
+  const tail = NL_TAIL[String(product.category || '').toLowerCase()];
+  return tail ? `${name} ${tail}` : `${name} — een officiële top-up, geleverd op het account dat je opgeeft.`;
+}
+
+const NL_TAIL = {
+  robux: 'rechtstreeks op je Roblox-account.',
+  'v-bucks': 'voor skins, emotes en de Battle Pass.',
+  valorant: 'voor agents, skins en de Battle Pass.',
+  cod: 'voor operators, blueprints en de Battle Pass.',
+  apex: 'voor legends, skins en Apex-packs.',
+  genshin: 'voor wishes en de Battle Pass.',
+  brawl: 'voor brawlers, skins en de Brawl Pass.',
+  clash: 'voor bouwers, boosts en kisten.',
+  clashroyale: 'voor kisten, kaarten en de Pass Royale.',
+  league: 'voor champions, skins en de Battle Pass.',
+  pubg: 'voor crates, skins en de Royale Pass.',
+  freefire: 'voor characters, skins en de Elite Pass.',
+  mlbb: 'voor heroes, skins en de Starlight Pass.',
+  pokemongo: 'voor items, meer opslag en raid passes.',
+  eafc: 'voor Ultimate Team-packs en drafts.',
+  gta: "voor auto's, panden en bedrijven in GTA Online.",
+  minecraft: 'voor skins, werelden en texture packs.',
+  gamepass: '— honderden games op console, pc en cloud.',
+  spotify: '— muziek zonder reclame, offline luisteren en betere kwaliteit.',
+  'discord-nitro': '— betere emoji, grotere uploads en een boost voor je server.',
+  giftcard: '— officiële code, wissel je in op je eigen account.',
+  mystery: '— elke box keert echt winkeltegoed uit, tot een jackpot van €150.',
+};

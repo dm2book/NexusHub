@@ -196,7 +196,7 @@ export default function Track() {
             <div className="rounded-2xl border border-indigo-500/30 bg-indigo-500/10 p-5 mb-6">
               <div className="text-indigo-200 font-semibold">{t('track.confirmed', '✅ Payment confirmed — we’re on it')}</div>
               <p className="text-slate-300 text-sm mt-1">
-                {t('track.confirmedSub', 'Your order is being prepared. Most orders are delivered automatically within seconds — keep this page open, it updates live.')}
+                {t('track.confirmedSub', 'Your order is being prepared. Items in stock go out automatically; the rest we deliver by hand, usually within a few hours. Keep this page open — it updates by itself.')}
               </p>
             </div>
           )}

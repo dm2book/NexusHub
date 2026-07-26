@@ -33,7 +33,7 @@ export default function RecentlyDelivered() {
   const r = feed[idx] || feed[0];
   const img = iconFor(r.category);
   const delivered = deliveryPhrase(r.deliverySeconds);
-  const who = r.city ? `${r.name} from ${r.city}` : r.name;
+  const who = r.city ? `${r.name || t('live.someone', 'Someone')} ${t('live.from', 'from')} ${r.city}` : (r.name || t('live.someone', 'Someone'));
 
   return (
     <div className={`fixed left-4 bottom-4 z-30 transition-all duration-500 ${show ? 'translate-y-0 opacity-100' : 'translate-y-6 opacity-0 pointer-events-none'}`}
@@ -44,7 +44,7 @@ export default function RecentlyDelivered() {
         </span>
         <div className="min-w-0">
           <div className="text-[13px] font-semibold text-slate-900 truncate">
-            <span className="text-violet-600">{who}</span> got {r.item}
+            <span className="text-violet-600">{who}</span> {t('live.got', 'got')} {r.item}
           </div>
           <div className="text-[11px] text-slate-400 flex items-center gap-1">
             {delivered

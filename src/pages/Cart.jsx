@@ -10,12 +10,20 @@ import { iconFor } from '../lib/sampleCatalog.js';
 import { navigateWithTransition } from '../lib/viewTransition.js';
 import LightProductCard from '../components/store/LightProductCard.jsx';
 import { usePageMeta } from '../lib/useMeta.js';
+import { matchBundle } from '../lib/bundles.js';
 
 export default function Cart() {
   usePageMeta('Your cart', 'Review the items in your cart before checking out.');
   const { items, setQty, remove, subtotal, currency, add } = useCart();
   const { t } = useI18n();
   const navigate = useNavigate();
+  // The cart used to show the plain subtotal, so a bundle looked more expensive
+  // here than on the card that sold it — and than what the server actually
+  // charges. Same rule as checkout, from one place.
+  const [bundles, setBundles] = useState([]);
+  useEffect(() => { api.get('/api/bundles').then((r) => setBundles(r.bundles || [])).catch(() => {}); }, []);
+  const bundle = matchBundle(items, bundles);
+  const total = Math.max(0, subtotal - (bundle?.discount || 0));
 
   if (items.length === 0) {
     return (
@@ -67,12 +75,20 @@ export default function Cart() {
           <div className="flex justify-between text-sm text-slate-500 mb-2">
             <span>{t('cart.subtotal', 'Subtotal')}</span><span className="text-slate-900 font-medium">{money(subtotal, currency)}</span>
           </div>
+          {bundle && (
+            <div className="flex justify-between text-sm mb-2">
+              <span className="text-violet-600 font-medium">
+                {t('cart.bundleApplied', 'Bundle')} · {bundle.name} (−{bundle.percent}%)
+              </span>
+              <span className="text-violet-600 font-semibold">−{money(bundle.discount, currency)}</span>
+            </div>
+          )}
           <div className="flex justify-between text-sm text-slate-500 mb-4">
-            <span>{t('cart.delivery', 'Delivery')}</span><span className="text-emerald-600 font-medium">{t('cart.instantFree', 'Instant · Free')}</span>
+            <span>{t('cart.delivery', 'Delivery')}</span><span className="text-emerald-600 font-medium">{t('cart.deliveryFree', 'Free')}</span>
           </div>
           <div className="flex justify-between text-lg border-t border-slate-100 pt-4 mb-6">
             <span className="text-slate-600">{t('cart.total', 'Total')}</span>
-            <span className="text-slate-900 font-bold">{money(subtotal, currency)}</span>
+            <span className="text-slate-900 font-bold">{money(total, currency)}</span>
           </div>
           <button onClick={() => navigateWithTransition(navigate, '/checkout')} className="btn-primary w-full py-3">
             {t('cart.checkout', 'Checkout')} <ArrowRight size={18} />

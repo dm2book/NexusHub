@@ -57,7 +57,7 @@ export default function PaymentMethods() {
       </div>
 
       <div className="grid sm:grid-cols-3 gap-4 mb-10">
-        {[[Zap, t('product.instant', 'Instant delivery'), t('pay.perk0', 'Codes & top-ups arrive in seconds after confirmation.')],
+        {[[Zap, t('pay.perk0t', 'Delivery you can follow'), t('pay.perk0', 'In stock is sent automatically once your payment is confirmed; the rest is delivered by hand, usually within a few hours.')],
           [ShieldCheck, t('pay.perk1t', 'Secure & fraud-screened'), t('pay.perk1', 'Every order is screened; we never see your card details.')],
           [BadgeCheck, t('checkout.protection', 'Buyer protection'), t('pay.perk2', 'Issues? Open a ticket — eligible orders are money-back guaranteed.')]].map(([I, pt, d]) => (
           <div key={pt} className="glass rounded-2xl p-5">

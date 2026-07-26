@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ShoppingCart, Zap } from 'lucide-react';
-import { categoryVisual, money, isCustomImage } from '../../lib/catalog.js';
+import { categoryVisual, money, isCustomImage, productDescription } from '../../lib/catalog.js';
 import { useI18n } from '../../lib/i18n.jsx';
 import { iconFor } from '../../lib/sampleCatalog.js';
 import { navigateWithTransition } from '../../lib/viewTransition.js';
@@ -18,7 +18,8 @@ const glowFor = (cat) => GLOW[cat] || '#7c5cff';
 
 /** Light-theme product card matching the storefront design. */
 export default function LightProductCard({ product, onAdd }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
+  const desc = productDescription(product, lang);
   const v = categoryVisual(product.category);
   const Icon = v.icon;
   const [imgBroken, setImgBroken] = useState(false);
@@ -48,7 +49,7 @@ export default function LightProductCard({ product, onAdd }) {
             <span className="text-[10px] font-black text-white bg-rose-500 rounded-full px-2 py-0.5 shadow-sm">-{discountPct}%</span>
           )}
           {product.featured && (
-            <span className="text-[10px] font-bold text-amber-600 bg-amber-100 rounded-full px-2 py-0.5">★ Featured</span>
+            <span className="text-[10px] font-bold text-amber-600 bg-amber-100 rounded-full px-2 py-0.5">★ {t('card.featured', 'Featured')}</span>
           )}
         </div>
         {product.stockLeft > 0 && (
@@ -87,7 +88,7 @@ export default function LightProductCard({ product, onAdd }) {
       </a>
       <div className="text-[11px] font-semibold uppercase tracking-wide text-violet-500">{v.label}</div>
       <Link to={to} className="font-bold text-[15px] text-slate-900 mt-0.5 hover:text-violet-600 line-clamp-2">{product.name}</Link>
-      {product.description && <p className="text-[12.5px] text-slate-400 mt-1 line-clamp-2 flex-1">{product.description}</p>}
+      {desc && <p className="text-[12.5px] text-slate-400 mt-1 line-clamp-2 flex-1">{desc}</p>}
       <div className="text-[12px] text-slate-400 mt-3">
         {t('home.from', 'From')} <span className="fm-num text-violet-600 text-[18px]">{money(product.price, product.currency)}</span>
         {onSale && (

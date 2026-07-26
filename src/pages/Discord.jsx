@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useI18n } from '../lib/i18n.jsx';
 import {
   MessageCircle, Hash, Megaphone, ShoppingBag, Users, Star, Ticket,
   Crown, Shield, Wrench, Headphones, Tag, Sparkles, ArrowRight, Circle,
@@ -25,16 +26,19 @@ const ROLES = [
   { name: 'Customer', icon: Tag, color: '#64748b', desc: 'Verified buyer' },
 ];
 
-const PERKS = [
-  'Instant order notifications & drops',
-  'Exclusive giveaways and discount codes',
-  'Verified buyer roles linked to your account',
-  'Direct support tickets with the team',
+const perks = (t) => [
+  // Was "Instant order notifications" — the notification is instant, the
+  // delivery is not, and the two read as the same promise.
+  t('discord.p1', 'Order updates and restock alerts'),
+  t('discord.p2', 'Exclusive giveaways and discount codes'),
+  t('discord.p3', 'Verified buyer roles linked to your account'),
+  t('discord.p4', 'Direct support tickets with the team'),
 ];
 
 const STATUS_COLOR = { online: '#23a55a', idle: '#f0b232', dnd: '#f23f43', offline: '#80848e' };
 
 export default function Discord() {
+  const { t } = useI18n();
   usePageMeta('Join our Discord', 'Support, restock alerts, giveaways and community vouches.');
   const { user } = useAuth();
   const [server, setServer] = useState(null);
@@ -145,7 +149,7 @@ export default function Discord() {
           <div className="card p-8">
             <h3 className="text-2xl text-white mb-5">Why join?</h3>
             <ul className="space-y-3">
-              {PERKS.map((p) => (
+              {perks(t).map((p) => (
                 <li key={p} className="flex items-start gap-3 text-slate-300">
                   <Circle size={8} className="mt-2 text-indigo-400 fill-indigo-400 shrink-0" /> {p}
                 </li>
@@ -157,7 +161,7 @@ export default function Discord() {
             <div className="orb w-60 h-60 -top-20 right-0" style={{ background: 'rgba(88,101,242,.5)' }} />
             <div className="relative">
               <h3 className="text-3xl text-white">Ready to jump in?</h3>
-              <p className="text-slate-300 mt-3">Join thousands of gamers. It’s free, and you can link your ForgeMarket account for verified roles.</p>
+              <p className="text-slate-300 mt-3">{t('discord.joinSub', 'Free to join, and you can link your ForgeMarket account for verified roles.')}</p>
               <JoinBtn className="px-7 py-3.5 mt-7 inline-flex text-base" />
             </div>
           </div>

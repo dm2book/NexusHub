@@ -2,14 +2,17 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { Home, ShoppingBag, Search, LifeBuoy } from 'lucide-react';
 import { usePageMeta } from '../lib/useMeta.js';
+import { useI18n } from '../lib/i18n.jsx';
 
-const POPULAR = [
+// Product names stay as they are in every language; only the last entry is copy.
+const popular = (t) => [
   ['Robux', '/shop?category=robux'], ['V-Bucks', '/shop?category=v-bucks'],
   ['Valorant', '/shop?category=valorant'], ['Discord Nitro', '/shop?category=discord-nitro'],
-  ['Steam Wallet', '/shop?category=steam'], ['Track order', '/track'],
+  ['Steam Wallet', '/shop?category=steam'], [t('footer.track', 'Track order'), '/track'],
 ];
 
 export default function NotFound() {
+  const { t } = useI18n();
   usePageMeta('Page not found', 'That page does not exist. Browse all products instead.');
   const navigate = useNavigate();
   const [q, setQ] = useState('');
@@ -23,30 +26,30 @@ export default function NotFound() {
       <div className="orb w-96 h-96 bg-primary/20 -top-20 left-1/3" />
       <div className="relative max-w-lg mx-auto fm-page">
         <div className="font-display text-7xl sm:text-9xl gradient-text">404</div>
-        <h1 className="text-2xl text-white mt-4">Page not found</h1>
-        <p className="text-slate-400 mt-2">The page you’re looking for drifted off into the void — but the shop didn’t.</p>
+        <h1 className="text-2xl text-white mt-4">{t('nf.title', 'Page not found')}</h1>
+        <p className="text-slate-400 mt-2">{t('nf.sub', 'The page you’re looking for drifted off into the void — but the shop didn’t.')}</p>
 
         {/* Search straight into the catalog */}
         <form onSubmit={search} className="flex gap-2 mt-7 max-w-sm mx-auto">
           <div className="relative flex-1">
             <Search size={16} className="absolute left-3.5 top-3.5 text-slate-500" />
             <input value={q} onChange={(e) => setQ(e.target.value)} autoFocus
-              placeholder="Search products…" className="input pl-10" />
+              placeholder={t('shop.search', 'Search products…')} className="input pl-10" />
           </div>
-          <button type="submit" className="btn-primary px-5">Search</button>
+          <button type="submit" className="btn-primary px-5">{t('nf.search', 'Search')}</button>
         </form>
 
         {/* Popular destinations */}
         <div className="flex flex-wrap justify-center gap-2 mt-5">
-          {POPULAR.map(([label, to]) => (
+          {popular(t).map(([label, to]) => (
             <Link key={label} to={to} className="chip hover:border-primary/50 hover:text-white">{label}</Link>
           ))}
         </div>
 
         <div className="flex justify-center gap-3 mt-8">
-          <Link to="/" className="btn-primary"><Home size={18} /> Home</Link>
-          <Link to="/shop" className="btn-ghost"><ShoppingBag size={18} /> Shop</Link>
-          <Link to="/contact" className="btn-ghost"><LifeBuoy size={18} /> Support</Link>
+          <Link to="/" className="btn-primary"><Home size={18} /> {t('nav.home', 'Home')}</Link>
+          <Link to="/shop" className="btn-ghost"><ShoppingBag size={18} /> {t('tab.shop', 'Shop')}</Link>
+          <Link to="/contact" className="btn-ghost"><LifeBuoy size={18} /> {t('nav.support', 'Support')}</Link>
         </div>
       </div>
     </div>

@@ -14,6 +14,7 @@ import { pricedBundles } from '../services/bundleService.js';
 import { peekGiftCard } from '../services/giftCardService.js';
 import { createOrder, getOrderByNumber, getOrder, markPaymentReceived } from '../services/orderService.js';
 import { answer } from '../services/assistantService.js';
+import { withCopy } from '../services/productCopy.js';
 import { submitProof, getOrderProof } from '../services/paymentProofService.js';
 import { listEnabledProviders } from '../services/oauthService.js';
 import { isEnabled as stripeEnabled, createCheckoutSession } from '../services/stripeService.js';
@@ -169,7 +170,7 @@ const instantFor = (product, count) => product.deliveryMode === 'auto' && count 
 router.get('/products', asyncHandler(async (_req, res) => {
   const products = await listProducts({ activeOnly: true });
   const counts = await availableCounts(products.map((p) => p.id));
-  res.json({ products: products.map((p) => ({
+  res.json({ products: products.map((p) => withCopy({
     ...p,
     stockLeft: stockLeftFor(p, counts[p.id] || 0),
     instant: instantFor(p, counts[p.id] || 0),
@@ -189,7 +190,7 @@ router.get('/products/:id', asyncHandler(async (req, res) => {
   const p = await getProduct(req.params.id);
   if (!p || !p.active) throw new ApiError(404, 'Product not found');
   const count = await availableCount(p.id);
-  res.json({ product: { ...p, stockLeft: stockLeftFor(p, count), instant: instantFor(p, count) } });
+  res.json({ product: withCopy({ ...p, stockLeft: stockLeftFor(p, count), instant: instantFor(p, count) }) });
 }));
 
 // Price history for the product-page chart.
@@ -230,7 +231,14 @@ router.get('/products/:id/recommendations', asyncHandler(async (req, res) => {
 let bundlesCache = { at: 0, data: null };
 router.get('/bundles', asyncHandler(async (_req, res) => {
   if (!bundlesCache.data || Date.now() - bundlesCache.at > 30_000) {
-    bundlesCache = { at: Date.now(), data: await pricedBundles() };
+    const bundles = await pricedBundles();
+    // Bundles are hand-written promos; the Dutch line is generated from the
+    // products in them so a new bundle is never English-only on a Dutch page.
+    bundlesCache = { at: Date.now(), data: bundles.map((b) => ({
+      ...b,
+      descriptionNl: b.descriptionNl
+        || `${(b.products || []).map((p) => p.name).join(' + ')} — samen voordeliger.`,
+    })) };
   }
   res.json({ bundles: bundlesCache.data });
 }));
