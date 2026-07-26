@@ -307,7 +307,7 @@ export default function Checkout() {
             ) : (
               <p className="text-slate-400 text-sm">
                 {provider === 'stripe'
-                  ? <>{t('checkout.stripe1', 'You’ll be redirected to')} <span className="text-white">Stripe</span> {t('checkout.stripe2', 'to pay securely by card.')}</>
+                  ? <>{t('checkout.stripe1', 'You’ll be redirected to')} <span className="text-white">Stripe</span> {t('checkout.stripe2', 'to complete your payment.')}</>
                   : provider === 'demo'
                     ? <>{t('checkout.demo1', 'Demo mode: your order is marked')} <span className="text-emerald-300">{t('checkout.demoPaid', 'paid')}</span> {t('checkout.demo2', 'instantly.')}</>
                     : <>{t('checkout.noPay1', 'Payment isn’t configured yet — your order will be placed as')} <span className="text-white">{t('status.pending', 'pending')}</span>.</>}

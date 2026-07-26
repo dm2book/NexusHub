@@ -21,10 +21,10 @@ export default function LiveActivity() {
   if (!hasFeed && !hasStats) return null;
 
   const STATS = stats ? [
-    { icon: CheckCircle2, value: `${fmt(stats.delivered)}`, label: 'Orders delivered', color: 'text-violet-600 bg-violet-100' },
-    { icon: Clock, value: secs(stats.avgDeliverySeconds), label: 'Average delivery', color: 'text-emerald-600 bg-emerald-100' },
-    { icon: Gauge, value: secs(stats.fastestDeliverySeconds), label: 'Fastest delivery', color: 'text-amber-600 bg-amber-100' },
-    { icon: BadgeCheck, value: `${fmt(stats.verifiedBuyers)}`, label: 'Verified reviews', color: 'text-blue-600 bg-blue-100' },
+    { icon: CheckCircle2, value: `${fmt(stats.delivered)}`, label: t('trust.sDelivered', 'Orders delivered'), color: 'text-violet-600 bg-violet-100' },
+    { icon: Clock, value: secs(stats.avgDeliverySeconds), label: t('trust.sAvg', 'Average delivery'), color: 'text-emerald-600 bg-emerald-100' },
+    { icon: Gauge, value: secs(stats.fastestDeliverySeconds), label: t('trust.sFastest', 'Fastest delivery'), color: 'text-amber-600 bg-amber-100' },
+    { icon: BadgeCheck, value: `${fmt(stats.verifiedBuyers)}`, label: t('trust.sVerified', 'Verified reviews'), color: 'text-blue-600 bg-blue-100' },
   ] : [];
 
   return (
@@ -55,7 +55,7 @@ export default function LiveActivity() {
                     </span>
                     <div className="min-w-0 flex-1">
                       <div className="text-sm text-slate-800 truncate">
-                        <span className="font-semibold text-violet-600">{r.city ? `${r.name} from ${r.city}` : r.name}</span> got {r.item}
+                        <span className="font-semibold text-violet-600">{r.city ? `${r.name || t('live.someone', 'Someone')} ${t('live.from', 'from')} ${r.city}` : (r.name || t('live.someone', 'Someone'))}</span> {t('live.got', 'got')} {r.item}
                       </div>
                       <div className="text-[11px] text-slate-400 flex items-center gap-1">
                         {delivered ? <><Zap size={10} className="text-amber-500" /> {t('live.deliveredIn', 'Delivered in')} {delivered}</> : <>{t('live.delivered', 'Delivered')}</>} · {timeAgo(r.secondsAgo)}

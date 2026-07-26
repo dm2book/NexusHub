@@ -6,20 +6,30 @@ import {
 import { useStats } from '../lib/useStats.js';
 import { useReviews } from '../lib/useReviews.js';
 import { usePageMeta } from '../lib/useMeta.js';
+import { useI18n } from '../lib/i18n.jsx';
 import LiveActivity from '../components/store/LiveActivity.jsx';
 
-const GUARANTEES = [
-  { icon: Zap, title: 'Fast, tracked delivery', text: 'Items we hold in stock are sent automatically the moment your payment is confirmed. Everything else is delivered by hand, and you can follow the status of your order at any time.' },
-  { icon: Lock, title: 'Secure by design', text: 'Passwordless login, encrypted sessions with one-time-use refresh tokens, and continuous fraud screening on every order.' },
-  { icon: RotateCcw, title: 'Money-back guarantee', text: "If we can't deliver your order, you get a full refund — no questions asked. Eligible orders are buyer-protected." },
-  { icon: BadgeCheck, title: 'Reviews you can check', text: 'Reviews marked "Verified buyer" are tied to a real, completed order. Community vouches from our Discord are shown separately and never carry that badge.' },
+const guarantees = (t) => [
+  { icon: Zap, title: t('trust.g1t', 'Fast, tracked delivery'),
+    text: t('trust.g1', 'Items we hold in stock are sent automatically the moment your payment is confirmed. Everything else is delivered by hand, and you can follow the status of your order at any time.') },
+  { icon: Lock, title: t('trust.g2t', 'Secure by design'),
+    text: t('trust.g2', 'Passwordless login, encrypted sessions with one-time-use refresh tokens, and continuous fraud screening on every order.') },
+  { icon: RotateCcw, title: t('trust.g3t', 'Money-back guarantee'),
+    text: t('trust.g3', "If we can't deliver your order, you get a full refund — no questions asked.") },
+  { icon: BadgeCheck, title: t('trust.g4t', 'Reviews you can check'),
+    text: t('trust.g4', 'Reviews marked "Verified buyer" are tied to a real, completed order. Community vouches from our Discord are shown separately and never carry that badge.') },
 ];
 
-const FAQ = [
-  ['How fast is delivery?', 'Most digital goods are delivered automatically within seconds of your payment being confirmed. You can watch the status live on your order page.'],
-  ['How do I pay?', 'Securely via Tikkie, Revolut or PayPal. You submit your transaction reference and we confirm it — usually within minutes during open hours.'],
-  ['What if something goes wrong?', 'Open a ticket in our Discord or from your dashboard. Eligible orders are money-back guaranteed, so you are never at risk.'],
-  ['Are the reviews real?', 'Yes. Reviews are published automatically from verified community vouches in our Discord — each tied to a real purchase.'],
+const faq = (t) => [
+  [t('trust.q1', 'How fast is delivery?'),
+   // Was "within seconds" — the same claim the rest of the site stopped making.
+   t('trust.a1', 'Items we have in stock are sent automatically once your payment is confirmed. Anything else we buy in and deliver by hand, usually within a few hours during the day. You can follow the status live on your order page.')],
+  [t('trust.q2', 'How do I pay?'),
+   t('trust.a2', 'You place the order, then pay the amount shown with your order number as the reference. We confirm every payment by hand — usually within minutes during the day.')],
+  [t('trust.q3', 'What if something goes wrong?'),
+   t('trust.a3', 'Open a ticket in our Discord or reply to your order email. If we cannot deliver, you get your money back.')],
+  [t('trust.q4', 'Are the reviews real?'),
+   t('trust.a4', 'Reviews marked as verified are tied to a real, completed order. Community vouches from Discord are shown separately and never carry that badge.')],
 ];
 
 function Stat({ icon: Icon, value, label, color }) {
@@ -35,6 +45,7 @@ function Stat({ icon: Icon, value, label, color }) {
 export default function Trust() {
   const stats = useStats();
   const reviews = useReviews();
+  const { t } = useI18n();
   usePageMeta('Trust Center — ForgeMarket', 'Delivery, review and refund statistics, security guarantees and proof you can trust ForgeMarket.');
   const avgDelivery = stats.avgDeliverySeconds == null ? '—'
     : stats.avgDeliverySeconds < 60 ? `< ${Math.max(1, Math.round(stats.avgDeliverySeconds))}s`
@@ -46,23 +57,23 @@ export default function Trust() {
       {/* Hero */}
       <div className="text-center mb-10">
         <span className="inline-flex items-center gap-2 text-[13px] font-semibold text-violet-700 bg-violet-100 rounded-full px-3 py-1.5">
-          <ShieldCheck size={14} /> Trust Center
+          <ShieldCheck size={14} /> {t('trust.badge', 'Trust Center')}
         </span>
-        <h1 className="text-4xl font-extrabold text-slate-900 mt-4">How your purchase is protected</h1>
-        <p className="text-slate-500 mt-3 max-w-xl mx-auto">Real numbers, real guarantees. Here's exactly how we keep every order safe, fast and protected.</p>
+        <h1 className="text-4xl font-extrabold text-slate-900 mt-4">{t('trust.title', 'How your purchase is protected')}</h1>
+        <p className="text-slate-500 mt-3 max-w-xl mx-auto">{t('trust.sub', 'Real numbers and real guarantees — exactly how we keep every order safe and protected.')}</p>
       </div>
 
       {/* Live stats (real only — cards without data hide themselves) */}
       {(() => {
         const cards = [
-          { icon: CheckCircle2, value: fmt(stats.delivered), label: 'Orders delivered', color: 'text-violet-600 bg-violet-100' },
-          { icon: Clock, value: avgDelivery, label: 'Average delivery', color: 'text-emerald-600 bg-emerald-100' },
+          { icon: CheckCircle2, value: fmt(stats.delivered), label: t('trust.sDelivered', 'Orders delivered'), color: 'text-violet-600 bg-violet-100' },
+          { icon: Clock, value: avgDelivery, label: t('trust.sAvg', 'Average delivery'), color: 'text-emerald-600 bg-emerald-100' },
           // Real fulfilment success rate — only once orders have finished.
           stats.successRate != null
-            ? { icon: ShieldCheck, value: `${stats.successRate}%`, label: 'Successfully delivered', color: 'text-emerald-600 bg-emerald-100' }
+            ? { icon: ShieldCheck, value: `${stats.successRate}%`, label: t('trust.sSuccess', 'Successfully delivered'), color: 'text-emerald-600 bg-emerald-100' }
             : null,
-          { icon: Star, value: stats.reviews > 0 ? `${stats.rating}/5` : '—', label: stats.reviews > 0 ? `${stats.reviews.toLocaleString('en-US')} reviews` : 'No reviews yet', color: 'text-amber-600 bg-amber-100' },
-          { icon: Users, value: stats.discordMembers > 0 ? stats.discordMembers.toLocaleString('en-US') : '24/7', label: stats.discordMembers > 0 ? 'Discord members' : 'Community support', color: 'text-blue-600 bg-blue-100' },
+          { icon: Star, value: stats.reviews > 0 ? `${stats.rating}/5` : '—', label: stats.reviews > 0 ? `${stats.reviews.toLocaleString('en-US')} ${t('trust.sReviews', 'reviews')}` : t('trust.sNoReviews', 'No reviews yet'), color: 'text-amber-600 bg-amber-100' },
+          { icon: Users, value: stats.discordMembers > 0 ? stats.discordMembers.toLocaleString('en-US') : '24/7', label: stats.discordMembers > 0 ? t('trust.sMembers', 'Discord members') : t('trust.sCommunity', 'Community support'), color: 'text-blue-600 bg-blue-100' },
         ].filter(Boolean);
         return (
           <div className={`grid grid-cols-2 ${cards.length >= 5 ? 'lg:grid-cols-5' : 'lg:grid-cols-4'} gap-4 mb-12`}>
@@ -75,9 +86,9 @@ export default function Trust() {
       <LiveActivity />
 
       {/* Guarantees */}
-      <h2 className="text-2xl font-extrabold text-slate-900 mb-5">Our guarantees</h2>
+      <h2 className="text-2xl font-extrabold text-slate-900 mb-5">{t('trust.guarantees', 'Our guarantees')}</h2>
       <div className="grid sm:grid-cols-2 gap-4 mb-12">
-        {GUARANTEES.map((g) => (
+        {guarantees(t).map((g) => (
           <div key={g.title} className="bg-white rounded-2xl border border-slate-200/70 shadow-sm p-6 flex gap-4 fm-lift">
             <span className="w-11 h-11 rounded-xl grid place-items-center bg-violet-100 text-violet-600 shrink-0"><g.icon size={20} /></span>
             <div>
@@ -94,19 +105,21 @@ export default function Trust() {
         <span className="w-14 h-14 rounded-2xl bg-white/15 grid place-items-center shrink-0"><MessageCircle size={26} /></span>
         <div className="flex-1">
           <h3 className="text-xl font-extrabold">
-            {stats.discordMembers > 0 ? `${stats.discordMembers.toLocaleString('en-US')} members can vouch for us` : 'Join a community that can vouch for us'}
+            {stats.discordMembers > 0
+              ? `${stats.discordMembers.toLocaleString('en-US')} ${t('trust.membersVouch', 'members can vouch for us')}`
+              : t('trust.joinVouch', 'Join a community that can vouch for us')}
           </h3>
-          <p className="text-white/85 text-sm mt-1">Public reviews, proof-of-delivery and a 24/7 community. See for yourself before you buy.</p>
+          <p className="text-white/85 text-sm mt-1">{t('trust.discordSub', 'Public reviews, proof of delivery and a community you can ask before you buy.')}</p>
         </div>
         <Link to="/discord" className="inline-flex items-center justify-center gap-2 bg-white text-indigo-600 font-semibold text-sm rounded-xl h-11 px-6 hover:bg-indigo-50 transition shrink-0">
-          Join Discord <ArrowRight size={16} />
+          {t('trust.joinDiscord', 'Join Discord')} <ArrowRight size={16} />
         </Link>
       </div>
 
       {/* Recent verified reviews (only when we have real ones) */}
       {reviews.length > 0 && (
         <>
-          <h2 className="text-2xl font-extrabold text-slate-900 mb-5">Verified customer reviews</h2>
+          <h2 className="text-2xl font-extrabold text-slate-900 mb-5">{t('trust.verifiedReviews', 'Verified customer reviews')}</h2>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-12">
             {reviews.slice(0, 6).map((r) => (
               <div key={r.id} className="bg-white rounded-2xl border border-slate-200/70 shadow-sm p-5 fm-lift">
@@ -114,7 +127,7 @@ export default function Trust() {
                 <p className="text-slate-600 text-sm">"{r.body}"</p>
                 <div className="flex items-center gap-2 mt-3 text-xs text-slate-400">
                   <BadgeCheck size={13} className="text-emerald-500" /> {r.author}{r.product ? ` · ${r.product}` : ''}
-                  {r.verified ? <span className="inline-flex items-center gap-1 text-emerald-600 font-semibold">· Verified buyer</span> : ' · Verified'}
+                  {r.verified ? <span className="inline-flex items-center gap-1 text-emerald-600 font-semibold">· {t('trust.verifiedBuyer', 'Verified buyer')}</span> : ''}
                 </div>
               </div>
             ))}
@@ -123,9 +136,9 @@ export default function Trust() {
       )}
 
       {/* FAQ */}
-      <h2 className="text-2xl font-extrabold text-slate-900 mb-5">Questions, answered</h2>
+      <h2 className="text-2xl font-extrabold text-slate-900 mb-5">{t('trust.faqTitle', 'Questions, answered')}</h2>
       <div className="space-y-3 mb-10">
-        {FAQ.map(([q, a]) => (
+        {faq(t).map(([q, a]) => (
           <div key={q} className="bg-white rounded-2xl border border-slate-200/70 shadow-sm p-5">
             <h3 className="font-semibold text-slate-900">{q}</h3>
             <p className="text-slate-500 text-sm mt-1.5 leading-relaxed">{a}</p>
@@ -136,7 +149,7 @@ export default function Trust() {
       <div className="text-center">
         <Link to="/shop" className="inline-flex items-center gap-2 text-white font-semibold rounded-xl px-7 h-12 shadow-lg shadow-violet-500/30 hover:brightness-105 transition"
           style={{ backgroundImage: 'linear-gradient(135deg,#7c5cff,#a855f7)' }}>
-          Shop with confidence <ArrowRight size={18} />
+          {t('trust.cta', 'Shop with confidence')} <ArrowRight size={18} />
         </Link>
       </div>
     </div>

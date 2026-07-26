@@ -96,7 +96,9 @@ export async function liveFeed({ limit = 12 } = {}) {
       LIMIT @limit`, { limit: Math.min(50, Math.max(1, limit)) });
   return rows.map((r) => ({
     id: r.id,
-    name: r.first_name || 'Someone',
+    // No English placeholder here: the storefront renders the fallback in the
+    // reader's own language. A server-side "Someone" stayed English forever.
+    name: r.first_name || null,
     city: r.city || null,
     item: r.product_label,
     category: r.category || '',

@@ -117,7 +117,7 @@ export default function Shop() {
           </h1>
           <p className="text-white/85 mt-1.5">{t('shop.tagline', 'Digital goods, delivered to your inbox & dashboard.')}</p>
           <div className="flex flex-wrap items-center gap-2 mt-4">
-            <span className="text-[11.5px] font-semibold bg-white/15 border border-white/25 rounded-full px-2.5 py-1">⚡ {t('product.instant', 'Instant delivery')}</span>
+            <span className="text-[11.5px] font-semibold bg-white/15 border border-white/25 rounded-full px-2.5 py-1">🛡 {t('shop.badgeProtected', 'Money back if undelivered')}</span>
             <span className="text-[11.5px] font-semibold bg-white/15 border border-white/25 rounded-full px-2.5 py-1">🛡 {t('product.protected', 'Buyer protected')}</span>
             {products !== null && (
               <span className="text-[11.5px] font-semibold bg-white/15 border border-white/25 rounded-full px-2.5 py-1">
@@ -150,7 +150,7 @@ export default function Shop() {
         {/* controls */}
         <div className="flex flex-col sm:flex-row gap-3 sm:items-center justify-between mb-5">
           <div className="text-slate-500 text-sm">
-            {products === null ? t('shop.loading', 'Loading…') : `${visible.length} product${visible.length !== 1 ? 's' : ''}`}
+            {products === null ? t('shop.loading', 'Loading…') : `${visible.length} ${t('shop.items', 'products')}`}
           </div>
           <div className="flex gap-3">
             <div className="relative flex-1 sm:w-60">

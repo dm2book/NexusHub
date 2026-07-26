@@ -8,7 +8,7 @@ import { deliveryInfo } from '../lib/deliveryInfo.js';
 import { api } from '../lib/api.js';
 import { useCart } from '../context/CartContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
-import { categoryVisual, money, isCustomImage } from '../lib/catalog.js';
+import { categoryVisual, money, isCustomImage, productDescription } from '../lib/catalog.js';
 import { iconFor } from '../lib/sampleCatalog.js';
 import { SAMPLE_PRODUCTS, withFallback } from '../lib/sampleCatalog.js';
 import { PageLoader } from '../components/ui.jsx';
@@ -25,13 +25,13 @@ import Tilt from '../components/Tilt.jsx';
 // The delivery badge is decided per product from real stock, not asserted for
 // every listing: only an auto-delivery product with a code in stock can honestly
 // claim "instant". The rest are hand-delivered and say so.
-const trustBadges = (instant) => [
+const trustBadges = (instant, t) => [
   instant
-    ? { icon: Zap, key: 'instant', title: 'In stock — instant', sub: 'Sent the moment payment clears' }
-    : { icon: Clock, key: 'handDelivered', title: 'Delivered by hand', sub: 'Usually within a few hours' },
-  { icon: ShieldCheck, key: 'protected', title: 'Buyer protected', sub: 'Money back if undelivered' },
-  { icon: BadgeCheck, key: 'verified', title: 'Verified reviews', sub: 'Tied to real orders' },
-  { icon: Headphones, key: 'support', title: 'Support via Discord', sub: 'Real person, not a bot' },
+    ? { icon: Zap, key: 'instant', title: t('product.bInstant', 'In stock — instant'), sub: t('product.bInstantSub', 'Sent the moment payment clears') }
+    : { icon: Clock, key: 'handDelivered', title: t('product.bHand', 'Delivered by hand'), sub: t('product.bHandSub', 'Usually within a few hours') },
+  { icon: ShieldCheck, key: 'protected', title: t('product.bProtected', 'Buyer protected'), sub: t('product.bProtectedSub', 'Money back if undelivered') },
+  { icon: BadgeCheck, key: 'verified', title: t('product.bVerified', 'Verified reviews'), sub: t('product.bVerifiedSub', 'Tied to real orders') },
+  { icon: Headphones, key: 'support', title: t('product.bSupport', 'Support via Discord'), sub: t('product.bSupportSub', 'Real person, not a bot') },
 ];
 
 // Answers a manual-payment store can actually stand behind. The old copy said
@@ -129,6 +129,7 @@ export default function ProductDetail() {
   if (!product) return <PageLoader />;
 
   const { icon: Icon, grad, label } = categoryVisual(product.category);
+  const desc = productDescription(product, lang);
   const related = all.filter((p) => p.id !== product.id && p.category === product.category).slice(0, 4);
   const crossSell = (recs.crossSell?.length ? recs.crossSell : related).slice(0, 4);
   const upsell = recs.upsell?.[0] || null;
@@ -271,7 +272,7 @@ export default function ProductDetail() {
             </Link>
           )}
 
-          {product.description && <p className="text-slate-400 mt-5 leading-relaxed">{product.description}</p>}
+          {desc && <p className="text-slate-400 mt-5 leading-relaxed">{desc}</p>}
 
           <div className="mt-8 space-y-3">
             <div className="flex items-center gap-3">
@@ -294,7 +295,7 @@ export default function ProductDetail() {
 
           {/* trust badges */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-8">
-            {trustBadges(!!product.instant).map(({ icon: I, title, sub, key }) => (
+            {trustBadges(!!product.instant, t).map(({ icon: I, title, sub, key }) => (
               <div key={title} className="glass rounded-xl p-3 text-center">
                 <I size={18} className="text-indigo-300 mx-auto mb-1.5" />
                 <div className="text-xs text-white font-medium">{t(`product.${key}`, title)}</div>
