@@ -400,8 +400,11 @@ client.once(Events.ClientReady, async () => {
       const ours = new Set(CATEGORIES.map((c) => c.name));
       const strays = [...guild.channels.cache.values()].filter((c) => {
         if (c.type === ChannelType.GuildCategory) return !ours.has(c.name) && c.name !== '📊 SERVER STATS';
-        if (c.parent && !ours.has(c.parent.name)) return false;      // in someone else's category
         if (c.parent?.name === '🎫 TICKETS') return false;            // live tickets
+        // Channels inside a category that is itself a leftover count too —
+        // skipping them meant the category could never be emptied, so it could
+        // never be deleted either. Emptiness is still the only thing that
+        // decides: a room with real conversation survives wherever it lives.
         return !wanted.has(c.name);
       });
 

@@ -13,6 +13,7 @@ import { recommendationsFor } from '../services/recommendationService.js';
 import { pricedBundles } from '../services/bundleService.js';
 import { peekGiftCard } from '../services/giftCardService.js';
 import { createOrder, getOrderByNumber, getOrder, markPaymentReceived } from '../services/orderService.js';
+import { answer } from '../services/assistantService.js';
 import { submitProof, getOrderProof } from '../services/paymentProofService.js';
 import { listEnabledProviders } from '../services/oauthService.js';
 import { isEnabled as stripeEnabled, createCheckoutSession } from '../services/stripeService.js';
@@ -104,6 +105,48 @@ router.get('/config', asyncHandler(async (_req, res) => {
     categoryLogos,
   });
 }));
+
+/**
+ * Forge, the storefront assistant.
+ *
+ * Answers from live data — the same catalog rows the shop renders (including the
+ * honest `instant` / `stockLeft` flags) and the same order lookup the track page
+ * uses. Nothing here is generated: an assistant that invents a price is worse
+ * than one that says it does not know.
+ *
+ * Rate-limited harder than the rest of /api: it is open to anyone, unauthenticated.
+ */
+router.post('/chat',
+  rateLimit({ windowMs: 60_000, max: 20, bucket: 'chat' }),
+  asyncHandler(async (req, res) => {
+    const { message, lang } = z.object({
+      message: z.string().min(1).max(500),
+      lang: z.enum(['nl', 'en']).optional(),
+    }).parse(req.body);
+
+    const products = await listProducts({ activeOnly: true }).catch(() => []);
+    const counts = await availableCounts(products.map((p) => p.id)).catch(() => ({}));
+    const catalog = products.map((p) => ({
+      ...p,
+      stockLeft: stockLeftFor(p, counts[p.id] || 0),
+      instant: instantFor(p, counts[p.id] || 0),
+    }));
+
+    const reply = await answer(message, {
+      lang: lang || 'en',
+      products: catalog,
+      // Only the public, non-sensitive fields the track page already exposes.
+      lookupOrder: async (number) => {
+        const order = await getOrderByNumber(number).catch(() => null);
+        if (!order) return null;
+        return {
+          number: order.number, status: order.status,
+          statusLabel: order.statusLabel, totalFormatted: order.totalFormatted,
+        };
+      },
+    });
+    res.json(reply);
+  }));
 
 // Helper: confirm the requester owns the order (account holder or guest email).
 async function assertOwnsOrder(req, order, email) {
