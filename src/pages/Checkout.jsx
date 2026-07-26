@@ -14,14 +14,8 @@ import { matchBundle } from '../lib/bundles.js';
 
 const METHOD_ICON = { tikkie: '🟢', revolut: '⚫', paypal: '🔵' };
 
-// Build the best pay link/instruction for a manual method.
-function payTarget(m, amountEur) {
-  let t = m.target || '';
-  if (m.kind === 'email') return { href: null, label: `Send €${amountEur} to ${t} (Friends & Family)` };
-  if (!/^https?:\/\//.test(t)) t = `https://${t}`;
-  if (m.id === 'paypal' && /paypal\.me/i.test(t)) t = `${t.replace(/\/$/, '')}/${amountEur}EUR`;
-  return { href: t, label: t.replace(/^https?:\/\//, '') };
-}
+// No URL building here: the created order carries every method already resolved
+// for its own total, so the checkout and the status page can never disagree.
 
 export default function Checkout() {
   usePageMeta('Checkout', 'Complete your order — guest checkout, no account needed.');
@@ -160,11 +154,11 @@ export default function Checkout() {
 
   // ── Manual payment instructions (after order placed) ──
   if (placed) {
-    const m = methods.find((x) => x.id === methodId) || methods[0];
     // Use the server order's authoritative total — the cart was just cleared, so
     // the live cart-derived `amountEur` would read €0.00 here.
     const payEur = ((placed.total ?? 0) / 100).toFixed(2);
-    const pt = m ? payTarget(m, payEur) : null;
+    // From the order the server just created, not recomputed from the cart.
+    const pm = (placed.payMethods || []).find((x) => x.id === methodId) || (placed.payMethods || [])[0] || null;
     return (
       <div className="section py-12 max-w-xl">
         <div className="card p-8 text-center">
@@ -190,11 +184,16 @@ export default function Checkout() {
             </div>
           )}
 
-          {pt && (
+          {pm && (
             <div className="mt-5">
-              {pt.href
-                ? <a href={pt.href} target="_blank" rel="noreferrer" className="btn-primary w-full py-3.5 text-base"><ExternalLink size={18} /> {t('checkout.payWith', 'Pay')} €{payEur} {t('checkout.with', 'with')} {m.label}</a>
-                : <div className="glass rounded-xl p-4 text-white">{pt.label}</div>}
+              {pm.url
+                ? <a href={pm.url} target="_blank" rel="noreferrer" className="btn-primary w-full py-3.5 text-base"><ExternalLink size={18} /> {t('checkout.payWith', 'Pay')} €{payEur} {t('checkout.with', 'with')} {pm.label}</a>
+                : <div className="glass rounded-xl p-4 text-white">{t('checkout.payTo', 'Send')} €{payEur} {t('checkout.payToWho', 'to')} {pm.target}</div>}
+              {pm.prefilled && (
+                <p className="text-emerald-300 text-xs mt-2">
+                  ✓ {t('checkout.filledIn', 'The amount is already in the link — you only have to confirm.')}
+                </p>
+              )}
               <p className="text-slate-500 text-xs mt-3">{note || t('checkout.noteDefault', 'After paying, your order is confirmed within minutes during open hours.')}</p>
             </div>
           )}

@@ -13,14 +13,9 @@ import { feedback } from '../lib/feedback.js';
 import Confetti from '../components/Confetti.jsx';
 import { usePageMeta } from '../lib/useMeta.js';
 
-const METHOD_ICON = { tikkie: '🟢', revolut: '⚫', paypal: '🔵' };
-function payHref(m, eur) {
-  let t = m.target || '';
-  if (m.kind === 'email') return null;
-  if (!/^https?:\/\//.test(t)) t = `https://${t}`;
-  if (m.id === 'paypal' && /paypal\.me/i.test(t)) t = `${t.replace(/\/$/, '')}/${eur}EUR`;
-  return t;
-}
+const METHOD_ICON = { tikkie: '🟢', revolut: '⚫', paypal: '🔵', bunq: '🟡' };
+// No URL building here on purpose: the server resolves every method for this
+// order, amount included. Three copies of that logic used to disagree.
 
 // Visual progress: 4 customer-facing steps over the internal statuses.
 const STEPS = [
@@ -167,7 +162,7 @@ export default function Track() {
           )}
 
           {/* Awaiting payment: pay links + reference */}
-          {result.status === 'pending' && (cfg.paymentMethods || []).length > 0 && (
+          {result.status === 'pending' && ((result.payMethods || []).length > 0 || result.payLink) && (
             <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-5 mb-6">
               <div className="flex items-center justify-between">
                 <div className="text-amber-200 font-semibold">{t('track.awaiting', '⏳ Awaiting payment')}</div>
@@ -194,12 +189,18 @@ export default function Track() {
                     {t('track.payOther', 'Or pay it yourself with the reference above:')}
                   </span>
                 )}
-                {cfg.paymentMethods.map((m) => {
-                  const href = payHref(m, (result.total / 100).toFixed(2));
-                  return href
-                    ? <a key={m.id} href={href} target="_blank" rel="noreferrer" className="btn-primary text-sm"><ExternalLink size={15} /> {METHOD_ICON[m.id] || '💳'} {m.label}</a>
-                    : <span key={m.id} className="btn-ghost text-sm cursor-default">{METHOD_ICON[m.id] || '💳'} {m.label}: {m.target}</span>;
-                })}
+                {(result.payMethods || []).map((m) => (
+                  m.url
+                    ? (
+                      <a key={m.id} href={m.url} target="_blank" rel="noreferrer" className="btn-primary text-sm">
+                        <ExternalLink size={15} /> {METHOD_ICON[m.id] || '💳'} {m.label}
+                        {/* Telling the buyer which links already carry the amount
+                            is the difference between one tap and a typo. */}
+                        {m.prefilled && <span className="text-emerald-200 text-[11px]">· {t('track.filledIn', 'amount filled in')}</span>}
+                      </a>
+                    )
+                    : <span key={m.id} className="btn-ghost text-sm cursor-default">{METHOD_ICON[m.id] || '💳'} {m.label}: {m.target}</span>
+                ))}
               </div>
               <p className="text-slate-500 text-xs mt-3">
                 {cfg.paymentNote
