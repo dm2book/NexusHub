@@ -10,6 +10,7 @@ import { useToast } from '../context/ToastContext.jsx';
 import { money } from '../lib/catalog.js';
 import { EmptyState } from '../components/ui.jsx';
 import { usePageMeta } from '../lib/useMeta.js';
+import { matchBundle } from '../lib/bundles.js';
 
 const METHOD_ICON = { tikkie: '🟢', revolut: '⚫', paypal: '🔵' };
 
@@ -52,13 +53,8 @@ export default function Checkout() {
   const [deliveryDetail, setDeliveryDetail] = useState('');
   const [deliveryMethod, setDeliveryMethod] = useState('code'); // 'code' | 'account' (buyer's pick)
 
-  // Best matching bundle: all of its products are in the cart.
-  const inCart = new Set(items.map((i) => i.id));
-  const itemTotal = (id) => items.filter((i) => i.id === id).reduce((s, i) => s + i.price * i.qty, 0);
-  const matchedBundle = bundles
-    .filter((b) => b.products?.every((p) => inCart.has(p.id)))
-    .map((b) => ({ name: b.name, percent: b.discountPercent, discount: Math.round(b.products.reduce((s, p) => s + itemTotal(p.id), 0) * b.discountPercent / 100) }))
-    .sort((a, b) => b.discount - a.discount)[0] || null;
+  // Same rule as the cart, from one place — they used to disagree.
+  const matchedBundle = matchBundle(items, bundles);
   const bundleDiscount = matchedBundle?.discount || 0;
 
   const couponDiscount = coupon

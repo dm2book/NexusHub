@@ -24,7 +24,7 @@ export default function BundlesShowcase() {
 
   const addBundle = (b) => {
     b.products.forEach((p) => add({ id: p.id, name: p.name, price: p.price, currency: b.currency, category: p.category, image: p.image || iconFor(p.category) }, 1));
-    toast.success(`${b.name} added — you save ${money(b.discount, b.currency)}!`);
+    toast.success(`${b.name} — ${t('bundle.added', 'added, you save')} ${money(b.discount, b.currency)}!`);
   };
 
   return (
