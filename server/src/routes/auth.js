@@ -290,9 +290,21 @@ router.get('/providers', (_req, res) => {
   res.json({ providers: listEnabledProviders() });
 });
 
+/**
+ * These two routes are entered by *navigating*, not by fetch — the browser is
+ * showing whatever they return. So they must never answer with an API error
+ * body: a buyer who taps "Continue with Discord" while the provider is
+ * unconfigured used to land on a white page reading
+ * `{"error":{"message":"Provider discord not configured"}}`. Every failure here
+ * goes back to the login page with a code the SPA can put into words.
+ */
+const oauthFail = (res, reason, provider) =>
+  res.redirect(`${config.appUrl}/login?error=${reason}&provider=${encodeURIComponent(provider)}`);
+
 // Start flow — sets a signed state cookie and redirects to the provider.
 router.get('/oauth/:provider/start', (req, res) => {
   const provider = req.params.provider;
+  if (!listEnabledProviders().includes(provider)) return oauthFail(res, 'oauth_unavailable', provider);
   const state = randomToken(16);
   res.cookie(`oauth_state_${provider}`, state, {
     httpOnly: true, secure: config.isProd, sameSite: 'lax', maxAge: 600_000, path: '/api/auth',
@@ -306,10 +318,17 @@ router.get('/oauth/:provider/callback', asyncHandler(async (req, res) => {
   const { code, state } = req.query;
   const expected = req.cookies?.[`oauth_state_${provider}`];
   if (!code || !state || state !== expected) {
-    return res.redirect(`${config.appUrl}/login?error=oauth_state`);
+    return oauthFail(res, 'oauth_state', provider);
   }
   res.clearCookie(`oauth_state_${provider}`, { path: '/api/auth' });
-  const session = await handleOAuthCallback(provider, String(code), ctxOf(req));
+  let session;
+  try {
+    session = await handleOAuthCallback(provider, String(code), ctxOf(req));
+  } catch {
+    // Token exchange refused, no email on the profile, provider down — none of
+    // that is something the buyer can read from a JSON body.
+    return oauthFail(res, 'oauth_failed', provider);
+  }
   await audit({ actor: { id: session.user.id, email: session.user.email },
     action: 'auth.login', metadata: { method: provider }, req });
   setSessionCookie(res, session.refreshToken);

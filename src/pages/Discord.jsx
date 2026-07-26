@@ -42,8 +42,17 @@ export default function Discord() {
   usePageMeta('Join our Discord', 'Support, restock alerts, giveaways and community vouches.');
   const { user } = useAuth();
   const [server, setServer] = useState(null);
+  // Offering "link my account" when Discord login isn't configured sends the
+  // buyer straight into a failed redirect. Only show it when the server says
+  // the provider is actually live.
+  const [canLink, setCanLink] = useState(false);
 
   useEffect(() => { api.get('/api/discord/server').then((r) => setServer(r.server)).catch(() => setServer({})); }, []);
+  useEffect(() => {
+    api.get('/api/auth/providers')
+      .then((r) => setCanLink((r.providers || []).includes('discord')))
+      .catch(() => setCanLink(false));
+  }, []);
 
   const invite = server?.inviteUrl || 'https://discord.gg/CrAfqENsSV';
   const JoinBtn = ({ className = '' }) => (
@@ -85,8 +94,10 @@ export default function Discord() {
 
           <div className="mt-8 flex items-center justify-center gap-4">
             <JoinBtn className="px-7 py-3.5 text-base" />
-            {user && (
-              <a href={`${api.base}/api/auth/oauth/discord/start`} className="btn-ghost px-7 py-3.5 text-base">Link my account</a>
+            {user && canLink && (
+              <a href={`${api.base}/api/auth/oauth/discord/start`} className="btn-ghost px-7 py-3.5 text-base">
+                {t('discord.link', 'Link my account')}
+              </a>
             )}
           </div>
 
@@ -161,7 +172,9 @@ export default function Discord() {
             <div className="orb w-60 h-60 -top-20 right-0" style={{ background: 'rgba(88,101,242,.5)' }} />
             <div className="relative">
               <h3 className="text-3xl text-white">Ready to jump in?</h3>
-              <p className="text-slate-300 mt-3">{t('discord.joinSub', 'Free to join, and you can link your ForgeMarket account for verified roles.')}</p>
+              <p className="text-slate-300 mt-3">{canLink
+                ? t('discord.joinSub', 'Free to join, and you can link your ForgeMarket account for verified roles.')
+                : t('discord.joinSubPlain', 'Free to join — ask a question, catch a drop, or leave a vouch after your order.')}</p>
               <JoinBtn className="px-7 py-3.5 mt-7 inline-flex text-base" />
             </div>
           </div>

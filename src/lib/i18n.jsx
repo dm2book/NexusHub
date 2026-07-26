@@ -144,6 +144,8 @@ const NL = {
   'discord.p3': 'Geverifieerde koper-rollen gekoppeld aan je account',
   'discord.p4': 'Direct een supportticket bij het team',
   'discord.joinSub': 'Gratis om lid te worden, en je kunt je ForgeMarket-account koppelen voor geverifieerde rollen.',
+  'discord.joinSubPlain': 'Gratis om lid te worden — stel een vraag, pak een drop of laat een vouch achter na je bestelling.',
+  'discord.link': 'Koppel mijn account',
 
   // 404
   'nf.title': 'Pagina niet gevonden',
@@ -517,6 +519,11 @@ const NL = {
   'login.startOver': 'Opnieuw beginnen',
   'login.google': 'Doorgaan met Google',
   'login.discord': 'Doorgaan met Discord',
+  'login.thatProvider': 'die aanbieder',
+  'login.oauthUnavailable': 'Inloggen met {name} kan nog niet. Gebruik hieronder je e-mailadres — dat werkt precies hetzelfde.',
+  'login.oauthState': 'Die inloglink is verlopen. Probeer het opnieuw.',
+  'login.oauthFailed': 'Het inloggen met {name} is niet afgerond. Probeer het opnieuw, of gebruik hieronder je e-mailadres.',
+  'login.oauthGeneric': 'Het inloggen is niet afgerond. Probeer het opnieuw.',
   'login.noPassword': 'Geen wachtwoord nodig — we gebruiken veilige eenmalige codes.',
   'login.or': 'of',
   'login.checking': 'Even kijken of je al ingelogd bent…',
