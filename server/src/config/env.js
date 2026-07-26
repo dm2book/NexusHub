@@ -99,6 +99,9 @@ export const config = {
     dropsWebhookUrl: env.DISCORD_DROPS_WEBHOOK_URL || '',
     // Optional webhook for staff stock alerts; falls back to the order webhook.
     stockWebhookUrl: env.DISCORD_STOCK_WEBHOOK_URL || '',
+    // Optional webhook for the public #reviews channel. Unset is the normal
+    // case: the community bot relays reviews through the signed outbox instead.
+    reviewsWebhookUrl: env.DISCORD_REVIEWS_WEBHOOK_URL || '',
     // Alert when a product's available code count drops below this.
     lowStockThreshold: Number(env.LOW_STOCK_THRESHOLD || 5),
     // Live member count shown on the storefront trust stats (optional).

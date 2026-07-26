@@ -26,19 +26,19 @@ export const ROLES = [
     responsibility: 'Keeps the community safe & on-topic: warnings, timeouts, spam/scam removal, escalations.',
   },
   {
-    key: 'support', name: 'Support', color: '#10b981', hoist: true, mentionable: true,
+    key: 'support', name: 'Support', color: '#10b981', hoist: true, mentionable: false,
     perms: ['ManageMessages', 'ManageThreads'],
     responsibility: 'Handles tickets, order questions, refunds and delivery issues. First line of customer help.',
   },
   {
     key: 'vip', name: 'VIP Customer', color: '#a855f7', hoist: true, mentionable: false,
     perms: [],
-    responsibility: 'Top customers: early drops, exclusive channels, better giveaway odds, priority support.',
+    responsibility: 'Top customers: early access to drops and codes, bonus giveaway entries, priority on tickets.',
   },
   {
     key: 'partner', name: 'Partner', color: '#eab308', hoist: true, mentionable: false,
     perms: [],
-    responsibility: 'Approved collaborators / affiliates. Access to the partner channel and co-marketing.',
+    responsibility: 'Approved collaborators / affiliates. Revenue share, early access and co-marketing.',
   },
   // Loyalty tiers — mirrored automatically from the store (lifetime spend).
   // Cosmetic colour roles; the site's role-sync matches these by NAME.
@@ -63,14 +63,11 @@ export const ROLES = [
     responsibility: 'Loyalty tier: first paid order on the store. Synced automatically.',
   },
   {
-    key: 'verified', name: 'Verified Customer', color: '#22c55e', hoist: false, mentionable: false,
+    // No colour on purpose: this role outranks the game and level roles, so a
+    // colour here would override every one of them on every member.
+    key: 'verified', name: 'Verified Customer', color: null, hoist: false, mentionable: false,
     perms: [],
     responsibility: 'Default member tier after passing verification — unlocks the full community.',
-  },
-  {
-    key: 'bot', name: 'Bot', color: '#5865F2', hoist: false, mentionable: false,
-    perms: [],
-    responsibility: 'Automation: onboarding, tickets, AI assistant, reviews, giveaways, logging.',
   },
 ];
 
@@ -83,6 +80,7 @@ const MEMBERS = ['verified', 'vip', 'partner', ...STAFF];
  * category.access: 'public' | 'verified' | 'vip' | 'staff'
  * channel.type: 'text' | 'voice' | 'forum' | 'announcement'
  * channel.readOnly: members can read but not post (staff can post)
+ * channel.public:   readable BEFORE verifying, even inside a gated category
  * channel.slowmode: seconds
  */
 export const CATEGORIES = [
@@ -99,89 +97,77 @@ export const CATEGORIES = [
   {
     name: '📢 ANNOUNCEMENTS', access: 'verified',
     channels: [
-      { name: 'announcements', type: 'announcement', readOnly: true, topic: 'Official ForgeMarket news. Follow this channel to never miss a drop.' },
-      { name: 'updates', type: 'text', readOnly: true, topic: 'Product, pricing and feature updates.' },
-      { name: 'restocks', type: 'text', readOnly: true, topic: 'Back-in-stock alerts for popular top-ups.' },
-      { name: 'status', type: 'text', readOnly: true, topic: 'Store & delivery status — all systems operational ✅' },
+      // #updates was merged in here: two staff-only news channels split an
+      // already-thin posting rhythm and both looked abandoned.
+      { name: 'announcements', type: 'announcement', readOnly: true, topic: 'Official ForgeMarket news, product and pricing updates. Follow to never miss a drop.' },
+      { name: 'restocks', type: 'text', readOnly: true, topic: 'Back-in-stock alerts. Grab the 🔔 Drops & Restocks role in #roles to get pinged.' },
+      { name: 'status', type: 'text', readOnly: true, topic: 'Posted here when something is delayed. No recent post = running normally.' },
     ],
   },
   {
     name: '🛒 MARKETPLACE', access: 'verified',
     channels: [
       { name: 'products', type: 'text', readOnly: true, topic: 'Browse the catalog — fair prices, money back if it never arrives → {STORE_URL}' },
-      { name: 'price-list', type: 'text', readOnly: true, topic: 'Live prices for our most popular top-ups.' },
+      { name: 'price-list', type: 'text', readOnly: true, topic: 'Live prices, synced automatically from the shop.' },
+      { name: 'how-to-buy', type: 'text', readOnly: true, public: true, topic: 'Step-by-step: how to order, how to pay, and when your code arrives.' },
       { name: 'deals', type: 'text', readOnly: true, topic: 'Limited-time deals and bundle prices.' },
       { name: 'ask-the-bot', type: 'text', slowmode: 3, topic: 'Ask our assistant anything — product recommendations, prices and order help.' },
-      { name: 'how-to-buy', type: 'text', readOnly: true, topic: 'Step-by-step: how to order, how to pay, and when your code arrives.' },
     ],
   },
   {
-    name: '💬 COMMUNITY', access: 'verified',
-    channels: [
-      { name: 'roles', type: 'text', readOnly: true, topic: 'Pick your games & notifications to get the right pings.' },
-      { name: 'introductions', type: 'text', slowmode: 10, topic: 'New here? Say hi 👋' },
-      { name: 'general', type: 'text', topic: 'General chat for the ForgeMarket community.' },
-      { name: 'gaming', type: 'text', topic: 'Talk games, tips and updates.' },
-      { name: 'looking-for-group', type: 'text', topic: 'Find teammates and squads — LFG here.' },
-      { name: 'clips', type: 'text', topic: 'Drop your best plays and clips.' },
-      { name: 'screenshots-media', type: 'text', topic: 'Share your best gaming moments.' },
-      { name: 'memes', type: 'text', topic: 'Gaming memes & fun.' },
-      { name: 'suggestions', type: 'text', topic: 'Got an idea? Use /suggest — the community votes and staff respond.' },
-      { name: 'starboard', type: 'text', readOnly: true, topic: 'The best messages, starred by the community ⭐ (react with ⭐).' },
-      { name: 'off-topic', type: 'text', topic: 'Anything goes (within the rules).' },
-    ],
-  },
-  {
-    // Dedicated voice hub — earn XP while you hang out (5 XP/min, capped/session).
-    name: '🔊 VOICE', access: 'verified',
-    channels: [
-      { name: '🛋️ Lounge', aka: ['lounge'], type: 'voice' },
-      { name: '🎮 Game Night', aka: ['game-night'], type: 'voice' },
-      { name: '🎧 Duo', type: 'voice', userLimit: 2 },
-      { name: '🎯 Squad', type: 'voice', userLimit: 5 },
-      { name: '🎵 Music', type: 'voice' },
-      { name: '💤 AFK', type: 'voice', afk: true },
-    ],
-  },
-  {
+    // Trust sits directly under the shop: "has anyone actually received their
+    // order?" is the first question a new store has to answer, and it used to be
+    // buried below seventeen chat and voice channels.
     name: '⭐ REVIEWS & TRUST', access: 'verified',
     channels: [
-      { name: 'reviews', type: 'text', readOnly: true, topic: 'Verified customer reviews. Posted automatically after real orders.' },
-      { name: 'vouchers', type: 'text', slowmode: 30, topic: 'Bought from us? Leave a quick voucher/vouch for the community 💚' },
-      { name: 'proof-of-delivery', type: 'text', readOnly: true, topic: 'Screenshots of real, completed deliveries.' },
-      { name: 'discount-codes', type: 'text', readOnly: true, topic: 'Active discount/voucher codes — redeem at checkout.' },
+      { name: 'reviews', type: 'text', readOnly: true, public: true, topic: 'Reviews from real orders — posted here automatically as they come in.' },
+      // Renamed from "vouchers": in Dutch a voucher is a discount coupon, and
+      // this server has a coupon channel two rows down.
+      { name: 'vouches', aka: ['vouchers'], type: 'text', slowmode: 30, topic: 'Bought from us? Leave a quick vouch for the community 💚' },
+      { name: 'proof-of-delivery', type: 'text', readOnly: true, public: true, topic: 'Screenshots of real, completed deliveries.' },
+      { name: 'discount-codes', type: 'text', readOnly: true, topic: 'Active discount codes — redeem at checkout.' },
     ],
   },
   {
     name: '🎫 SUPPORT', access: 'verified',
     channels: [
-      { name: 'open-a-ticket', type: 'text', readOnly: true, topic: 'Need help? Tap the button to open a private ticket with our team.' },
-      { name: 'faq', type: 'text', readOnly: true, topic: 'Answers to the most common questions.' },
-      { name: 'support-info', type: 'text', readOnly: true, topic: 'Hours, response times and how support works.' },
-      { name: 'report-a-scam', type: 'text', readOnly: true, topic: 'Staff never DM first. Report suspicious users here via a ticket.' },
+      { name: 'open-a-ticket', type: 'text', readOnly: true, topic: 'Need help? Tap a button to open a private ticket with our team.' },
+      { name: 'faq', type: 'text', readOnly: true, public: true, topic: 'Answers to the most common questions.' },
+      { name: 'support-info', type: 'text', readOnly: true, topic: 'How support works, and what to expect.' },
+      { name: 'report-a-scam', type: 'text', readOnly: true, public: true, topic: 'Staff never DM first. Report suspicious users here.' },
     ],
   },
   {
-    name: '📅 EVENTS', access: 'verified',
+    // One conversation, not seven. With a small server every extra chat channel
+    // is an empty room, and an empty room reads as an abandoned store.
+    name: '💬 COMMUNITY', access: 'verified',
     channels: [
-      { name: 'events', type: 'announcement', readOnly: true, topic: 'Tournaments, drops and community events.' },
-      { name: 'event-signup', type: 'text', topic: 'Sign up for upcoming events.' },
-      { name: 'events-stage', type: 'voice', topic: 'Live event voice/stage.' },
+      { name: 'roles', type: 'text', readOnly: true, topic: 'Pick your games & notifications to get the right pings.' },
+      { name: 'general', type: 'text', topic: 'General chat for the ForgeMarket community — say hi 👋' },
+      { name: 'media', aka: ['clips', 'screenshots-media', 'memes'], type: 'text', topic: 'Clips, screenshots and memes.' },
+      { name: 'suggestions', type: 'text', topic: 'Got an idea? Use /suggest — the community votes and staff respond.' },
+      { name: 'starboard', type: 'text', readOnly: true, topic: 'The best messages, starred by the community ⭐ (react with ⭐).' },
+    ],
+  },
+  {
+    name: '🔊 VOICE', access: 'verified',
+    channels: [
+      { name: '🛋️ Lounge', aka: ['lounge'], type: 'voice' },
+      { name: '🎮 Game Night', aka: ['game-night'], type: 'voice' },
+      { name: '💤 AFK', type: 'voice', afk: true },
     ],
   },
   {
     name: '🎉 GIVEAWAYS', access: 'verified',
     channels: [
       { name: 'giveaways', type: 'text', readOnly: true, topic: 'Enter active giveaways. Hosted by the team & the bot.' },
-      { name: 'giveaway-chat', type: 'text', topic: 'Talk about current giveaways.' },
       { name: 'winners', type: 'text', readOnly: true, topic: 'Hall of winners 🏆' },
     ],
   },
   {
     name: '🤝 PARTNERS', access: 'verified',
     channels: [
-      { name: 'partnerships', type: 'text', readOnly: true, topic: 'Want to partner or become an affiliate? Open a ticket to apply.' },
-      { name: 'partner-perks', type: 'text', readOnly: true, topic: 'Perks & benefits for approved partners.' },
+      { name: 'partners', aka: ['partnerships', 'partner-perks'], type: 'text', readOnly: true, topic: 'Creator, community owner or reseller? Apply here — perks for approved partners.' },
     ],
   },
   {
@@ -198,7 +184,7 @@ export const CATEGORIES = [
       { name: 'ticket-logs', type: 'text', topic: 'Transcripts of closed tickets (auto-posted).' },
       { name: 'mod-log', type: 'text', topic: 'Moderation + audit events (auto-posted).' },
       { name: 'leads', type: 'text', topic: 'Captured leads + order/sales notifications from the bot.' },
-      { name: 'staff-voice', type: 'voice', topic: 'Staff voice.' },
+      { name: 'staff-voice', type: 'voice' },
     ],
   },
 ];
@@ -212,9 +198,10 @@ export const GAME_ROLES = [
   { key: 'valorant', label: 'Valorant', emoji: '🟥', color: '#fb7185' },
   { key: 'cod', label: 'Call of Duty', emoji: '🟧', color: '#f97316' },
   { key: 'apex', label: 'Apex Legends', emoji: '🔺', color: '#ef4444' },
-  { key: 'genshin', label: 'Genshin', emoji: '🟦', color: '#22d3ee' },
+  { key: 'genshin', label: 'Genshin', emoji: '⚗️', color: '#22d3ee' },
   { key: 'brawl', label: 'Brawl Stars', emoji: '🟨', color: '#eab308' },
   { key: 'clash', label: 'Clash of Clans', emoji: '🟪', color: '#a78bfa' },
+  { key: 'giftcards', label: 'Gift Cards', emoji: '🎁', color: '#14b8a6' },
 ];
 export const NOTIFY_ROLES = [
   { key: 'drops', label: 'Drops & Restocks', emoji: '🔔', color: '#6366f1' },
@@ -255,7 +242,7 @@ export const MESSAGES = {
       "**1. Be respectful.** No harassment, hate, or NSFW.\n" +
       "**2. No scams.** Never trade outside official channels. Staff will *never* DM you first.\n" +
       "**3. No spam / self-promo** without permission.\n" +
-      "**4. English in main channels** so staff can moderate.\n" +
+      "**4. Nederlands of Engels** in the main channels — anything else we can't moderate.\n" +
       "**5. One account per person.** No ban evasion.\n" +
       "**6. Use tickets for order issues** — don't share private info publicly.\n" +
       "**7. Staff decisions are final.** Appeals via ticket.\n\n" +
@@ -369,10 +356,6 @@ export const MESSAGES = {
       "• **VIP Customers** get bonus entries.\n" +
       "• Winners are announced in <#winners>.\n\nGood luck! 🍀",
   },
-  eventsIntro: {
-    title: '📅 Community events',
-    description: "Tournaments, drops and community nights. Sign up in <#event-signup> and hop into <#events-stage> when we go live.",
-  },
   staffIntro: {
     title: '🛠️ Staff HQ',
     description:
@@ -391,21 +374,26 @@ export const MESSAGES = {
       "Buttons below take you straight there 👇",
   },
   status: {
-    title: '🟢 Status — all systems operational',
+    title: '🟢 Store status',
+    // No standing "all systems operational" claim: this panel is pinned once and
+    // would keep saying it during an outage. It explains the channel instead.
     description:
-      "**Store:** online ✅\n**Deliveries:** running ✅\n**Payments:** being confirmed as normal ✅\n\n" +
-      "We post here if anything is ever delayed. No news = all good.",
+      "This is where we post when something is delayed — a payment provider acting up, a supplier being slow, " +
+      "or maintenance on the shop.\n\n" +
+      "**No recent post = everything is running normally.**\n\n" +
+      "Waiting on an order right now? `/order <your number>` gives you its live status, or check " +
+      "{STORE_URL}/track — no account needed.",
   },
   priceList: {
     image: '{STORE_URL}/discord/banner-products.png?v=2',
     color: 0x6366f1,
-    title: '🏷️ Live price list',
+    title: '🏷️ Prices',
+    // Deliberately no prices here. The bot posts a live, auto-syncing price
+    // embed in this same channel; a second hand-written list could only ever
+    // drift out of date and contradict it.
     description:
-      "Our most popular top-ups (full catalog + live prices on the site):\n\n" +
-      "• **Robux** — from €9.99\n• **V-Bucks** — from €6.99\n• **Valorant VP** — from €9.99\n" +
-      "• **CoD Points** — from €23.99\n• **Apex Coins** — from €9.99\n• **Genshin Crystals** — from €15.99\n" +
-      "• **Brawl Stars Gems** — from €6.99\n• **Clash of Clans Gems** — from €4.99\n\n" +
-      "Prices may change — always check the shop for the live price 👇",
+      "The full price list below updates itself straight from the shop, so what you see here is what you pay.\n\n" +
+      "Looking for something that isn't listed? Ask in <#ask-the-bot> — if we can get it, we will.",
   },
   vouchersIntro: {
     image: '{STORE_URL}/discord/banner-vouches.png?v=2',
@@ -435,14 +423,10 @@ export const MESSAGES = {
     title: '🤝 Partner with ForgeMarket',
     description:
       "Content creator, community owner or reseller? Let's work together.\n\n" +
-      "Open a ticket in <#open-a-ticket> (choose **Partnership**) with a bit about you and your audience. " +
-      "Approved partners get the **Partner** role, perks and co-marketing.",
-  },
-  partnerPerks: {
-    title: '🎁 Partner perks',
-    description:
-      "• Affiliate/revenue share\n• Exclusive partner channel & support\n• Co-marketing and shoutouts\n" +
-      "• Early access to drops and codes\n\nApply via a ticket — see <#partnerships>.",
+      "**What you get:** revenue share, early access to drops and codes, a partner role, " +
+      "direct line to the owner and co-marketing.\n\n" +
+      "**How to apply:** tap the button below (or open a ticket and pick **Partnership**) and tell us " +
+      "who you are and where your audience is. We reply to every application.",
   },
   rolesPanel: {
     title: '🎮 Pick your roles',
@@ -517,7 +501,7 @@ export const FAQ = [
   { q: 'What payment methods can I use?', a: 'You pay by bank transfer or payment link, using your order number as the reference. We confirm every payment by hand — usually within minutes during the day. More automatic methods are coming.' },
   { q: 'I didn’t get my code — what now?', a: 'First check spam. Then run `/order <your number>` to see the live status. Still nothing? Open a ticket in #open-a-ticket with your order number — if it never arrives you get your money back.' },
   { q: 'Can I get a refund?', a: 'Yes, request a refund from your order page or via a ticket. Approved refunds go back to your original payment method.' },
-  { q: 'How do I become a VIP?', a: 'VIP is granted to loyal customers — keep buying and stay active. VIPs get early drops, exclusive channels and better giveaway odds.' },
+  { q: 'How do I become a VIP?', a: 'VIP is granted to loyal customers — keep buying and stay active. VIPs get early access to drops and codes, bonus giveaway entries and priority on tickets.' },
   { q: 'How do giveaways work?', a: 'We host giveaways in #giveaways. React/enter to participate; winners are posted in #winners. VIPs get bonus entries.' },
   { q: 'Do you sell <game> currency?', a: 'We stock Robux, V-Bucks, Valorant, CoD, Apex, Genshin, Brawl Stars, Clash of Clans and more — check #products or ask in #ask-the-bot.' },
 ];

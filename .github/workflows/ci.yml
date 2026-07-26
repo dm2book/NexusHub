@@ -54,10 +54,13 @@ jobs:
           node --check discord/src/setup.js
           node --check discord/src/register-commands.js
 
-      # Buyer-facing bot logic that must not regress. Pure module — no token,
-      # no network, so it runs in CI like any other unit test.
-      - name: Discord order-status tests
-        run: node discord/test/order-status.test.mjs
+      # Buyer-facing bot logic and the server blueprint. Pure modules — no token,
+      # no network — so they run in CI like any other unit test.
+      - name: Discord tests
+        run: |
+          node discord/test/order-status.test.mjs
+          node discord/test/panels.test.mjs
+          node discord/test/server-blueprint.test.mjs
 
       - name: Server e2e suites (fresh Postgres DB per suite)
         run: npm test
