@@ -25,6 +25,7 @@ import { money } from '../lib/catalog.js';
 import { withFallback, SAMPLE_PRODUCTS, iconPath } from '../lib/sampleCatalog.js';
 import { useCategoryLogos } from '../lib/useCategoryLogos.js';
 import { SUPPORT_EMAIL } from '../lib/support.js';
+import ChatWidget, { openForgeChat } from '../components/ChatWidget.jsx';
 
 const ICON = iconPath;
 
@@ -339,16 +340,25 @@ export default function HomeStore() {
             <div className="flex items-start gap-2.5 mt-3">
               <span className="w-9 h-9 rounded-xl grid place-items-center text-white shrink-0"
                 style={{ backgroundImage: 'linear-gradient(135deg,#7c5cff,#a855f7)' }}>🤖</span>
-              <div className="bg-slate-100 rounded-xl rounded-tl-sm px-3 py-2 text-[13px] text-slate-600">
+              <button type="button" onClick={() => openForgeChat()}
+                className="bg-slate-100 rounded-xl rounded-tl-sm px-3 py-2 text-[13px] text-slate-600 text-left hover:bg-slate-200 transition">
                 {tr('home.botHi', 'Hi! 👋 How can I help you today?')}
-              </div>
+              </button>
             </div>
-            <Link to="/contact" className="mt-3 flex items-center justify-center gap-2 text-white font-semibold text-sm rounded-xl h-10 transition hover:brightness-105"
+            {/* This used to be a link to the contact page. A card that shows an
+                avatar, a greeting and a green "Online" dot is a chat as far as
+                anyone tapping it is concerned — so now it opens the real one. */}
+            <button type="button" onClick={() => openForgeChat()}
+              className="mt-3 w-full flex items-center justify-center gap-2 text-white font-semibold text-sm rounded-xl h-10 transition hover:brightness-105"
               style={{ backgroundImage: 'linear-gradient(135deg,#7c5cff,#a855f7)' }}>
               <MessageCircle size={16} /> {tr('home.chat', 'Chat with us')}
-            </Link>
+            </button>
           </div>
         </aside>
+
+        {/* The assistant itself. The homepage is not inside SiteLayout, so
+            without this the card had nothing to open. */}
+        <ChatWidget />
 
         {/* Main */}
         <main className="flex-1 min-w-0 space-y-6">

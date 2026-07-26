@@ -12,7 +12,7 @@
  */
 import 'dotenv/config';
 import {
-  Client, GatewayIntentBits, PermissionFlagsBits, ChannelType,
+  Client, GatewayIntentBits, PermissionFlagsBits, ChannelType, Events,
   EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle,
 } from 'discord.js';
 import { ROLES, CATEGORIES, STAFF, MEMBERS, GAME_ROLES, NOTIFY_ROLES, LEVEL_ROLES } from './config.js';
@@ -40,6 +40,9 @@ const PRUNE = !/^(0|false|off|no)$/i.test((process.env.PRUNE || '').trim());
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 const resolvePerms = (arr = []) => arr.map((n) => P[n]).filter(Boolean);
+/** Role colour in the shape discord.js 14.26+ wants; undefined leaves it default. */
+const roleColors = (c) => (c == null ? undefined : { primaryColor: c });
+
 /** Panel data (already substituted + channel-linked) → an embed. */
 const embed = (m) => {
   const e = new EmbedBuilder().setColor(m.color ?? 0x6366f1)
@@ -51,7 +54,7 @@ const embed = (m) => {
 const row = (...buttons) => new ActionRowBuilder().addComponents(...buttons);
 const link = (label, url) => new ButtonBuilder().setLabel(label).setStyle(ButtonStyle.Link).setURL(url);
 
-client.once('ready', async () => {
+client.once(Events.ClientReady, async () => {
   try {
     const guild = await client.guilds.fetch(DISCORD_GUILD_ID);
     await guild.roles.fetch();
@@ -76,7 +79,7 @@ client.once('ready', async () => {
         let role = guild.roles.cache.find((x) => x.name === r.name);
         if (!role) {
           role = await guild.roles.create({
-            name: r.name, color: r.color ?? undefined, hoist: r.hoist, mentionable: r.mentionable,
+            name: r.name, colors: roleColors(r.color), hoist: r.hoist, mentionable: r.mentionable,
             permissions: resolvePerms(r.perms), reason: 'ForgeMarket setup',
           });
           console.log(`  + role ${r.name}`);
@@ -92,7 +95,7 @@ client.once('ready', async () => {
             || (r.color != null && role.hexColor.toLowerCase() !== String(r.color).toLowerCase());
           if (changed) {
             await role.edit({
-              color: r.color ?? undefined, hoist: r.hoist, mentionable: r.mentionable,
+              colors: roleColors(r.color), hoist: r.hoist, mentionable: r.mentionable,
               permissions: resolvePerms(r.perms), reason: 'ForgeMarket setup: reconcile',
             }).catch((e) => console.log(`  ! role ${r.name} update failed: ${e.message}`));
             console.log(`  · role ${r.name}: synced to config`);
@@ -112,7 +115,7 @@ client.once('ready', async () => {
         if (!existing) {
           // permissions: [] — otherwise Discord copies @everyone's set into a
           // role handed out by a button any member can press.
-          await guild.roles.create({ name: r.label, color: r.color, mentionable: false, permissions: [], reason: 'ForgeMarket self-roles' });
+          await guild.roles.create({ name: r.label, colors: roleColors(r.color), mentionable: false, permissions: [], reason: 'ForgeMarket self-roles' });
           console.log(`  + self-role ${r.label}`);
         } else if (existing.mentionable && existing.editable) {
           await existing.edit({ mentionable: false }).catch(() => {});
@@ -125,7 +128,7 @@ client.once('ready', async () => {
     for (const r of LEVEL_ROLES) {
       try {
         if (!guild.roles.cache.find((x) => x.name === r.name)) {
-          await guild.roles.create({ name: r.name, color: r.color, permissions: [], reason: 'ForgeMarket level roles' });
+          await guild.roles.create({ name: r.name, colors: roleColors(r.color), permissions: [], reason: 'ForgeMarket level roles' });
           console.log(`  + level role ${r.name}`);
         }
       } catch (e) { console.log(`  ! level role ${r.name} failed: ${e.message}`); }
@@ -397,8 +400,11 @@ client.once('ready', async () => {
       const ours = new Set(CATEGORIES.map((c) => c.name));
       const strays = [...guild.channels.cache.values()].filter((c) => {
         if (c.type === ChannelType.GuildCategory) return !ours.has(c.name) && c.name !== '📊 SERVER STATS';
-        if (c.parent && !ours.has(c.parent.name)) return false;      // in someone else's category
         if (c.parent?.name === '🎫 TICKETS') return false;            // live tickets
+        // Channels inside a category that is itself a leftover count too —
+        // skipping them meant the category could never be emptied, so it could
+        // never be deleted either. Emptiness is still the only thing that
+        // decides: a room with real conversation survives wherever it lives.
         return !wanted.has(c.name);
       });
 
