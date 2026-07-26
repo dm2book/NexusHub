@@ -5,6 +5,7 @@
 import { run, get, all, nowIso } from '../db/index.js';
 import { newId } from '../utils/ids.js';
 import { bustSocialCaches } from '../routes/social.js';
+import { postReviewEvent } from './discordService.js';
 
 /** Insert a review. De-dupes on external_id (the Discord message/user id). */
 export async function addReview({ author, avatarUrl, stars, body, product, source = 'discord', externalId }) {
@@ -22,6 +23,12 @@ export async function addReview({ author, avatarUrl, stars, body, product, sourc
     { id, author: String(author || 'Anonymous').slice(0, 80), avatar: avatarUrl || null,
       stars: s, body: clean, product: product || null, source, ext: externalId || null, at: nowIso() });
   bustSocialCaches(); // rating + review count changed → refresh public stats now
+  // Mirror into the community. A Discord vouch already lives there, so only
+  // reviews from elsewhere are relayed — otherwise the channel echoes itself.
+  if (source !== 'discord') {
+    postReviewEvent({ author, stars: s, body: clean, product, verified: false })
+      .catch((e) => console.error('[reviews] discord relay:', e.message));
+  }
   return { id, deduped: false };
 }
 
@@ -44,6 +51,9 @@ export async function addVerifiedReview({ userId, email, orderId, author, stars,
       product: product || null, oid: orderId, uid: userId || null,
       email: email ? String(email).toLowerCase() : null, city: city || null, at: nowIso() });
   bustSocialCaches(); // verified review just added → the average rating updates instantly
+  // This is the one that matters: a review tied to a real, completed order.
+  postReviewEvent({ author, stars: s, body: clean, product, verified: true, city })
+    .catch((e) => console.error('[reviews] discord relay:', e.message));
   return { id, deduped: false };
 }
 

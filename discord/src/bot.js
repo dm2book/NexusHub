@@ -21,6 +21,7 @@ import {
 import Anthropic from '@anthropic-ai/sdk';
 import { FAQ, GAME_ROLES, NOTIFY_ROLES, LEVEL_ROLES, DELIVERY_INFO } from './config.js';
 import { orderStatusView } from './orderStatus.js';
+import { buildPanels, panelNeedsUpdate } from './panels.js';
 
 // Delivery explanation for a product category (falls back to a generic one).
 const deliveryFor = (category) => DELIVERY_INFO[category] || DELIVERY_INFO.default;
@@ -29,6 +30,18 @@ const SELF_ROLES = [...GAME_ROLES, ...NOTIFY_ROLES];
 const STAFF_ROLE_NAMES = ['Owner', 'Admin', 'Moderator', 'Support'];
 const isStaff = (member) => member?.permissions?.has?.(PermissionFlagsBits.ManageMessages)
   || member?.roles?.cache?.some((r) => STAFF_ROLE_NAMES.includes(r.name));
+
+/**
+ * A narrower gate than isStaff, for the commands that expose money or reach the
+ * whole server.
+ *
+ * The first person given the Support role will be a friend helping with tickets.
+ * isStaff() also let them read weekly revenue and margins, publish discount
+ * codes and announce to everyone — none of which answering a ticket requires.
+ */
+const isOwnerLevel = (member) => member?.permissions?.has?.(PermissionFlagsBits.ManageGuild)
+  || member?.roles?.cache?.some((r) => ['Owner', 'Admin'].includes(r.name));
+const OWNER_ONLY = { content: 'That one is owner/admin only.', ephemeral: true };
 
 // A support ticket, detected reliably by its topic (which survives the channel
 // being renamed to "✋-…" when staff claims it) — falling back to the name
@@ -180,6 +193,12 @@ const anthropic = ANTHROPIC_API_KEY ? new Anthropic({ apiKey: ANTHROPIC_API_KEY 
 // served no image (e.g. mid domain-switch) would otherwise keep showing the
 // stale/blank cached copy. Bump this whenever the banner artwork changes.
 const BANNER = (n) => `${STORE_URL}/discord/banner-${n}.png?v=2`;
+/** #name → a real clickable mention, or plain #name if that channel is missing.
+ *  Discord only linkifies <#id>; a name in those brackets renders as raw text. */
+const chanRef = (guild, name) => {
+  const ch = guild?.channels?.cache?.find((c) => c.name === name);
+  return ch ? `<#${ch.id}>` : `#${name}`;
+};
 const BRAND_ICON = `${STORE_URL}/icon-512.png`;
 
 const client = new Client({
@@ -367,7 +386,7 @@ const PANEL_BANNERS = {
   deals: ['deals', 0xef4444],
   'discount-codes': ['deals', 0xec4899],
   reviews: ['vouches', 0x22c55e],
-  vouchers: ['vouches', 0x22c55e],
+  vouches: ['vouches', 0x22c55e],
   giveaways: ['giveaways', 0xa855f7],
 };
 
@@ -391,6 +410,45 @@ async function syncPanelBanners(guild) {
   }
   if (edited) console.log(`🖼️  [panel-sync] banners added/refreshed on ${edited} panel(s)`);
   if (missing.length) console.log(`ℹ️  [panel-sync] no setup panel found in: ${missing.join(', ')} — run \`REPOST=1 npm run setup\` once to create them`);
+}
+
+/**
+ * Keep the pinned panels' TEXT current.
+ *
+ * setup.js posts each panel once and then reports "exists" forever, so every
+ * later copy fix — including corrections to what we promise customers — used to
+ * sit in the repo and never reach the live server unless someone remembered to
+ * re-run setup with REPOST=1 (which deletes and re-pins everything, losing the
+ * message history and every pin position).
+ *
+ * On boot we now rebuild each panel from config and edit only the ones whose
+ * text actually changed. Buttons are preserved: editing `embeds` alone leaves
+ * `components` untouched.
+ */
+async function syncPanelCopy(guild) {
+  let edited = 0;
+  try {
+    const channelIdByName = {};
+    guild.channels.cache.forEach((c) => { if (c.name) channelIdByName[c.name] = c.id; });
+    const panels = buildPanels({ storeUrl: STORE_URL, guildName: guild.name, channelIdByName });
+
+    for (const [chName, panel] of Object.entries(panels)) {
+      const ch = findChannel(guild, chName);
+      if (!ch || typeof ch.messages?.fetch !== 'function') continue;
+      const msgs = await ch.messages.fetch({ limit: 30 }).catch(() => null);
+      const mine = msgs?.find((m) => m.author.id === client.user.id
+        && m.embeds[0]?.footer?.text === 'forgemarket-setup');
+      if (!mine) continue;                       // not built yet — setup.js posts it
+      if (!panelNeedsUpdate(mine.embeds[0], panel)) continue;
+      const e = EmbedBuilder.from(mine.embeds[0])
+        .setTitle(panel.title).setDescription(panel.description);
+      await mine.edit({ embeds: [e] }).catch(() => {});
+      edited++;
+      console.log(`  · [panel-copy] #${chName} updated`);
+    }
+  } catch (e) { console.error('[panel-copy]', e.message); }
+  if (edited) console.log(`📝 [panel-copy] refreshed ${edited} panel(s) from config`);
+  return edited;
 }
 
 // Startup self-check: are the brand banners actually reachable AND actually
@@ -467,7 +525,7 @@ client.on(Events.GuildMemberUpdate, (oldM, newM) => {
 // ── ready ────────────────────────────────────────────────────────────────
 client.once(Events.ClientReady, (c) => {
   console.log(`✅ ${c.user.tag} online — AI: ${anthropic ? 'on' : 'rule-based'} · API: ${FORGEMARKET_API_URL || 'sample'}`);
-  c.user.setPresence({ activities: [{ name: '/ask · instant top-ups' }], status: 'online' });
+  c.user.setPresence({ activities: [{ name: '/order · check your order status' }], status: 'online' });
   const refresh = () => c.guilds.cache.forEach((g) => updateServerStats(g));
   refresh();
   setInterval(refresh, 6 * 60_000); // respect channel-rename rate limits
@@ -498,6 +556,9 @@ client.once(Events.ClientReady, (c) => {
   // the existing setup messages (no manual re-run of setup needed).
   checkBrandAssets().then((ok) => {
     if (ok) c.guilds.cache.forEach((g) => syncPanelBanners(g));
+    // Copy sync runs regardless of the banner check — the text matters even when
+    // the images are unreachable.
+    c.guilds.cache.forEach((g) => syncPanelCopy(g));
   });
 
   // Daily vouch spotlight → #general (checked hourly, posts once a day).
@@ -525,14 +586,17 @@ client.on(Events.GuildMemberAdd, async (member) => {
     .setTitle(`Welcome to ${member.guild.name} ⚡`)
     .setThumbnail(BRAND_ICON)
     .setImage(BANNER('welcome'))
+    // One instruction, then what unlocks after it. Real channel mentions, so the
+    // links are tappable — and the three channels that are still locked are
+    // named as such instead of sending the member to a door they can't open.
     .setDescription(
       `Hey ${member.user.username}! Glad you're here.\n\n` +
-      "✅ **Verify** in the #verify channel to unlock everything\n" +
-      "🛒 Browse top-ups or ask me in **#ask-the-bot**\n" +
-      "🎁 Join **#giveaways** for free drops\n" +
-      "🎫 Need help? **#open-a-ticket**\n\n" +
-      "🛡️ **Stay safe:** our staff will **NEVER** DM you first, never ask for your password, " +
-      "and we only sell via the official store link in the server. Anyone else is a scammer — report them in #open-a-ticket.\n\n" +
+      `**Step 1 — verify.** Tap ${chanRef(member.guild, 'verify')} and press the green button. ` +
+      'That unlocks the shop channels, giveaways and support.\n\n' +
+      `Already curious? ${chanRef(member.guild, 'how-to-buy')} and ${chanRef(member.guild, 'faq')} ` +
+      'are readable right now, no verification needed.\n\n' +
+      "🛡️ **Stay safe:** our staff will **NEVER** DM you first and will never ask for your password. " +
+      'We only sell through the official store link. Anyone who DMs you a "deal" is a scammer — report them.\n\n' +
       "Money back if it never arrives · a real person on support · no account needed to buy.")
     .setFooter({ text: 'ForgeMarket · game top-ups & gift cards' });
   const dmButtons = new ActionRowBuilder().addComponents(
@@ -545,7 +609,9 @@ client.on(Events.GuildMemberAdd, async (member) => {
   celebrateMilestone(member.guild); // 🎉 every 100 members
   // Public greeting — skipped during join spikes so a raid can't flood #general.
   if (recentJoins.length < 5) {
-    const ch = findChannel(member.guild, 'general');
+    // #welcome, not #general: an unverified member cannot see #general, so the
+    // one message meant to greet them was posted where they could never read it.
+    const ch = findChannel(member.guild, 'welcome') || findChannel(member.guild, 'general');
     const verifyCh = findChannel(member.guild, 'verify');
     ch?.send(`👋 Welcome <@${member.id}>! Verify in ${verifyCh ? `<#${verifyCh.id}>` : '#verify'} to unlock everything, and say hi 💜`)
       .then((m) => setTimeout(() => m.delete().catch(() => {}), 10 * 60_000))
@@ -584,17 +650,14 @@ async function handleButton(i) {
     if (role && i.member.roles.cache.has(role.id)) {
       return i.reply({ content: 'You’re already verified ✅', ephemeral: true });
     }
+    // Built from the same source as the #rules panel: a member must consent to
+    // the rules that are actually posted, not to a copy that drifted from them.
+    const channelIdByName = {};
+    i.guild.channels.cache.forEach((c) => { if (c.name) channelIdByName[c.name] = c.id; });
+    const rulesCopy = buildPanels({ storeUrl: STORE_URL, guildName: i.guild.name, channelIdByName }).rules;
     const rules = new EmbedBuilder().setColor(0x6366f1)
       .setTitle('📜 Read & accept the rules')
-      .setDescription(
-        '**1. Be respectful.** No harassment, hate or NSFW.\n' +
-        '**2. No scams.** Trade only via official channels. Staff will **never** DM you first.\n' +
-        '**3. No spam / self-promo** without permission.\n' +
-        '**4. English in main channels** so staff can moderate.\n' +
-        '**5. One account per person.** No ban evasion.\n' +
-        '**6. Use tickets for order issues** — never share private info publicly.\n' +
-        '**7. Staff decisions are final.** Appeals via ticket.\n\n' +
-        'Press the green button below to accept the rules and unlock the server.')
+      .setDescription(`${rulesCopy.description}\n\nPress the green button below to accept and unlock the server.`)
       .setFooter({ text: 'ForgeMarket • verification' });
     const agree = new ButtonBuilder().setCustomId('verify:agree').setLabel('I agree — verify me')
       .setEmoji('✅').setStyle(ButtonStyle.Success);
@@ -608,10 +671,24 @@ async function handleButton(i) {
     if (i.member.roles.cache.has(role.id)) {
       return i.update({ content: 'You’re already verified ✅', embeds: [], components: [] }).catch(() => {});
     }
-    await i.member.roles.add(role).catch(() => {});
+    // Never claim success we did not achieve. If the bot's own role sits below
+    // "Verified Customer", Discord refuses the grant — and swallowing that told
+    // every new member they were verified while they still saw an empty server.
+    try {
+      await i.member.roles.add(role);
+    } catch (e) {
+      console.error('[verify] role grant failed:', e.message);
+      leadLog(i.guild, `⚠️ Verification FAILED for <@${i.user.id}>: ${e.message} — drag my role above **${role.name}**.`);
+      return i.update({
+        content: '⚠️ I couldn’t give you the Verified role — my own role is ranked below it, so Discord blocked me. ' +
+          'This is on us, not you: an admin has been notified and it takes them 10 seconds to fix. Try again after that.',
+        embeds: [], components: [],
+      }).catch(() => {});
+    }
     leadLog(i.guild, `✅ Verified: <@${i.user.id}>`);
     return i.update({
-      content: '✅ **Verified!** Welcome in — the full server is now unlocked. Start at <#products> and <#ask-the-bot>. 🎮',
+      content: `✅ **Verified!** Welcome in — the full server is now unlocked. ` +
+        `Start at ${chanRef(i.guild, 'products')} and ${chanRef(i.guild, 'ask-the-bot')}. 🎮`,
       embeds: [], components: [],
     }).catch(() => {});
   }
@@ -873,7 +950,27 @@ async function rateSupport(i, stars) {
     .setDescription(`⭐ Support rated **${stars}/5** by <@${i.user.id}>`)] }).catch(() => {});
 }
 
+/**
+ * Commands an unverified account may still use.
+ *
+ * Everything else waits until they pass the gate: an account that has not done
+ * the human check could otherwise burn Anthropic credit on /ask, or publish to
+ * the server, straight from the public welcome channels. /order stays open on
+ * purpose — order tracking is deliberately account-free everywhere else too.
+ */
+const PRE_VERIFY_COMMANDS = new Set(['help', 'order', 'shop', 'invite']);
+
 async function handleCommand(i) {
+  if (!PRE_VERIFY_COMMANDS.has(i.commandName) && i.guild) {
+    const verified = findRole(i.guild, 'Verified Customer');
+    if (verified && !i.member?.roles?.cache?.has(verified.id) && !isStaff(i.member)) {
+      return i.reply({
+        content: `Verify first in ${chanRef(i.guild, 'verify')} — it takes one tap and unlocks everything. ` +
+          'Tracking an order? `/order` works right away.',
+        ephemeral: true,
+      });
+    }
+  }
   if (i.commandName === 'help') {
     // Buyers first, and only staff see the staff block — a shopper asking for
     // help should not have to read past /flashsale and /clearpins to find
@@ -1223,7 +1320,15 @@ function leaderboardCmd(i) {
 // DMs) when it has no webhooks/bot token of its own; we poll the signed
 // endpoint every 60s and post them. This is what makes 'Discord automation'
 // work with zero Vercel-side secrets.
-const OUTBOX_CHANNEL = { leads: ['leads', 'staff-announcements'], deals: ['deals', 'restocks', 'announcements'] };
+const OUTBOX_CHANNEL = {
+  leads: ['leads', 'staff-announcements'],
+  deals: ['deals', 'restocks', 'announcements'],
+  // #reviews has always claimed it fills itself after real orders; the store now
+  // actually emits them, so route them there (falling back to #vouches).
+  reviews: ['reviews', 'vouches'],
+};
+/** Notification roles the bot may ping when relaying a store event. */
+const OUTBOX_PING = { deals: ['Deals', 'Drops & Restocks'] };
 async function pollOutbox(c) {
   if (!FORGEMARKET_API_URL || !REVIEW_INGEST_SECRET) return;
   try {
@@ -1247,7 +1352,21 @@ async function pollOutbox(c) {
         if (!guild) continue;
         const names = OUTBOX_CHANNEL[ev.channel] || ['leads'];
         const ch = names.map((n) => findChannel(guild, n)).find(Boolean);
-        if (ch) await ch.send(ev.body).catch(() => {});
+        if (!ch) continue;
+        // Members opt into "Drops & Restocks" / "Deals" in #roles and, until now,
+        // nothing ever pinged those roles — the opt-in led nowhere. The roles are
+        // not mentionable by members, so this ping is ours alone to make.
+        const pingRoles = (OUTBOX_PING[ev.channel] || [])
+          .map((n) => findRole(guild, n)).filter(Boolean);
+        const body = pingRoles.length
+          ? { ...ev.body,
+              content: [...pingRoles.map((r) => `<@&${r.id}>`), ev.body.content].filter(Boolean).join(' '),
+              allowedMentions: { roles: pingRoles.map((r) => r.id) } }
+          : ev.body;
+        const sent = await ch.send(body).catch(() => null);
+        // #announcements is an announcement channel; publishing is the only
+        // reason to use that type, and nothing was ever crossposted.
+        if (sent && ch.type === ChannelType.GuildAnnouncement) await sent.crosspost().catch(() => {});
       } catch (e) { console.error('[outbox] event failed:', e.message); }
     }
     if (events.length) console.log(`📮 [outbox] relayed ${events.length} store event(s)`);
@@ -1290,18 +1409,28 @@ async function lookupOrder(i) {
   return i.editReply({ embeds: [e], components: [row] });
 }
 
-// ── /vouch → posts to #vouchers ───────────────────────────────────────────────
+// ── /vouch → posts to #vouches ────────────────────────────────────────────────
 const vouchLastAt = new Map(); // userId → ts of their last vouch (anti-spam)
 async function postVouch(i) {
+  // A vouch is mirrored onto the storefront, where the page promises reviews
+  // come from real customers. A brand-new unverified account must not be able
+  // to write there — that is how a review section stops meaning anything.
+  const verified = findRole(i.guild, 'Verified Customer');
+  if (verified && !i.member?.roles?.cache?.has(verified.id) && !isStaff(i.member)) {
+    return i.reply({
+      content: `Verify first in ${chanRef(i.guild, 'verify')} before leaving a vouch 💚`,
+      ephemeral: true,
+    });
+  }
   const message = i.options.getString('message');
   const stars = Math.min(5, Math.max(1, i.options.getInteger('stars') || 5));
-  // One vouch per user per hour — keeps #vouchers and the site honest.
+  // One vouch per user per hour — keeps #vouches and the site honest.
   const last = vouchLastAt.get(i.user.id) || 0;
   if (Date.now() - last < 3_600_000) {
     return i.reply({ content: 'You already vouched recently — thank you! You can vouch again in a bit. 💚', ephemeral: true });
   }
   vouchLastAt.set(i.user.id, Date.now());
-  const ch = findChannel(i.guild, 'vouchers');
+  const ch = findChannel(i.guild, 'vouches') || findChannel(i.guild, 'vouchers');
   const e = new EmbedBuilder().setColor(0x22c55e)
     .setAuthor({ name: i.user.username, iconURL: i.user.displayAvatarURL() })
     .setDescription(`${'⭐'.repeat(stars)}\n\n${message}`)
@@ -1500,7 +1629,7 @@ function maybePostWeeklyLeaderboard(guild) {
   if (!top.length) return;
   META.lastWeeklyPost = week;
   saveMeta();
-  const ch = findChannel(guild, 'general') || findChannel(guild, 'events');
+  const ch = findChannel(guild, 'general');
   if (!ch) return;
   const lines = top.map(([id, r], n) =>
     `**${['🥇', '🥈', '🥉'][n] || `${n + 1}.`}** <@${id}> — Level ${r.lvl} · ${r.xp} XP`).join('\n');
@@ -1674,7 +1803,7 @@ async function balanceCmd(i) {
 
 // /digest + /stock — staff-only, on demand
 async function digestCmd(i) {
-  if (!isStaff(i.member)) return i.reply({ content: 'Staff only.', ephemeral: true });
+  if (!isOwnerLevel(i.member)) return i.reply(OWNER_ONLY);
   await i.deferReply({ ephemeral: true });
   const d = await fetchDigest();
   if (!d) return i.editReply('Couldn’t reach the store digest — check FORGEMARKET_API_URL & REVIEW_INGEST_SECRET.');
@@ -1682,7 +1811,7 @@ async function digestCmd(i) {
 }
 
 async function stockCmd(i) {
-  if (!isStaff(i.member)) return i.reply({ content: 'Staff only.', ephemeral: true });
+  if (!isOwnerLevel(i.member)) return i.reply(OWNER_ONLY);
   await i.deferReply({ ephemeral: true });
   const d = await fetchDigest();
   if (!d) return i.editReply('Couldn’t reach the store — check FORGEMARKET_API_URL & REVIEW_INGEST_SECRET.');
@@ -1695,7 +1824,7 @@ async function stockCmd(i) {
 
 // /launch — staff: live "can I sell today?" readiness report from the store
 async function launchCmd(i) {
-  if (!isStaff(i.member)) return i.reply({ content: 'Staff only.', ephemeral: true });
+  if (!isOwnerLevel(i.member)) return i.reply(OWNER_ONLY);
   await i.deferReply({ ephemeral: true });
   const d = await fetchDigest();
   if (!d?.launch) return i.editReply('Couldn’t reach the store — check FORGEMARKET_API_URL & REVIEW_INGEST_SECRET.');
@@ -1739,20 +1868,34 @@ const ORDER_RE = /\bFM-\d{4}-[A-Z0-9]{4,}\b/i;
 const orderLookupCooldown = new Map(); // channelId -> ts
 client.on(Events.MessageCreate, async (m) => {
   try {
-    if (m.author.bot || !m.guild || !m.channel.topic?.startsWith('ticket-owner:')) return;
+    if (m.author.bot || !m.guild || !FORGEMARKET_API_URL) return;
     const match = m.content.match(ORDER_RE);
-    if (!match || !FORGEMARKET_API_URL) return;
+    if (!match) return;
     const now = Date.now();
-    if (now - (orderLookupCooldown.get(m.channel.id) || 0) < 60_000) return; // 1/min per ticket
+    if (now - (orderLookupCooldown.get(m.channel.id) || 0) < 60_000) return; // 1/min per channel
     orderLookupCooldown.set(m.channel.id, now);
-    const e = await orderStatusEmbed(match[0].toUpperCase());
-    if (e) await m.reply({ embeds: [e] });
+
+    // Inside a ticket the channel is private (owner + staff only), so posting the
+    // status saves everyone a round trip.
+    if (m.channel.topic?.startsWith('ticket-owner:')) {
+      const e = await orderStatusEmbed(match[0].toUpperCase());
+      if (e) await m.reply({ embeds: [e] });
+      return;
+    }
+    // In a public channel we must NOT post it: the number may not be theirs, and
+    // the status carries the order total. Point them at the private command
+    // instead — most people paste a number because they don't know it exists.
+    await m.reply({
+      content: `Looking for that order? Run \`/order ${match[0].toUpperCase()}\` — the answer is only visible to you. ` +
+        'Heads up: an order number is personal, better not to post it in public. \u{1F512}',
+      allowedMentions: { repliedUser: true },
+    }).catch(() => {});
   } catch { /* best-effort */ }
 });
 
 // ── /coupon (staff) → posts a discount code to #discount-codes ────────────────
 async function postCoupon(i) {
-  if (!isStaff(i.member)) return i.reply({ content: 'Only staff can post coupons.', ephemeral: true });
+  if (!isOwnerLevel(i.member)) return i.reply(OWNER_ONLY);
   const code = i.options.getString('code').toUpperCase();
   const percent = Math.min(90, Math.max(1, i.options.getInteger('percent') || 10));
   const note = i.options.getString('note') || 'Redeem at checkout on the website.';
@@ -1769,7 +1912,7 @@ async function postCoupon(i) {
 
 // ── /announce (staff) → posts to #announcements ───────────────────────────────
 async function postAnnounce(i) {
-  if (!isStaff(i.member)) return i.reply({ content: 'Only staff can announce.', ephemeral: true });
+  if (!isOwnerLevel(i.member)) return i.reply(OWNER_ONLY);
   const message = i.options.getString('message');
   const ch = findChannel(i.guild, 'announcements') || i.channel;
   const e = new EmbedBuilder().setColor(0x6366f1).setTitle('📢 Announcement')

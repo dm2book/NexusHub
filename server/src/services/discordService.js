@@ -251,6 +251,39 @@ export async function postDropEvent(kind, data = {}) {
 }
 
 /**
+ * Mirror a new customer review into the community.
+ *
+ * #reviews has always told members that verified reviews "are posted here
+ * automatically after real orders" — but nothing ever wrote to it, so the one
+ * channel that answers "has anyone actually received their order?" sat empty
+ * while the panel above it claimed otherwise. This makes the promise true.
+ *
+ * Only reviews tied to a real order carry the verified badge; a Discord vouch
+ * is mirrored as an ordinary community review, never as a verified one.
+ */
+export async function postReviewEvent({ author, stars, body, product, verified = false, city } = {}) {
+  const text = String(body || '').trim();
+  if (!text) return;
+  const s = Math.min(5, Math.max(1, Number(stars) || 5));
+  const embed = {
+    author: { name: String(author || 'Customer').slice(0, 80) },
+    description: `${'⭐'.repeat(s)}${s < 5 ? '☆'.repeat(5 - s) : ''}\n\n${text.slice(0, 900)}`,
+    color: verified ? 0x22c55e : 0x6366f1,
+    fields: [
+      ...(product ? [{ name: 'Product', value: String(product).slice(0, 100), inline: true }] : []),
+      ...(city ? [{ name: 'From', value: String(city).slice(0, 60), inline: true }] : []),
+    ],
+    footer: {
+      text: verified
+        ? `${config.email.fromName} · verified purchase`
+        : `${config.email.fromName} · community vouch`,
+    },
+    timestamp: new Date().toISOString(),
+  };
+  await deliver('reviews', config.discord.reviewsWebhookUrl, { embeds: [embed] });
+}
+
+/**
  * Alert staff when the API throws an unhandled 500. Throttled to one alert per
  * route per 5 minutes so an error storm can't flood the channel. Best-effort.
  */
