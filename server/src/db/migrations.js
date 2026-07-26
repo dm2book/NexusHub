@@ -915,4 +915,18 @@ CREATE INDEX IF NOT EXISTS idx_saved_carts_reminder ON saved_carts (updated_at);
 ALTER TABLE supplier_products ADD COLUMN IF NOT EXISTS supplier_url TEXT;
 `,
   },
+  {
+    id: '022_order_pay_link',
+    sql: `
+-- ── Per-order payment link ──────────────────────────────────────────────────
+-- Payment is manual: the buyer gets one shared payment link and has to type the
+-- amount and the reference themselves, which is where it goes wrong — a wrong
+-- cent or a missing reference turns into the owner matching payments by hand.
+-- The owner can now drop a payment request with the exact amount already in it
+-- (made in seconds in the bank app) onto a single order; the buyer's live status
+-- page picks it up without a refresh.
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS pay_link TEXT;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS pay_link_at TEXT;
+`,
+  },
 ];

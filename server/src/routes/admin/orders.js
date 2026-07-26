@@ -9,15 +9,16 @@ import { asyncHandler } from '../../middleware/error.js';
 import { requirePermission } from '../../middleware/rbac.js';
 import {
   listOrders, getOrder, transitionOrder, markPaymentReceived, setOrderNotes, deliverOrder,
-  exportOrdersCsv, orderUrlFor,
+  exportOrdersCsv, orderUrlFor, setOrderPayLink, clearOrderPayLink,
 } from '../../services/orderService.js';
+import { PayLinkError } from '../../utils/payLink.js';
 import { fulfillOrder, listFulfillment, listFulfillmentLogs } from '../../services/fulfillmentService.js';
 import * as analytics from '../../services/analyticsService.js';
 import { listPendingProofs, confirmProof, rejectProof } from '../../services/paymentProofService.js';
 import { sendEmail } from '../../services/emailService.js';
 import { notify } from '../../services/notificationService.js';
 import { audit } from '../../services/auditService.js';
-import { notFound } from '../../utils/errors.js';
+import { notFound, badRequest } from '../../utils/errors.js';
 
 const router = Router();
 const actor = (req) => ({ actorId: req.user.id, user: req.user });
@@ -171,6 +172,37 @@ router.put('/:id/notes', requirePermission('orders.update'), asyncHandler(async 
 }));
 
 // Contact Customer — sends an email + in-app notification.
+/**
+ * Attach a payment link with the exact amount to one order.
+ *
+ * Payment is manual here, and the shared checkout link cannot carry an amount —
+ * the buyer types it, and a wrong cent becomes the owner matching payments by
+ * hand. The owner makes a request in their bank app and pastes it here; the
+ * buyer's live status page picks it up.
+ */
+router.post('/:id/pay-link', requirePermission('orders.update'),
+  asyncHandler(async (req, res) => {
+    const { url } = z.object({ url: z.string().min(1).max(500) }).parse(req.body);
+    try {
+      const result = await setOrderPayLink(req.params.id, url, actor(req));
+      await audit({ actor: req.user, action: 'order.pay_link_set', targetType: 'order',
+        targetId: req.params.id, metadata: { host: new URL(result.payLink).hostname }, req });
+      res.json(result);
+    } catch (e) {
+      // A rejected link is owner error, not a server fault — say what is wrong.
+      if (e instanceof PayLinkError) throw badRequest(e.message);
+      throw e;
+    }
+  }));
+
+router.delete('/:id/pay-link', requirePermission('orders.update'),
+  asyncHandler(async (req, res) => {
+    await clearOrderPayLink(req.params.id);
+    await audit({ actor: req.user, action: 'order.pay_link_clear', targetType: 'order',
+      targetId: req.params.id, req });
+    res.json({ ok: true });
+  }));
+
 router.post('/:id/contact', requirePermission('orders.contact'),
   asyncHandler(async (req, res) => {
     const { subject, message } = z.object({

@@ -15,6 +15,7 @@ export default function AdminOrderDetail() {
   const [confirm, setConfirm] = useState(false);
   const [busy, setBusy] = useState(false);
   const [codes, setCodes] = useState({});
+  const [payLink, setPayLink] = useState('');
 
   const load = useCallback(() => {
     api.get(`/api/admin/orders/${id}`).then(setData).catch((e) => toast.error(e.message));
@@ -89,6 +90,45 @@ export default function AdminOrderDetail() {
               <span className="text-white font-semibold">{money(order.total, order.currency)}</span>
             </div>
           </div>
+
+          {/* Payment is manual: the shared checkout link cannot carry an amount,
+              so the buyer types it and a wrong cent lands on the owner. Paste a
+              request made in the bank app and the buyer's live status page shows
+              a pay button with the amount already in it. */}
+          {order.status === 'pending' && hasPermission('orders.update') && (
+            <div className="card p-5 border border-amber-500/20">
+              <h3 className="text-white mb-1">Payment link for this order</h3>
+              <p className="text-slate-500 text-sm mb-4">
+                Make a payment request for <span className="text-white font-semibold">{money(order.total, order.currency)}</span> in
+                your bank app and paste the link here. The customer sees it on their status page straight away —
+                no amount to type, no reference to forget. You can also do this from your phone with
+                <span className="text-slate-300"> /paylink {order.number} &lt;link&gt;</span> in Discord.
+              </p>
+              {order.payLink ? (
+                <div className="flex flex-wrap items-center gap-3">
+                  <a href={order.payLink} target="_blank" rel="noreferrer"
+                     className="text-emerald-300 text-sm font-mono truncate max-w-[24rem]">{order.payLink}</a>
+                  <button onClick={async () => {
+                    setBusy(true);
+                    try { await api.del(`/api/admin/orders/${id}/pay-link`); toast.success('Link removed.'); load(); }
+                    catch (e) { toast.error(e.message); } finally { setBusy(false); }
+                  }} disabled={busy} className="btn-ghost text-sm">Remove</button>
+                </div>
+              ) : (
+                <form onSubmit={async (e) => {
+                  e.preventDefault();
+                  setBusy(true);
+                  try { await api.post(`/api/admin/orders/${id}/pay-link`, { url: payLink.trim() });
+                    toast.success('The customer can now pay the exact amount.'); setPayLink(''); load(); }
+                  catch (err) { toast.error(err.message); } finally { setBusy(false); }
+                }} className="flex flex-col sm:flex-row gap-2">
+                  <input value={payLink} onChange={(e) => setPayLink(e.target.value)}
+                    placeholder="https://tikkie.me/pay/..." className="input flex-1 text-base" />
+                  <button disabled={busy || !payLink.trim()} className="btn-primary px-5">Attach</button>
+                </form>
+              )}
+            </div>
+          )}
 
           {hasPermission('orders.complete') && !['completed', 'refunded', 'cancelled'].includes(order.status) && (
             <div className="card p-5 border border-emerald-500/20">

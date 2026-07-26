@@ -15,6 +15,7 @@ import { formatMoney } from '../utils/money.js';
 import { config, manualPayMethods } from '../config/env.js';
 import { badRequest, notFound, conflict } from '../utils/errors.js';
 import { sendEmailAsync } from './emailService.js';
+import { validatePayLink } from '../utils/payLink.js';
 import { renderTemplate, baseContext } from './templateService.js';
 import { notify } from './notificationService.js';
 import { scoreOrder } from './fraudService.js';
@@ -419,6 +420,47 @@ export async function sendReviewRequests({ afterHours = 24, limit = 25 } = {}) {
   return sent;
 }
 
+/**
+ * Attach a payment link with the exact amount already in it to one order.
+ *
+ * The shared link on the checkout page cannot carry an amount, so the buyer
+ * types it themselves — and a wrong cent or a missing reference becomes the
+ * owner reconciling payments by hand. A per-order link removes both.
+ *
+ * Only meaningful while the order is still unpaid: once money has arrived,
+ * showing a pay button invites a second payment.
+ */
+export async function setOrderPayLink(orderId, rawUrl, ctx = {}) {
+  const order = await getOrder(orderId);
+  if (!order) throw notFound('Order not found');
+  if (order.status !== 'pending') {
+    throw badRequest(`Order ${order.number} is not waiting for payment (${order.statusLabel}).`);
+  }
+  const url = validatePayLink(rawUrl);
+  await run('UPDATE orders SET pay_link=@u, pay_link_at=@at, updated_at=@at WHERE id=@id',
+    { u: url, at: nowIso(), id: orderId });
+  // Deliberately NOT in order_status_history: nothing about the order's state
+  // changed, and the buyer's public timeline would show "Pending" twice. The
+  // admin audit log records who attached it.
+  // The buyer may be sitting on the status page right now — it polls, so this
+  // arrives without them doing anything.
+  if (order.userId) {
+    await notify(order.userId, {
+      type: 'order_update', title: `Payment link ready for ${order.number}`,
+      body: 'Your payment link with the exact amount is ready.',
+      link: `/account/orders/${orderId}`,
+    }).catch(() => {});
+  }
+  return { ok: true, payLink: url, number: order.number };
+}
+
+/** Remove a payment link (wrong link pasted, or the order moved on). */
+export async function clearOrderPayLink(orderId) {
+  await run('UPDATE orders SET pay_link=NULL, pay_link_at=NULL, updated_at=@at WHERE id=@id',
+    { at: nowIso(), id: orderId });
+  return { ok: true };
+}
+
 export async function appendHistory(orderId, from, to, changedBy, reason) {
   await run(`INSERT INTO order_status_history (id, order_id, from_status, to_status, changed_by, reason, created_at)
        VALUES (@id, @oid, @from, @to, @by, @reason, @at)`,
@@ -463,6 +505,9 @@ async function hydrate(row) {
     paymentStatus: row.payment_status, paymentRef: row.payment_ref,
     billing: parse(row.billing), fraudScore: row.fraud_score, fraudStatus: row.fraud_status,
     notes: row.notes,
+    // Per-order payment link with the exact amount already in it, when the
+    // owner has pasted one. Public on purpose: the buyer needs to click it.
+    payLink: row.pay_link || null, payLinkAt: row.pay_link_at || null,
     items: items.map((i) => {
       const metadata = parse(i.metadata) || {};
       if (!metadata.category && backfill[i.product_id]) metadata.category = backfill[i.product_id];
@@ -604,8 +649,22 @@ function statusBlurb(status) {
 /** Manual-payment instructions block for the order-received email (Tikkie/Revolut/PayPal). */
 function paymentInstructionsHtml(order) {
   const methods = manualPayMethods();
-  if (!methods.length || ['completed', 'refunded', 'cancelled', 'payment_received'].includes(order.status)) return '';
+  const settled = ['completed', 'refunded', 'cancelled', 'payment_received'].includes(order.status);
+  if (settled) return '';
+  // A per-order link stands on its own: it must still reach the buyer when no
+  // generic method is configured, which is exactly the case while the owner is
+  // between payment providers.
+  if (!methods.length && !order.payLink) return '';
   const amt = formatMoney(order.total, order.currency);
+
+  // A payment request the owner made for THIS order already carries the amount
+  // and needs no reference — so it goes first, and the generic methods below
+  // become the fallback rather than the instruction.
+  const exact = order.payLink
+    ? `<div class="quote"><strong>Pay ${amt} — the amount is already filled in</strong><br>` +
+      `<a href="${escapeHtml(order.payLink)}">${escapeHtml(String(order.payLink).replace(/^https?:\/\//, '').slice(0, 60))}</a>` +
+      `</div>`
+    : '';
   const eur = (order.total / 100).toFixed(2);
   const rows = methods.map((m) => {
     if (m.kind === 'email') {
@@ -615,7 +674,9 @@ function paymentInstructionsHtml(order) {
     if (m.id === 'paypal' && /paypal\.me/i.test(url)) url = `${url.replace(/\/$/, '')}/${eur}EUR`;
     return `<tr><td><strong>${m.label}</strong></td><td class="r"><a href="${url}">${escapeHtml(url.replace(/^https?:\/\//, ''))}</a></td></tr>`;
   }).join('');
-  return `<div class="quote"><strong>Complete your payment — ${amt}</strong><br>` +
+  if (!methods.length) return exact;   // only the exact-amount link to show
+  return exact +
+    `<div class="quote"><strong>${exact ? 'Or pay it yourself' : 'Complete your payment'} — ${amt}</strong><br>` +
     `Pay using one of the methods below and put your order number <strong>${order.number}</strong> as the reference. ` +
     `Your order is confirmed as soon as we receive it.</div>` +
     `<table class="summary"><tbody>${rows}</tbody></table>`;

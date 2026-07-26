@@ -179,7 +179,21 @@ export default function Track() {
                   className="font-mono text-white inline-flex items-center gap-1"><Copy size={12} /> {result.number}</button>{' '}
                 {t('track.payRef', 'as the reference. We confirm it manually (usually within minutes) — this page updates by itself.')}
               </p>
+              {/* A link the owner made with the exact amount already in it beats
+                  every generic method: nothing to type, nothing to get wrong. */}
+              {result.payLink && (
+                <a href={result.payLink} target="_blank" rel="noreferrer"
+                   className="btn-primary w-full mt-4 py-3.5 text-base justify-center">
+                  <ExternalLink size={18} /> {t('track.payExact', 'Pay')} {result.totalFormatted} —{' '}
+                  {t('track.payExactSub', 'amount already filled in')}
+                </a>
+              )}
               <div className="flex flex-wrap gap-2 mt-4">
+                {result.payLink && (
+                  <span className="w-full text-slate-400 text-xs mb-1">
+                    {t('track.payOther', 'Or pay it yourself with the reference above:')}
+                  </span>
+                )}
                 {cfg.paymentMethods.map((m) => {
                   const href = payHref(m, (result.total / 100).toFixed(2));
                   return href
@@ -187,7 +201,10 @@ export default function Track() {
                     : <span key={m.id} className="btn-ghost text-sm cursor-default">{METHOD_ICON[m.id] || '💳'} {m.label}: {m.target}</span>;
                 })}
               </div>
-              {cfg.paymentNote && <p className="text-slate-500 text-xs mt-3">{cfg.paymentNote}</p>}
+              <p className="text-slate-500 text-xs mt-3">
+                {cfg.paymentNote
+                  || t('track.payNote', 'Once we confirm your payment your order moves on by itself — this page updates live.')}
+              </p>
             </div>
           )}
 
