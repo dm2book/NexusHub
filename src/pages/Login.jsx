@@ -46,6 +46,27 @@ export default function Login() {
   useEffect(() => { if (user) navigate(dest, { replace: true }); }, [user]);
   useEffect(() => { api.get('/api/auth/providers').then((r) => setProviders(r.providers)).catch(() => {}); }, []);
 
+  // A failed social login comes back as a redirect, not as a fetch, so the
+  // reason arrives in the query string. Say it in words and clean the URL up
+  // again — a refresh should not resurrect the message.
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const reason = params.get('error');
+    if (!reason) return;
+    const provider = params.get('provider') || '';
+    const name = provider ? provider[0].toUpperCase() + provider.slice(1) : t('login.thatProvider', 'that provider');
+    const messages = {
+      oauth_unavailable: t('login.oauthUnavailable',
+        'Signing in with {name} isn’t available yet. Use your email address below — it works the same.', { name }),
+      oauth_state: t('login.oauthState',
+        'That sign-in link expired. Please try again.'),
+      oauth_failed: t('login.oauthFailed',
+        'We couldn’t finish signing you in with {name}. Please try again, or use your email address below.', { name }),
+    };
+    setError(messages[reason] || t('login.oauthGeneric', 'Sign-in didn’t complete. Please try again.'));
+    navigate({ pathname: location.pathname }, { replace: true, state: location.state });
+  }, []);
+
   // Single ticking timer drives both countdowns.
   useEffect(() => {
     if (step !== 'code') return;
