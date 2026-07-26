@@ -32,6 +32,10 @@ export default function Login() {
   const dest = location.state?.from || '/account';
 
   const [providers, setProviders] = useState([]);
+  // Whether the server can actually deliver an SMS. Until it answers we assume
+  // it cannot, so the form never promises SMS and then takes it away — losing
+  // the phone option on load reads as the page breaking.
+  const [smsOk, setSmsOk] = useState(false);
   const [step, setStep] = useState('id');        // id | code | totp
   const [totpTicket, setTotpTicket] = useState(null); // 2FA challenge after a correct OTP
   const [identifier, setIdentifier] = useState('');
@@ -44,7 +48,12 @@ export default function Login() {
   const [otpKey, setOtpKey] = useState(0);           // bump to reset the OTP boxes
 
   useEffect(() => { if (user) navigate(dest, { replace: true }); }, [user]);
-  useEffect(() => { api.get('/api/auth/providers').then((r) => setProviders(r.providers)).catch(() => {}); }, []);
+  useEffect(() => {
+    api.get('/api/auth/providers').then((r) => {
+      setProviders(r.providers || []);
+      setSmsOk((r.channels || ['email']).includes('sms'));
+    }).catch(() => {});
+  }, []);
 
   // A failed social login comes back as a redirect, not as a fetch, so the
   // reason arrives in the query string. Say it in words and clean the URL up
@@ -99,6 +108,12 @@ export default function Login() {
 
   const start = async (e) => {
     e.preventDefault();
+    // We already know this cannot work, so answer here rather than making them
+    // wait for a round trip that comes back in the server's language.
+    if (!smsOk && !isEmail(identifier.trim())) {
+      setError(t('login.emailOnly', 'We can only send codes by email right now. Enter your email address to sign in.'));
+      return;
+    }
     setBusy(true);
     try { await sendCode(identifier); }
     catch (err) { track('otp_failed', { phase: 'request', status: err?.status }); setError(friendlyError(err)); }
@@ -157,6 +172,30 @@ export default function Login() {
   const fmt = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
   const idIsEmail = isEmail(identifier.trim());
 
+  /**
+   * The line under the input. Written out rather than nested in ternaries
+   * because the interesting case is easy to fall through by accident: with SMS
+   * switched off and a phone number typed, the old chain landed on "We'll text
+   * you a one-time code" — the exact promise this page must stop making.
+   */
+  const hint = (() => {
+    const typedPhone = identifier.trim() !== '' && !idIsEmail;
+    if (!smsOk && typedPhone) {
+      // Silent while the red error says the same thing — one problem, one line.
+      return error ? '' : (
+        <span className="text-amber-300">
+          {t('login.emailOnlyTyped', 'We can only send codes by email — enter your email address.')}
+        </span>
+      );
+    }
+    if (identifier.trim() === '') {
+      return smsOk ? t('login.idHint', 'Use your email or phone number.')
+                   : t('login.idHintEmail', 'We’ll email you a one-time code — no password needed.');
+    }
+    return idIsEmail ? t('login.emailHint', 'We’ll email you a one-time code.')
+                     : t('login.smsHint', 'We’ll text you a one-time code.');
+  })();
+
   // While the silent sign-in ladder (session/trusted-device) is still running,
   // don't show the form yet — otherwise a returning customer can request a code
   // they'll never need, a moment before being auto-signed-in.
@@ -208,17 +247,17 @@ export default function Login() {
         ) : step === 'id' ? (
           <form onSubmit={start} className="space-y-4">
             <div>
-              <label className="label">{t('login.idLabel', 'Email or phone')}</label>
+              <label className="label">
+                {smsOk ? t('login.idLabel', 'Email or phone') : t('login.idLabelEmail', 'Email address')}
+              </label>
               <div className="relative">
                 <AtSign size={16} className="absolute left-3.5 top-3.5 text-slate-500" />
-                <input required value={identifier} onChange={(e) => setIdentifier(e.target.value)}
-                  placeholder="you@example.com  ·  +31 6 12345678" className="input pl-10"
-                  autoComplete="username" autoFocus />
+                <input required value={identifier}
+                  onChange={(e) => { setIdentifier(e.target.value); if (error) setError(''); }}
+                  placeholder={smsOk ? 'you@example.com  ·  +31 6 12345678' : 'you@example.com'} className="input pl-10"
+                  autoComplete={smsOk ? 'username' : 'email'} inputMode={smsOk ? 'text' : 'email'} autoFocus />
               </div>
-              <p className="text-slate-500 text-xs mt-1.5">
-                {identifier.trim() === '' ? t('login.idHint', 'Use your email or phone number.')
-                  : idIsEmail ? t('login.emailHint', 'We’ll email you a one-time code.') : t('login.smsHint', 'We’ll text you a one-time code.')}
-              </p>
+              <p className="text-slate-500 text-xs mt-1.5">{hint}</p>
             </div>
             {error && <p className="text-sm text-red-300 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">{error}</p>}
             <button disabled={busy || !identifier.trim()} className="btn-primary w-full py-3">
@@ -262,7 +301,8 @@ export default function Login() {
 
             <button type="button" onClick={() => { setStep('id'); setError(''); }}
               className="text-sm text-slate-400 hover:text-white w-full text-center">
-              {t('login.different', 'Use a different email or phone')}
+              {smsOk ? t('login.different', 'Use a different email or phone')
+                     : t('login.differentEmail', 'Use a different email address')}
             </button>
           </div>
         )}

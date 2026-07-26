@@ -11,7 +11,7 @@ import { sha256, safeEqual, randomToken } from '../utils/crypto.js';
 import { badRequest, unauthorized, tooMany } from '../utils/errors.js';
 import { sendEmailAsync } from './emailService.js';
 import { upsertUserByEmail, upsertUserByPhone, touchLogin, getUserPermissions } from './userService.js';
-import { sendSms, isValidPhone, normalizePhone } from './smsService.js';
+import { sendSms, isValidPhone, normalizePhone, smsAvailable } from './smsService.js';
 import { audit } from './auditService.js';
 
 /** Human-readable device label from a User-Agent string (best-effort). */
@@ -149,6 +149,13 @@ export async function verifyEmailOtp(email, code, ctx = {}) {
 
 /** Create + SMS a one-time login code to a phone number. Rate-limited per number/IP. */
 export async function requestPhoneOtp(phone, ctx = {}) {
+  // Refuse before writing a code row. Storing an OTP we cannot deliver leaves
+  // the caller to announce "code sent" and the person to wait out a countdown
+  // for a message nobody sent — and it burns their rate-limit budget doing it.
+  // This is the single choke point for all three callers (login, resend, and
+  // adding a number to an account), so the promise can only be made where it
+  // can be kept.
+  if (!smsAvailable()) throw badRequest('SMS codes aren’t available right now. Use your email address to sign in instead.');
   const p = normalizePhone(phone);
   if (!isValidPhone(p)) throw badRequest('Enter a valid phone number (e.g. +31612345678)');
   const ip = ctx.ip || null;

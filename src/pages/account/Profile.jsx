@@ -77,8 +77,20 @@ function PhoneSection() {
   const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
+  const [smsOk, setSmsOk] = useState(false);
 
   const hasPhone = !!user?.phone;
+
+  useEffect(() => {
+    api.get('/api/auth/providers')
+      .then((r) => setSmsOk((r.channels || ['email']).includes('sms')))
+      .catch(() => setSmsOk(false));
+  }, []);
+
+  // Nothing to offer: adding a number buys SMS login and SMS alerts, and
+  // without a provider it buys neither. Someone who already stored one still
+  // sees it below, so they can take it off.
+  if (!smsOk && !hasPhone) return null;
 
   const request = async () => {
     if (phone.trim().length < 6) { toast.error('Enter a valid phone number.'); return; }
@@ -100,7 +112,9 @@ function PhoneSection() {
   return (
     <div className="card p-6">
       <h3 className="text-white flex items-center gap-2 mb-1"><Phone size={17} className="text-indigo-300" /> Phone number</h3>
-      <p className="text-slate-500 text-sm mb-4">Add a phone for SMS login and security alerts.</p>
+      <p className="text-slate-500 text-sm mb-4">{smsOk
+        ? 'Add a phone for SMS login and security alerts.'
+        : 'SMS codes are switched off, so this number isn’t used for login right now.'}</p>
 
       {hasPhone ? (
         <div className="flex items-center gap-3 bg-space-black rounded-xl px-4 py-3">
@@ -111,7 +125,7 @@ function PhoneSection() {
           </div>
           <button onClick={remove} className="text-slate-400 hover:text-red-400 text-xs flex items-center gap-1"><Trash2 size={13} /> Remove</button>
         </div>
-      ) : step === 'idle' ? (
+      ) : !smsOk ? null : step === 'idle' ? (
         <button onClick={() => setStep('enter')} className="btn-ghost text-sm"><Phone size={15} /> Add phone number</button>
       ) : (
         <div className="space-y-3">

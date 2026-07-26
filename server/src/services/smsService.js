@@ -15,6 +15,18 @@ export function normalizePhone(input) {
 }
 export const isValidPhone = (p) => E164.test(normalizePhone(p));
 
+/**
+ * Can we actually get a code onto someone's phone?
+ *
+ * Not the same question as "is Twilio configured": in development the code is
+ * printed to the console, which is a real delivery channel for whoever is
+ * running the server. In production it is not — and the login page used to
+ * announce "We sent a 6-digit code by SMS" either way, then count down ten
+ * minutes for a message that was never sent. Everything that offers SMS asks
+ * this first.
+ */
+export const smsAvailable = () => config.sms.enabled || !config.isProd;
+
 export async function sendSms(to, body) {
   const phone = normalizePhone(to);
   if (!config.sms.enabled) {
