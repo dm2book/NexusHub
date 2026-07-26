@@ -50,6 +50,10 @@ const commands = [
     .addStringOption((o) => o.setName('code').setDescription('e.g. FORGE10').setRequired(true))
     .addIntegerOption((o) => o.setName('percent').setDescription('% off (1–90)').setRequired(true))
     .addStringOption((o) => o.setName('note').setDescription('Optional note')),
+  new SlashCommandBuilder().setName('paylink')
+    .setDescription('Owner: attach a payment link with the exact amount to an order')
+    .addStringOption((o) => o.setName('order').setDescription('Order number, e.g. FM-2026-8KQ2R7XZ').setRequired(true))
+    .addStringOption((o) => o.setName('link').setDescription('The payment request link from your bank app').setRequired(true)),
   new SlashCommandBuilder().setName('digest').setDescription('Staff: live store digest (revenue, orders, stock)'),
   new SlashCommandBuilder().setName('stock').setDescription('Staff: which products are low on codes'),
   new SlashCommandBuilder().setName('launch').setDescription('Staff: live ready-to-sell checklist'),

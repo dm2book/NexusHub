@@ -344,6 +344,10 @@ const NL = {
   // Track — resterende teksten
   'track.order': 'Bestelling',
   'track.live': 'Live — wordt automatisch bijgewerkt',
+  'track.payNote': 'Zodra we je betaling bevestigen gaat je bestelling vanzelf verder — deze pagina ververst live.',
+  'track.payExact': 'Betaal',
+  'track.payExactSub': 'bedrag staat er al in',
+  'track.payOther': 'Of maak het zelf over met de referentie hierboven:',
   'track.refundedSub': 'Deze bestelling is terugbetaald. Gebruikt winkeltegoed is teruggestort in je wallet.',
   'track.closedSub': 'Deze bestelling is gesloten. Denk je dat dit een vergissing is? Neem contact op met support, dan lossen we het op.',
   'track.contactSupport': 'Contact met support →',

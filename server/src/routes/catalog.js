@@ -389,6 +389,10 @@ router.get('/track/:number', asyncHandler(async (req, res) => {
     number: order.number, status: order.status, statusLabel: order.statusLabel,
     total: order.total, totalFormatted: order.totalFormatted, currency: order.currency,
     history: order.history.map((h) => ({ to: h.to_status, at: h.created_at })),
+    // The owner can attach a payment request with the exact amount already in
+    // it; the buyer's page polls, so it appears without a refresh. Only while
+    // the order is unpaid — a pay button on a paid order invites paying twice.
+    payLink: order.status === 'pending' ? (order.payLink || null) : null,
     updatedAt: order.updatedAt,
   });
 }));

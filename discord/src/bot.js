@@ -1025,7 +1025,8 @@ async function handleCommand(i) {
       .setFooter({ text: 'Chat and voice both earn XP — level roles are automatic' });
     if (isStaff(i.member)) {
       e.addFields({ name: '🛠️ Staff only',
-        value: '`/close` · `/giveaway` · `/reroll` · `/coupon` · `/flashsale`\n' +
+        value: '`/paylink` — attach a payment link with the exact amount to an order\n' +
+               '`/close` · `/giveaway` · `/reroll` · `/coupon` · `/flashsale`\n' +
                '`/digest` — live store numbers · `/stock` — low stock · `/launch` — ready-to-sell check\n' +
                '`/announce` · `/clearpins`' });
     }
@@ -1052,6 +1053,7 @@ async function handleCommand(i) {
   if (i.commandName === 'launch') return launchCmd(i);
   if (i.commandName === 'stock') return stockCmd(i);
   if (i.commandName === 'coupon') return postCoupon(i);
+  if (i.commandName === 'paylink') return payLinkCmd(i);
   if (i.commandName === 'flashsale') return flashSale(i);
   if (i.commandName === 'announce') return postAnnounce(i);
   if (i.commandName === 'clearpins') return clearPinsCmd(i);
@@ -1940,6 +1942,43 @@ client.on(Events.MessageCreate, async (m) => {
     }).catch(() => {});
   } catch { /* best-effort */ }
 });
+
+/**
+ * /paylink — attach a payment request with the exact amount to an order.
+ *
+ * The owner gets a Discord ping the second an order lands. Making the request in
+ * the bank app and pasting it back here takes ten seconds, and it removes the
+ * whole "customer typed the wrong amount / forgot the reference" problem — the
+ * buyer's status page is already polling, so the button appears for them without
+ * a refresh.
+ */
+async function payLinkCmd(i) {
+  if (!isOwnerLevel(i.member)) return i.reply(OWNER_ONLY);
+  await i.deferReply({ ephemeral: true });
+  if (!FORGEMARKET_API_URL || !REVIEW_INGEST_SECRET) {
+    return i.editReply('Payment links aren’t configured — the store link or the shared secret is missing.');
+  }
+  const number = i.options.getString('order').trim().toUpperCase();
+  const url = i.options.getString('link').trim();
+  try {
+    const ts = String(Date.now());
+    const signature = createHmac('sha256', REVIEW_INGEST_SECRET)
+      .update(`${ts}.paylink:${number}:${url}`).digest('hex');
+    const res = await fetch(`${FORGEMARKET_API_URL.replace(/\/$/, '')}/api/discord/pay-link`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-timestamp': ts, 'x-signature': signature },
+      body: JSON.stringify({ number, url }),
+    });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok) return i.editReply(`⚠️ ${d.error || `Couldn’t attach that link (${res.status}).`}`);
+    return i.editReply(
+      `✅ Payment link attached to **${d.number}** (${d.total}).\n` +
+      'The buyer sees a "pay this exact amount" button on their status page right away — no refresh needed.');
+  } catch (e) {
+    console.error('[paylink]', e.message);
+    return i.editReply('Couldn’t reach the store right now — try again in a minute.');
+  }
+}
 
 // ── /coupon (staff) → posts a discount code to #discount-codes ────────────────
 async function postCoupon(i) {

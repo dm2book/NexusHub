@@ -10,6 +10,7 @@ import { launchChecks } from '../services/launchCheckService.js';
 import { coinBalance } from '../services/forgeCoinService.js';
 import { balanceOf } from '../services/walletService.js';
 import { loyaltyFor } from '../services/loyaltyService.js';
+import { getOrderByNumber, setOrderPayLink } from '../services/orderService.js';
 
 const router = Router();
 
@@ -27,6 +28,35 @@ router.post('/outbox',
     const events = await claimOutbox(20);
     await stampBotSeen();
     res.json({ events });
+  }));
+
+/**
+ * The bot's /paylink command: attach a payment request with the exact amount to
+ * one order, from the owner's phone.
+ *
+ * The owner already confirms every payment by hand and gets a Discord ping the
+ * moment an order lands. Making the payment request in the bank app and pasting
+ * it back is ten seconds — and it removes the whole class of "typed the wrong
+ * amount / forgot the reference" problems.
+ *
+ * Both the order number and the URL are bound into the signature, so a captured
+ * request cannot be replayed against a different order or with a different link.
+ */
+export const canonicalPayLink = (b = {}) => `paylink:${b.number || ''}:${b.url || ''}`;
+router.post('/pay-link',
+  verifyIngest(canonicalPayLink)(config.discord.reviewIngestSecret),
+  asyncHandler(async (req, res) => {
+    const number = String(req.body?.number || '').trim().toUpperCase();
+    const url = String(req.body?.url || '').trim();
+    const order = await getOrderByNumber(number);
+    if (!order) return res.status(404).json({ error: `No order ${number}` });
+    try {
+      const result = await setOrderPayLink(order.id, url, { actorId: 'discord' });
+      res.json({ ok: true, number: result.number, total: order.totalFormatted });
+    } catch (e) {
+      // Bad link or wrong order state — the bot shows this to the owner as-is.
+      res.status(400).json({ error: e.message });
+    }
   }));
 
 // Member balance for the bot's /saldo command: given a Discord user id, return

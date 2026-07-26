@@ -164,7 +164,10 @@ export const config = {
       tikkie: env.PAY_TIKKIE || '',     // a Tikkie payment-request link
       revolut: env.PAY_REVOLUT || '',   // revolut.me/yourname
       paypal: env.PAY_PAYPAL || '',     // paypal.me/yourname or your PayPal email
-      note: env.PAY_NOTE || 'After paying, your order is confirmed within minutes during open hours.',
+      // Empty by default: an owner-written note cannot be translated, so a
+      // hardcoded English one would sit on a Dutch page forever. The storefront
+      // shows its own translated line when this is unset.
+      note: env.PAY_NOTE || '',
     },
   },
 };
