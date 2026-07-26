@@ -22,6 +22,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { FAQ, GAME_ROLES, NOTIFY_ROLES, LEVEL_ROLES, DELIVERY_INFO } from './config.js';
 import { orderStatusView } from './orderStatus.js';
 import { buildPanels, panelNeedsUpdate } from './panels.js';
+import { scamReason } from './scamGuard.js';
 
 // Delivery explanation for a product category (falls back to a generic one).
 const deliveryFor = (category) => DELIVERY_INFO[category] || DELIVERY_INFO.default;
@@ -97,8 +98,14 @@ const levelFor = (xp) => Math.floor(0.18 * Math.sqrt(xp));
 const xpForLevel = (lvl) => Math.ceil((lvl / 0.18) ** 2);
 const xpCooldown = new Map();
 
-// Anti-scam: invite links + common scam phrases.
-const SCAM = /(discord\.(gg|com\/invite)\/|free\s*nitro|steamcommunity\.com\/(gift|trade)|t\.me\/|claim\s+your\s+(reward|prize|nitro)|airdrop|nitro\s+giveaway\s+http)/i;
+// Anti-scam detection lives in its own module so it can be tested without a
+// Discord token — see discord/test/scam-guard.test.mjs.
+const SCAM_HOST_BASE = (() => {
+  try { return new URL(STORE_URL).hostname.replace(/^www\./, '').toLowerCase(); }
+  catch { return 'forgemarket.nl'; }
+})();
+const scamReasonFor = (content, { mentionCount = 0, mentionsEveryone = false } = {}) =>
+  scamReason(content, { storeHost: SCAM_HOST_BASE, mentionCount, mentionsEveryone });
 
 const {
   DISCORD_TOKEN, ANTHROPIC_API_KEY, AI_MODEL = 'claude-sonnet-4-6',
@@ -242,6 +249,21 @@ async function getProducts() {
 
 const money = (cents, cur = 'EUR') =>
   new Intl.NumberFormat('en-IE', { style: 'currency', currency: cur }).format((cents || 0) / 100);
+
+/**
+ * What a buyer can actually expect, from the store's own flags.
+ * `instant` is true only when a code is in stock and the product auto-delivers,
+ * which is the one case where "straight away" is a promise we can keep.
+ */
+function availabilityLine(p) {
+  const left = Number(p?.stockLeft);
+  if (p?.instant) {
+    return Number.isFinite(left) && left > 0
+      ? `✅ In stock — sent automatically once your payment is confirmed. **Only ${left} left.**`
+      : '✅ In stock — sent automatically once your payment is confirmed.';
+  }
+  return '🕐 Delivered by hand after your payment is confirmed — usually within a few hours during the day.';
+}
 
 function leadLog(guild, text) {
   const ch = findChannel(guild, 'leads');
@@ -506,7 +528,9 @@ async function checkImpersonation(member) {
       .map(normalizeName).filter(Boolean);
     const hit = candidates.find((c) => staff.has(c));
     if (!hit) return;
-    const ch = findChannel(member.guild, 'scam-warning') || findChannel(member.guild, 'mod-log');
+    // Staff-only on purpose: a name can match by coincidence, and publicly
+    // accusing the wrong member is its own harm. #mod-log is where staff decide.
+    const ch = findChannel(member.guild, 'mod-log') || findChannel(member.guild, 'staff-chat');
     if (!ch) return;
     await ch.send({ embeds: [new EmbedBuilder().setColor(0xef4444)
       .setTitle('🚨 Possible staff impersonation')
@@ -763,7 +787,7 @@ async function enterGiveaway(i, messageId) {
   // Verified-only entry (ties into the verification gate).
   const verified = findRole(i.guild, 'Verified Customer');
   if (verified && !i.member.roles.cache.has(verified.id)) {
-    return i.reply({ content: 'Please verify in #verify first to enter giveaways. ✅', ephemeral: true });
+    return i.reply({ content: `Please verify in ${chanRef(i.guild, 'verify')} first to enter giveaways. ✅`, ephemeral: true });
   }
   if (gw.entries.has(i.user.id)) {
     gw.entries.delete(i.user.id);
@@ -1196,13 +1220,32 @@ client.on(Events.MessageCreate, async (m) => {
   if (m.author.bot || !m.guild) return;
   if (isTicketChannel(m.channel)) return;
   if (isStaff(m.member)) return;
-  if (!SCAM.test(m.content)) return;
+
+  const hit = scamReasonFor(m.content, {
+    mentionCount: m.mentions?.users?.size || 0,
+    mentionsEveryone: !!m.mentions?.everyone,
+  });
+  if (!hit) return;
+  const reason = hit.label;
+
   await m.delete().catch(() => {});
-  const warn = await m.channel.send(
-    `⚠️ <@${m.author.id}> invites & "free" offers aren’t allowed. **Staff never DM you first** — stay safe.`).catch(() => null);
-  setTimeout(() => warn?.delete().catch(() => {}), 8000);
+  const notice = hit.kind === 'lookalike'
+    ? `⚠️ <@${m.author.id}> that link is **not** our shop. The only official address is ${STORE_URL} — anything else is someone trying to take your money.`
+    : hit.kind === 'solicit'
+      ? `⚠️ <@${m.author.id}> no selling or buying by DM here. **Staff never DM you first**, and deals in DMs are how people get scammed.`
+      : `⚠️ <@${m.author.id}> invites, mass pings & "free" offers aren't allowed. **Staff never DM you first** — stay safe.`;
+  const warn = await m.channel.send(notice).catch(() => null);
+  setTimeout(() => warn?.delete().catch(() => {}), 12_000);
+
   const log = findChannel(m.guild, 'mod-log');
-  if (log) log.send(`🚫 Auto-removed from <@${m.author.id}> in <#${m.channel.id}>: \`${m.content.slice(0, 140).replace(/`/g, "'")}\``).catch(() => {});
+  if (log) {
+    log.send({ embeds: [new EmbedBuilder().setColor(0xef4444)
+      .setTitle('🚫 Message auto-removed')
+      .setDescription(`**Reason:** ${reason}\n**Member:** <@${m.author.id}> (\`${m.author.tag}\`)\n` +
+        `**Channel:** <#${m.channel.id}>\n**Account age:** <t:${Math.floor(m.author.createdTimestamp / 1000)}:R>`)
+      .addFields({ name: 'Content', value: `\`\`\`${m.content.slice(0, 900).replace(/```/g, "'''")}\`\`\`` })
+      .setTimestamp()] }).catch(() => {});
+  }
 });
 
 // ── Ticket activity: a human reply re-arms the inactivity timer ──────────────
@@ -1479,6 +1522,11 @@ async function priceCmd(i) {
       (top.length > 1
         ? `\n\n**Also matching:**\n${top.slice(1).map(({ p }) => `• ${p.name} — ${money(p.price, p.currency)}`).join('\n')}`
         : ''))
+    // The store already computes an honest availability flag per product —
+    // `instant` is true only when a code is in stock AND the product
+    // auto-delivers. Showing it here answers the question behind /price
+    // ("when do I get it?") with the same answer the product page gives.
+    .addFields({ name: '⏱️ When you get it', value: availabilityLine(best) })
     .addFields({ name: '📦 How it’s delivered', value: d.method.slice(0, 1024) })
     .setFooter({ text: 'Live prices from the store · use /delivery for full steps' });
   return i.editReply({ embeds: [e] });
@@ -1845,7 +1893,7 @@ async function maybeVouchSpotlight(guild) {
     if (META.lastSpotlight === today) return;
     const hour = new Date().getUTCHours();
     if (hour < 15) return; // afternoon post (17:00 NL)
-    const src = findChannel(guild, 'vouchers');
+    const src = findChannel(guild, 'vouches') || findChannel(guild, 'vouchers');
     const dst = findChannel(guild, 'general');
     if (!src || !dst) return;
     const msgs = await src.messages.fetch({ limit: 50 }).catch(() => null);

@@ -61,6 +61,7 @@ jobs:
           node discord/test/order-status.test.mjs
           node discord/test/panels.test.mjs
           node discord/test/server-blueprint.test.mjs
+          node discord/test/scam-guard.test.mjs
 
       - name: Server e2e suites (fresh Postgres DB per suite)
         run: npm test
