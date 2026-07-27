@@ -30,7 +30,36 @@ const router = Router();
 
 // Public customer reviews (vouches ingested from Discord). Cached briefly.
 let reviewsCache = { at: 0, data: null };
+
+/**
+ * Let Vercel's CDN answer instead of the function.
+ *
+ * Measured on a cold serverless start: ~3.4s importing modules, ~1.2s in
+ * ensureReady()'s migrate/seed check, then the query — before Neon has even
+ * woken from its idle suspend. That is where "sometimes 10 seconds for the
+ * products" comes from, and no amount of query tuning fixes it, because the
+ * request never reaches a query.
+ *
+ * These routes take no user, no cookie and no language: every visitor gets a
+ * byte-identical body. So the edge can hold it, and the overwhelming majority
+ * of visits never touch the function at all.
+ *
+ * `stale-while-revalidate` is the important half: once the window passes, the
+ * next visitor still gets the cached copy instantly while the CDN refreshes in
+ * the background. Nobody ever waits for a cold start.
+ *
+ * The cost is staleness. `stockLeft` and `instant` can be up to `seconds` old,
+ * so a product that sells out keeps showing as in stock for that long. With
+ * payments confirmed by hand that is well inside the noise — but it is why the
+ * windows are a minute, not an hour, and why anything order-specific or
+ * user-specific below is deliberately left uncached.
+ */
+const publicCache = (res, seconds, swr = seconds * 10) => {
+  res.set('Cache-Control', `public, max-age=0, s-maxage=${seconds}, stale-while-revalidate=${swr}`);
+};
+
 router.get('/reviews', asyncHandler(async (_req, res) => {
+  publicCache(res, 300);
   if (!reviewsCache.data || Date.now() - reviewsCache.at > 20_000) {
     reviewsCache = { at: Date.now(), data: await listReviews({ limit: 30 }) };
   }
@@ -78,6 +107,7 @@ router.post('/track', rateLimit({ bucket: 'track', windowMs: 60_000, max: 120 })
 // deliveries…). Cached briefly so the homepage stays fast under load.
 let statsCache = { at: 0, data: null };
 router.get('/stats', asyncHandler(async (_req, res) => {
+  publicCache(res, 300);
   if (!statsCache.data || Date.now() - statsCache.at > 30_000) {
     statsCache = { at: Date.now(), data: await publicStats() };
   }
@@ -92,6 +122,7 @@ const paymentProvider = () =>
 
 // Public runtime config the SPA can read (feature flags, enabled providers).
 router.get('/config', asyncHandler(async (_req, res) => {
+  publicCache(res, 60);
   // Owner-set per-category logos (best-effort — never fail config on a DB hiccup).
   const categoryLogos = await getCategoryLogos().catch(() => ({}));
   res.json({
@@ -168,6 +199,7 @@ const stockLeftFor = (product, count) =>
 const instantFor = (product, count) => product.deliveryMode === 'auto' && count > 0;
 
 router.get('/products', asyncHandler(async (_req, res) => {
+  publicCache(res, 60);
   const products = await listProducts({ activeOnly: true });
   const counts = await availableCounts(products.map((p) => p.id));
   res.json({ products: products.map((p) => withCopy({
@@ -180,6 +212,7 @@ router.get('/products', asyncHandler(async (_req, res) => {
 // Trending products (most-sold recently). Registered before /products/:id.
 let trendingCache = { at: 0, data: null };
 router.get('/products/trending', asyncHandler(async (_req, res) => {
+  publicCache(res, 300);
   if (!trendingCache.data || Date.now() - trendingCache.at > 60_000) {
     trendingCache = { at: Date.now(), data: await trendingProducts({ days: 14, limit: 8 }) };
   }
@@ -187,6 +220,7 @@ router.get('/products/trending', asyncHandler(async (_req, res) => {
 }));
 
 router.get('/products/:id', asyncHandler(async (req, res) => {
+  publicCache(res, 60);
   const p = await getProduct(req.params.id);
   if (!p || !p.active) throw new ApiError(404, 'Product not found');
   const count = await availableCount(p.id);
@@ -195,11 +229,13 @@ router.get('/products/:id', asyncHandler(async (req, res) => {
 
 // Price history for the product-page chart.
 router.get('/products/:id/price-history', asyncHandler(async (req, res) => {
+  publicCache(res, 600);
   res.json({ history: await priceHistory(req.params.id) });
 }));
 
 // Upcoming drops (restocks / launches / sales) for the storefront calendar.
 router.get('/drops', asyncHandler(async (_req, res) => {
+  publicCache(res, 120);
   res.json({ drops: await listUpcomingDrops() });
 }));
 
@@ -224,12 +260,14 @@ router.get('/coupons/:code', asyncHandler(async (req, res) => {
 
 // Cross-sell + upsell recommendations for a product.
 router.get('/products/:id/recommendations', asyncHandler(async (req, res) => {
+  publicCache(res, 300);
   res.json(await recommendationsFor(req.params.id, { limit: 4 }));
 }));
 
 // Active bundle offers (resolved products + pricing). Cached briefly.
 let bundlesCache = { at: 0, data: null };
 router.get('/bundles', asyncHandler(async (_req, res) => {
+  publicCache(res, 300);
   if (!bundlesCache.data || Date.now() - bundlesCache.at > 30_000) {
     const bundles = await pricedBundles();
     // Bundles are hand-written promos; the Dutch line is generated from the
