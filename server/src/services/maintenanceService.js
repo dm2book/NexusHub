@@ -13,7 +13,7 @@ const HOURS = (n) => new Date(Date.now() - n * 3_600_000).toISOString();
 const DAYS = (n) => new Date(Date.now() - n * 86_400_000).toISOString();
 
 export async function runMaintenance() {
-  const summary = { otpPurged: 0, sessionsExpired: 0, ordersCancelled: 0, remindersSent: 0, reviewRequestsSent: 0, cartRemindersSent: 0, fulfillmentsRetried: 0, at: nowIso() };
+  const summary = { otpPurged: 0, ipsForgotten: 0, sessionsExpired: 0, ordersCancelled: 0, remindersSent: 0, reviewRequestsSent: 0, cartRemindersSent: 0, fulfillmentsRetried: 0, at: nowIso() };
 
   // 1. Purge OTP codes that are long expired / already consumed (keep table small).
   try {
@@ -21,6 +21,46 @@ export async function runMaintenance() {
       { cut: HOURS(2) });
     summary.otpPurged = r?.changes ?? 0;
   } catch (e) { summary.otpError = e.message; }
+
+  // 1b. Forget IP addresses once they have done their job.
+  //
+  // The IP is genuinely load-bearing while it is fresh: it caps OTP requests
+  // per network (authService), it is half the brute-force gate on login
+  // (recentFailures matches on identifier OR ip) and it is how an unfamiliar
+  // sign-in is spotted. Not collecting it would leave real holes.
+  //
+  // But those windows are minutes to weeks, and the rows lived forever. That is
+  // the part the GDPR actually objects to — keeping personal data past the
+  // purpose it was collected for. So the ROW stays (audit trails, order
+  // history, fraud evidence all keep their shape) and only the IP is nulled,
+  // well outside every window that reads it.
+  try {
+    // Which of these actually carry an ip is a schema question, not something
+    // to hardcode — the first version of this listed refund_requests, which has
+    // no ip column, and the whole step aborted on the error.
+    const WINDOWS = {
+      login_attempts: 90,     // read within 15 min (failures) and ~90 days (familiar device)
+      sms_verifications: 7,   // read within the OTP lifetime only
+      otp_codes: 2,           // rows are deleted above anyway; this catches stragglers
+      sessions: 90,           // current state while active; pointless once long expired
+      trusted_devices: 180,   // "is this the device you always use" needs history
+      payment_proofs: 365,    // fraud evidence attached to money
+      coupon_redemptions: 365,
+      audit_logs: 365,        // security evidence — longest, but not forever
+    };
+    const present = await all(
+      `SELECT table_name FROM information_schema.columns
+        WHERE column_name = 'ip' AND table_schema = 'public'`);
+    const have = new Set(present.map((r) => r.table_name));
+    let cleared = 0;
+    for (const [table, days] of Object.entries(WINDOWS)) {
+      if (!have.has(table)) continue;
+      const r = await run(
+        `UPDATE ${table} SET ip = NULL WHERE ip IS NOT NULL AND created_at < @cut`, { cut: DAYS(days) });
+      cleared += r?.changes ?? 0;
+    }
+    summary.ipsForgotten = cleared;
+  } catch (e) { summary.ipForgetError = e.message; }
 
   // 2. Mark expired refresh sessions revoked so they drop out of "active sessions".
   try {
