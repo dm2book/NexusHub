@@ -127,6 +127,35 @@ export default function Shop() {
           </div>
         </div>
 
+        {/* Category filter, phones only — the sidebar above is `hidden lg:block`,
+            so until now a phone had no way to filter the catalogue at all. Same
+            state and same setCategory as the sidebar, so the two cannot drift.
+            A horizontal rail rather than a dropdown: the icons are the point,
+            and it keeps the current choice visible while you browse. */}
+        <div className="lg:hidden -mx-4 px-4 mb-6">
+          <div className="fm-rail flex gap-2 overflow-x-auto pb-1 snap-x">
+            <button onClick={() => setCategory('')}
+              className={`snap-start shrink-0 inline-flex items-center gap-2 h-11 px-3.5 rounded-xl border text-[14px] font-semibold transition fm-press ${
+                !category ? 'bg-violet-600 text-white border-violet-600' : 'bg-white text-slate-600 border-slate-200'}`}>
+              <LayoutGrid size={16} className={category ? 'text-violet-600' : 'text-white'} />
+              {t('shop.all', 'All Products')}
+            </button>
+            {categories.map((c) => {
+              const v = categoryVisual(c); const img = logoFor(categoryLogos, c); const Icon = v.icon;
+              const on = category === c;
+              return (
+                <button key={c} onClick={() => setCategory(c)}
+                  className={`snap-start shrink-0 inline-flex items-center gap-2 h-11 pl-2 pr-3.5 rounded-xl border text-[14px] font-semibold transition fm-press ${
+                    on ? 'bg-violet-600 text-white border-violet-600' : 'bg-white text-slate-600 border-slate-200'}`}>
+                  {img ? <img src={img} alt="" className="w-7 h-7 object-contain" />
+                    : <span className={`w-7 h-7 rounded-lg bg-gradient-to-br ${v.grad} grid place-items-center`}><Icon size={14} className="text-white" /></span>}
+                  <span className="whitespace-nowrap">{v.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         {/* Trending row */}
         {showTrending && (
           <div className="mb-7">
@@ -170,7 +199,7 @@ export default function Shop() {
 
         {/* grid */}
         {products === null ? (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
             {Array.from({ length: 8 }).map((_, i) => <SkeletonCard key={i} />)}
           </div>
         ) : visible.length === 0 ? (
@@ -182,7 +211,7 @@ export default function Shop() {
             </p>
           </div>
         ) : (
-          <div key={`${category}-${sort}-${search}`} className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 fm-grid-in">
+          <div key={`${category}-${sort}-${search}`} className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 fm-grid-in">
             {visible.map((p, i) => (
               // Stagger capped at 8 so a 74-product grid does not end with a
               // card waiting two seconds for its turn.
