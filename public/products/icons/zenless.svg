@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" fill="none">
+
+  <defs><radialGradient id="zenless-sh1" cx="0.5" cy="0.5" r="0.5">
+    <stop offset="0" stop-color="#0b1220" stop-opacity="0.4"/>
+    <stop offset="0.6" stop-color="#0b1220" stop-opacity="0.16000000000000003"/>
+    <stop offset="1" stop-color="#0b1220" stop-opacity="0"/>
+  </radialGradient></defs>
+  <ellipse cx="256" cy="386" rx="104" ry="20" fill="url(#zenless-sh1)"/><path d="M147 179L201.5 120L310.5 120L365 179L256 356Z" fill="#60541e" transform="translate(0 12)"/><path d="M147 179L201.5 120L201.5 179Z" fill="#f5e080"/><path d="M201.5 120L310.5 120L310.5 179L201.5 179Z" fill="#f8e9a5"/><path d="M310.5 120L365 179L310.5 179Z" fill="#f0d34e"/><path d="M147 179L201.5 179L256 356Z" fill="#e2c546"/><path d="M201.5 179L310.5 179L256 356Z" fill="#f3db6e"/><path d="M310.5 179L365 179L256 356Z" fill="#a38f32"/><path d="M147 179L201.5 120L310.5 120L365 179L256 356Z" fill="none" stroke="#f9edb7" stroke-opacity="0.5" stroke-width="3"/><path d="M201.5 120L237.83 120L212.4 179L201.5 179Z" fill="#fff" opacity="0.22"/>
+</svg>

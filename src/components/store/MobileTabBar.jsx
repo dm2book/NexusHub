@@ -8,13 +8,15 @@ import { useI18n } from '../../lib/i18n.jsx';
  * and on pages that pin their own bottom UI (product buy bar, checkout CTA) so
  * the two never overlap. Safe-area padding for iPhones with a home indicator.
  */
+/** Pages with their own fixed bottom UI, where the tab bar would collide. */
+const hasMobileTabBar = (pathname) => !/^\/(product\/|checkout)/.test(String(pathname || ''));
+
 export default function MobileTabBar() {
   const { pathname } = useLocation();
   const { count } = useCart();
   const { t } = useI18n();
 
-  // Pages with their own fixed bottom UI — the tab bar would collide.
-  if (/^\/(product\/|checkout)/.test(pathname)) return null;
+  if (!hasMobileTabBar(pathname)) return null;
 
   const TABS = [
     { to: '/', icon: Home, label: t('tab.home', 'Home'), exact: true },

@@ -166,14 +166,22 @@ const CATALOG = [
 const parse = (s) => { try { return JSON.parse(s || '{}'); } catch { return {}; } };
 
 // Premium 3D icon tiles per category (public/products/icons) — one unique icon each.
-const CATS_WITH_ICON = ['robux', 'v-bucks', 'valorant', 'cod', 'genshin', 'brawl', 'apex',
-  'clash', 'clashroyale', 'league', 'freefire', 'pubg', 'mlbb', 'eafc', 'gta', 'minecraft',
-  'pokemongo', 'discord-nitro', 'spotify', 'netflix', 'gamepass', 'steam', 'playstation',
-  'xbox', 'nintendo', 'amazon', 'googleplay', 'itunes', 'giftcard', 'chest'];
+const CATS_WITH_ICON = [
+  'albion', 'amazon', 'amongus', 'apex', 'battlenet', 'battlepass', 'bloodstrike', 'brawl',
+  'bundle', 'chest', 'clash', 'clashroyale', 'cod', 'coin', 'crunchyroll', 'csgo',
+  'deltaforce', 'discord-nitro', 'disneyplus', 'dota', 'eafc', 'eaplay', 'epicgames',
+  'fallguys', 'favourite', 'freefire', 'gamepass', 'gem', 'genshin', 'giftcard', 'googleplay',
+  'gta', 'honkai', 'itunes', 'league', 'marvelrivals', 'minecraft', 'mlbb', 'mystery',
+  'netflix', 'nintendo', 'paysafecard', 'playstation', 'pokemongo', 'psplus', 'pubg', 'robux',
+  'rocketleague', 'rust', 'spotify', 'standoff', 'steam', 'telegram', 'tiktok', 'twitch',
+  'ubisoft', 'v-bucks', 'valorant', 'voucher', 'wildrift', 'wow', 'xbox', 'youtube', 'zenless',
+];
 // Categories using the owner's own brand artwork are raster; the generated 3D
 // icons are SVG — keep in sync with RASTER_ICONS in src/lib/sampleCatalog.js.
-const RASTER_ICONS = ['robux', 'v-bucks', 'valorant', 'discord-nitro', 'steam',
-  'giftcard', 'playstation', 'xbox', 'cod', 'eafc'];
+const RASTER_ICONS = [
+  'cod', 'discord-nitro', 'eafc', 'giftcard', 'playstation', 'robux', 'steam', 'v-bucks',
+  'valorant', 'xbox',
+];
 const iconFor = (cat) => (CATS_WITH_ICON.includes(cat)
   ? `/products/icons/${cat}.${RASTER_ICONS.includes(cat) ? 'png' : 'svg'}` : null);
 

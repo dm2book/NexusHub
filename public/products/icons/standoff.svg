@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" fill="none">
+
+  <defs><radialGradient id="standoff-sh1" cx="0.5" cy="0.5" r="0.5">
+    <stop offset="0" stop-color="#0b1220" stop-opacity="0.4"/>
+    <stop offset="0.6" stop-color="#0b1220" stop-opacity="0.16000000000000003"/>
+    <stop offset="1" stop-color="#0b1220" stop-opacity="0"/>
+  </radialGradient></defs>
+  <ellipse cx="256" cy="388" rx="132" ry="26" fill="url(#standoff-sh1)"/>
+  <defs>
+    <linearGradient id="standoff-g2" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#ddbf8a"/>
+      <stop offset="0.5" stop-color="#c59135"/>
+      <stop offset="1" stop-color="#9e742a"/>
+    </linearGradient>
+    <clipPath id="standoff-c3"><path d="M98 296a70 70 0 1 0 140 0a70 70 0 1 0 -140 0Z"/></clipPath>
+    <radialGradient id="standoff-p4" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.72"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <defs><path id="standoff-s5" d="M98 296a70 70 0 1 0 140 0a70 70 0 1 0 -140 0Z"/></defs><use href="#standoff-s5" y="20" fill="#594118"/><use href="#standoff-s5" y="19" fill="#5c4319"/><use href="#standoff-s5" y="18" fill="#5e4519"/><use href="#standoff-s5" y="17" fill="#61471a"/><use href="#standoff-s5" y="16" fill="#64491b"/><use href="#standoff-s5" y="15" fill="#664b1c"/><use href="#standoff-s5" y="14" fill="#694d1c"/><use href="#standoff-s5" y="13" fill="#6c4f1d"/><use href="#standoff-s5" y="12" fill="#6e511e"/><use href="#standoff-s5" y="11" fill="#71531e"/><use href="#standoff-s5" y="10" fill="#74551f"/><use href="#standoff-s5" y="9" fill="#765620"/><use href="#standoff-s5" y="8" fill="#795820"/><use href="#standoff-s5" y="7" fill="#7b5a21"/><use href="#standoff-s5" y="6" fill="#7e5c22"/><use href="#standoff-s5" y="5" fill="#815e23"/><use href="#standoff-s5" y="4" fill="#836023"/><use href="#standoff-s5" y="3" fill="#866224"/><use href="#standoff-s5" y="2" fill="#896425"/><use href="#standoff-s5" y="1" fill="#8b6625"/>
+  <path d="M98 296a70 70 0 1 0 140 0a70 70 0 1 0 -140 0Z" fill="url(#standoff-g2)"/>
+  <path d="M98 296a70 70 0 1 0 140 0a70 70 0 1 0 -140 0Z" fill="none" stroke="#e5cea4" stroke-opacity="0.75" stroke-width="3"/>
+  
+  <defs>
+    <linearGradient id="standoff-g6" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#d6b988"/>
+      <stop offset="0.5" stop-color="#b88731"/>
+      <stop offset="1" stop-color="#936c27"/>
+    </linearGradient>
+    <clipPath id="standoff-c7"><path d="M288 304a58 58 0 1 0 116 0a58 58 0 1 0 -116 0Z"/></clipPath>
+    <radialGradient id="standoff-p8" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.72"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <defs><path id="standoff-s9" d="M288 304a58 58 0 1 0 116 0a58 58 0 1 0 -116 0Z"/></defs><use href="#standoff-s9" y="16" fill="#533d16"/><use href="#standoff-s9" y="15" fill="#563f17"/><use href="#standoff-s9" y="14" fill="#594218"/><use href="#standoff-s9" y="13" fill="#5c4418"/><use href="#standoff-s9" y="12" fill="#5f4619"/><use href="#standoff-s9" y="11" fill="#62481a"/><use href="#standoff-s9" y="10" fill="#654b1b"/><use href="#standoff-s9" y="9" fill="#684d1c"/><use href="#standoff-s9" y="8" fill="#6c4f1d"/><use href="#standoff-s9" y="7" fill="#6f511d"/><use href="#standoff-s9" y="6" fill="#72541e"/><use href="#standoff-s9" y="5" fill="#75561f"/><use href="#standoff-s9" y="4" fill="#785820"/><use href="#standoff-s9" y="3" fill="#7b5a21"/><use href="#standoff-s9" y="2" fill="#7e5d21"/><use href="#standoff-s9" y="1" fill="#815f22"/>
+  <path d="M288 304a58 58 0 1 0 116 0a58 58 0 1 0 -116 0Z" fill="url(#standoff-g6)"/>
+  <path d="M288 304a58 58 0 1 0 116 0a58 58 0 1 0 -116 0Z" fill="none" stroke="#dfc9a2" stroke-opacity="0.75" stroke-width="3"/>
+  
+  <defs>
+    <linearGradient id="standoff-g10" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#edcb8e"/>
+      <stop offset="0.5" stop-color="#e0a53c"/>
+      <stop offset="1" stop-color="#b38430"/>
+    </linearGradient>
+    <clipPath id="standoff-c11"><path d="M138 238a118 118 0 1 0 236 0a118 118 0 1 0 -236 0Z"/></clipPath>
+    <radialGradient id="standoff-p12" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.72"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <defs><path id="standoff-s13" d="M138 238a118 118 0 1 0 236 0a118 118 0 1 0 -236 0Z"/></defs><use href="#standoff-s13" y="30" fill="#654a1b"/><use href="#standoff-s13" y="29" fill="#674c1c"/><use href="#standoff-s13" y="28" fill="#694d1c"/><use href="#standoff-s13" y="27" fill="#6b4f1d"/><use href="#standoff-s13" y="26" fill="#6d501d"/><use href="#standoff-s13" y="25" fill="#6f521e"/><use href="#standoff-s13" y="24" fill="#71531e"/><use href="#standoff-s13" y="23" fill="#73551f"/><use href="#standoff-s13" y="22" fill="#75561f"/><use href="#standoff-s13" y="21" fill="#775820"/><use href="#standoff-s13" y="20" fill="#795920"/><use href="#standoff-s13" y="19" fill="#7b5b21"/><use href="#standoff-s13" y="18" fill="#7d5c21"/><use href="#standoff-s13" y="17" fill="#7f5e22"/><use href="#standoff-s13" y="16" fill="#815f22"/><use href="#standoff-s13" y="15" fill="#836123"/><use href="#standoff-s13" y="14" fill="#856224"/><use href="#standoff-s13" y="13" fill="#876424"/><use href="#standoff-s13" y="12" fill="#896525"/><use href="#standoff-s13" y="11" fill="#8b6725"/><use href="#standoff-s13" y="10" fill="#8d6826"/><use href="#standoff-s13" y="9" fill="#8f6a26"/><use href="#standoff-s13" y="8" fill="#916b27"/><use href="#standoff-s13" y="7" fill="#936d27"/><use href="#standoff-s13" y="6" fill="#956e28"/><use href="#standoff-s13" y="5" fill="#977028"/><use href="#standoff-s13" y="4" fill="#997129"/><use href="#standoff-s13" y="3" fill="#9b7329"/><use href="#standoff-s13" y="2" fill="#9d742a"/><use href="#standoff-s13" y="1" fill="#9f762a"/>
+  <path d="M138 238a118 118 0 1 0 236 0a118 118 0 1 0 -236 0Z" fill="url(#standoff-g10)"/>
+  <path d="M138 238a118 118 0 1 0 236 0a118 118 0 1 0 -236 0Z" fill="none" stroke="#f1d7a7" stroke-opacity="0.75" stroke-width="3"/>
+  <g clip-path="url(#standoff-c11)"><ellipse cx="216" cy="172" rx="96" ry="54"
+      fill="url(#standoff-p12)" transform="rotate(-24 216 172)"/></g><path d="M158 238a98 98 0 1 0 196 0a98 98 0 1 0 -196 0Z" fill="none" stroke="#ecc98a" stroke-opacity="0.55" stroke-width="5"/><g fill="none" stroke="#fff6e0" stroke-width="12" opacity="0.95">
+    <circle cx="256" cy="238" r="52"/><circle cx="256" cy="238" r="22"/>
+    <path d="M256 164v26M256 286v26M182 238h26M304 238h26" stroke-linecap="round"/>
+  </g>
+</svg>

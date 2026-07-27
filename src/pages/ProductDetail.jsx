@@ -62,13 +62,13 @@ export default function ProductDetail() {
   const [mysteryPool, setMysteryPool] = useState(null);
   const [priceHist, setPriceHist] = useState([]);
   const [heroBroken, setHeroBroken] = useState(false); // product image failed to load
-  usePageMeta(product?.name || 'Product', product?.description || 'Instant digital delivery.');
+  usePageMeta(product?.name || 'Product', product?.description || 'Digital top-ups and gift cards, delivered with your order number as the reference.');
   // Product structured data → rich results (price, rating) in Google.
   useJsonLd('product', product && {
     '@context': 'https://schema.org',
     '@type': 'Product',
     name: product.name,
-    description: product.description || 'Instant digital delivery.',
+    description: product.description || 'Digital top-ups and gift cards, delivered with your order number as the reference.',
     sku: product.sku || product.id,
     category: product.category,
     ...(product.image ? { image: product.image } : {}),

@@ -5,6 +5,7 @@ import StoreFooter from '../components/store/StoreFooter.jsx';
 import RecentlyDelivered from '../components/store/RecentlyDelivered.jsx';
 import CommandPalette from '../components/store/CommandPalette.jsx';
 import MobileTabBar from '../components/store/MobileTabBar.jsx';
+import ChatWidget from '../components/ChatWidget.jsx';
 import AnnouncementBar from '../components/store/AnnouncementBar.jsx';
 import { useReveal } from '../lib/useReveal.js';
 
@@ -35,6 +36,10 @@ export default function StoreLayout() {
       <RecentlyDelivered />
       <CommandPalette />
       <MobileTabBar />
+      {/* The assistant used to exist on the homepage alone. Every page that can
+          raise a question — the shop, a product, the cart, checkout, the status
+          page — is inside THIS layout, so that is where it has to live. */}
+      <ChatWidget />
     </div>
   );
 }

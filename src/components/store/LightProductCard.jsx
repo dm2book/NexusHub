@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ShoppingCart, Zap } from 'lucide-react';
+import { ShoppingCart, Zap, Clock } from 'lucide-react';
 import { categoryVisual, money, isCustomImage, productDescription } from '../../lib/catalog.js';
 import { useI18n } from '../../lib/i18n.jsx';
 import { iconFor } from '../../lib/sampleCatalog.js';
@@ -40,7 +40,7 @@ export default function LightProductCard({ product, onAdd }) {
   };
 
   return (
-    <div className="group bg-white rounded-2xl border border-slate-200/70 shadow-sm fm-lift p-4 flex flex-col">
+    <div className="group w-full bg-white rounded-2xl border border-slate-200/70 shadow-sm fm-lift p-4 flex flex-col">
       <a href={to} onClick={openWithMorph}
         className="fm-card-media fm-logo-plinth relative rounded-xl h-[150px] grid place-items-center mb-3"
         style={{ '--card-glow': `radial-gradient(circle, ${glowFor(product.category)}45, transparent 70%)` }}>
@@ -58,10 +58,21 @@ export default function LightProductCard({ product, onAdd }) {
           </span>
         )}
         {product.sold > 20 && (
-          <span className="absolute bottom-2.5 left-2.5 z-10 text-[10px] font-semibold text-orange-600 bg-orange-50 rounded-full px-2 py-0.5">🔥 High demand</span>
+          <span className="absolute bottom-2.5 left-2.5 z-10 text-[10px] font-semibold text-orange-600 bg-orange-50 rounded-full px-2 py-0.5">
+            🔥 {t('card.highDemand', 'High demand')}
+          </span>
         )}
-        <span className="absolute bottom-2.5 right-2.5 z-10 inline-flex items-center gap-0.5 text-[10px] font-bold text-violet-700 bg-white/85 backdrop-blur rounded-full px-2 py-0.5 shadow-sm">
-          <Zap size={10} className="fill-current" /> {t('card.instant', 'Instant')}
+        {/* This badge used to read "Instant" on every card, unconditionally —
+            including hand-delivered products and everything out of stock. The
+            server already computes an honest flag (deliveryMode === 'auto' AND
+            real codes on the shelf, see instantFor in routes/catalog.js); the
+            card simply ignored it. Same two states the assistant uses, so the
+            shop tells one story about delivery. */}
+        <span className={`absolute bottom-2.5 right-2.5 z-10 inline-flex items-center gap-0.5 text-[10px] font-bold rounded-full px-2 py-0.5 shadow-sm backdrop-blur ${
+          product.instant ? 'text-emerald-700 bg-emerald-50/90' : 'text-amber-700 bg-amber-50/90'}`}>
+          {product.instant
+            ? <><Zap size={10} className="fill-current" /> {t('card.inStock', 'In stock')}</>
+            : <><Clock size={10} /> {t('card.byHand', 'By hand')}</>}
         </span>
         {img ? (
           isCustomImage(img) ? (
@@ -96,14 +107,14 @@ export default function LightProductCard({ product, onAdd }) {
         )}
       </div>
       <div className="flex items-center gap-2 mt-3">
-        <Link to={`/product/${product.id}`} className="flex-1 text-center text-sm font-semibold rounded-lg h-9 grid place-items-center hover:brightness-105 transition"
+        <Link to={`/product/${product.id}`} className="flex-1 text-center text-sm font-semibold rounded-lg h-11 sm:h-10 grid place-items-center hover:brightness-105 transition"
           style={{ backgroundImage: 'linear-gradient(135deg,#7c5cff,#a855f7)', color: '#fff' }}>{t('product.buyNow', 'Buy Now')}</Link>
         <button aria-label="Add to cart"
           onClick={(e) => {
             flyToCart(e.currentTarget.closest('.group')?.querySelector('[data-morph]'));
             onAdd?.(product);
           }}
-          className="w-9 h-9 rounded-lg border border-slate-200 grid place-items-center text-slate-500 hover:bg-slate-50 hover:text-violet-600 active:scale-90 transition-transform">
+          className="w-11 h-11 sm:w-10 sm:h-10 shrink-0 rounded-lg border border-slate-200 grid place-items-center text-slate-500 hover:bg-slate-50 hover:text-violet-600 active:scale-90 transition-transform">
           <ShoppingCart size={16} />
         </button>
       </div>

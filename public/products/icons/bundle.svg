@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" fill="none">
+
+  <defs><radialGradient id="bundle-sh1" cx="0.5" cy="0.5" r="0.5">
+    <stop offset="0" stop-color="#0b1220" stop-opacity="0.4"/>
+    <stop offset="0.6" stop-color="#0b1220" stop-opacity="0.16000000000000003"/>
+    <stop offset="1" stop-color="#0b1220" stop-opacity="0"/>
+  </radialGradient></defs>
+  <ellipse cx="256" cy="388" rx="130" ry="24" fill="url(#bundle-sh1)"/>
+  <defs>
+    <linearGradient id="bundle-g2" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#b3a0ff"/>
+      <stop offset="0.5" stop-color="#7c5cff"/>
+      <stop offset="1" stop-color="#634acc"/>
+    </linearGradient>
+    <clipPath id="bundle-c3"><path d="M149 139H363A18 18 0 0 1 381 157V327A18 18 0 0 1 363 345H149A18 18 0 0 1 131 327V157A18 18 0 0 1 149 139Z"/></clipPath>
+    <radialGradient id="bundle-p4" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.72"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <defs><path id="bundle-s5" d="M149 139H363A18 18 0 0 1 381 157V327A18 18 0 0 1 363 345H149A18 18 0 0 1 131 327V157A18 18 0 0 1 149 139Z"/></defs><use href="#bundle-s5" y="28" fill="#382973"/><use href="#bundle-s5" y="27" fill="#392a75"/><use href="#bundle-s5" y="26" fill="#3a2b78"/><use href="#bundle-s5" y="25" fill="#3c2c7a"/><use href="#bundle-s5" y="24" fill="#3d2d7d"/><use href="#bundle-s5" y="23" fill="#3e2d7f"/><use href="#bundle-s5" y="22" fill="#3f2e82"/><use href="#bundle-s5" y="21" fill="#402f84"/><use href="#bundle-s5" y="20" fill="#413087"/><use href="#bundle-s5" y="19" fill="#433189"/><use href="#bundle-s5" y="18" fill="#44328c"/><use href="#bundle-s5" y="17" fill="#45338e"/><use href="#bundle-s5" y="16" fill="#463491"/><use href="#bundle-s5" y="15" fill="#473593"/><use href="#bundle-s5" y="14" fill="#493696"/><use href="#bundle-s5" y="13" fill="#4a3698"/><use href="#bundle-s5" y="12" fill="#4b379a"/><use href="#bundle-s5" y="11" fill="#4c389d"/><use href="#bundle-s5" y="10" fill="#4d399f"/><use href="#bundle-s5" y="9" fill="#4e3aa2"/><use href="#bundle-s5" y="8" fill="#503ba4"/><use href="#bundle-s5" y="7" fill="#513ca7"/><use href="#bundle-s5" y="6" fill="#523da9"/><use href="#bundle-s5" y="5" fill="#533eac"/><use href="#bundle-s5" y="4" fill="#543eae"/><use href="#bundle-s5" y="3" fill="#553fb1"/><use href="#bundle-s5" y="2" fill="#5740b3"/><use href="#bundle-s5" y="1" fill="#5841b6"/>
+  <path d="M149 139H363A18 18 0 0 1 381 157V327A18 18 0 0 1 363 345H149A18 18 0 0 1 131 327V157A18 18 0 0 1 149 139Z" fill="url(#bundle-g2)"/>
+  <path d="M149 139H363A18 18 0 0 1 381 157V327A18 18 0 0 1 363 345H149A18 18 0 0 1 131 327V157A18 18 0 0 1 149 139Z" fill="none" stroke="#c4b6ff" stroke-opacity="0.75" stroke-width="3"/>
+  <g clip-path="url(#bundle-c3)"><ellipse cx="216" cy="172" rx="96" ry="54"
+      fill="url(#bundle-p4)" transform="rotate(-24 216 172)"/></g><rect x="131" y="229.64" width="250" height="24" fill="#f5c451" opacity=".92"/>
+          <rect x="244" y="139" width="24" height="206" fill="#f5c451" opacity=".92"/>
+          <rect x="226" y="225.52" width="60" height="32" rx="8" fill="#a78537"/>
+</svg>

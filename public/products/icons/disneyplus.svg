@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" fill="none">
+
+  <defs><radialGradient id="disneyplus-sh1" cx="0.5" cy="0.5" r="0.5">
+    <stop offset="0" stop-color="#0b1220" stop-opacity="0.4"/>
+    <stop offset="0.6" stop-color="#0b1220" stop-opacity="0.16000000000000003"/>
+    <stop offset="1" stop-color="#0b1220" stop-opacity="0"/>
+  </radialGradient></defs>
+  <ellipse cx="256" cy="388" rx="118" ry="24" fill="url(#disneyplus-sh1)"/>
+  <defs>
+    <linearGradient id="disneyplus-g2" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#8699cc"/>
+      <stop offset="0.5" stop-color="#2f4fa7"/>
+      <stop offset="1" stop-color="#263f86"/>
+    </linearGradient>
+    <clipPath id="disneyplus-c3"><path d="M196 126H316A52 52 0 0 1 368 178V298A52 52 0 0 1 316 350H196A52 52 0 0 1 144 298V178A52 52 0 0 1 196 126Z"/></clipPath>
+    <radialGradient id="disneyplus-p4" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.72"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <defs><path id="disneyplus-s5" d="M196 126H316A52 52 0 0 1 368 178V298A52 52 0 0 1 316 350H196A52 52 0 0 1 144 298V178A52 52 0 0 1 196 126Z"/></defs><use href="#disneyplus-s5" y="26" fill="#15244b"/><use href="#disneyplus-s5" y="25" fill="#16254d"/><use href="#disneyplus-s5" y="24" fill="#16264e"/><use href="#disneyplus-s5" y="23" fill="#172650"/><use href="#disneyplus-s5" y="22" fill="#172752"/><use href="#disneyplus-s5" y="21" fill="#182854"/><use href="#disneyplus-s5" y="20" fill="#182955"/><use href="#disneyplus-s5" y="19" fill="#192a57"/><use href="#disneyplus-s5" y="18" fill="#192a59"/><use href="#disneyplus-s5" y="17" fill="#1a2b5b"/><use href="#disneyplus-s5" y="16" fill="#1a2c5c"/><use href="#disneyplus-s5" y="15" fill="#1b2d5e"/><use href="#disneyplus-s5" y="14" fill="#1b2e60"/><use href="#disneyplus-s5" y="13" fill="#1c2f62"/><use href="#disneyplus-s5" y="12" fill="#1c2f63"/><use href="#disneyplus-s5" y="11" fill="#1d3065"/><use href="#disneyplus-s5" y="10" fill="#1d3167"/><use href="#disneyplus-s5" y="9" fill="#1e3268"/><use href="#disneyplus-s5" y="8" fill="#1e336a"/><use href="#disneyplus-s5" y="7" fill="#1f336c"/><use href="#disneyplus-s5" y="6" fill="#1f346e"/><use href="#disneyplus-s5" y="5" fill="#20356f"/><use href="#disneyplus-s5" y="4" fill="#203671"/><use href="#disneyplus-s5" y="3" fill="#213773"/><use href="#disneyplus-s5" y="2" fill="#213775"/><use href="#disneyplus-s5" y="1" fill="#223876"/>
+  <path d="M196 126H316A52 52 0 0 1 368 178V298A52 52 0 0 1 316 350H196A52 52 0 0 1 144 298V178A52 52 0 0 1 196 126Z" fill="url(#disneyplus-g2)"/>
+  <path d="M196 126H316A52 52 0 0 1 368 178V298A52 52 0 0 1 316 350H196A52 52 0 0 1 144 298V178A52 52 0 0 1 196 126Z" fill="none" stroke="#a1b0d7" stroke-opacity="0.75" stroke-width="3"/>
+  <g clip-path="url(#disneyplus-c3)"><ellipse cx="216" cy="172" rx="96" ry="54"
+      fill="url(#disneyplus-p4)" transform="rotate(-24 216 172)"/></g><path d="M210 180L248 180L268 242L268 180L302 180L302 296L264 296L244 236L244 296L210 296Z" fill="#f0f4ff" opacity="0.95"/>
+</svg>

@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" fill="none">
+
+  <defs><radialGradient id="telegram-sh1" cx="0.5" cy="0.5" r="0.5">
+    <stop offset="0" stop-color="#0b1220" stop-opacity="0.4"/>
+    <stop offset="0.6" stop-color="#0b1220" stop-opacity="0.16000000000000003"/>
+    <stop offset="1" stop-color="#0b1220" stop-opacity="0"/>
+  </radialGradient></defs>
+  <ellipse cx="256" cy="388" rx="118" ry="24" fill="url(#telegram-sh1)"/>
+  <defs>
+    <linearGradient id="telegram-g2" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#86c7e7"/>
+      <stop offset="0.5" stop-color="#2f9ed6"/>
+      <stop offset="1" stop-color="#267eab"/>
+    </linearGradient>
+    <clipPath id="telegram-c3"><path d="M196 126H316A52 52 0 0 1 368 178V298A52 52 0 0 1 316 350H196A52 52 0 0 1 144 298V178A52 52 0 0 1 196 126Z"/></clipPath>
+    <radialGradient id="telegram-p4" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.72"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <defs><path id="telegram-s5" d="M196 126H316A52 52 0 0 1 368 178V298A52 52 0 0 1 316 350H196A52 52 0 0 1 144 298V178A52 52 0 0 1 196 126Z"/></defs><use href="#telegram-s5" y="26" fill="#154760"/><use href="#telegram-s5" y="25" fill="#164962"/><use href="#telegram-s5" y="24" fill="#164a64"/><use href="#telegram-s5" y="23" fill="#174c67"/><use href="#telegram-s5" y="22" fill="#174e69"/><use href="#telegram-s5" y="21" fill="#184f6b"/><use href="#telegram-s5" y="20" fill="#18516d"/><use href="#telegram-s5" y="19" fill="#195370"/><use href="#telegram-s5" y="18" fill="#195472"/><use href="#telegram-s5" y="17" fill="#1a5674"/><use href="#telegram-s5" y="16" fill="#1a5876"/><use href="#telegram-s5" y="15" fill="#1b5979"/><use href="#telegram-s5" y="14" fill="#1b5b7b"/><use href="#telegram-s5" y="13" fill="#1c5d7d"/><use href="#telegram-s5" y="12" fill="#1c5e7f"/><use href="#telegram-s5" y="11" fill="#1d6081"/><use href="#telegram-s5" y="10" fill="#1d6184"/><use href="#telegram-s5" y="9" fill="#1e6386"/><use href="#telegram-s5" y="8" fill="#1e6588"/><use href="#telegram-s5" y="7" fill="#1f668a"/><use href="#telegram-s5" y="6" fill="#1f688d"/><use href="#telegram-s5" y="5" fill="#206a8f"/><use href="#telegram-s5" y="4" fill="#206b91"/><use href="#telegram-s5" y="3" fill="#216d93"/><use href="#telegram-s5" y="2" fill="#216f96"/><use href="#telegram-s5" y="1" fill="#227098"/>
+  <path d="M196 126H316A52 52 0 0 1 368 178V298A52 52 0 0 1 316 350H196A52 52 0 0 1 144 298V178A52 52 0 0 1 196 126Z" fill="url(#telegram-g2)"/>
+  <path d="M196 126H316A52 52 0 0 1 368 178V298A52 52 0 0 1 316 350H196A52 52 0 0 1 144 298V178A52 52 0 0 1 196 126Z" fill="none" stroke="#a1d3ed" stroke-opacity="0.75" stroke-width="3"/>
+  <g clip-path="url(#telegram-c3)"><ellipse cx="216" cy="172" rx="96" ry="54"
+      fill="url(#telegram-p4)" transform="rotate(-24 216 172)"/></g><path d="M268 176L216 246L252 246L242 302L298 228L258 228Z"
+    fill="#f0faff" opacity="0.95"/>
+</svg>

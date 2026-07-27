@@ -32,7 +32,7 @@ export default function Shop() {
   const [sort, setSort] = useState('popular');
   const categoryLogos = useCategoryLogos(); // owner-set logos (Admin → Categories)
   const category = params.get('category') || '';
-  usePageMeta('Shop', 'Browse game currency, gift cards and subscriptions — instant delivery.');
+  usePageMeta('Shop', 'Game currency, gift cards and subscriptions. In stock is sent automatically once payment is confirmed; the rest is delivered by hand.');
 
   useEffect(() => {
     api.get('/api/products')
@@ -136,7 +136,7 @@ export default function Shop() {
             </div>
             <div className="fm-rail flex gap-4 overflow-x-auto pb-2 snap-x">
               {trending.slice(0, 8).map((p) => (
-                <div key={p.id} className="snap-start shrink-0 w-[210px]">
+                <div key={p.id} className="snap-start shrink-0 w-[210px] flex fm-reveal">
                   <LightProductCard product={p} onAdd={onAdd} />
                 </div>
               ))}
@@ -183,7 +183,13 @@ export default function Shop() {
           </div>
         ) : (
           <div key={`${category}-${sort}-${search}`} className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 fm-grid-in">
-            {visible.map((p) => <LightProductCard key={p.id} product={p} onAdd={onAdd} />)}
+            {visible.map((p, i) => (
+              // Stagger capped at 8 so a 74-product grid does not end with a
+              // card waiting two seconds for its turn.
+              <div key={p.id} className="flex fm-reveal" style={{ transitionDelay: `${Math.min(i, 8) * 45}ms` }}>
+                <LightProductCard product={p} onAdd={onAdd} />
+              </div>
+            ))}
           </div>
         )}
       </main>

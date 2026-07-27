@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" fill="none">
+
+  <defs><radialGradient id="paysafecard-sh2" cx="0.5" cy="0.5" r="0.5">
+    <stop offset="0" stop-color="#0b1220" stop-opacity="0.4"/>
+    <stop offset="0.6" stop-color="#0b1220" stop-opacity="0.16000000000000003"/>
+    <stop offset="1" stop-color="#0b1220" stop-opacity="0"/>
+  </radialGradient></defs>
+  <ellipse cx="256" cy="388" rx="132" ry="24" fill="url(#paysafecard-sh2)"/><mask id="paysafecard-vm1" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512">
+      <rect x="0" y="0" width="512" height="512" fill="#fff"/>
+      <circle cx="290.84" cy="152" r="22" fill="#000"/>
+      <circle cx="290.84" cy="324" r="22" fill="#000"/>
+    </mask>
+    <g mask="url(#paysafecard-vm1)">
+  <defs>
+    <linearGradient id="paysafecard-g3" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#8dbeab"/>
+      <stop offset="0.5" stop-color="#3a8f6f"/>
+      <stop offset="1" stop-color="#2e7259"/>
+    </linearGradient>
+    <clipPath id="paysafecard-c4"><path d="M146 152H366A24 24 0 0 1 390 176V300A24 24 0 0 1 366 324H146A24 24 0 0 1 122 300V176A24 24 0 0 1 146 152Z"/></clipPath>
+    <radialGradient id="paysafecard-p5" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.72"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <defs><path id="paysafecard-s6" d="M146 152H366A24 24 0 0 1 390 176V300A24 24 0 0 1 366 324H146A24 24 0 0 1 122 300V176A24 24 0 0 1 146 152Z"/></defs><use href="#paysafecard-s6" y="24" fill="#1a4032"/><use href="#paysafecard-s6" y="23" fill="#1b4233"/><use href="#paysafecard-s6" y="22" fill="#1b4335"/><use href="#paysafecard-s6" y="21" fill="#1c4536"/><use href="#paysafecard-s6" y="20" fill="#1d4737"/><use href="#paysafecard-s6" y="19" fill="#1d4838"/><use href="#paysafecard-s6" y="18" fill="#1e4a3a"/><use href="#paysafecard-s6" y="17" fill="#1f4b3b"/><use href="#paysafecard-s6" y="16" fill="#1f4d3c"/><use href="#paysafecard-s6" y="15" fill="#204f3d"/><use href="#paysafecard-s6" y="14" fill="#21503f"/><use href="#paysafecard-s6" y="13" fill="#215240"/><use href="#paysafecard-s6" y="12" fill="#225441"/><use href="#paysafecard-s6" y="11" fill="#235542"/><use href="#paysafecard-s6" y="10" fill="#235744"/><use href="#paysafecard-s6" y="9" fill="#245845"/><use href="#paysafecard-s6" y="8" fill="#255a46"/><use href="#paysafecard-s6" y="7" fill="#255c47"/><use href="#paysafecard-s6" y="6" fill="#265d49"/><use href="#paysafecard-s6" y="5" fill="#275f4a"/><use href="#paysafecard-s6" y="4" fill="#27614b"/><use href="#paysafecard-s6" y="3" fill="#28624c"/><use href="#paysafecard-s6" y="2" fill="#29644e"/><use href="#paysafecard-s6" y="1" fill="#29654f"/>
+  <path d="M146 152H366A24 24 0 0 1 390 176V300A24 24 0 0 1 366 324H146A24 24 0 0 1 122 300V176A24 24 0 0 1 146 152Z" fill="url(#paysafecard-g3)"/>
+  <path d="M146 152H366A24 24 0 0 1 390 176V300A24 24 0 0 1 366 324H146A24 24 0 0 1 122 300V176A24 24 0 0 1 146 152Z" fill="none" stroke="#a6cdbe" stroke-opacity="0.75" stroke-width="3"/>
+  <g clip-path="url(#paysafecard-c4)"><ellipse cx="216" cy="172" rx="96" ry="54"
+      fill="url(#paysafecard-p5)" transform="rotate(-24 216 172)"/></g></g><rect x="148" y="194" width="80.4" height="14" rx="7" fill="#f2fff8" opacity=".92"/>
+          <rect x="148" y="226" width="53.6" height="10" rx="5" fill="#f2fff8" opacity=".6"/><g><rect x="308.84" y="192" width="8" height="92" rx="2" fill="#f2fff8" opacity=".8"/><rect x="321.84" y="192" width="5" height="92" rx="2" fill="#f2fff8" opacity=".8"/><rect x="334.84" y="192" width="8" height="92" rx="2" fill="#f2fff8" opacity=".8"/><rect x="347.84" y="192" width="5" height="92" rx="2" fill="#f2fff8" opacity=".8"/><rect x="360.84" y="192" width="8" height="92" rx="2" fill="#f2fff8" opacity=".8"/><rect x="373.84" y="192" width="5" height="92" rx="2" fill="#f2fff8" opacity=".8"/></g>
+</svg>

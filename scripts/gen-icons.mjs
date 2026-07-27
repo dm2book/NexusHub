@@ -418,6 +418,62 @@ const glyphA = (color = '#fff') => `<path d="${polyPath([
   [CX, CY - 4], [CX - 22, CY + 58],
 ])}" fill="${color}" opacity="0.95"/>`;
 
+
+/**
+ * Voucher: a card with a notch bitten out of each long edge — the shape a
+ * top-up code arrives on. Nothing else in the set reads as "a code on a slip".
+ */
+const voucher = (color, accent) => {
+  const w = 268, h = 172, x = CX - w / 2, y = CY - h / 2;
+  const nx = x + w * 0.63;
+  // A real mask, not two circles painted in the page colour: these icons sit on
+  // tinted product tiles, where painted "holes" would read as light grey dots.
+  const m = nid('vm');
+  let out = contactShadow(132, 24);
+  out += `<mask id="${m}" maskUnits="userSpaceOnUse" x="0" y="0" width="${S}" height="${S}">
+      <rect x="0" y="0" width="${S}" height="${S}" fill="#fff"/>
+      <circle cx="${round(nx)}" cy="${round(y)}" r="22" fill="#000"/>
+      <circle cx="${round(nx)}" cy="${round(y + h)}" r="22" fill="#000"/>
+    </mask>
+    <g mask="url(#${m})">${solid(roundRectPath(x, y, w, h, 24), { color, depth: 24 })}</g>`;
+  out += `<rect x="${round(x + 26)}" y="${round(y + 42)}" width="${round(w * 0.30)}" height="14" rx="7" fill="${accent}" opacity=".92"/>
+          <rect x="${round(x + 26)}" y="${round(y + 74)}" width="${round(w * 0.20)}" height="10" rx="5" fill="${accent}" opacity=".6"/>`;
+  out += `<g>${[0, 1, 2, 3, 4, 5].map((i) =>
+    `<rect x="${round(nx + 18 + i * 13)}" y="${round(y + 40)}" width="${i % 2 ? 5 : 8}" height="${round(h - 80)}" rx="2" fill="${accent}" opacity=".8"/>`).join('')}</g>`;
+  return out;
+};
+
+/** Rocket — speed and boosts: battle passes, level-ups, anything "get ahead". */
+const rocket = (color, accent) => {
+  const bodyD = `M${CX} ${CY - 122}c48 42 68 96 68 146l-26 30h-84l-26-30c0-50 20-104 68-146Z`;
+  const finL = `M${CX - 68} ${CY + 30}l-48 42 10 46 46-36Z`;
+  const finR = `M${CX + 68} ${CY + 30}l48 42-10 46-46-36Z`;
+  let out = contactShadow(120, 24);
+  out += solid(finL, { color: shade(accent, -0.1), depth: 16, gloss: false });
+  out += solid(finR, { color: shade(accent, -0.1), depth: 16, gloss: false });
+  out += solid(bodyD, { color, depth: 26 });
+  out += `<circle cx="${CX}" cy="${CY - 40}" r="30" fill="${shade(color, -0.42)}" opacity=".9"/>
+          <circle cx="${CX}" cy="${CY - 40}" r="21" fill="${shade(accent, 0.4)}"/>`;
+  return out;
+};
+
+/** Crate — banded like a shipping crate: bundles, packs and multi-buys. */
+const crate = (color, band) => {
+  const w = 250, h = 206, x = CX - w / 2, y = CY - h / 2 + 4;
+  let out = contactShadow(130, 24);
+  out += solid(roundRectPath(x, y, w, h, 18), { color, depth: 28 });
+  out += `<rect x="${round(x)}" y="${round(y + h * 0.44)}" width="${w}" height="24" fill="${band}" opacity=".92"/>
+          <rect x="${round(CX - 12)}" y="${round(y)}" width="24" height="${h}" fill="${band}" opacity=".92"/>
+          <rect x="${round(CX - 30)}" y="${round(y + h * 0.42)}" width="60" height="32" rx="8" fill="${shade(band, -0.32)}"/>`;
+  return out;
+};
+
+/** Heart — favourites, and "support the creator" style top-ups. */
+const heart = (color) => {
+  const d = `M${CX} ${CY + 96}c-98-66-130-106-130-152a63 63 0 0 1 130-31 63 63 0 0 1 130 31c0 46-32 86-130 152Z`;
+  return contactShadow(122, 24) + solid(d, { color, depth: 26 });
+};
+
 /* ── the catalogue ───────────────────────────────────────────────────────── */
 const ICONS = {
   // game currency — coins & gems
@@ -454,11 +510,49 @@ const ICONS = {
   gamepass:     () => tile('#2f9e4f', glyphBars('#f0fff5')),
   'discord-nitro': () => tile('#5865F2', glyphBoltSmall('#f2f4ff')),
 
+  // more game currency — categories a NL top-up shop grows into. Each is an
+  // ORIGINAL stylised object from the primitives above: the colour and the shape
+  // evoke the genre, never a company's mark. A green cube reads as a blocky
+  // sandbox game; it is not anybody's logo.
+  rocketleague: () => rocket('#2f7fd6', '#f0a92a'),
+  fallguys:     () => ball('#f25ca2', '#ffd166'),
+  amongus:      () => bag('#d8433e'),
+  standoff:     () => roundCoin('#e0a53c', glyphTarget('#fff6e0')),
+  marvelrivals: () => gemIcon('#e04a4a'),
+  honkai:       () => gemIcon('#c9a6ff'),
+  zenless:      () => gemIcon('#f0d24a'),
+  deltaforce:   () => roundCoin('#6f8f4a', glyphTarget('#f2ffe8')),
+  bloodstrike:  () => roundCoin('#c94a4a', glyphTarget('#fff0f0')),
+  rust:         () => cube('#b3673a', '#7a4a2a', '#96593a'),
+  albion:       () => roundCoin('#d4a72c', glyphCrown('#fff8e6')),
+  dota:         () => gemIcon('#c94a3a'),
+  csgo:         () => roundCoin('#e08a2a', glyphTarget('#fff5e8')),
+  tiktok:       () => roundCoin('#22c9c9', glyphNote('#f0ffff')),
+  telegram:     () => tile('#2f9ed6', glyphBoltSmall('#f0faff')),
+  crunchyroll:  () => tile('#f08322', glyphPlay('#fff6e9')),
+  youtube:      () => tile('#d6202c', glyphPlay('#fff0f0')),
+  twitch:       () => tile('#7f4fd6', glyphBars('#f5f0ff')),
+  disneyplus:   () => tile('#2f4fa7', glyphN('#f0f4ff')),
+  paysafecard:  () => voucher('#3a8f6f', '#f2fff8'),
+  epicgames:    () => tile('#3a3f4a', glyphBoltSmall('#eef1f7')),
+  battlenet:    () => sphere('#3f7fbf', detailCross('#f0f8ff')),
+  ubisoft:      () => sphere('#2f9ed6', detailPanels('#f0faff')),
+  eaplay:       () => tile('#e0453f', glyphBars('#fff0f0')),
+  psplus:       () => voucher('#1f6fd0', '#eaf3ff'),
+  battlepass:   () => rocket('#8b5cf6', '#f5c451'),
+
   // generic
   giftcard:     () => giftCard('#8b5cf6', '#f5c451'),
   chest:        () => chest('#b3742f', '#e0a63c'),
   coin:         () => roundCoin('#e8b431', glyphA('#fff8e0')),
   gem:          () => gemIcon('#22c9c9'),
+  // 'mystery' had no 3D icon at all: mystery boxes fell back to a flat gradient
+  // tile with a lucide glyph, the only category in the shop that never got the
+  // treatment. It is also the most expensive product on the site.
+  mystery:      () => chest('#b3543a', '#f0a92a'),
+  bundle:       () => crate('#7c5cff', '#f5c451'),
+  voucher:      () => voucher('#8b5cf6', '#f5f0ff'),
+  favourite:    () => heart('#e0456f'),
 };
 
 /* ── write them out ──────────────────────────────────────────────────────── */

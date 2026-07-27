@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" fill="none">
+
+  <defs><radialGradient id="battlepass-sh1" cx="0.5" cy="0.5" r="0.5">
+    <stop offset="0" stop-color="#0b1220" stop-opacity="0.4"/>
+    <stop offset="0.6" stop-color="#0b1220" stop-opacity="0.16000000000000003"/>
+    <stop offset="1" stop-color="#0b1220" stop-opacity="0"/>
+  </radialGradient></defs>
+  <ellipse cx="256" cy="388" rx="120" ry="24" fill="url(#battlepass-sh1)"/>
+  <defs>
+    <linearGradient id="battlepass-g2" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#ebd195"/>
+      <stop offset="0.5" stop-color="#ddb049"/>
+      <stop offset="1" stop-color="#b18d3a"/>
+    </linearGradient>
+    <clipPath id="battlepass-c3"><path d="M188 268l-48 42 10 46 46-36Z"/></clipPath>
+    <radialGradient id="battlepass-p4" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.72"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <defs><path id="battlepass-s5" d="M188 268l-48 42 10 46 46-36Z"/></defs><use href="#battlepass-s5" y="16" fill="#634f21"/><use href="#battlepass-s5" y="15" fill="#675222"/><use href="#battlepass-s5" y="14" fill="#6b5524"/><use href="#battlepass-s5" y="13" fill="#6e5825"/><use href="#battlepass-s5" y="12" fill="#725b26"/><use href="#battlepass-s5" y="11" fill="#765e27"/><use href="#battlepass-s5" y="10" fill="#7a6129"/><use href="#battlepass-s5" y="9" fill="#7d642a"/><use href="#battlepass-s5" y="8" fill="#81672b"/><use href="#battlepass-s5" y="7" fill="#856a2c"/><use href="#battlepass-s5" y="6" fill="#896d2e"/><use href="#battlepass-s5" y="5" fill="#8c702f"/><use href="#battlepass-s5" y="4" fill="#907330"/><use href="#battlepass-s5" y="3" fill="#947631"/><use href="#battlepass-s5" y="2" fill="#987933"/><use href="#battlepass-s5" y="1" fill="#9b7c34"/>
+  <path d="M188 268l-48 42 10 46 46-36Z" fill="url(#battlepass-g2)"/>
+  <path d="M188 268l-48 42 10 46 46-36Z" fill="none" stroke="#f0dbad" stroke-opacity="0.75" stroke-width="3"/>
+  
+  <defs>
+    <linearGradient id="battlepass-g6" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#ebd195"/>
+      <stop offset="0.5" stop-color="#ddb049"/>
+      <stop offset="1" stop-color="#b18d3a"/>
+    </linearGradient>
+    <clipPath id="battlepass-c7"><path d="M324 268l48 42-10 46-46-36Z"/></clipPath>
+    <radialGradient id="battlepass-p8" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.72"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <defs><path id="battlepass-s9" d="M324 268l48 42-10 46-46-36Z"/></defs><use href="#battlepass-s9" y="16" fill="#634f21"/><use href="#battlepass-s9" y="15" fill="#675222"/><use href="#battlepass-s9" y="14" fill="#6b5524"/><use href="#battlepass-s9" y="13" fill="#6e5825"/><use href="#battlepass-s9" y="12" fill="#725b26"/><use href="#battlepass-s9" y="11" fill="#765e27"/><use href="#battlepass-s9" y="10" fill="#7a6129"/><use href="#battlepass-s9" y="9" fill="#7d642a"/><use href="#battlepass-s9" y="8" fill="#81672b"/><use href="#battlepass-s9" y="7" fill="#856a2c"/><use href="#battlepass-s9" y="6" fill="#896d2e"/><use href="#battlepass-s9" y="5" fill="#8c702f"/><use href="#battlepass-s9" y="4" fill="#907330"/><use href="#battlepass-s9" y="3" fill="#947631"/><use href="#battlepass-s9" y="2" fill="#987933"/><use href="#battlepass-s9" y="1" fill="#9b7c34"/>
+  <path d="M324 268l48 42-10 46-46-36Z" fill="url(#battlepass-g6)"/>
+  <path d="M324 268l48 42-10 46-46-36Z" fill="none" stroke="#f0dbad" stroke-opacity="0.75" stroke-width="3"/>
+  
+  <defs>
+    <linearGradient id="battlepass-g10" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#bca0fa"/>
+      <stop offset="0.5" stop-color="#8b5cf6"/>
+      <stop offset="1" stop-color="#6f4ac5"/>
+    </linearGradient>
+    <clipPath id="battlepass-c11"><path d="M256 116c48 42 68 96 68 146l-26 30h-84l-26-30c0-50 20-104 68-146Z"/></clipPath>
+    <radialGradient id="battlepass-p12" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.72"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <defs><path id="battlepass-s13" d="M256 116c48 42 68 96 68 146l-26 30h-84l-26-30c0-50 20-104 68-146Z"/></defs><use href="#battlepass-s13" y="26" fill="#3f296f"/><use href="#battlepass-s13" y="25" fill="#402a72"/><use href="#battlepass-s13" y="24" fill="#422b74"/><use href="#battlepass-s13" y="23" fill="#432c77"/><use href="#battlepass-s13" y="22" fill="#452d79"/><use href="#battlepass-s13" y="21" fill="#462e7c"/><use href="#battlepass-s13" y="20" fill="#482f7e"/><use href="#battlepass-s13" y="19" fill="#493081"/><use href="#battlepass-s13" y="18" fill="#4a3183"/><use href="#battlepass-s13" y="17" fill="#4c3286"/><use href="#battlepass-s13" y="16" fill="#4d3388"/><use href="#battlepass-s13" y="15" fill="#4f348b"/><use href="#battlepass-s13" y="14" fill="#50358d"/><use href="#battlepass-s13" y="13" fill="#523690"/><use href="#battlepass-s13" y="12" fill="#533693"/><use href="#battlepass-s13" y="11" fill="#543795"/><use href="#battlepass-s13" y="10" fill="#563898"/><use href="#battlepass-s13" y="9" fill="#57399a"/><use href="#battlepass-s13" y="8" fill="#593a9d"/><use href="#battlepass-s13" y="7" fill="#5a3b9f"/><use href="#battlepass-s13" y="6" fill="#5b3ca2"/><use href="#battlepass-s13" y="5" fill="#5d3da4"/><use href="#battlepass-s13" y="4" fill="#5e3ea7"/><use href="#battlepass-s13" y="3" fill="#603fa9"/><use href="#battlepass-s13" y="2" fill="#6140ac"/><use href="#battlepass-s13" y="1" fill="#6341ae"/>
+  <path d="M256 116c48 42 68 96 68 146l-26 30h-84l-26-30c0-50 20-104 68-146Z" fill="url(#battlepass-g10)"/>
+  <path d="M256 116c48 42 68 96 68 146l-26 30h-84l-26-30c0-50 20-104 68-146Z" fill="none" stroke="#cbb6fb" stroke-opacity="0.75" stroke-width="3"/>
+  <g clip-path="url(#battlepass-c11)"><ellipse cx="216" cy="172" rx="96" ry="54"
+      fill="url(#battlepass-p12)" transform="rotate(-24 216 172)"/></g><circle cx="256" cy="198" r="30" fill="#51358f" opacity=".9"/>
+          <circle cx="256" cy="198" r="21" fill="#f9dc97"/>
+</svg>

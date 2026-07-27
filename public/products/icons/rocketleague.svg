@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" fill="none">
+
+  <defs><radialGradient id="rocketleague-sh1" cx="0.5" cy="0.5" r="0.5">
+    <stop offset="0" stop-color="#0b1220" stop-opacity="0.4"/>
+    <stop offset="0.6" stop-color="#0b1220" stop-opacity="0.16000000000000003"/>
+    <stop offset="1" stop-color="#0b1220" stop-opacity="0"/>
+  </radialGradient></defs>
+  <ellipse cx="256" cy="388" rx="120" ry="24" fill="url(#rocketleague-sh1)"/>
+  <defs>
+    <linearGradient id="rocketleague-g2" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#e8c381"/>
+      <stop offset="0.5" stop-color="#d89826"/>
+      <stop offset="1" stop-color="#ad7a1e"/>
+    </linearGradient>
+    <clipPath id="rocketleague-c3"><path d="M188 268l-48 42 10 46 46-36Z"/></clipPath>
+    <radialGradient id="rocketleague-p4" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.72"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <defs><path id="rocketleague-s5" d="M188 268l-48 42 10 46 46-36Z"/></defs><use href="#rocketleague-s5" y="16" fill="#614411"/><use href="#rocketleague-s5" y="15" fill="#654712"/><use href="#rocketleague-s5" y="14" fill="#684912"/><use href="#rocketleague-s5" y="13" fill="#6c4c13"/><use href="#rocketleague-s5" y="12" fill="#704e14"/><use href="#rocketleague-s5" y="11" fill="#735114"/><use href="#rocketleague-s5" y="10" fill="#775315"/><use href="#rocketleague-s5" y="9" fill="#7b5615"/><use href="#rocketleague-s5" y="8" fill="#7f5916"/><use href="#rocketleague-s5" y="7" fill="#825b17"/><use href="#rocketleague-s5" y="6" fill="#865e17"/><use href="#rocketleague-s5" y="5" fill="#8a6018"/><use href="#rocketleague-s5" y="4" fill="#8d6319"/><use href="#rocketleague-s5" y="3" fill="#916519"/><use href="#rocketleague-s5" y="2" fill="#95681a"/><use href="#rocketleague-s5" y="1" fill="#986a1a"/>
+  <path d="M188 268l-48 42 10 46 46-36Z" fill="url(#rocketleague-g2)"/>
+  <path d="M188 268l-48 42 10 46 46-36Z" fill="none" stroke="#edd19d" stroke-opacity="0.75" stroke-width="3"/>
+  
+  <defs>
+    <linearGradient id="rocketleague-g6" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#e8c381"/>
+      <stop offset="0.5" stop-color="#d89826"/>
+      <stop offset="1" stop-color="#ad7a1e"/>
+    </linearGradient>
+    <clipPath id="rocketleague-c7"><path d="M324 268l48 42-10 46-46-36Z"/></clipPath>
+    <radialGradient id="rocketleague-p8" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.72"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <defs><path id="rocketleague-s9" d="M324 268l48 42-10 46-46-36Z"/></defs><use href="#rocketleague-s9" y="16" fill="#614411"/><use href="#rocketleague-s9" y="15" fill="#654712"/><use href="#rocketleague-s9" y="14" fill="#684912"/><use href="#rocketleague-s9" y="13" fill="#6c4c13"/><use href="#rocketleague-s9" y="12" fill="#704e14"/><use href="#rocketleague-s9" y="11" fill="#735114"/><use href="#rocketleague-s9" y="10" fill="#775315"/><use href="#rocketleague-s9" y="9" fill="#7b5615"/><use href="#rocketleague-s9" y="8" fill="#7f5916"/><use href="#rocketleague-s9" y="7" fill="#825b17"/><use href="#rocketleague-s9" y="6" fill="#865e17"/><use href="#rocketleague-s9" y="5" fill="#8a6018"/><use href="#rocketleague-s9" y="4" fill="#8d6319"/><use href="#rocketleague-s9" y="3" fill="#916519"/><use href="#rocketleague-s9" y="2" fill="#95681a"/><use href="#rocketleague-s9" y="1" fill="#986a1a"/>
+  <path d="M324 268l48 42-10 46-46-36Z" fill="url(#rocketleague-g6)"/>
+  <path d="M324 268l48 42-10 46-46-36Z" fill="none" stroke="#edd19d" stroke-opacity="0.75" stroke-width="3"/>
+  
+  <defs>
+    <linearGradient id="rocketleague-g10" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#86b5e7"/>
+      <stop offset="0.5" stop-color="#2f7fd6"/>
+      <stop offset="1" stop-color="#2666ab"/>
+    </linearGradient>
+    <clipPath id="rocketleague-c11"><path d="M256 116c48 42 68 96 68 146l-26 30h-84l-26-30c0-50 20-104 68-146Z"/></clipPath>
+    <radialGradient id="rocketleague-p12" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.72"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <defs><path id="rocketleague-s13" d="M256 116c48 42 68 96 68 146l-26 30h-84l-26-30c0-50 20-104 68-146Z"/></defs><use href="#rocketleague-s13" y="26" fill="#153960"/><use href="#rocketleague-s13" y="25" fill="#163a62"/><use href="#rocketleague-s13" y="24" fill="#163c64"/><use href="#rocketleague-s13" y="23" fill="#173d67"/><use href="#rocketleague-s13" y="22" fill="#173e69"/><use href="#rocketleague-s13" y="21" fill="#18406b"/><use href="#rocketleague-s13" y="20" fill="#18416d"/><use href="#rocketleague-s13" y="19" fill="#194270"/><use href="#rocketleague-s13" y="18" fill="#194372"/><use href="#rocketleague-s13" y="17" fill="#1a4574"/><use href="#rocketleague-s13" y="16" fill="#1a4676"/><use href="#rocketleague-s13" y="15" fill="#1b4779"/><use href="#rocketleague-s13" y="14" fill="#1b497b"/><use href="#rocketleague-s13" y="13" fill="#1c4a7d"/><use href="#rocketleague-s13" y="12" fill="#1c4b7f"/><use href="#rocketleague-s13" y="11" fill="#1d4d81"/><use href="#rocketleague-s13" y="10" fill="#1d4e84"/><use href="#rocketleague-s13" y="9" fill="#1e4f86"/><use href="#rocketleague-s13" y="8" fill="#1e5188"/><use href="#rocketleague-s13" y="7" fill="#1f528a"/><use href="#rocketleague-s13" y="6" fill="#1f538d"/><use href="#rocketleague-s13" y="5" fill="#20548f"/><use href="#rocketleague-s13" y="4" fill="#205691"/><use href="#rocketleague-s13" y="3" fill="#215793"/><use href="#rocketleague-s13" y="2" fill="#215896"/><use href="#rocketleague-s13" y="1" fill="#225a98"/>
+  <path d="M256 116c48 42 68 96 68 146l-26 30h-84l-26-30c0-50 20-104 68-146Z" fill="url(#rocketleague-g10)"/>
+  <path d="M256 116c48 42 68 96 68 146l-26 30h-84l-26-30c0-50 20-104 68-146Z" fill="none" stroke="#a1c5ed" stroke-opacity="0.75" stroke-width="3"/>
+  <g clip-path="url(#rocketleague-c11)"><ellipse cx="216" cy="172" rx="96" ry="54"
+      fill="url(#rocketleague-p12)" transform="rotate(-24 216 172)"/></g><circle cx="256" cy="198" r="30" fill="#1b4a7c" opacity=".9"/>
+          <circle cx="256" cy="198" r="21" fill="#f6cb7f"/>
+</svg>

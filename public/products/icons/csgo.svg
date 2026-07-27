@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" fill="none">
+
+  <defs><radialGradient id="csgo-sh1" cx="0.5" cy="0.5" r="0.5">
+    <stop offset="0" stop-color="#0b1220" stop-opacity="0.4"/>
+    <stop offset="0.6" stop-color="#0b1220" stop-opacity="0.16000000000000003"/>
+    <stop offset="1" stop-color="#0b1220" stop-opacity="0"/>
+  </radialGradient></defs>
+  <ellipse cx="256" cy="388" rx="132" ry="26" fill="url(#csgo-sh1)"/>
+  <defs>
+    <linearGradient id="csgo-g2" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#ddb181"/>
+      <stop offset="0.5" stop-color="#c57925"/>
+      <stop offset="1" stop-color="#9e611e"/>
+    </linearGradient>
+    <clipPath id="csgo-c3"><path d="M98 296a70 70 0 1 0 140 0a70 70 0 1 0 -140 0Z"/></clipPath>
+    <radialGradient id="csgo-p4" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.72"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <defs><path id="csgo-s5" d="M98 296a70 70 0 1 0 140 0a70 70 0 1 0 -140 0Z"/></defs><use href="#csgo-s5" y="20" fill="#593611"/><use href="#csgo-s5" y="19" fill="#5c3812"/><use href="#csgo-s5" y="18" fill="#5e3912"/><use href="#csgo-s5" y="17" fill="#613b13"/><use href="#csgo-s5" y="16" fill="#643d13"/><use href="#csgo-s5" y="15" fill="#663e14"/><use href="#csgo-s5" y="14" fill="#694014"/><use href="#csgo-s5" y="13" fill="#6c4215"/><use href="#csgo-s5" y="12" fill="#6e4315"/><use href="#csgo-s5" y="11" fill="#714516"/><use href="#csgo-s5" y="10" fill="#744716"/><use href="#csgo-s5" y="9" fill="#764817"/><use href="#csgo-s5" y="8" fill="#794a17"/><use href="#csgo-s5" y="7" fill="#7b4b18"/><use href="#csgo-s5" y="6" fill="#7e4d18"/><use href="#csgo-s5" y="5" fill="#814f19"/><use href="#csgo-s5" y="4" fill="#835019"/><use href="#csgo-s5" y="3" fill="#86521a"/><use href="#csgo-s5" y="2" fill="#89541a"/><use href="#csgo-s5" y="1" fill="#8b551b"/>
+  <path d="M98 296a70 70 0 1 0 140 0a70 70 0 1 0 -140 0Z" fill="url(#csgo-g2)"/>
+  <path d="M98 296a70 70 0 1 0 140 0a70 70 0 1 0 -140 0Z" fill="none" stroke="#e5c39d" stroke-opacity="0.75" stroke-width="3"/>
+  
+  <defs>
+    <linearGradient id="csgo-g6" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#d6ad7f"/>
+      <stop offset="0.5" stop-color="#b87122"/>
+      <stop offset="1" stop-color="#935a1b"/>
+    </linearGradient>
+    <clipPath id="csgo-c7"><path d="M288 304a58 58 0 1 0 116 0a58 58 0 1 0 -116 0Z"/></clipPath>
+    <radialGradient id="csgo-p8" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.72"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <defs><path id="csgo-s9" d="M288 304a58 58 0 1 0 116 0a58 58 0 1 0 -116 0Z"/></defs><use href="#csgo-s9" y="16" fill="#53330f"/><use href="#csgo-s9" y="15" fill="#563510"/><use href="#csgo-s9" y="14" fill="#593710"/><use href="#csgo-s9" y="13" fill="#5c3911"/><use href="#csgo-s9" y="12" fill="#5f3b11"/><use href="#csgo-s9" y="11" fill="#623c12"/><use href="#csgo-s9" y="10" fill="#653e12"/><use href="#csgo-s9" y="9" fill="#684013"/><use href="#csgo-s9" y="8" fill="#6c4214"/><use href="#csgo-s9" y="7" fill="#6f4414"/><use href="#csgo-s9" y="6" fill="#724615"/><use href="#csgo-s9" y="5" fill="#754815"/><use href="#csgo-s9" y="4" fill="#784a16"/><use href="#csgo-s9" y="3" fill="#7b4b16"/><use href="#csgo-s9" y="2" fill="#7e4d17"/><use href="#csgo-s9" y="1" fill="#814f17"/>
+  <path d="M288 304a58 58 0 1 0 116 0a58 58 0 1 0 -116 0Z" fill="url(#csgo-g6)"/>
+  <path d="M288 304a58 58 0 1 0 116 0a58 58 0 1 0 -116 0Z" fill="none" stroke="#dfbf9c" stroke-opacity="0.75" stroke-width="3"/>
+  
+  <defs>
+    <linearGradient id="csgo-g10" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#edbb83"/>
+      <stop offset="0.5" stop-color="#e08a2a"/>
+      <stop offset="1" stop-color="#b36e22"/>
+    </linearGradient>
+    <clipPath id="csgo-c11"><path d="M138 238a118 118 0 1 0 236 0a118 118 0 1 0 -236 0Z"/></clipPath>
+    <radialGradient id="csgo-p12" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.72"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <defs><path id="csgo-s13" d="M138 238a118 118 0 1 0 236 0a118 118 0 1 0 -236 0Z"/></defs><use href="#csgo-s13" y="30" fill="#653e13"/><use href="#csgo-s13" y="29" fill="#673f13"/><use href="#csgo-s13" y="28" fill="#694014"/><use href="#csgo-s13" y="27" fill="#6b4214"/><use href="#csgo-s13" y="26" fill="#6d4314"/><use href="#csgo-s13" y="25" fill="#6f4415"/><use href="#csgo-s13" y="24" fill="#714515"/><use href="#csgo-s13" y="23" fill="#734716"/><use href="#csgo-s13" y="22" fill="#754816"/><use href="#csgo-s13" y="21" fill="#774916"/><use href="#csgo-s13" y="20" fill="#794a17"/><use href="#csgo-s13" y="19" fill="#7b4c17"/><use href="#csgo-s13" y="18" fill="#7d4d17"/><use href="#csgo-s13" y="17" fill="#7f4e18"/><use href="#csgo-s13" y="16" fill="#814f18"/><use href="#csgo-s13" y="15" fill="#835119"/><use href="#csgo-s13" y="14" fill="#855219"/><use href="#csgo-s13" y="13" fill="#875319"/><use href="#csgo-s13" y="12" fill="#89541a"/><use href="#csgo-s13" y="11" fill="#8b551a"/><use href="#csgo-s13" y="10" fill="#8d571a"/><use href="#csgo-s13" y="9" fill="#8f581b"/><use href="#csgo-s13" y="8" fill="#91591b"/><use href="#csgo-s13" y="7" fill="#935a1b"/><use href="#csgo-s13" y="6" fill="#955c1c"/><use href="#csgo-s13" y="5" fill="#975d1c"/><use href="#csgo-s13" y="4" fill="#995e1d"/><use href="#csgo-s13" y="3" fill="#9b5f1d"/><use href="#csgo-s13" y="2" fill="#9d611d"/><use href="#csgo-s13" y="1" fill="#9f621e"/>
+  <path d="M138 238a118 118 0 1 0 236 0a118 118 0 1 0 -236 0Z" fill="url(#csgo-g10)"/>
+  <path d="M138 238a118 118 0 1 0 236 0a118 118 0 1 0 -236 0Z" fill="none" stroke="#f1ca9f" stroke-opacity="0.75" stroke-width="3"/>
+  <g clip-path="url(#csgo-c11)"><ellipse cx="216" cy="172" rx="96" ry="54"
+      fill="url(#csgo-p12)" transform="rotate(-24 216 172)"/></g><path d="M158 238a98 98 0 1 0 196 0a98 98 0 1 0 -196 0Z" fill="none" stroke="#ecb97f" stroke-opacity="0.55" stroke-width="5"/><g fill="none" stroke="#fff5e8" stroke-width="12" opacity="0.95">
+    <circle cx="256" cy="238" r="52"/><circle cx="256" cy="238" r="22"/>
+    <path d="M256 164v26M256 286v26M182 238h26M304 238h26" stroke-linecap="round"/>
+  </g>
+</svg>

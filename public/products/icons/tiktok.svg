@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" fill="none">
+
+  <defs><radialGradient id="tiktok-sh1" cx="0.5" cy="0.5" r="0.5">
+    <stop offset="0" stop-color="#0b1220" stop-opacity="0.4"/>
+    <stop offset="0.6" stop-color="#0b1220" stop-opacity="0.16000000000000003"/>
+    <stop offset="1" stop-color="#0b1220" stop-opacity="0"/>
+  </radialGradient></defs>
+  <ellipse cx="256" cy="388" rx="132" ry="26" fill="url(#tiktok-sh1)"/>
+  <defs>
+    <linearGradient id="tiktok-g2" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#7dd2d2"/>
+      <stop offset="0.5" stop-color="#1eb1b1"/>
+      <stop offset="1" stop-color="#188e8e"/>
+    </linearGradient>
+    <clipPath id="tiktok-c3"><path d="M98 296a70 70 0 1 0 140 0a70 70 0 1 0 -140 0Z"/></clipPath>
+    <radialGradient id="tiktok-p4" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.72"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <defs><path id="tiktok-s5" d="M98 296a70 70 0 1 0 140 0a70 70 0 1 0 -140 0Z"/></defs><use href="#tiktok-s5" y="20" fill="#0e5050"/><use href="#tiktok-s5" y="19" fill="#0e5252"/><use href="#tiktok-s5" y="18" fill="#0f5555"/><use href="#tiktok-s5" y="17" fill="#0f5757"/><use href="#tiktok-s5" y="16" fill="#105959"/><use href="#tiktok-s5" y="15" fill="#105c5c"/><use href="#tiktok-s5" y="14" fill="#105e5e"/><use href="#tiktok-s5" y="13" fill="#116060"/><use href="#tiktok-s5" y="12" fill="#116363"/><use href="#tiktok-s5" y="11" fill="#126565"/><use href="#tiktok-s5" y="10" fill="#126868"/><use href="#tiktok-s5" y="9" fill="#126a6a"/><use href="#tiktok-s5" y="8" fill="#136c6c"/><use href="#tiktok-s5" y="7" fill="#136f6f"/><use href="#tiktok-s5" y="6" fill="#147171"/><use href="#tiktok-s5" y="5" fill="#147373"/><use href="#tiktok-s5" y="4" fill="#147676"/><use href="#tiktok-s5" y="3" fill="#157878"/><use href="#tiktok-s5" y="2" fill="#157a7a"/><use href="#tiktok-s5" y="1" fill="#167d7d"/>
+  <path d="M98 296a70 70 0 1 0 140 0a70 70 0 1 0 -140 0Z" fill="url(#tiktok-g2)"/>
+  <path d="M98 296a70 70 0 1 0 140 0a70 70 0 1 0 -140 0Z" fill="none" stroke="#9adcdc" stroke-opacity="0.75" stroke-width="3"/>
+  
+  <defs>
+    <linearGradient id="tiktok-g6" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#7bcbcb"/>
+      <stop offset="0.5" stop-color="#1ca5a5"/>
+      <stop offset="1" stop-color="#168484"/>
+    </linearGradient>
+    <clipPath id="tiktok-c7"><path d="M288 304a58 58 0 1 0 116 0a58 58 0 1 0 -116 0Z"/></clipPath>
+    <radialGradient id="tiktok-p8" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.72"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <defs><path id="tiktok-s9" d="M288 304a58 58 0 1 0 116 0a58 58 0 1 0 -116 0Z"/></defs><use href="#tiktok-s9" y="16" fill="#0d4a4a"/><use href="#tiktok-s9" y="15" fill="#0d4d4d"/><use href="#tiktok-s9" y="14" fill="#0e5050"/><use href="#tiktok-s9" y="13" fill="#0e5252"/><use href="#tiktok-s9" y="12" fill="#0f5555"/><use href="#tiktok-s9" y="11" fill="#0f5858"/><use href="#tiktok-s9" y="10" fill="#105b5b"/><use href="#tiktok-s9" y="9" fill="#105e5e"/><use href="#tiktok-s9" y="8" fill="#116161"/><use href="#tiktok-s9" y="7" fill="#116363"/><use href="#tiktok-s9" y="6" fill="#116666"/><use href="#tiktok-s9" y="5" fill="#126969"/><use href="#tiktok-s9" y="4" fill="#126c6c"/><use href="#tiktok-s9" y="3" fill="#136f6f"/><use href="#tiktok-s9" y="2" fill="#137171"/><use href="#tiktok-s9" y="1" fill="#147474"/>
+  <path d="M288 304a58 58 0 1 0 116 0a58 58 0 1 0 -116 0Z" fill="url(#tiktok-g6)"/>
+  <path d="M288 304a58 58 0 1 0 116 0a58 58 0 1 0 -116 0Z" fill="none" stroke="#99d7d7" stroke-opacity="0.75" stroke-width="3"/>
+  
+  <defs>
+    <linearGradient id="tiktok-g10" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#7fe0e0"/>
+      <stop offset="0.5" stop-color="#22c9c9"/>
+      <stop offset="1" stop-color="#1ba1a1"/>
+    </linearGradient>
+    <clipPath id="tiktok-c11"><path d="M138 238a118 118 0 1 0 236 0a118 118 0 1 0 -236 0Z"/></clipPath>
+    <radialGradient id="tiktok-p12" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.72"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <defs><path id="tiktok-s13" d="M138 238a118 118 0 1 0 236 0a118 118 0 1 0 -236 0Z"/></defs><use href="#tiktok-s13" y="30" fill="#0f5a5a"/><use href="#tiktok-s13" y="29" fill="#0f5c5c"/><use href="#tiktok-s13" y="28" fill="#105e5e"/><use href="#tiktok-s13" y="27" fill="#106060"/><use href="#tiktok-s13" y="26" fill="#106161"/><use href="#tiktok-s13" y="25" fill="#116363"/><use href="#tiktok-s13" y="24" fill="#116565"/><use href="#tiktok-s13" y="23" fill="#116767"/><use href="#tiktok-s13" y="22" fill="#116969"/><use href="#tiktok-s13" y="21" fill="#126b6b"/><use href="#tiktok-s13" y="20" fill="#126c6c"/><use href="#tiktok-s13" y="19" fill="#126e6e"/><use href="#tiktok-s13" y="18" fill="#137070"/><use href="#tiktok-s13" y="17" fill="#137272"/><use href="#tiktok-s13" y="16" fill="#137474"/><use href="#tiktok-s13" y="15" fill="#147676"/><use href="#tiktok-s13" y="14" fill="#147777"/><use href="#tiktok-s13" y="13" fill="#147979"/><use href="#tiktok-s13" y="12" fill="#147b7b"/><use href="#tiktok-s13" y="11" fill="#157d7d"/><use href="#tiktok-s13" y="10" fill="#157f7f"/><use href="#tiktok-s13" y="9" fill="#158181"/><use href="#tiktok-s13" y="8" fill="#168282"/><use href="#tiktok-s13" y="7" fill="#168484"/><use href="#tiktok-s13" y="6" fill="#168686"/><use href="#tiktok-s13" y="5" fill="#178888"/><use href="#tiktok-s13" y="4" fill="#178a8a"/><use href="#tiktok-s13" y="3" fill="#178c8c"/><use href="#tiktok-s13" y="2" fill="#178d8d"/><use href="#tiktok-s13" y="1" fill="#188f8f"/>
+  <path d="M138 238a118 118 0 1 0 236 0a118 118 0 1 0 -236 0Z" fill="url(#tiktok-g10)"/>
+  <path d="M138 238a118 118 0 1 0 236 0a118 118 0 1 0 -236 0Z" fill="none" stroke="#9ce7e7" stroke-opacity="0.75" stroke-width="3"/>
+  <g clip-path="url(#tiktok-c11)"><ellipse cx="216" cy="172" rx="96" ry="54"
+      fill="url(#tiktok-p12)" transform="rotate(-24 216 172)"/></g><path d="M158 238a98 98 0 1 0 196 0a98 98 0 1 0 -196 0Z" fill="none" stroke="#7adfdf" stroke-opacity="0.55" stroke-width="5"/><g fill="#f0ffff" opacity="0.95">
+    <rect x="264" y="176" width="16" height="94" rx="8"/>
+    <path d="M264 176q46 -11 58 -21v34q-12 10 -58 21Z"/>
+    <ellipse cx="244" cy="270" rx="30" ry="24"/>
+  </g>
+</svg>

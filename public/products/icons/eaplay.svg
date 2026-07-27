@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" fill="none">
+
+  <defs><radialGradient id="eaplay-sh1" cx="0.5" cy="0.5" r="0.5">
+    <stop offset="0" stop-color="#0b1220" stop-opacity="0.4"/>
+    <stop offset="0.6" stop-color="#0b1220" stop-opacity="0.16000000000000003"/>
+    <stop offset="1" stop-color="#0b1220" stop-opacity="0"/>
+  </radialGradient></defs>
+  <ellipse cx="256" cy="388" rx="118" ry="24" fill="url(#eaplay-sh1)"/>
+  <defs>
+    <linearGradient id="eaplay-g2" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#ed9390"/>
+      <stop offset="0.5" stop-color="#e0453f"/>
+      <stop offset="1" stop-color="#b33732"/>
+    </linearGradient>
+    <clipPath id="eaplay-c3"><path d="M196 126H316A52 52 0 0 1 368 178V298A52 52 0 0 1 316 350H196A52 52 0 0 1 144 298V178A52 52 0 0 1 196 126Z"/></clipPath>
+    <radialGradient id="eaplay-p4" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.72"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <defs><path id="eaplay-s5" d="M196 126H316A52 52 0 0 1 368 178V298A52 52 0 0 1 316 350H196A52 52 0 0 1 144 298V178A52 52 0 0 1 196 126Z"/></defs><use href="#eaplay-s5" y="26" fill="#651f1c"/><use href="#eaplay-s5" y="25" fill="#67201d"/><use href="#eaplay-s5" y="24" fill="#6a201d"/><use href="#eaplay-s5" y="23" fill="#6c211e"/><use href="#eaplay-s5" y="22" fill="#6e221f"/><use href="#eaplay-s5" y="21" fill="#71231f"/><use href="#eaplay-s5" y="20" fill="#732320"/><use href="#eaplay-s5" y="19" fill="#752421"/><use href="#eaplay-s5" y="18" fill="#772521"/><use href="#eaplay-s5" y="17" fill="#7a2622"/><use href="#eaplay-s5" y="16" fill="#7c2623"/><use href="#eaplay-s5" y="15" fill="#7e2723"/><use href="#eaplay-s5" y="14" fill="#812824"/><use href="#eaplay-s5" y="13" fill="#832925"/><use href="#eaplay-s5" y="12" fill="#852925"/><use href="#eaplay-s5" y="11" fill="#882a26"/><use href="#eaplay-s5" y="10" fill="#8a2b26"/><use href="#eaplay-s5" y="9" fill="#8c2b27"/><use href="#eaplay-s5" y="8" fill="#8f2c28"/><use href="#eaplay-s5" y="7" fill="#912d28"/><use href="#eaplay-s5" y="6" fill="#932e29"/><use href="#eaplay-s5" y="5" fill="#952e2a"/><use href="#eaplay-s5" y="4" fill="#982f2a"/><use href="#eaplay-s5" y="3" fill="#9a302b"/><use href="#eaplay-s5" y="2" fill="#9c312c"/><use href="#eaplay-s5" y="1" fill="#9f312c"/>
+  <path d="M196 126H316A52 52 0 0 1 368 178V298A52 52 0 0 1 316 350H196A52 52 0 0 1 144 298V178A52 52 0 0 1 196 126Z" fill="url(#eaplay-g2)"/>
+  <path d="M196 126H316A52 52 0 0 1 368 178V298A52 52 0 0 1 316 350H196A52 52 0 0 1 144 298V178A52 52 0 0 1 196 126Z" fill="none" stroke="#f1aba9" stroke-opacity="0.75" stroke-width="3"/>
+  <g clip-path="url(#eaplay-c3)"><ellipse cx="216" cy="172" rx="96" ry="54"
+      fill="url(#eaplay-p4)" transform="rotate(-24 216 172)"/></g><g fill="#fff0f0" opacity="0.92">
+    <rect x="204" y="230" width="26" height="58" rx="13"/>
+    <rect x="243" y="192" width="26" height="96" rx="13"/>
+    <rect x="282" y="214" width="26" height="74" rx="13"/>
+  </g>
+</svg>

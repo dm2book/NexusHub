@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" fill="none">
+
+  <defs><radialGradient id="deltaforce-sh1" cx="0.5" cy="0.5" r="0.5">
+    <stop offset="0" stop-color="#0b1220" stop-opacity="0.4"/>
+    <stop offset="0.6" stop-color="#0b1220" stop-opacity="0.16000000000000003"/>
+    <stop offset="1" stop-color="#0b1220" stop-opacity="0"/>
+  </radialGradient></defs>
+  <ellipse cx="256" cy="388" rx="132" ry="26" fill="url(#deltaforce-sh1)"/>
+  <defs>
+    <linearGradient id="deltaforce-g2" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#a4b491"/>
+      <stop offset="0.5" stop-color="#627e41"/>
+      <stop offset="1" stop-color="#4e6534"/>
+    </linearGradient>
+    <clipPath id="deltaforce-c3"><path d="M98 296a70 70 0 1 0 140 0a70 70 0 1 0 -140 0Z"/></clipPath>
+    <radialGradient id="deltaforce-p4" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.72"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <defs><path id="deltaforce-s5" d="M98 296a70 70 0 1 0 140 0a70 70 0 1 0 -140 0Z"/></defs><use href="#deltaforce-s5" y="20" fill="#2c391d"/><use href="#deltaforce-s5" y="19" fill="#2d3b1e"/><use href="#deltaforce-s5" y="18" fill="#2f3c1f"/><use href="#deltaforce-s5" y="17" fill="#303e20"/><use href="#deltaforce-s5" y="16" fill="#314021"/><use href="#deltaforce-s5" y="15" fill="#334222"/><use href="#deltaforce-s5" y="14" fill="#344322"/><use href="#deltaforce-s5" y="13" fill="#354523"/><use href="#deltaforce-s5" y="12" fill="#374724"/><use href="#deltaforce-s5" y="11" fill="#384825"/><use href="#deltaforce-s5" y="10" fill="#3a4a26"/><use href="#deltaforce-s5" y="9" fill="#3b4c27"/><use href="#deltaforce-s5" y="8" fill="#3c4d28"/><use href="#deltaforce-s5" y="7" fill="#3e4f29"/><use href="#deltaforce-s5" y="6" fill="#3f512a"/><use href="#deltaforce-s5" y="5" fill="#40532b"/><use href="#deltaforce-s5" y="4" fill="#42542b"/><use href="#deltaforce-s5" y="3" fill="#43562c"/><use href="#deltaforce-s5" y="2" fill="#44582d"/><use href="#deltaforce-s5" y="1" fill="#46592e"/>
+  <path d="M98 296a70 70 0 1 0 140 0a70 70 0 1 0 -140 0Z" fill="url(#deltaforce-g2)"/>
+  <path d="M98 296a70 70 0 1 0 140 0a70 70 0 1 0 -140 0Z" fill="none" stroke="#b8c5aa" stroke-opacity="0.75" stroke-width="3"/>
+  
+  <defs>
+    <linearGradient id="deltaforce-g6" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#a0af8e"/>
+      <stop offset="0.5" stop-color="#5b753d"/>
+      <stop offset="1" stop-color="#495e31"/>
+    </linearGradient>
+    <clipPath id="deltaforce-c7"><path d="M288 304a58 58 0 1 0 116 0a58 58 0 1 0 -116 0Z"/></clipPath>
+    <radialGradient id="deltaforce-p8" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.72"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <defs><path id="deltaforce-s9" d="M288 304a58 58 0 1 0 116 0a58 58 0 1 0 -116 0Z"/></defs><use href="#deltaforce-s9" y="16" fill="#29351b"/><use href="#deltaforce-s9" y="15" fill="#2b371c"/><use href="#deltaforce-s9" y="14" fill="#2c391d"/><use href="#deltaforce-s9" y="13" fill="#2e3b1e"/><use href="#deltaforce-s9" y="12" fill="#2f3d1f"/><use href="#deltaforce-s9" y="11" fill="#313f20"/><use href="#deltaforce-s9" y="10" fill="#324121"/><use href="#deltaforce-s9" y="9" fill="#344322"/><use href="#deltaforce-s9" y="8" fill="#364524"/><use href="#deltaforce-s9" y="7" fill="#374625"/><use href="#deltaforce-s9" y="6" fill="#394826"/><use href="#deltaforce-s9" y="5" fill="#3a4a27"/><use href="#deltaforce-s9" y="4" fill="#3c4c28"/><use href="#deltaforce-s9" y="3" fill="#3d4e29"/><use href="#deltaforce-s9" y="2" fill="#3f502a"/><use href="#deltaforce-s9" y="1" fill="#40522b"/>
+  <path d="M288 304a58 58 0 1 0 116 0a58 58 0 1 0 -116 0Z" fill="url(#deltaforce-g6)"/>
+  <path d="M288 304a58 58 0 1 0 116 0a58 58 0 1 0 -116 0Z" fill="none" stroke="#b5c1a8" stroke-opacity="0.75" stroke-width="3"/>
+  
+  <defs>
+    <linearGradient id="deltaforce-g10" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#abbe96"/>
+      <stop offset="0.5" stop-color="#6f8f4a"/>
+      <stop offset="1" stop-color="#59723b"/>
+    </linearGradient>
+    <clipPath id="deltaforce-c11"><path d="M138 238a118 118 0 1 0 236 0a118 118 0 1 0 -236 0Z"/></clipPath>
+    <radialGradient id="deltaforce-p12" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.72"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <defs><path id="deltaforce-s13" d="M138 238a118 118 0 1 0 236 0a118 118 0 1 0 -236 0Z"/></defs><use href="#deltaforce-s13" y="30" fill="#324021"/><use href="#deltaforce-s13" y="29" fill="#334122"/><use href="#deltaforce-s13" y="28" fill="#344322"/><use href="#deltaforce-s13" y="27" fill="#354423"/><use href="#deltaforce-s13" y="26" fill="#364524"/><use href="#deltaforce-s13" y="25" fill="#374724"/><use href="#deltaforce-s13" y="24" fill="#384825"/><use href="#deltaforce-s13" y="23" fill="#394926"/><use href="#deltaforce-s13" y="22" fill="#3a4a26"/><use href="#deltaforce-s13" y="21" fill="#3b4c27"/><use href="#deltaforce-s13" y="20" fill="#3c4d28"/><use href="#deltaforce-s13" y="19" fill="#3d4e28"/><use href="#deltaforce-s13" y="18" fill="#3e5029"/><use href="#deltaforce-s13" y="17" fill="#3f512a"/><use href="#deltaforce-s13" y="16" fill="#40522a"/><use href="#deltaforce-s13" y="15" fill="#41542b"/><use href="#deltaforce-s13" y="14" fill="#42552c"/><use href="#deltaforce-s13" y="13" fill="#43562c"/><use href="#deltaforce-s13" y="12" fill="#44572d"/><use href="#deltaforce-s13" y="11" fill="#45592e"/><use href="#deltaforce-s13" y="10" fill="#465a2e"/><use href="#deltaforce-s13" y="9" fill="#475b2f"/><use href="#deltaforce-s13" y="8" fill="#485d30"/><use href="#deltaforce-s13" y="7" fill="#495e30"/><use href="#deltaforce-s13" y="6" fill="#4a5f31"/><use href="#deltaforce-s13" y="5" fill="#4b6132"/><use href="#deltaforce-s13" y="4" fill="#4c6232"/><use href="#deltaforce-s13" y="3" fill="#4d6333"/><use href="#deltaforce-s13" y="2" fill="#4e6434"/><use href="#deltaforce-s13" y="1" fill="#4f6634"/>
+  <path d="M138 238a118 118 0 1 0 236 0a118 118 0 1 0 -236 0Z" fill="url(#deltaforce-g10)"/>
+  <path d="M138 238a118 118 0 1 0 236 0a118 118 0 1 0 -236 0Z" fill="none" stroke="#becdae" stroke-opacity="0.75" stroke-width="3"/>
+  <g clip-path="url(#deltaforce-c11)"><ellipse cx="216" cy="172" rx="96" ry="54"
+      fill="url(#deltaforce-p12)" transform="rotate(-24 216 172)"/></g><path d="M158 238a98 98 0 1 0 196 0a98 98 0 1 0 -196 0Z" fill="none" stroke="#a9bc92" stroke-opacity="0.55" stroke-width="5"/><g fill="none" stroke="#f2ffe8" stroke-width="12" opacity="0.95">
+    <circle cx="256" cy="238" r="52"/><circle cx="256" cy="238" r="22"/>
+    <path d="M256 164v26M256 286v26M182 238h26M304 238h26" stroke-linecap="round"/>
+  </g>
+</svg>
