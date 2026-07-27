@@ -40,9 +40,9 @@ export default function LightProductCard({ product, onAdd }) {
   };
 
   return (
-    <div className="group w-full bg-white rounded-2xl border border-slate-200/70 shadow-sm fm-lift p-4 flex flex-col">
+    <div className="group w-full bg-white rounded-2xl border border-slate-200/70 shadow-sm fm-lift p-3 sm:p-4 flex flex-col">
       <a href={to} onClick={openWithMorph}
-        className="fm-card-media fm-logo-plinth relative rounded-xl h-[150px] grid place-items-center mb-3"
+        className="fm-card-media fm-logo-plinth relative rounded-xl h-[122px] sm:h-[150px] grid place-items-center mb-3"
         style={{ '--card-glow': `radial-gradient(circle, ${glowFor(product.category)}45, transparent 70%)` }}>
         <div className="absolute top-2.5 left-2.5 z-10 flex flex-col items-start gap-1">
           {onSale && (
@@ -99,8 +99,8 @@ export default function LightProductCard({ product, onAdd }) {
       </a>
       <div className="text-[11px] font-semibold uppercase tracking-wide text-violet-500">{v.label}</div>
       <Link to={to} className="font-bold text-[15px] text-slate-900 mt-0.5 hover:text-violet-600 line-clamp-2">{product.name}</Link>
-      {desc && <p className="text-[12.5px] text-slate-400 mt-1 line-clamp-2 flex-1">{desc}</p>}
-      <div className="text-[12px] text-slate-400 mt-3">
+      {desc && <p className="text-[12.5px] text-slate-400 mt-1 line-clamp-2">{desc}</p>}
+      <div className="text-[12px] text-slate-400 mt-3 pt-0.5 mt-auto">
         {t('home.from', 'From')} <span className="fm-num text-violet-600 text-[18px]">{money(product.price, product.currency)}</span>
         {onSale && (
           <span className="ml-2 text-slate-400 line-through fm-num text-[13px]">{money(product.compareAtPrice, product.currency)}</span>

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import PayFacts from '../components/store/PayFacts.jsx';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
   Search, Loader2, ExternalLink, Copy, Check, CreditCard, Cog, PackageCheck,
@@ -164,15 +165,12 @@ export default function Track() {
           {/* Awaiting payment: pay links + reference */}
           {result.status === 'pending' && ((result.payMethods || []).length > 0 || result.payLink) && (
             <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-5 mb-6">
-              <div className="flex items-center justify-between">
-                <div className="text-amber-200 font-semibold">{t('track.awaiting', '⏳ Awaiting payment')}</div>
-                <div className="text-white font-semibold">{result.totalFormatted}</div>
-              </div>
-              <p className="text-slate-300 text-sm mt-1">
-                {t('track.payWith', 'Pay with your order number')}{' '}
-                <button onClick={() => { navigator.clipboard?.writeText(result.number); toast.success(t('track.copied', 'Reference copied')); }}
-                  className="font-mono text-white inline-flex items-center gap-1"><Copy size={12} /> {result.number}</button>{' '}
-                {t('track.payRef', 'as the reference. We confirm it manually (usually within minutes) — this page updates by itself.')}
+              <div className="text-amber-200 font-semibold mb-3">{t('track.awaiting', '⏳ Awaiting payment')}</div>
+              {/* Same two facts as the checkout screen, same treatment: the
+                  amount was buried in a corner and could not be copied. */}
+              <PayFacts amount={result.totalFormatted} reference={result.number} />
+              <p className="text-slate-300 text-[12.5px] mt-2">
+                {t('track.payRef2', 'We confirm every payment by hand, usually within minutes — this page updates by itself.')}
               </p>
               {/* A link the owner made with the exact amount already in it beats
                   every generic method: nothing to type, nothing to get wrong. */}

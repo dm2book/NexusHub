@@ -5,6 +5,7 @@ import { api } from '../lib/api.js';
 import { fileToDataUrl } from '../lib/imageUpload.js';
 import { useI18n } from '../lib/i18n.jsx';
 import { useCart } from '../context/CartContext.jsx';
+import PayFacts from '../components/store/PayFacts.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { money } from '../lib/catalog.js';
@@ -166,13 +167,10 @@ export default function Checkout() {
           <h1 className="text-2xl text-white">{t('checkout.almostThere', 'Almost there — complete your payment')}</h1>
           <p className="text-slate-400 mt-2">{t('checkout.orderWord', 'Order')} <span className="font-mono text-white">{placed.number}</span> {t('checkout.reserved', 'is reserved. Pay the amount below and we’ll confirm it (usually within minutes).')}</p>
 
-          <div className="glass rounded-2xl p-5 mt-6 text-left">
-            <div className="flex items-center justify-between"><span className="text-slate-400 text-sm">{t('checkout.amount', 'Amount')}</span><span className="text-2xl text-white font-semibold">€{payEur}</span></div>
-            <div className="flex items-center justify-between mt-3">
-              <span className="text-slate-400 text-sm">{t('checkout.reference', 'Reference (put in the note)')}</span>
-              <button onClick={() => { navigator.clipboard?.writeText(placed.number); toast.success(t('track.copied', 'Reference copied')); }}
-                className="inline-flex items-center gap-1.5 text-white font-mono text-sm"><Copy size={13} /> {placed.number}</button>
-            </div>
+          {/* The amount used to be plain text — the one number people retype,
+              and it could not be copied. Both facts are now one tap each. */}
+          <div className="mt-6 text-left">
+            <PayFacts amount={`€${payEur}`} reference={placed.number} />
           </div>
 
           {methods.length > 1 && (
