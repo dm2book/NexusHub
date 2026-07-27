@@ -357,6 +357,11 @@ export default function Checkout() {
               : provider === 'manual' ? <>{t('checkout.placePay', 'Place order & pay')}</>
               : <>{t('checkout.placeOrder', 'Place order')}</>}
           </button>
+          {!consent && !busy && (
+            <p className="text-amber-300 text-[12.5px] mt-2 text-center">
+              {t('checkout.consentFirst', 'Tick the box above to continue — it is required by EU law before we can deliver straight away.')}
+            </p>
+          )}
           {/* Purchase protection */}
           <div className="mt-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 p-3">
             <div className="flex items-center gap-2 text-emerald-300 text-sm font-medium"><ShieldCheck size={15} /> {t('checkout.protection', 'Buyer protection')}</div>
@@ -382,6 +387,11 @@ export default function Checkout() {
               : <>{t('checkout.placeOrder', 'Place order')}</>}
           </button>
         </div>
+          {!consent && !busy && (
+            <p className="text-amber-300 text-[12.5px] mt-2 text-center">
+              {t('checkout.consentFirst', 'Tick the box above to continue — it is required by EU law before we can deliver straight away.')}
+            </p>
+          )}
       </form>
     </div>
   );

@@ -49,22 +49,33 @@ export default function Cart() {
           {items.map((it) => {
             const v = categoryVisual(it.category); const img = it.image || iconFor(it.category); const Icon = v.icon;
             return (
-              <div key={it.id} className="bg-white rounded-2xl border border-slate-200/70 shadow-sm p-4 flex items-center gap-4">
-                <div className="w-16 h-16 rounded-xl bg-slate-50 grid place-items-center shrink-0">
-                  {img ? <img src={img} alt="" className="w-12 h-12 object-contain" />
-                    : <span className={`w-12 h-12 rounded-lg bg-gradient-to-br ${v.grad} grid place-items-center`}><Icon size={22} className="text-white" /></span>}
+              /* Thumbnail, name, stepper, line price and remove were one
+                 non-wrapping row. At 390px that row measured 472px, so the LINE
+                 PRICE — the number the buyer is checking — was pushed off the
+                 screen entirely. Below sm the stepper and price move onto their
+                 own line under the name; from sm up the original row returns. */
+              <div key={it.id} className="bg-white rounded-2xl border border-slate-200/70 shadow-sm p-3 sm:p-4
+                grid grid-cols-[auto_1fr_auto] sm:flex sm:items-center gap-x-3 sm:gap-4 gap-y-3">
+                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl bg-slate-50 grid place-items-center shrink-0 row-span-1">
+                  {img ? <img src={img} alt="" className="w-11 h-11 sm:w-12 sm:h-12 object-contain" />
+                    : <span className={`w-11 h-11 sm:w-12 sm:h-12 rounded-lg bg-gradient-to-br ${v.grad} grid place-items-center`}><Icon size={22} className="text-white" /></span>}
                 </div>
-                <div className="flex-1 min-w-0">
-                  <Link to={`/product/${it.id}`} className="font-semibold text-slate-900 hover:text-violet-600 transition">{it.name}</Link>
+                <div className="min-w-0 sm:flex-1 self-center">
+                  <Link to={`/product/${it.id}`} className="font-semibold text-slate-900 hover:text-violet-600 transition line-clamp-2">{it.name}</Link>
                   <div className="text-slate-400 text-sm">{money(it.price, it.currency)} {t('cart.each', 'each')}</div>
                 </div>
-                <div className="flex items-center bg-slate-100 rounded-lg">
-                  <button onClick={() => setQty(it.id, it.qty - 1)} className="p-2 text-slate-500 hover:text-slate-900"><Minus size={14} /></button>
-                  <span className="w-8 text-center text-slate-900 text-sm font-medium">{it.qty}</span>
-                  <button onClick={() => setQty(it.id, it.qty + 1)} className="p-2 text-slate-500 hover:text-slate-900"><Plus size={14} /></button>
+                <button onClick={() => remove(it.id)} aria-label={t('cart.remove', 'Remove')}
+                  className="w-11 h-11 shrink-0 self-start sm:self-center grid place-items-center rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 sm:order-last"><Trash2 size={17} /></button>
+                <div className="col-span-3 sm:col-auto flex items-center justify-between sm:justify-start gap-3 sm:contents">
+                  <div className="flex items-center bg-slate-100 rounded-xl">
+                    <button onClick={() => setQty(it.id, it.qty - 1)} aria-label={t('cart.less', 'One less')}
+                      className="w-11 h-11 grid place-items-center text-slate-500 hover:text-slate-900 rounded-l-xl active:scale-95 transition-transform"><Minus size={16} /></button>
+                    <span className="w-8 text-center text-slate-900 text-[15px] font-semibold tabular-nums">{it.qty}</span>
+                    <button onClick={() => setQty(it.id, it.qty + 1)} aria-label={t('cart.more', 'One more')}
+                      className="w-11 h-11 grid place-items-center text-slate-500 hover:text-slate-900 rounded-r-xl active:scale-95 transition-transform"><Plus size={16} /></button>
+                  </div>
+                  <div className="sm:w-24 text-right font-bold text-[17px] sm:text-base text-slate-900 tabular-nums">{money(it.price * it.qty, it.currency)}</div>
                 </div>
-                <div className="w-24 text-right font-semibold text-slate-900">{money(it.price * it.qty, it.currency)}</div>
-                <button onClick={() => remove(it.id)} className="p-2 text-slate-400 hover:text-red-500"><Trash2 size={16} /></button>
               </div>
             );
           })}
@@ -98,6 +109,25 @@ export default function Cart() {
       </div>
 
       <CartCrossSell items={items} onAdd={add} />
+
+      {/* Measured with three items on a 390px phone: the Checkout button sat at
+          869px in an 844px viewport — off screen, with nothing pinned. The
+          checkout page already has a bar like this; the cart, one step earlier
+          in the same funnel, did not. Sits above the 63px tab bar, and repeats
+          the total so the buyer never has to scroll back to check it. */}
+      <div className="lg:hidden fixed inset-x-0 z-30 bg-white/95 backdrop-blur border-t border-slate-200 px-4 py-3 flex items-center gap-3"
+        style={{ bottom: 'calc(63px + env(safe-area-inset-bottom))' }}>
+        <div className="min-w-0">
+          <div className="text-[11px] text-slate-400">{t('cart.total', 'Total')}</div>
+          <div className="text-[19px] font-extrabold text-slate-900 leading-tight tabular-nums">{money(total, currency)}</div>
+        </div>
+        <button onClick={() => navigateWithTransition(navigate, '/checkout')}
+          className="btn-primary flex-1 h-12 fm-press">
+          {t('cart.checkout', 'Checkout')} <ArrowRight size={18} />
+        </button>
+      </div>
+      {/* Clearance so the last card is never hidden behind the bar above. */}
+      <div className="lg:hidden h-24" aria-hidden />
     </div>
   );
 }
