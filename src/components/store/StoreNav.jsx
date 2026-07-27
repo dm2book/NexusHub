@@ -19,6 +19,20 @@ export function LangSwitch({ className = '' }) {
 
 /** Shared light storefront top-nav (used on the home page and every store page). */
 export default function StoreNav() {
+  /* The header lifting off the page as you scroll is the clearest signal the
+     site is responding to you, and it costs one class. Passive listener and a
+     boolean, so it does not re-render on every frame. */
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 8);
+    onScroll();
+    // Scroll restoration on reload does not fire a scroll event, so a page
+    // reopened half-way down would keep a flat header. Re-read after a frame.
+    const raf = requestAnimationFrame(onScroll);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => { cancelAnimationFrame(raf); window.removeEventListener('scroll', onScroll); };
+  }, []);
+
   const { count } = useCart();
   const { user, isStaff, loading } = useAuth();
   const { pathname } = useLocation();
@@ -37,7 +51,7 @@ export default function StoreNav() {
   ];
 
   return (
-    <header className="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-slate-200/70">
+    <header className={`fm-nav sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-slate-200/70 ${scrolled ? 'is-scrolled' : ''}`}>
       <div className="max-w-[1400px] mx-auto px-4 lg:px-8 h-[68px] flex items-center gap-6">
         <button onClick={() => setOpen((v) => !v)} aria-label="Menu"
           className="lg:hidden w-10 h-10 -ml-1 rounded-xl hover:bg-slate-100 grid place-items-center text-slate-700">
