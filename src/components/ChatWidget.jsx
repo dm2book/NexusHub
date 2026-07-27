@@ -120,14 +120,14 @@ export default function ChatWidget() {
       <button
         onClick={() => setOpen((v) => !v)}
         aria-label={open ? 'Close chat assistant' : 'Open chat assistant'}
-        className="fixed bottom-5 right-5 z-50 w-14 h-14 rounded-full flex items-center justify-center text-white shadow-lg transition-transform hover:scale-110 active:scale-95"
+        className={`fixed right-5 z-50 w-14 h-14 rounded-full flex items-center justify-center text-white shadow-lg transition-transform hover:scale-110 active:scale-95 fm-fab`}
         style={{ backgroundImage: 'linear-gradient(135deg,#6366f1,#a855f7,#ec4899)', boxShadow: '0 8px 30px rgba(139,92,246,.5)' }}
       >
         {open ? <X size={24} /> : <MessageCircle size={24} />}
       </button>
 
       {open && (
-        <div className="fixed bottom-24 right-5 z-50 w-[min(92vw,380px)] h-[min(70vh,560px)] flex flex-col rounded-3xl overflow-hidden border border-white/10 bg-elevated/95 backdrop-blur-xl shadow-2xl animate-fade-up">
+        <div className={`fixed right-5 z-50 w-[min(92vw,380px)] h-[min(70vh,560px)] flex flex-col rounded-3xl overflow-hidden border border-white/10 bg-elevated/95 backdrop-blur-xl shadow-2xl animate-fade-up fm-fab-panel`}>
           <div className="px-5 py-4 flex items-center gap-3 border-b border-white/10"
                style={{ backgroundImage: 'linear-gradient(120deg, rgba(99,102,241,.25), rgba(168,85,247,.2))' }}>
             <div className="w-10 h-10 rounded-xl flex items-center justify-center"

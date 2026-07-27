@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" fill="none">
+
+  <defs><radialGradient id="youtube-sh1" cx="0.5" cy="0.5" r="0.5">
+    <stop offset="0" stop-color="#0b1220" stop-opacity="0.4"/>
+    <stop offset="0.6" stop-color="#0b1220" stop-opacity="0.16000000000000003"/>
+    <stop offset="1" stop-color="#0b1220" stop-opacity="0"/>
+  </radialGradient></defs>
+  <ellipse cx="256" cy="388" rx="118" ry="24" fill="url(#youtube-sh1)"/>
+  <defs>
+    <linearGradient id="youtube-g2" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#e77e85"/>
+      <stop offset="0.5" stop-color="#d6202c"/>
+      <stop offset="1" stop-color="#ab1a23"/>
+    </linearGradient>
+    <clipPath id="youtube-c3"><path d="M196 126H316A52 52 0 0 1 368 178V298A52 52 0 0 1 316 350H196A52 52 0 0 1 144 298V178A52 52 0 0 1 196 126Z"/></clipPath>
+    <radialGradient id="youtube-p4" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.72"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <defs><path id="youtube-s5" d="M196 126H316A52 52 0 0 1 368 178V298A52 52 0 0 1 316 350H196A52 52 0 0 1 144 298V178A52 52 0 0 1 196 126Z"/></defs><use href="#youtube-s5" y="26" fill="#600e14"/><use href="#youtube-s5" y="25" fill="#620e14"/><use href="#youtube-s5" y="24" fill="#640f15"/><use href="#youtube-s5" y="23" fill="#670f15"/><use href="#youtube-s5" y="22" fill="#690f16"/><use href="#youtube-s5" y="21" fill="#6b1016"/><use href="#youtube-s5" y="20" fill="#6d1017"/><use href="#youtube-s5" y="19" fill="#701017"/><use href="#youtube-s5" y="18" fill="#721118"/><use href="#youtube-s5" y="17" fill="#741118"/><use href="#youtube-s5" y="16" fill="#761119"/><use href="#youtube-s5" y="15" fill="#791219"/><use href="#youtube-s5" y="14" fill="#7b121a"/><use href="#youtube-s5" y="13" fill="#7d131a"/><use href="#youtube-s5" y="12" fill="#7f131a"/><use href="#youtube-s5" y="11" fill="#81131b"/><use href="#youtube-s5" y="10" fill="#84141b"/><use href="#youtube-s5" y="9" fill="#86141c"/><use href="#youtube-s5" y="8" fill="#88141c"/><use href="#youtube-s5" y="7" fill="#8a151d"/><use href="#youtube-s5" y="6" fill="#8d151d"/><use href="#youtube-s5" y="5" fill="#8f151e"/><use href="#youtube-s5" y="4" fill="#91161e"/><use href="#youtube-s5" y="3" fill="#93161f"/><use href="#youtube-s5" y="2" fill="#96161f"/><use href="#youtube-s5" y="1" fill="#981720"/>
+  <path d="M196 126H316A52 52 0 0 1 368 178V298A52 52 0 0 1 316 350H196A52 52 0 0 1 144 298V178A52 52 0 0 1 196 126Z" fill="url(#youtube-g2)"/>
+  <path d="M196 126H316A52 52 0 0 1 368 178V298A52 52 0 0 1 316 350H196A52 52 0 0 1 144 298V178A52 52 0 0 1 196 126Z" fill="none" stroke="#ed9ba0" stroke-opacity="0.75" stroke-width="3"/>
+  <g clip-path="url(#youtube-c3)"><ellipse cx="216" cy="172" rx="96" ry="54"
+      fill="url(#youtube-p4)" transform="rotate(-24 216 172)"/></g><path d="M222 186L308 238L222 290Z" fill="#fff0f0" opacity="0.95"/>
+</svg>

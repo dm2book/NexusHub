@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" fill="none">
+
+  <defs><radialGradient id="amongus-sh1" cx="0.5" cy="0.5" r="0.5">
+    <stop offset="0" stop-color="#0b1220" stop-opacity="0.4"/>
+    <stop offset="0.6" stop-color="#0b1220" stop-opacity="0.16000000000000003"/>
+    <stop offset="1" stop-color="#0b1220" stop-opacity="0"/>
+  </radialGradient></defs>
+  <ellipse cx="256" cy="388" rx="112" ry="22" fill="url(#amongus-sh1)"/>
+  <defs>
+    <linearGradient id="amongus-g2" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#e8928f"/>
+      <stop offset="0.5" stop-color="#d8433e"/>
+      <stop offset="1" stop-color="#ad3632"/>
+    </linearGradient>
+    <clipPath id="amongus-c3"><path d="M178 156H334A26 26 0 0 1 360 182V326A26 26 0 0 1 334 352H178A26 26 0 0 1 152 326V182A26 26 0 0 1 178 156Z"/></clipPath>
+    <radialGradient id="amongus-p4" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.72"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <defs><path id="amongus-s5" d="M178 156H334A26 26 0 0 1 360 182V326A26 26 0 0 1 334 352H178A26 26 0 0 1 152 326V182A26 26 0 0 1 178 156Z"/></defs><use href="#amongus-s5" y="26" fill="#611e1c"/><use href="#amongus-s5" y="25" fill="#631f1d"/><use href="#amongus-s5" y="24" fill="#661f1d"/><use href="#amongus-s5" y="23" fill="#68201e"/><use href="#amongus-s5" y="22" fill="#6a211f"/><use href="#amongus-s5" y="21" fill="#6c211f"/><use href="#amongus-s5" y="20" fill="#6f2220"/><use href="#amongus-s5" y="19" fill="#712321"/><use href="#amongus-s5" y="18" fill="#732421"/><use href="#amongus-s5" y="17" fill="#752422"/><use href="#amongus-s5" y="16" fill="#782523"/><use href="#amongus-s5" y="15" fill="#7a2623"/><use href="#amongus-s5" y="14" fill="#7c2624"/><use href="#amongus-s5" y="13" fill="#7f2725"/><use href="#amongus-s5" y="12" fill="#812825"/><use href="#amongus-s5" y="11" fill="#832826"/><use href="#amongus-s5" y="10" fill="#852926"/><use href="#amongus-s5" y="9" fill="#882a27"/><use href="#amongus-s5" y="8" fill="#8a2a28"/><use href="#amongus-s5" y="7" fill="#8c2b28"/><use href="#amongus-s5" y="6" fill="#8e2c29"/><use href="#amongus-s5" y="5" fill="#912d2a"/><use href="#amongus-s5" y="4" fill="#932d2a"/><use href="#amongus-s5" y="3" fill="#952e2b"/><use href="#amongus-s5" y="2" fill="#972f2c"/><use href="#amongus-s5" y="1" fill="#9a2f2c"/>
+  <path d="M178 156H334A26 26 0 0 1 360 182V326A26 26 0 0 1 334 352H178A26 26 0 0 1 152 326V182A26 26 0 0 1 178 156Z" fill="url(#amongus-g2)"/>
+  <path d="M178 156H334A26 26 0 0 1 360 182V326A26 26 0 0 1 334 352H178A26 26 0 0 1 152 326V182A26 26 0 0 1 178 156Z" fill="none" stroke="#edaaa8" stroke-opacity="0.75" stroke-width="3"/>
+  <g clip-path="url(#amongus-c3)"><ellipse cx="216" cy="172" rx="96" ry="54"
+      fill="url(#amongus-p4)" transform="rotate(-24 216 172)"/></g><path d="M206 162v-26a52 52 0 0 1 100 0v26"
+    fill="none" stroke="#e47b78" stroke-width="18" stroke-linecap="round"/>
+</svg>

@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" fill="none">
+
+  <defs><radialGradient id="favourite-sh1" cx="0.5" cy="0.5" r="0.5">
+    <stop offset="0" stop-color="#0b1220" stop-opacity="0.4"/>
+    <stop offset="0.6" stop-color="#0b1220" stop-opacity="0.16000000000000003"/>
+    <stop offset="1" stop-color="#0b1220" stop-opacity="0"/>
+  </radialGradient></defs>
+  <ellipse cx="256" cy="388" rx="122" ry="24" fill="url(#favourite-sh1)"/>
+  <defs>
+    <linearGradient id="favourite-g2" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#ed93ab"/>
+      <stop offset="0.5" stop-color="#e0456f"/>
+      <stop offset="1" stop-color="#b33759"/>
+    </linearGradient>
+    <clipPath id="favourite-c3"><path d="M256 334c-98-66-130-106-130-152a63 63 0 0 1 130-31 63 63 0 0 1 130 31c0 46-32 86-130 152Z"/></clipPath>
+    <radialGradient id="favourite-p4" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.72"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <defs><path id="favourite-s5" d="M256 334c-98-66-130-106-130-152a63 63 0 0 1 130-31 63 63 0 0 1 130 31c0 46-32 86-130 152Z"/></defs><use href="#favourite-s5" y="26" fill="#651f32"/><use href="#favourite-s5" y="25" fill="#672033"/><use href="#favourite-s5" y="24" fill="#6a2034"/><use href="#favourite-s5" y="23" fill="#6c2135"/><use href="#favourite-s5" y="22" fill="#6e2237"/><use href="#favourite-s5" y="21" fill="#712338"/><use href="#favourite-s5" y="20" fill="#732339"/><use href="#favourite-s5" y="19" fill="#75243a"/><use href="#favourite-s5" y="18" fill="#77253b"/><use href="#favourite-s5" y="17" fill="#7a263c"/><use href="#favourite-s5" y="16" fill="#7c263e"/><use href="#favourite-s5" y="15" fill="#7e273f"/><use href="#favourite-s5" y="14" fill="#812840"/><use href="#favourite-s5" y="13" fill="#832941"/><use href="#favourite-s5" y="12" fill="#852942"/><use href="#favourite-s5" y="11" fill="#882a43"/><use href="#favourite-s5" y="10" fill="#8a2b44"/><use href="#favourite-s5" y="9" fill="#8c2b46"/><use href="#favourite-s5" y="8" fill="#8f2c47"/><use href="#favourite-s5" y="7" fill="#912d48"/><use href="#favourite-s5" y="6" fill="#932e49"/><use href="#favourite-s5" y="5" fill="#952e4a"/><use href="#favourite-s5" y="4" fill="#982f4b"/><use href="#favourite-s5" y="3" fill="#9a304d"/><use href="#favourite-s5" y="2" fill="#9c314e"/><use href="#favourite-s5" y="1" fill="#9f314f"/>
+  <path d="M256 334c-98-66-130-106-130-152a63 63 0 0 1 130-31 63 63 0 0 1 130 31c0 46-32 86-130 152Z" fill="url(#favourite-g2)"/>
+  <path d="M256 334c-98-66-130-106-130-152a63 63 0 0 1 130-31 63 63 0 0 1 130 31c0 46-32 86-130 152Z" fill="none" stroke="#f1abbe" stroke-opacity="0.75" stroke-width="3"/>
+  <g clip-path="url(#favourite-c3)"><ellipse cx="216" cy="172" rx="96" ry="54"
+      fill="url(#favourite-p4)" transform="rotate(-24 216 172)"/></g>
+</svg>

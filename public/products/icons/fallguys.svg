@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" fill="none">
+
+  <defs><radialGradient id="fallguys-sh4" cx="0.5" cy="0.5" r="0.5">
+    <stop offset="0" stop-color="#0b1220" stop-opacity="0.4"/>
+    <stop offset="0.6" stop-color="#0b1220" stop-opacity="0.16000000000000003"/>
+    <stop offset="1" stop-color="#0b1220" stop-opacity="0"/>
+  </radialGradient></defs>
+  <ellipse cx="256" cy="388" rx="104" ry="22" fill="url(#fallguys-sh4)"/>
+  <defs>
+    <clipPath id="fallguys-bc2"><circle cx="256" cy="238" r="118"/></clipPath>
+    <radialGradient id="fallguys-bg1" cx="0.34" cy="0.28" r="0.85">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.45"/>
+      <stop offset="0.6" stop-color="#fff" stop-opacity="0"/>
+      <stop offset="1" stop-color="#000" stop-opacity="0.35"/>
+    </radialGradient>
+    <radialGradient id="fallguys-bs3" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.85"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <g clip-path="url(#fallguys-bc2)">
+    <rect x="138" y="120" width="236" height="118" fill="#f25ca2"/>
+    <rect x="138" y="238" width="236" height="118" fill="#ffd166"/>
+    <rect x="138" y="225" width="236" height="26" fill="#161b26"/>
+    <circle cx="256" cy="238" r="42" fill="#161b26"/>
+    <circle cx="256" cy="238" r="30" fill="#f4f6fb"/>
+    <circle cx="256" cy="238" r="18" fill="#d8dde8"/>
+    <circle cx="256" cy="238" r="118" fill="url(#fallguys-bg1)"/>
+  </g>
+  <ellipse cx="216" cy="186" rx="46" ry="30" fill="url(#fallguys-bs3)" transform="rotate(-28 216 186)"/>
+</svg>

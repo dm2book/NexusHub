@@ -101,15 +101,23 @@ const P = [
 ];
 
 // Premium 3D icon tiles (public/products/icons) — one unique icon per category.
-const CATS_WITH_ICON = ['robux', 'v-bucks', 'valorant', 'cod', 'genshin', 'brawl', 'apex',
-  'clash', 'clashroyale', 'league', 'freefire', 'pubg', 'mlbb', 'eafc', 'gta', 'minecraft',
-  'pokemongo', 'discord-nitro', 'spotify', 'netflix', 'gamepass', 'steam', 'playstation',
-  'xbox', 'nintendo', 'amazon', 'googleplay', 'itunes', 'giftcard', 'chest', 'wildrift', 'wow'];
+const CATS_WITH_ICON = [
+  'albion', 'amazon', 'amongus', 'apex', 'battlenet', 'battlepass', 'bloodstrike', 'brawl',
+  'bundle', 'chest', 'clash', 'clashroyale', 'cod', 'coin', 'crunchyroll', 'csgo',
+  'deltaforce', 'discord-nitro', 'disneyplus', 'dota', 'eafc', 'eaplay', 'epicgames',
+  'fallguys', 'favourite', 'freefire', 'gamepass', 'gem', 'genshin', 'giftcard', 'googleplay',
+  'gta', 'honkai', 'itunes', 'league', 'marvelrivals', 'minecraft', 'mlbb', 'mystery',
+  'netflix', 'nintendo', 'paysafecard', 'playstation', 'pokemongo', 'psplus', 'pubg', 'robux',
+  'rocketleague', 'rust', 'spotify', 'standoff', 'steam', 'telegram', 'tiktok', 'twitch',
+  'ubisoft', 'v-bucks', 'valorant', 'voucher', 'wildrift', 'wow', 'xbox', 'youtube', 'zenless',
+];
 export const CATEGORY_ICON = Object.fromEntries(CATS_WITH_ICON.map((c) => [c, c]));
 // Categories using the owner's own brand artwork (raster). The rest use the
 // generated 3D icons, which are SVG — so the extension differs per category.
-export const RASTER_ICONS = new Set(['robux', 'v-bucks', 'valorant', 'discord-nitro', 'steam',
-  'giftcard', 'playstation', 'xbox', 'cod', 'eafc']);
+export const RASTER_ICONS = new Set([
+  'cod', 'discord-nitro', 'eafc', 'giftcard', 'playstation', 'robux', 'steam', 'v-bucks',
+  'valorant', 'xbox',
+]);
 /** Path to the built-in icon for a category name (not the file's own slug). */
 export const iconPath = (name) => `/products/icons/${name}.${RASTER_ICONS.has(name) ? 'png' : 'svg'}`;
 export const iconFor = (category) => (CATEGORY_ICON[category] ? iconPath(CATEGORY_ICON[category]) : null);

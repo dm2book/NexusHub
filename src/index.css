@@ -583,3 +583,17 @@ h1, h2, h3, .font-display, .fm-head {
   .fm-annc::after, .fm-annc-wiggle { animation: none !important; }
   .fm-check-draw circle, .fm-check-draw path { animation: none !important; stroke-dashoffset: 0 !important; }
 }
+
+/* ── Floating chat button ─────────────────────────────────────────
+   It is fixed to the same corner as whatever each page pins to the bottom
+   edge, and at a flat bottom-5 it sat on top of the "Cart" tab and covered the
+   label. Measured: the tab bar is 63px, the product page's own buy bar is 73px.
+   Clear the taller of the two rather than branching per route — one rule cannot
+   drift out of sync with the pages. Desktop has no bottom bar, so that case is
+   a media query: JS cannot see a breakpoint. */
+.fm-fab       { bottom: calc(73px + env(safe-area-inset-bottom) + 0.75rem); }
+.fm-fab-panel { bottom: calc(73px + env(safe-area-inset-bottom) + 5.5rem); }
+@media (min-width: 1024px) {
+  .fm-fab       { bottom: 1.25rem; }
+  .fm-fab-panel { bottom: 6rem; }
+}

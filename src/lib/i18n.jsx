@@ -165,6 +165,9 @@ const NL = {
   'discord.rSupport': 'Behandelt je tickets',
   'discord.rVip': 'Extra’s voor vaste klanten',
   'discord.rCustomer': 'Geverifieerde koper',
+  'card.highDemand': 'Veel verkocht',
+  'card.inStock': 'Op voorraad',
+  'card.byHand': 'Met de hand',
 
   // 404
   'nf.title': 'Pagina niet gevonden',
@@ -256,7 +259,6 @@ const NL = {
 
   // Product card
   'card.from': 'Vanaf',
-  'card.instant': 'Direct',
   'card.lastOne': 'Laatste!',
   'card.onlyLeft': 'Nog {n} op voorraad',
 

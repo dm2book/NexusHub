@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" fill="none">
+
+  <defs><radialGradient id="bloodstrike-sh1" cx="0.5" cy="0.5" r="0.5">
+    <stop offset="0" stop-color="#0b1220" stop-opacity="0.4"/>
+    <stop offset="0.6" stop-color="#0b1220" stop-opacity="0.16000000000000003"/>
+    <stop offset="1" stop-color="#0b1220" stop-opacity="0"/>
+  </radialGradient></defs>
+  <ellipse cx="256" cy="388" rx="132" ry="26" fill="url(#bloodstrike-sh1)"/>
+  <defs>
+    <linearGradient id="bloodstrike-g2" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#d29191"/>
+      <stop offset="0.5" stop-color="#b14141"/>
+      <stop offset="1" stop-color="#8e3434"/>
+    </linearGradient>
+    <clipPath id="bloodstrike-c3"><path d="M98 296a70 70 0 1 0 140 0a70 70 0 1 0 -140 0Z"/></clipPath>
+    <radialGradient id="bloodstrike-p4" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.72"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <defs><path id="bloodstrike-s5" d="M98 296a70 70 0 1 0 140 0a70 70 0 1 0 -140 0Z"/></defs><use href="#bloodstrike-s5" y="20" fill="#501d1d"/><use href="#bloodstrike-s5" y="19" fill="#521e1e"/><use href="#bloodstrike-s5" y="18" fill="#551f1f"/><use href="#bloodstrike-s5" y="17" fill="#572020"/><use href="#bloodstrike-s5" y="16" fill="#592121"/><use href="#bloodstrike-s5" y="15" fill="#5c2222"/><use href="#bloodstrike-s5" y="14" fill="#5e2222"/><use href="#bloodstrike-s5" y="13" fill="#602323"/><use href="#bloodstrike-s5" y="12" fill="#632424"/><use href="#bloodstrike-s5" y="11" fill="#652525"/><use href="#bloodstrike-s5" y="10" fill="#682626"/><use href="#bloodstrike-s5" y="9" fill="#6a2727"/><use href="#bloodstrike-s5" y="8" fill="#6c2828"/><use href="#bloodstrike-s5" y="7" fill="#6f2929"/><use href="#bloodstrike-s5" y="6" fill="#712a2a"/><use href="#bloodstrike-s5" y="5" fill="#732b2b"/><use href="#bloodstrike-s5" y="4" fill="#762b2b"/><use href="#bloodstrike-s5" y="3" fill="#782c2c"/><use href="#bloodstrike-s5" y="2" fill="#7a2d2d"/><use href="#bloodstrike-s5" y="1" fill="#7d2e2e"/>
+  <path d="M98 296a70 70 0 1 0 140 0a70 70 0 1 0 -140 0Z" fill="url(#bloodstrike-g2)"/>
+  <path d="M98 296a70 70 0 1 0 140 0a70 70 0 1 0 -140 0Z" fill="none" stroke="#dcaaaa" stroke-opacity="0.75" stroke-width="3"/>
+  
+  <defs>
+    <linearGradient id="bloodstrike-g6" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#cb8e8e"/>
+      <stop offset="0.5" stop-color="#a53d3d"/>
+      <stop offset="1" stop-color="#843131"/>
+    </linearGradient>
+    <clipPath id="bloodstrike-c7"><path d="M288 304a58 58 0 1 0 116 0a58 58 0 1 0 -116 0Z"/></clipPath>
+    <radialGradient id="bloodstrike-p8" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.72"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <defs><path id="bloodstrike-s9" d="M288 304a58 58 0 1 0 116 0a58 58 0 1 0 -116 0Z"/></defs><use href="#bloodstrike-s9" y="16" fill="#4a1b1b"/><use href="#bloodstrike-s9" y="15" fill="#4d1c1c"/><use href="#bloodstrike-s9" y="14" fill="#501d1d"/><use href="#bloodstrike-s9" y="13" fill="#521e1e"/><use href="#bloodstrike-s9" y="12" fill="#551f1f"/><use href="#bloodstrike-s9" y="11" fill="#582020"/><use href="#bloodstrike-s9" y="10" fill="#5b2121"/><use href="#bloodstrike-s9" y="9" fill="#5e2222"/><use href="#bloodstrike-s9" y="8" fill="#612424"/><use href="#bloodstrike-s9" y="7" fill="#632525"/><use href="#bloodstrike-s9" y="6" fill="#662626"/><use href="#bloodstrike-s9" y="5" fill="#692727"/><use href="#bloodstrike-s9" y="4" fill="#6c2828"/><use href="#bloodstrike-s9" y="3" fill="#6f2929"/><use href="#bloodstrike-s9" y="2" fill="#712a2a"/><use href="#bloodstrike-s9" y="1" fill="#742b2b"/>
+  <path d="M288 304a58 58 0 1 0 116 0a58 58 0 1 0 -116 0Z" fill="url(#bloodstrike-g6)"/>
+  <path d="M288 304a58 58 0 1 0 116 0a58 58 0 1 0 -116 0Z" fill="none" stroke="#d7a8a8" stroke-opacity="0.75" stroke-width="3"/>
+  
+  <defs>
+    <linearGradient id="bloodstrike-g10" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#e09696"/>
+      <stop offset="0.5" stop-color="#c94a4a"/>
+      <stop offset="1" stop-color="#a13b3b"/>
+    </linearGradient>
+    <clipPath id="bloodstrike-c11"><path d="M138 238a118 118 0 1 0 236 0a118 118 0 1 0 -236 0Z"/></clipPath>
+    <radialGradient id="bloodstrike-p12" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.72"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <defs><path id="bloodstrike-s13" d="M138 238a118 118 0 1 0 236 0a118 118 0 1 0 -236 0Z"/></defs><use href="#bloodstrike-s13" y="30" fill="#5a2121"/><use href="#bloodstrike-s13" y="29" fill="#5c2222"/><use href="#bloodstrike-s13" y="28" fill="#5e2222"/><use href="#bloodstrike-s13" y="27" fill="#602323"/><use href="#bloodstrike-s13" y="26" fill="#612424"/><use href="#bloodstrike-s13" y="25" fill="#632424"/><use href="#bloodstrike-s13" y="24" fill="#652525"/><use href="#bloodstrike-s13" y="23" fill="#672626"/><use href="#bloodstrike-s13" y="22" fill="#692626"/><use href="#bloodstrike-s13" y="21" fill="#6b2727"/><use href="#bloodstrike-s13" y="20" fill="#6c2828"/><use href="#bloodstrike-s13" y="19" fill="#6e2828"/><use href="#bloodstrike-s13" y="18" fill="#702929"/><use href="#bloodstrike-s13" y="17" fill="#722a2a"/><use href="#bloodstrike-s13" y="16" fill="#742a2a"/><use href="#bloodstrike-s13" y="15" fill="#762b2b"/><use href="#bloodstrike-s13" y="14" fill="#772c2c"/><use href="#bloodstrike-s13" y="13" fill="#792c2c"/><use href="#bloodstrike-s13" y="12" fill="#7b2d2d"/><use href="#bloodstrike-s13" y="11" fill="#7d2e2e"/><use href="#bloodstrike-s13" y="10" fill="#7f2e2e"/><use href="#bloodstrike-s13" y="9" fill="#812f2f"/><use href="#bloodstrike-s13" y="8" fill="#823030"/><use href="#bloodstrike-s13" y="7" fill="#843030"/><use href="#bloodstrike-s13" y="6" fill="#863131"/><use href="#bloodstrike-s13" y="5" fill="#883232"/><use href="#bloodstrike-s13" y="4" fill="#8a3232"/><use href="#bloodstrike-s13" y="3" fill="#8c3333"/><use href="#bloodstrike-s13" y="2" fill="#8d3434"/><use href="#bloodstrike-s13" y="1" fill="#8f3434"/>
+  <path d="M138 238a118 118 0 1 0 236 0a118 118 0 1 0 -236 0Z" fill="url(#bloodstrike-g10)"/>
+  <path d="M138 238a118 118 0 1 0 236 0a118 118 0 1 0 -236 0Z" fill="none" stroke="#e7aeae" stroke-opacity="0.75" stroke-width="3"/>
+  <g clip-path="url(#bloodstrike-c11)"><ellipse cx="216" cy="172" rx="96" ry="54"
+      fill="url(#bloodstrike-p12)" transform="rotate(-24 216 172)"/></g><path d="M158 238a98 98 0 1 0 196 0a98 98 0 1 0 -196 0Z" fill="none" stroke="#df9292" stroke-opacity="0.55" stroke-width="5"/><g fill="none" stroke="#fff0f0" stroke-width="12" opacity="0.95">
+    <circle cx="256" cy="238" r="52"/><circle cx="256" cy="238" r="22"/>
+    <path d="M256 164v26M256 286v26M182 238h26M304 238h26" stroke-linecap="round"/>
+  </g>
+</svg>
