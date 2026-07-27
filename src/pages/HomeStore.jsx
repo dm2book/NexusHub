@@ -64,19 +64,17 @@ const NAV = [
   { key: 'nav.support', label: 'Support', to: '/contact' },
 ];
 
-const HERO_FEATURES = [
-  { icon: Zap, key: 'instant', title: 'Instant Delivery', sub: 'Get your items instantly', color: 'text-violet-600 bg-violet-100' },
-  { icon: ShieldCheck, key: 'secure', title: 'Secure Payments', sub: '100% secure & trusted', color: 'text-emerald-600 bg-emerald-100' },
-  { icon: Headphones, key: 'support', title: '24/7 Support', sub: "We're here for you", color: 'text-blue-600 bg-blue-100' },
-  { icon: Tag, key: 'prices', title: 'Best Prices', sub: 'Competitive prices daily', color: 'text-amber-600 bg-amber-100' },
+const TRUST = [
+  { icon: Zap, key: 'tStock', title: 'In stock, sent automatically', sub: 'Everything else by hand, usually a few hours', color: 'text-violet-600 bg-violet-100' },
+  { icon: ShieldCheck, key: 'tMoneyBack', title: 'Money back if we cannot deliver', sub: 'Refunded, no argument', color: 'text-emerald-600 bg-emerald-100' },
+  { icon: MessageCircle, key: 'tHuman', title: 'A real person on Discord', sub: 'Run from the Netherlands', color: 'text-blue-600 bg-blue-100' },
+  { icon: Tag, key: 'tNoFees', title: 'The price you see', sub: 'No hidden fees at checkout', color: 'text-amber-600 bg-amber-100' },
 ];
 
-const TRUST = [
-  { icon: Zap, key: 'tInstant', title: 'Instant Delivery', sub: 'Fast & reliable delivery', color: 'text-violet-600 bg-violet-100' },
-  { icon: ShieldCheck, key: 'tSecure', title: '100% Secure', sub: 'Your data is protected', color: 'text-emerald-600 bg-emerald-100' },
-  { icon: Tag, key: 'prices', title: 'Best Prices', sub: 'Competitive prices daily', color: 'text-amber-600 bg-amber-100' },
-  { icon: Headphones, key: 'tSupport', title: '24/7 Support', sub: 'Always here to help', color: 'text-blue-600 bg-blue-100' },
-];
+// Shown only at ≥1536px, and it used to carry a second, wronger copy of these
+// same four claims. One source now — declared AFTER TRUST, not before: as a
+// const alias above it, this hit the temporal dead zone and blanked the page.
+const HERO_FEATURES = TRUST;
 
 // Real counts only — append "+" once the number is large enough to round.
 const fmtCount = (n) => `${Number(n || 0).toLocaleString('en-US')}${Number(n || 0) >= 100 ? '+' : ''}`;
@@ -104,7 +102,7 @@ const statCards = (s, tr = (_k, en) => en) => {
   // Promises that hold from the first order — never animated, never a count.
   const promises = [
     { icon: ShieldCheck, value: tr('home.s.moneyBack', 'Money back'), label: tr('home.s.ifUndelivered', 'If undelivered'), color: 'text-emerald-600 bg-emerald-100' },
-    { icon: Zap, value: tr('home.s.inStock', 'In stock'), label: tr('home.s.instantCodes', 'Delivered instantly'), color: 'text-violet-600 bg-violet-100' },
+    { icon: Zap, value: tr('home.s.inStock', 'In stock'), label: tr('home.s.instantCodes', 'Sent automatically'), color: 'text-violet-600 bg-violet-100' },
     { icon: MessageCircle, value: 'Discord', label: tr('home.s.realSupport', 'Real human support'), color: 'text-blue-600 bg-blue-100' },
     { icon: Tag, value: tr('home.s.noHidden', 'No fees'), label: tr('home.s.priceYouSee', 'The price you see'), color: 'text-amber-600 bg-amber-100' },
   ];
@@ -119,12 +117,23 @@ export default function HomeStore() {
   const reviews = useReviews();
   const categoryLogos = useCategoryLogos(); // owner-set logos (Admin → Categories)
   useReveal();
+  /* The homepage carries its own copy of the header rather than rendering
+     <StoreNav />, so it needs its own scroll state — the two have already
+     drifted in other ways and this is the cheap half of the fix. */
+  const [navScrolled, setNavScrolled] = useState(false);
+  useEffect(() => {
+    const onScroll = () => setNavScrolled(window.scrollY > 8);
+    onScroll();
+    const raf = requestAnimationFrame(onScroll);   // catches scroll restoration
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => { cancelAnimationFrame(raf); window.removeEventListener('scroll', onScroll); };
+  }, []);
   useEffect(() => {
     const ref = new URLSearchParams(window.location.search).get('ref');
     if (ref) localStorage.setItem('fm_ref', ref.toUpperCase().slice(0, 40));
   }, []);
   usePageMeta('ForgeMarket — Everything You Need, All in One Place',
-    'Buy Robux, V-Bucks, Valorant Points, gift cards and more instantly. Fast delivery, secure payments, 24/7 support.');
+    'Robux, V-Bucks, Valorant Points and gift cards. In stock is sent automatically, everything else by hand — money back if we cannot deliver.');
   // Organization + site-search structured data for rich Google results.
   useJsonLd('org', {
     '@context': 'https://schema.org',
@@ -188,7 +197,7 @@ export default function HomeStore() {
       <AnnouncementBar />
 
       {/* ── Top nav ─────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-slate-200/70">
+      <header className={`fm-nav sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-slate-200/70 ${navScrolled ? 'is-scrolled' : ''}`}>
         <div className="max-w-[1400px] 2xl:max-w-[1560px] mx-auto px-4 lg:px-8 h-[68px] flex items-center gap-3 sm:gap-6">
           <button onClick={() => setMenuOpen((v) => !v)} aria-label={tr('nav.menu', 'Menu')} aria-expanded={menuOpen}
             className="lg:hidden w-10 h-10 -ml-1 rounded-xl hover:bg-slate-100 grid place-items-center text-slate-700">
@@ -367,7 +376,7 @@ export default function HomeStore() {
             {/* On xl the feature cards get their own column instead of floating
                 over the artwork, which used to bury the right-hand logos. */}
             <div className="grid lg:grid-cols-[1.05fr_1fr] 2xl:grid-cols-[1.1fr_1fr_206px] gap-8 2xl:gap-6 items-center">
-              <div>
+              <div className="fm-stagger" style={{ '--fm-stagger': '80ms' }}>
                 <span className="inline-flex items-center gap-2 text-[13px] font-semibold text-violet-700 bg-violet-100 rounded-full px-3 py-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-violet-500" /> {tr('home.badge', 'Buyer protected · Real human support')}
                 </span>
@@ -379,11 +388,11 @@ export default function HomeStore() {
                   {tr('home.sub', 'Robux, V-Bucks, Valorant Points and more. In stock is sent automatically — everything else by hand, usually within a few hours.')}
                 </p>
                 <div className="flex flex-wrap items-center gap-3 mt-7">
-                  <Link to="/shop" className="inline-flex items-center gap-2 text-white font-semibold rounded-xl px-6 h-12 shadow-lg shadow-violet-500/30 hover:brightness-105 transition"
+                  <Link to="/shop" className="fm-press inline-flex items-center gap-2 text-white font-semibold rounded-xl px-6 h-12 shadow-lg shadow-violet-500/30 hover:brightness-105 transition"
                     style={{ backgroundImage: 'linear-gradient(135deg,#7c5cff,#a855f7)' }}>
                     {tr('home.shopNowBig', 'Shop Now')} <ArrowRight size={18} />
                   </Link>
-                  <Link to="/shop" className="inline-flex items-center gap-2 font-semibold rounded-xl px-6 h-12 border border-slate-300 text-slate-700 hover:bg-slate-50 transition">
+                  <Link to="/shop" className="fm-press inline-flex items-center gap-2 font-semibold rounded-xl px-6 h-12 border border-slate-300 text-slate-700 hover:bg-slate-50 transition">
                     {tr('home.viewAll', 'View All Products')}
                   </Link>
                 </div>
@@ -419,7 +428,7 @@ export default function HomeStore() {
 
           {/* How it works — a manual-payment store has to answer "what happens
               after I pay?" before it asks for money. */}
-          <section className="fm-reveal">
+          <section className="fm-reveal fm-reveal-children">
             <div className="flex items-center justify-between mb-4">
               <h2 className="fm-head text-2xl">{tr('home.howTitle', 'How it works')}</h2>
               <Link to="/how-it-works" className="text-sm font-semibold text-violet-600 hover:text-violet-700 inline-flex items-center gap-1">
@@ -448,7 +457,7 @@ export default function HomeStore() {
           </section>
 
           {/* Trust bar */}
-          <section className="bg-white rounded-2xl border border-slate-200/70 shadow-sm grid grid-cols-2 lg:grid-cols-4 divide-x divide-y lg:divide-y-0 divide-slate-100">
+          <section className="fm-reveal fm-reveal-children bg-white rounded-2xl border border-slate-200/70 shadow-sm grid grid-cols-2 lg:grid-cols-4 divide-x divide-y lg:divide-y-0 divide-slate-100">
             {TRUST.map((t) => (
               <div key={t.title} className="flex items-center gap-3 px-5 py-5">
                 <span className={`w-11 h-11 rounded-xl grid place-items-center ${t.color}`}><t.icon size={20} /></span>
@@ -458,7 +467,7 @@ export default function HomeStore() {
           </section>
 
           {/* Popular products */}
-          <section className="fm-reveal">
+          <section className="fm-reveal fm-reveal-children">
             <div className="flex items-center justify-between mb-4">
               <h2 className="fm-head text-2xl flex items-center gap-2">{tr('home.popular', 'Popular Products')} <span>🔥</span></h2>
               <Link to="/shop" className="text-violet-600 font-semibold text-sm inline-flex items-center gap-1 hover:gap-2 transition-all">
@@ -496,7 +505,7 @@ export default function HomeStore() {
           </section>
 
           {/* Bottom: stats + reviews + discord */}
-          <section className={`grid gap-5 fm-reveal ${hasReviews ? 'lg:grid-cols-3' : 'lg:grid-cols-2'}`}>
+          <section className={`grid gap-5 fm-reveal fm-reveal-children ${hasReviews ? 'lg:grid-cols-3' : 'lg:grid-cols-2'}`}>
             {/* Stats */}
             <div className="bg-white rounded-2xl border border-slate-200/70 shadow-sm p-5 grid grid-cols-2 gap-4 fm-lift">
               {STATS.map((st) => (
@@ -575,7 +584,7 @@ export default function HomeStore() {
           </section>
 
           {/* Ways to save & win — surface the engagement features */}
-          <section className="fm-reveal">
+          <section className="fm-reveal fm-reveal-children">
             <h2 className="fm-head text-2xl mb-4">{tr('home.waysTitle', 'Save more & win big')}</h2>
             <div className="grid sm:grid-cols-3 gap-4">
               {[

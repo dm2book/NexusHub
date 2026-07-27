@@ -597,3 +597,63 @@ h1, h2, h3, .font-display, .fm-head {
   .fm-fab       { bottom: 1.25rem; }
   .fm-fab-panel { bottom: 6rem; }
 }
+
+/* ── Visible motion ───────────────────────────────────────────────────────
+   The site had motion, but almost all of it was section-level: five whole
+   blocks fading in as single units, and a hero — the first thing anyone sees —
+   that did not move at all. The result read as a static page. These utilities
+   move the individual things a person actually looks at.
+
+   Everything animates transform/opacity only (compositor-friendly on the
+   mid-range phones this shop sells to), and every rule is switched off under
+   prefers-reduced-motion at the bottom of this block. */
+
+/* Children enter in sequence. Set --fm-stagger to change the step. */
+.fm-stagger > * { opacity: 0; animation: fmRise .62s var(--ease-expressive) forwards; }
+.fm-stagger > *:nth-child(1) { animation-delay: calc(var(--fm-stagger, 70ms) * 0); }
+.fm-stagger > *:nth-child(2) { animation-delay: calc(var(--fm-stagger, 70ms) * 1); }
+.fm-stagger > *:nth-child(3) { animation-delay: calc(var(--fm-stagger, 70ms) * 2); }
+.fm-stagger > *:nth-child(4) { animation-delay: calc(var(--fm-stagger, 70ms) * 3); }
+.fm-stagger > *:nth-child(5) { animation-delay: calc(var(--fm-stagger, 70ms) * 4); }
+.fm-stagger > *:nth-child(6) { animation-delay: calc(var(--fm-stagger, 70ms) * 5); }
+.fm-stagger > *:nth-child(n+7) { animation-delay: calc(var(--fm-stagger, 70ms) * 6); }
+@keyframes fmRise { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+
+/* Same idea for a revealed section: stagger its children once .is-in lands,
+   so a section arrives as a sequence rather than one slab. */
+.fm-reveal.fm-reveal-children > * { opacity: 0; transform: translateY(16px);
+  transition: opacity .55s var(--ease-expressive), transform .55s var(--ease-expressive); }
+.fm-reveal.fm-reveal-children.is-in > * { opacity: 1; transform: none; }
+.fm-reveal.fm-reveal-children.is-in > *:nth-child(2) { transition-delay: 60ms; }
+.fm-reveal.fm-reveal-children.is-in > *:nth-child(3) { transition-delay: 120ms; }
+.fm-reveal.fm-reveal-children.is-in > *:nth-child(4) { transition-delay: 180ms; }
+.fm-reveal.fm-reveal-children.is-in > *:nth-child(n+5) { transition-delay: 240ms; }
+
+/* The sticky header condenses once the page moves — the clearest signal on the
+   site that it is responding to you. Toggled by a scroll listener in
+   StoreNav. */
+.fm-nav { transition: box-shadow var(--dur-base) var(--ease-glide),
+                      background-color var(--dur-base) var(--ease-glide),
+                      backdrop-filter var(--dur-base) var(--ease-glide); }
+.fm-nav.is-scrolled { box-shadow: 0 10px 30px -18px rgba(15, 23, 42, .35);
+  background-color: rgba(255, 255, 255, .82); backdrop-filter: saturate(1.4) blur(12px); }
+
+/* Press feedback that is felt rather than admired: every button and link-button
+   dips a little. Pointer-coarse only gets the scale, so a mouse click stays
+   crisp. */
+.fm-press { transition: transform var(--dur-fast) var(--ease-spring), filter var(--dur-fast) var(--ease-glide); }
+.fm-press:active { transform: scale(.965); }
+
+/* Gentle idle float for hero artwork — slow enough to read as depth, not as a
+   distraction. */
+.fm-float { animation: fmFloat 6s var(--ease-glide) infinite; }
+@keyframes fmFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .fm-stagger > *,
+  .fm-reveal.fm-reveal-children > *,
+  .fm-float, .fm-press, .fm-nav {
+    animation: none !important; transition: none !important;
+    transform: none !important; opacity: 1 !important;
+  }
+}

@@ -53,7 +53,7 @@ const NL = {
   'home.s.moneyBack': 'Geld terug',
   'home.s.ifUndelivered': 'Als het niet aankomt',
   'home.s.inStock': 'Op voorraad',
-  'home.s.instantCodes': 'Direct verstuurd',
+  'home.s.instantCodes': 'Automatisch verstuurd',
   'home.s.realSupport': 'Een echt mens',
   'home.s.noHidden': 'Geen kosten',
   'home.s.priceYouSee': 'De prijs die je ziet',
@@ -168,6 +168,14 @@ const NL = {
   'card.highDemand': 'Veel verkocht',
   'card.inStock': 'Op voorraad',
   'card.byHand': 'Met de hand',
+  'home.f.tStock': 'Op voorraad? Automatisch verstuurd',
+  'home.f.tStockSub': 'De rest met de hand, meestal binnen een paar uur',
+  'home.f.tMoneyBack': 'Geld terug als we niet kunnen leveren',
+  'home.f.tMoneyBackSub': 'Terugbetaald, zonder gedoe',
+  'home.f.tHuman': 'Een echt mens op Discord',
+  'home.f.tHumanSub': 'Vanuit Nederland',
+  'home.f.tNoFees': 'De prijs die je ziet',
+  'home.f.tNoFeesSub': 'Geen verborgen kosten bij het afrekenen',
 
   // 404
   'nf.title': 'Pagina niet gevonden',
