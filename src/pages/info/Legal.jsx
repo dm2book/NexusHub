@@ -110,7 +110,7 @@ const privacy = (t) => (
       <li>{t('legal.p1a', 'Your email address — needed to sign in, to send your order confirmation, and to deliver your code.')}</li>
       <li>{t('legal.p1b', 'Your order: what you bought, the amount, the status history, and any game account name you supplied for a top-up.')}</li>
       <li>{t('legal.p1c', 'A display name and, only if you choose to add one, a phone number.')}</li>
-      <li>{t('legal.p1d', 'Technical data: your IP address and browser, recorded with logins and orders to detect fraud and abuse.')}</li>
+      <li>{t('legal.p1d', 'Technical data: your IP address and browser, recorded with logins and orders. It is what stops someone hammering the login with a thousand email addresses, and what tells us a sign-in came from somewhere unfamiliar. We do not use it to build a profile of you, and it is erased on the schedule below.')}</li>
       <li>{t('legal.p1e', 'If you link your Discord account: your Discord user ID and username, so you can be given the right role.')}</li>
       <li>{t('legal.p1f', 'If you upload a payment screenshot: that image, until your payment is confirmed.')}</li>
     </ul>
@@ -137,6 +137,7 @@ const privacy = (t) => (
     <h2>{t('legal.p4h', 'How long we keep it')}</h2>
     <ul>
       <li>{t('legal.p4a', 'Order and payment records: seven years, because Dutch tax law requires it.')}</li>
+      <li>{t('legal.p4e', 'IP addresses: erased once they have done their job — after 7 days for login codes, 90 days for sign-in history, and at most a year where they are evidence attached to a payment. The record itself stays; the address is removed from it.')}</li>
       <li>{t('legal.p4b', 'Login codes: deleted automatically shortly after they expire or are used.')}</li>
       <li>{t('legal.p4c', 'Sessions: until they expire or you sign out; you can revoke them yourself in your account.')}</li>
       <li>{t('legal.p4d', 'Payment screenshots: removed once your payment has been confirmed.')}</li>
