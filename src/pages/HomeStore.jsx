@@ -183,7 +183,7 @@ export default function HomeStore() {
   const addToCart = (t) => add(t.cheapest);
 
   return (
-    <div className="min-h-screen bg-[#f6f7fb] text-slate-900 fm-page" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
+    <div className="min-h-screen overflow-x-clip bg-[#f6f7fb] text-slate-900 fm-page" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
       <style>{`
         @keyframes fmFloat { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-14px)} }
         @keyframes fmFloat2 { 0%,100%{transform:translateY(0)} 50%{transform:translateY(10px)} }
@@ -486,11 +486,11 @@ export default function HomeStore() {
                     <p className="text-[12.5px] text-slate-400 mt-0.5">{tr('home.packs', '{n} packs available', { n: p.count })}</p>
                     <div className="text-[12px] text-slate-400 mt-2">{tr('home.from', 'From')} <span className="fm-num text-violet-600 text-[17px]">{money(p.from, p.currency)}</span></div>
                     <div className="flex items-center gap-2 mt-3">
-                      <Link to={`/shop?category=${p.slug}`} className="flex-1 text-center text-white text-sm font-semibold rounded-lg h-9 grid place-items-center hover:brightness-105 transition"
+                      <Link to={`/shop?category=${p.slug}`} className="flex-1 text-center text-white text-sm font-semibold rounded-lg h-11 sm:h-10 grid place-items-center hover:brightness-105 transition"
                         style={{ backgroundImage: 'linear-gradient(135deg,#7c5cff,#a855f7)' }}>{tr('product.buyNow', 'Buy Now')}</Link>
                       <button aria-label={`Add ${p.cheapest.name} to cart`}
                         onClick={(e) => { flyToCart(e.currentTarget.closest('.snap-start')?.querySelector('img')); addToCart(p); }}
-                        className="w-9 h-9 rounded-lg border border-slate-200 grid place-items-center text-slate-500 hover:bg-slate-50 hover:text-violet-600 active:scale-90 transition-transform">
+                        className="w-11 h-11 sm:w-10 sm:h-10 shrink-0 rounded-lg border border-slate-200 grid place-items-center text-slate-500 hover:bg-slate-50 hover:text-violet-600 active:scale-90 transition-transform">
                         <ShoppingCart size={16} />
                       </button>
                     </div>
