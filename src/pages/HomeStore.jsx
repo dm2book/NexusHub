@@ -26,6 +26,7 @@ import { SystemStatus } from '../components/store/StoreFooter.jsx';
 import { money } from '../lib/catalog.js';
 import { withFallback, SAMPLE_PRODUCTS, iconPath } from '../lib/sampleCatalog.js';
 import { useCategoryLogos } from '../lib/useCategoryLogos.js';
+import { useTrustpilot } from '../lib/useTrustpilot.js';
 import { SUPPORT_EMAIL } from '../lib/support.js';
 import ChatWidget, { openForgeChat } from '../components/ChatWidget.jsx';
 
@@ -118,6 +119,7 @@ export default function HomeStore() {
   const stats = useStats();
   const reviews = useReviews();
   const categoryLogos = useCategoryLogos(); // owner-set logos (Admin → Categories)
+  const trustpilot = useTrustpilot();       // '' until TRUSTPILOT_URL is set
   useReveal();
   /* The homepage carries its own copy of the header rather than rendering
      <StoreNav />, so it needs its own scroll state — the two have already
@@ -596,6 +598,15 @@ export default function HomeStore() {
               <Link to="/refunds" className="inline-flex items-center gap-2 text-sm font-semibold rounded-xl px-4 h-11 border border-slate-200 text-slate-700 hover:bg-slate-50 transition">
                 <ShieldCheck size={16} /> {tr('home.whoRefunds', 'Refund policy')}
               </Link>
+              {/* Sits with the contact routes, not with our own review card: the
+                  point of this one is that it leaves the site. Only rendered
+                  once a profile exists. */}
+              {trustpilot && (
+                <a href={trustpilot} target="_blank" rel="noreferrer"
+                  className="inline-flex items-center gap-2 text-sm font-semibold rounded-xl px-4 h-11 border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition">
+                  ⭐ {tr('home.whoTrustpilot', 'Check us on Trustpilot')}
+                </a>
+              )}
             </div>
           </section>
 

@@ -161,6 +161,7 @@ export const DEFAULT_TEMPLATES = [
       for your order <strong>{{order.number}}</strong>! If everything arrived as expected, a quick review would
       mean the world — it takes 20 seconds and helps other gamers buy with confidence.</p>
       <p style="text-align:center"><a class="btn" href="{{review.url}}">Leave a quick review</a></p>
+      {{review.trustpilotHtml}}
       <p style="text-align:center;color:#8b93a7;font-size:13px">Something not right? Just reply to this email or open
       a ticket in our Discord and we'll make it right.</p>`,
   },
@@ -209,6 +210,17 @@ export const DEFAULT_TEMPLATES = [
  * customized the template.
  */
 export const LEGACY_TEMPLATE_BODIES = {
+  // Same copy, before the optional Trustpilot line was added — so a live
+  // database that never customized this mail picks the new one up on boot.
+  review_request: [`
+      <div class="badge">⭐</div>
+      <h1 style="text-align:center">How did we do?</h1>
+      <p style="text-align:center;max-width:420px;margin-left:auto;margin-right:auto">Hi {{user.name}}, thanks again
+      for your order <strong>{{order.number}}</strong>! If everything arrived as expected, a quick review would
+      mean the world — it takes 20 seconds and helps other gamers buy with confidence.</p>
+      <p style="text-align:center"><a class="btn" href="{{review.url}}">Leave a quick review</a></p>
+      <p style="text-align:center;color:#8b93a7;font-size:13px">Something not right? Just reply to this email or open
+      a ticket in our Discord and we'll make it right.</p>`],
   order_completed: [`
       <h1>Order complete!</h1>
       <p>Hi {{user.name}}, your order <strong>{{order.number}}</strong> is done — here

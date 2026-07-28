@@ -73,6 +73,7 @@ const NL = {
   'home.whoSub': 'ForgeMarket is een kleine winkel vanuit Nederland — geen gezichtsloze website. Gaat er iets mis met je bestelling, dan krijg je een echt mens aan de lijn, en je geld terug als we niet kunnen leveren.',
   'home.whoDiscord': 'Vraag het ons op Discord',
   'home.whoRefunds': 'Terugbetalingsbeleid',
+  'home.whoTrustpilot': 'Bekijk ons op Trustpilot',
 
   // Afrekenen — EU-akkoord en betaalbewijs
   'checkout.consent': 'Ik wil mijn bestelling meteen geleverd krijgen en begrijp dat ik daarmee mijn 14 dagen bedenktijd verlies zodra hij geleverd is.',
@@ -243,6 +244,9 @@ const NL = {
   'legal.p7': 'Deze winkel is niet bedoeld voor kinderen onder de 16. Denk je dat een kind ons persoonsgegevens heeft gegeven, neem dan contact op en we verwijderen ze.',
   'legal.p8h': 'Beveiliging',
   'legal.p8': 'Inloggen gaat zonder wachtwoord, dus er is geen wachtwoord van jou dat wij kunnen verliezen. Verkeer is versleuteld, sessies gebruiken kortlevende tokens, en toegang tot de beheerkant vereist een tweede factor. Geen systeem is perfect: raakt een datalek ooit jouw gegevens, dan laten we het je weten.',
+  'footer.trustpilot': 'Lees onze Trustpilot-reviews',
+  'reviews.tpTitle': 'Ook op Trustpilot',
+  'reviews.tpSub': 'Reviews die wij niet hosten en niet kunnen aanpassen — lees ze daar voordat je koopt.',
   'cart.memberOff': 'Forge+ lid — {n}% korting',
   'checkout.memberOff': 'Forge+ lid — {n}% korting',
   'cart.remove': 'Verwijderen',

@@ -125,5 +125,33 @@ console.log('\n— Template upgrades —');
   ok('an admin-edited body is left alone', kept.body_html === mine);
 }
 
+// ── 5. The review mail links Trustpilot only when there is a profile ────────
+console.log('\n— Trustpilot in the review request —');
+{
+  const tpl = DEFAULT_TEMPLATES.find((t) => t.id === 'review_request');
+  const ctx = (trustpilotHtml) => baseContext({
+    user: { name: 'Sam' }, order: { number: 'FM-1' },
+    review: { url: 'https://forgemarket.nl/track?number=FM-1', trustpilotHtml },
+  });
+  const TP = '<p><a href="https://nl.trustpilot.com/review/forgemarket.nl">Trustpilot</a></p>';
+
+  const off = renderTemplate(tpl, ctx('')).html;
+  ok('no profile configured → the mail never mentions Trustpilot', !/trustpilot/i.test(off));
+  ok('the own-review button survives either way', /forgemarket\.nl\/track/.test(off));
+
+  const on = renderTemplate(tpl, ctx(TP)).html;
+  ok('a configured profile is linked', /nl\.trustpilot\.com\/review\/forgemarket\.nl/.test(on));
+  // A *Html token that got escaped would ship literal &lt;a&gt; to the inbox.
+  ok('the html token is not escaped into visible markup', !/&lt;a /.test(on));
+
+  // A live database seeded before this change must pick the new copy up.
+  await run('UPDATE email_templates SET body_html=@b WHERE id=@i',
+    { b: LEGACY_TEMPLATE_BODIES.review_request[0], i: 'review_request' });
+  await syncEmailTemplates();
+  const upgraded = await get("SELECT body_html FROM email_templates WHERE id='review_request'");
+  ok('an untouched review mail gains the Trustpilot slot on boot',
+    /\{\{review\.trustpilotHtml\}\}/.test(upgraded.body_html));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

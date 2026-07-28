@@ -9,6 +9,7 @@ import { useReviews } from '../../lib/useReviews.js';
 import { useStats } from '../../lib/useStats.js';
 import { useI18n } from '../../lib/i18n.jsx';
 import { usePageMeta } from '../../lib/useMeta.js';
+import { useTrustpilot } from '../../lib/useTrustpilot.js';
 
 /** "Write a review" — verified buyers pick one of their delivered orders. */
 function WriteReview({ t }) {
@@ -81,6 +82,11 @@ function WriteReview({ t }) {
 }
 
 export default function Reviews() {
+  /* Reviews on this page are ours — we host them, so a sceptic can reasonably
+     discount them. A Trustpilot profile is the one place they can read reviews
+     we do NOT control, which is exactly why it belongs on this page rather
+     than only in the footer. Hidden until the profile exists. */
+  const trustpilot = useTrustpilot();
   usePageMeta('Customer reviews', 'Reviews from real ForgeMarket orders, plus vouches from ForgeMarket Support on Discord.');
   const reviews = useReviews();
   const stats = useStats();
@@ -93,6 +99,18 @@ export default function Reviews() {
   return (
     <InfoShell eyebrow={t('reviews.eyebrow', 'Loved by gamers')} title={t('reviews.title', 'Customer reviews')}
       subtitle={t('reviews.sub', 'Real feedback from verified buyers, plus vouches left in ForgeMarket Support.')} narrow={false}>
+      {trustpilot && (
+        <a href={trustpilot} target="_blank" rel="noreferrer"
+          className="flex items-center gap-3.5 mb-8 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 hover:bg-emerald-100/70 hover:border-emerald-300 transition fm-press">
+          <span className="text-2xl leading-none shrink-0">⭐</span>
+          <span className="text-sm sm:text-[15px] leading-snug">
+            <span className="font-bold text-emerald-800">{t('reviews.tpTitle', 'Also on Trustpilot')}</span>
+            <span className="block text-slate-600 mt-0.5">
+              {t('reviews.tpSub', 'Reviews we do not host and cannot edit — read them there before you buy.')}
+            </span>
+          </span>
+        </a>
+      )}
       <div className="flex flex-wrap items-center justify-center gap-6 mb-10">
         {stats.reviews > 0 && (
           <>

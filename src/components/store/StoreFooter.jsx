@@ -4,6 +4,7 @@ import { Zap } from 'lucide-react';
 import { api } from '../../lib/api.js';
 import { useI18n } from '../../lib/i18n.jsx';
 import { SUPPORT_EMAIL } from '../../lib/support.js';
+import { useTrustpilot } from '../../lib/useTrustpilot.js';
 
 /** Real system status from /api/health (no fake claims). */
 export function SystemStatus() {
@@ -22,6 +23,7 @@ export function SystemStatus() {
 
 /** Shared light storefront footer. */
 export default function StoreFooter() {
+  const trustpilot = useTrustpilot();
   const { t } = useI18n();
   const COLS = [
     { title: t('footer.shop', 'Shop'), links: [
@@ -66,6 +68,16 @@ export default function StoreFooter() {
             <a href={`mailto:${SUPPORT_EMAIL}`}
               className="block mt-2 text-sm text-slate-500 hover:text-violet-600 transition">
               ✉️ {SUPPORT_EMAIL}
+            </a>
+          )}
+          {/* Renders only once TRUSTPILOT_URL is set on the server. A shop with
+              no profile shows nothing here rather than a link that 404s — and a
+              buyer who checks reviews and lands on an error trusts you less
+              than one who never saw a link at all. */}
+          {trustpilot && (
+            <a href={trustpilot} target="_blank" rel="noreferrer"
+              className="block mt-2 text-sm text-slate-500 hover:text-emerald-600 transition">
+              ⭐ {t('footer.trustpilot', 'Read our Trustpilot reviews')}
             </a>
           )}
         </div>

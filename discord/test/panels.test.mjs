@@ -70,6 +70,31 @@ console.log('— Panel copy —');
   ok('no panel title exceeds 256 chars', titleTooLong.length === 0, titleTooLong.join(', '));
 }
 
+// Trustpilot: the #links panel is the anti-scam reference ("if it isn't here,
+// it isn't us"), so a link to a profile that does not exist yet is worse than
+// no link at all. The whole feature is therefore conditional, both ways.
+console.log('\n— Trustpilot —');
+{
+  const TP = 'https://nl.trustpilot.com/review/forgemarket.nl';
+  const withTp = buildPanels({ storeUrl: 'https://forgemarket.nl', channelIdByName: ids, trustpilotUrl: TP });
+
+  ok('unset: the links panel says nothing about Trustpilot', !/trustpilot/i.test(panels.links.description));
+  ok('unset: the reviews panel says nothing about Trustpilot', !/trustpilot/i.test(panels.reviews.description));
+  const anyMention = Object.entries(panels).filter(([, p]) => /trustpilot/i.test(`${p.title} ${p.description}`)).map(([n]) => n);
+  ok('unset: no panel at all mentions it', anyMention.length === 0, anyMention.join(', '));
+
+  ok('set: the links panel carries the real URL', withTp.links.description.includes(TP));
+  ok('set: the reviews panel carries the real URL', withTp.reviews.description.includes(TP));
+  ok('set: the links panel keeps every other official link',
+    ['/shop', '/track', '/account'].every((p) => withTp.links.description.includes(`https://forgemarket.nl${p}`)));
+  ok('set: still no raw placeholder leaks',
+    !/\{[A-Z_]+\}/.test(`${withTp.links.description} ${withTp.reviews.description}`));
+  ok('whitespace-only value counts as unset',
+    !/trustpilot/i.test(buildPanels({ storeUrl: 'https://forgemarket.nl', trustpilotUrl: '   ' }).links.description));
+  ok('set: descriptions stay inside the 4096-char embed limit',
+    Object.values(withTp).every((p) => (p.description || '').length <= 4096));
+}
+
 console.log('\n— Copy sync —');
 {
   ok('a changed description triggers an update',

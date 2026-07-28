@@ -333,15 +333,22 @@ export const MESSAGES = {
       "**Refunds:** request from your order page or via a ticket — approved refunds go to your original method.\n" +
       "**Safety:** our staff will **never DM you first** and never ask for passwords. Report anyone who does.",
   },
-  reviewsIntro: {
+  // Takes the Trustpilot URL because the strongest thing this panel can say is
+  // "and you don't have to take our word for it" — but only once there is a
+  // profile to point at. Unset, the line is absent rather than dead.
+  reviewsIntro: ({ trustpilotUrl = '' } = {}) => ({
     image: '{STORE_URL}/discord/banner-vouches.png?v=2',
     color: 0x22c55e,
     title: '⭐ Verified customer reviews',
     description:
       "Every review here is tied to a **real, completed order** — no fakes.\n\n" +
       "See genuine delivery screenshots in <#proof-of-delivery>, and bought from us? " +
-      "Leave a quick vouch in <#vouches> 💚",
-  },
+      "Leave a quick vouch in <#vouches> 💚" +
+      (trustpilotUrl
+        ? `\n\n⭐ **We're on Trustpilot too:** ${trustpilotUrl}\n` +
+          "Those reviews live on a platform we don't own and can't edit — read them before you buy."
+        : ''),
+  }),
   proofIntro: {
     title: '📸 Proof of delivery',
     description: "Real screenshots of completed deliveries. Transparency builds trust. 🔒",
@@ -362,7 +369,12 @@ export const MESSAGES = {
       "Internal area. Tickets log to <#ticket-logs>, moderation to <#mod-log>, and the bot posts joins, " +
       "tickets, buying-intent leads and sales to <#leads>.\n\nKeep it professional — customers come first. 💪",
   },
-  links: {
+  // This panel is the anti-scam reference: "if it isn't listed here, it isn't
+  // us". That only holds if the list is complete, so the Trustpilot profile
+  // belongs here the moment it exists — and nowhere in the copy before that,
+  // because a link to a profile that doesn't exist is exactly what the panel
+  // warns against.
+  links: ({ trustpilotUrl = '' } = {}) => ({
     title: '🔗 Official ForgeMarket links',
     description:
       "Only trust links posted here or by staff.\n\n" +
@@ -370,9 +382,10 @@ export const MESSAGES = {
       "🏠 **Home:** {STORE_URL}\n" +
       "📦 **Track your order:** {STORE_URL}/track\n" +
       "👤 **Your account:** {STORE_URL}/account\n" +
+      (trustpilotUrl ? `⭐ **Trustpilot reviews:** ${trustpilotUrl}\n` : '') +
       "❓ **FAQ:** see <#faq>\n\n" +
       "Buttons below take you straight there 👇",
-  },
+  }),
   status: {
     title: '🟢 Store status',
     // No standing "all systems operational" claim: this panel is pinned once and

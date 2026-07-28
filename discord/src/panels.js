@@ -28,7 +28,10 @@ export function linkChannels(text, channelIdByName = {}) {
 }
 
 /** Build every panel's final copy. Returns { channelName: {title, description, color, image} }. */
-export function buildPanels({ storeUrl, guildName = 'ForgeMarket', channelIdByName = {} } = {}) {
+export function buildPanels({
+  storeUrl, guildName = 'ForgeMarket', channelIdByName = {}, trustpilotUrl = '',
+} = {}) {
+  const tp = String(trustpilotUrl || '').trim();
   const sub = (s) => String(s ?? '').replaceAll('{STORE_URL}', storeUrl);
   const copy = (s) => linkChannels(sub(s), channelIdByName);
   const P = (m) => ({
@@ -44,7 +47,7 @@ export function buildPanels({ storeUrl, guildName = 'ForgeMarket', channelIdByNa
     'start-here': P(MESSAGES.startHere),
     rules: P(MESSAGES.rules),
     verify: P(MESSAGES.verify),
-    links: P(MESSAGES.links),
+    links: P(MESSAGES.links({ trustpilotUrl: tp })),
     announcements: P(MESSAGES.announcement),
     status: P(MESSAGES.status),
     products: P(MESSAGES.products),
@@ -59,7 +62,7 @@ export function buildPanels({ storeUrl, guildName = 'ForgeMarket', channelIdByNa
     'support-info': P(MESSAGES.supportInfo),
     'report-a-scam': P(MESSAGES.reportScam),
     'open-a-ticket': P(MESSAGES.ticketPanel),
-    reviews: P(MESSAGES.reviewsIntro),
+    reviews: P(MESSAGES.reviewsIntro({ trustpilotUrl: tp })),
     vouches: P(MESSAGES.vouchersIntro),
     'proof-of-delivery': P(MESSAGES.proofIntro),
     'discount-codes': P(MESSAGES.discountCodes),
