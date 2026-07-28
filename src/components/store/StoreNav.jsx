@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Search, ShoppingCart, Zap, ArrowRight, Shield, Menu, X } from 'lucide-react';
+import { Search, ShoppingCart, Zap, ArrowRight, Shield, Menu, X, User } from 'lucide-react';
 import { useCart } from '../../context/CartContext.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useI18n } from '../../lib/i18n.jsx';
@@ -106,7 +106,18 @@ export default function StoreNav() {
         {loading ? (
           <span className="hidden sm:inline-flex w-16 h-4 rounded fm-skeleton" aria-hidden />
         ) : user ? (
-          <Link to="/account" className="hidden sm:inline-flex text-[15px] font-medium text-slate-600 hover:text-slate-900">{t('nav.account', 'Account')}</Link>
+          <>
+            {/* Below sm this used to be the ONLY account affordance in the
+                header, and it was hidden — while the Admin button next to it
+                was not. A signed-in owner on a phone therefore saw a route to
+                the admin panel and no route to their own account at all. The
+                icon is always visible; the word appears when there is room. */}
+            <Link to="/account" aria-label={t('nav.account', 'Account')}
+              className="inline-flex items-center gap-1.5 text-[15px] font-medium text-slate-600 hover:text-slate-900 rounded-xl w-11 h-11 sm:w-auto sm:h-auto justify-center sm:justify-start">
+              <User size={19} className="sm:hidden" />
+              <span className="hidden sm:inline">{t('nav.account', 'Account')}</span>
+            </Link>
+          </>
         ) : (
           <Link to="/login" className="hidden sm:inline-flex text-[15px] font-medium text-slate-600 hover:text-slate-900">{t('nav.login', 'Log in')}</Link>
         )}
