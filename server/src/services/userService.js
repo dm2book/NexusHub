@@ -1,5 +1,6 @@
 /** User CRUD + RBAC resolution helpers. */
 import { run, get, all, nowIso, tx } from '../db/index.js';
+import { memberDiscountPercent } from './membershipService.js';
 import { newId } from '../utils/ids.js';
 import { config } from '../config/env.js';
 
@@ -93,8 +94,13 @@ export async function hasPermission(userId, permission) {
 export async function publicUser(userId) {
   const u = await getUserById(userId);
   if (!u) return null;
-  const [roles, perms] = await Promise.all([
+  const [roles, perms, memberPercent] = await Promise.all([
     getUserRoles(userId), getUserPermissions(userId),
+    // The storefront has to know about the standing member discount, or it
+    // shows a total the server will not charge. That is exactly how the cart
+    // came to quote €4.49 for an order that was billed at €4.27: the discount
+    // lived only in createOrder, and the client recomputed the total without it.
+    memberDiscountPercent(userId).catch(() => 0),
   ]);
   return {
     id: u.id,
@@ -107,6 +113,7 @@ export async function publicUser(userId) {
     status: u.status,
     preferences: safeJson(u.preferences),
     totpEnabled: !!u.totp_enabled_at,
+    memberPercent,          // standing % off every order, 0 when not a member
     roles,
     permissions: [...perms],
     createdAt: u.created_at,

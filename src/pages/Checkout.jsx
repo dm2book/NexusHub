@@ -55,7 +55,11 @@ export default function Checkout() {
   const couponDiscount = coupon
     ? (coupon.percent ? Math.round(subtotal * coupon.percent / 100) : Math.min(subtotal, coupon.value || 0))
     : 0;
-  const discount = Math.min(subtotal, couponDiscount + bundleDiscount);
+  /* Forge+ takes a standing percentage off every order server-side. Leaving it
+     out here meant the summary quoted more than the buyer was charged. */
+  const memberPercent = user?.memberPercent || 0;
+  const memberDiscount = memberPercent ? Math.round(subtotal * memberPercent / 100) : 0;
+  const discount = Math.min(subtotal, couponDiscount + memberDiscount + bundleDiscount);
   const afterDiscount = Math.max(0, subtotal - discount);
   const creditToApply = useCredit ? Math.min(creditBalance, afterDiscount) : 0;
   const grandTotal = Math.max(0, afterDiscount - creditToApply);
@@ -342,6 +346,7 @@ export default function Checkout() {
           <div className="border-t border-white/5 pt-4 mb-6 space-y-1.5">
             <div className="flex justify-between text-sm text-slate-400"><span>{t('cart.subtotal', 'Subtotal')}</span><span>{money(subtotal, currency)}</span></div>
             {matchedBundle && <div className="flex justify-between text-sm text-amber-300"><span>Bundle ({matchedBundle.name} · {matchedBundle.percent}%)</span><span>−{money(bundleDiscount, currency)}</span></div>}
+            {memberDiscount > 0 && <div className="flex justify-between text-sm text-violet-300"><span>{t('checkout.memberOff', 'Forge+ member — {n}% off', { n: memberPercent })}</span><span>−{money(memberDiscount, currency)}</span></div>}
             {coupon && <div className="flex justify-between text-sm text-emerald-300"><span>{t('checkout.coupon', 'Coupon')} ({coupon.code}{coupon.percent ? ` · ${coupon.percent}%` : ''})</span><span>−{money(couponDiscount, currency)}</span></div>}
             {creditToApply > 0 && <div className="flex justify-between text-sm text-indigo-300"><span>{t('checkout.credit', 'Store credit')}</span><span>−{money(creditToApply, currency)}</span></div>}
             <div className="flex justify-between text-lg pt-1"><span className="text-slate-300">{t('cart.total', 'Total')}</span><span className="text-white font-semibold">{money(grandTotal, currency)}</span></div>
