@@ -243,6 +243,8 @@ const NL = {
   'legal.p7': 'Deze winkel is niet bedoeld voor kinderen onder de 16. Denk je dat een kind ons persoonsgegevens heeft gegeven, neem dan contact op en we verwijderen ze.',
   'legal.p8h': 'Beveiliging',
   'legal.p8': 'Inloggen gaat zonder wachtwoord, dus er is geen wachtwoord van jou dat wij kunnen verliezen. Verkeer is versleuteld, sessies gebruiken kortlevende tokens, en toegang tot de beheerkant vereist een tweede factor. Geen systeem is perfect: raakt een datalek ooit jouw gegevens, dan laten we het je weten.',
+  'cart.memberOff': 'Forge+ lid — {n}% korting',
+  'checkout.memberOff': 'Forge+ lid — {n}% korting',
   'cart.remove': 'Verwijderen',
   'cart.less': 'Eén minder',
   'cart.more': 'Eén meer',

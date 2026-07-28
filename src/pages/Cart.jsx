@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext.jsx';
 import { Minus, Plus, Trash2, ShoppingBag, ArrowRight } from 'lucide-react';
 import { useCart } from '../context/CartContext.jsx';
 import { useI18n } from '../lib/i18n.jsx';
@@ -15,6 +16,7 @@ import { matchBundle } from '../lib/bundles.js';
 export default function Cart() {
   usePageMeta('Your cart', 'Review the items in your cart before checking out.');
   const { items, setQty, remove, subtotal, currency, add } = useCart();
+  const { user } = useAuth();
   const { t } = useI18n();
   const navigate = useNavigate();
   // The cart used to show the plain subtotal, so a bundle looked more expensive
@@ -23,7 +25,14 @@ export default function Cart() {
   const [bundles, setBundles] = useState([]);
   useEffect(() => { api.get('/api/bundles').then((r) => setBundles(r.bundles || [])).catch(() => {}); }, []);
   const bundle = matchBundle(items, bundles);
-  const total = Math.max(0, subtotal - (bundle?.discount || 0));
+  /* The server also takes a standing percentage off for Forge+ members
+     (createOrder → memberDiscountPercent). This total left it out, so a member
+     saw €4.49 here and was billed €4.27 — the same class of mismatch as the
+     bundle bug: the client recomputing a total the server owns. Mirrors the
+     server's order: percentage off the SUBTOTAL, then the bundle. */
+  const memberPercent = user?.memberPercent || 0;
+  const memberDiscount = memberPercent ? Math.round(subtotal * memberPercent / 100) : 0;
+  const total = Math.max(0, subtotal - memberDiscount - (bundle?.discount || 0));
 
   if (items.length === 0) {
     return (
@@ -92,6 +101,12 @@ export default function Cart() {
                 {t('cart.bundleApplied', 'Bundle')} · {bundle.name} (−{bundle.percent}%)
               </span>
               <span className="text-violet-600 font-semibold">−{money(bundle.discount, currency)}</span>
+            </div>
+          )}
+          {memberDiscount > 0 && (
+            <div className="flex justify-between text-sm mb-2">
+              <span className="text-violet-600 font-medium">{t('cart.memberOff', 'Forge+ member — {n}% off', { n: memberPercent })}</span>
+              <span className="text-violet-600 font-medium">−{money(memberDiscount, currency)}</span>
             </div>
           )}
           <div className="flex justify-between text-sm text-slate-500 mb-4">
