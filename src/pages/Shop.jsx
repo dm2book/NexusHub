@@ -185,12 +185,12 @@ export default function Shop() {
             <div className="relative flex-1 sm:w-60">
               <Search size={16} className="absolute left-3 top-3 text-slate-400" />
               <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t('shop.search', 'Search products…')}
-                className="w-full rounded-xl bg-white border border-slate-200 pl-9 pr-3 h-10 text-sm text-slate-700 outline-none focus:border-violet-400" />
+                className="w-full rounded-xl bg-white border border-slate-200 pl-9 pr-3 h-11 sm:h-10 text-base sm:text-sm text-slate-700 outline-none focus:border-violet-400" />
             </div>
             <div className="relative">
               <SlidersHorizontal size={15} className="absolute left-3 top-3 text-slate-400 pointer-events-none" />
               <select value={sort} onChange={(e) => setSort(e.target.value)}
-                className="appearance-none cursor-pointer rounded-xl bg-white border border-slate-200 pl-9 pr-8 h-10 text-sm text-slate-700 outline-none focus:border-violet-400">
+                className="appearance-none cursor-pointer rounded-xl bg-white border border-slate-200 pl-9 pr-8 h-11 sm:h-10 text-base sm:text-sm text-slate-700 outline-none focus:border-violet-400">
                 {Object.entries(SORTS).map(([k, v]) => <option key={k} value={k}>{t(v.key, v.label)}</option>)}
               </select>
             </div>

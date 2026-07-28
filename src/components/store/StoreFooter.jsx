@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Zap } from 'lucide-react';
 import { api } from '../../lib/api.js';
 import { useI18n } from '../../lib/i18n.jsx';
+import { SUPPORT_EMAIL } from '../../lib/support.js';
 
 /** Real system status from /api/health (no fake claims). */
 export function SystemStatus() {
@@ -57,6 +58,16 @@ export default function StoreFooter() {
           <Link to="/discord" className="inline-flex items-center gap-2 mt-4 text-sm font-semibold text-violet-600 hover:text-violet-700">
             {t('footer.discord', '💬 ForgeMarket Support on Discord')}
           </Link>
+          {/* The footer is where a hesitant buyer looks for proof a human is
+              behind this. Discord alone reads as "gamers only"; an address on
+              the shop's own domain reads as a business. Renders only when set,
+              so it never advertises a route that goes nowhere. */}
+          {SUPPORT_EMAIL && (
+            <a href={`mailto:${SUPPORT_EMAIL}`}
+              className="block mt-2 text-sm text-slate-500 hover:text-violet-600 transition">
+              ✉️ {SUPPORT_EMAIL}
+            </a>
+          )}
         </div>
         {COLS.map((c) => (
           <div key={c.title}>
