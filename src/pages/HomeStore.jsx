@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import {
   Search, ShoppingCart, Zap, ShieldCheck, Headphones, Tag, Star, ArrowRight,
   Plus, LayoutGrid, Users, CheckCircle2, Clock, MessageCircle, ChevronRight, Sparkles, Shield, Menu, X,
+  User as UserIcon,
 } from 'lucide-react';
 import { useCart } from '../context/CartContext.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -252,7 +253,14 @@ export default function HomeStore() {
             </Link>
           )}
           {user ? (
-            <Link to="/account" className="hidden sm:inline-flex text-[15px] font-medium text-slate-600 hover:text-slate-900">{tr('nav.account', 'Account')}</Link>
+            /* Same fix as StoreNav: this was hidden below sm while the Admin
+               button beside it was not, so a signed-in owner on a phone could
+               reach the admin panel but not their own account. */
+            <Link to="/account" aria-label={tr('nav.account', 'Account')}
+              className="inline-flex items-center gap-1.5 text-[15px] font-medium text-slate-600 hover:text-slate-900 rounded-xl w-11 h-11 sm:w-auto sm:h-auto justify-center sm:justify-start shrink-0">
+              <UserIcon size={19} className="sm:hidden" />
+              <span className="hidden sm:inline">{tr('nav.account', 'Account')}</span>
+            </Link>
           ) : (
             <Link to="/login" className="hidden sm:inline-flex text-[15px] font-medium text-slate-600 hover:text-slate-900">{tr('nav.login', 'Log in')}</Link>
           )}

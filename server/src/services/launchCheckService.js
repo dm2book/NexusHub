@@ -71,6 +71,36 @@ export async function launchChecks() {
         ? `Configured: ${bits.join(', ')}${relayed ? ' + bot relay' : ''}`
         : 'Start your Discord bot (npm start in discord/) — it connects automatically, no Vercel setup needed.');
 
+  // 7. Two-factor on the accounts that can see everything.
+  //
+  // The admin panel shows every order, every buyer's email and every delivered
+  // code. Sign-in here is passwordless, so without a second factor an attacker
+  // who reaches the owner's inbox — a reused password on some other site, a
+  // SIM swap — owns the shop. This cannot be switched on for someone: it needs
+  // their authenticator app and a code only their phone can produce. So the
+  // job here is to make forgetting it visible.
+  try {
+    const staff = await get(
+      `SELECT COUNT(*) AS n FROM users u
+        WHERE EXISTS (SELECT 1 FROM user_roles r WHERE r.user_id = u.id
+                        AND r.role_id IN ('owner','admin'))`);
+    const armed = await get(
+      `SELECT COUNT(*) AS n FROM users u
+        WHERE u.totp_enabled_at IS NOT NULL
+          AND EXISTS (SELECT 1 FROM user_roles r WHERE r.user_id = u.id
+                        AND r.role_id IN ('owner','admin'))`);
+    const total = Number(staff?.n || 0), on = Number(armed?.n || 0);
+    if (!total) {
+      add('twofactor', 'Admin two-factor', 'warn',
+        'No admin account exists yet — sign in once with an address listed in ADMIN_EMAILS.');
+    } else if (on >= total) {
+      add('twofactor', 'Admin two-factor', 'ok', `Enabled on all ${total} admin account(s)`);
+    } else {
+      add('twofactor', 'Admin two-factor', 'fail',
+        `${total - on} of ${total} admin account(s) have no second factor. Anyone who reaches that inbox can read every order and every delivered code — turn it on in Account → Settings.`);
+    }
+  } catch (e) { add('twofactor', 'Admin two-factor', 'warn', `Could not check: ${e.message}`); }
+
   const failing = checks.filter((c) => c.status === 'fail').length;
   const warning = checks.filter((c) => c.status === 'warn').length;
   return {
