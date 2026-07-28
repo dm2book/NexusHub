@@ -132,6 +132,7 @@ router.get('/config', asyncHandler(async (_req, res) => {
     paymentNote: config.payments.manual.note,
     announcement: config.shop.announcement,  // optional promo bar text
     trustpilotUrl: config.shop.trustpilotUrl,  // '' when the shop has no profile yet
+    trustpilotReviewUrl: config.shop.trustpilotReviewUrl,  // the form, for surfaces that ask
     oauthProviders: listEnabledProviders(),
     discordEnabled: !!config.discord.inviteUrl || !!config.discord.guildId,
     brand: config.email.fromName,

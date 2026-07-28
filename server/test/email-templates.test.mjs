@@ -18,7 +18,7 @@ const ok = (name, cond, extra = '') => { if (cond) { pass++; console.log(`  ✅ 
 await (await import('../src/app.js')).ensureReady();
 const { createProduct } = await import('../src/services/productService.js');
 const { addProductCodes } = await import('../src/services/codeStockService.js');
-const { createOrder, renderOrderEmail, markPaymentReceived } = await import('../src/services/orderService.js');
+const { createOrder, renderOrderEmail, markPaymentReceived, sendReviewRequests } = await import('../src/services/orderService.js');
 const { EMAIL_THEMES, renderTemplate, baseContext } = await import('../src/services/templateService.js');
 const { LEGACY_TEMPLATE_BODIES, DEFAULT_TEMPLATES } = await import('../src/services/defaultTemplates.js');
 const { syncEmailTemplates } = await import('../src/db/seed.js');
@@ -151,6 +151,31 @@ console.log('\n— Trustpilot in the review request —');
   const upgraded = await get("SELECT body_html FROM email_templates WHERE id='review_request'");
   ok('an untouched review mail gains the Trustpilot slot on boot',
     /\{\{review\.trustpilotHtml\}\}/.test(upgraded.body_html));
+
+  // The whole point of the ask is that it lands ON the form. Checked through
+  // the real path — a completed order actually run through sendReviewRequests
+  // — rather than by re-stating the template, because the bug this guards
+  // against is the wiring handing over the profile URL instead.
+  const { config } = await import('../src/config/env.js');
+  const before = config.shop.trustpilotReviewUrl;
+  config.shop.trustpilotReviewUrl = 'https://nl.trustpilot.com/evaluate/forgemarket.nl';
+  try {
+    const p = await createProduct({ name: `Ask ${tag}`, category: 'robux', price: 500, announce: false });
+    await addProductCodes(p.id, [`ASK-${tag}`]);
+    const o = await createOrder({ email: `ask${tag}@x.dev`, items: [{ productId: p.id, quantity: 1 }] });
+    await markPaymentReceived(o.id, `txask${tag}`, { actorId: 'test' });
+    await new Promise((r) => setTimeout(r, 600));
+    // afterHours 0 so the order just completed still qualifies.
+    await sendReviewRequests({ afterHours: 0 });
+    const logged = await get(
+      "SELECT context FROM email_log WHERE template_id='review_request' AND to_email=@to ORDER BY created_at DESC LIMIT 1",
+      { to: `ask${tag}@x.dev` });
+    const ctx = typeof logged?.context === 'string' ? JSON.parse(logged.context) : logged?.context;
+    const html = String(ctx?.review?.trustpilotHtml || '');
+    ok('the review request actually goes out', !!logged);
+    ok('the ask links the /evaluate/ form, not the profile',
+      html.includes('/evaluate/forgemarket.nl') && !html.includes('/review/forgemarket.nl'), html.slice(0, 160));
+  } finally { config.shop.trustpilotReviewUrl = before; }
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

@@ -15,10 +15,13 @@ let pass = 0, fail = 0;
 const ok = (name, cond, extra = '') => { if (cond) { pass++; console.log(`  ✅ ${name}`); } else { fail++; console.log(`  ❌ ${name} ${extra}`); } };
 
 // The module reads process.env once at import, so each case needs a fresh copy.
-const shopFor = async (value) => {
+let bust = 0;
+const shopFor = async (value, writeValue) => {
   if (value === undefined) delete process.env.TRUSTPILOT_URL;
   else process.env.TRUSTPILOT_URL = value;
-  const mod = await import(`../src/config/env.js?tp=${encodeURIComponent(String(value))}`);
+  if (writeValue === undefined) delete process.env.TRUSTPILOT_REVIEW_URL;
+  else process.env.TRUSTPILOT_REVIEW_URL = writeValue;
+  const mod = await import(`../src/config/env.js?tp=${bust++}`);
   return mod.config.shop;
 };
 
@@ -60,6 +63,59 @@ console.log('\n— Unset stays unset —');
 
   const slashOnly = await shopFor('/');
   ok('a lone slash does not become "https://"', slashOnly.trustpilotUrl === '', JSON.stringify(slashOnly.trustpilotUrl));
+}
+
+// Reading and writing are different jobs: a surface that ASKS for a review must
+// open the form, because every click between the ask and the box costs reviews.
+console.log('\n— Asking vs reading —');
+{
+  const nl = await shopFor('https://nl.trustpilot.com/review/forgemarket.nl');
+  ok('the write link is the /evaluate/ form',
+    nl.trustpilotReviewUrl === 'https://nl.trustpilot.com/evaluate/forgemarket.nl', nl.trustpilotReviewUrl);
+  ok('the profile link is left as the profile',
+    nl.trustpilotUrl === 'https://nl.trustpilot.com/review/forgemarket.nl', nl.trustpilotUrl);
+
+  const www = await shopFor('https://www.trustpilot.com/review/forgemarket.nl');
+  ok('any trustpilot subdomain works',
+    www.trustpilotReviewUrl === 'https://www.trustpilot.com/evaluate/forgemarket.nl', www.trustpilotReviewUrl);
+
+  const bare = await shopFor('nl.trustpilot.com/review/forgemarket.nl');
+  ok('a scheme-less paste still derives correctly',
+    bare.trustpilotReviewUrl === 'https://nl.trustpilot.com/evaluate/forgemarket.nl', bare.trustpilotReviewUrl);
+
+  const explicit = await shopFor('https://nl.trustpilot.com/review/forgemarket.nl',
+    'https://nl.trustpilot.com/evaluate/shop.forgemarket.nl');
+  ok('an explicit TRUSTPILOT_REVIEW_URL wins over the derivation',
+    explicit.trustpilotReviewUrl === 'https://nl.trustpilot.com/evaluate/shop.forgemarket.nl', explicit.trustpilotReviewUrl);
+
+  const none = await shopFor('');
+  ok('no profile means no write link either', none.trustpilotReviewUrl === '', JSON.stringify(none.trustpilotReviewUrl));
+}
+
+// A rewrite that guesses wrong is worse than no rewrite: the profile page
+// always carries a "Write a review" button, so falling back costs one click,
+// while a mangled path costs the review entirely.
+console.log('\n— Never invent a path —');
+{
+  // "/review/" appears in the path but the host is not Trustpilot at all.
+  const other = await shopFor('https://example.com/review/forgemarket');
+  ok('a non-Trustpilot host is never rewritten',
+    other.trustpilotReviewUrl === 'https://example.com/review/forgemarket', other.trustpilotReviewUrl);
+
+  // A host that merely ENDS in something similar must not match.
+  const lookalike = await shopFor('https://nottrustpilot.com/review/forgemarket');
+  ok('a look-alike domain is never rewritten',
+    lookalike.trustpilotReviewUrl === 'https://nottrustpilot.com/review/forgemarket', lookalike.trustpilotReviewUrl);
+
+  // Already the form: leave it alone rather than mangling it.
+  const already = await shopFor('https://nl.trustpilot.com/evaluate/forgemarket.nl');
+  ok('a URL that is already the form is left alone',
+    already.trustpilotReviewUrl === 'https://nl.trustpilot.com/evaluate/forgemarket.nl', already.trustpilotReviewUrl);
+
+  // Trustpilot, but some other page — no /review/ to swap.
+  const odd = await shopFor('https://nl.trustpilot.com/categories/gaming');
+  ok('an unrecognised Trustpilot path falls back to itself',
+    odd.trustpilotReviewUrl === 'https://nl.trustpilot.com/categories/gaming', odd.trustpilotReviewUrl);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
