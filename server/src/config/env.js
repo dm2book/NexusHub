@@ -199,6 +199,35 @@ const externalUrl = (v) => {
   return /^https?:\/\//i.test(u) ? u : `https://${u}`;
 };
 
+/**
+ * The "write a review" URL that belongs with a given profile URL.
+ *
+ * Reading and writing are different jobs. A surface that says "see what others
+ * think" should open the profile; a surface that ASKS for a review should open
+ * the form, because every extra click between the ask and the box costs
+ * reviews. Trustpilot spells the second one /evaluate/ instead of /review/.
+ *
+ * Derived rather than demanded: filling in two near-identical URLs by hand is
+ * two chances to paste the wrong one. TRUSTPILOT_REVIEW_URL still overrides it
+ * for a shop whose form lives somewhere unusual.
+ *
+ * The host check matters. Without it any URL containing "/review/" would get
+ * rewritten into a path that may not exist — so anything we do not recognise
+ * falls back to the profile, which always has a "Write a review" button on it.
+ * A longer route beats a broken one.
+ */
+const trustpilotWriteUrl = (profile) => {
+  if (!profile) return '';
+  try {
+    const u = new URL(profile);
+    if (!/(^|\.)trustpilot\.com$/i.test(u.hostname)) return profile;
+    if (!/^\/review\//i.test(u.pathname)) return profile;
+    u.pathname = u.pathname.replace(/^\/review\//i, '/evaluate/');
+    return u.toString().replace(/\/+$/, '');
+  } catch { return profile; }
+};
+
+const trustpilotUrl = externalUrl(env.TRUSTPILOT_URL);
 config.shop = {
   coupons: parseCoupons(env.COUPONS),
   announcement: env.SITE_ANNOUNCEMENT || '',
@@ -206,7 +235,9 @@ config.shop = {
   // renders the link only when it is set, so an unconfigured shop never sends
   // a buyer to a page that does not exist. An env var rather than a constant
   // so the URL can change without a rebuild.
-  trustpilotUrl: externalUrl(env.TRUSTPILOT_URL),
+  trustpilotUrl,
+  // Where we send someone we are actively asking for a review.
+  trustpilotReviewUrl: externalUrl(env.TRUSTPILOT_REVIEW_URL) || trustpilotWriteUrl(trustpilotUrl),
 };
 
 /** Validate a coupon code → { code, percent } or null. */

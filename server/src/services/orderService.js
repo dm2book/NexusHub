@@ -419,9 +419,12 @@ export async function sendReviewRequests({ afterHours = 24, limit = 25 } = {}) {
         // A buyer who just clicked "leave a review" is the only person who will
         // ever write a second one. Rendered as an empty string when no profile
         // is configured, so the mail simply has one paragraph fewer.
-        trustpilotHtml: config.shop.trustpilotUrl
+        //
+        // Points at the FORM, not the profile: this mail is an ask, and a
+        // profile page makes them hunt for the button before they can start.
+        trustpilotHtml: config.shop.trustpilotReviewUrl
           ? `<p style="text-align:center;color:#8b93a7;font-size:13px;margin-top:-6px">or leave it on
-             <a href="${config.shop.trustpilotUrl}" style="color:#f59e0b;font-weight:600">Trustpilot</a>
+             <a href="${config.shop.trustpilotReviewUrl}" style="color:#f59e0b;font-weight:600">Trustpilot</a>
              — that one is public and we can't edit it.</p>`
           : '',
       },

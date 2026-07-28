@@ -137,9 +137,18 @@ export async function sendDeliveryDm(order) {
       description:
         `Thanks for shopping with **${config.email.fromName}** — here are your items:\n\n${items}\n${codes}\n` +
         `📧 A copy is in your email. Keep your codes private and never share them in public channels.\n\n` +
-        `💚 Happy with your order? Type **/vouch** in the server — it posts in #vouchers *and* on the website, and helps us a lot!`,
+        `💚 Happy with your order? Type **/vouch** in the server — it posts in #vouchers *and* on the website, and helps us a lot!` +
+        // The one message a buyer reads while the order is still in their
+        // hands. Links the form rather than the profile: this is an ask.
+        (config.shop.trustpilotReviewUrl
+          ? `\n⭐ A line on [Trustpilot](${config.shop.trustpilotReviewUrl}) helps even more — that one is public and we can't edit it.`
+          : ''),
       color: 0x10b981,
-      footer: { text: `${config.email.fromName} · instant delivery` },
+      // Was "instant delivery", which is the exact claim the storefront, the
+      // emails and the Discord panels all stopped making — most orders are
+      // delivered by hand. A promise we break in a delivery message is worse
+      // than no footer at all.
+      footer: { text: config.email.fromName },
       timestamp: new Date().toISOString(),
     };
     // Direct DM with a server-side bot token; otherwise relay via the outbox

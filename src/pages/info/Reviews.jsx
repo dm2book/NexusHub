@@ -9,10 +9,11 @@ import { useReviews } from '../../lib/useReviews.js';
 import { useStats } from '../../lib/useStats.js';
 import { useI18n } from '../../lib/i18n.jsx';
 import { usePageMeta } from '../../lib/useMeta.js';
-import { useTrustpilot } from '../../lib/useTrustpilot.js';
+import { useTrustpilot, useTrustpilotLinks } from '../../lib/useTrustpilot.js';
 
 /** "Write a review" — verified buyers pick one of their delivered orders. */
 function WriteReview({ t }) {
+  const { review: trustpilotWrite } = useTrustpilotLinks();
   const { user } = useAuth();
   const toast = useToast();
   const [orders, setOrders] = useState(null);
@@ -36,12 +37,38 @@ function WriteReview({ t }) {
       await api.post(`/api/account/orders/${orderId}/review`, { stars, body: body.trim() });
       toast.success(t('reviews.wThanks', 'Thanks — your verified review is live!'));
       setDone(true);
-      setTimeout(() => window.location.reload(), 1200);
+      // With a Trustpilot profile the panel below replaces the form and asks
+      // for a second review; reloading would wipe it off the screen at the one
+      // moment this person is willing to write. Without one there is nothing to
+      // stay for, so the list refresh still happens.
+      if (!trustpilotWrite) setTimeout(() => window.location.reload(), 1200);
     } catch (e) { toast.error(e.message); }
     finally { setBusy(false); }
   };
 
-  if (done) return null;
+  // Nobody is ever more willing to review you than the person who just did.
+  // The words are still in their head — this asks while that is true, instead
+  // of in an email next week they will not open.
+  if (done) {
+    if (!trustpilotWrite) return null;
+    return (
+      <div className="max-w-xl mx-auto card p-6 mb-10 text-center">
+        <div className="text-3xl mb-2">💚</div>
+        <h3 className="text-white font-bold mb-1">{t('reviews.tpDoneTitle', 'Thanks — that means a lot')}</h3>
+        <p className="text-slate-400 text-sm leading-relaxed">
+          {t('reviews.tpDoneSub', 'One more thing, if you have 20 seconds: the same words on Trustpilot reach people who have never heard of us. We cannot edit or delete anything there, which is exactly why buyers trust it.')}
+        </p>
+        <a href={trustpilotWrite} target="_blank" rel="noreferrer"
+          className="inline-flex items-center justify-center gap-2 mt-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-900 font-bold text-sm px-5 h-11 transition fm-press">
+          ⭐ {t('reviews.tpDoneCta', 'Post it on Trustpilot')}
+        </a>
+        <button onClick={() => window.location.reload()}
+          className="block mx-auto mt-3 text-[13px] text-slate-500 hover:text-slate-300 transition">
+          {t('reviews.tpDoneSkip', 'No thanks')}
+        </button>
+      </div>
+    );
+  }
   return (
     <div className="max-w-xl mx-auto card p-6 mb-10">
       <h3 className="text-white font-bold flex items-center gap-2 mb-1"><PenLine size={16} className="text-violet-400" /> {t('reviews.write', 'Write a review')}</h3>

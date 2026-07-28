@@ -126,6 +126,25 @@ const FORGEMARKET_API_URL = cleanUrl(process.env.FORGEMARKET_API_URL, STORE_URL)
 // "we have no profile yet" everywhere, so the bot stays silent about it rather
 // than sending a buyer who went to check the reviews to a 404.
 const TRUSTPILOT_URL = cleanUrl(process.env.TRUSTPILOT_URL, '');
+/**
+ * Where to send someone we are ASKING for a review, as opposed to someone
+ * going to read them. Trustpilot spells that /evaluate/ instead of /review/,
+ * and every click between the ask and the box costs reviews.
+ *
+ * Derived from the profile so the owner fills in one variable, not two nearly
+ * identical ones. Anything we do not recognise falls through to the profile,
+ * which always carries a "Write a review" button — a longer route beats a
+ * broken one. Mirrors trustpilotWriteUrl() in the server's config.
+ */
+const TRUSTPILOT_REVIEW_URL = cleanUrl(process.env.TRUSTPILOT_REVIEW_URL, '') || (() => {
+  if (!TRUSTPILOT_URL) return '';
+  try {
+    const u = new URL(TRUSTPILOT_URL);
+    if (!/(^|\.)trustpilot\.com$/i.test(u.hostname) || !/^\/review\//i.test(u.pathname)) return TRUSTPILOT_URL;
+    u.pathname = u.pathname.replace(/^\/review\//i, '/evaluate/');
+    return u.toString().replace(/\/+$/, '');
+  } catch { return TRUSTPILOT_URL; }
+})();
 
 // Push a /vouch to the website so it appears on the storefront reviews section.
 // Signed with HMAC-SHA256 (x-timestamp + x-signature) so the API can verify
@@ -1504,7 +1523,7 @@ async function postVouch(i) {
   return i.reply({
     ephemeral: true,
     content: 'Thanks for the vouch! 💚 Posted in #vouchers **and** on the website.'
-      + (TRUSTPILOT_URL ? `\n\n⭐ Would you put it on Trustpilot too? It helps more than you'd think: ${TRUSTPILOT_URL}` : ''),
+      + (TRUSTPILOT_REVIEW_URL ? `\n\n⭐ Would you put it on Trustpilot too? It helps more than you'd think: ${TRUSTPILOT_REVIEW_URL}` : ''),
   });
 }
 
