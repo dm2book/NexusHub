@@ -183,6 +183,22 @@ function parseCoupons(s) {
   });
   return out;
 }
+/**
+ * Normalize a link that must leave this site.
+ *
+ * Copying a URL out of a browser that hides the scheme gives you
+ * "nl.trustpilot.com/review/…", and an <a href> without a scheme is a
+ * RELATIVE path: the visitor lands on forgemarket.nl/nl.trustpilot.com/… —
+ * our own 404 — instead of the profile. The Discord bot already fixes this up
+ * for its own copy, so the mistake would work there and break only on the
+ * website, which is the hardest kind to notice.
+ */
+const externalUrl = (v) => {
+  const u = String(v || '').trim().replace(/\/+$/, '');
+  if (!u) return '';
+  return /^https?:\/\//i.test(u) ? u : `https://${u}`;
+};
+
 config.shop = {
   coupons: parseCoupons(env.COUPONS),
   announcement: env.SITE_ANNOUNCEMENT || '',
@@ -190,7 +206,7 @@ config.shop = {
   // renders the link only when it is set, so an unconfigured shop never sends
   // a buyer to a page that does not exist. An env var rather than a constant
   // so the URL can change without a rebuild.
-  trustpilotUrl: (env.TRUSTPILOT_URL || '').trim(),
+  trustpilotUrl: externalUrl(env.TRUSTPILOT_URL),
 };
 
 /** Validate a coupon code → { code, percent } or null. */
