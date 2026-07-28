@@ -372,19 +372,25 @@ export default function HomeStore() {
         {/* Main */}
         <main className="flex-1 min-w-0 space-y-6">
           {/* Hero */}
-          <section className="relative overflow-hidden rounded-3xl bg-white border border-slate-200/70 shadow-sm px-6 sm:px-10 py-9">
+          {/* The one place on the shop that is allowed to be theatre. Dark
+              stage, a single coloured beam, oversized ghost type — the rest of
+              the site stays light, because a price on a dark background is one
+              more thing for a nervous buyer to squint at. */}
+          <section className="fm-stage relative overflow-hidden rounded-3xl px-6 sm:px-10 py-12 sm:py-14">
+            <span className="fm-beam" aria-hidden />
+            <span className="fm-ghostword" aria-hidden>FORGE</span>
             {/* On xl the feature cards get their own column instead of floating
                 over the artwork, which used to bury the right-hand logos. */}
             <div className="grid lg:grid-cols-[1.05fr_1fr] 2xl:grid-cols-[1.1fr_1fr_206px] gap-8 2xl:gap-6 items-center">
-              <div className="fm-stagger" style={{ '--fm-stagger': '80ms' }}>
-                <span className="inline-flex items-center gap-2 text-[13px] font-semibold text-violet-700 bg-violet-100 rounded-full px-3 py-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-violet-500" /> {tr('home.badge', 'Buyer protected · Real human support')}
+              <div className="relative fm-stagger" style={{ '--fm-stagger': '90ms' }}>
+                <span className="inline-flex items-center gap-2 text-[13px] font-semibold text-violet-100 bg-white/10 border border-white/15 backdrop-blur rounded-full px-3 py-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-violet-300 animate-pulse" /> {tr('home.badge', 'Buyer protected · Real human support')}
                 </span>
-                <h1 className="fm-head text-[40px] sm:text-[52px] leading-[1.05] mt-5">
+                <h1 className="fm-head fm-streak text-white text-[42px] sm:text-[58px] leading-[1.02] mt-5 tracking-[-.02em]">
                   {tr('home.h1a', 'Everything You Need,')}<br />
                   <span className="fm-gradient-text">{tr('home.h1b', 'All in One Place.')}</span>
                 </h1>
-                <p className="text-slate-500 text-[16px] mt-5 max-w-lg leading-relaxed">
+                <p className="text-slate-300/90 text-[16px] mt-5 max-w-lg leading-relaxed">
                   {tr('home.sub', 'Robux, V-Bucks, Valorant Points and more. In stock is sent automatically — everything else by hand, usually within a few hours.')}
                 </p>
                 <div className="flex flex-wrap items-center gap-3 mt-7">
@@ -392,7 +398,7 @@ export default function HomeStore() {
                     style={{ backgroundImage: 'linear-gradient(135deg,#7c5cff,#a855f7)' }}>
                     {tr('home.shopNowBig', 'Shop Now')} <ArrowRight size={18} />
                   </Link>
-                  <Link to="/shop" className="fm-press inline-flex items-center gap-2 font-semibold rounded-xl px-6 h-12 border border-slate-300 text-slate-700 hover:bg-slate-50 transition">
+                  <Link to="/shop" className="fm-press inline-flex items-center gap-2 font-semibold rounded-xl px-6 h-12 border border-white/25 text-white hover:bg-white/10 transition">
                     {tr('home.viewAll', 'View All Products')}
                   </Link>
                 </div>
@@ -400,10 +406,10 @@ export default function HomeStore() {
                   <div className="flex items-center gap-3 mt-7">
                     <div className="flex -space-x-2.5">
                       {['#f472b6', '#60a5fa', '#34d399', '#fbbf24'].map((c, i) => (
-                        <span key={i} className="w-9 h-9 rounded-full border-2 border-white" style={{ background: c }} />
+                        <span key={i} className="w-9 h-9 rounded-full border-2 border-white/25" style={{ background: c }} />
                       ))}
                     </div>
-                    <div className="text-sm"><b className="fm-head">{fmtCount(stats.reviews)}</b> <span className="text-slate-500">{tr('home.happy', 'Happy Customers')}</span></div>
+                    <div className="text-sm text-white"><b className="fm-head">{fmtCount(stats.reviews)}</b> <span className="text-slate-400">{tr('home.happy', 'Happy Customers')}</span></div>
                   </div>
                 )}
               </div>
@@ -414,10 +420,10 @@ export default function HomeStore() {
               {/* feature cards — their own column once the layout is wide enough */}
               <div className="hidden 2xl:flex flex-col gap-2.5">
                 {HERO_FEATURES.map((f) => (
-                  <div key={f.title} className="flex items-center gap-3 bg-white/95 backdrop-blur border border-slate-200/70 rounded-2xl px-3.5 py-2.5 shadow-md transition hover:shadow-lg hover:-translate-y-0.5">
+                  <div key={f.title} className="flex items-center gap-3 bg-white/[.07] backdrop-blur border border-white/12 rounded-2xl px-3.5 py-2.5 transition hover:bg-white/[.11] hover:-translate-y-0.5">
                     <span className={`w-9 h-9 rounded-xl grid place-items-center shrink-0 ${f.color}`}><f.icon size={17} /></span>
                     <div className="leading-tight min-w-0">
-                      <div className="text-[13px] font-semibold">{tr(`home.f.${f.key}`, f.title)}</div>
+                      <div className="text-[13px] font-semibold text-white">{tr(`home.f.${f.key}`, f.title)}</div>
                       <div className="text-[11px] text-slate-400">{tr(`home.f.${f.key}Sub`, f.sub)}</div>
                     </div>
                   </div>
@@ -658,13 +664,14 @@ function HeroRender() {
       {/* sparkles (deepest layer — drift the most) */}
       {[['12%', '16%'], ['84%', '22%'], ['66%', '6%'], ['20%', '72%'], ['90%', '60%'], ['48%', '90%']].map(([l, t], i) => (
         <div key={i} className="fm-px absolute" style={{ left: l, top: t, '--d': 0.16 + (i % 3) * 0.04 }}>
-          <Sparkles size={i % 2 ? 16 : 12} className="text-violet-400/70 fm-float2" style={{ animationDelay: `${i * 0.4}s` }} />
+          <Sparkles size={i % 2 ? 16 : 12} className="text-violet-300/80 fm-orbit" style={{ animationDelay: `${i * 0.55}s`, '--orbit-dur': `${8 + i}s` }} />
         </div>
       ))}
       {/* center V-Bucks (foreground — drifts least, feels closest) */}
       <div className="fm-px absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10" style={{ '--d': 0.04 }}>
         <span className="fm-hero-item" style={{ '--halo': HALO['v-bucks'] }}>
-          <img src={ICON('v-bucks')} alt="" className="w-[150px] h-[150px] object-contain drop-shadow-2xl fm-float" />
+          <img src={ICON('v-bucks')} alt="" className="w-[150px] h-[150px] object-contain drop-shadow-2xl fm-orbit"
+            style={{ '--orbit-dur': '13s' }} />
         </span>
       </div>
       {/* surrounding cluster (mid layers, varied float + rotation) */}
