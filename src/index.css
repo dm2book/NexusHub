@@ -657,3 +657,91 @@ h1, h2, h3, .font-display, .fm-head {
     transform: none !important; opacity: 1 !important;
   }
 }
+
+/* ── Cinematic hero ───────────────────────────────────────────────────────
+   Borrowed from a brand campaign page: near-black stage, ONE coloured light
+   source, oversized type, and depth built from layered motion rather than from
+   photography — which is what a shop selling SVG coin icons has to work with.
+
+   Deliberately scoped to the hero. The rest of the shop stays light and plain:
+   a buyer being asked to transfer money to a stranger is helped by clarity, not
+   by atmosphere, and every dark-on-dark price is one more reason to hesitate. */
+.fm-stage {
+  background:
+    radial-gradient(120% 80% at 50% 0%,  rgba(124,92,255,.30), transparent 60%),
+    radial-gradient(80% 60% at 85% 100%, rgba(236,72,153,.18), transparent 65%),
+    linear-gradient(180deg, #0b0d1a 0%, #121428 55%, #0d0f1e 100%);
+}
+/* The light column: a soft vertical beam behind the artwork, like the red strip
+   in the reference. Pure gradient — no image, nothing to download. */
+.fm-beam {
+  position: absolute; top: -12%; bottom: -12%; left: 50%; width: 34%;
+  transform: translateX(-50%);
+  background: linear-gradient(180deg, transparent, rgba(167,139,250,.55) 22%, rgba(236,72,153,.42) 62%, transparent);
+  filter: blur(46px); opacity: .85; pointer-events: none;
+}
+/* Faint scanning sheen so the stage is never completely static. */
+.fm-stage::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,.055) 50%, transparent 60%);
+  background-size: 250% 100%;
+  animation: fmSheen 9s var(--ease-glide) infinite;
+}
+@keyframes fmSheen { from { background-position: 180% 0; } to { background-position: -80% 0; } }
+
+/* Oversized ghost word behind the content — the "CHILE20" trick. */
+.fm-ghostword {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%);
+  font-weight: 900; letter-spacing: -.04em; white-space: nowrap;
+  font-size: clamp(84px, 20vw, 260px); line-height: .8;
+  color: transparent; -webkit-text-stroke: 1.5px rgba(255,255,255,.07);
+  pointer-events: none; user-select: none;
+}
+
+/* Each floating icon gets its own drift, so the cluster reads as depth rather
+   than as one sprite sheet sliding about. */
+.fm-orbit { animation: fmOrbit var(--orbit-dur, 11s) var(--ease-glide) infinite; will-change: transform; }
+@keyframes fmOrbit {
+  0%,100% { transform: translate3d(0,0,0) rotate(0deg); }
+  33%     { transform: translate3d(6px,-14px,0) rotate(2.5deg); }
+  66%     { transform: translate3d(-5px,-6px,0) rotate(-2deg); }
+}
+
+/* Entrance with a streak of motion blur, like the type in the reference.
+   `both`, not `backwards`: this class is used on children of .fm-stagger, whose
+   base rule sets opacity:0 and relies on its own animation's `forwards` fill to
+   land at 1. A second animation on the same element REPLACES that one — with
+   `backwards` the element finished the streak and then snapped back to the
+   base opacity:0, and the headline vanished from the hero entirely. */
+.fm-streak { animation: fmStreak .8s var(--ease-expressive) both; }
+@keyframes fmStreak {
+  from { opacity: 0; transform: translateY(26px) scale(.985); filter: blur(11px); }
+  60%  { filter: blur(2px); }
+  to   { opacity: 1; transform: none; filter: blur(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fm-stage::after, .fm-orbit, .fm-streak {
+    animation: none !important; transform: none !important; filter: none !important; opacity: 1 !important;
+  }
+}
+
+/* The scroll hairline. Its hue travels with you — a cheap stand-in for the
+   colour temperature shifts the reference campaign gets from lighting. */
+.fm-progress {
+  background: linear-gradient(90deg, #7c5cff, #a855f7 45%, #ec4899 75%, #f59e0b);
+  box-shadow: 0 0 12px rgba(168,85,247,.5);
+  transition: opacity var(--dur-quick) var(--ease-glide);
+}
+
+/* One motion vocabulary. The reveal now speaks the same language as the hero's
+   streak — it settles INTO focus rather than merely fading up, so a section
+   arriving reads as the same gesture as the headline arriving. */
+.fm-reveal { opacity: 0; transform: translateY(22px) scale(.995); filter: blur(6px);
+  transition: opacity .7s var(--ease-expressive), transform .7s var(--ease-expressive), filter .5s var(--ease-expressive); }
+.fm-reveal.is-in { opacity: 1; transform: none; filter: blur(0); }
+
+@media (prefers-reduced-motion: reduce) {
+  .fm-progress { display: none; }
+  .fm-reveal { filter: none !important; }
+}
