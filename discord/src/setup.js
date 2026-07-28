@@ -21,6 +21,11 @@ import { buildPanels } from './panels.js';
 const { DISCORD_TOKEN, DISCORD_GUILD_ID } = process.env;
 let STORE_URL = process.env.STORE_URL || 'https://forgemarket.nl';
 if (!/^https?:\/\//.test(STORE_URL)) STORE_URL = `https://${STORE_URL}`;
+// Optional — blank means the shop has no Trustpilot profile yet, and the setup
+// then simply builds one fewer link. Never defaulted: a guessed profile URL is
+// worse than none at all in a channel whose whole job is "trust only these".
+let TRUSTPILOT_URL = (process.env.TRUSTPILOT_URL || '').trim();
+if (TRUSTPILOT_URL && !/^https?:\/\//.test(TRUSTPILOT_URL)) TRUSTPILOT_URL = `https://${TRUSTPILOT_URL}`;
 
 const MARKER = 'forgemarket-setup';
 
@@ -324,7 +329,9 @@ client.once(Events.ClientReady, async () => {
     // mentions now that every channel exists.
     const channelIdByName = Object.fromEntries(
       Object.entries(channelByName).map(([n, c]) => [n, c.id]));
-    const PANEL_COPY = buildPanels({ storeUrl: STORE_URL, guildName: guild.name, channelIdByName });
+    const PANEL_COPY = buildPanels({
+      storeUrl: STORE_URL, guildName: guild.name, channelIdByName, trustpilotUrl: TRUSTPILOT_URL,
+    });
 
     const ticketButtons = [
       new ButtonBuilder().setCustomId('ticket:order').setLabel('Order issue').setEmoji('🛒').setStyle(ButtonStyle.Primary),
@@ -339,9 +346,12 @@ client.once(Events.ClientReady, async () => {
       ['start-here'],
       ['rules'],
       ['verify', [verifyButton]],
+      // Five buttons is Discord's per-row limit, so the Trustpilot button only
+      // fits because it is the fifth — don't add a sixth without a second row.
       ['links', [
         link('🛍️ Shop', `${STORE_URL}/shop`), link('🏠 Home', STORE_URL),
-        link('📦 Track order', `${STORE_URL}/track`), link('👤 Account', `${STORE_URL}/account`)]],
+        link('📦 Track order', `${STORE_URL}/track`), link('👤 Account', `${STORE_URL}/account`),
+        ...(TRUSTPILOT_URL ? [link('⭐ Trustpilot', TRUSTPILOT_URL)] : [])]],
       ['announcements'],
       ['status', [link('📦 Track an order', `${STORE_URL}/track`)]],
       ['products', [link('🛍️ Browse the shop', `${STORE_URL}/shop`)]],
@@ -353,7 +363,7 @@ client.once(Events.ClientReady, async () => {
       ['report-a-scam', [new ButtonBuilder().setCustomId('ticket:other')
         .setLabel('Report a scammer').setEmoji('🚨').setStyle(ButtonStyle.Danger)]],
       ['open-a-ticket', ticketButtons],
-      ['reviews'],
+      ['reviews', TRUSTPILOT_URL ? [link('⭐ Read us on Trustpilot', TRUSTPILOT_URL)] : null],
       ['vouches'],
       ['proof-of-delivery'],
       ['discount-codes'],

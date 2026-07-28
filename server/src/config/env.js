@@ -183,7 +183,15 @@ function parseCoupons(s) {
   });
   return out;
 }
-config.shop = { coupons: parseCoupons(env.COUPONS), announcement: env.SITE_ANNOUNCEMENT || '' };
+config.shop = {
+  coupons: parseCoupons(env.COUPONS),
+  announcement: env.SITE_ANNOUNCEMENT || '',
+  // Public Trustpilot profile. Empty until the shop has one — every surface
+  // renders the link only when it is set, so an unconfigured shop never sends
+  // a buyer to a page that does not exist. An env var rather than a constant
+  // so the URL can change without a rebuild.
+  trustpilotUrl: (env.TRUSTPILOT_URL || '').trim(),
+};
 
 /** Validate a coupon code → { code, percent } or null. */
 export function couponFor(code) {

@@ -131,6 +131,7 @@ router.get('/config', asyncHandler(async (_req, res) => {
     paymentMethods: manual,                 // [{id,label,target,kind}]
     paymentNote: config.payments.manual.note,
     announcement: config.shop.announcement,  // optional promo bar text
+    trustpilotUrl: config.shop.trustpilotUrl,  // '' when the shop has no profile yet
     oauthProviders: listEnabledProviders(),
     discordEnabled: !!config.discord.inviteUrl || !!config.discord.guildId,
     brand: config.email.fromName,

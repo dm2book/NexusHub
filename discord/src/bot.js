@@ -122,6 +122,10 @@ const STORE_URL = cleanUrl(process.env.STORE_URL, 'https://forgemarket.nl');
 // The store and its API live on the same domain, so default the API URL to the
 // store URL — /order, /digest and the live price list then work out of the box.
 const FORGEMARKET_API_URL = cleanUrl(process.env.FORGEMARKET_API_URL, STORE_URL);
+// Public Trustpilot profile. No default on purpose: an unset value must mean
+// "we have no profile yet" everywhere, so the bot stays silent about it rather
+// than sending a buyer who went to check the reviews to a 404.
+const TRUSTPILOT_URL = cleanUrl(process.env.TRUSTPILOT_URL, '');
 
 // Push a /vouch to the website so it appears on the storefront reviews section.
 // Signed with HMAC-SHA256 (x-timestamp + x-signature) so the API can verify
@@ -452,7 +456,9 @@ async function syncPanelCopy(guild) {
   try {
     const channelIdByName = {};
     guild.channels.cache.forEach((c) => { if (c.name) channelIdByName[c.name] = c.id; });
-    const panels = buildPanels({ storeUrl: STORE_URL, guildName: guild.name, channelIdByName });
+    const panels = buildPanels({
+      storeUrl: STORE_URL, guildName: guild.name, channelIdByName, trustpilotUrl: TRUSTPILOT_URL,
+    });
 
     for (const [chName, panel] of Object.entries(panels)) {
       const ch = findChannel(guild, chName);
@@ -678,7 +684,9 @@ async function handleButton(i) {
     // the rules that are actually posted, not to a copy that drifted from them.
     const channelIdByName = {};
     i.guild.channels.cache.forEach((c) => { if (c.name) channelIdByName[c.name] = c.id; });
-    const rulesCopy = buildPanels({ storeUrl: STORE_URL, guildName: i.guild.name, channelIdByName }).rules;
+    const rulesCopy = buildPanels({
+      storeUrl: STORE_URL, guildName: i.guild.name, channelIdByName, trustpilotUrl: TRUSTPILOT_URL,
+    }).rules;
     const rules = new EmbedBuilder().setColor(0x6366f1)
       .setTitle('📜 Read & accept the rules')
       .setDescription(`${rulesCopy.description}\n\nPress the green button below to accept and unlock the server.`)
@@ -1490,7 +1498,14 @@ async function postVouch(i) {
     avatarUrl: i.user.displayAvatarURL({ extension: 'png', size: 128 }),
     stars, body: message, externalId: `vouch:${i.user.id}`,
   });
-  return i.reply({ content: 'Thanks for the vouch! 💚 Posted in #vouchers **and** on the website.', ephemeral: true });
+  // Someone who just wrote something nice is the only person who will ever
+  // bother writing it twice. Asking here — and only here — is why this line is
+  // in the vouch reply rather than pinned somewhere nobody reads.
+  return i.reply({
+    ephemeral: true,
+    content: 'Thanks for the vouch! 💚 Posted in #vouchers **and** on the website.'
+      + (TRUSTPILOT_URL ? `\n\n⭐ Would you put it on Trustpilot too? It helps more than you'd think: ${TRUSTPILOT_URL}` : ''),
+  });
 }
 
 // ── /price → live price lookup from the real catalog ─────────────────────────
