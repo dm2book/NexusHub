@@ -1,4 +1,5 @@
 import { Outlet, useLocation } from 'react-router-dom';
+import ScrollProgress from '../components/store/ScrollProgress.jsx';
 import { useEffect } from 'react';
 import StoreNav from '../components/store/StoreNav.jsx';
 import StoreFooter from '../components/store/StoreFooter.jsx';
@@ -36,6 +37,7 @@ export default function StoreLayout() {
       <RecentlyDelivered />
       <CommandPalette />
       <MobileTabBar />
+      <ScrollProgress />
       {/* The assistant used to exist on the homepage alone. Every page that can
           raise a question — the shop, a product, the cart, checkout, the status
           page — is inside THIS layout, so that is where it has to live. */}

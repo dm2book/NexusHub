@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
+import ScrollProgress from '../components/store/ScrollProgress.jsx';
 import { Link } from 'react-router-dom';
 import {
   Search, ShoppingCart, Zap, ShieldCheck, Headphones, Tag, Star, ArrowRight,
@@ -368,6 +369,7 @@ export default function HomeStore() {
         {/* The assistant itself. The homepage is not inside SiteLayout, so
             without this the card had nothing to open. */}
         <ChatWidget />
+      <ScrollProgress />
 
         {/* Main */}
         <main className="flex-1 min-w-0 space-y-6">

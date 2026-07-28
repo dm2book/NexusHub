@@ -725,3 +725,23 @@ h1, h2, h3, .font-display, .fm-head {
     animation: none !important; transform: none !important; filter: none !important; opacity: 1 !important;
   }
 }
+
+/* The scroll hairline. Its hue travels with you — a cheap stand-in for the
+   colour temperature shifts the reference campaign gets from lighting. */
+.fm-progress {
+  background: linear-gradient(90deg, #7c5cff, #a855f7 45%, #ec4899 75%, #f59e0b);
+  box-shadow: 0 0 12px rgba(168,85,247,.5);
+  transition: opacity var(--dur-quick) var(--ease-glide);
+}
+
+/* One motion vocabulary. The reveal now speaks the same language as the hero's
+   streak — it settles INTO focus rather than merely fading up, so a section
+   arriving reads as the same gesture as the headline arriving. */
+.fm-reveal { opacity: 0; transform: translateY(22px) scale(.995); filter: blur(6px);
+  transition: opacity .7s var(--ease-expressive), transform .7s var(--ease-expressive), filter .5s var(--ease-expressive); }
+.fm-reveal.is-in { opacity: 1; transform: none; filter: blur(0); }
+
+@media (prefers-reduced-motion: reduce) {
+  .fm-progress { display: none; }
+  .fm-reveal { filter: none !important; }
+}
