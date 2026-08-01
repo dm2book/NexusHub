@@ -146,7 +146,10 @@ export default function HomeStore() {
         '@type': 'OnlineStore',
         name: 'ForgeMarket',
         url: window.location.origin,
-        description: 'Premium gaming top-ups: Robux, V-Bucks, gift cards & more with instant delivery.',
+        // Machine-readable text Google can quote verbatim, so it has to match
+        // what the visible site says: in stock goes out automatically, the rest
+        // is delivered by hand.
+        description: 'Game top-ups and gift cards: Robux, V-Bucks, Valorant, Steam and more. In stock is sent automatically; everything else is delivered by hand, usually within a few hours.',
       },
       {
         '@type': 'WebSite',
@@ -242,7 +245,8 @@ export default function HomeStore() {
 
           <LangSwitch className="hidden sm:inline-flex" />
 
-          <Link to="/cart" data-cart-target className="relative w-10 h-10 rounded-xl hover:bg-slate-100 grid place-items-center text-slate-700">
+          <Link to="/cart" data-cart-target aria-label={tr('nav.cart', 'Shopping cart')}
+            className="relative w-10 h-10 rounded-xl hover:bg-slate-100 grid place-items-center text-slate-700">
             <ShoppingCart size={20} />
             {count > 0 && (
               <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-violet-600 text-white text-[11px] font-semibold grid place-items-center">{count}</span>

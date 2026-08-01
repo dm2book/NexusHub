@@ -73,6 +73,18 @@ export async function createOrder(input, ctx = {}) {
     throw badRequest('An order needs at least one item');
   }
 
+  // EU distance selling: for digital goods the 14-day withdrawal right only
+  // lapses if the buyer expressly consented to immediate delivery AND
+  // acknowledged losing it — and the trader has to be able to PROVE that. The
+  // checkout has shown this checkbox for a while, but it never left the browser,
+  // so a chargeback would have found nothing on file. Recorded here, and the
+  // sentence itself is kept because the wording is what was agreed to.
+  //
+  // Refusing the order rather than defaulting to "consented" is deliberate: an
+  // assumed waiver is exactly the thing a dispute would throw out.
+  const consentText = String(input.consentText || '').trim().slice(0, 400);
+  if (!input.consent) throw badRequest('Please confirm immediate delivery before ordering');
+
   const orderId = newId('ord');
   const number = newOrderNumber();
   const at = nowIso();
@@ -142,11 +154,14 @@ export async function createOrder(input, ctx = {}) {
 
   await tx(async () => {
     await run(`INSERT INTO orders
-          (id, number, user_id, email, status, currency, subtotal, total, billing, created_at, updated_at)
-         VALUES (@id, @num, @uid, @email, 'pending', @cur, @sub, @tot, @bill, @at, @at)`,
+          (id, number, user_id, email, status, currency, subtotal, total, billing,
+           consent_at, consent_text, created_at, updated_at)
+         VALUES (@id, @num, @uid, @email, 'pending', @cur, @sub, @tot, @bill,
+           @consentAt, @consentText, @at, @at)`,
         { id: orderId, num: number, uid: input.userId || null, email,
           cur: currency, sub: subtotal, tot: total,
-          bill: JSON.stringify(billing), at });
+          bill: JSON.stringify(billing),
+          consentAt: at, consentText: consentText || null, at });
     for (const it of lineItems) {
       await run(`INSERT INTO order_items (id, order_id, product_id, name, quantity, unit_price, metadata)
            VALUES (@id, @oid, @pid, @name, @qty, @price, @meta)`,
@@ -172,6 +187,18 @@ export async function createOrder(input, ctx = {}) {
   const fraud = await scoreOrder({ order, user: ctx.user, email });
   await run('UPDATE orders SET fraud_score=@s, fraud_status=@d WHERE id=@id',
       { s: fraud.score, d: fraud.decision, id: orderId });
+
+  // Nothing left to pay — store credit (or a 100% coupon) covered the lot. The
+  // credit was already debited above, so leaving this 'pending' would park the
+  // buyer on a screen asking them to transfer €0.00 with a reference, until the
+  // 14-day auto-cancel swept it up. Settle it here instead, down the same path a
+  // real payment takes, so stock is dispensed and the delivery email goes out.
+  if (total === 0) {
+    const settled = await markPaymentReceived(orderId, `credit_${orderId}`,
+      { actorId: ctx.actorId || 'system', reason: 'Covered in full by store credit' })
+      .catch((e) => { console.error('[order] zero-total settle:', e.message); return null; });
+    if (settled) return settled;
+  }
 
   // Customer comms.
   const fresh = await getOrder(orderId);

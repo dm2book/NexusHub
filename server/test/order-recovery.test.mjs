@@ -31,7 +31,7 @@ const product = await createProduct({ name: `Recovery Pack ${tag}`, category: 'g
 // ── 1. Guest order emails must not point at the dashboard ───────────────────
 console.log('— Guest order links (no login wall) —');
 {
-  const guest = await createOrder({ email: `guest${tag}@x.dev`, items: [{ productId: product.id, quantity: 1 }] });
+  const guest = await createOrder({ consent: true, consentText: 'test consent', email: `guest${tag}@x.dev`, items: [{ productId: product.id, quantity: 1 }] });
   const url = orderUrlFor(await getOrder(guest.id));
   ok('guest order URL is the public track page', url.includes('/track?number='), url);
   ok('guest order URL carries the order number', url.includes(encodeURIComponent(guest.number)), url);
@@ -47,7 +47,7 @@ console.log('— Guest order links (no login wall) —');
 // ── 2. A signed-in buyer still gets their dashboard ─────────────────────────
 {
   const { user } = await upsertUserByEmail(`member${tag}@x.dev`);
-  const member = await createOrder({ email: user.email, userId: user.id, items: [{ productId: product.id, quantity: 1 }] });
+  const member = await createOrder({ consent: true, consentText: 'test consent', email: user.email, userId: user.id, items: [{ productId: product.id, quantity: 1 }] });
   const url = orderUrlFor(await getOrder(member.id));
   ok('signed-in order URL is the dashboard', url.includes(`/account/orders/${member.id}`), url);
 }
@@ -60,8 +60,8 @@ console.log('\n— Recovery reporting —');
     `rate=${fresh.paymentReminders.recoveryRate}`);
 
   // Two unpaid orders, backdated so the reminder cron picks them up.
-  const a = await createOrder({ email: `chase-a${tag}@x.dev`, items: [{ productId: product.id, quantity: 1 }] });
-  const b = await createOrder({ email: `chase-b${tag}@x.dev`, items: [{ productId: product.id, quantity: 1 }] });
+  const a = await createOrder({ consent: true, consentText: 'test consent', email: `chase-a${tag}@x.dev`, items: [{ productId: product.id, quantity: 1 }] });
+  const b = await createOrder({ consent: true, consentText: 'test consent', email: `chase-b${tag}@x.dev`, items: [{ productId: product.id, quantity: 1 }] });
   const old = new Date(Date.now() - 3 * 3_600_000).toISOString();
   for (const o of [a, b]) await run('UPDATE orders SET created_at=@at WHERE id=@id', { at: old, id: o.id });
 
@@ -91,7 +91,7 @@ console.log('\n— Recovery reporting —');
     `waiting=${afterPay.paymentReminders.stillWaiting}`);
 
   // An order paid BEFORE any reminder must never be attributed to the email.
-  const c = await createOrder({ email: `early${tag}@x.dev`, items: [{ productId: product.id, quantity: 1 }] });
+  const c = await createOrder({ consent: true, consentText: 'test consent', email: `early${tag}@x.dev`, items: [{ productId: product.id, quantity: 1 }] });
   await addProductCodes(product.id, [`REC-${tag}-2`]);
   await markPaymentReceived(c.id, `tx-early${tag}`, { actorId: 'test' });
   const afterEarly = await recoveryMetrics({ days: 30 });
@@ -101,7 +101,7 @@ console.log('\n— Recovery reporting —');
     `recovered=${afterEarly.paymentReminders.recovered}`);
 
   // Unpaid + old + never mailed = money the cron is leaving on the table.
-  const d = await createOrder({ email: `unchased${tag}@x.dev`, items: [{ productId: product.id, quantity: 1 }] });
+  const d = await createOrder({ consent: true, consentText: 'test consent', email: `unchased${tag}@x.dev`, items: [{ productId: product.id, quantity: 1 }] });
   await run('UPDATE orders SET created_at=@at WHERE id=@id', { at: old, id: d.id });
   const withGap = await recoveryMetrics({ days: 30 });
   ok('unchased unpaid orders are surfaced', withGap.paymentReminders.notSentYet === 1,

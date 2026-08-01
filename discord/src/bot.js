@@ -1401,6 +1401,23 @@ const OUTBOX_CHANNEL = {
 };
 /** Notification roles the bot may ping when relaying a store event. */
 const OUTBOX_PING = { deals: ['Deals', 'Drops & Restocks'] };
+
+/** Tell the store which events really landed, so the rest can be retried. */
+async function ackOutbox(ids) {
+  try {
+    const ts = String(Date.now());
+    const canonical = `ack:${[...new Set(ids.map(String))].sort().join(',')}`;
+    const signature = createHmac('sha256', REVIEW_INGEST_SECRET).update(`${ts}.${canonical}`).digest('hex');
+    const res = await fetch(`${FORGEMARKET_API_URL.replace(/\/$/, '')}/api/discord/outbox/ack`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-timestamp': ts, 'x-signature': signature },
+      body: JSON.stringify({ ids }),
+    });
+    // A store that has not deployed the ack endpoint yet returns 404. Say so
+    // once rather than silently: without it every event is retried forever.
+    if (!res.ok) console.error(`[outbox] ack ${res.status} — events will be re-offered`);
+  } catch (e) { console.error('[outbox] ack failed:', e.message); }
+}
 async function pollOutbox(c) {
   if (!FORGEMARKET_API_URL || !REVIEW_INGEST_SECRET) return;
   try {
@@ -1413,11 +1430,24 @@ async function pollOutbox(c) {
     });
     if (!res.ok) throw new Error(`outbox ${res.status}`);
     const { events = [] } = await res.json();
+    // Only ids that genuinely reached Discord are acknowledged. Anything that
+    // throws, or has no channel to go to, stays queued on the store side and is
+    // offered again once its lease expires — order pings ride this queue, and a
+    // silently dropped one means a paid order nobody hears about.
+    const delivered = [];
     for (const ev of events) {
       try {
         if (ev.channel === 'dm') {
           const { discordUserId, ...body } = ev.body || {};
-          if (discordUserId) await c.users.send(discordUserId, body).catch(() => {});
+          if (!discordUserId) { delivered.push(ev.id); continue; } // nothing to send to
+          // A member with DMs closed will never accept this one; retrying it every
+          // lease forever is worse than letting it go, so it counts as handled.
+          await c.users.send(discordUserId, body)
+            .then(() => delivered.push(ev.id))
+            .catch((e) => {
+              if (e?.code === 50007) { delivered.push(ev.id); return; } // cannot DM this user
+              console.error('[outbox] dm failed:', e.message);
+            });
           continue;
         }
         const guild = c.guilds.cache.first();
@@ -1435,13 +1465,22 @@ async function pollOutbox(c) {
               content: [...pingRoles.map((r) => `<@&${r.id}>`), ev.body.content].filter(Boolean).join(' '),
               allowedMentions: { roles: pingRoles.map((r) => r.id) } }
           : ev.body;
-        const sent = await ch.send(body).catch(() => null);
+        const sent = await ch.send(body).catch((e) => {
+          console.error(`[outbox] #${ch.name} send failed:`, e.message);
+          return null;
+        });
+        if (sent) delivered.push(ev.id);
         // #announcements is an announcement channel; publishing is the only
         // reason to use that type, and nothing was ever crossposted.
         if (sent && ch.type === ChannelType.GuildAnnouncement) await sent.crosspost().catch(() => {});
       } catch (e) { console.error('[outbox] event failed:', e.message); }
     }
-    if (events.length) console.log(`📮 [outbox] relayed ${events.length} store event(s)`);
+    if (delivered.length) await ackOutbox(delivered);
+    if (events.length) {
+      const stuck = events.length - delivered.length;
+      console.log(`📮 [outbox] relayed ${delivered.length}/${events.length} store event(s)` +
+        (stuck ? ` · ${stuck} left queued for retry` : ''));
+    }
   } catch (e) {
     // 404 = the store hasn't deployed the outbox yet; stay quiet about it.
     if (!/outbox 404/.test(e.message)) console.error('[outbox]', e.message);

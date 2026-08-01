@@ -79,16 +79,16 @@ export default function LightProductCard({ product, onAdd }) {
             // Owner-supplied photo/logo: fill the tile with a soft blurred copy
             // so any baked-in background blends in instead of floating as a box.
             <>
-              <img src={img} alt="" aria-hidden="true"
+              <img src={img} alt="" aria-hidden="true" loading="lazy" decoding="async"
                 className="absolute inset-0 w-full h-full object-cover scale-125 blur-2xl opacity-90" />
               {/* data-morph is forced position:relative by .fm-card-media (see index.css),
                   so centre it with the grid + cap its size. Fixed-px max-height —
                   a % one resolves against the auto grid track and is ignored. */}
-              <img data-morph src={img} alt={product.name} onError={() => setImgBroken(true)}
+              <img data-morph src={img} alt={product.name} loading="lazy" decoding="async" onError={() => setImgBroken(true)}
                 className="relative z-[1] max-w-[86%] max-h-[118px] object-contain drop-shadow-md group-hover:scale-105 transition-transform duration-500" />
             </>
           ) : (
-            <img data-morph src={img} alt={product.name} onError={() => setImgBroken(true)}
+            <img data-morph src={img} alt={product.name} loading="lazy" decoding="async" onError={() => setImgBroken(true)}
               className="fm-logo w-[92px] h-[92px] group-hover:scale-105 transition-transform" />
           )
         ) : (

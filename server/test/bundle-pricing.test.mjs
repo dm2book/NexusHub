@@ -72,12 +72,12 @@ console.log('\n— The server agrees —');
   const server = await bestBundleDiscount(items);
   ok('server discount matches the storefront', server.discount === priced.discount, `${server.discount}`);
 
-  const order = await createOrder({ email: `bundle${tag}@x.dev`, items: [{ productId: a.id, quantity: 1 }, { productId: b.id, quantity: 1 }] });
+  const order = await createOrder({ consent: true, consentText: 'test consent', email: `bundle${tag}@x.dev`, items: [{ productId: a.id, quantity: 1 }, { productId: b.id, quantity: 1 }] });
   ok('the order total is the price the buyer was shown', order.total === priced.total, `${order.total} vs ${priced.total}`);
   ok('the discount is recorded on the order', order.billing?.bundleDiscount === priced.discount, `${order.billing?.bundleDiscount}`);
   ok('the bundle name is recorded', !!order.billing?.bundle);
 
-  const solo = await createOrder({ email: `solo${tag}@x.dev`, items: [{ productId: a.id, quantity: 1 }] });
+  const solo = await createOrder({ consent: true, consentText: 'test consent', email: `solo${tag}@x.dev`, items: [{ productId: a.id, quantity: 1 }] });
   ok('a single product gets no bundle discount', solo.total === a.price, `${solo.total}`);
 }
 

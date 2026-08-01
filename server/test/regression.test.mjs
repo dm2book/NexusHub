@@ -27,7 +27,7 @@ const best = await bestBundleDiscount([
 ]);
 ok('bundle discount computed', best.discount === Math.round(1200 * 0.15));
 
-const o = await createOrder({ email: 'combo@example.com', coupon: c.code, items: [
+const o = await createOrder({ consent: true, consentText: 'test consent', email: 'combo@example.com', coupon: c.code, items: [
   { productId: p1.id, quantity: 1 }, { productId: p2.id, quantity: 1 }] });
 ok('order applies coupon + bundle', o.total === 1200 - Math.round(1200 * 0.10) - Math.round(1200 * 0.15));
 

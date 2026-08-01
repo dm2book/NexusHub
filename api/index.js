@@ -12,6 +12,15 @@
  * `npm install` covers both the SPA build and this function.
  */
 import { createApp } from '../server/src/app.js';
+import { assertProductionConfig } from '../server/src/config/env.js';
+
+// The standalone server (server/src/index.js) has always run this check, but
+// THIS file is what Vercel actually deploys — so in production the check never
+// ran. Without it a missing JWT_SECRET silently falls back to the dev default
+// that is committed to this repository, and anyone who reads the repo can mint
+// a token for any account. Failing to boot is the correct outcome: a function
+// that refuses to start is visible in the deploy log, a forgeable session is not.
+assertProductionConfig();
 
 const app = createApp({ lazyReady: true });
 

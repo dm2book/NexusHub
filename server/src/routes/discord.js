@@ -1,7 +1,7 @@
 /** Public Discord community info + the bot's staff digest endpoint. */
 import { Router } from 'express';
 import { asyncHandler } from '../middleware/error.js';
-import { getServerInfo, claimOutbox, stampBotSeen, setLiveInviteUrl } from '../services/discordService.js';
+import { getServerInfo, claimOutbox, ackOutbox, stampBotSeen, setLiveInviteUrl } from '../services/discordService.js';
 import { verifyIngest } from '../middleware/ingestSignature.js';
 import { config } from '../config/env.js';
 import { overview, topProducts } from '../services/analyticsService.js';
@@ -28,6 +28,17 @@ router.post('/outbox',
     const events = await claimOutbox(20);
     await stampBotSeen();
     res.json({ events });
+  }));
+
+// The bot reports back which events it actually delivered. Anything it does not
+// acknowledge stays queued and is offered again once the lease expires, so a
+// failed send costs a retry instead of the event.
+export const canonicalAck = (body) =>
+  `ack:${[...new Set((body?.ids || []).map(String))].sort().join(',')}`;
+router.post('/outbox/ack',
+  verifyIngest(canonicalAck)(config.discord.reviewIngestSecret),
+  asyncHandler(async (req, res) => {
+    res.json({ acked: await ackOutbox(req.body?.ids || []) });
   }));
 
 /**

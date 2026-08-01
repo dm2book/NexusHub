@@ -54,7 +54,13 @@ async function request(path, { method = 'GET', body, raw = false, retry = true, 
     clearTimeout(timer);
     // First request woke a cold serverless function / sleeping DB — retry once,
     // by which point it's warm and responds quickly.
-    if (e.name === 'AbortError' && _coldRetry) {
+    //
+    // GET only, and deliberately so. An AbortError means THIS SIDE gave up after
+    // the timeout, not that the server ignored us: a slow POST /api/orders may
+    // well have committed already, and retrying it would hand the buyer a second
+    // order number and a second payment reminder for one purchase. Re-fetching a
+    // GET costs nothing; re-sending a write costs an order.
+    if (e.name === 'AbortError' && _coldRetry && method === 'GET') {
       return request(path, { method, body, raw, retry, timeout, _coldRetry: false });
     }
     const err = new Error(e.name === 'AbortError'

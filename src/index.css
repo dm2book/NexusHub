@@ -591,8 +591,12 @@ h1, h2, h3, .font-display, .fm-head {
    Clear the taller of the two rather than branching per route — one rule cannot
    drift out of sync with the pages. Desktop has no bottom bar, so that case is
    a media query: JS cannot see a breakpoint. */
-.fm-fab       { bottom: calc(73px + env(safe-area-inset-bottom) + 0.75rem); }
-.fm-fab-panel { bottom: calc(73px + env(safe-area-inset-bottom) + 5.5rem); }
+/* 73px clears the mobile tab bar. Cart and Checkout stack their own sticky pay
+   bar in the same corner, which is taller — measured with elementFromPoint, the
+   bubble was sitting on the right-hand end of the Checkout button and eating
+   real taps. Those pages raise --fm-fab-lift while they are mounted. */
+.fm-fab       { bottom: calc(var(--fm-fab-lift, 73px) + env(safe-area-inset-bottom) + 0.75rem); }
+.fm-fab-panel { bottom: calc(var(--fm-fab-lift, 73px) + env(safe-area-inset-bottom) + 5.5rem); }
 @media (min-width: 1024px) {
   .fm-fab       { bottom: 1.25rem; }
   .fm-fab-panel { bottom: 6rem; }

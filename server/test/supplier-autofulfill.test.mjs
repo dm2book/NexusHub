@@ -45,7 +45,7 @@ await run(`INSERT INTO users (id,email,display_name,created_at,updated_at)
            VALUES (@id,'sup@test.dev','S',@at,@at) ON CONFLICT (id) DO NOTHING`, { id: uid, at });
 
 const paidOrder = async (productId) => {
-  const o = await createOrder({ email: 'sup@test.dev', userId: uid, items: [{ productId, quantity: 1 }] }, { actorId: uid });
+  const o = await createOrder({ consent: true, consentText: 'test consent', email: 'sup@test.dev', userId: uid, items: [{ productId, quantity: 1 }] }, { actorId: uid });
   await transitionOrder(o.id, 'payment_received', { actorId: 'admin' });
   return o;
 };
