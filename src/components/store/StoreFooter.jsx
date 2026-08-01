@@ -5,6 +5,7 @@ import { api } from '../../lib/api.js';
 import { useI18n } from '../../lib/i18n.jsx';
 import { SUPPORT_EMAIL } from '../../lib/support.js';
 import { useTrustpilot } from '../../lib/useTrustpilot.js';
+import SellerIdentity from './SellerIdentity.jsx';
 
 /** Real system status from /api/health (no fake claims). */
 export function SystemStatus() {
@@ -80,6 +81,13 @@ export default function StoreFooter() {
               ⭐ {t('footer.trustpilot', 'Read our Trustpilot reviews')}
             </a>
           )}
+          {/* Who is selling, in the place every shopper has been trained to look
+              for it. Dutch and EU law require this to be stated before someone
+              buys; a footer that names nobody is the single most common thing a
+              scam storefront and a real one look different on. */}
+          <div className="mt-5 pt-4 border-t border-slate-200/70">
+            <SellerIdentity compact />
+          </div>
         </div>
         {COLS.map((c) => (
           <div key={c.title}>
