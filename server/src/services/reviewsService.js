@@ -95,7 +95,19 @@ export async function deleteReview(id) {
 
 /** Aggregate rating + count over visible reviews. */
 export async function reviewStats() {
+  // Verified only — a review tied to a real delivered order.
+  //
+  // The public star rating drives the homepage, the Trust Center and the
+  // Product structured data Google shows as stars. It used to average every
+  // visible review, and a Discord /vouch counts as visible: the role that
+  // unlocks it only confirms you are human, not that you ever bought anything.
+  // One five-star from every member of a server would have moved the number the
+  // whole shop is judged on.
+  //
+  // Vouches still show on the site as community vouches. They just no longer
+  // vote on a rating that claims to come from customers.
   const r = await get(
-    `SELECT COUNT(*) AS n, COALESCE(AVG(stars),0) AS avg FROM reviews WHERE status='visible'`);
+    `SELECT COUNT(*) AS n, COALESCE(AVG(stars),0) AS avg
+       FROM reviews WHERE status='visible' AND verified=1`);
   return { count: Number(r?.n || 0), average: Math.round(Number(r?.avg || 0) * 10) / 10 };
 }

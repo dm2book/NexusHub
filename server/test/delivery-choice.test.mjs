@@ -24,7 +24,7 @@ await addProductCodes(p.id, [`GC-${tag}-A`, `GC-${tag}-B`, `GC-${tag}-C`]);
 // ── Account top-up: must NOT auto-dispense a code even though stock exists ────
 console.log('— Account top-up delivery —');
 {
-  const o = await createOrder({ email: `acc${tag}@x.dev`, items: [{ productId: p.id, quantity: 1 }],
+  const o = await createOrder({ consent: true, consentText: 'test consent', email: `acc${tag}@x.dev`, items: [{ productId: p.id, quantity: 1 }],
     billing: { deliveryMethod: 'account', deliveryDetails: 'CoolGamer123', deliveryLabel: 'Roblox username' } });
   ok('order stored deliveryMethod=account', o.billing?.deliveryMethod === 'account', o.billing?.deliveryMethod);
   await markPaymentReceived(o.id, `t_${tag}_a`, {});
@@ -45,7 +45,7 @@ console.log('— Account top-up delivery —');
 // ── Gift code: normal auto-dispense from stock ───────────────────────────────
 console.log('\n— Gift-code delivery —');
 {
-  const o = await createOrder({ email: `code${tag}@x.dev`, items: [{ productId: p.id, quantity: 1 }],
+  const o = await createOrder({ consent: true, consentText: 'test consent', email: `code${tag}@x.dev`, items: [{ productId: p.id, quantity: 1 }],
     billing: { deliveryMethod: 'code' } });
   ok('order stored deliveryMethod=code', o.billing?.deliveryMethod === 'code', o.billing?.deliveryMethod);
   ok('code order has no stray delivery target', !o.billing?.deliveryDetails, JSON.stringify(o.billing));
@@ -63,7 +63,7 @@ console.log('\n— Gift-code delivery —');
 console.log('\n— Order summary breakdown (price-bug fix) —');
 {
   const coup = await createCoupon({ code: `SUM${tag}`, kind: 'fixed', value: 300, announce: false }); // €3 off
-  const o = await createOrder({ email: `sum${tag}@x.dev`, coupon: coup.code, items: [{ productId: p.id, quantity: 1 }],
+  const o = await createOrder({ consent: true, consentText: 'test consent', email: `sum${tag}@x.dev`, coupon: coup.code, items: [{ productId: p.id, quantity: 1 }],
     billing: { deliveryMethod: 'code' } });
   ok('order total reflects the €3 coupon (999 → 699)', o.total === 699, `total=${o.total}`);
   const email = await renderOrderEmail(o.id, 'order_received');

@@ -12,6 +12,7 @@ import { money } from '../lib/catalog.js';
 import { EmptyState } from '../components/ui.jsx';
 import { usePageMeta } from '../lib/useMeta.js';
 import { matchBundle } from '../lib/bundles.js';
+import { useStickyBarLift } from '../lib/useStickyBarLift.js';
 
 const METHOD_ICON = { tikkie: '🟢', revolut: '⚫', paypal: '🔵' };
 
@@ -20,6 +21,7 @@ const METHOD_ICON = { tikkie: '🟢', revolut: '⚫', paypal: '🔵' };
 
 export default function Checkout() {
   usePageMeta('Checkout', 'Complete your order — guest checkout, no account needed.');
+  useStickyBarLift(); // keep the chat bubble off the sticky pay bar
   const { t } = useI18n();
   const { items, subtotal, currency, clear } = useCart();
   const { user } = useAuth();
@@ -33,6 +35,17 @@ export default function Checkout() {
   // buyer explicitly asks for immediate delivery and acknowledges losing it.
   // Without this every code sold is refundable on demand.
   const [consent, setConsent] = useState(false);
+  // Resolved once so the sentence stored against the order is byte-for-byte the
+  // one this buyer actually read — including which language they read it in.
+  const consentSentence = t('checkout.consent',
+    'I want my order delivered immediately and I understand I lose my 14-day right of withdrawal once it has been delivered.');
+  // A disabled button that does nothing when tapped reads as a broken shop.
+  const jumpToConsent = () => {
+    const el = document.getElementById('fm-consent');
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    el.querySelector('input')?.focus({ preventScroll: true });
+  };
   const [provider, setProvider] = useState('none');     // stripe | demo | manual | none
   const [methods, setMethods] = useState([]);
   const [note, setNote] = useState('');
@@ -135,6 +148,11 @@ export default function Checkout() {
         coupon: coupon?.code,
         useCredit: creditToApply || undefined,
         paymentMethod: methodId || undefined,
+        // Sent, not just checked in the browser: the server records it against
+        // the order, which is what a chargeback dispute actually needs. The
+        // sentence travels with it because the wording is what was agreed to.
+        consent: true,
+        consentText: consentSentence,
       });
 
       if (provider === 'stripe') {
@@ -351,10 +369,10 @@ export default function Checkout() {
             {creditToApply > 0 && <div className="flex justify-between text-sm text-indigo-300"><span>{t('checkout.credit', 'Store credit')}</span><span>−{money(creditToApply, currency)}</span></div>}
             <div className="flex justify-between text-lg pt-1"><span className="text-slate-300">{t('cart.total', 'Total')}</span><span className="text-white font-semibold">{money(grandTotal, currency)}</span></div>
           </div>
-          <label className="flex items-start gap-2.5 mb-3 text-[12.5px] text-slate-400 cursor-pointer">
+          <label id="fm-consent" className="flex items-start gap-2.5 mb-3 text-[12.5px] text-slate-400 cursor-pointer scroll-mt-24">
             <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)}
               className="mt-0.5 shrink-0 w-4 h-4 accent-violet-600" />
-            <span>{t('checkout.consent', 'I want my order delivered immediately and I understand I lose my 14-day right of withdrawal once it has been delivered.')}</span>
+            <span>{consentSentence}</span>
           </label>
           <button disabled={busy || !consent} className="btn-primary w-full py-3">
             {busy ? <Loader2 size={18} className="animate-spin" />
@@ -379,24 +397,37 @@ export default function Checkout() {
         </div>
 
         {/* Sticky pay bar — on a phone the real button is far below the fold. */}
-        <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur border-t border-slate-200 px-4 py-3 flex items-center gap-3"
+        {/* The bar is the only thing a phone shows on arrival, and its button is
+            dead until the consent box — 293px further down, measured — is ticked.
+            The explanation therefore has to live INSIDE the bar, and tapping the
+            disabled button has to take you to the box rather than doing nothing. */}
+        <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur border-t border-slate-200 px-4 py-3"
           style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}>
-          <div className="min-w-0">
-            <div className="text-[11px] text-slate-500">{t('cart.total', 'Total')}</div>
-            <div className="text-lg fm-num text-violet-600 leading-tight">{money(grandTotal, currency)}</div>
+          <div className="flex items-center gap-3">
+            <div className="min-w-0">
+              <div className="text-[11px] text-slate-500">{t('cart.total', 'Total')}</div>
+              <div className="text-lg fm-num text-violet-600 leading-tight">{money(grandTotal, currency)}</div>
+            </div>
+            {!consent && !busy ? (
+              <button type="button" onClick={jumpToConsent}
+                className="btn-primary flex-1 py-3 fm-tap">
+                {t('checkout.reviewFirst', 'Confirm delivery to continue')}
+              </button>
+            ) : (
+              <button type="submit" disabled={busy} className="btn-primary flex-1 py-3 fm-tap">
+                {busy ? <Loader2 size={18} className="animate-spin" />
+                  : provider === 'stripe' ? <>{t('checkout.payCard', 'Pay with card')}</>
+                  : provider === 'manual' ? <>{t('checkout.placePay', 'Place order & pay')}</>
+                  : <>{t('checkout.placeOrder', 'Place order')}</>}
+              </button>
+            )}
           </div>
-          <button type="submit" disabled={busy || !consent} className="btn-primary flex-1 py-3 fm-tap">
-            {busy ? <Loader2 size={18} className="animate-spin" />
-              : provider === 'stripe' ? <>{t('checkout.payCard', 'Pay with card')}</>
-              : provider === 'manual' ? <>{t('checkout.placePay', 'Place order & pay')}</>
-              : <>{t('checkout.placeOrder', 'Place order')}</>}
-          </button>
-        </div>
           {!consent && !busy && (
-            <p className="text-amber-300 text-[12.5px] mt-2 text-center">
-              {t('checkout.consentFirst', 'Tick the box above to continue — it is required by EU law before we can deliver straight away.')}
+            <p className="text-slate-500 text-[11.5px] mt-1.5 leading-snug">
+              {t('checkout.consentFirstShort', 'One tick needed: EU law requires your go-ahead before we deliver straight away.')}
             </p>
           )}
+        </div>
       </form>
     </div>
   );

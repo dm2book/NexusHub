@@ -67,7 +67,7 @@ console.log('— What counts as a payment link —');
 console.log('\n— Attaching it to an order —');
 {
   const p = await createProduct({ name: `Pay ${tag}`, category: 'robux', price: 1438, announce: false });
-  const order = await createOrder({ email: `pay${tag}@x.dev`, items: [{ productId: p.id, quantity: 1 }] });
+  const order = await createOrder({ consent: true, consentText: 'test consent', email: `pay${tag}@x.dev`, items: [{ productId: p.id, quantity: 1 }] });
 
   ok('a fresh order has no link', (await getOrder(order.id)).payLink === null);
 
@@ -93,7 +93,7 @@ console.log('\n— Attaching it to an order —');
 console.log('\n— It only exists while payment is outstanding —');
 {
   const p = await createProduct({ name: `Paid ${tag}`, category: 'robux', price: 999, announce: false });
-  const order = await createOrder({ email: `paid${tag}@x.dev`, items: [{ productId: p.id, quantity: 1 }] });
+  const order = await createOrder({ consent: true, consentText: 'test consent', email: `paid${tag}@x.dev`, items: [{ productId: p.id, quantity: 1 }] });
   await setOrderPayLink(order.id, 'https://tikkie.me/pay/before', { actorId: 'test' });
   await addProductCodes(p.id, [`PAY-${tag}`]);
   await markPaymentReceived(order.id, `tx${tag}`, { actorId: 'test' });
@@ -109,7 +109,7 @@ console.log('\n— It only exists while payment is outstanding —');
 console.log('\n— The buyer sees it —');
 {
   const p = await createProduct({ name: `Mail ${tag}`, category: 'robux', price: 1438, announce: false });
-  const order = await createOrder({ email: `mail${tag}@x.dev`, items: [{ productId: p.id, quantity: 1 }] });
+  const order = await createOrder({ consent: true, consentText: 'test consent', email: `mail${tag}@x.dev`, items: [{ productId: p.id, quantity: 1 }] });
   await setOrderPayLink(order.id, 'https://tikkie.me/pay/in-the-email', { actorId: 'test' });
 
   const mail = await renderOrderEmail(order.id, 'payment_reminder');

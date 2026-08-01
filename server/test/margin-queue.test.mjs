@@ -22,7 +22,7 @@ const sup = await createSupplier({ name: `KgLoss ${tag}`, connectorKind: 'kingui
 await mapSupplierProduct({ supplierId: sup.id, productId: p.id, supplierSku: '999',
   supplierUrl: 'https://www.kinguin.net/category/999/losskey', cost: 1200 });
 
-const order = await createOrder({ email: `loss${tag}@x.dev`, items: [{ productId: p.id, quantity: 1 }] });
+const order = await createOrder({ consent: true, consentText: 'test consent', email: `loss${tag}@x.dev`, items: [{ productId: p.id, quantity: 1 }] });
 await markPaymentReceived(order.id, `t_${tag}`, {});
 await new Promise((r) => setTimeout(r, 900)); // let the async payment handler finish
 

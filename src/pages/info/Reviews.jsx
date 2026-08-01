@@ -149,13 +149,25 @@ export default function Reviews() {
             <div className="h-12 w-px bg-white/10 hidden sm:block" />
           </>
         )}
-        <div className="grid grid-cols-3 gap-6 text-center">
-          {[[fmt(stats.delivered), t('reviews.delivered', 'Delivered')],
-            [stats.successRate != null ? `${stats.successRate}%` : '100%', stats.successRate != null ? t('home.s.fulfilled', 'Fulfilled') : t('reviews.protected', 'Protected')],
-            [avgDelivery, t('reviews.avgDelivery', 'Avg. delivery')]].map(([n, l]) => (
-            <div key={l}><div className="text-2xl font-display text-white">{n}</div><div className="text-slate-500 text-xs">{l}</div></div>
-          ))}
-        </div>
+        {(() => {
+          // Was a fixed three-up with `successRate ?? '100%'` hardcoded. The
+          // server returns null until orders have actually finished — on purpose,
+          // so the UI can hide it — and printing 100% beside "0 Delivered" on
+          // launch day reads as either a lie or a bug. Drop the tile instead, and
+          // let the grid follow how many real numbers there are.
+          const tiles = [
+            [fmt(stats.delivered), t('reviews.delivered', 'Delivered')],
+            stats.successRate != null ? [`${stats.successRate}%`, t('home.s.fulfilled', 'Fulfilled')] : null,
+            [avgDelivery, t('reviews.avgDelivery', 'Avg. delivery')],
+          ].filter(Boolean);
+          return (
+            <div className={`grid ${tiles.length === 3 ? 'grid-cols-3' : 'grid-cols-2'} gap-6 text-center`}>
+              {tiles.map(([n, l]) => (
+                <div key={l}><div className="text-2xl font-display text-white">{n}</div><div className="text-slate-500 text-xs">{l}</div></div>
+              ))}
+            </div>
+          );
+        })()}
       </div>
 
       <WriteReview t={t} />

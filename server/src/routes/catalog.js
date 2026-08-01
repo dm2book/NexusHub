@@ -306,6 +306,12 @@ router.post('/orders', rateLimit({ bucket: 'checkout', windowMs: 60_000, max: 20
       coupon: z.string().max(40).optional(),
       useCredit: z.number().int().nonnegative().max(100_000_00).optional(),
       paymentMethod: z.string().max(20).optional(),
+      // Required, and listed here on purpose: zod strips unknown keys, so a
+      // field missing from this schema never reaches createOrder no matter what
+      // the client sends. The buyer's waiver of the 14-day withdrawal right is
+      // the one piece of evidence a chargeback turns on.
+      consent: z.literal(true),
+      consentText: z.string().max(400).optional(),
     }).parse(req.body);
 
     const order = await createOrder(
@@ -353,8 +359,17 @@ router.post('/orders/:id/proof', rateLimit({ bucket: 'proof', windowMs: 60_000, 
     const body = z.object({
       method: z.string().max(20).optional(),
       transactionId: z.string().max(120).optional(),
-      screenshotUrl: z.string().url().max(500)
-        .refine((u) => /^https?:\/\//i.test(u), 'Link must be a http(s) URL').optional(),
+      // The checkout uploads the buyer's payment screenshot as a resized data
+      // URI (Checkout.jsx -> fileToDataUrl), which the old `.url().max(500)` +
+      // http(s) rule rejected every single time — the easiest way for someone on
+      // a phone to prove they paid always errored. Accept both shapes: a linked
+      // image, or an inline one bounded to the same 900 kB the client caps at.
+      screenshotUrl: z.string().max(1_400_000)
+        .refine((u) => /^https?:\/\//i.test(u) || /^data:image\/(png|jpe?g|webp|gif);base64,/i.test(u),
+          'Must be an http(s) link or an uploaded image')
+        .refine((u) => !u.startsWith('data:') || u.length <= 1_300_000,
+          'That image is too large — try a smaller screenshot')
+        .optional(),
       note: z.string().max(300).optional(),
       email: z.string().email().optional(),
     }).parse(req.body || {});

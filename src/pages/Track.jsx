@@ -89,7 +89,7 @@ export default function Track() {
       <form onSubmit={track} className="flex gap-3 mb-8">
         <input value={number} onChange={(e) => setNumber(e.target.value.toUpperCase())}
           placeholder="FM-2026-XXXXXXXX" className="input font-mono" />
-        <button disabled={busy || !number} className="btn-primary px-6">
+        <button disabled={busy || !number} aria-label={t('track.find', 'Find my order')} className="btn-primary px-6">
           {busy ? <Loader2 size={18} className="animate-spin" /> : <Search size={18} />}
         </button>
       </form>

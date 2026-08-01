@@ -27,7 +27,7 @@ await mapSupplierProduct({ supplierId: sup.id, productId: p.id, supplierSku: 'of
   supplierUrl: 'https://www.eldorado.gg/roblox-robux/i/10001', cost: 700 });
 
 // Order carrying the buyer's delivery target, then mark it paid.
-const order = await createOrder({ email: `p2p${tag}@x.dev`,
+const order = await createOrder({ consent: true, consentText: 'test consent', email: `p2p${tag}@x.dev`,
   items: [{ productId: p.id, quantity: 2 }],
   billing: { deliveryDetails: 'CoolGamer123', deliveryLabel: 'Roblox username' } });
 ok('order stored the delivery target in billing', order.billing?.deliveryDetails === 'CoolGamer123', JSON.stringify(order.billing));

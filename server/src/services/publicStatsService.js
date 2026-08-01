@@ -10,6 +10,7 @@
 import { get, all } from '../db/index.js';
 import { config } from '../config/env.js';
 import { reviewStats } from './reviewsService.js';
+import { getServerInfo } from './discordService.js';
 
 async function safe(fn, fallback) {
   try { const v = await fn(); return v == null ? fallback : v; }
@@ -62,7 +63,16 @@ export async function publicStats() {
     }));
   }, []);
 
-  const discordMembers = Number(config.discord?.memberCount || process.env.DISCORD_MEMBER_COUNT || 0);
+  // The homepage renders this with a pulsing green dot and the word "online", so
+  // it had better be live. It used to read only DISCORD_MEMBER_COUNT — a number
+  // typed in by hand — while the real presence count from Discord's widget was
+  // already available two files away and simply unused. Live first, cached by
+  // getServerInfo(); the env var stays as the fallback for a guild with its
+  // widget switched off.
+  const discordMembers = await safe(async () => {
+    const info = await getServerInfo();
+    return Number(info?.online ?? 0) || Number(config.discord?.memberCount || 0);
+  }, Number(config.discord?.memberCount || 0));
 
   // Real fulfilment success rate = completed ÷ (completed + refunded + cancelled
   // + failed). Null until there are finished orders (so the UI can hide it).

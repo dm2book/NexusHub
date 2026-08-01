@@ -73,13 +73,12 @@ export default function ProductDetail() {
     category: product.category,
     ...(product.image ? { image: product.image } : {}),
     brand: { '@type': 'Brand', name: 'ForgeMarket' },
-    ...(stats.reviews > 0 ? {
-      aggregateRating: {
-        '@type': 'AggregateRating',
-        ratingValue: String(stats.rating),
-        reviewCount: stats.reviews,
-      },
-    } : {}),
+    // No aggregateRating. It used to be filled from useStats(), which is the
+    // SITE-WIDE rating — so every product claimed the shop's average, including
+    // products nobody has ever reviewed. Google requires a rating on a Product
+    // to be about that product; misrepresenting it risks a manual action, and
+    // rich-result stars are worth far more than borrowed ones. Add this back
+    // once reviews carry a product_id and the number is genuinely per product.
     offers: {
       '@type': 'Offer',
       price: ((product.price || 0) / 100).toFixed(2),
@@ -277,9 +276,11 @@ export default function ProductDetail() {
           <div className="mt-8 space-y-3">
             <div className="flex items-center gap-3">
               <div className="flex items-center glass rounded-xl">
-                <button onClick={() => setQty((q) => Math.max(1, q - 1))} className="p-3 text-slate-300 hover:text-white"><Minus size={16} /></button>
+                <button onClick={() => setQty((q) => Math.max(1, q - 1))} aria-label={t('product.qtyLess', 'One fewer')}
+                  className="p-3 text-slate-300 hover:text-white"><Minus size={16} /></button>
                 <span className="w-10 text-center text-white">{qty}</span>
-                <button onClick={() => setQty((q) => q + 1)} className="p-3 text-slate-300 hover:text-white"><Plus size={16} /></button>
+                <button onClick={() => setQty((q) => q + 1)} aria-label={t('product.qtyMore', 'One more')}
+                  className="p-3 text-slate-300 hover:text-white"><Plus size={16} /></button>
               </div>
               <span className="text-slate-500 text-sm font-rajdhani uppercase tracking-wide">{t('product.qty', 'Quantity')}</span>
             </div>
@@ -304,8 +305,13 @@ export default function ProductDetail() {
             ))}
           </div>
 
+          {/* Was unconditional. Most orders are hand-delivered, and this sits on
+              the last screen before add-to-cart — the worst place to over-promise.
+              Follows the same real stock signal the delivery badge uses. */}
           <div className="flex items-center gap-2 mt-6 text-sm text-emerald-300">
-            <BadgeCheck size={16} /> {t('product.autoDeliver', 'Delivered to your dashboard automatically after payment')}
+            <BadgeCheck size={16} /> {product.instant
+              ? t('product.autoDeliver', 'In stock — sent automatically once your payment is confirmed')
+              : t('product.handDeliver', 'Delivered by hand after your payment is confirmed, usually within a few hours')}
           </div>
         </div>
       </div>

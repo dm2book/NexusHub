@@ -39,7 +39,7 @@ console.log('\n— Atomic payment confirm (no double delivery) —');
 {
   const p = await createProduct({ name: `Race Key ${tag}`, category: 'giftcard', price: 1000, announce: false });
   await addProductCodes(p.id, ['CODE-A', 'CODE-B', 'CODE-C', 'CODE-D']); // plenty of stock
-  const order = await createOrder({ email: `buyer${tag}@x.dev`, items: [{ productId: p.id, quantity: 1 }] });
+  const order = await createOrder({ consent: true, consentText: 'test consent', email: `buyer${tag}@x.dev`, items: [{ productId: p.id, quantity: 1 }] });
   // two separate proofs a customer could submit for the same order
   const pr1 = await submitProof(order.id, { transactionId: `TXA${tag}` }, {});
   const pr2 = await submitProof(order.id, { transactionId: `TXB${tag}` }, {});
@@ -62,7 +62,7 @@ console.log('\n— Supplier margin guard (null cost / discount) —');
   // (a) null cost → must NOT auto-buy (unknown cost = uncapped purchase risk)
   const pNull = await createProduct({ name: `NullCost ${tag}`, category: 'giftcard', price: 1000, announce: false });
   await mapSupplierProduct({ supplierId: sup.id, productId: pNull.id, supplierSku: '111', cost: null });
-  const oNull = await createOrder({ email: `n${tag}@x.dev`, items: [{ productId: pNull.id, quantity: 1 }] });
+  const oNull = await createOrder({ consent: true, consentText: 'test consent', email: `n${tag}@x.dev`, items: [{ productId: pNull.id, quantity: 1 }] });
   const didNull = await autoFulfillFromSuppliers(oNull.id, {});
   ok('null supplier cost is NOT auto-bought (routes to manual)', didNull === false, `did=${didNull}`);
 
@@ -70,7 +70,7 @@ console.log('\n— Supplier margin guard (null cost / discount) —');
   const pDisc = await createProduct({ name: `Disc ${tag}`, category: 'giftcard', price: 1000, announce: false });
   await mapSupplierProduct({ supplierId: sup.id, productId: pDisc.id, supplierSku: '222', cost: 900 });
   const coup = await createCoupon({ code: `MARGIN${tag}`, kind: 'percent', value: 30, announce: false });
-  const oDisc = await createOrder({ email: `d${tag}@x.dev`, coupon: coup.code, items: [{ productId: pDisc.id, quantity: 1 }] });
+  const oDisc = await createOrder({ consent: true, consentText: 'test consent', email: `d${tag}@x.dev`, coupon: coup.code, items: [{ productId: pDisc.id, quantity: 1 }] });
   ok('discounted order total reflects the 30% off', oDisc.total === 700, `total=${oDisc.total}`);
   const didDisc = await autoFulfillFromSuppliers(oDisc.id, {});
   ok('supplier cost 900 ≥ effective revenue 700 → NOT auto-bought', didDisc === false, `did=${didDisc}`);

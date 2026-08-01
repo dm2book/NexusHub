@@ -32,14 +32,27 @@ export async function createCheckoutSession(order) {
     customer_email: order.email,
     client_reference_id: order.id,
     metadata: { orderId: order.id, orderNumber: order.number },
-    line_items: order.items.map((it) => ({
-      quantity: it.quantity,
+    // ONE line for order.total, not a line per item at list price.
+    //
+    // Building the lines from unit_price re-derives the SUBTOTAL and silently
+    // drops every coupon, Forge+ discount, bundle and — worst — the store credit
+    // that createOrder has already debited, so the buyer would be charged twice
+    // for that part. The server owns the total; Stripe should only collect it.
+    line_items: [{
+      quantity: 1,
       price_data: {
         currency: (order.currency || 'eur').toLowerCase(),
-        unit_amount: it.unit_price, // already minor units
-        product_data: { name: it.name },
+        unit_amount: order.total, // already minor units, discounts applied
+        product_data: {
+          name: order.items.length === 1
+            ? order.items[0].name
+            : `ForgeMarket order ${order.number}`,
+          description: order.items.length === 1 && order.items[0].quantity > 1
+            ? `${order.items[0].quantity} ×`
+            : order.items.map((it) => `${it.quantity} × ${it.name}`).join(', ').slice(0, 500) || undefined,
+        },
       },
-    })),
+    }],
     success_url: `${config.appUrl}/checkout/success?order=${order.id}&n=${encodeURIComponent(order.number)}&session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${config.appUrl}/cart?canceled=1`,
   });

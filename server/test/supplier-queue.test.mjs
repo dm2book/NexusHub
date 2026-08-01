@@ -46,7 +46,7 @@ ok(maps[0]?.supplier_url === URL, 'supplier_url persisted on the mapping', maps[
 console.log('\n— Three orders paid in a known order → queue buys oldest-first, one at a time —');
 const nums = [];
 for (let i = 0; i < 3; i++) {
-  const o = await createOrder({ email: 'q@test.dev', userId: uid, items: [{ productId: prod.id, quantity: 1 }] }, { actorId: uid });
+  const o = await createOrder({ consent: true, consentText: 'test consent', email: 'q@test.dev', userId: uid, items: [{ productId: prod.id, quantity: 1 }] }, { actorId: uid });
   // stagger created_at so "oldest first" is deterministic
   await run(`UPDATE orders SET created_at=@c WHERE id=@id`, { c: new Date(Date.now() - (100 - i) * 1000).toISOString(), id: o.id });
   await run(`UPDATE orders SET status='payment_received', payment_status='paid' WHERE id=@id`, { id: o.id });

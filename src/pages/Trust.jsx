@@ -73,7 +73,12 @@ export default function Trust() {
             ? { icon: ShieldCheck, value: `${stats.successRate}%`, label: t('trust.sSuccess', 'Successfully delivered'), color: 'text-emerald-600 bg-emerald-100' }
             : null,
           { icon: Star, value: stats.reviews > 0 ? `${stats.rating}/5` : '—', label: stats.reviews > 0 ? `${stats.reviews.toLocaleString('en-US')} ${t('trust.sReviews', 'reviews')}` : t('trust.sNoReviews', 'No reviews yet'), color: 'text-amber-600 bg-amber-100' },
-          { icon: Users, value: stats.discordMembers > 0 ? stats.discordMembers.toLocaleString('en-US') : '24/7', label: stats.discordMembers > 0 ? t('trust.sMembers', 'Discord members') : t('trust.sCommunity', 'Support on Discord'), color: 'text-blue-600 bg-blue-100' },
+          // Was `: '24/7'` when the member count is unset (the default). One
+          // person cannot staff 24/7, and presenting it as a statistic on the
+          // page called Trust Center is the worst possible place to overreach.
+          stats.discordMembers > 0
+            ? { icon: Users, value: stats.discordMembers.toLocaleString('en-US'), label: t('trust.sMembers', 'Discord members'), color: 'text-blue-600 bg-blue-100' }
+            : null,
         ].filter(Boolean);
         return (
           <div className={`grid grid-cols-2 ${cards.length >= 5 ? 'lg:grid-cols-5' : 'lg:grid-cols-4'} gap-4 mb-12`}>
@@ -126,7 +131,10 @@ export default function Trust() {
                 <div className="flex text-amber-400 mb-2">{Array.from({ length: r.stars || 5 }).map((_, i) => <Star key={i} size={14} fill="currentColor" />)}</div>
                 <p className="text-slate-600 text-sm">"{r.body}"</p>
                 <div className="flex items-center gap-2 mt-3 text-xs text-slate-400">
-                  <BadgeCheck size={13} className="text-emerald-500" /> {r.author}{r.product ? ` · ${r.product}` : ''}
+                  {/* The green check used to render on every review; only the
+                      words were gated. A checkmark next to a name reads as
+                      verification on its own. */}
+                  {r.verified && <BadgeCheck size={13} className="text-emerald-500" />} {r.author}{r.product ? ` · ${r.product}` : ''}
                   {r.verified ? <span className="inline-flex items-center gap-1 text-emerald-600 font-semibold">· {t('trust.verifiedBuyer', 'Verified buyer')}</span> : ''}
                 </div>
               </div>

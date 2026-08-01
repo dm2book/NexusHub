@@ -12,9 +12,11 @@ import { navigateWithTransition } from '../lib/viewTransition.js';
 import LightProductCard from '../components/store/LightProductCard.jsx';
 import { usePageMeta } from '../lib/useMeta.js';
 import { matchBundle } from '../lib/bundles.js';
+import { useStickyBarLift } from '../lib/useStickyBarLift.js';
 
 export default function Cart() {
   usePageMeta('Your cart', 'Review the items in your cart before checking out.');
+  useStickyBarLift(); // keep the chat bubble off the sticky checkout bar
   const { items, setQty, remove, subtotal, currency, add } = useCart();
   const { user } = useAuth();
   const { t } = useI18n();

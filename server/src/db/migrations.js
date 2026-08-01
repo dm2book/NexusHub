@@ -929,4 +929,33 @@ ALTER TABLE orders ADD COLUMN IF NOT EXISTS pay_link TEXT;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS pay_link_at TEXT;
 `,
   },
+  {
+    id: '023_withdrawal_consent',
+    sql: `
+-- ── Proof that the buyer waived the 14-day withdrawal right ─────────────────
+-- Digital goods keep that right unless the buyer gave express prior consent to
+-- immediate delivery AND acknowledged losing it. The checkout has always shown
+-- the checkbox, but it lived only in React state: the payload never carried it,
+-- so nothing was ever recorded. In a chargeback or a complaint that leaves the
+-- shop with no evidence at all, holding codes that were already spent.
+--
+-- The exact sentence is stored, not just a flag, because the wording is what
+-- was actually agreed to and it will change over time.
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS consent_at TEXT;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS consent_text TEXT;
+`,
+  },
+  {
+    id: '024_outbox_lease',
+    sql: `
+-- ── Lease Discord events instead of marking them delivered on hand-over ─────
+-- delivered_at used to be stamped the moment the bot POLLED, so a failed send,
+-- a missing permission or a bot restart lost the event permanently and silently.
+-- claimed_at now holds a short lease; delivered_at is only set once the bot
+-- acknowledges what it really sent, and an expired lease is offered again.
+ALTER TABLE discord_outbox ADD COLUMN IF NOT EXISTS claimed_at TEXT;
+CREATE INDEX IF NOT EXISTS idx_outbox_pending
+  ON discord_outbox (delivered_at, claimed_at, created_at);
+`,
+  },
 ];

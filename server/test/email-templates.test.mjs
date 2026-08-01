@@ -69,7 +69,7 @@ console.log('\n— Redeem steps per category —');
   const odd = await createProduct({ name: `Mystery ${tag}`, category: 'freefire', price: 499, announce: false });
 
   const deliver = async (items, codes) => {
-    const o = await createOrder({ email: `redeem${tag}-${Math.random().toString(36).slice(2, 7)}@x.dev`, items });
+    const o = await createOrder({ consent: true, consentText: 'test consent', email: `redeem${tag}-${Math.random().toString(36).slice(2, 7)}@x.dev`, items });
     for (const [pid, code] of codes) await addProductCodes(pid, [code]);
     await markPaymentReceived(o.id, `tx${Math.random().toString(36).slice(2, 9)}`, { actorId: 'test' });
     await new Promise((r) => setTimeout(r, 500));
@@ -97,7 +97,7 @@ console.log('\n— Redeem steps per category —');
 // ── 3. Account top-ups have nothing to redeem ───────────────────────────────
 {
   const topup = await createProduct({ name: `Direct ${tag}`, category: 'robux', price: 999, announce: false, deliveryField: 'Roblox username' });
-  const o = await createOrder({
+  const o = await createOrder({ consent: true, consentText: 'test consent',
     email: `acct${tag}@x.dev`, items: [{ productId: topup.id, quantity: 1 }],
     billing: { deliveryMethod: 'account', deliveryDetails: 'coolgamer123', deliveryLabel: 'Roblox username' },
   });
@@ -162,7 +162,7 @@ console.log('\n— Trustpilot in the review request —');
   try {
     const p = await createProduct({ name: `Ask ${tag}`, category: 'robux', price: 500, announce: false });
     await addProductCodes(p.id, [`ASK-${tag}`]);
-    const o = await createOrder({ email: `ask${tag}@x.dev`, items: [{ productId: p.id, quantity: 1 }] });
+    const o = await createOrder({ consent: true, consentText: 'test consent', email: `ask${tag}@x.dev`, items: [{ productId: p.id, quantity: 1 }] });
     await markPaymentReceived(o.id, `txask${tag}`, { actorId: 'test' });
     await new Promise((r) => setTimeout(r, 600));
     // afterHours 0 so the order just completed still qualifies.

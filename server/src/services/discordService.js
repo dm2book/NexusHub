@@ -46,13 +46,30 @@ export async function relayDm(discordUserId, body) {
   return enqueueOutbox('dm', { discordUserId, ...body });
 }
 
-/** Bot relay: claim pending events (marks them delivered) + housekeeping. */
+/**
+ * Bot relay: lease pending events + housekeeping.
+ *
+ * This used to stamp delivered_at while merely HANDING the events over, before
+ * the bot had sent anything. Anything that went wrong after that point — the
+ * response never arriving, a missing channel permission, the bot restarting —
+ * lost the event permanently and silently. Order pings ride this queue, and with
+ * manual payment confirmation a lost ping means a paid order nobody knows about.
+ *
+ * Now the rows are LEASED: claimed_at is stamped so a second poll does not pick
+ * up the same work, but delivered_at stays null until the bot confirms via
+ * ackOutbox(). A lease older than LEASE_MS is offered again, so a crash between
+ * lease and send costs one retry instead of the event.
+ */
+const LEASE_MS = 5 * 60_000;
+
 export async function claimOutbox(limit = 20) {
+  const staleBefore = new Date(Date.now() - LEASE_MS).toISOString();
   const rows = await all(
     `SELECT id, kind, payload FROM discord_outbox
-      WHERE delivered_at IS NULL ORDER BY created_at ASC LIMIT @l`, { l: limit });
+      WHERE delivered_at IS NULL AND (claimed_at IS NULL OR claimed_at < @stale)
+      ORDER BY created_at ASC LIMIT @l`, { l: limit, stale: staleBefore });
   if (rows.length) {
-    await run(`UPDATE discord_outbox SET delivered_at=@at WHERE id = ANY(@ids)`,
+    await run(`UPDATE discord_outbox SET claimed_at=@at WHERE id = ANY(@ids)`,
       { at: nowIso(), ids: rows.map((r) => r.id) });
   }
   // Housekeeping: delivered events older than 14 days can go.
@@ -62,6 +79,20 @@ export async function claimOutbox(limit = 20) {
     try { return { id: r.id, channel: r.kind, body: JSON.parse(r.payload) }; }
     catch { return null; }
   }).filter(Boolean);
+}
+
+/**
+ * The bot confirms what it actually managed to send. Only these are retired;
+ * everything else stays in the queue and is offered again once its lease ages
+ * out, which is the whole point of leasing rather than marking on hand-over.
+ */
+export async function ackOutbox(ids = []) {
+  const list = [...new Set((Array.isArray(ids) ? ids : []).map(String).filter(Boolean))].slice(0, 200);
+  if (!list.length) return 0;
+  const r = await run(
+    `UPDATE discord_outbox SET delivered_at=@at WHERE id = ANY(@ids) AND delivered_at IS NULL`,
+    { at: nowIso(), ids: list });
+  return r?.changes ?? 0;
 }
 
 /** Stamp/read when the bot last polled — powers the launch-check status. */
