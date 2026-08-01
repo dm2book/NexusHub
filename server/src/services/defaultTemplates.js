@@ -36,7 +36,8 @@ export const DEFAULT_TEMPLATES = [
       sent automatically; anything else we deliver by hand, usually within a few hours.
       Follow the status here — no account needed:</p>
       <p><a class="btn" href="{{order.url}}">Track your order</a></p>
-      <p>Need help? Just reply to this email or open a ticket in our Discord.</p>`,
+      <p>Need help? Just reply to this email or open a ticket in our Discord.</p>
+      {{order.consentHtml}}`,
   },
   {
     id: 'payment_reminder',
@@ -271,6 +272,16 @@ export const LEGACY_TEMPLATE_BODIES = {
       {{order.paymentHtml}}
       <p>Once your payment is confirmed we deliver instantly to your account & email.
       You can follow the status any time:</p>
+      <p><a class="btn" href="{{order.url}}">Track your order</a></p>
+      <p>Need help? Just reply to this email or open a ticket in our Discord.</p>`, `
+      <h1>Thank you for your order! 🎉</h1>
+      <p>Hi {{user.name}}, thanks for shopping with {{brand.name}}! We've received
+      order <strong>{{order.number}}</strong> (total <strong>{{order.total}}</strong>).</p>
+      {{order.itemsHtml}}
+      {{order.paymentHtml}}
+      <p>As soon as we confirm your payment we deliver. Items we have in stock are
+      sent automatically; anything else we deliver by hand, usually within a few hours.
+      Follow the status here — no account needed:</p>
       <p><a class="btn" href="{{order.url}}">Track your order</a></p>
       <p>Need help? Just reply to this email or open a ticket in our Discord.</p>`],
   // Superseded by copy that says what happens next and when — the originals were

@@ -52,6 +52,30 @@ console.log('— Withdrawal consent —');
   // change over time (and differs per language).
   ok('the exact sentence the buyer read is stored',
     row?.consent_text === 'Ik wil mijn bestelling meteen geleverd krijgen.', row?.consent_text);
+
+  // Evidence nobody can retrieve is not evidence. It was written on creation but
+  // hydrate() never read it back, so producing it in a dispute meant opening the
+  // database by hand — which is not a thing that happens during a chargeback.
+  const { getOrder } = await import('../src/services/orderService.js');
+  const fetched = await getOrder(order.id);
+  ok('the waiver comes back on the order the admin screen reads',
+    !!fetched?.consentAt && fetched.consentText === 'Ik wil mijn bestelling meteen geleverd krijgen.',
+    JSON.stringify({ at: fetched?.consentAt, text: fetched?.consentText }));
+
+  // EU distance selling also requires CONFIRMING the waiver to the consumer on a
+  // durable medium. A checkbox on a page they have since closed is not one.
+  const { renderOrderEmail } = await import('../src/services/orderService.js');
+  const mail = await renderOrderEmail(order.id, 'order_received');
+  ok('the confirmation email states the withdrawal right',
+    /Right of withdrawal/i.test(mail.html), mail.html.slice(0, 120));
+  ok('it quotes the buyer back their own sentence',
+    mail.html.includes('Ik wil mijn bestelling meteen geleverd krijgen.'));
+
+  // And an order placed before this existed must not print an empty legal block.
+  await run('UPDATE orders SET consent_at=NULL, consent_text=NULL WHERE id=@id', { id: order.id });
+  const legacyMail = await renderOrderEmail(order.id, 'order_received');
+  ok('an order with no recorded waiver prints no block at all',
+    !/Right of withdrawal/i.test(legacyMail.html));
 }
 
 // ── 2. A zero total settles itself ─────────────────────────────────────────
