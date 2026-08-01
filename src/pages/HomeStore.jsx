@@ -418,7 +418,7 @@ export default function HomeStore() {
                     {tr('home.viewAll', 'View All Products')}
                   </Link>
                 </div>
-                {stats.reviews > 0 && (
+                {stats.reviews > 0 ? (
                   <div className="flex items-center gap-3 mt-7">
                     <div className="flex -space-x-2.5">
                       {['#f472b6', '#60a5fa', '#34d399', '#fbbf24'].map((c, i) => (
@@ -427,6 +427,24 @@ export default function HomeStore() {
                     </div>
                     <div className="text-sm text-white"><b className="fm-head">{fmtCount(stats.reviews)}</b> <span className="text-slate-400">{tr('home.happy', 'Happy Customers')}</span></div>
                   </div>
+                ) : (
+                  /* Before the first review lands this space was simply empty —
+                     exactly where a first-time visitor decides whether to trust
+                     the shop. These three answer the questions a stranger taking
+                     a bank transfer actually gets asked, and all three are true
+                     on day one, which is more than a review count can say. */
+                  <ul className="flex flex-col gap-2 mt-7 text-[13.5px] text-slate-200/95">
+                    {[
+                      tr('home.trustWho', 'Run from the Netherlands by one person — name and contact on every page'),
+                      tr('home.trustPay', 'You pay after ordering, with your order number as reference. Nothing is charged automatically'),
+                      tr('home.trustBack', 'Money back in full if we cannot deliver'),
+                    ].map((line) => (
+                      <li key={line} className="flex items-start gap-2.5">
+                        <CheckCircle2 size={15} className="text-emerald-400 shrink-0 mt-0.5" />
+                        <span>{line}</span>
+                      </li>
+                    ))}
+                  </ul>
                 )}
               </div>
 

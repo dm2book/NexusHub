@@ -75,6 +75,42 @@ const NL = {
   'home.whoRefunds': 'Terugbetalingsbeleid',
   'home.whoTrustpilot': 'Bekijk ons op Trustpilot',
 
+  // Verkopersidentiteit — wettelijk verplicht vóór de koop (BW 6:230m)
+  'seller.title': 'Van wie je koopt',
+  'seller.sub': 'Geen gezichtsloze webshop. Hier staat precies wie er achter deze winkel zit en hoe je hem bereikt — vóórdat je betaalt, niet erna.',
+  'seller.who': 'Verkoper',
+  'seller.based': 'Gevestigd in',
+  'seller.registration': 'Registratie',
+  'seller.contact': 'Contact',
+  'seller.kvk': 'KvK',
+  'seller.vat': 'Btw-nummer',
+  'seller.discord': 'ForgeMarket Support op Discord',
+  'seller.notRegistered': 'Nog niet ingeschreven bij de Kamer van Koophandel — dit is een particuliere verkoper. Je rechten als consument, inclusief de geld-terug-garantie, zijn hoe dan ook hetzelfde.',
+  'seller.incomplete': 'Een volledig postadres wordt hier nog toegevoegd. Tot die tijd bereik je een echt mens via Discord of e-mail — en kan een bestelling niet geleverd worden, dan krijg je je geld terug. Dat is het stuk dat je echt beschermt.',
+  'seller.compactPrivate': 'Gerund door één persoon in Nederland. Nog geen ingeschreven bedrijf.',
+
+  // Over ons — vervangt de oude claims
+  'about.title': 'Een kleine winkel, netjes gerund',
+  'about.sub': 'ForgeMarket verkoopt game-tegoeden en cadeaukaarten vanuit Nederland. Het wordt door één persoon gerund — en daarom staat hieronder wat er echt gebeurt in plaats van wat indrukwekkend klinkt.',
+  'about.fDeliveryT': 'Hoe je bestelling geleverd wordt',
+  'about.fDelivery': 'Ligt de code op voorraad, dan gaat hij automatisch de deur uit zodra je betaling bevestigd is. De rest kopen we voor je in en leveren we met de hand — normaal binnen een paar uur overdag, en de volgende ochtend als je \u2019s nachts bestelt. Op de productpagina staat vooraf welke van de twee geldt.',
+  'about.fPayT': 'Hoe je betaalt',
+  'about.fPay': 'Je plaatst eerst de bestelling en betaalt daarna het getoonde bedrag, met je bestelnummer als referentie. Betalingen worden door een mens gekoppeld, niet door een machine, dus overdag gaat dat het snelst. Er wordt niets automatisch afgeschreven en er worden geen kaartgegevens op deze site bewaard.',
+  'about.fWrongT': 'Als er iets misgaat',
+  'about.fWrong': 'Kan een bestelling niet geleverd worden, dan krijg je je geld volledig terug — dat is de garantie, geen gunst. Zolang je bestelling niet geleverd is kun je hem nog annuleren door op je bestelmail te reageren. De volledige voorwaarden staan op de terugbetalingspagina.',
+  'about.fReachT': 'Een mens bereiken',
+  'about.fReach': 'Elk ticket en elke mail wordt beantwoord door de persoon die de winkel runt. Dat betekent eerlijke tijden in plaats van een callcenter: snel overdag, en de volgende ochtend als je \u2019s nachts schrijft.',
+  'about.ready': 'Toch nog twijfels?',
+  'about.readySub': 'Vraag het voordat je koopt — op Discord kun je het ook aan mensen vragen die al besteld hebben. Je hebt geen account nodig om te kijken of een bestelling te volgen.',
+
+  // Trust Center — tekst zonder cijfers
+  'trust.subNew': 'Precies hoe je bestelling beschermd is, van wie je koopt, en wat er gebeurt als er iets misgaat.',
+
+  // Homepage — de drie feiten die vóór de eerste review het vertrouwen dragen
+  'home.trustWho': 'Vanuit Nederland gerund door één persoon — naam en contact staan op elke pagina',
+  'home.trustPay': 'Je betaalt ná het bestellen, met je bestelnummer als referentie. Er wordt niets automatisch afgeschreven',
+  'home.trustBack': 'Volledig geld terug als we niet kunnen leveren',
+
   // Afrekenen — EU-akkoord en betaalbewijs
   'checkout.consent': 'Ik wil mijn bestelling meteen geleverd krijgen en begrijp dat ik daarmee mijn 14 dagen bedenktijd verlies zodra hij geleverd is.',
   'proof.attached': 'Screenshot toegevoegd',
@@ -669,18 +705,6 @@ const NL = {
 
   // About
   'about.eyebrow': 'Over ons',
-  'about.title': 'Digitale producten, goed geregeld',
-  'about.sub': 'ForgeMarket is een moderne marketplace voor digitale producten — gebouwd op echte fulfilment-, beveiligings- en support-infrastructuur.',
-  'about.speed': 'Snelheid',
-  'about.speedSub': 'Door geautomatiseerde fulfilment worden de meeste bestellingen in seconden geleverd.',
-  'about.trust': 'Vertrouwen',
-  'about.trustSub': 'Fraudecontrole, audit-logs en veilige wachtwoordloze accounts.',
-  'about.care': 'Zorg',
-  'about.careSub': 'Een echt mens op support, en geld terug als een bestelling niet aankomt.',
-  'about.scale': 'Schaal',
-  'about.scaleSub': 'Een multi-leverancier-systeem dat veerkrachtig inkoopt bij meerdere aanbieders.',
-  'about.ready': 'Klaar om te beginnen?',
-  'about.readySub': 'Bekijk de shop, of bereik ForgeMarket Support op Discord.',
 
   // Betaalmethoden-pagina
   'pay.eyebrow': 'Afrekenen',

@@ -8,6 +8,7 @@ import { useReviews } from '../lib/useReviews.js';
 import { usePageMeta } from '../lib/useMeta.js';
 import { useI18n } from '../lib/i18n.jsx';
 import LiveActivity from '../components/store/LiveActivity.jsx';
+import SellerIdentity from '../components/store/SellerIdentity.jsx';
 
 const guarantees = (t) => [
   { icon: Zap, title: t('trust.g1t', 'Fast, tracked delivery'),
@@ -60,19 +61,38 @@ export default function Trust() {
           <ShieldCheck size={14} /> {t('trust.badge', 'Trust Center')}
         </span>
         <h1 className="text-4xl font-extrabold text-slate-900 mt-4">{t('trust.title', 'How your purchase is protected')}</h1>
-        <p className="text-slate-500 mt-3 max-w-xl mx-auto">{t('trust.sub', 'Real numbers and real guarantees — exactly how we keep every order safe and protected.')}</p>
+        {/* The old subtitle promised "real numbers" unconditionally, directly
+            above three empty tiles. It now promises numbers only when there are
+            numbers; before that it promises what is actually true on day one. */}
+        <p className="text-slate-500 mt-3 max-w-xl mx-auto">
+          {stats.delivered > 0
+            ? t('trust.sub', 'Real numbers and real guarantees — exactly how we keep every order safe and protected.')
+            : t('trust.subNew', 'Exactly how your order is protected, who you are buying from, and what happens if something goes wrong.')}
+        </p>
       </div>
 
       {/* Live stats (real only — cards without data hide themselves) */}
       {(() => {
         const cards = [
-          { icon: CheckCircle2, value: fmt(stats.delivered), label: t('trust.sDelivered', 'Orders delivered'), color: 'text-violet-600 bg-violet-100' },
-          { icon: Clock, value: avgDelivery, label: t('trust.sAvg', 'Average delivery'), color: 'text-emerald-600 bg-emerald-100' },
+          // A count of zero and a dash are not "real numbers" — they are three
+          // empty boxes telling a first-time visitor nobody has ever bought here,
+          // on the page they opened to decide whether to. Each tile now appears
+          // only once it has something to report; when none of them do, the grid
+          // is skipped entirely and the guarantees below carry the page. Those
+          // are true on day one, which is the whole point.
+          stats.delivered > 0
+            ? { icon: CheckCircle2, value: fmt(stats.delivered), label: t('trust.sDelivered', 'Orders delivered'), color: 'text-violet-600 bg-violet-100' }
+            : null,
+          stats.avgDeliverySeconds != null
+            ? { icon: Clock, value: avgDelivery, label: t('trust.sAvg', 'Average delivery'), color: 'text-emerald-600 bg-emerald-100' }
+            : null,
           // Real fulfilment success rate — only once orders have finished.
           stats.successRate != null
             ? { icon: ShieldCheck, value: `${stats.successRate}%`, label: t('trust.sSuccess', 'Successfully delivered'), color: 'text-emerald-600 bg-emerald-100' }
             : null,
-          { icon: Star, value: stats.reviews > 0 ? `${stats.rating}/5` : '—', label: stats.reviews > 0 ? `${stats.reviews.toLocaleString('en-US')} ${t('trust.sReviews', 'reviews')}` : t('trust.sNoReviews', 'No reviews yet'), color: 'text-amber-600 bg-amber-100' },
+          stats.reviews > 0
+            ? { icon: Star, value: `${stats.rating}/5`, label: `${stats.reviews.toLocaleString('en-US')} ${t('trust.sReviews', 'reviews')}`, color: 'text-amber-600 bg-amber-100' }
+            : null,
           // Was `: '24/7'` when the member count is unset (the default). One
           // person cannot staff 24/7, and presenting it as a statistic on the
           // page called Trust Center is the worst possible place to overreach.
@@ -80,8 +100,10 @@ export default function Trust() {
             ? { icon: Users, value: stats.discordMembers.toLocaleString('en-US'), label: t('trust.sMembers', 'Discord members'), color: 'text-blue-600 bg-blue-100' }
             : null,
         ].filter(Boolean);
+        if (!cards.length) return null;
+        const cols = cards.length >= 5 ? 'lg:grid-cols-5' : cards.length >= 3 ? 'lg:grid-cols-4' : 'lg:grid-cols-2';
         return (
-          <div className={`grid grid-cols-2 ${cards.length >= 5 ? 'lg:grid-cols-5' : 'lg:grid-cols-4'} gap-4 mb-12`}>
+          <div className={`grid grid-cols-2 ${cols} gap-4 mb-12`}>
             {cards.map((c) => <Stat key={c.label} icon={c.icon} value={c.value} label={c.label} color={c.color} />)}
           </div>
         );
@@ -89,6 +111,15 @@ export default function Trust() {
 
       {/* Live, database-backed activity (hides itself until there's real data) */}
       <LiveActivity />
+
+      {/* Who is selling. On a page about trust this outranks any statistic: a
+          buyer sending a bank transfer to a shop they have never heard of wants
+          a name and a way to reach it, and that is true on day one when no
+          number is. Light wrapper because this page is on a light ground. */}
+      <div className="mb-12 [&_.card]:bg-white [&_.card]:border [&_.card]:border-slate-200/70 [&_.card]:shadow-sm
+                      [&_h2]:text-slate-900 [&_dd]:text-slate-700 [&_p]:text-slate-500">
+        <SellerIdentity />
+      </div>
 
       {/* Guarantees */}
       <h2 className="text-2xl font-extrabold text-slate-900 mb-5">{t('trust.guarantees', 'Our guarantees')}</h2>
