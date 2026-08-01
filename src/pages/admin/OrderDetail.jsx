@@ -130,6 +130,28 @@ export default function AdminOrderDetail() {
             </div>
           )}
 
+          {/* The evidence behind a chargeback. Digital codes cannot be handed
+              back, so the shop's whole defence is that the buyer expressly asked
+              for immediate delivery and accepted losing the 14-day withdrawal
+              right. It is recorded per order — shown here so it can actually be
+              produced, rather than sitting in a column nobody can reach. */}
+          {order.consentAt && (
+            <div className="card p-5">
+              <h3 className="text-white mb-1">Right of withdrawal</h3>
+              <p className="text-slate-500 text-sm mb-3">
+                Recorded when the order was placed. Copy this into any dispute.
+              </p>
+              <div className="rounded-xl bg-slate-900/60 border border-slate-700/60 p-4">
+                <div className="text-[11px] uppercase tracking-wider text-slate-500 mb-1">Agreed at</div>
+                <div className="text-slate-200 text-sm font-mono mb-3">{new Date(order.consentAt).toLocaleString('nl-NL')}</div>
+                <div className="text-[11px] uppercase tracking-wider text-slate-500 mb-1">Exact wording shown to the buyer</div>
+                <p className="text-slate-300 text-sm leading-relaxed">
+                  {order.consentText || <span className="text-slate-500 italic">Recorded before the wording was stored with it.</span>}
+                </p>
+              </div>
+            </div>
+          )}
+
           {hasPermission('orders.complete') && !['completed', 'refunded', 'cancelled'].includes(order.status) && (
             <div className="card p-5 border border-emerald-500/20">
               <h3 className="text-white mb-1">Deliver code(s)</h3>

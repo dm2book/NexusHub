@@ -549,6 +549,13 @@ async function hydrate(row) {
     // Per-order payment link with the exact amount already in it, when the
     // owner has pasted one. Public on purpose: the buyer needs to click it.
     payLink: row.pay_link || null, payLinkAt: row.pay_link_at || null,
+    // The buyer's waiver of the 14-day withdrawal right. Written on creation but
+    // never read back until now, which made it evidence nobody could produce:
+    // in a chargeback the owner would have had to open the database by hand.
+    // Surfaced on the order itself so the admin screen, the buyer's own status
+    // page and the confirmation email all read the same record.
+    consentAt: row.consent_at || null,
+    consentText: row.consent_text || null,
     // Resolved once, on the server: each configured method with the amount (and
     // where the provider allows it, the reference) already in the URL.
     payMethods: payMethodsFor(manualPayMethods(), {
@@ -692,6 +699,31 @@ function statusBlurb(status) {
 }
 
 /** Build an email-safe HTML summary table of the order's line items + total. */
+/**
+ * The buyer's own record of waiving the 14-day withdrawal right.
+ *
+ * Storing the waiver server-side covers the shop in a dispute, but EU distance
+ * selling also requires the trader to CONFIRM the agreement to the consumer on a
+ * durable medium — the consent to immediate performance and the acknowledgement
+ * that the right lapses included. An email is that medium; a checkbox that only
+ * ever existed on a page they have since closed is not.
+ *
+ * Quoted back verbatim, with the timestamp, so what the buyer keeps and what the
+ * shop can produce are the same sentence.
+ */
+function consentHtml(order) {
+  if (!order.consentAt) return '';
+  const when = new Date(order.consentAt);
+  const stamp = Number.isNaN(when.getTime()) ? '' : when.toISOString().replace('T', ' ').slice(0, 16) + ' UTC';
+  const sentence = String(order.consentText || '').trim();
+  const escaped = sentence
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return `<p style="color:#8b93a7;font-size:12px;line-height:1.6;margin-top:18px;padding-top:14px;border-top:1px solid rgba(255,255,255,.08)">
+    <strong style="color:#b6c1d1">Right of withdrawal</strong><br>
+    ${escaped ? `On ${stamp} you confirmed: “${escaped}”<br>` : `On ${stamp} you asked for immediate delivery and acknowledged that the 14-day right of withdrawal lapses once the order has been delivered.<br>`}
+    Until delivery you can still cancel — just reply to this email.</p>`;
+}
+
 /** Manual-payment instructions block for the order-received email (Tikkie/Revolut/PayPal). */
 function paymentInstructionsHtml(order) {
   const methods = manualPayMethods();
@@ -888,6 +920,7 @@ function emailContext(order, ctx = {}) {
       deliveriesHtml: deliveryHtml(order), // back-compat alias for older templates
       redeemHtml: redeemHtml(order),
       paymentHtml: paymentInstructionsHtml(order),
+      consentHtml: consentHtml(order),
       url: orderUrlFor(order),
     },
     refund: ctx.refundAmount != null
