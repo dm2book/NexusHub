@@ -106,6 +106,42 @@ const NL = {
   // Trust Center — tekst zonder cijfers
   'trust.subNew': 'Precies hoe je bestelling beschermd is, van wie je koopt, en wat er gebeurt als er iets misgaat.',
 
+  // Productpagina — voorraad, levertijd en wat we van je vragen
+  'pd.stockIn': 'Op voorraad',
+  'pd.stockInSub': 'Gaat automatisch de deur uit zodra je betaling bevestigd is.',
+  'pd.stockLow': 'Nog {n} op voorraad',
+  'pd.stockLast': 'Laatste op voorraad',
+  'pd.stockToOrder': 'Op bestelling leverbaar',
+  'pd.stockToOrderSub': 'Wordt voor je ingekocht en met de hand geleverd nadat je betaling bevestigd is.',
+  'pd.etaInstantT': 'Automatisch verstuurd na betaling',
+  'pd.etaInstant': 'Je code ligt al klaar. Betalingen worden door een mens gekoppeld, dus overdag gaat dat het snelst — en de code gaat er vanzelf uit zodra dat gebeurt.',
+  'pd.etaHandT': 'Met de hand geleverd, meestal binnen een paar uur',
+  'pd.etaHand': 'We kopen dit voor je in zodra je betaling bevestigd is. Overdag is dat normaal een paar uur; bestel je \u2019s nachts, dan gaat het de volgende ochtend als eerste de deur uit.',
+  'pd.needT': 'We vragen om je {n}',
+  'pd.need': 'Die vul je in bij het afrekenen. We vragen nooit om je wachtwoord.',
+  'pd.needChoice': 'Of kies bij het afrekenen een cadeaucode en wissel hem zelf in — jouw keuze.',
+  'pd.tMoneyBack': 'Geld terug als we niet kunnen leveren',
+  'pd.tNoAccount': 'Geen account nodig om te bestellen',
+  'pd.tVerified': 'Reviews gekoppeld aan echte bestellingen',
+  'pd.tHuman': 'Er antwoordt een echt mens',
+  'pd.shopRating': '{r} over de hele winkel · {n} reviews',
+  'pd.noReviewsYet': 'Nog geen reviews — de winkel is nieuw',
+  'pd.shopReviews': 'Wat kopers over de winkel zeggen',
+
+  // Productpagina — FAQ per product
+  'pdq.speedQ': 'Hoe snel heb ik het?',
+  'pdq.speedAInstant': 'Deze ligt op voorraad, dus hij gaat automatisch de deur uit zodra je betaling bevestigd is. Betalingen worden door een mens gekoppeld, en dat gaat overdag het snelst — bestel je laat op de avond, dan wordt het de volgende ochtend als eerste opgepakt.',
+  'pdq.speedAHand': 'We kopen dit voor je in zodra je betaling bevestigd is en leveren het met de hand. Overdag is dat normaal een paar uur; bestel je laat op de avond, dan gaat het de volgende ochtend als eerste de deur uit.',
+  'pdq.payQ': 'Hoe betaal ik?',
+  'pdq.payA': 'Je plaatst eerst de bestelling en maakt daarna het exacte bedrag over met je bestelnummer als referentie — via Tikkie of een overboeking. Er wordt niets automatisch afgeschreven en er worden geen kaartgegevens op deze site bewaard.',
+  'pdq.accountQ': 'Hebben jullie mijn accountgegevens nodig?',
+  'pdq.accountA': 'Alleen je {n}, die je bij het afrekenen invult zodat we hem kunnen bijvullen. We vragen nooit om je wachtwoord en hoeven nooit als jou in te loggen.',
+  'pdq.accountAChoice': 'Alleen je {n} — en alleen als je voor de directe bijvulling kiest. Kies bij het afrekenen een cadeaucode en je geeft ons niets meer dan een e-mailadres. In beide gevallen vragen we nooit om je wachtwoord.',
+  'pdq.accountNeedQ': 'Heb ik een account bij jullie nodig?',
+  'pdq.accountNeedA': 'Nee. Je kunt als gast bestellen en je bestelling volgen met de link in je bevestigingsmail. Een account voegt alleen je bestelgeschiedenis en tegoed toe.',
+  'pdq.wrongQ': 'En als het niet aankomt?',
+  'pdq.wrongA': 'Reageer op je bestelmail of open een ticket in Discord — er antwoordt een echt mens. Kunnen we je bestelling niet leveren, dan krijg je je geld volledig terug, en zolang hij niet geleverd is kun je nog annuleren.',
+
   // Homepage — de drie feiten die vóór de eerste review het vertrouwen dragen
   'home.trustWho': 'Vanuit Nederland gerund door één persoon — naam en contact staan op elke pagina',
   'home.trustPay': 'Je betaalt ná het bestellen, met je bestelnummer als referentie. Er wordt niets automatisch afgeschreven',
