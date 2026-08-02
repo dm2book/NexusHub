@@ -958,4 +958,22 @@ CREATE INDEX IF NOT EXISTS idx_outbox_pending
   ON discord_outbox (delivered_at, claimed_at, created_at);
 `,
   },
+  {
+    id: '025_psp_payment',
+    sql: `
+-- ── The PSP payment behind an order ────────────────────────────────────────
+-- payment_ref only gets written once money has arrived, which is too late for
+-- two things: resuming a checkout the buyer abandoned halfway, and issuing a
+-- refund. Both need the payment id from the moment it is created.
+--
+-- Kept provider-agnostic. A shop that switches PSP must still be able to refund
+-- what the previous one took, so the row has to say which API owns the id.
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS psp_provider TEXT;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS psp_payment_id TEXT;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS psp_status TEXT;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS psp_checkout_url TEXT;
+-- The webhook arrives with nothing but a payment id.
+CREATE INDEX IF NOT EXISTS idx_orders_psp_payment ON orders (psp_payment_id);
+`,
+  },
 ];

@@ -31,6 +31,8 @@ Project → **Settings → Environment Variables**:
 | `APP_URL` | ✅ | your deployed URL, e.g. `https://forgemarket.vercel.app` |
 | `API_URL` | ✅ | same URL (API is same-origin) |
 | `POSTGRES_URL` | auto | set by Vercel Postgres (or set `DATABASE_URL` yourself) |
+| `MOLLIE_API_KEY` | recommended | `live_…` from my.mollie.com → Developers → API keys. Enables iDEAL, Bancontact, Apple Pay, credit card and PayPal, and takes priority over every other method. A `test_` key makes the server refuse to boot in production. |
+| `MOLLIE_WEBHOOK_BASE` | only locally | leave empty in production — the webhook uses `API_URL` and needs no setup in the Mollie dashboard. Locally, point it at a tunnel (Mollie cannot reach `localhost`). |
 | `STRIPE_SECRET_KEY` | optional | enables real card payments via Stripe Checkout (`sk_live_…`/`sk_test_…`) |
 | `STRIPE_WEBHOOK_SECRET` | with Stripe | `whsec_…` — set the webhook endpoint to `https://YOUR-URL/api/payments/stripe/webhook` (event `checkout.session.completed`) |
 | `DEMO_PAYMENTS` | optional | `true` marks orders paid instantly (no PSP). Used only when Stripe is not configured. |

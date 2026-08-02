@@ -158,6 +158,17 @@ export const config = {
       secretKey: env.STRIPE_SECRET_KEY || '',
       webhookSecret: env.STRIPE_WEBHOOK_SECRET || '',
     },
+    // Mollie: hosted checkout for iDEAL, Bancontact, Apple Pay, card and PayPal.
+    // One key switches it on. There is no webhook secret to configure — Mollie
+    // signs nothing, and the webhook is verified by fetching the payment back
+    // from the API instead (see mollieService).
+    mollie: {
+      apiKey: (env.MOLLIE_API_KEY || '').trim(),
+      // Optional. Mollie must be able to REACH the webhook, so on a preview
+      // deployment or a tunnel this has to be the public origin rather than
+      // whatever API_URL happens to be.
+      webhookBase: (env.MOLLIE_WEBHOOK_BASE || '').trim(),
+    },
     // Manual payment methods (Tikkie / Revolut / PayPal). The customer pays via the
     // link with their order number as reference; an admin confirms in the dashboard.
     manual: {
@@ -265,6 +276,12 @@ export function assertProductionConfig() {
   // Demo payments mark orders paid without any money arriving. Shipping that
   // live would hand out codes for free, so it is a hard failure, not a warning.
   if (config.payments.demoMode) missing.push('DEMO_PAYMENTS=false (demo mode marks orders paid without payment)');
+  // A test key on a live shop takes real buyers to Mollie's sandbox: the order
+  // is marked paid and no money ever moves. Silent, and only discovered when the
+  // bank statement does not match the orders.
+  if (/^test_/.test(config.payments.mollie.apiKey)) {
+    missing.push('a LIVE MOLLIE_API_KEY (a test_ key never takes real money)');
+  }
   if (missing.length) {
     throw new Error(`Refusing to start in production without: ${missing.join(', ')}`);
   }

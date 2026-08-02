@@ -12,12 +12,13 @@ import { evaluateCoupon } from '../services/couponService.js';
 import { recommendationsFor } from '../services/recommendationService.js';
 import { pricedBundles } from '../services/bundleService.js';
 import { peekGiftCard } from '../services/giftCardService.js';
-import { createOrder, getOrderByNumber, getOrder, markPaymentReceived } from '../services/orderService.js';
+import { createOrder, getOrderByNumber, getOrder, markPaymentReceived, getPspPayment } from '../services/orderService.js';
 import { answer } from '../services/assistantService.js';
 import { withCopy } from '../services/productCopy.js';
 import { submitProof, getOrderProof } from '../services/paymentProofService.js';
 import { listEnabledProviders } from '../services/oauthService.js';
 import { isEnabled as stripeEnabled, createCheckoutSession } from '../services/stripeService.js';
+import { isEnabled as mollieEnabled, SUPPORTED_METHODS as MOLLIE_METHODS } from '../services/mollieService.js';
 import { publicStats } from '../services/publicStatsService.js';
 import { recordPageView } from '../services/trackingService.js';
 import { getCategoryLogos } from '../services/settingsService.js';
@@ -114,11 +115,23 @@ router.get('/stats', asyncHandler(async (_req, res) => {
   res.json(statsCache.data);
 }));
 
-// Which payment path the storefront should use. Manual methods (Tikkie/Revolut/
-// PayPal) take priority when configured, then Stripe, then demo.
+/**
+ * Which payment path the storefront should use.
+ *
+ * Mollie comes first when it is configured, and deliberately outranks the manual
+ * links even if both are set up. It is the only path where the money confirms
+ * itself: iDEAL settles in seconds, the webhook marks the order paid, and stock
+ * dispenses without anyone reading a bank app. A manual link means the buyer
+ * waits for a human — worth having as a fallback, not worth preferring.
+ *
+ * Then manual, then Stripe, then demo.
+ */
 const manual = manualPayMethods();
 const paymentProvider = () =>
-  manual.length ? 'manual' : stripeEnabled() ? 'stripe' : config.payments.demoMode ? 'demo' : 'none';
+  mollieEnabled() ? 'mollie'
+    : manual.length ? 'manual'
+      : stripeEnabled() ? 'stripe'
+        : config.payments.demoMode ? 'demo' : 'none';
 
 // Public runtime config the SPA can read (feature flags, enabled providers).
 router.get('/config', asyncHandler(async (_req, res) => {
@@ -129,6 +142,11 @@ router.get('/config', asyncHandler(async (_req, res) => {
     paymentProvider: paymentProvider(),
     demoPayments: config.payments.demoMode,
     paymentMethods: manual,                 // [{id,label,target,kind}]
+    // What the buyer may end up seeing on Mollie's page. Which of these is
+    // actually offered depends on the amount and the country, so the checkout
+    // asks /api/mollie/methods for the real list once it knows the total —
+    // this is only the shop-level "we accept these" statement.
+    mollieMethods: mollieEnabled() ? MOLLIE_METHODS : [],
     paymentNote: config.payments.manual.note,
     announcement: config.shop.announcement,  // optional promo bar text
     trustpilotUrl: config.shop.trustpilotUrl,  // '' when the shop has no profile yet
@@ -183,7 +201,7 @@ router.post('/chat',
   }));
 
 // Helper: confirm the requester owns the order (account holder or guest email).
-async function assertOwnsOrder(req, order, email) {
+export async function assertOwnsOrder(req, order, email) {
   const owns = (req.user && order.email.toLowerCase() === req.user.email.toLowerCase()) ||
     (email && email.toLowerCase() === order.email.toLowerCase());
   if (!owns) throw forbidden('This order is not yours');
@@ -455,6 +473,14 @@ router.get('/track/:number', asyncHandler(async (req, res) => {
     // Resolved server-side with the amount already in each URL where the
     // provider supports it, so the page never has to build a payment link.
     payMethods: order.status === 'pending' ? order.payMethods : [],
+    // The Mollie checkout page for an unpaid order, so a buyer who closed the
+    // tab, ran out of battery or bounced off their banking app can pick the
+    // payment straight back up. Same trust model as payLink above: the order
+    // number is what got you here, and the page it opens only accepts money.
+    // Cleared the moment the order stops being pending.
+    payUrl: order.status === 'pending' ? (await getPspPayment(order.id)
+      .then((p) => (p?.provider === 'mollie' && ['open', 'pending'].includes(p.status || '') ? p.checkoutUrl : null))
+      .catch(() => null)) : null,
     updatedAt: order.updatedAt,
   });
 }));

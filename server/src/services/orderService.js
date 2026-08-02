@@ -23,7 +23,7 @@ import { scoreOrder } from './fraudService.js';
 import { getProduct } from './productService.js';
 import { postOrderEvent } from './discordService.js';
 import { grantTierForOrder, syncLoyaltyRoles, sendDeliveryDm } from './discordRolesService.js';
-import { availableCount, claimCodes, checkLowStock } from './codeStockService.js';
+import { availableCount, claimCodes, checkLowStock, releaseCodes } from './codeStockService.js';
 import { memberDiscountPercent } from './membershipService.js';
 import { recordOrderCommission } from './affiliateService.js';
 import { recordPurchaseEvent } from './socialProofService.js';
@@ -221,6 +221,16 @@ export async function createOrder(input, ctx = {}) {
 export async function deliverOrder(orderId, deliveries = [], ctx = {}) {
   const order = await getOrderRow(orderId);
   if (!order) throw notFound('Order not found');
+  // An order whose money has gone back is not deliverable, and the force-complete
+  // below would otherwise drag it straight out of `refunded` into `completed`.
+  //
+  // This is not theoretical: auto-dispense runs in the background from the moment
+  // an order is paid, so a refund or chargeback landing seconds later raced it and
+  // the loser was always the refund. The buyer kept the code AND the money, and the
+  // order read `completed` — nothing in the dashboard would ever have shown it.
+  if (['refunded', 'cancelled'].includes(order.status)) {
+    throw conflict(`Order is ${order.status} — it cannot be delivered`);
+  }
   for (const d of deliveries) {
     const content = String(d.content || '').trim();
     if (!content) continue;
@@ -365,6 +375,15 @@ export async function autoDispenseFromStock(orderId, ctx = {}) {
     for (const c of codes) deliveries.push({ orderItemId: it.id, content: c, type: 'code' });
   }
   if (!deliveries.length) return false;
+  // Re-read: claiming the codes above took time, and a refund or cancellation
+  // landing in that window means these codes must go back on the shelf rather
+  // than sit marked `used` against an order nobody will ever receive.
+  const now = await getOrderRow(orderId);
+  if (!now || ['refunded', 'cancelled'].includes(now.status)) {
+    const freed = await releaseCodes(orderId).catch(() => 0);
+    console.warn(`[autodispense] ${order.number} became ${now?.status} mid-delivery — returned ${freed} code(s) to stock`);
+    return false;
+  }
   await deliverOrder(orderId, deliveries, { ...ctx, reason: 'Auto-delivered from stock' });
   // Stock just moved — ping staff once if any item is now running low.
   for (const it of order.items) checkLowStock(it.product_id).catch(() => {});
@@ -556,6 +575,11 @@ async function hydrate(row) {
     // page and the confirmation email all read the same record.
     consentAt: row.consent_at || null,
     consentText: row.consent_text || null,
+    // Which PSP holds this payment. Needed by the admin refund (money has to go
+    // back through the same rails it came in on) and by the buyer's status page.
+    pspProvider: row.psp_provider || null,
+    pspPaymentId: row.psp_payment_id || null,
+    pspStatus: row.psp_status || null,
     // Resolved once, on the server: each configured method with the amount (and
     // where the provider allows it, the reference) already in the URL.
     payMethods: payMethodsFor(manualPayMethods(), {
@@ -664,6 +688,34 @@ export async function markPaymentReceived(orderId, paymentRef, ctx = {}) {
   // Record an affiliate commission if this buyer was referred (best-effort).
   try { await recordOrderCommission(await getOrder(orderId)); } catch { /* non-fatal */ }
   return result;
+}
+
+/**
+ * Remember which PSP payment belongs to this order.
+ *
+ * Written when the payment is CREATED, not when it succeeds: resuming an
+ * abandoned checkout and issuing a refund both need the id long before any
+ * money has moved. Fields are updated individually so a webhook that only knows
+ * the status cannot wipe the checkout URL a buyer still needs.
+ */
+export async function setPspPayment(orderId, { provider, paymentId, status, checkoutUrl } = {}) {
+  const sets = ['updated_at=@at'];
+  const params = { id: orderId, at: nowIso() };
+  if (provider) { sets.push('psp_provider=@prov'); params.prov = provider; }
+  if (paymentId) { sets.push('psp_payment_id=@pid'); params.pid = paymentId; }
+  if (status) { sets.push('psp_status=@st'); params.st = status; }
+  if (checkoutUrl !== undefined) { sets.push('psp_checkout_url=@url'); params.url = checkoutUrl || null; }
+  await run(`UPDATE orders SET ${sets.join(', ')} WHERE id=@id`, params);
+}
+
+/** The PSP payment behind an order, for refunds and for resuming a checkout. */
+export async function getPspPayment(orderId) {
+  const r = await get(
+    'SELECT psp_provider, psp_payment_id, psp_status, psp_checkout_url FROM orders WHERE id=@id',
+    { id: orderId });
+  if (!r?.psp_payment_id) return null;
+  return { provider: r.psp_provider, paymentId: r.psp_payment_id,
+           status: r.psp_status, checkoutUrl: r.psp_checkout_url };
 }
 
 export async function setOrderNotes(orderId, notes) {

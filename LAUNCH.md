@@ -62,6 +62,7 @@ Health probe for uptime monitors: **`/api/health`**.
 | `DISCORD_CLIENT_ID` / `DISCORD_CLIENT_SECRET` | "Continue with Discord" |
 | `COUPONS` | `CODE:percent,CODE2:percent` discount codes |
 | `DISCORD_MEMBER_COUNT` | shown in trust stats if the widget isn't public |
+| `MOLLIE_API_KEY` | **iDEAL, Bancontact, Apple Pay, card and PayPal.** Takes priority over the manual links — it is the only method that confirms itself and dispatches stock without you |
 | `STRIPE_SECRET_KEY` | enable card payments instead of/alongside manual |
 
 ---
@@ -70,6 +71,11 @@ Health probe for uptime monitors: **`/api/health`**.
 1. Open the site → **Log in** with `t6202600@gmail.com` → code from email → you're **Owner**.
 2. Top‑right **Admin 🛡** → check **Payments**, **Users**, **Analytics** (Retention panel).
 3. Buy a product → submit a fake transaction ID → confirm it in **Admin → Payments** → order completes.
+   With `MOLLIE_API_KEY` set: buy a product → pay with iDEAL → you land back on the
+   success page, which waits for the real confirmation before it says "payment
+   received" → the order shows **Payment Received** and any in-stock code is
+   emailed automatically. Then refund it from **Admin → Orders**; the money goes
+   back through Mollie before the status changes, so the two can never disagree.
 4. Account → **Rewards**: loyalty tier, referral link, Forge+.
 
 ## 8. Security housekeeping  **(only you)**

@@ -9,8 +9,9 @@ import { asyncHandler } from '../../middleware/error.js';
 import { requirePermission } from '../../middleware/rbac.js';
 import {
   listOrders, getOrder, transitionOrder, markPaymentReceived, setOrderNotes, deliverOrder,
-  exportOrdersCsv, orderUrlFor, setOrderPayLink, clearOrderPayLink,
+  exportOrdersCsv, orderUrlFor, setOrderPayLink, clearOrderPayLink, getPspPayment,
 } from '../../services/orderService.js';
+import { refundPayment, isEnabled as mollieEnabled } from '../../services/mollieService.js';
 import { PayLinkError } from '../../utils/payLink.js';
 import { fulfillOrder, listFulfillment, listFulfillmentLogs } from '../../services/fulfillmentService.js';
 import * as analytics from '../../services/analyticsService.js';
@@ -132,15 +133,47 @@ router.post('/:id/complete', requirePermission('orders.complete'),
     res.json({ order });
   }));
 
-// Refund.
+/**
+ * Refund.
+ *
+ * When the money came in through a PSP it has to go back out the same way.
+ * Flipping the status to `refunded` while Mollie still holds the funds tells the
+ * buyer, the dashboard and the bookkeeping a thing that is not true — so the
+ * refund is sent first, and the status only follows once it is accepted.
+ *
+ * If the API call fails nothing changes: better a visible error the owner can
+ * retry than an order that claims to be refunded and never was. Orders paid
+ * manually (bank transfer) have no PSP payment and are marked refunded directly,
+ * because the owner sends those back by hand.
+ */
 router.post('/:id/refund', requirePermission('orders.refund'),
   asyncHandler(async (req, res) => {
     const { reason } = z.object({ reason: z.string().optional() }).parse(req.body);
+    const existing = await getOrder(req.params.id);
+    if (!existing) throw notFound('Order not found');
+
+    let refund = null;
+    const psp = await getPspPayment(existing.id);
+    if (psp?.provider === 'mollie' && mollieEnabled()) {
+      try {
+        refund = await refundPayment(psp.paymentId, {
+          cents: existing.total,
+          currency: existing.currency || 'EUR',
+          description: `Refund ${existing.number}`,
+        });
+      } catch (e) {
+        await audit({ actor: req.user, action: 'order.refund_failed', targetType: 'order',
+          targetId: existing.id, metadata: { paymentId: psp.paymentId, error: e.message }, req });
+        throw badRequest(`Mollie refused the refund: ${e.message}`);
+      }
+    }
+
     const order = await transitionOrder(req.params.id, 'refunded',
       { ...actor(req), reason: reason || 'Refunded by staff' });
     await audit({ actor: req.user, action: 'order.refund', targetType: 'order',
-      targetId: order.id, metadata: { reason }, req });
-    res.json({ order });
+      targetId: order.id,
+      metadata: { reason, provider: psp?.provider || 'manual', refundId: refund?.id || null }, req });
+    res.json({ order, refund });
   }));
 
 // Cancel.

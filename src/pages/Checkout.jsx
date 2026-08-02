@@ -6,6 +6,7 @@ import { fileToDataUrl } from '../lib/imageUpload.js';
 import { useI18n } from '../lib/i18n.jsx';
 import { useCart } from '../context/CartContext.jsx';
 import PayFacts from '../components/store/PayFacts.jsx';
+import MollieMethods from '../components/store/MollieMethods.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { money } from '../lib/catalog.js';
@@ -23,7 +24,7 @@ const METHOD_ICON = { tikkie: '🟢', revolut: '⚫', paypal: '🔵' };
 export default function Checkout() {
   usePageMeta('Checkout', 'Complete your order — guest checkout, no account needed.');
   useStickyBarLift(); // keep the chat bubble off the sticky pay bar
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const { items, subtotal, currency, clear } = useCart();
   const { user } = useAuth();
   const toast = useToast();
@@ -47,8 +48,10 @@ export default function Checkout() {
     el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     el.querySelector('input')?.focus({ preventScroll: true });
   };
-  const [provider, setProvider] = useState('none');     // stripe | demo | manual | none
+  const [provider, setProvider] = useState('none');     // mollie | stripe | demo | manual | none
   const [methods, setMethods] = useState([]);
+  const [mollieOffered, setMollieOffered] = useState([]); // ['ideal','bancontact',…]
+  const [mollieMethod, setMollieMethod] = useState('');   // '' = choose on Mollie's page
   const [note, setNote] = useState('');
   const [methodId, setMethodId] = useState('');
   // Restored from the cache before first paint, so returning from a banking app
@@ -137,6 +140,7 @@ export default function Checkout() {
       setProvider(c.paymentProvider);
       setMethods(c.paymentMethods || []);
       setNote(c.paymentNote || '');
+      setMollieOffered(c.mollieMethods || []);
       if ((c.paymentMethods || []).length) setMethodId(c.paymentMethods[0].id);
     }).catch(() => {});
   }, []);
@@ -174,6 +178,27 @@ export default function Checkout() {
         consentText: consentSentence,
       });
 
+      if (provider === 'mollie') {
+        // The payment is created BEFORE the cart is cleared: if Mollie refuses,
+        // the buyer still has their cart and can try again instead of staring at
+        // an empty checkout after a failure that was not theirs.
+        const r = await api.post(`/api/orders/${order.id}/mollie`, {
+          email, method: mollieMethod || undefined, locale: lang === 'en' ? 'en' : 'nl',
+        });
+        if (r.checkoutUrl) {
+          // Cached first: iOS discards a backgrounded tab, and coming back from a
+          // banking app must not land on "Nothing to check out".
+          rememberOrder(order);
+          clear();
+          window.location.href = r.checkoutUrl;
+          return;
+        }
+        // No URL means the order was already settled — send them to the status
+        // page rather than opening a second payment.
+        clear();
+        navigate(user ? `/account/orders/${order.id}` : `/track?number=${order.number}`);
+        return;
+      }
       if (provider === 'stripe') {
         const { url } = await api.post(`/api/orders/${order.id}/checkout`, { email });
         clear(); window.location.href = url; return;
@@ -340,7 +365,10 @@ export default function Checkout() {
 
           <div className="card p-6">
             <h3 className="text-white mb-3 flex items-center gap-2"><Lock size={16} className="text-indigo-300" /> {t('checkout.method', 'Payment method')}</h3>
-            {provider === 'manual' ? (
+            {provider === 'mollie' ? (
+              <MollieMethods amount={grandTotal} value={mollieMethod}
+                onChange={setMollieMethod} offered={mollieOffered} />
+            ) : provider === 'manual' ? (
               <>
                 <div className="grid sm:grid-cols-3 gap-3">
                   {methods.map((m) => (
@@ -412,6 +440,7 @@ export default function Checkout() {
           </label>
           <button disabled={busy || !consent} className="btn-primary w-full py-3">
             {busy ? <Loader2 size={18} className="animate-spin" />
+              : provider === 'mollie' ? <>{t('checkout.payNow', 'Pay {amount} securely', { amount: money(grandTotal, currency) })}</>
               : provider === 'stripe' ? <>{t('checkout.payCard', 'Pay with card')}</>
               : provider === 'manual' ? <>{t('checkout.placePay', 'Place order & pay')}</>
               : <>{t('checkout.placeOrder', 'Place order')}</>}
@@ -452,6 +481,7 @@ export default function Checkout() {
             ) : (
               <button type="submit" disabled={busy} className="btn-primary flex-1 py-3 fm-tap">
                 {busy ? <Loader2 size={18} className="animate-spin" />
+                  : provider === 'mollie' ? <>{t('checkout.payNowShort', 'Pay securely')}</>
                   : provider === 'stripe' ? <>{t('checkout.payCard', 'Pay with card')}</>
                   : provider === 'manual' ? <>{t('checkout.placePay', 'Place order & pay')}</>
                   : <>{t('checkout.placeOrder', 'Place order')}</>}
