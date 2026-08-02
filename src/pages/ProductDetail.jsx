@@ -21,28 +21,51 @@ import { useI18n } from '../lib/i18n.jsx';
 import { recordProductView, useRecentlyViewed } from '../lib/recentlyViewed.js';
 import { flyToCart } from '../lib/flyToCart.js';
 import Tilt from '../components/Tilt.jsx';
+import { DeliveryFacts, TrustRow } from '../components/store/ProductDelivery.jsx';
 
-// The delivery badge is decided per product from real stock, not asserted for
-// every listing: only an auto-delivery product with a code in stock can honestly
-// claim "instant". The rest are hand-delivered and say so.
-const trustBadges = (instant, t) => [
-  instant
-    ? { icon: Zap, key: 'instant', title: t('product.bInstant', 'In stock — instant'), sub: t('product.bInstantSub', 'Sent the moment payment clears') }
-    : { icon: Clock, key: 'handDelivered', title: t('product.bHand', 'Delivered by hand'), sub: t('product.bHandSub', 'Usually within a few hours') },
-  { icon: ShieldCheck, key: 'protected', title: t('product.bProtected', 'Buyer protected'), sub: t('product.bProtectedSub', 'Money back if undelivered') },
-  { icon: BadgeCheck, key: 'verified', title: t('product.bVerified', 'Verified reviews'), sub: t('product.bVerifiedSub', 'Tied to real orders') },
-  { icon: Headphones, key: 'support', title: t('product.bSupport', 'Support via Discord'), sub: t('product.bSupportSub', 'Real person, not a bot') },
-];
-
-// Answers a manual-payment store can actually stand behind. The old copy said
+// Built per product, not per site: what a buyer asks about a Robux top-up that
+// needs their username is not what they ask about a Steam code. Answers a
+// manual-payment shop can actually stand behind — the previous copy claimed
 // payment was confirmed "within minutes" around the clock and that delivery was
-// automatic for most orders — neither is true while confirmation is done by hand.
-const FAQ = [
-  ['How fast will I get it?', 'If the item is in stock it is sent automatically as soon as your payment is confirmed. Everything else is delivered by hand, normally within a few hours. You can follow the status of your order on the Track page at any time.', 'speed'],
-  ['How do I pay?', 'You pay by bank transfer using the amount and reference shown after checkout. Your payment is checked by a person, so it is confirmed fastest during the day — if you order late at night it may be handled the next morning.', 'pay'],
-  ['Is it safe?', 'Your order is money-back guaranteed: if we cannot deliver it, you get a full refund. Login is passwordless, and your payment details are never stored on this site.', 'safe'],
-  ['What if it doesn’t arrive?', 'Message us on Discord or reply to your order email. If we cannot deliver, you are refunded in full — see the Refund Policy for exactly what is covered.', 'arrive'],
-];
+// automatic for most orders, and neither is true while a person confirms by hand.
+const productFaq = (product, t) => {
+  const out = [];
+
+  out.push([
+    t('pdq.speedQ', 'How fast will I get it?'),
+    product.instant
+      ? t('pdq.speedAInstant', 'This one is in stock, so it is sent automatically the moment your payment is confirmed. Payments are matched by a person, which is fastest during the day — order late at night and it is handled first thing in the morning.')
+      : t('pdq.speedAHand', 'We buy this in for you once your payment is confirmed, and deliver it by hand. During the day that is normally a few hours; order late at night and it goes out first thing in the morning.'),
+  ]);
+
+  out.push([
+    t('pdq.payQ', 'How do I pay?'),
+    t('pdq.payA', 'You place the order first, then transfer the exact amount shown using your order number as the reference — Tikkie or a bank transfer. Nothing is charged automatically and no card details are stored on this site.'),
+  ]);
+
+  // Only asked when it applies. A gift-code product should not raise the
+  // question of handing over an account at all.
+  if (product.deliveryField) {
+    out.push([
+      t('pdq.accountQ', 'Do you need my account details?'),
+      product.deliveryChoice
+        ? t('pdq.accountAChoice', 'Only your {n} — and only if you choose the direct top-up. Pick a gift code at checkout instead and you give us nothing but an email address. We never ask for your password either way.', { n: product.deliveryField })
+        : t('pdq.accountA', 'Only your {n}, which you enter at checkout so we can top it up. We never ask for your password, and we never need to log in as you.', { n: product.deliveryField }),
+    ]);
+  }
+
+  out.push([
+    t('pdq.accountNeedQ', 'Do I need an account with you?'),
+    t('pdq.accountNeedA', 'No. You can order as a guest and follow the order with the link in your confirmation email. An account only adds order history and store credit.'),
+  ]);
+
+  out.push([
+    t('pdq.wrongQ', 'What if it does not arrive?'),
+    t('pdq.wrongA', 'Reply to your order email or open a ticket in Discord — a real person answers. If we cannot deliver your order you get your money back in full, and until it is delivered you can still cancel it.'),
+  ]);
+
+  return out;
+};
 
 export default function ProductDetail() {
   const { id } = useParams();
@@ -57,7 +80,6 @@ export default function ProductDetail() {
   const [all, setAll] = useState([]);
   const [qty, setQty] = useState(1);
   const [notFound, setNotFound] = useState(false);
-  const [openFaq, setOpenFaq] = useState(0);
   const [recs, setRecs] = useState({ crossSell: [], upsell: [] });
   const [mysteryPool, setMysteryPool] = useState(null);
   const [priceHist, setPriceHist] = useState([]);
@@ -196,18 +218,22 @@ export default function ProductDetail() {
 
           {/* rating + stock */}
           <div className="flex items-center gap-3 mt-3 text-sm">
-            {stats.reviews > 0 && (
-              <span className="flex items-center gap-1 text-amber-400">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <Star key={i} size={14} fill={i < Math.round(stats.rating || 0) ? 'currentColor' : 'none'} />
-                ))}
-              </span>
-            )}
-            {stats.reviews > 0
-              ? <span className="text-slate-400">{stats.rating} · {stats.reviews.toLocaleString('en-US')} {t('product.reviewsWord', 'reviews')}</span>
-              : <span className="text-slate-400">{t('product.new', 'New')}</span>}
-            {typeof product.stock === 'number' && product.stock > 0 && product.stock <= 10 && (
-              <span className="text-red-500 font-semibold">{t('product.onlyLeft', 'Only {n} left', { n: product.stock })}</span>
+            {/* These stars used to be stats.rating — the SHOP's average, sitting
+                under this product's name where every reader takes it as this
+                product's score. Reviews carry no product_id yet, so the honest
+                move is to label the shop rating as the shop's and link it. */}
+            {stats.reviews > 0 ? (
+              <Link to="/reviews" className="inline-flex items-center gap-1.5 text-slate-600 hover:text-violet-700 transition">
+                <span className="flex items-center gap-0.5 text-amber-500">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <Star key={i} size={14} fill={i < Math.round(stats.rating || 0) ? 'currentColor' : 'none'} />
+                  ))}
+                </span>
+                <span>{t('pd.shopRating', '{r} across the shop · {n} reviews', {
+                  r: stats.rating, n: stats.reviews.toLocaleString('en-US') })}</span>
+              </Link>
+            ) : (
+              <span className="text-slate-500">{t('pd.noReviewsYet', 'No reviews yet — the shop is new')}</span>
             )}
           </div>
 
@@ -223,11 +249,12 @@ export default function ProductDetail() {
             )}
           </div>
 
-          {product.stockLeft > 0 && (
-            <div className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-red-600 bg-red-50 border border-red-200 rounded-full px-3 py-1">
-              🔥 {product.stockLeft === 1 ? t('card.lastOne', 'Last one!') : t('product.almostGone', 'Almost sold out — only {n} left', { n: product.stockLeft })}
-            </div>
-          )}
+          {/* Stock, the real estimate, and what we will ask you for — the three
+              things a buyer weighs before transferring money to a stranger.
+              Above the pack switcher on purpose: each pack is its own route, so
+              this always describes the product on screen, and delivery is the
+              question people have BEFORE they pick a size. */}
+          <DeliveryFacts product={product} t={t} />
 
           {/* Pack switcher — jump between sizes of the same category in one tap */}
           {related.length > 0 && (
@@ -256,11 +283,6 @@ export default function ProductDetail() {
               </div>
             </div>
           )}
-
-          {/* delivery estimate */}
-          <div className="inline-flex items-center gap-2 mt-3 text-sm text-emerald-600 bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-3 py-1.5">
-            <Zap size={14} /> {t('product.delivery', 'Delivery:')} <b>{t('product.asap', 'as fast as possible')}</b>
-          </div>
 
           {/* Upsell: nudge to a bigger pack */}
           {upsell && (
@@ -294,27 +316,60 @@ export default function ProductDetail() {
             </div>
           </div>
 
-          {/* trust badges */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-8">
-            {trustBadges(!!product.instant, t).map(({ icon: I, title, sub, key }) => (
-              <div key={title} className="glass rounded-xl p-3 text-center">
-                <I size={18} className="text-indigo-300 mx-auto mb-1.5" />
-                <div className="text-xs text-white font-medium">{t(`product.${key}`, title)}</div>
-                <div className="text-[11px] text-slate-500">{t(`product.${key}Sub`, sub)}</div>
-              </div>
-            ))}
-          </div>
-
-          {/* Was unconditional. Most orders are hand-delivered, and this sits on
-              the last screen before add-to-cart — the worst place to over-promise.
-              Follows the same real stock signal the delivery badge uses. */}
-          <div className="flex items-center gap-2 mt-6 text-sm text-emerald-300">
-            <BadgeCheck size={16} /> {product.instant
-              ? t('product.autoDeliver', 'In stock — sent automatically once your payment is confirmed')
-              : t('product.handDeliver', 'Delivered by hand after your payment is confirmed, usually within a few hours')}
-          </div>
+          {/* Trust indicators, read last before the tap. The old block here
+              repeated the delivery promise that DeliveryFacts now states once,
+              properly, above the button — two versions of the same claim in one
+              column is how they drift apart. These four are policy and mechanism
+              only, all true on day one. */}
+          <TrustRow t={t} />
         </div>
       </div>
+
+      {/* Moved above the mystery pool and the price chart: "how does this
+          actually reach me?" is the question a buyer has BEFORE deciding,
+          and it was sitting three screens down, under a graph. */}
+      {/* How this is delivered — category-specific, the #1 pre-purchase question */}
+      {(() => {
+        const d = deliveryInfo(product.category, lang);
+        return (
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 sm:p-8 mt-14 shadow-sm">
+            <div className="flex items-center gap-3 mb-4">
+              <span className="w-10 h-10 rounded-xl grid place-items-center text-white shrink-0"
+                style={{ backgroundImage: 'linear-gradient(135deg,#7c5cff,#a855f7)' }}>
+                <Truck size={18} />
+              </span>
+              <div>
+                <h2 className="text-xl font-extrabold text-slate-900">{t('product.howDelivered', 'How this is delivered')}</h2>
+                <p className="text-slate-500 text-sm">{d.method}</p>
+              </div>
+            </div>
+            <div className="grid md:grid-cols-2 gap-6 mt-5">
+              <div>
+                <div className="text-[11px] font-bold uppercase tracking-wider text-violet-600 mb-3">{t('product.steps', 'Steps')}</div>
+                <ol className="space-y-2.5">
+                  {d.steps.map((s, i) => (
+                    <li key={i} className="flex items-start gap-3 text-sm text-slate-700">
+                      <span className="w-6 h-6 rounded-full bg-violet-100 text-violet-700 text-xs font-bold grid place-items-center shrink-0 mt-0.5">{i + 1}</span>
+                      <span>{s}</span>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+              <div>
+                <div className="text-[11px] font-bold uppercase tracking-wider text-amber-600 mb-3">{t('product.goodToKnow', 'Good to know')}</div>
+                <ul className="space-y-2.5">
+                  {d.notes.map((n, i) => (
+                    <li key={i} className="flex items-start gap-2.5 text-sm text-slate-600">
+                      <Info size={15} className="text-amber-500 shrink-0 mt-0.5" />
+                      <span>{n}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Mystery box — possible prizes (the odds stay a mystery on purpose) */}
       {product.kind === 'mystery' && mysteryPool && mysteryPool.length > 0 && (
@@ -378,54 +433,11 @@ export default function ProductDetail() {
         );
       })()}
 
-      {/* How this is delivered — category-specific, the #1 pre-purchase question */}
-      {(() => {
-        const d = deliveryInfo(product.category, lang);
-        return (
-          <div className="bg-white border border-slate-200 rounded-2xl p-6 sm:p-8 mt-14 shadow-sm">
-            <div className="flex items-center gap-3 mb-4">
-              <span className="w-10 h-10 rounded-xl grid place-items-center text-white shrink-0"
-                style={{ backgroundImage: 'linear-gradient(135deg,#7c5cff,#a855f7)' }}>
-                <Truck size={18} />
-              </span>
-              <div>
-                <h2 className="text-xl font-extrabold text-slate-900">{t('product.howDelivered', 'How this is delivered')}</h2>
-                <p className="text-slate-500 text-sm">{d.method}</p>
-              </div>
-            </div>
-            <div className="grid md:grid-cols-2 gap-6 mt-5">
-              <div>
-                <div className="text-[11px] font-bold uppercase tracking-wider text-violet-600 mb-3">{t('product.steps', 'Steps')}</div>
-                <ol className="space-y-2.5">
-                  {d.steps.map((s, i) => (
-                    <li key={i} className="flex items-start gap-3 text-sm text-slate-700">
-                      <span className="w-6 h-6 rounded-full bg-violet-100 text-violet-700 text-xs font-bold grid place-items-center shrink-0 mt-0.5">{i + 1}</span>
-                      <span>{s}</span>
-                    </li>
-                  ))}
-                </ol>
-              </div>
-              <div>
-                <div className="text-[11px] font-bold uppercase tracking-wider text-amber-600 mb-3">{t('product.goodToKnow', 'Good to know')}</div>
-                <ul className="space-y-2.5">
-                  {d.notes.map((n, i) => (
-                    <li key={i} className="flex items-start gap-2.5 text-sm text-slate-600">
-                      <Info size={15} className="text-amber-500 shrink-0 mt-0.5" />
-                      <span>{n}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
-
       {/* Reviews + FAQ */}
       <div className="grid lg:grid-cols-2 gap-10 mt-16">
         <section>
           <div className="flex items-center justify-between mb-5">
-            <h2 className="text-2xl font-extrabold text-slate-900">{t('product.buyersSay', 'What buyers say')}</h2>
+            <h2 className="text-2xl font-extrabold text-slate-900">{t('pd.shopReviews', 'What buyers say about the shop')}</h2>
             <Link to="/reviews" className="text-violet-600 text-sm font-semibold hover:underline">{t('product.reviewsAll', 'All reviews →')}</Link>
           </div>
           {stats.reviews > 0 && (
@@ -464,16 +476,15 @@ export default function ProductDetail() {
 
         <section>
           <h2 className="text-2xl font-extrabold text-slate-900 mb-5">{t('product.faqTitle', 'Frequently asked')}</h2>
-          <div className="space-y-3">
-            {FAQ.map(([q, a, key], i) => (
-              <button key={q} onClick={() => setOpenFaq(openFaq === i ? -1 : i)}
-                className="card w-full text-left p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-white font-medium text-sm">{t(`faq.${key}q`, q)}</span>
-                  <ChevronDown size={16} className={`text-slate-400 shrink-0 transition-transform ${openFaq === i ? 'rotate-180' : ''}`} />
-                </div>
-                {openFaq === i && <p className="text-slate-400 text-sm mt-2.5 leading-relaxed">{t(`faq.${key}a`, a)}</p>}
-              </button>
+          <div className="bg-white rounded-2xl border border-slate-200/70 shadow-sm divide-y divide-slate-100 overflow-hidden">
+            {productFaq(product, t).map(([q, a]) => (
+              <details key={q} className="group">
+                <summary className="flex items-center justify-between gap-3 cursor-pointer list-none px-4 py-3.5 min-h-[56px] hover:bg-slate-50 transition">
+                  <span className="font-semibold text-slate-900 text-[14.5px]">{q}</span>
+                  <ChevronDown size={16} className="shrink-0 text-slate-400 transition-transform group-open:rotate-180" />
+                </summary>
+                <p className="px-4 pb-4 -mt-1 text-sm text-slate-600 leading-relaxed">{a}</p>
+              </details>
             ))}
           </div>
         </section>
