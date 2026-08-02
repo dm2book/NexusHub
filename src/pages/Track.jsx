@@ -88,6 +88,8 @@ export default function Track() {
 
       <form onSubmit={track} className="flex gap-3 mb-8">
         <input value={number} onChange={(e) => setNumber(e.target.value.toUpperCase())}
+          aria-label={t('track.number', 'Order number')} enterKeyHint="go"
+          autoCapitalize="characters" autoCorrect="off" spellCheck={false} autoComplete="off"
           placeholder="FM-2026-XXXXXXXX" className="input font-mono" />
         <button disabled={busy || !number} aria-label={t('track.find', 'Find my order')} className="btn-primary px-6">
           {busy ? <Loader2 size={18} className="animate-spin" /> : <Search size={18} />}
@@ -200,7 +202,7 @@ export default function Track() {
                     : <span key={m.id} className="btn-ghost text-sm cursor-default">{METHOD_ICON[m.id] || '💳'} {m.label}: {m.target}</span>
                 ))}
               </div>
-              <p className="text-slate-500 text-xs mt-3">
+              <p className="text-slate-600 text-xs mt-3">
                 {cfg.paymentNote
                   || t('track.payNote', 'Once we confirm your payment your order moves on by itself — this page updates live.')}
               </p>

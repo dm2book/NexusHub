@@ -441,6 +441,10 @@ router.get('/track/:number', asyncHandler(async (req, res) => {
   const order = await getOrderByNumber(req.params.number);
   if (!order) throw new ApiError(404, 'Order not found');
   res.json({
+    // The id lets a restored or shared pay link offer the payment-proof form.
+    // The order NUMBER is the credential that got you here, and every write by
+    // id still goes through assertOwnsOrder(email), so this grants nothing extra.
+    id: order.id,
     number: order.number, status: order.status, statusLabel: order.statusLabel,
     total: order.total, totalFormatted: order.totalFormatted, currency: order.currency,
     history: order.history.map((h) => ({ to: h.to_status, at: h.created_at })),

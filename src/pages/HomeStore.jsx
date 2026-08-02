@@ -207,7 +207,7 @@ export default function HomeStore() {
       <header className={`fm-nav sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-slate-200/70 ${navScrolled ? 'is-scrolled' : ''}`}>
         <div className="max-w-[1400px] 2xl:max-w-[1560px] mx-auto px-4 lg:px-8 h-[68px] flex items-center gap-3 sm:gap-6">
           <button onClick={() => setMenuOpen((v) => !v)} aria-label={tr('nav.menu', 'Menu')} aria-expanded={menuOpen}
-            className="lg:hidden w-10 h-10 -ml-1 rounded-xl hover:bg-slate-100 grid place-items-center text-slate-700">
+            className="lg:hidden w-11 h-11 shrink-0 -ml-1.5 rounded-xl hover:bg-slate-100 grid place-items-center text-slate-700">
             {menuOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
 
@@ -239,14 +239,14 @@ export default function HomeStore() {
             <kbd className="ml-auto text-[11px] bg-white border border-slate-200 rounded px-1.5 py-0.5 text-slate-400">⌘K</kbd>
           </button>
           <button onClick={() => window.dispatchEvent(new CustomEvent('forge:cmdk'))} aria-label="Search"
-            className="md:hidden w-10 h-10 rounded-xl hover:bg-slate-100 grid place-items-center text-slate-700">
+            className="md:hidden w-11 h-11 shrink-0 rounded-xl hover:bg-slate-100 grid place-items-center text-slate-700">
             <Search size={20} />
           </button>
 
           <LangSwitch className="hidden sm:inline-flex" />
 
           <Link to="/cart" data-cart-target aria-label={tr('nav.cart', 'Shopping cart')}
-            className="relative w-10 h-10 rounded-xl hover:bg-slate-100 grid place-items-center text-slate-700">
+            className="relative w-11 h-11 shrink-0 rounded-xl hover:bg-slate-100 grid place-items-center text-slate-700">
             <ShoppingCart size={20} />
             {count > 0 && (
               <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-violet-600 text-white text-[11px] font-semibold grid place-items-center">{count}</span>
@@ -386,7 +386,11 @@ export default function HomeStore() {
       <ScrollProgress />
 
         {/* Main */}
-        <main className="flex-1 min-w-0 space-y-6">
+        {/* The homepage is its own route, outside StoreLayout, so it never
+            inherited the light-theme remaps and its card text failed AA on
+            white. The hero inside keeps its dark palette via the .fm-stage
+            exceptions in index.css. */}
+        <main className="theme-light flex-1 min-w-0 space-y-6">
           {/* Hero */}
           {/* The one place on the shop that is allowed to be theatre. Dark
               stage, a single coloured beam, oversized ghost type — the rest of

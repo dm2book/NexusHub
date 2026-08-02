@@ -30,6 +30,14 @@ export default function Shop() {
   const [products, setProducts] = useState(null);
   const [search, setSearch] = useState(() => new URLSearchParams(window.location.search).get('search') || '');
   const [sort, setSort] = useState('popular');
+  /* Measured at 390px: rendering the whole catalogue made this page 15,455px —
+     18 screens — and fired 65 image requests before the buyer had scrolled once.
+     A phone pays for every one of those. 24 fills roughly three screens, which
+     is more than enough to judge the shop, and the rest is one tap away.
+     A button rather than infinite scroll on purpose: infinite scroll makes the
+     footer — where the seller identity and the refund policy live — unreachable. */
+  const PAGE = 24;
+  const [shown, setShown] = useState(PAGE);
   const categoryLogos = useCategoryLogos(); // owner-set logos (Admin → Categories)
   const category = params.get('category') || '';
   usePageMeta('Shop', 'Game currency, gift cards and subscriptions. In stock is sent automatically once payment is confirmed; the rest is delivered by hand.');
@@ -42,6 +50,8 @@ export default function Shop() {
 
   const categories = useMemo(
     () => [...new Set((products || []).map((p) => p.category).filter(Boolean))], [products]);
+
+  useEffect(() => { setShown(PAGE); }, [category, sort, search]);
 
   const visible = useMemo(() => {
     let list = (products || []).slice();
@@ -178,18 +188,21 @@ export default function Shop() {
 
         {/* controls */}
         <div className="flex flex-col sm:flex-row gap-3 sm:items-center justify-between mb-5">
-          <div className="text-slate-500 text-sm">
+          <div className="text-slate-600 text-sm">
             {products === null ? t('shop.loading', 'Loading…') : `${visible.length} ${t('shop.items', 'products')}`}
           </div>
           <div className="flex gap-3">
             <div className="relative flex-1 sm:w-60">
               <Search size={16} className="absolute left-3 top-3 text-slate-400" />
               <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t('shop.search', 'Search products…')}
+                type="search" aria-label={t('shop.search', 'Search products…')} enterKeyHint="search"
+                autoCorrect="off" autoCapitalize="off" spellCheck={false}
                 className="w-full rounded-xl bg-white border border-slate-200 pl-9 pr-3 h-11 sm:h-10 text-base sm:text-sm text-slate-700 outline-none focus:border-violet-400" />
             </div>
             <div className="relative">
               <SlidersHorizontal size={15} className="absolute left-3 top-3 text-slate-400 pointer-events-none" />
               <select value={sort} onChange={(e) => setSort(e.target.value)}
+                aria-label={t('shop.sortBy', 'Sort products by')}
                 className="appearance-none cursor-pointer rounded-xl bg-white border border-slate-200 pl-9 pr-8 h-11 sm:h-10 text-base sm:text-sm text-slate-700 outline-none focus:border-violet-400">
                 {Object.entries(SORTS).map(([k, v]) => <option key={k} value={k}>{t(v.key, v.label)}</option>)}
               </select>
@@ -212,13 +225,24 @@ export default function Shop() {
           </div>
         ) : (
           <div key={`${category}-${sort}-${search}`} className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 fm-grid-in">
-            {visible.map((p, i) => (
+            {visible.slice(0, shown).map((p, i) => (
               // Stagger capped at 8 so a 74-product grid does not end with a
               // card waiting two seconds for its turn.
               <div key={p.id} className="flex fm-reveal" style={{ transitionDelay: `${Math.min(i, 8) * 45}ms` }}>
                 <LightProductCard product={p} onAdd={onAdd} />
               </div>
             ))}
+          </div>
+        )}
+        {visible.length > shown && (
+          <div className="mt-6 flex flex-col items-center gap-2">
+            <button onClick={() => setShown((n) => n + PAGE)}
+              className="w-full sm:w-auto min-h-[48px] px-8 rounded-xl border border-slate-200 bg-white font-semibold text-slate-700 hover:border-violet-300 hover:text-violet-700 transition fm-press">
+              {t('shop.loadMore', 'Show more products')}
+            </button>
+            <span className="text-[13px] text-slate-400">
+              {t('shop.showing', '{n} of {total}', { n: shown, total: visible.length })}
+            </span>
           </div>
         )}
       </main>

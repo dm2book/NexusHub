@@ -49,7 +49,7 @@ export default function LightProductCard({ product, onAdd }) {
             <span className="text-[10px] font-black text-white bg-rose-500 rounded-full px-2 py-0.5 shadow-sm">-{discountPct}%</span>
           )}
           {product.featured && (
-            <span className="text-[10px] font-bold text-amber-600 bg-amber-100 rounded-full px-2 py-0.5">★ {t('card.featured', 'Featured')}</span>
+            <span className="text-[10px] font-bold text-amber-800 bg-amber-100 rounded-full px-2 py-0.5">★ {t('card.featured', 'Featured')}</span>
           )}
         </div>
         {product.stockLeft > 0 && (
@@ -97,7 +97,7 @@ export default function LightProductCard({ product, onAdd }) {
           </div>
         )}
       </a>
-      <div className="text-[11px] font-semibold uppercase tracking-wide text-violet-500">{v.label}</div>
+      <div className="text-[11px] font-semibold uppercase tracking-wide text-violet-700">{v.label}</div>
       <Link to={to} className="font-bold text-[15px] text-slate-900 mt-0.5 hover:text-violet-600 line-clamp-2">{product.name}</Link>
       {desc && <p className="text-[12.5px] text-slate-400 mt-1 line-clamp-2">{desc}</p>}
       <div className="text-[12px] text-slate-400 mt-3 pt-0.5 mt-auto">

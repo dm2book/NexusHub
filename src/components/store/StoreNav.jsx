@@ -53,8 +53,11 @@ export default function StoreNav() {
   return (
     <header className={`fm-nav sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-slate-200/70 ${scrolled ? 'is-scrolled' : ''}`}>
       <div className="max-w-[1400px] mx-auto px-4 lg:px-8 h-[68px] flex items-center gap-6">
-        <button onClick={() => setOpen((v) => !v)} aria-label="Menu"
-          className="lg:hidden w-10 h-10 -ml-1 rounded-xl hover:bg-slate-100 grid place-items-center text-slate-700">
+        {/* shrink-0 is load-bearing: this row is over-full at 390px, and without
+            it the browser squeezes these 40px buttons down to 20-27px — measured.
+            w-11 puts them on the 44px thumb target instead of just under it. */}
+        <button onClick={() => setOpen((v) => !v)} aria-label={t('nav.menu', 'Menu')}
+          className="lg:hidden w-11 h-11 shrink-0 -ml-1.5 rounded-xl hover:bg-slate-100 grid place-items-center text-slate-700">
           {open ? <X size={20} /> : <Menu size={20} />}
         </button>
         <Link to="/" className="flex items-center gap-2.5 shrink-0">
@@ -84,15 +87,15 @@ export default function StoreNav() {
           <span className="text-sm">{t('nav.search', 'Search for products...')}</span>
           <kbd className="ml-auto text-[11px] bg-white border border-slate-200 rounded px-1.5 py-0.5">⌘K</kbd>
         </button>
-        <button onClick={() => window.dispatchEvent(new CustomEvent('forge:cmdk'))} aria-label="Search"
-          className="md:hidden w-10 h-10 rounded-xl hover:bg-slate-100 grid place-items-center text-slate-700">
+        <button onClick={() => window.dispatchEvent(new CustomEvent('forge:cmdk'))} aria-label={t('nav.search', 'Search for products...')}
+          className="md:hidden w-11 h-11 shrink-0 rounded-xl hover:bg-slate-100 grid place-items-center text-slate-700">
           <Search size={20} />
         </button>
 
         <LangSwitch className="hidden sm:inline-flex" />
 
         <Link to="/cart" data-cart-target aria-label={t('nav.cart', 'Shopping cart')}
-          className="relative w-10 h-10 rounded-xl hover:bg-slate-100 grid place-items-center text-slate-700">
+          className="relative w-11 h-11 shrink-0 rounded-xl hover:bg-slate-100 grid place-items-center text-slate-700">
           <ShoppingCart size={20} />
           {count > 0 && (
             <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-violet-600 text-white text-[11px] font-semibold grid place-items-center">{count}</span>

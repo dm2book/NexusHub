@@ -285,7 +285,7 @@ h1, h2, h3, .font-display, .fm-head {
    near-black. That must NOT reach elements carrying their own coloured
    background: the primary CTA sits on the purple gradient and was rendering
    near-black text on it (every "Buy now" / "Browse shop" on the storefront). */
-.theme-light .text-white { color:#0f172a; }
+.theme-light [class~="text-white"] { color:#0f172a; }
 .theme-light .btn-primary,
 .theme-light .btn-primary:hover,
 .theme-light [style*="gradient"].text-white { color:#fff; }
@@ -297,6 +297,57 @@ h1, h2, h3, .font-display, .fm-head {
 .theme-light .border-white\/10 { border-color:#e7e9ee; }
 .theme-light .divide-white\/5 > :not([hidden]) ~ :not([hidden]) { border-color:#eef0f4; }
 .theme-light .bg-space-black, .theme-light .bg-elevated { background:#f8fafc; }
+
+/* The gap that made /track unreadable.
+   `.card`/`.glass`/`.bg-elevated` turn light above and text-slate-* is remapped,
+   but `text-white` and the pale accent shades were not — so every heading and
+   status line on a light surface stayed a dark-theme colour. Measured on /track
+   at 390px against a WCAG AA floor of 4.5:1: "⏳ Awaiting payment" 1.72:1, the
+   delivery-timeline labels 2.56:1, the payment hint 1.19:1. That is the page
+   every order email links to.
+
+   Remapped for the WHOLE light scope rather than per component: a first attempt
+   scoped these to `.card` descendants and missed everything sitting on a tinted
+   panel (bg-amber-500/10 and friends), which is most of them. The genuinely dark
+   surfaces inside the light scope — the hero stage and the gradient brand cards
+   — take their pale values back at the end of this block. */
+.theme-light .text-white { color:#0f172a; }
+.theme-light .text-amber-200,  .theme-light .text-amber-300   { color:#b45309; }
+.theme-light .text-emerald-200,.theme-light .text-emerald-300 { color:#047857; }
+.theme-light .text-red-200,    .theme-light .text-red-300     { color:#b91c1c; }
+.theme-light .text-indigo-200, .theme-light .text-indigo-300  { color:#4338ca; }
+.theme-light .text-violet-300, .theme-light .text-violet-400  { color:#6d28d9; }
+.theme-light .text-blue-200,   .theme-light .text-blue-300    { color:#1d4ed8; }
+.theme-light .text-fuchsia-300 { color:#a21caf; }
+/* Both landed just under AA at 4.45:1 and 1.19:1 respectively. */
+.theme-light .text-slate-400 { color:#5b6779; }
+.theme-light .text-slate-500 { color:#6b7789; }
+
+/* …except where the surface really is dark. Anything inside the hero stage, a
+   gradient brand card or an explicitly dark panel keeps the light-on-dark
+   palette it was designed with. Listed last so it wins on equal specificity. */
+/* `.btn-primary` and `.chip-active` build their white from `@apply text-white`
+   in the components layer, so naming them together with `.text-white` in one
+   selector list makes Tailwind chase a circular @apply. Kept apart, and the
+   utility itself is matched by attribute for the same reason. */
+.theme-light .fm-stage [class~="text-white"],
+.theme-light .fm-hero-brand [class~="text-white"],
+.theme-light [style*="gradient"] [class~="text-white"],
+.theme-light [style*="gradient"][class~="text-white"] { color:#fff; }
+.theme-light .btn-primary, .theme-light .chip-active { color:#fff; }
+/* Prefix matching, not exact class names: Tailwind's opacity modifiers produce
+   `text-slate-300/90`, which an exact selector silently misses — and the hero
+   sub-copy uses exactly that. */
+.theme-light .fm-stage [class*="text-slate-2"],
+.theme-light .fm-hero-brand [class*="text-slate-2"],
+.theme-light .fm-stage [class*="text-slate-3"],
+.theme-light .fm-hero-brand [class*="text-slate-3"] { color:#cbd5e1; }
+.theme-light .fm-stage [class*="text-slate-4"],
+.theme-light .fm-hero-brand [class*="text-slate-4"] { color:#94a3b8; }
+.theme-light .fm-stage [class*="text-emerald-"] { color:#6ee7b7; }
+.theme-light .fm-stage [class*="text-amber-"]   { color:#fcd34d; }
+.theme-light .fm-stage [class*="text-white"],
+.theme-light .fm-hero-brand [class*="text-white"] { color:#fff; }
 
 /* ── Premium storefront motion & effects ───────────────────────────────── */
 /* Route/page entrance — a single, intentional gesture: rise + settle + de-blur.

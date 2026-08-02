@@ -13,6 +13,7 @@ import { EmptyState } from '../components/ui.jsx';
 import { usePageMeta } from '../lib/useMeta.js';
 import { matchBundle } from '../lib/bundles.js';
 import { useStickyBarLift } from '../lib/useStickyBarLift.js';
+import { rememberOrder, recallOrder, forgetOrder } from '../lib/lastOrder.js';
 
 const METHOD_ICON = { tikkie: '🟢', revolut: '⚫', paypal: '🔵' };
 
@@ -50,7 +51,10 @@ export default function Checkout() {
   const [methods, setMethods] = useState([]);
   const [note, setNote] = useState('');
   const [methodId, setMethodId] = useState('');
-  const [placed, setPlaced] = useState(null);           // created order (manual flow)
+  // Restored from the cache before first paint, so returning from a banking app
+  // shows the reference immediately rather than flashing an empty checkout.
+  const [placed, setPlaced] = useState(() => recallOrder(
+    new URLSearchParams(window.location.search).get('order')));
   const [couponInput, setCouponInput] = useState('');
   const [coupon, setCoupon] = useState(null);           // { code, kind, percent, value, label }
   const [creditBalance, setCreditBalance] = useState(0); // store credit (cents)
@@ -85,6 +89,21 @@ export default function Checkout() {
       setCoupon(c); toast.success(`Code applied — ${c.label || 'discount'}!`);
     } catch (e) { setCoupon(null); toast.error(e.message || 'Invalid or expired code'); }
   };
+
+  // A shared or bookmarked pay link must work on a device that has never seen
+  // this order. The number alone is enough: /api/track is the same public
+  // lookup the order email points at.
+  useEffect(() => {
+    const wanted = new URLSearchParams(window.location.search).get('order');
+    if (!wanted || placed) return;
+    let alive = true;
+    api.get(`/api/track/${encodeURIComponent(wanted)}`)
+      // The track endpoint answers flat, and only a still-unpaid order should
+      // reopen a pay screen — one on a delivered order invites paying twice.
+      .then((o) => { if (alive && o?.status === 'pending') setPlaced(o); })
+      .catch(() => { /* unknown or settled — fall through to the normal checkout */ });
+    return () => { alive = false; };
+  }, [placed]);
 
   useEffect(() => { if (user?.email) setEmail(user.email); }, [user]);
   useEffect(() => {
@@ -166,7 +185,20 @@ export default function Checkout() {
         return;
       }
       if (provider === 'manual') {
-        clear(); setPlaced(order);   // show pay instructions
+        // The pay screen used to live only in component state, so it survived
+        // nothing: measured on a phone, a reload wiped the amount AND the
+        // reference and left "Nothing to check out". That matters more here
+        // than anywhere else on the site — this flow REQUIRES leaving for a
+        // banking app, and iOS routinely discards the backgrounded tab. The
+        // reference is the whole reconciliation mechanism for a manual shop.
+        //
+        // Two belts: the order number goes in the URL (so Back, forward and a
+        // shared link all work, the pattern CheckoutSuccess already uses), and
+        // the order is cached so the screen redraws instantly without a fetch.
+        clear();
+        rememberOrder(order);
+        setPlaced(order);
+        navigate(`/checkout?order=${encodeURIComponent(order.number)}`, { replace: true });
         return;
       }
       clear(); toast.success(`${t('checkout.orderWord', 'Order')} ${order.number} ${t('checkout.placed', 'placed!')}`);
@@ -252,33 +284,36 @@ export default function Checkout() {
             <h3 className="text-white mb-5">{t('checkout.contact', 'Contact & billing')}</h3>
             <div className="space-y-4">
               <div>
-                <label className="label">{t('checkout.email', 'Email (delivery + receipt)')}</label>
-                <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
+                <label className="label" htmlFor="co-email">{t('checkout.email', 'Email (delivery + receipt)')}</label>
+                <input id="co-email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
                   autoComplete="email" inputMode="email" autoCapitalize="off" autoCorrect="off" spellCheck={false}
                   className="input" placeholder="you@example.com" />
               </div>
               <div className="grid sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="label">{t('checkout.name', 'Full name')}</label>
-                  <input value={fullName} onChange={(e) => setFullName(e.target.value)} autoComplete="name"
+                  <label className="label" htmlFor="co-name">{t('checkout.name', 'Full name')}</label>
+                  <input id="co-name" value={fullName} onChange={(e) => setFullName(e.target.value)} autoComplete="name"
                     className="input" placeholder={t('checkout.optional', 'Optional')} />
                 </div>
                 <div>
-                  <label className="label">{t('checkout.city', 'City')}</label>
-                  <input value={city} onChange={(e) => setCity(e.target.value)} autoComplete="address-level2"
+                  <label className="label" htmlFor="co-city">{t('checkout.city', 'City')}</label>
+                  <input id="co-city" value={city} onChange={(e) => setCity(e.target.value)} autoComplete="address-level2"
                     className="input" placeholder={t('checkout.optional', 'Optional')} />
                 </div>
               </div>
               {offersChoice && !requiresAccount && (
                 <div>
-                  <label className="label">{t('checkout.deliveryChoose', 'How do you want it delivered?')}</label>
-                  <div className="grid sm:grid-cols-2 gap-2.5">
-                    <button type="button" onClick={() => setDeliveryMethod('code')}
+                  {/* This caption heads a pair of BUTTONS, not a field, so a
+                      <label> would point at nothing. A named radiogroup is what a
+                      screen reader can actually announce and move between. */}
+                  <div className="label" id="co-delivery-label">{t('checkout.deliveryChoose', 'How do you want it delivered?')}</div>
+                  <div role="radiogroup" aria-labelledby="co-delivery-label" className="grid sm:grid-cols-2 gap-2.5">
+                    <button type="button" role="radio" aria-checked={method === 'code'} onClick={() => setDeliveryMethod('code')}
                       className={`rounded-xl border p-3.5 text-left transition ${method === 'code' ? 'border-primary bg-primary/10' : 'border-white/10 hover:border-white/25'}`}>
                       <div className="text-white font-medium text-sm">📧 {t('checkout.deliveryCode', 'Gift code')}</div>
                       <div className="text-slate-500 text-xs mt-0.5">{t('checkout.deliveryCodeSub', 'Emailed to you to redeem yourself')}</div>
                     </button>
-                    <button type="button" onClick={() => setDeliveryMethod('account')}
+                    <button type="button" role="radio" aria-checked={method === 'account'} onClick={() => setDeliveryMethod('account')}
                       className={`rounded-xl border p-3.5 text-left transition ${method === 'account' ? 'border-primary bg-primary/10' : 'border-white/10 hover:border-white/25'}`}>
                       <div className="text-white font-medium text-sm">⚡ {t('checkout.deliveryAccount', 'Direct to my account')}</div>
                       <div className="text-slate-500 text-xs mt-0.5">{t('checkout.deliveryAccountSub', 'We top up your account for you')}</div>
@@ -288,8 +323,8 @@ export default function Checkout() {
               )}
               {needsTarget && (
                 <div>
-                  <label className="label">{deliveryLabels.join(' / ')} <span className="text-indigo-400">*</span></label>
-                  <input required value={deliveryDetail} onChange={(e) => setDeliveryDetail(e.target.value)}
+                  <label className="label" htmlFor="co-target">{deliveryLabels.join(' / ')} <span className="text-indigo-400">*</span></label>
+                  <input id="co-target" required value={deliveryDetail} onChange={(e) => setDeliveryDetail(e.target.value)}
                     autoCapitalize="off" autoCorrect="off" spellCheck={false} autoComplete="off"
                     className="input" placeholder={t('checkout.deliveryPh', 'Where should we deliver? e.g. your in-game username')} />
                   <p className="text-slate-500 text-xs mt-1">{t('checkout.deliveryHint', 'We deliver this order to this target — double-check it.')}</p>
@@ -344,9 +379,10 @@ export default function Checkout() {
           {/* Coupon */}
           <div className="flex gap-2 mb-4">
             <input value={couponInput} onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+              aria-label={t('checkout.couponPh', 'Discount code')} enterKeyHint="done"
               autoCapitalize="characters" autoCorrect="off" spellCheck={false} autoComplete="off"
               placeholder={t('checkout.couponPh', 'Discount code')} className="input py-2 text-base" />
-            <button type="button" onClick={applyCoupon} className="btn-ghost px-4 text-sm">{t('checkout.apply', 'Apply')}</button>
+            <button type="button" onClick={applyCoupon} className="btn-ghost px-4 min-h-[44px] text-sm">{t('checkout.apply', 'Apply')}</button>
           </div>
           {/* Store credit */}
           {creditBalance > 0 && (
