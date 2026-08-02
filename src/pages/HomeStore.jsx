@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import {
   Search, ShoppingCart, Zap, ShieldCheck, Headphones, Tag, Star, ArrowRight,
   Plus, LayoutGrid, Users, CheckCircle2, Clock, MessageCircle, ChevronRight, Sparkles, Shield, Menu, X,
+  BadgeCheck,
   User as UserIcon,
 } from 'lucide-react';
 import { useCart } from '../context/CartContext.jsx';
@@ -17,12 +18,12 @@ import { useStats } from '../lib/useStats.js';
 import { useReviews } from '../lib/useReviews.js';
 import { useReveal } from '../lib/useReveal.js';
 import { useParallax } from '../lib/useParallax.js';
-import CountUp from '../components/CountUp.jsx';
 import RecentlyDelivered from '../components/store/RecentlyDelivered.jsx';
 import CommandPalette from '../components/store/CommandPalette.jsx';
 import MobileTabBar from '../components/store/MobileTabBar.jsx';
 import AnnouncementBar from '../components/store/AnnouncementBar.jsx';
-import { SystemStatus } from '../components/store/StoreFooter.jsx';
+import StoreFooter from '../components/store/StoreFooter.jsx';
+import SellerIdentity from '../components/store/SellerIdentity.jsx';
 import { money } from '../lib/catalog.js';
 import { withFallback, SAMPLE_PRODUCTS, iconPath } from '../lib/sampleCatalog.js';
 import { useCategoryLogos } from '../lib/useCategoryLogos.js';
@@ -46,18 +47,50 @@ const CATEGORIES = [
   { label: 'Discord Nitro', slug: 'discord-nitro', img: 'discord-nitro' },
 ];
 
-/* ── Popular category tiles — prices/data are resolved from the REAL catalog
-   at runtime (cheapest product per category; add-to-cart adds a real product). */
-const POPULAR_TILES = [
-  { name: 'Robux', img: 'robux', slug: 'robux' },
-  { name: 'V-Bucks', img: 'v-bucks', slug: 'v-bucks' },
-  { name: 'Valorant Points', img: 'valorant', slug: 'valorant', popular: true },
-  { name: 'Gift Cards', img: 'giftcard', slug: 'giftcard' },
-  { name: 'Discord Nitro', img: 'discord-nitro', slug: 'discord-nitro' },
-  { name: 'CoD Points', img: 'cod', slug: 'cod' },
-  { name: 'EA FC / FIFA', img: 'eafc', slug: 'eafc' },
-  { name: 'Brawl Stars', img: 'brawl', slug: 'brawl' },
+/* ── The three things this shop sells ─────────────────────────────────────
+   Not a marketing framing: these are real category slugs, and each pillar
+   renders only the ones the live catalogue actually has stock in. A pillar with
+   nothing behind it disappears rather than showing an empty shelf.
+
+   Ordered by how a buyer arrives: most people come for a specific game currency,
+   gift cards are the gift/no-account case, subscriptions are the recurring one. */
+const PILLARS = [
+  {
+    key: 'currency',
+    title: 'Game currency',
+    sub: 'Robux, V-Bucks, Valorant Points and the rest — topped up on your account or sent as a code.',
+    slugs: ['robux', 'v-bucks', 'valorant', 'cod', 'eafc', 'apex', 'genshin', 'brawl',
+            'clash', 'pubg', 'freefire', 'league', 'mlbb', 'gta', 'minecraft'],
+  },
+  {
+    key: 'giftcards',
+    title: 'Gift cards',
+    sub: 'Steam, PlayStation, Xbox, Netflix and more. A code by email — no account of yours needed.',
+    slugs: ['giftcard', 'steam', 'playstation', 'xbox', 'nintendo', 'googleplay', 'paysafecard'],
+  },
+  {
+    key: 'subscriptions',
+    title: 'Subscriptions',
+    sub: 'Discord Nitro, Game Pass, Spotify. Bought as a code you redeem yourself, so nothing renews behind your back.',
+    slugs: ['discord-nitro', 'gamepass', 'spotify', 'psplus', 'netflix', 'youtube', 'eaplay', 'disneyplus'],
+  },
 ];
+
+/* Display names for the category slugs above. Anything missing falls back to a
+   title-cased slug, so a new category still renders rather than breaking. */
+const SLUG_LABEL = {
+  robux: 'Robux', 'v-bucks': 'V-Bucks', valorant: 'Valorant Points', cod: 'CoD Points',
+  eafc: 'EA FC', apex: 'Apex Coins', genshin: 'Genshin', brawl: 'Brawl Stars',
+  clash: 'Clash of Clans', pubg: 'PUBG', freefire: 'Free Fire', league: 'League of Legends',
+  mlbb: 'Mobile Legends', gta: 'GTA', minecraft: 'Minecraft',
+  giftcard: 'Gift cards', steam: 'Steam', playstation: 'PlayStation', xbox: 'Xbox',
+  nintendo: 'Nintendo', googleplay: 'Google Play', paysafecard: 'paysafecard',
+  'discord-nitro': 'Discord Nitro', gamepass: 'Xbox Game Pass', spotify: 'Spotify',
+  psplus: 'PS Plus', netflix: 'Netflix', youtube: 'YouTube Premium',
+  eaplay: 'EA Play', disneyplus: 'Disney+',
+};
+const labelFor = (slug) => SLUG_LABEL[slug]
+  || slug.split('-').map((w) => w[0].toUpperCase() + w.slice(1)).join(' ');
 
 const NAV = [
   { key: 'nav.home', label: 'Home', to: '/' },
@@ -81,37 +114,6 @@ const HERO_FEATURES = TRUST;
 
 // Real counts only — append "+" once the number is large enough to round.
 const fmtCount = (n) => `${Number(n || 0).toLocaleString('en-US')}${Number(n || 0) >= 100 ? '+' : ''}`;
-// Real average delivery time → a short human string, or null when there are no
-// completed orders yet (so we never fake an "instant" claim).
-const fmtDelivery = (s) => (s == null ? null
-  : s < 90 ? `${Math.max(1, Math.round(s))}s`
-  : s < 5400 ? `${Math.round(s / 60)} min`
-  : `${Math.round(s / 3600)}h`);
-// No fabricated metrics. `count: true` marks a real measured number, which may
-// animate up from zero; fixed claims must NEVER animate, because counting up
-// "100%" and "24/7" renders "0% Buyer protected" and "0/7 Customer Support" on
-// first paint — the exact opposite of the claim.
-// A zero is worse than silence: "0 Happy Customers" tells a first-time visitor
-// that nobody has ever bought here. So a count is only shown once it is real,
-// and the block is topped up with guarantees that are true on day one.
-const statCards = (s, tr = (_k, en) => en) => {
-  const real = [];
-  // "Happy customers" = people who actually LEFT A REVIEW — not just anyone who ordered.
-  if (s.reviews > 0) real.push({ icon: Users, value: fmtCount(s.reviews), count: true, label: tr('home.s.customers', 'Happy Customers'), color: 'text-violet-600 bg-violet-100' });
-  if (s.delivered > 0) real.push({ icon: ShoppingCart, value: fmtCount(s.delivered), count: true, label: tr('home.s.delivered', 'Orders Delivered'), color: 'text-blue-600 bg-blue-100' });
-  if (s.successRate != null) real.push({ icon: CheckCircle2, value: `${s.successRate}%`, count: true, label: tr('home.s.fulfilled', 'Fulfilled'), color: 'text-emerald-600 bg-emerald-100' });
-  if (s.avgDeliverySeconds != null) real.push({ icon: Clock, value: fmtDelivery(s.avgDeliverySeconds), label: tr('home.s.avgDelivery', 'Avg. delivery'), color: 'text-amber-600 bg-amber-100' });
-
-  // Promises that hold from the first order — never animated, never a count.
-  const promises = [
-    { icon: ShieldCheck, value: tr('home.s.moneyBack', 'Money back'), label: tr('home.s.ifUndelivered', 'If undelivered'), color: 'text-emerald-600 bg-emerald-100' },
-    { icon: Zap, value: tr('home.s.inStock', 'In stock'), label: tr('home.s.instantCodes', 'Sent automatically'), color: 'text-violet-600 bg-violet-100' },
-    { icon: MessageCircle, value: 'Discord', label: tr('home.s.realSupport', 'Real human support'), color: 'text-blue-600 bg-blue-100' },
-    { icon: Tag, value: tr('home.s.noHidden', 'No fees'), label: tr('home.s.priceYouSee', 'The price you see'), color: 'text-amber-600 bg-amber-100' },
-  ];
-  return [...real, ...promises].slice(0, 4);
-};
-
 export default function HomeStore() {
   const { count, add } = useCart();
   const { user, isStaff } = useAuth();
@@ -136,8 +138,10 @@ export default function HomeStore() {
     const ref = new URLSearchParams(window.location.search).get('ref');
     if (ref) localStorage.setItem('fm_ref', ref.toUpperCase().slice(0, 40));
   }, []);
-  usePageMeta('ForgeMarket — Everything You Need, All in One Place',
-    'Robux, V-Bucks, Valorant Points and gift cards. In stock is sent automatically, everything else by hand — money back if we cannot deliver.');
+  // The tab title and the Google result. It carried the same interchangeable
+  // slogan the hero used to, in the one place a searcher sees before clicking.
+  usePageMeta('ForgeMarket — game currency, gift cards and subscriptions',
+    'Robux, V-Bucks, Steam, Discord Nitro and more, from a small shop run in the Netherlands. In stock is sent automatically, everything else by hand — money back if we cannot deliver.');
   // Organization + site-search structured data for rich Google results.
   useJsonLd('org', {
     '@context': 'https://schema.org',
@@ -168,12 +172,9 @@ export default function HomeStore() {
   // How it works, Reviews, Drops and Support were unreachable from '/'.
   const [menuOpen, setMenuOpen] = useState(false);
   useEffect(() => { api.get('/api/config').then((c) => setAnnouncement(c.announcement || '')).catch(() => {}); }, []);
-  const railRef = useRef(null);
-  const STATS = statCards(stats, tr);
   // Real reviews only — an empty testimonial card costs more trust than it earns.
   const hasReviews = reviews.length > 0;
 
-  const scrollRail = () => railRef.current?.scrollBy({ left: 320, behavior: 'smooth' });
 
   // Real catalog → tiles show the true "From" price; add-to-cart adds the
   // cheapest REAL product in that category (no fabricated items/prices).
@@ -181,13 +182,22 @@ export default function HomeStore() {
   useEffect(() => {
     api.get('/api/products').then((r) => setProducts(withFallback(r.products))).catch(() => setProducts(SAMPLE_PRODUCTS));
   }, []);
-  const popular = useMemo(() => POPULAR_TILES.map((t) => {
-    const items = products.filter((p) => p.category === t.slug && p.active !== false);
-    if (!items.length) return null;
-    const cheapest = items.reduce((a, b) => (a.price <= b.price ? a : b));
-    return { ...t, cheapest, from: cheapest.price, currency: cheapest.currency || 'EUR', count: items.length };
+  /* Each pillar resolved against the live catalogue: a category appears only if
+     it has active products, with its real cheapest price and real pack count. A
+     pillar with nothing behind it is dropped entirely rather than rendering an
+     empty shelf — the shop starts small and should look small-and-real rather
+     than big-and-hollow. */
+  const pillars = useMemo(() => PILLARS.map((pillar) => {
+    const cats = pillar.slugs.map((slug) => {
+      const items = products.filter((p) => p.category === slug && p.active !== false);
+      if (!items.length) return null;
+      const cheapest = items.reduce((a, b) => (a.price <= b.price ? a : b));
+      return { slug, label: labelFor(slug), cheapest,
+               from: cheapest.price, currency: cheapest.currency || 'EUR', count: items.length };
+    }).filter(Boolean);
+    return cats.length ? { ...pillar, cats } : null;
   }).filter(Boolean), [products]);
-  const addToCart = (t) => add(t.cheapest);
+  const addToCart = (c) => add(c.cheapest);
 
   return (
     <div className="min-h-screen overflow-x-clip bg-[#f6f7fb] text-slate-900 fm-page" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
@@ -216,7 +226,9 @@ export default function HomeStore() {
               style={{ backgroundImage: 'linear-gradient(135deg,#7c5cff,#a855f7)' }}>
               <Zap size={18} fill="white" />
             </span>
-            <span className="fm-head text-xl">ForgeMarket</span>
+            {/* Hidden on the narrowest screens: with it, the header row measured
+                wider than 390px and clipped the Sign Up button off the edge. */}
+            <span className="hidden xs:inline fm-head text-xl">ForgeMarket</span>
           </Link>
 
           <nav className="hidden lg:flex items-center gap-7 text-[15px] font-medium text-slate-600">
@@ -396,7 +408,7 @@ export default function HomeStore() {
               stage, a single coloured beam, oversized ghost type — the rest of
               the site stays light, because a price on a dark background is one
               more thing for a nervous buyer to squint at. */}
-          <section className="fm-stage relative overflow-hidden rounded-3xl px-6 sm:px-10 py-12 sm:py-14">
+          <section className="fm-stage relative overflow-hidden rounded-3xl px-5 sm:px-10 py-9 sm:py-14">
             <span className="fm-beam" aria-hidden />
             <span className="fm-ghostword" aria-hidden>FORGE</span>
             {/* On xl the feature cards get their own column instead of floating
@@ -406,14 +418,29 @@ export default function HomeStore() {
                 <span className="inline-flex items-center gap-2 text-[13px] font-semibold text-violet-100 bg-white/10 border border-white/15 backdrop-blur rounded-full px-3 py-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-violet-300 animate-pulse" /> {tr('home.badge', 'Buyer protected · Real human support')}
                 </span>
-                <h1 className="fm-head fm-streak text-white text-[42px] sm:text-[58px] leading-[1.02] mt-5 tracking-[-.02em]">
-                  {tr('home.h1a', 'Everything You Need,')}<br />
-                  <span className="fm-gradient-text">{tr('home.h1b', 'All in One Place.')}</span>
+                {/* "Everything You Need, All in One Place" said nothing about
+                    what is sold or why to trust it — the biggest text on the
+                    page carrying zero information. It now names the three things
+                    this shop actually stocks, and the second line is the part a
+                    stranger taking a bank transfer is really weighing. */}
+                <h1 className="fm-head fm-streak text-white text-[30px] xs:text-[34px] sm:text-[50px] leading-[1.06] mt-4 tracking-[-.02em]">
+                  {tr('home.h1a', 'Game currency, gift cards')}<br />
+                  <span className="fm-gradient-text">{tr('home.h1b', 'and subscriptions.')}</span>
                 </h1>
-                <p className="text-slate-300/90 text-[16px] mt-5 max-w-lg leading-relaxed">
-                  {tr('home.sub', 'Robux, V-Bucks, Valorant Points and more. In stock is sent automatically — everything else by hand, usually within a few hours.')}
+                <p className="text-slate-300/90 text-[15px] sm:text-[16px] mt-4 max-w-lg leading-relaxed">
+                  {tr('home.sub', 'Robux, V-Bucks, Steam, Discord Nitro and more. In stock goes out automatically; everything else by hand, usually within a few hours.')}
                 </p>
-                <div className="flex flex-wrap items-center gap-3 mt-7">
+                {/* The three pillars as real entry points, not decoration: each
+                    one deep-links into the shop already filtered. */}
+                <div className="flex flex-wrap gap-2 mt-4">
+                  {pillars.map((p) => (
+                    <Link key={p.key} to={`/shop?category=${p.cats[0].slug}`}
+                      className="fm-press text-[13px] font-semibold text-white/95 bg-white/10 hover:bg-white/[.16] border border-white/15 rounded-full px-3.5 py-2 transition">
+                      {tr(`home.pillar.${p.key}`, p.title)}
+                    </Link>
+                  ))}
+                </div>
+                <div className="flex flex-wrap items-center gap-3 mt-5">
                   <Link to="/shop" className="fm-press inline-flex items-center gap-2 text-white font-semibold rounded-xl px-6 h-12 shadow-lg shadow-violet-500/30 hover:brightness-105 transition"
                     style={{ backgroundImage: 'linear-gradient(135deg,#7c5cff,#a855f7)' }}>
                     {tr('home.shopNowBig', 'Shop Now')} <ArrowRight size={18} />
@@ -500,176 +527,199 @@ export default function HomeStore() {
             </div>
           </section>
 
-          {/* Trust bar */}
-          <section className="fm-reveal fm-reveal-children bg-white rounded-2xl border border-slate-200/70 shadow-sm grid grid-cols-2 lg:grid-cols-4 divide-x divide-y lg:divide-y-0 divide-slate-100">
-            {TRUST.map((t) => (
-              <div key={t.title} className="flex items-center gap-3 px-5 py-5">
-                <span className={`w-11 h-11 rounded-xl grid place-items-center ${t.color}`}><t.icon size={20} /></span>
-                <div><div className="font-semibold text-[15px]">{tr(`home.f.${t.key}`, t.title)}</div><div className="text-[12.5px] text-slate-400">{tr(`home.f.${t.key}Sub`, t.sub)}</div></div>
+          {/* ── Popular products ──────────────────────────────────────────
+              Three pillars, each resolved from the live catalogue. Grouping by
+              what the shop actually sells beats one undifferentiated rail: a
+              buyer arriving for Nitro should not have to scroll past Robux. */}
+          {pillars.map((pillar) => (
+            <section key={pillar.key} className="fm-reveal fm-reveal-children">
+              <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-1.5 sm:gap-4 mb-3">
+                <div className="min-w-0">
+                  <h2 className="fm-head text-2xl">{tr(`home.pillar.${pillar.key}`, pillar.title)}</h2>
+                  <p className="text-[13.5px] text-slate-600 mt-1 max-w-2xl leading-relaxed">
+                    {tr(`home.pillar.${pillar.key}Sub`, pillar.sub)}
+                  </p>
+                </div>
+                <Link to={`/shop?category=${pillar.cats[0].slug}`}
+                  className="shrink-0 self-start sm:self-auto text-violet-700 font-semibold text-sm inline-flex items-center gap-1 hover:gap-2 transition-all">
+                  {tr('home.viewAll', 'View All Products')} <ArrowRight size={15} />
+                </Link>
               </div>
-            ))}
-          </section>
-
-          {/* Popular products */}
-          <section className="fm-reveal fm-reveal-children">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="fm-head text-2xl flex items-center gap-2">{tr('home.popular', 'Popular Products')} <span>🔥</span></h2>
-              <Link to="/shop" className="text-violet-600 font-semibold text-sm inline-flex items-center gap-1 hover:gap-2 transition-all">
-                {tr('home.viewAll', 'View All Products')} <ArrowRight size={15} />
-              </Link>
-            </div>
-            <div className="relative">
-              <div ref={railRef} className="fm-rail flex gap-4 overflow-x-auto pb-2 scroll-smooth snap-x">
-                {popular.map((p) => (
-                  <div key={p.name} className="snap-start shrink-0 w-[230px] bg-white rounded-2xl border border-slate-200/70 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all p-4">
-                    <div className="fm-logo-plinth rounded-xl h-[150px] grid place-items-center mb-3">
-                      {p.popular && <span className="absolute top-2.5 right-2.5 z-10 text-[10px] font-bold text-violet-700 bg-violet-100 rounded-full px-2 py-0.5">{tr('card.popular', 'Popular')}</span>}
-                      <img src={categoryLogos[p.slug] || ICON(p.img)} alt={p.name} className="fm-logo w-[92px] h-[92px]" />
+              <div className="fm-rail flex gap-4 overflow-x-auto pb-2 scroll-smooth snap-x">
+                {pillar.cats.map((c) => (
+                  <div key={c.slug} className="snap-start shrink-0 w-[212px] bg-white rounded-2xl border border-slate-200/70 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all p-4">
+                    <div className="fm-logo-plinth rounded-xl h-[132px] grid place-items-center mb-3">
+                      <img src={categoryLogos[c.slug] || ICON(c.slug)} alt="" aria-hidden="true"
+                        loading="lazy" decoding="async" className="fm-logo w-[84px] h-[84px]" />
                     </div>
-                    <h3 className="font-bold text-[15px]">{p.name}</h3>
-                    <p className="text-[12.5px] text-slate-400 mt-0.5">{tr('home.packs', '{n} packs available', { n: p.count })}</p>
-                    <div className="text-[12px] text-slate-400 mt-2">{tr('home.from', 'From')} <span className="fm-num text-violet-600 text-[17px]">{money(p.from, p.currency)}</span></div>
+                    <h3 className="font-bold text-[15px] text-slate-900">{c.label}</h3>
+                    <p className="text-[12.5px] text-slate-500 mt-0.5">
+                      {tr('home.packs', '{n} packs available', { n: c.count })}
+                    </p>
+                    <div className="text-[12px] text-slate-500 mt-2">
+                      {tr('home.from', 'From')} <span className="fm-num text-violet-700 text-[17px]">{money(c.from, c.currency)}</span>
+                    </div>
                     <div className="flex items-center gap-2 mt-3">
-                      <Link to={`/shop?category=${p.slug}`} className="flex-1 text-center text-white text-sm font-semibold rounded-lg h-11 sm:h-10 grid place-items-center hover:brightness-105 transition"
-                        style={{ backgroundImage: 'linear-gradient(135deg,#7c5cff,#a855f7)' }}>{tr('product.buyNow', 'Buy Now')}</Link>
-                      <button aria-label={`Add ${p.cheapest.name} to cart`}
-                        onClick={(e) => { flyToCart(e.currentTarget.closest('.snap-start')?.querySelector('img')); addToCart(p); }}
-                        className="w-11 h-11 sm:w-10 sm:h-10 shrink-0 rounded-lg border border-slate-200 grid place-items-center text-slate-500 hover:bg-slate-50 hover:text-violet-600 active:scale-90 transition-transform">
+                      <Link to={`/shop?category=${c.slug}`}
+                        className="flex-1 text-center text-white text-sm font-semibold rounded-lg h-11 grid place-items-center hover:brightness-105 transition"
+                        style={{ backgroundImage: 'linear-gradient(135deg,#7c5cff,#a855f7)' }}>
+                        {tr('home.browseCat', 'Browse')}
+                      </Link>
+                      <button aria-label={tr('home.addCheapest', 'Add the cheapest {n} pack to your cart', { n: c.label })}
+                        onClick={(e) => { flyToCart(e.currentTarget.closest('.snap-start')?.querySelector('img')); addToCart(c); }}
+                        className="w-11 h-11 shrink-0 rounded-lg border border-slate-200 grid place-items-center text-slate-600 hover:bg-slate-50 hover:text-violet-700 active:scale-90 transition-transform">
                         <ShoppingCart size={16} />
                       </button>
                     </div>
                   </div>
                 ))}
               </div>
-              <button onClick={scrollRail} aria-label="Scroll"
-                className="hidden sm:grid absolute -right-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white border border-slate-200 shadow-lg place-items-center text-slate-600 hover:text-violet-600">
-                <ChevronRight size={20} />
-              </button>
-            </div>
-          </section>
+            </section>
+          ))}
 
-          {/* Bottom: stats + reviews + discord */}
-          <section className={`grid gap-5 fm-reveal fm-reveal-children ${hasReviews ? 'lg:grid-cols-3' : 'lg:grid-cols-2'}`}>
-            {/* Stats */}
-            <div className="bg-white rounded-2xl border border-slate-200/70 shadow-sm p-5 grid grid-cols-2 gap-4 fm-lift">
-              {STATS.map((st) => (
-                <div key={st.label} className="flex items-center gap-3">
-                  <span className={`w-11 h-11 rounded-xl grid place-items-center ${st.color}`}><st.icon size={20} /></span>
-                  <div><div className="fm-head text-lg leading-none"><CountUp value={st.value} animate={!!st.count} /></div><div className="text-[12px] text-slate-400 mt-1">{st.label}</div></div>
-                </div>
-              ))}
-            </div>
-
-            {/* Reviews — only once real ones exist */}
-            {hasReviews && (
-            <div className="bg-white rounded-2xl border border-slate-200/70 shadow-sm p-5 fm-lift">
-              <div className="font-bold mb-3">{tr('home.reviewsTitle', 'What Our Customers Say')}</div>
-              {stats.reviews > 0 && (
-                <div className="flex items-center gap-2 mb-4">
-                  <div className="flex text-amber-400">{Array.from({ length: 5 }).map((_, i) => <Star key={i} size={16} fill="currentColor" />)}</div>
-                  {stats.rating != null && <span className="fm-head">{stats.rating} {tr('home.outOf5', 'out of 5')}</span>}
-                  <span className="text-[12px] text-slate-400">{tr('home.basedOn', 'Based on {n} reviews', { n: stats.reviews.toLocaleString('en-US') })}</span>
-                </div>
-              )}
-              {reviews.length > 0 ? (
-                <div className="space-y-2.5">
-                  {reviews.slice(0, 2).map((r) => (
-                    <div key={r.id} className="bg-slate-50 rounded-xl p-3">
-                      <div className="flex text-amber-400 mb-1">{Array.from({ length: r.stars || 5 }).map((_, i) => <Star key={i} size={12} fill="currentColor" />)}</div>
-                      <p className="text-[13px] text-slate-600 line-clamp-3">"{r.body}"</p>
-                      <p className="text-[11px] text-slate-400 mt-1">– {r.author}{r.product ? ` · ${r.product}` : ''}</p>
-                    </div>
-                  ))}
-                </div>
-              ) : null}
-            </div>
-            )}
-
-            {/* Discord */}
-            <div className="fm-hero-brand rounded-2xl p-6 text-white shadow-lg shadow-indigo-500/20 flex flex-col fm-lift"
-              style={{ backgroundImage: 'linear-gradient(150deg,#6366f1,#8b5cf6)' }}>
-              <span className="w-12 h-12 rounded-2xl bg-white/15 grid place-items-center mb-4"><MessageCircle size={24} /></span>
-              <div className="fm-head text-xl">{tr('home.joinDiscord', 'ForgeMarket Support')}</div>
-              <p className="text-white/85 text-sm mt-2 leading-relaxed flex-1">{tr('home.discordSub', 'Reach a real person on Discord — plus restock alerts, deals and giveaways.')}</p>
-              {stats.discordMembers > 0 && (
-                <div className="flex items-center gap-2 mt-3 text-white/90 text-sm">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                  <b>{stats.discordMembers.toLocaleString('en-US')}</b> {tr('home.membersOnline', 'members online')}
-                </div>
-              )}
-              <Link to="/discord" className="mt-4 inline-flex items-center justify-center gap-2 bg-white text-indigo-600 font-semibold text-sm rounded-xl h-11 hover:bg-indigo-50 transition">
-                {tr('home.joinBtn', 'Join Discord')} <ArrowRight size={16} />
-              </Link>
-            </div>
-          </section>
-
-          {/* Who you're buying from — an anonymous seller taking bank transfers
-              is the exact scam pattern this audience has been burned by. No
-              company is claimed here, because there isn't one registered yet. */}
-          <section className="fm-reveal bg-white rounded-2xl border border-slate-200/70 shadow-sm p-5 sm:p-6">
-            <h2 className="fm-head text-xl mb-1.5">{tr('home.whoTitle', 'Questions before you buy?')}</h2>
-            <p className="text-[14.5px] text-slate-500 leading-relaxed max-w-2xl">
-              {tr('home.whoSub', 'ForgeMarket is a small store run from the Netherlands — not a faceless website. If anything about your order goes wrong, you get a real person, and you get your money back if we cannot deliver.')}
-            </p>
-            <div className="flex flex-wrap items-center gap-2.5 mt-4">
-              <a href="/discord" className="inline-flex items-center gap-2 text-white text-sm font-semibold rounded-xl px-4 h-11 shadow-lg shadow-violet-500/30 hover:brightness-105 transition"
-                style={{ backgroundImage: 'linear-gradient(135deg,#5865F2,#7c5cff)' }}>
-                <MessageCircle size={16} /> {tr('home.whoDiscord', 'Ask us on Discord')}
-              </a>
-              {SUPPORT_EMAIL && (
-                <a href={`mailto:${SUPPORT_EMAIL}`} className="inline-flex items-center gap-2 text-sm font-semibold rounded-xl px-4 h-11 border border-slate-200 text-slate-700 hover:bg-slate-50 transition">
-                  {SUPPORT_EMAIL}
-                </a>
-              )}
-              <Link to="/refunds" className="inline-flex items-center gap-2 text-sm font-semibold rounded-xl px-4 h-11 border border-slate-200 text-slate-700 hover:bg-slate-50 transition">
-                <ShieldCheck size={16} /> {tr('home.whoRefunds', 'Refund policy')}
-              </Link>
-              {/* Sits with the contact routes, not with our own review card: the
-                  point of this one is that it leaves the site. Only rendered
-                  once a profile exists. */}
-              {trustpilot && (
-                <a href={trustpilot} target="_blank" rel="noreferrer"
-                  className="inline-flex items-center gap-2 text-sm font-semibold rounded-xl px-4 h-11 border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition">
-                  ⭐ {tr('home.whoTrustpilot', 'Check us on Trustpilot')}
-                </a>
-              )}
-            </div>
-          </section>
-
-          {/* Ways to save & win — surface the engagement features */}
+          {/* ── Why ForgeMarket ───────────────────────────────────────────
+              Four reasons, each one a fact a buyer can check today rather than a
+              value the shop claims to hold. The identity block underneath is the
+              one that answers "who is actually taking my money". */}
           <section className="fm-reveal fm-reveal-children">
-            <h2 className="fm-head text-2xl mb-4">{tr('home.waysTitle', 'Save more & win big')}</h2>
-            <div className="grid sm:grid-cols-3 gap-4">
+            <h2 className="fm-head text-2xl mb-1">{tr('home.whyTitle', 'Why ForgeMarket')}</h2>
+            <p className="text-[13.5px] text-slate-600 mb-4 max-w-2xl leading-relaxed">
+              {tr('home.whySub', 'Four things you can verify before you spend anything.')}
+            </p>
+            <div className="grid sm:grid-cols-2 gap-4">
               {[
-                { to: '/account/forge-shop', emoji: '🪙', grad: 'from-amber-400 to-rose-500', title: tr('home.wCoins', 'Forge Coins'), sub: tr('home.wCoinsSub', 'Earn 1 coin per €10 — spend on discount codes & giveaway boosts.') },
-                { to: '/shop', emoji: '🎁', grad: 'from-fuchsia-500 to-violet-600', title: tr('home.wMystery', 'Mystery boxes'), sub: tr('home.wMysterySub', 'Every box wins — real prizes, instant store credit, 1 free reroll.') },
-                { to: '/drops', emoji: '📅', grad: 'from-violet-500 to-indigo-600', title: tr('home.wDrops', 'Drop calendar'), sub: tr('home.wDropsSub', 'Restocks, launches & flash sales — never miss one.') },
+                { icon: Tag, color: 'text-violet-700 bg-violet-100',
+                  t: tr('home.why1t', 'You pay after you order'),
+                  s: tr('home.why1s', 'You place the order first and then transfer the exact amount shown, with your order number as the reference. Nothing is charged automatically and no card details are stored here.') },
+                { icon: ShieldCheck, color: 'text-emerald-700 bg-emerald-100',
+                  t: tr('home.why2t', 'Money back if we cannot deliver'),
+                  s: tr('home.why2s', 'Not a goodwill gesture — it is the policy, in writing on the refund page. Until your order is delivered you can still cancel it by replying to your order email.') },
+                { icon: MessageCircle, color: 'text-blue-700 bg-blue-100',
+                  t: tr('home.why3t', 'A real person answers'),
+                  s: tr('home.why3s', 'Every ticket and every email goes to the person who runs the shop, from the Netherlands. That means honest hours: fast during the day, next morning if you write at night.') },
+                { icon: BadgeCheck, color: 'text-amber-700 bg-amber-100',
+                  t: tr('home.why4t', 'Reviews tied to real orders'),
+                  s: tr('home.why4s', 'A review only carries the verified badge if it is attached to a delivered order. Community vouches from Discord are shown separately and never get that badge.') },
               ].map((c) => (
-                <Link key={c.to} to={c.to}
-                  className="group bg-white rounded-2xl border border-slate-200/70 shadow-sm p-5 hover:border-violet-300 hover:shadow-md transition">
-                  <div className={`w-12 h-12 rounded-xl grid place-items-center text-2xl bg-gradient-to-br ${c.grad} shadow-lg mb-3`}>{c.emoji}</div>
-                  <div className="font-bold text-slate-900 flex items-center gap-1">{c.title} <ArrowRight size={15} className="text-violet-500 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition" /></div>
-                  <p className="text-sm text-slate-500 mt-1">{c.sub}</p>
-                </Link>
+                <div key={c.t} className="bg-white rounded-2xl border border-slate-200/70 shadow-sm p-5 flex gap-4">
+                  <span className={`w-11 h-11 rounded-xl grid place-items-center shrink-0 ${c.color}`}><c.icon size={20} /></span>
+                  <div>
+                    <div className="font-bold text-slate-900">{c.t}</div>
+                    <p className="text-sm text-slate-500 mt-1 leading-relaxed">{c.s}</p>
+                  </div>
+                </div>
               ))}
+            </div>
+            <div className="mt-4">
+              <SellerIdentity />
             </div>
           </section>
 
-          {/* Footer */}
-          <footer className="pt-6 pb-10 text-center text-sm text-slate-400">
-            <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 mb-3">
-              <Link to="/about" className="hover:text-slate-700">{tr('footer.about', 'About')}</Link>
-              <Link to="/faq" className="hover:text-slate-700">{tr('footer.faq', 'FAQ')}</Link>
-              <Link to="/payment-methods" className="hover:text-slate-700">{tr('footer.payments', 'Payment Methods')}</Link>
-              <Link to="/track" className="hover:text-slate-700">{tr('footer.track', 'Track Order')}</Link>
-              <Link to="/refunds" className="hover:text-slate-700">{tr('footer.refunds', 'Refunds')}</Link>
-              <Link to="/terms" className="hover:text-slate-700">{tr('footer.terms', 'Terms')}</Link>
-              <Link to="/privacy" className="hover:text-slate-700">{tr('footer.privacy', 'Privacy')}</Link>
+          {/* ── Reviews ───────────────────────────────────────────────────
+              Real ones when they exist. Before that, the honest version: say
+              there are none yet and point at the two places a buyer can check
+              instead. Inventing social proof here is the one thing that would
+              undo everything above it. */}
+          <section className="fm-reveal">
+            <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-1.5 sm:gap-4 mb-3">
+              <div>
+                <h2 className="fm-head text-2xl">{tr('home.reviewsTitle', 'What buyers say')}</h2>
+                {stats.reviews > 0 && (
+                  <div className="flex items-center gap-2 mt-1">
+                    <div className="flex text-amber-500">
+                      {Array.from({ length: 5 }).map((_, i) => <Star key={i} size={15} fill="currentColor" />)}
+                    </div>
+                    {stats.rating != null && <span className="fm-head text-slate-900">{stats.rating}</span>}
+                    <span className="text-[13px] text-slate-500">
+                      {tr('home.basedOn', 'Based on {n} reviews', { n: stats.reviews.toLocaleString('en-US') })}
+                    </span>
+                  </div>
+                )}
+              </div>
+              <Link to="/reviews" className="shrink-0 text-violet-700 font-semibold text-sm inline-flex items-center gap-1 hover:gap-2 transition-all">
+                {tr('footer.reviews', 'Reviews')} <ArrowRight size={15} />
+              </Link>
             </div>
-            © {new Date().getFullYear()} ForgeMarket · {tr('footer.rights', 'Digital goods for gamers')} · <SystemStatus />
-          </footer>
+
+            {hasReviews ? (
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {reviews.slice(0, 3).map((r) => (
+                  <div key={r.id} className="bg-white rounded-2xl border border-slate-200/70 shadow-sm p-5">
+                    <div className="flex text-amber-500 mb-2">
+                      {Array.from({ length: r.stars || 5 }).map((_, i) => <Star key={i} size={13} fill="currentColor" />)}
+                    </div>
+                    <p className="text-[14px] text-slate-700 leading-relaxed">&ldquo;{r.body}&rdquo;</p>
+                    <p className="text-[12px] text-slate-500 mt-2">
+                      – {r.author}{r.product ? ` · ${r.product}` : ''}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="bg-white rounded-2xl border border-slate-200/70 shadow-sm p-6 sm:p-7">
+                <div className="font-bold text-slate-900">{tr('home.noReviewsT', 'No reviews yet — the shop is new')}</div>
+                <p className="text-sm text-slate-500 mt-1.5 leading-relaxed max-w-2xl">
+                  {tr('home.noReviewsS', 'Rather than borrow someone else’s, there is nothing here until a real buyer leaves one. A review can only be written from a delivered order, so this page fills up at the pace the shop actually sells.')}
+                </p>
+                <div className="flex flex-wrap gap-2.5 mt-4">
+                  <Link to="/discord" className="fm-press inline-flex items-center gap-2 text-white text-sm font-semibold rounded-xl px-4 h-11 shadow-lg shadow-violet-500/25 hover:brightness-105 transition"
+                    style={{ backgroundImage: 'linear-gradient(135deg,#5865F2,#7c5cff)' }}>
+                    <MessageCircle size={16} /> {tr('home.askBuyers', 'Ask in Discord before you buy')}
+                  </Link>
+                  {trustpilot && (
+                    <a href={trustpilot} target="_blank" rel="noreferrer"
+                      className="inline-flex items-center gap-2 text-sm font-semibold rounded-xl px-4 h-11 border border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 transition">
+                      ⭐ {tr('home.whoTrustpilot', 'Check us on Trustpilot')}
+                    </a>
+                  )}
+                  <Link to="/trust" className="inline-flex items-center gap-2 text-sm font-semibold rounded-xl px-4 h-11 border border-slate-200 text-slate-700 hover:bg-slate-50 transition">
+                    <ShieldCheck size={16} /> {tr('footer.trust', 'Trust Center')}
+                  </Link>
+                </div>
+              </div>
+            )}
+          </section>
+
+          {/* ── FAQ ───────────────────────────────────────────────────────
+              The four questions a manual-payment shop gets asked before the
+              first order. Native <details> so it works without JavaScript, is
+              keyboard-operable for free, and each answer is findable by search. */}
+          <section className="fm-reveal">
+            <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-1.5 sm:gap-4 mb-3">
+              <h2 className="fm-head text-2xl">{tr('home.faqTitle', 'Questions people ask first')}</h2>
+              <Link to="/faq" className="shrink-0 text-violet-700 font-semibold text-sm inline-flex items-center gap-1 hover:gap-2 transition-all">
+                {tr('home.faqAll', 'All questions')} <ArrowRight size={15} />
+              </Link>
+            </div>
+            <div className="bg-white rounded-2xl border border-slate-200/70 shadow-sm divide-y divide-slate-100 overflow-hidden">
+              {[
+                [tr('home.faq1q', 'How fast do I get it?'),
+                 tr('home.faq1a', 'If the code is already in stock it is sent automatically the moment your payment is confirmed. Everything else is bought in and delivered by hand, normally within a few hours during the day. The product page tells you which of the two applies before you buy.')],
+                [tr('home.faq2q', 'How do I pay?'),
+                 tr('home.faq2a', 'You order first, then pay the exact amount shown with your order number as the reference — Tikkie or a bank transfer. Payments are matched by a person, so confirmation is fastest during the day.')],
+                [tr('home.faq3q', 'Do I need an account?'),
+                 tr('home.faq3a', 'No. You can order as a guest and follow your order with the link in your confirmation email. An account only adds order history and store credit.')],
+                [tr('home.faq4q', 'What if something goes wrong?'),
+                 tr('home.faq4a', 'Reply to your order email or open a ticket in Discord. If we cannot deliver your order you get your money back in full — and until it is delivered you can still cancel.')],
+              ].map(([q, a]) => (
+                <details key={q} className="group">
+                  <summary className="flex items-center justify-between gap-4 cursor-pointer list-none px-5 py-4 min-h-[56px] hover:bg-slate-50 transition">
+                    <span className="font-semibold text-slate-900 text-[15px]">{q}</span>
+                    <ChevronRight size={18} className="shrink-0 text-slate-400 transition-transform group-open:rotate-90" />
+                  </summary>
+                  <p className="px-5 pb-4 -mt-1 text-sm text-slate-600 leading-relaxed">{a}</p>
+                </details>
+              ))}
+            </div>
+          </section>
         </main>
       </div>
+      {/* ── Footer ────────────────────────────────────────────────────────
+          The shared one, not a second hand-maintained copy. It carries the
+          seller identity, the legal links and the live system status — all
+          things the homepage previously did not show at all. Wrapped in
+          theme-light because this page is its own route, outside StoreLayout. */}
+      <div className="theme-light"><StoreFooter /></div>
       <RecentlyDelivered />
       <CommandPalette />
       <MobileTabBar />
