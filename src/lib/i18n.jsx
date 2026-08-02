@@ -111,6 +111,43 @@ const NL = {
   'home.trustPay': 'Je betaalt ná het bestellen, met je bestelnummer als referentie. Er wordt niets automatisch afgeschreven',
   'home.trustBack': 'Volledig geld terug als we niet kunnen leveren',
 
+  // Homepage — de drie pijlers
+  'home.pillar.currency': 'Game-tegoeden',
+  'home.pillar.currencySub': 'Robux, V-Bucks, Valorant Points en de rest — bijgeschreven op je account of als code opgestuurd.',
+  'home.pillar.giftcards': 'Cadeaukaarten',
+  'home.pillar.giftcardsSub': 'Steam, PlayStation, Xbox, Netflix en meer. Een code per e-mail — je hoeft ons geen account te geven.',
+  'home.pillar.subscriptions': 'Abonnementen',
+  'home.pillar.subscriptionsSub': 'Discord Nitro, Game Pass, Spotify. Als code die je zelf inwisselt, dus er wordt niets stilletjes verlengd.',
+  'home.browseCat': 'Bekijken',
+  'home.addCheapest': 'Voeg het goedkoopste {n}-pakket toe aan je winkelwagen',
+
+  // Homepage — waarom ForgeMarket
+  'home.whyTitle': 'Waarom ForgeMarket',
+  'home.whySub': 'Vier dingen die je kunt controleren vóórdat je iets uitgeeft.',
+  'home.why1t': 'Je betaalt ná je bestelling',
+  'home.why1s': 'Je plaatst eerst de bestelling en maakt daarna het getoonde bedrag over, met je bestelnummer als referentie. Er wordt niets automatisch afgeschreven en er worden hier geen kaartgegevens bewaard.',
+  'home.why2t': 'Geld terug als we niet kunnen leveren',
+  'home.why2s': 'Geen gunst maar beleid, zwart op wit op de terugbetalingspagina. Zolang je bestelling niet geleverd is kun je hem nog annuleren door op je bestelmail te reageren.',
+  'home.why3t': 'Er antwoordt een echt mens',
+  'home.why3s': 'Elk ticket en elke mail komt bij de persoon die de winkel runt, vanuit Nederland. Dat betekent eerlijke tijden: snel overdag, de volgende ochtend als je \u2019s nachts schrijft.',
+  'home.why4t': 'Reviews die aan echte bestellingen hangen',
+  'home.why4s': 'Een review krijgt het geverifieerd-label alleen als hij aan een geleverde bestelling vastzit. Vouches uit Discord staan apart en krijgen dat label nooit.',
+
+  // Homepage — reviews (lege staat) en FAQ
+  'home.noReviewsT': 'Nog geen reviews — de winkel is nieuw',
+  'home.noReviewsS': 'In plaats van die van iemand anders te lenen staat hier niets tot een echte koper er een achterlaat. Een review kun je alleen schrijven vanuit een geleverde bestelling, dus deze pagina vult zich in het tempo waarin de winkel echt verkoopt.',
+  'home.askBuyers': 'Vraag het in Discord voordat je koopt',
+  'home.faqTitle': 'Vragen die mensen het eerst stellen',
+  'home.faqAll': 'Alle vragen',
+  'home.faq1q': 'Hoe snel heb ik het?',
+  'home.faq1a': 'Ligt de code op voorraad, dan gaat hij automatisch de deur uit zodra je betaling bevestigd is. De rest kopen we voor je in en leveren we met de hand, normaal binnen een paar uur overdag. Op de productpagina staat vooraf welke van de twee geldt.',
+  'home.faq2q': 'Hoe betaal ik?',
+  'home.faq2a': 'Je bestelt eerst en betaalt daarna het exacte bedrag met je bestelnummer als referentie — via Tikkie of een overboeking. Betalingen worden door een mens gekoppeld, dus overdag gaat dat het snelst.',
+  'home.faq3q': 'Heb ik een account nodig?',
+  'home.faq3a': 'Nee. Je kunt als gast bestellen en je bestelling volgen met de link in je bevestigingsmail. Een account voegt alleen je bestelgeschiedenis en tegoed toe.',
+  'home.faq4q': 'En als er iets misgaat?',
+  'home.faq4a': 'Reageer op je bestelmail of open een ticket in Discord. Kunnen we je bestelling niet leveren, dan krijg je je geld volledig terug — en zolang hij niet geleverd is kun je nog annuleren.',
+
   // Afrekenen — EU-akkoord en betaalbewijs
   'checkout.consent': 'Ik wil mijn bestelling meteen geleverd krijgen en begrijp dat ik daarmee mijn 14 dagen bedenktijd verlies zodra hij geleverd is.',
   'proof.attached': 'Screenshot toegevoegd',
@@ -337,9 +374,9 @@ const NL = {
 
   // Home
   'home.badge': 'Kopersbescherming · Echte support',
-  'home.h1a': 'Alles wat je nodig hebt,',
-  'home.h1b': 'op één plek.',
-  'home.sub': 'Robux, V-Bucks, Valorant Points en meer. Op voorraad gaat automatisch — de rest leveren we met de hand, meestal binnen een paar uur.',
+  'home.h1a': 'Game-tegoeden, cadeaukaarten',
+  'home.h1b': 'en abonnementen.',
+  'home.sub': 'Robux, V-Bucks, Steam, Discord Nitro en meer. Op voorraad gaat automatisch de deur uit; de rest met de hand, meestal binnen een paar uur.',
   'home.shopNow': 'Shop nu',
   'home.shopNowBig': 'Shop nu',
   'home.viewAll': 'Bekijk alle producten',
@@ -351,7 +388,7 @@ const NL = {
   'home.offer': 'Aanbieding',
   'home.botHi': 'Hoi! 👋 Waarmee kan ik je helpen?',
   'home.chat': 'Chat met ons',
-  'home.reviewsTitle': 'Wat onze klanten zeggen',
+  'home.reviewsTitle': 'Wat kopers zeggen',
   'home.outOf5': 'van de 5',
   'home.basedOn': 'Op basis van {n} reviews',
   'home.beFirst': 'Wees de eerste die na een aankoop een geverifieerde review achterlaat.',
