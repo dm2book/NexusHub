@@ -18,8 +18,8 @@ export function SystemStatus() {
   }, []);
   if (ok === null) return null;
   return ok
-    ? <span className="text-emerald-500">{t('status.ok', '● All systems operational')}</span>
-    : <span className="text-amber-500">{t('status.degraded', '● Partial degradation — orders may be delayed')}</span>;
+    ? <span className="text-emerald-700">{t('status.ok', '● All systems operational')}</span>
+    : <span className="text-amber-700">{t('status.degraded', '● Partial degradation — orders may be delayed')}</span>;
 }
 
 /** Shared light storefront footer. */

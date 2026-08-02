@@ -33,7 +33,9 @@ export default function StoreLayout() {
       <main key={pathname} className="theme-light flex-1 fm-page pb-20 lg:pb-0">
         <Outlet />
       </main>
-      <StoreFooter />
+      {/* theme-light too: the footer is a sibling of <main>, so its slate text
+          was never remapped and read at 2.56:1 on white — measured. */}
+      <div className="theme-light"><StoreFooter /></div>
       <RecentlyDelivered />
       <CommandPalette />
       <MobileTabBar />

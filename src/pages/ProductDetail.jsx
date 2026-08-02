@@ -277,10 +277,10 @@ export default function ProductDetail() {
             <div className="flex items-center gap-3">
               <div className="flex items-center glass rounded-xl">
                 <button onClick={() => setQty((q) => Math.max(1, q - 1))} aria-label={t('product.qtyLess', 'One fewer')}
-                  className="p-3 text-slate-300 hover:text-white"><Minus size={16} /></button>
+                  className="p-3.5 text-slate-300 hover:text-white"><Minus size={16} /></button>
                 <span className="w-10 text-center text-white">{qty}</span>
                 <button onClick={() => setQty((q) => q + 1)} aria-label={t('product.qtyMore', 'One more')}
-                  className="p-3 text-slate-300 hover:text-white"><Plus size={16} /></button>
+                  className="p-3.5 text-slate-300 hover:text-white"><Plus size={16} /></button>
               </div>
               <span className="text-slate-500 text-sm font-rajdhani uppercase tracking-wide">{t('product.qty', 'Quantity')}</span>
             </div>

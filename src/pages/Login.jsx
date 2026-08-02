@@ -247,14 +247,17 @@ export default function Login() {
         ) : step === 'id' ? (
           <form onSubmit={start} className="space-y-4">
             <div>
-              <label className="label">
+              {/* htmlFor, so tapping the caption focuses the field — on a phone
+                  the caption is a far bigger target than the input's own edge. */}
+              <label className="label" htmlFor="login-id">
                 {smsOk ? t('login.idLabel', 'Email or phone') : t('login.idLabelEmail', 'Email address')}
               </label>
               <div className="relative">
                 <AtSign size={16} className="absolute left-3.5 top-3.5 text-slate-500" />
-                <input required value={identifier}
+                <input id="login-id" required value={identifier}
                   onChange={(e) => { setIdentifier(e.target.value); if (error) setError(''); }}
                   placeholder={smsOk ? 'you@example.com  ·  +31 6 12345678' : 'you@example.com'} className="input pl-10"
+                  enterKeyHint="go"
                   autoComplete={smsOk ? 'username' : 'email'} inputMode={smsOk ? 'text' : 'email'} autoFocus />
               </div>
               <p className="text-slate-500 text-xs mt-1.5">{hint}</p>
