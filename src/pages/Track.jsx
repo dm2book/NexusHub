@@ -164,8 +164,29 @@ export default function Track() {
             </div>
           )}
 
+          {/* Unfinished Mollie payment — pick it straight back up.
+              A buyer who bounced off their banking app, ran out of battery or
+              simply closed the tab has nowhere to go otherwise, and a new order
+              would double the stock reservation. This resumes the same payment. */}
+          {result.status === 'pending' && result.payUrl && (
+            <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-5 mb-6">
+              <div className="text-amber-200 font-semibold mb-3">{t('track.awaiting', '⏳ Awaiting payment')}</div>
+              {/* Deliberately not the copy-the-amount-and-reference block used
+                  below. Those two facts exist because a manual transfer is typed
+                  by hand and can get them wrong; here the payment page already
+                  knows both, and telling someone to copy a reference into their
+                  banking app would be instructions for a different shop. */}
+              <a href={result.payUrl} className="btn-primary w-full py-3.5 text-base justify-center">
+                <ExternalLink size={18} /> {t('track.resumePay', 'Continue payment of')} {result.totalFormatted}
+              </a>
+              <p className="text-slate-300 text-[12.5px] mt-2">
+                {t('track.resumePaySub', 'Your payment was started but not finished. Nothing has been charged yet — this takes you back to the secure payment page, and this page updates by itself the moment it goes through.')}
+              </p>
+            </div>
+          )}
+
           {/* Awaiting payment: pay links + reference */}
-          {result.status === 'pending' && ((result.payMethods || []).length > 0 || result.payLink) && (
+          {result.status === 'pending' && !result.payUrl && ((result.payMethods || []).length > 0 || result.payLink) && (
             <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-5 mb-6">
               <div className="text-amber-200 font-semibold mb-3">{t('track.awaiting', '⏳ Awaiting payment')}</div>
               {/* Same two facts as the checkout screen, same treatment: the

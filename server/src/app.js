@@ -26,6 +26,7 @@ import accountRoutes from './routes/account.js';
 import catalogRoutes from './routes/catalog.js';
 import discordRoutes from './routes/discord.js';
 import paymentRoutes from './routes/payments.js';
+import mollieWebhook, { mollieApi } from './routes/mollie.js';
 import socialRoutes from './routes/social.js';
 import adminRoutes from './routes/admin/index.js';
 
@@ -90,6 +91,9 @@ export function createApp({ lazyReady = false } = {}) {
   // Stripe webhook needs the raw body for signature verification — mount it
   // BEFORE the JSON parser.
   app.use('/api/payments/stripe/webhook', express.raw({ type: '*/*' }));
+  // Mollie POSTs form data (`id=tr_xxx`), not JSON — give that one path its own
+  // parser before the JSON one rejects the content type.
+  app.use('/api/payments/mollie/webhook', express.urlencoded({ extended: false, limit: '16kb' }));
   // 3mb so a (base64) product image an admin uploads fits — the image guard
   // (isSafeImageValue) still caps the actual data URI below this.
   app.use(express.json({ limit: '3mb' }));
@@ -143,6 +147,12 @@ export function createApp({ lazyReady = false } = {}) {
   // monitors and Vercel Cron aren't throttled or require a session.
   app.use('/api', cronRoutes);
 
+  // Mollie's webhook is a server-to-server call with no session, and Mollie
+  // retries a non-2xx for two days. Mounted before the general API rate limit so
+  // a busy hour can never turn a payment confirmation into a 429; the route
+  // carries its own, far more generous, limiter.
+  app.use('/api/payments', mollieWebhook);
+
   app.use(attachUser);
   app.use('/api', rateLimit({ bucket: 'api' }));
 
@@ -153,6 +163,7 @@ export function createApp({ lazyReady = false } = {}) {
   app.use('/api/discord', discordRoutes);
   app.use('/api/payments', paymentRoutes);
   app.use('/api/social', socialRoutes);
+  app.use('/api', mollieApi);
   app.use('/api', catalogRoutes);
   app.use('/api/admin', adminRoutes);
 

@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, FileText, RefreshCw, Download, Copy, Star, BadgeCheck } from 'lucide-react';
+import { ArrowLeft, FileText, RefreshCw, Download, Copy, Star, BadgeCheck, CreditCard } from 'lucide-react';
 import { api } from '../../lib/api.js';
 import { money, date } from '../../lib/format.js';
 import { PageLoader, StatusBadge, STATUS_META, Modal } from '../../components/ui.jsx';
@@ -19,6 +19,26 @@ export default function OrderDetail() {
   const [reviewBusy, setReviewBusy] = useState(false);
   const [mystery, setMystery] = useState([]);
   const [rerolling, setRerolling] = useState('');
+  const [payBusy, setPayBusy] = useState(false);
+
+  /**
+   * Finish paying an order that never got paid.
+   *
+   * Without this the only way back to an abandoned payment is placing the order
+   * again, which reserves the stock twice. The server resumes the existing
+   * Mollie payment when there is one, so this cannot open a second charge.
+   */
+  const payNow = async () => {
+    setPayBusy(true);
+    try {
+      const r = await api.post(`/api/orders/${id}/mollie`, {});
+      if (r.checkoutUrl) { window.location.href = r.checkoutUrl; return; }
+      // Already settled while this tab sat open — show the truth, don't redirect.
+      load();
+      toast.success('This order is already paid.');
+    } catch (e) { toast.error(e.message || 'Could not start the payment.'); }
+    finally { setPayBusy(false); }
+  };
 
   const reroll = async (pullId) => {
     setRerolling(pullId);
@@ -96,6 +116,11 @@ export default function OrderDetail() {
           <StatusBadge status={order.status} />
           <a href={`${api.base}/api/account/orders/${id}/invoice`} target="_blank" rel="noreferrer"
              className="btn-ghost text-sm"><FileText size={16} /> Invoice</a>
+          {order.status === 'pending' && order.pspProvider === 'mollie' && (
+            <button onClick={payNow} disabled={payBusy} className="btn-primary text-sm">
+              <CreditCard size={16} /> {payBusy ? 'One moment…' : `Pay ${money(order.total, order.currency)}`}
+            </button>
+          )}
           {(order.status === 'completed') && (
             <button onClick={() => setRefundOpen(true)} className="btn-ghost text-sm">
               <RefreshCw size={16} /> Request refund

@@ -104,3 +104,31 @@ export async function claimCodes(productId, n, orderId) {
   });
   return claimed;
 }
+
+/**
+ * Put codes claimed for an order back on the shelf.
+ *
+ * Claiming happens before delivery, so a delivery that is then refused — an
+ * order refunded or cancelled in the same instant it was being auto-dispensed —
+ * would otherwise leave those codes marked `used` against an order nobody ever
+ * received. Silent, permanent stock loss that only shows up as a product that
+ * mysteriously sells out early.
+ *
+ * Only codes that were never handed over are released: anything already written
+ * into `deliveries` has reached the buyer and must stay claimed.
+ */
+export async function releaseCodes(orderId) {
+  const rows = await all(
+    `SELECT id, code FROM product_codes WHERE order_id=@o AND status='used'`, { o: orderId });
+  if (!rows.length) return 0;
+  const delivered = new Set((await all(
+    'SELECT content FROM deliveries WHERE order_id=@o', { o: orderId })).map((d) => d.content));
+  let freed = 0;
+  for (const row of rows) {
+    if (delivered.has(row.code)) continue;
+    await run(`UPDATE product_codes SET status='available', order_id=NULL, used_at=NULL WHERE id=@id`,
+        { id: row.id });
+    freed++;
+  }
+  return freed;
+}
