@@ -976,4 +976,58 @@ ALTER TABLE orders ADD COLUMN IF NOT EXISTS psp_checkout_url TEXT;
 CREATE INDEX IF NOT EXISTS idx_orders_psp_payment ON orders (psp_payment_id);
 `,
   },
+  {
+    id: '026_fraud_controls',
+    sql: `
+-- ── Holding a delivery, and the evidence for doing it ──────────────────────
+-- The shop already scored every order for fraud and then delivered it anyway:
+-- fraud_status was written and never read again. These columns are what turns
+-- that score into a decision that actually holds a code back.
+--
+-- fraud_hold is separate from the order status on purpose. A held order is
+-- still a normal paid order — it just has not been handed over yet. Folding it
+-- into the state machine would mean inventing a status that every report, email
+-- and transition table has to learn, and un-holding it would rewrite history.
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS fraud_hold INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS fraud_hold_reason TEXT;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS fraud_reviewed_at TEXT;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS fraud_reviewed_by TEXT;
+-- The IP an order was placed from. Scoring needs it (one address ordering under
+-- five different emails is the whole signal), and nothing else on the order
+-- carried it. Swept by the retention job like every other ip column.
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS ip TEXT;
+CREATE INDEX IF NOT EXISTS idx_orders_ip ON orders (ip, created_at);
+CREATE INDEX IF NOT EXISTS idx_orders_email_created ON orders (email, created_at);
+-- The review queue is read by "what is waiting", not by order id.
+CREATE INDEX IF NOT EXISTS idx_orders_fraud_hold ON orders (fraud_hold, created_at);
+
+-- ── Chargebacks ────────────────────────────────────────────────────────────
+-- A chargeback was only ever visible as an order that turned 'refunded', which
+-- is indistinguishable from a refund we chose to give. They are opposite facts:
+-- one is service, the other is money taken back against our will, and only the
+-- second should make the next order from that buyer harder.
+--
+-- Kept as its own table rather than an order flag because the useful lookups
+-- are by email and by IP across ALL orders, including ones since deleted.
+CREATE TABLE IF NOT EXISTS chargebacks (
+  id              TEXT PRIMARY KEY,
+  order_id        TEXT REFERENCES orders(id) ON DELETE SET NULL,
+  order_number    TEXT,
+  email           TEXT NOT NULL,
+  ip              TEXT,
+  amount          BIGINT NOT NULL DEFAULT 0,
+  currency        TEXT NOT NULL DEFAULT 'EUR',
+  provider        TEXT,
+  payment_id      TEXT,
+  reason          TEXT,
+  source          TEXT NOT NULL DEFAULT 'psp',
+  created_at      TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_chargebacks_email ON chargebacks (email, created_at);
+CREATE INDEX IF NOT EXISTS idx_chargebacks_ip ON chargebacks (ip);
+-- One row per payment: the PSP can report the same chargeback more than once.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_chargebacks_payment
+  ON chargebacks (payment_id) WHERE payment_id IS NOT NULL;
+`,
+  },
 ];

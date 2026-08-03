@@ -230,8 +230,31 @@ export default function Track() {
             </div>
           )}
 
+          {/* Held for a manual check.
+              Shown INSTEAD of the reassurance below, because "payment confirmed
+              — we're on it" is not true of an order nobody is preparing. What it
+              does not say is which signal caught them: that would be a free
+              tuning loop for whoever is trying it on. */}
+          {result.onHold && !failed && (
+            <div className="rounded-2xl border border-indigo-500/30 bg-indigo-500/10 p-5 mb-6">
+              <div className="text-indigo-200 font-semibold">
+                🔍 {t('track.onHold', 'We’re checking this order')}
+              </div>
+              <p className="text-slate-300 text-sm mt-1">
+                {/* Translated here rather than shown from `onHoldMessage`. The
+                    server sends that sentence for clients that cannot translate
+                    (the Discord bot, emails) — rendering it here would hand a
+                    Dutch buyer an English one. */}
+                {t('track.onHoldSub', 'This order is being checked by a person before it is delivered. Your payment is safe — if we cannot complete the order you get every cent back.')}
+              </p>
+              <Link to="/contact" className="text-indigo-300 text-sm hover:underline mt-2 inline-block">
+                {t('track.contactSupport', 'Contact support →')}
+              </Link>
+            </div>
+          )}
+
           {/* In-flight reassurance */}
-          {['payment_received', 'processing', 'awaiting_fulfillment'].includes(result.status) && (
+          {!result.onHold && ['payment_received', 'processing', 'awaiting_fulfillment'].includes(result.status) && (
             <div className="rounded-2xl border border-indigo-500/30 bg-indigo-500/10 p-5 mb-6">
               <div className="text-indigo-200 font-semibold">{t('track.confirmed', '✅ Payment confirmed — we’re on it')}</div>
               <p className="text-slate-300 text-sm mt-1">

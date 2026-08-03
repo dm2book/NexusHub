@@ -19,6 +19,8 @@ import { submitProof, getOrderProof } from '../services/paymentProofService.js';
 import { listEnabledProviders } from '../services/oauthService.js';
 import { isEnabled as stripeEnabled, createCheckoutSession } from '../services/stripeService.js';
 import { isEnabled as mollieEnabled, SUPPORTED_METHODS as MOLLIE_METHODS } from '../services/mollieService.js';
+import { countryOf } from '../utils/netRisk.js';
+import { holdMessage } from '../services/fraudService.js';
 import { publicStats } from '../services/publicStatsService.js';
 import { recordPageView } from '../services/trackingService.js';
 import { getCategoryLogos } from '../services/settingsService.js';
@@ -310,7 +312,7 @@ router.get('/gift-cards/:code', asyncHandler(async (req, res) => {
 
 // Place an order. Authenticated users get it linked to their account; guests
 // may order by email. Checkout/payment capture would call markPaymentReceived.
-router.post('/orders', rateLimit({ bucket: 'checkout', windowMs: 60_000, max: 20 }),
+router.post('/orders', rateLimit({ bucket: 'checkout', windowMs: 60_000, max: 20, shared: true }),
   asyncHandler(async (req, res) => {
     const body = z.object({
       email: z.string().email(),
@@ -332,14 +334,18 @@ router.post('/orders', rateLimit({ bucket: 'checkout', windowMs: 60_000, max: 20
       consentText: z.string().max(400).optional(),
     }).parse(req.body);
 
+    // The IP and country are the only fraud signals that exist solely at the
+    // edge — by the time an order reaches the service layer there is nothing
+    // left to read them from, which is why they are threaded through here
+    // rather than looked up later.
     const order = await createOrder(
       { ...body, userId: req.user?.id || null },
-      { user: req.user, actorId: req.user?.id });
+      { user: req.user, actorId: req.user?.id, ip: req.ip || null, country: countryOf(req) });
     res.status(201).json({ order });
   }));
 
 // Create a Stripe Checkout Session for an order and return its redirect URL.
-router.post('/orders/:id/checkout', rateLimit({ bucket: 'pay', windowMs: 60_000, max: 30 }),
+router.post('/orders/:id/checkout', rateLimit({ bucket: 'pay', windowMs: 60_000, max: 30, shared: true }),
   asyncHandler(async (req, res) => {
     if (!stripeEnabled()) throw new ApiError(400, 'Card payments are not configured');
     const order = await getOrder(req.params.id);
@@ -352,7 +358,7 @@ router.post('/orders/:id/checkout', rateLimit({ bucket: 'pay', windowMs: 60_000,
   }));
 
 // Demo payment — marks an order paid without a real PSP, gated by DEMO_PAYMENTS.
-router.post('/orders/:id/pay', rateLimit({ bucket: 'pay', windowMs: 60_000, max: 30 }),
+router.post('/orders/:id/pay', rateLimit({ bucket: 'pay', windowMs: 60_000, max: 30, shared: true }),
   asyncHandler(async (req, res) => {
     // Demo self-pay is a dev convenience only. Refuse it whenever a real payment
     // method is configured — otherwise a live deploy that forgot NODE_ENV would
@@ -370,7 +376,7 @@ router.post('/orders/:id/pay', rateLimit({ bucket: 'pay', windowMs: 60_000, max:
   }));
 
 // Customer submits proof of payment for a manual-payment order.
-router.post('/orders/:id/proof', rateLimit({ bucket: 'proof', windowMs: 60_000, max: 10 }),
+router.post('/orders/:id/proof', rateLimit({ bucket: 'proof', windowMs: 60_000, max: 10, shared: true }),
   asyncHandler(async (req, res) => {
     const order = await getOrder(req.params.id);
     if (!order) throw new ApiError(404, 'Order not found');
@@ -481,6 +487,13 @@ router.get('/track/:number', asyncHandler(async (req, res) => {
     payUrl: order.status === 'pending' ? (await getPspPayment(order.id)
       .then((p) => (p?.provider === 'mollie' && ['open', 'pending'].includes(p.status || '') ? p.checkoutUrl : null))
       .catch(() => null)) : null,
+    // A held order is paid and normal on every other measure, so without this it
+    // would show "payment confirmed, we're on it" while nothing is being
+    // prepared at all. The buyer is owed the truth about why their code has not
+    // arrived; what they are NOT told is which signal caught them, because that
+    // is a free tuning loop for the next attempt.
+    onHold: !!order.fraudHold,
+    onHoldMessage: order.fraudHold ? holdMessage() : null,
     updatedAt: order.updatedAt,
   });
 }));

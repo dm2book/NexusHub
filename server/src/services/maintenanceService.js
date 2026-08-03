@@ -46,6 +46,13 @@ export async function runMaintenance() {
       trusted_devices: 180,   // "is this the device you always use" needs history
       payment_proofs: 365,    // fraud evidence attached to money
       coupon_redemptions: 365,
+      // Read by fraud scoring: "has this address ordered under other emails
+      // today" and "has a chargeback come from here". Both windows are days to
+      // months, so a year is already generous — but a chargeback can arrive
+      // ~120 days after the payment, so the ledger keeps its address longer
+      // than the order does or the signal would expire before the fraud did.
+      orders: 365,
+      chargebacks: 540,
       audit_logs: 365,        // security evidence — longest, but not forever
     };
     const present = await all(

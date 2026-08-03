@@ -217,6 +217,33 @@ export async function postPaymentProofAlert(order, proof = {}) {
   await deliver('leads', config.discord.orderWebhookUrl, { embeds: [embed] });
 }
 
+/**
+ * A paid order whose delivery is being held back.
+ *
+ * This is the one alert that costs money to ignore in both directions: leave it
+ * and a real customer sits waiting for a code they paid for, act on it wrongly
+ * and a stolen card gets handed a code that cannot be recalled. So it names the
+ * exact signals rather than just a score, and links straight to the queue.
+ */
+export async function postFraudHoldAlert(order, { score, signals = [] } = {}) {
+  const embed = {
+    title: '🛑 Delivery held — order needs a human',
+    description: 'Nothing has been delivered. It stays held until someone approves or rejects it.',
+    color: 0xef4444,
+    fields: [
+      { name: 'Order', value: `\`${order.number}\``, inline: true },
+      { name: 'Amount', value: money(order.total, order.currency), inline: true },
+      { name: 'Risk score', value: `${score} / 100`, inline: true },
+      { name: 'Customer', value: order.email || 'unknown' },
+      ...(signals.length ? [{ name: 'Why', value: signals.map((s) => `• ${s.detail}`).join('\n').slice(0, 1000) }] : []),
+      { name: 'Review', value: `${config.appUrl}/admin/security` },
+    ],
+    footer: { text: config.email.fromName },
+    timestamp: new Date().toISOString(),
+  };
+  await deliver('leads', config.discord.orderWebhookUrl, { embeds: [embed] });
+}
+
 /** Fire a webhook payload; best-effort, logs and swallows every failure. */
 async function postWebhook(url, payload) {
   if (!url) return false;

@@ -5,7 +5,13 @@ import { asyncHandler } from '../../middleware/error.js';
 import { requirePermission } from '../../middleware/rbac.js';
 import { all } from '../../db/index.js';
 import { listAuditLogs, audit } from '../../services/auditService.js';
-import { listFlaggedOrders } from '../../services/fraudService.js';
+import { listFlaggedOrders, heldOrderCount } from '../../services/fraudService.js';
+import {
+  releaseFraudHold, rejectFraudHold, getOrder, getOrderByNumber, getPspPayment, transitionOrder,
+} from '../../services/orderService.js';
+import { recordChargeback, listChargebacks, chargebackSummary } from '../../services/chargebackService.js';
+import { currentLimits } from '../../services/orderLimitService.js';
+import { refundPayment, isEnabled as mollieEnabled } from '../../services/mollieService.js';
 import { publicUser, setUserRoles, getUserById } from '../../services/userService.js';
 import { grantCoins } from '../../services/forgeCoinService.js';
 import { grantMembership, cancelMembership } from '../../services/membershipService.js';
@@ -26,8 +32,99 @@ router.get('/audit', requirePermission('audit.read'), asyncHandler(async (req, r
 
 // ── Fraud review queue ─────────────────────────────────────────────────────
 router.get('/fraud', requirePermission('security.manage'), asyncHandler(async (_req, res) => {
-  res.json({ flagged: await listFlaggedOrders() });
+  const [flagged, held, chargebacks, cbSummary] = await Promise.all([
+    listFlaggedOrders(),
+    heldOrderCount(),
+    listChargebacks({ limit: 50 }),
+    chargebackSummary(),
+  ]);
+  res.json({ flagged, held, chargebacks, chargebackSummary: cbSummary, limits: currentLimits() });
 }));
+
+/**
+ * Approve a held order — release it and deliver.
+ *
+ * The consequential half of the queue: this hands over a code that cannot be
+ * recalled. Audited with who did it, because if this order charges back in six
+ * weeks that decision is the thing worth being able to look back at.
+ */
+router.post('/fraud/:id/approve', requirePermission('security.manage'),
+  asyncHandler(async (req, res) => {
+    const { reason } = z.object({ reason: z.string().max(300).optional() }).parse(req.body || {});
+    const result = await releaseFraudHold(req.params.id,
+      { actorId: req.user.id, user: req.user, reason });
+    res.json(result);
+  }));
+
+/**
+ * Reject a held order — refund it and keep it held.
+ *
+ * The refund runs first and through the PSP, so the money genuinely goes back
+ * rather than the order merely being labelled. A refund that Mollie refuses
+ * leaves everything untouched and says so, instead of quietly marking an order
+ * refunded while the shop still holds the money.
+ */
+router.post('/fraud/:id/reject', requirePermission('security.manage'),
+  asyncHandler(async (req, res) => {
+    const { reason, refund = true } = z.object({
+      reason: z.string().max(300).optional(),
+      refund: z.boolean().optional(),
+    }).parse(req.body || {});
+
+    const order = await getOrder(req.params.id);
+    if (!order) throw notFound('Order not found');
+
+    let refunded = null;
+    // Only when money actually arrived. Rejecting an unpaid order is just a
+    // refusal — there is nothing to send back.
+    if (refund && !['pending', 'refunded', 'cancelled', 'failed'].includes(order.status)) {
+      const psp = await getPspPayment(order.id);
+      if (psp?.provider === 'mollie' && mollieEnabled()) {
+        try {
+          refunded = await refundPayment(psp.paymentId, {
+            cents: order.total, currency: order.currency || 'EUR',
+            description: `Refund ${order.number}`,
+          });
+        } catch (e) {
+          throw badRequest(`Mollie refused the refund: ${e.message}`);
+        }
+      }
+      await transitionOrder(order.id, 'refunded',
+        { actorId: req.user.id, user: req.user, reason: reason || 'Rejected in fraud review' });
+    }
+
+    const updated = await rejectFraudHold(req.params.id,
+      { actorId: req.user.id, user: req.user, reason });
+    res.json({ order: updated, refund: refunded });
+  }));
+
+// ── Chargebacks ────────────────────────────────────────────────────────────
+// Recorded automatically from the PSP webhook; this is for the ones that reach
+// the owner by email or by bank letter instead, which is most of them for a
+// shop small enough not to have a disputes dashboard.
+router.post('/chargebacks', requirePermission('security.manage'),
+  asyncHandler(async (req, res) => {
+    const body = z.object({
+      orderNumber: z.string().min(1).max(40),
+      amount: z.number().int().positive().optional(),
+      reason: z.string().max(300).optional(),
+    }).parse(req.body);
+
+    const order = await getOrderByNumber(body.orderNumber);
+    if (!order) throw notFound(`No order ${body.orderNumber}`);
+
+    const result = await recordChargeback({
+      order,
+      amount: body.amount ?? order.total,
+      currency: order.currency,
+      provider: order.pspProvider || 'manual',
+      paymentId: order.pspPaymentId || null,
+      reason: body.reason || null,
+      source: 'staff',
+      actor: req.user,
+    });
+    res.status(result.duplicate ? 200 : 201).json(result);
+  }));
 
 // ── Users & roles ──────────────────────────────────────────────────────────
 router.get('/roles', requirePermission('users.read'), asyncHandler(async (_req, res) => {

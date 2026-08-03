@@ -72,7 +72,10 @@ async function userForIdentifier(identifier) {
 }
 
 // ── Email OTP ──────────────────────────────────────────────────────────────
-const otpLimiter = rateLimit({ bucket: 'auth_otp', windowMs: 60_000, max: 5 });
+// Shared across instances: five login attempts a minute has to mean five,
+// not five per serverless instance that happens to be warm. This is the one
+// limiter standing between a code-guessing script and an account.
+const otpLimiter = rateLimit({ bucket: 'auth_otp', windowMs: 60_000, max: 5, shared: true });
 
 // Unified entry point: email OR phone. If this device is trusted for the
 // matching account → instant login, no OTP. Otherwise send a code.

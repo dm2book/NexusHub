@@ -19,6 +19,7 @@ import {
 } from '../services/mollieService.js';
 import { getOrder, markPaymentReceived, transitionOrder, setPspPayment } from '../services/orderService.js';
 import { audit } from '../services/auditService.js';
+import { recordChargeback } from '../services/chargebackService.js';
 import { get } from '../db/index.js';
 
 const router = Router();
@@ -108,6 +109,18 @@ export async function applyPayment(paymentId, ctx = {}) {
   }
 
   if (effect === 'refunded' || effect === 'chargeback') {
+    // Written before the status changes, and outside the already-refunded
+    // shortcut below: a chargeback can land on an order we already refunded, and
+    // that is precisely the case worth recording. It is also idempotent per
+    // payment id, so Mollie repeating the webhook cannot double someone's
+    // apparent history and push their next order into a block.
+    if (effect === 'chargeback') {
+      await recordChargeback({
+        order, amount: payment.chargedBackCents, currency: payment.currency,
+        provider: 'mollie', paymentId: payment.id,
+        reason: payment.failureReason || 'Charged back via Mollie', source: 'psp',
+      }).catch((e) => console.error('[mollie] chargeback ledger:', e.message));
+    }
     if (order.status === 'refunded') return { ok: true, effect, skipped: 'already refunded' };
     const refunded = await settleAsRefunded(order.id, reason);
     if (!refunded) {
@@ -202,7 +215,7 @@ mollieApi.get('/mollie/methods', asyncHandler(async (req, res) => {
  * entirely.
  */
 mollieApi.post('/orders/:id/mollie',
-  rateLimit({ bucket: 'pay', windowMs: 60_000, max: 30 }),
+  rateLimit({ bucket: 'pay', windowMs: 60_000, max: 30, shared: true }),
   asyncHandler(async (req, res) => {
     if (!isEnabled()) throw new ApiError(400, 'Mollie is not configured');
 
@@ -270,7 +283,7 @@ mollieApi.post('/orders/:id/mollie',
  * as the public handle for a status. Nothing beyond that status is returned.
  */
 mollieApi.post('/orders/:id/mollie/sync',
-  rateLimit({ bucket: 'pay', windowMs: 60_000, max: 30 }),
+  rateLimit({ bucket: 'pay', windowMs: 60_000, max: 30, shared: true }),
   asyncHandler(async (req, res) => {
     if (!isEnabled()) throw new ApiError(400, 'Mollie is not configured');
     const order = await getOrder(req.params.id);
