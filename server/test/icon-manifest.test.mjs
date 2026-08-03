@@ -35,9 +35,14 @@ const list = (text, name) => {
 const front = readFileSync(join(ROOT, 'src', 'lib', 'sampleCatalog.js'), 'utf8');
 const seed = readFileSync(join(ROOT, 'server', 'src', 'db', 'demoSeed.js'), 'utf8');
 
-const files = readdirSync(ICON_DIR).filter((f) => /\.(svg|png)$/.test(f));
-const onDisk = new Set(files.map((f) => f.replace(/\.(svg|png)$/, '')));
-const rasterOnDisk = new Set(files.filter((f) => f.endsWith('.png')).map((f) => f.replace(/\.png$/, '')));
+// The raster icons are WebP now — as PNGs they were 481KB across ten files and
+// competed for bandwidth with the JavaScript the page cannot paint without.
+// PNG is still recognised here so a newly added icon in the old format is
+// caught by the extension check below rather than silently 404ing.
+const RASTER_EXT = /\.(png|webp)$/;
+const files = readdirSync(ICON_DIR).filter((f) => /\.(svg|png|webp)$/.test(f));
+const onDisk = new Set(files.map((f) => f.replace(/\.(svg|png|webp)$/, '')));
+const rasterOnDisk = new Set(files.filter((f) => RASTER_EXT.test(f)).map((f) => f.replace(RASTER_EXT, '')));
 
 console.log('— The two copies of the list agree —');
 {
@@ -69,7 +74,7 @@ console.log('\n— Every mapped category resolves to a file that exists —');
   // The extension is chosen from RASTER_ICONS, so a slug in the wrong set
   // produces a 404 that only shows up as a blank tile in the shop.
   const wrongExt = a.filter((c) => raster.has(c) !== rasterOnDisk.has(c));
-  ok('every slug is in the raster set iff its file is a .png',
+  ok('every slug is in the raster set iff its file is a raster one',
     wrongExt.length === 0, `mismatched: [${wrongExt}]`);
 }
 

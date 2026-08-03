@@ -33,11 +33,15 @@ export default function MobileTabBar() {
       <div className="grid grid-cols-5 h-[62px]">
         {TABS.map((tab) => {
           const on = active(tab);
+          // Inactive tabs are slate-500, not slate-400: on white the lighter
+          // grey measures 2.85:1, under the 4.5:1 that small text needs. This
+          // bar is on every phone screen, so it was the most-seen failure on
+          // the site.
           const Icon = tab.icon;
           return (
             <Link key={tab.to} to={tab.to}
               className={`relative flex flex-col items-center justify-center gap-0.5 text-[10.5px] font-semibold transition
-                ${on ? 'text-violet-600' : 'text-slate-400 hover:text-slate-600'}`}>
+                ${on ? 'text-violet-600' : 'text-slate-500 hover:text-slate-700'}`}>
               <span className="relative">
                 <Icon size={21} strokeWidth={on ? 2.4 : 2} />
                 {tab.badge > 0 && (

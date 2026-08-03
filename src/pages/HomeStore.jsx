@@ -1,4 +1,5 @@
-import { useEffect, useState, useRef, useMemo } from 'react';
+import { useEffect, useState, useRef, useMemo, lazy, Suspense } from 'react';
+import DeferUntilIdle from '../components/DeferUntilIdle.jsx';
 import ScrollProgress from '../components/store/ScrollProgress.jsx';
 import { Link } from 'react-router-dom';
 import {
@@ -19,7 +20,7 @@ import { useReviews } from '../lib/useReviews.js';
 import { useReveal } from '../lib/useReveal.js';
 import { useParallax } from '../lib/useParallax.js';
 import RecentlyDelivered from '../components/store/RecentlyDelivered.jsx';
-import CommandPalette from '../components/store/CommandPalette.jsx';
+const CommandPalette = lazy(() => import('../components/store/CommandPalette.jsx'));
 import MobileTabBar from '../components/store/MobileTabBar.jsx';
 import AnnouncementBar from '../components/store/AnnouncementBar.jsx';
 import StoreFooter from '../components/store/StoreFooter.jsx';
@@ -29,7 +30,8 @@ import { withFallback, SAMPLE_PRODUCTS, iconPath } from '../lib/sampleCatalog.js
 import { useCategoryLogos } from '../lib/useCategoryLogos.js';
 import { useTrustpilot } from '../lib/useTrustpilot.js';
 import { SUPPORT_EMAIL } from '../lib/support.js';
-import ChatWidget, { openForgeChat } from '../components/ChatWidget.jsx';
+import { openForgeChat } from '../lib/forgeChat.js';
+const ChatWidget = lazy(() => import('../components/ChatWidget.jsx'));
 
 const ICON = iconPath;
 
@@ -394,7 +396,7 @@ export default function HomeStore() {
 
         {/* The assistant itself. The homepage is not inside SiteLayout, so
             without this the card had nothing to open. */}
-        <ChatWidget />
+        <DeferUntilIdle><Suspense fallback={null}><ChatWidget /></Suspense></DeferUntilIdle>
       <ScrollProgress />
 
         {/* Main */}
@@ -410,7 +412,14 @@ export default function HomeStore() {
               more thing for a nervous buyer to squint at. */}
           <section className="fm-stage relative overflow-hidden rounded-3xl px-5 sm:px-10 py-9 sm:py-14">
             <span className="fm-beam" aria-hidden />
-            <span className="fm-ghostword" aria-hidden>FORGE</span>
+            {/* Decoration, drawn by CSS rather than typed here.
+                As a text node it was the LARGEST CONTENTFUL PAINT on the
+                homepage — 260px of outlined letters, measured beating both the
+                real heading and its subtitle. The browser was therefore rating
+                the page's loading speed on a watermark nobody reads. Moving the
+                letters into a ::before takes it out of the running without
+                changing a pixel. */}
+            <span className="fm-ghostword" aria-hidden />
             {/* On xl the feature cards get their own column instead of floating
                 over the artwork, which used to bury the right-hand logos. */}
             <div className="grid lg:grid-cols-[1.05fr_1fr] 2xl:grid-cols-[1.1fr_1fr_206px] gap-8 2xl:gap-6 items-center">
@@ -721,7 +730,7 @@ export default function HomeStore() {
           theme-light because this page is its own route, outside StoreLayout. */}
       <div className="theme-light"><StoreFooter /></div>
       <RecentlyDelivered />
-      <CommandPalette />
+      <DeferUntilIdle><Suspense fallback={null}><CommandPalette /></Suspense></DeferUntilIdle>
       <MobileTabBar />
     </div>
   );

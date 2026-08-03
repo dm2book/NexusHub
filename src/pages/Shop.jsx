@@ -166,7 +166,17 @@ export default function Shop() {
           </div>
         </div>
 
-        {/* Trending row */}
+        {/* Trending row.
+            The space is held open while the fetch is in flight: this block sits
+            above the whole catalogue, so appearing late shoved every product
+            down the page. Measured on /shop as the second-largest layout shift
+            after the bundles row, which had the same problem. `trending` is
+            null until the request settles and an array afterwards, so "still
+            loading" and "nothing to show" are genuinely distinguishable — no
+            gap is reserved for a row that will never arrive. */}
+        {!category && !search.trim() && trending === null && (
+          <div className="mb-7 h-[300px] sm:h-[326px]" aria-hidden />
+        )}
         {showTrending && (
           <div className="mb-7">
             <div className="flex items-center gap-2 mb-3">
@@ -228,7 +238,7 @@ export default function Shop() {
             {visible.slice(0, shown).map((p, i) => (
               // Stagger capped at 8 so a 74-product grid does not end with a
               // card waiting two seconds for its turn.
-              <div key={p.id} className="flex fm-reveal" style={{ transitionDelay: `${Math.min(i, 8) * 45}ms` }}>
+              <div key={p.id} className="flex fm-reveal fm-card-slot" style={{ transitionDelay: `${Math.min(i, 8) * 45}ms` }}>
                 <LightProductCard product={p} onAdd={onAdd} />
               </div>
             ))}

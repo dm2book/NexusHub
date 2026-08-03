@@ -118,8 +118,15 @@ export const RASTER_ICONS = new Set([
   'cod', 'discord-nitro', 'eafc', 'giftcard', 'playstation', 'robux', 'steam', 'v-bucks',
   'valorant', 'xbox',
 ]);
-/** Path to the built-in icon for a category name (not the file's own slug). */
-export const iconPath = (name) => `/products/icons/${name}.${RASTER_ICONS.has(name) ? 'png' : 'svg'}`;
+/**
+ * Path to the built-in icon for a category name (not the file's own slug).
+ *
+ * The raster icons are WebP. As PNGs they were 481KB across ten files — a
+ * single 256px icon weighed 95KB — and they downloaded in parallel with the
+ * JavaScript the page cannot paint without, on a connection that has to carry
+ * both. Same pixels, 83% fewer bytes.
+ */
+export const iconPath = (name) => `/products/icons/${name}.${RASTER_ICONS.has(name) ? 'webp' : 'svg'}`;
 export const iconFor = (category) => (CATEGORY_ICON[category] ? iconPath(CATEGORY_ICON[category]) : null);
 
 // Products whose own brand differs from their category — the gift cards all

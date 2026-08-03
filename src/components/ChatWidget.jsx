@@ -60,9 +60,10 @@ const ACTION_TO = { shop: '/shop', track: '/track', discord: '/discord', how: '/
  * page. Anyone who tapped it reasonably concluded the bot was broken. Now the
  * card opens this, the real one.
  */
-export function openForgeChat(message) {
-  window.dispatchEvent(new CustomEvent('forge:chat:open', { detail: { message } }));
-}
+// Moved to src/lib/forgeChat.js so callers can trigger the chat without
+// importing this file, which is lazy-loaded. Re-exported for anything that
+// still reaches for it here.
+export { openForgeChat } from '../lib/forgeChat.js';
 
 export default function ChatWidget() {
   const { lang } = useI18n();

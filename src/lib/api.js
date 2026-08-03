@@ -28,6 +28,10 @@ async function refresh() {
   });
   if (!res.ok) return false;
   const { accessToken: tok } = await res.json();
+  // The endpoint now answers 200 with a null token when there is no session, so
+  // an anonymous visit is not a failed request. Guard against writing that null
+  // over a token another tab may have just set.
+  if (!tok) return false;
   setAccessToken(tok);
   return true;
 }
