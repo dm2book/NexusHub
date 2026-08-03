@@ -316,7 +316,13 @@ router.get('/gift-cards/:code', asyncHandler(async (req, res) => {
 
 // Place an order. Authenticated users get it linked to their account; guests
 // may order by email. Checkout/payment capture would call markPaymentReceived.
-router.post('/orders', rateLimit({ bucket: 'checkout', windowMs: 60_000, max: 20, shared: true }),
+// The first wall a burst meets, and the one worth being able to move without a
+// deploy — see LIMIT_CHECKOUT_PER_MINUTE in config/env.js for why.
+router.post('/orders',
+  rateLimit({
+    bucket: 'checkout', windowMs: 60_000,
+    max: config.security.checkoutPerMinute, shared: true,
+  }),
   asyncHandler(async (req, res) => {
     const body = z.object({
       email: z.string().email(),
