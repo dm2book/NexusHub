@@ -150,8 +150,11 @@ const product = await createProduct({
 });
 await addProductCodes(product.id, [`MOLLIE-${tag}-A`, `MOLLIE-${tag}-B`, `MOLLIE-${tag}-C`]);
 
+// A fresh address per order: the shop caps how many orders one email may place
+// in a day, and this suite makes more than that.
+let seq = 0;
 const newOrder = async () => createOrder({
-  email: `mollie${tag}@example.com`,
+  email: `mollie${tag}-${++seq}@example.com`,
   items: [{ productId: product.id, quantity: 1 }],
   currency: 'EUR',
   consent: true, consentText: 'Immediate delivery, waiving withdrawal.',
@@ -275,7 +278,7 @@ const stubPayment = (id, order, over = {}) => {
   };
   for (const [from, path] of Object.entries(PATHS)) {
     const order = await createOrder({
-      email: `mollie${tag}@example.com`, currency: 'EUR',
+      email: `mollie${tag}-m${++seq}@example.com`, currency: 'EUR',
       items: [{ productId: manualProduct.id, quantity: 1 }],
       consent: true, consentText: 'Immediate delivery, waiving withdrawal.',
     });

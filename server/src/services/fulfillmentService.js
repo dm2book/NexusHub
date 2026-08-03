@@ -374,8 +374,13 @@ async function releaseLease(token) {
  *  so the queue advances instead of looping on an order that opens no request. */
 async function nextSupplierOrder(skip = new Set()) {
   const rows = await all(
+    // fraud_hold is filtered here rather than at delivery on purpose: this queue
+    // BUYS the item from a supplier before delivering it. Discovering the hold
+    // afterwards would mean the shop has already spent real money stocking an
+    // order it may be about to refuse.
     `SELECT o.id FROM orders o
       WHERE o.status IN ('payment_received','processing')
+        AND o.fraud_hold = 0
         AND NOT EXISTS (SELECT 1 FROM fulfillment_requests fr WHERE fr.order_id = o.id)
       ORDER BY o.created_at ASC LIMIT 50`);
   for (const r of rows) {

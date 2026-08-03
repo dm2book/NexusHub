@@ -567,6 +567,8 @@ const NL = {
   'track.payNote': 'Zodra we je betaling bevestigen gaat je bestelling vanzelf verder — deze pagina ververst live.',
   'track.filledIn': 'bedrag staat er al in',
   'track.resumePay': 'Betaling afronden van',
+  'track.onHold': 'We controleren deze bestelling',
+  'track.onHoldSub': 'Deze bestelling wordt door een mens gecontroleerd voordat hij geleverd wordt. Je betaling is veilig — kunnen we de bestelling niet afronden, dan krijg je elke cent terug.',
   'track.resumePaySub': 'Je betaling is gestart maar niet afgerond. Er is nog niets afgeschreven — dit brengt je terug naar de beveiligde betaalpagina, en deze pagina ververst vanzelf zodra het rond is.',
   'track.payExact': 'Betaal',
   'track.payExactSub': 'bedrag staat er al in',

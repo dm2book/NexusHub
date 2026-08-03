@@ -144,9 +144,35 @@ export const config = {
     // Shared secret the maintenance cron must present (Vercel Cron sets the
     // Authorization header to `Bearer <CRON_SECRET>`).
     cronSecret: env.CRON_SECRET || '',
-    // Fraud scoring threshold above which an order is flagged for review.
+    // Fraud scoring thresholds.
+    //
+    // `review` holds the delivery: the order is paid and normal, but no code
+    // leaves the shop until a person has looked at it. `block` refuses the order
+    // outright at checkout, before any money is asked for.
+    //
+    // Digital goods are irreversible — once a code is read it cannot be taken
+    // back, and a chargeback lands weeks later with nothing to reclaim. That is
+    // why review holds delivery rather than merely colouring a row in the admin.
     fraudReviewThreshold: Number(env.FRAUD_REVIEW_THRESHOLD || 60),
     fraudBlockThreshold: Number(env.FRAUD_BLOCK_THRESHOLD || 85),
+
+    // Hard limits, checked before an order is even created. These are not risk
+    // signals — they are ceilings. A shop run by one person has no legitimate
+    // buyer placing fifteen orders in a day, and the damage a stolen card can do
+    // in one night is exactly what these bound.
+    //
+    // Set any of them to 0 to switch that limit off.
+    orderLimits: {
+      // Per email address, rolling 24h.
+      perEmailPerDay: Number(env.LIMIT_ORDERS_PER_EMAIL_DAY ?? 8),
+      // Per IP, rolling 24h. Higher than the email limit: a household, a school
+      // or a phone network legitimately shares one address.
+      perIpPerDay: Number(env.LIMIT_ORDERS_PER_IP_DAY ?? 15),
+      // Total value one email may order in 24h, in cents.
+      valuePerEmailPerDay: Number(env.LIMIT_VALUE_PER_EMAIL_DAY ?? 100_000),
+      // Largest single order, in cents. The ceiling on one mistake.
+      maxOrderValue: Number(env.LIMIT_MAX_ORDER_VALUE ?? 50_000),
+    },
   },
 
   payments: {

@@ -62,6 +62,8 @@ Health probe for uptime monitors: **`/api/health`**.
 | `DISCORD_CLIENT_ID` / `DISCORD_CLIENT_SECRET` | "Continue with Discord" |
 | `COUPONS` | `CODE:percent,CODE2:percent` discount codes |
 | `DISCORD_MEMBER_COUNT` | shown in trust stats if the widget isn't public |
+| `FRAUD_REVIEW_THRESHOLD` | lower it to have more orders held for you to check by hand; raise it to be left alone. Default 60 |
+| `LIMIT_MAX_ORDER_VALUE` | the most one order may be, in cents. Default 50000 (€500) — the ceiling on a single bad night |
 | `MOLLIE_API_KEY` | **iDEAL, Bancontact, Apple Pay, card and PayPal.** Takes priority over the manual links — it is the only method that confirms itself and dispatches stock without you |
 | `STRIPE_SECRET_KEY` | enable card payments instead of/alongside manual |
 
@@ -77,6 +79,10 @@ Health probe for uptime monitors: **`/api/health`**.
    emailed automatically. Then refund it from **Admin → Orders**; the money goes
    back through Mollie before the status changes, so the two can never disagree.
 4. Account → **Rewards**: loyalty tier, referral link, Forge+.
+5. **Fraud**: Admin → Security → Fraud review should be empty. To see it work,
+   record a chargeback there against one of your own test orders — the next
+   order from that email is held, its code is **not** delivered, and the buyer's
+   track page says a person is checking it. Approve it and the code goes out.
 
 ## 8. Security housekeeping  **(only you)**
 Rotate anything ever pasted in chat: Discord **bot token**, Vercel token, Resend key.

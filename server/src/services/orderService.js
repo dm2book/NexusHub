@@ -20,8 +20,10 @@ import { payMethodsFor } from '../utils/payMethodUrl.js';
 import { renderTemplate, baseContext } from './templateService.js';
 import { notify } from './notificationService.js';
 import { scoreOrder } from './fraudService.js';
+import { assertOrderLimits } from './orderLimitService.js';
+import { audit } from './auditService.js';
 import { getProduct } from './productService.js';
-import { postOrderEvent } from './discordService.js';
+import { postOrderEvent, postFraudHoldAlert } from './discordService.js';
 import { grantTierForOrder, syncLoyaltyRoles, sendDeliveryDm } from './discordRolesService.js';
 import { availableCount, claimCodes, checkLowStock, releaseCodes } from './codeStockService.js';
 import { memberDiscountPercent } from './membershipService.js';
@@ -152,15 +154,21 @@ export async function createOrder(input, ctx = {}) {
   if (bundleDiscount) { billing.bundle = bundle.bundle?.name; billing.bundleDiscount = bundleDiscount; }
   if (creditApplied) billing.creditApplied = creditApplied;
 
+  // Ceilings, checked before anything is written. Scoring decides how suspicious
+  // an order is; this decides whether it is plausible at all. A stolen card that
+  // trips no rule can still place forty orders overnight — these bound that
+  // without needing to be clever about it.
+  await assertOrderLimits({ email, ip: ctx.ip || null, total, currency });
+
   await tx(async () => {
     await run(`INSERT INTO orders
           (id, number, user_id, email, status, currency, subtotal, total, billing,
-           consent_at, consent_text, created_at, updated_at)
+           consent_at, consent_text, ip, created_at, updated_at)
          VALUES (@id, @num, @uid, @email, 'pending', @cur, @sub, @tot, @bill,
-           @consentAt, @consentText, @at, @at)`,
+           @consentAt, @consentText, @ip, @at, @at)`,
         { id: orderId, num: number, uid: input.userId || null, email,
           cur: currency, sub: subtotal, tot: total,
-          bill: JSON.stringify(billing),
+          bill: JSON.stringify(billing), ip: ctx.ip || null,
           consentAt: at, consentText: consentText || null, at });
     for (const it of lineItems) {
       await run(`INSERT INTO order_items (id, order_id, product_id, name, quantity, unit_price, metadata)
@@ -182,11 +190,54 @@ export async function createOrder(input, ctx = {}) {
       .catch((e) => console.error('[coupon] redemption', e.message));
   }
 
-  // Fraud screening (records signals; may flag/block).
+  // ── Fraud screening ────────────────────────────────────────────────────
+  // The score used to be written here and then never read again: an order could
+  // be recorded as `blocked` and have its codes auto-delivered seconds later.
+  // Now the decision does something.
   const order = await getOrder(orderId);
-  const fraud = await scoreOrder({ order, user: ctx.user, email });
-  await run('UPDATE orders SET fraud_score=@s, fraud_status=@d WHERE id=@id',
-      { s: fraud.score, d: fraud.decision, id: orderId });
+  const fraud = await scoreOrder({
+    order, user: ctx.user, email, ip: ctx.ip || null, country: ctx.country || null,
+  });
+  // `review` holds the delivery. The order stays a perfectly normal paid order —
+  // it just does not hand anything over until a person has looked at it. That
+  // matters here more than in a physical shop: a code cannot be un-read, and the
+  // chargeback arrives weeks later with nothing left to reclaim.
+  const hold = fraud.decision === 'review' || fraud.decision === 'block';
+  await run(
+    `UPDATE orders SET fraud_score=@s, fraud_status=@d, fraud_hold=@h, fraud_hold_reason=@r
+      WHERE id=@id`,
+    { s: fraud.score, d: fraud.decision, id: orderId,
+      h: hold ? 1 : 0,
+      r: hold ? fraud.signals.map((x) => x.detail).join(' · ').slice(0, 500) : null });
+
+  if (fraud.decision === 'block') {
+    // Refused outright, before the buyer is asked for a cent. The order row
+    // stays — it is the evidence, and deleting the record of a blocked attempt
+    // throws away the history the next attempt would be scored against.
+    await transitionOrder(orderId, 'failed',
+      { actorId: 'fraud', reason: `Blocked by fraud screening (score ${fraud.score})` })
+      .catch((e) => console.error('[fraud] could not fail blocked order:', e.message));
+    await audit({
+      actor: { id: 'fraud', email: 'fraud' }, action: 'order.blocked',
+      targetType: 'order', targetId: orderId,
+      metadata: { score: fraud.score, signals: fraud.signals.map((x) => x.rule) },
+    }).catch(() => {});
+    throw badRequest(
+      'We could not accept this order. Nothing has been charged. '
+      + 'If you think this is a mistake, email us and a person will place it for you.');
+  }
+
+  if (hold) {
+    console.warn(`[fraud] holding ${number} (score ${fraud.score}): ${fraud.signals.map((x) => x.rule).join(', ')}`);
+    await audit({
+      actor: { id: 'fraud', email: 'fraud' }, action: 'order.held',
+      targetType: 'order', targetId: orderId,
+      metadata: { score: fraud.score, signals: fraud.signals.map((x) => x.rule) },
+    }).catch(() => {});
+    // Staff need to know something is waiting; the buyer is told at the point
+    // where they would otherwise be wondering where their code is.
+    await postFraudHoldAlert(await getOrder(orderId), fraud).catch(() => {});
+  }
 
   // Nothing left to pay — store credit (or a 100% coupon) covered the lot. The
   // credit was already debited above, so leaving this 'pending' would park the
@@ -230,6 +281,14 @@ export async function deliverOrder(orderId, deliveries = [], ctx = {}) {
   // order read `completed` — nothing in the dashboard would ever have shown it.
   if (['refunded', 'cancelled'].includes(order.status)) {
     throw conflict(`Order is ${order.status} — it cannot be delivered`);
+  }
+  // Held for review. Refused here rather than only in auto-dispense, because
+  // this is also the door the supplier queue and the staff button come through,
+  // and a hold that only covers one of the three routes is not a hold. Approving
+  // the order in the review queue clears it; there is no way past it that does
+  // not involve a person deciding.
+  if (order.fraud_hold) {
+    throw conflict('This order is held for fraud review — approve it before delivering');
   }
   for (const d of deliveries) {
     const content = String(d.content || '').trim();
@@ -327,6 +386,12 @@ export async function transitionOrder(orderId, to, ctx = {}) {
         if (delivered) return;
         // Not in local stock → hand off to the serial supplier queue, which
         // buys + delivers paid orders one at a time, oldest first.
+        // A held order belongs in the review queue, not the fulfilment one.
+        // Putting it in both would show staff a "deliver this" task they cannot
+        // action — deliverOrder refuses a held order — and the resulting error
+        // teaches people to distrust the queue rather than the order.
+        const held = await get('SELECT fraud_hold FROM orders WHERE id=@id', { id: orderId });
+        if (held?.fraud_hold) return;
         const { drainSupplierQueue, ensureManualFulfillment } = await import('./fulfillmentService.js');
         await drainSupplierQueue(ctx);
         // Still nothing auto (no stock, no auto-supplier, e.g. a P2P top-up)?
@@ -362,6 +427,17 @@ export async function transitionOrder(orderId, to, ctx = {}) {
 export async function autoDispenseFromStock(orderId, ctx = {}) {
   const order = await getOrder(orderId);
   if (!order || ['completed', 'refunded', 'cancelled'].includes(order.status)) return false;
+  // A held order delivers nothing, automatically or otherwise.
+  //
+  // This single line is what the whole fraud score was missing. The score was
+  // computed, stored, shown in the admin — and then the codes went out anyway,
+  // because nothing between the payment and the delivery ever read it. Held
+  // orders now wait for a person, and a digital code is the one thing where
+  // waiting is still an option: it cannot be recalled once it has been read.
+  if (order.fraudHold) {
+    console.warn(`[autodispense] ${order.number} is held for review — not delivering`);
+    return false;
+  }
   // Direct account top-up is always hand-delivered — never auto-dispense a code.
   if (order.billing?.deliveryMethod === 'account') return false;
   for (const it of order.items) {
@@ -564,6 +640,12 @@ async function hydrate(row) {
     totalFormatted: formatMoney(row.total, row.currency),
     paymentStatus: row.payment_status, paymentRef: row.payment_ref,
     billing: parse(row.billing), fraudScore: row.fraud_score, fraudStatus: row.fraud_status,
+    // Whether this order's delivery is stopped, and why. Read by auto-dispense,
+    // by the buyer's status page and by the review queue — the same fact, so it
+    // can never be true in one place and false in another.
+    fraudHold: !!row.fraud_hold, fraudHoldReason: row.fraud_hold_reason || null,
+    fraudReviewedAt: row.fraud_reviewed_at || null,
+    ip: row.ip || null,
     notes: row.notes,
     // Per-order payment link with the exact amount already in it, when the
     // owner has pasted one. Public on purpose: the buyer needs to click it.
@@ -633,7 +715,7 @@ async function summarize(row) {
     product: productLabel, itemCount: items.length,
     amount: row.total, amountFormatted: formatMoney(row.total, row.currency),
     currency: row.currency, status: row.status, statusLabel: labelFor(row.status),
-    fraudStatus: row.fraud_status, fraudScore: row.fraud_score,
+    fraudStatus: row.fraud_status, fraudScore: row.fraud_score, fraudHold: !!row.fraud_hold,
     date: row.created_at,
   };
 }
@@ -716,6 +798,72 @@ export async function getPspPayment(orderId) {
   if (!r?.psp_payment_id) return null;
   return { provider: r.psp_provider, paymentId: r.psp_payment_id,
            status: r.psp_status, checkoutUrl: r.psp_checkout_url };
+}
+
+// ── Fraud review ───────────────────────────────────────────────────────────
+
+/**
+ * Approve a held order: release it and deliver.
+ *
+ * The hold is cleared first and the delivery attempted after, in that order —
+ * `deliverOrder` and `autoDispenseFromStock` both refuse a held order, so doing
+ * it the other way round would have staff clicking approve and nothing
+ * happening. Who approved it and when are kept: if this order charges back
+ * later, that decision is the thing worth being able to look back at.
+ */
+export async function releaseFraudHold(orderId, ctx = {}) {
+  const order = await getOrder(orderId);
+  if (!order) throw notFound('Order not found');
+  if (!order.fraudHold) return { order, alreadyReleased: true };
+
+  await run(
+    `UPDATE orders SET fraud_hold=0, fraud_status='ok', fraud_reviewed_at=@at,
+            fraud_reviewed_by=@by, updated_at=@at WHERE id=@id`,
+    { at: nowIso(), by: ctx.actorId || 'staff', id: orderId });
+
+  await audit({
+    actor: ctx.user || { id: ctx.actorId || 'staff', email: ctx.actorId || 'staff' },
+    action: 'order.fraud_released', targetType: 'order', targetId: orderId,
+    metadata: { score: order.fraudScore, reason: ctx.reason || null },
+  }).catch(() => {});
+
+  // Only if the money is already in. Approving an unpaid order just means it may
+  // proceed normally once it is paid — the usual payment path picks it up.
+  let delivered = false;
+  if (!['pending', 'refunded', 'cancelled', 'failed', 'completed'].includes(order.status)) {
+    delivered = await autoDispenseFromStock(orderId, { ...ctx, reason: 'Released after fraud review' })
+      .catch((e) => { console.error('[fraud] release dispense:', e.message); return false; });
+  }
+  return { order: await getOrder(orderId), delivered };
+}
+
+/**
+ * Reject a held order: refund it and keep the hold.
+ *
+ * The hold stays deliberately. It is the record that this order was stopped on
+ * purpose, and a refunded order can no longer be delivered anyway — clearing it
+ * would only make the queue look tidier while losing why it was there.
+ *
+ * The refund itself goes through the caller, because sending money back is a PSP
+ * operation and this module does not talk to a PSP.
+ */
+export async function rejectFraudHold(orderId, ctx = {}) {
+  const order = await getOrder(orderId);
+  if (!order) throw notFound('Order not found');
+
+  await run(
+    `UPDATE orders SET fraud_status='block', fraud_reviewed_at=@at, fraud_reviewed_by=@by,
+            fraud_hold_reason=@r, updated_at=@at WHERE id=@id`,
+    { at: nowIso(), by: ctx.actorId || 'staff',
+      r: (ctx.reason || order.fraudHoldReason || 'Rejected in fraud review').slice(0, 500), id: orderId });
+
+  await audit({
+    actor: ctx.user || { id: ctx.actorId || 'staff', email: ctx.actorId || 'staff' },
+    action: 'order.fraud_rejected', targetType: 'order', targetId: orderId,
+    metadata: { score: order.fraudScore, reason: ctx.reason || null },
+  }).catch(() => {});
+
+  return getOrder(orderId);
 }
 
 export async function setOrderNotes(orderId, notes) {
