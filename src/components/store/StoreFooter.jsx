@@ -42,7 +42,8 @@ export default function StoreFooter() {
       [t('footer.faq', 'FAQ'), '/faq'],
       [t('footer.refunds', 'Refund Policy'), '/refunds'],
       [t('footer.terms', 'Terms'), '/terms'],
-      [t('footer.privacy', 'Privacy'), '/privacy']] },
+      [t('footer.privacy', 'Privacy'), '/privacy'],
+      [t('footer.cookies', 'Cookies'), '/cookies']] },
   ];
   return (
     <footer className="border-t border-slate-200/70 bg-white mt-12">

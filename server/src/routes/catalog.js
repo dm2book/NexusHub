@@ -442,7 +442,11 @@ router.post('/track/:number/review',
 router.get('/sitemap.xml', asyncHandler(async (_req, res) => {
   const base = config.appUrl.replace(/\/$/, '');
   const staticPages = ['', '/shop', '/reviews', '/how-it-works', '/faq', '/about',
-    '/contact', '/track', '/discord', '/payment-methods', '/refunds', '/trust'];
+    '/contact', '/track', '/discord', '/payment-methods', '/refunds', '/trust',
+    // The legal pages were missing entirely. They are exactly the pages a buyer
+    // looks for before trusting a shop they have not heard of, and the ones a
+    // search engine reads to decide the site is a real business.
+    '/terms', '/privacy', '/cookies'];
   const products = await listProducts({ activeOnly: true });
   const urls = [
     ...staticPages.map((p) => ({ loc: `${base}${p}`, prio: p === '' ? '1.0' : '0.7' })),

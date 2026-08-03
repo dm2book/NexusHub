@@ -97,6 +97,13 @@ export default function App() {
           <Route path="/trust" element={<Trust />} />
           <Route path="/terms" element={<Legal kind="terms" />} />
           <Route path="/privacy" element={<Legal kind="privacy" />} />
+          <Route path="/cookies" element={<Legal kind="cookies" />} />
+          {/* Dutch-language aliases: these are the URLs people type and the ones
+              a link in an email or a Discord message tends to use. */}
+          <Route path="/voorwaarden" element={<Legal kind="terms" />} />
+          <Route path="/privacybeleid" element={<Legal kind="privacy" />} />
+          <Route path="/cookiebeleid" element={<Legal kind="cookies" />} />
+          <Route path="/retourbeleid" element={<Refunds />} />
           <Route path="/login" element={<Login />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
         </Route>
