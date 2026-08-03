@@ -27,6 +27,15 @@ export default function StoreFooter() {
   const trustpilot = useTrustpilot();
   const { t } = useI18n();
   const COLS = [
+    // The landing pages get a column of their own. Not decoration: a page that
+    // nothing links to is a page a crawler has to be told about twice, and this
+    // is also where a visitor who lands on the FAQ finds what the shop sells.
+    { title: t('footer.popular', 'Popular'), links: [
+      ['Robux', '/robux'],
+      ['V-Bucks', '/v-bucks'],
+      ['Valorant Points', '/valorant-points'],
+      [t('footer.giftcards', 'Giftcards'), '/giftcards'],
+      [t('footer.gameCurrency', 'Game currency'), '/game-currency']] },
     { title: t('footer.shop', 'Shop'), links: [
       [t('footer.allProducts', 'All Products'), '/shop'],
       [t('footer.wishlist', 'Wishlist'), '/wishlist'],

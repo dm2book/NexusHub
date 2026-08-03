@@ -22,7 +22,7 @@ const SORTS = {
   name: { key: 'shop.sortName', label: 'Name A–Z', fn: (a, b) => a.name.localeCompare(b.name) },
 };
 
-export default function Shop() {
+export default function Shop({ landingCategory = null, landingTitle = null, landingSub = null } = {}) {
   const { add } = useCart();
   const toast = useToast();
   const { t } = useI18n();
@@ -39,8 +39,16 @@ export default function Shop() {
   const PAGE = 24;
   const [shown, setShown] = useState(PAGE);
   const categoryLogos = useCategoryLogos(); // owner-set logos (Admin → Categories)
-  const category = params.get('category') || '';
-  usePageMeta('Shop', 'Game currency, gift cards and subscriptions. In stock is sent automatically once payment is confirmed; the rest is delivered by hand.');
+  // A landing route (/robux, /giftcards…) pins the category; the sidebar and the
+  // rail still work, they just start from here. One component, one catalogue —
+  // a second copy of the shop per keyword is how those pages go stale.
+  const category = landingCategory ?? (params.get('category') || '');
+  // No arguments: usePageMeta falls back to this route's own copy in
+  // content/seo.js — the same copy the prerendered HTML already carries, for
+  // /shop and for every landing route alike. Passing a hardcoded "Shop" here
+  // replaced a written title with a one-word one the moment React mounted,
+  // quietly undoing the prerender for anyone who looked at the tab.
+  usePageMeta();
 
   useEffect(() => {
     api.get('/api/products')
@@ -123,9 +131,18 @@ export default function Shop() {
             );
           })()}
           <h1 className="text-3xl font-extrabold tracking-tight" style={{ color: '#fff' }}>
-            {category ? categoryVisual(category).label : t('shop.all', 'All Products')}
+            {/* A landing page states its own subject — "Robux kopen" rather
+                than the category label — because that heading is the page's
+                single strongest on-page signal and the one a visitor reads
+                first to know they are in the right place. */}
+            {landingTitle || (category ? categoryVisual(category).label : t('shop.all', 'All Products'))}
           </h1>
-          <p className="text-white/85 mt-1.5">{t('shop.tagline', 'Digital goods, delivered to your inbox & dashboard.')}</p>
+          {/* A landing page says what IT is about. The generic shop line under
+              a "Robux kopen" heading is the on-page equivalent of a title tag
+              that does not match its content. */}
+          <p className="text-white/85 mt-1.5">
+            {landingSub || t('shop.tagline', 'Digital goods, delivered to your inbox & dashboard.')}
+          </p>
           <div className="flex flex-wrap items-center gap-2 mt-4">
             <span className="text-[11.5px] font-semibold bg-white/15 border border-white/25 rounded-full px-2.5 py-1">🛡 {t('shop.badgeProtected', 'Money back if undelivered')}</span>
             <span className="text-[11.5px] font-semibold bg-white/15 border border-white/25 rounded-full px-2.5 py-1">🛡 {t('product.protected', 'Buyer protected')}</span>

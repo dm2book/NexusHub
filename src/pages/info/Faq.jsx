@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import InfoShell from '../../components/InfoShell.jsx';
 import { useI18n } from '../../lib/i18n.jsx';
-import { usePageMeta } from '../../lib/useMeta.js';
+import { usePageMeta, useJsonLd } from '../../lib/useMeta.js';
+import { faqLd } from '../../content/seo.js';
 
 // Full EN + NL content sets — one language per render, never mixed.
 const CONTENT = {
@@ -10,12 +11,12 @@ const CONTENT = {
     eyebrow: 'Help center', title: 'Frequently asked questions',
     groups: [
       { title: 'Orders & delivery', items: [
-        ['How fast is delivery?', 'Most digital goods are delivered automatically within seconds of payment. You can watch the status update live on your order page.'],
+        ['How fast is delivery?', 'What we hold in stock is released automatically as soon as your payment is confirmed. Everything else we buy in and deliver by hand, usually within a few hours during the day. Your order page shows which one applies and updates live.'],
         ['Where do I find my codes?', 'In your dashboard under Downloads, and on the order page once the order is completed.'],
         ['Can I track my order?', 'Yes — use the order page in your dashboard, or the public Track Order page with your order number.'],
       ] },
       { title: 'Payments & refunds', items: [
-        ['Which payment methods are supported?', 'You can pay with Tikkie, Revolut or PayPal. At checkout you pick a method and pay using your order number as the reference — see our Payment Methods page for details.'],
+        ['Which payment methods are supported?', 'iDEAL, Bancontact, Apple Pay, credit card and PayPal, through our payment provider Mollie. Your order is confirmed automatically — with iDEAL usually within seconds.'],
         ['How do refunds work?', 'Request a refund from your order page or open a ticket in our Discord. Once approved, eligible orders are refunded to your original method.'],
       ] },
       { title: 'Account & security', items: [
@@ -29,12 +30,12 @@ const CONTENT = {
     eyebrow: 'Helpcentrum', title: 'Veelgestelde vragen',
     groups: [
       { title: 'Bestellingen & levering', items: [
-        ['Hoe snel is de levering?', 'De meeste digitale producten worden binnen seconden na betaling automatisch geleverd. Je kunt de status live volgen op je bestelpagina.'],
+        ['Hoe snel is de levering?', 'Wat we op voorraad hebben gaat automatisch de deur uit zodra je betaling bevestigd is. De rest kopen we in en leveren we met de hand, meestal binnen een paar uur overdag. Op je bestelpagina zie je welke van de twee geldt, en die ververst live.'],
         ['Waar vind ik mijn codes?', 'In je dashboard onder Downloads, en op de bestelpagina zodra de bestelling is afgerond.'],
         ['Kan ik mijn bestelling volgen?', 'Ja — via de bestelpagina in je dashboard, of via de publieke Volg-pagina met je bestelnummer.'],
       ] },
       { title: 'Betalingen & terugbetalingen', items: [
-        ['Welke betaalmethoden worden ondersteund?', 'Je kunt betalen met Tikkie, Revolut of PayPal. Bij het afrekenen kies je een methode en betaal je met je bestelnummer als referentie — zie onze Betaalmethoden-pagina voor details.'],
+        ['Welke betaalmethoden worden ondersteund?', 'iDEAL, Bancontact, Apple Pay, creditcard en PayPal, via onze betaaldienstverlener Mollie. Je bestelling wordt automatisch bevestigd — bij iDEAL meestal binnen seconden.'],
         ['Hoe werken terugbetalingen?', 'Vraag een terugbetaling aan via je bestelpagina of open een ticket in onze Discord. Na goedkeuring wordt het bedrag teruggestort via je oorspronkelijke betaalmethode.'],
       ] },
       { title: 'Account & veiligheid', items: [
@@ -50,6 +51,10 @@ export default function Faq() {
   usePageMeta('FAQ — delivery, payment & refunds', 'How fast delivery is, how paying works, what happens if an order does not arrive, and how refunds are handled.');
   const { lang } = useI18n();
   const L = CONTENT[lang] || CONTENT.en;
+  // Built from the questions this page actually renders, not a hand-kept second
+  // list. FAQ markup that does not match the visible page is the fastest way to
+  // lose the rich result it was added for.
+  useJsonLd('faq', faqLd(L.groups.flatMap((g) => g.items.map(([q, a]) => ({ q, a })))));
   return (
     <InfoShell eyebrow={L.eyebrow} title={L.title}>
       <div className="space-y-10">
