@@ -60,12 +60,17 @@ export default function StoreNav() {
           className="lg:hidden w-11 h-11 shrink-0 -ml-1.5 rounded-xl hover:bg-slate-100 grid place-items-center text-slate-700">
           {open ? <X size={20} /> : <Menu size={20} />}
         </button>
-        <Link to="/" className="flex items-center gap-2.5 shrink-0">
-          <span className="w-9 h-9 rounded-xl flex items-center justify-center text-white shadow-lg shadow-violet-500/30"
+        {/* The wordmark is allowed to shrink; the mark and the buttons are not.
+            Every item in this row used to be shrink-0, so at 390px the row was
+            32px wider than the screen and EVERY page scrolled sideways — measured
+            on /faq and /about as well as the legal pages. The logo is the one
+            thing here that can give way without losing a function. */}
+        <Link to="/" className="flex items-center gap-2.5 min-w-0">
+          <span className="w-9 h-9 shrink-0 rounded-xl flex items-center justify-center text-white shadow-lg shadow-violet-500/30"
             style={{ backgroundImage: 'linear-gradient(135deg,#7c5cff,#a855f7)' }}>
             <Zap size={18} fill="white" />
           </span>
-          <span className="text-xl font-extrabold tracking-tight text-slate-900">ForgeMarket</span>
+          <span className="text-xl font-extrabold tracking-tight text-slate-900 truncate">ForgeMarket</span>
         </Link>
 
         <nav className="hidden lg:flex items-center gap-7 text-[15px] font-medium text-slate-600">

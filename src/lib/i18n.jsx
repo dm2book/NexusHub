@@ -43,6 +43,7 @@ const NL = {
   'footer.refunds': 'Terugbetalingsbeleid',
   'footer.terms': 'Voorwaarden',
   'footer.privacy': 'Privacy',
+  'footer.cookies': 'Cookies',
   'footer.rights': 'Digitale producten voor gamers',
 
   // ── Aangevuld: sleutels die wel in de code stonden maar geen NL-tekst hadden.
