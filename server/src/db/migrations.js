@@ -1030,4 +1030,39 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_chargebacks_payment
   ON chargebacks (payment_id) WHERE payment_id IS NOT NULL;
 `,
   },
+  {
+    id: '027_discord_link',
+    sql: `
+-- ── Connecting a Discord account to a ForgeMarket account ──────────────────
+-- Signing in WITH Discord already created this link as a side effect. That only
+-- ever worked for people whose Discord email happens to match the address they
+-- shop under, and it forced anyone who wanted to connect to log out and back in
+-- through Discord. Linking is now its own action, which needs somewhere to
+-- remember who started it.
+--
+-- The intent is stored server-side rather than in a cookie so the callback can
+-- never be talked into attaching someone else's Discord account: the state
+-- string is the only thing that travels, and it resolves to a user id here.
+CREATE TABLE IF NOT EXISTS oauth_link_intents (
+  state           TEXT PRIMARY KEY,
+  user_id         TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  provider        TEXT NOT NULL,
+  created_at      TEXT NOT NULL,
+  expires_at      TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_link_intents_expiry ON oauth_link_intents (expires_at);
+
+-- When this account's Discord roles were last reconciled. Read by the
+-- maintenance sweep to pick the stalest members, so someone who links today and
+-- joins the server next week still ends up with the roles they earned.
+ALTER TABLE oauth_accounts ADD COLUMN IF NOT EXISTS synced_at TEXT;
+
+-- A vouch posted in Discord carries no site account, so the review role could
+-- never be given for one. The bot can now send the author's Discord id along
+-- with the review, which is the only thing that ties the two identities
+-- together. Optional: reviews without it still work exactly as before.
+ALTER TABLE reviews ADD COLUMN IF NOT EXISTS discord_uid TEXT;
+CREATE INDEX IF NOT EXISTS idx_reviews_discord_uid ON reviews (discord_uid) WHERE discord_uid IS NOT NULL;
+`,
+  },
 ];

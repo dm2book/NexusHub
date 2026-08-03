@@ -83,6 +83,10 @@ router.post('/reviews/ingest',
       body: z.string().min(1).max(600),
       product: z.string().max(120).optional(),
       externalId: z.string().max(120).optional(),
+      // The author's Discord account id. Optional so an older bot keeps working
+      // exactly as before — but it is the only thing that ties a /vouch to an
+      // account here, and therefore the only way a vouch can earn a role.
+      discordUid: z.string().max(32).optional(),
     }).parse(req.body);
     const r = await addReview({ ...body, source: 'discord' });
     reviewsCache = { at: 0, data: null }; // bust cache

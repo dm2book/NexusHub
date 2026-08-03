@@ -18,6 +18,7 @@ import {
   listEnabledProviders, buildAuthUrl, handleOAuthCallback,
 } from '../services/oauthService.js';
 import { publicUser, getUserByEmail, getUserById } from '../services/userService.js';
+import { beginLink, completeLink } from '../services/discordLinkService.js';
 import {
   createTrustedDevice, resolveTrustedDevice, listTrustedDevices, renameTrustedDevice,
   revokeTrustedDevice, revokeAllTrustedDevices, recordLoginAttempt, recentFailures,
@@ -343,6 +344,34 @@ router.get('/oauth/:provider/callback', asyncHandler(async (req, res) => {
   setSessionCookie(res, session.refreshToken);
   // Hand the access token to the SPA via a short-lived fragment.
   res.redirect(`${config.appUrl}/auth/callback#token=${session.accessToken}`);
+}));
+
+// ── Connecting Discord to an account you are already signed in to ──────────
+// Separate from the login flow above on purpose. That one authenticates you and
+// creates an account from your provider email; this one attaches a Discord
+// account to the account you are already using, without touching your session.
+
+const linkBack = (status, extra = '') =>
+  `${config.appUrl}/account/profile?discord=${status}${extra ? `&reason=${encodeURIComponent(extra)}` : ''}`;
+
+router.get('/oauth/discord/link/start', requireAuth, asyncHandler(async (req, res) => {
+  // The state is the only thing that travels; it resolves to this user id
+  // server-side, so the callback cannot be pointed at somebody else's account.
+  const state = randomToken(24);
+  res.redirect(await beginLink(req.user.id, state));
+}));
+
+router.get('/oauth/discord/link/callback', asyncHandler(async (req, res) => {
+  const { code, state } = req.query;
+  if (!code || !state) return res.redirect(linkBack('failed', 'Discord did not send a code back'));
+  try {
+    await completeLink(String(state), String(code));
+    return res.redirect(linkBack('linked'));
+  } catch (e) {
+    // These messages are written to be read by the person: "already connected to
+    // another account" is something they can act on, unlike a 400.
+    return res.redirect(linkBack('failed', e.message || 'Could not connect Discord'));
+  }
 }));
 
 // ── Session lifecycle ──────────────────────────────────────────────────────

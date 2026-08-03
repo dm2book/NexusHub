@@ -24,7 +24,7 @@ import { assertOrderLimits } from './orderLimitService.js';
 import { audit } from './auditService.js';
 import { getProduct } from './productService.js';
 import { postOrderEvent, postFraudHoldAlert } from './discordService.js';
-import { grantTierForOrder, syncLoyaltyRoles, sendDeliveryDm } from './discordRolesService.js';
+import { syncMemberRoles, sendDeliveryDm } from './discordRolesService.js';
 import { availableCount, claimCodes, checkLowStock, releaseCodes } from './codeStockService.js';
 import { memberDiscountPercent } from './membershipService.js';
 import { recordOrderCommission } from './affiliateService.js';
@@ -362,11 +362,16 @@ export async function transitionOrder(orderId, to, ctx = {}) {
     }
   }
   if (to === 'refunded') await postOrderEvent(updated, 'refunded').catch(() => {});
-  // Grant the buyer's Discord tier (Verified vs VIP) once the order is paid,
-  // and mirror their loyalty tier (Bronze→Platinum) as a server role.
-  if (to === 'payment_received' || to === 'completed') {
-    await grantTierForOrder(updated);
-    await syncLoyaltyRoles(updated.userId).catch(() => {});
+  // Bring the buyer's Discord roles in line with this order.
+  //
+  // Fired on the way DOWN as well as up, which is the part that was missing:
+  // roles were granted when an order was paid and never touched again, so a
+  // refund or a chargeback left a VIP badge on someone who no longer had a
+  // single paid order. The reconciler works out the whole set from scratch, so
+  // one call handles both directions.
+  if (['payment_received', 'completed', 'refunded', 'cancelled', 'failed'].includes(to)) {
+    await syncMemberRoles(updated.userId, { reason: `order ${updated.number} → ${to}` })
+      .catch((e) => console.error('[discord] role sync:', e.message));
   }
   if (updated.userId) {
     await notify(updated.userId, {

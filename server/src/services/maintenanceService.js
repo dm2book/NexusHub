@@ -8,6 +8,8 @@ import { transitionOrder, sendPaymentReminders, sendReviewRequests } from './ord
 import { sendCartReminders } from './cartService.js';
 import { retryPendingFulfillments, drainSupplierQueue, sweepUnfulfilledPaidOrders } from './fulfillmentService.js';
 import { retryFailedEmails } from './emailService.js';
+import { sweepMemberRoles } from './discordRolesService.js';
+import { purgeExpiredLinkIntents } from './discordLinkService.js';
 
 const HOURS = (n) => new Date(Date.now() - n * 3_600_000).toISOString();
 const DAYS = (n) => new Date(Date.now() - n * 86_400_000).toISOString();
@@ -130,6 +132,25 @@ export async function runMaintenance() {
   try {
     summary.emailsRetried = await retryFailedEmails({ limit: 20 });
   } catch (e) { summary.emailRetryError = e.message; }
+
+  // 11. Reconcile Discord roles for the members checked longest ago.
+  //
+  //     Roles used to be granted only at the instant an order was paid, so
+  //     anyone who linked their account and joined the server afterwards never
+  //     received the role they had already earned — nothing ever came back for
+  //     them. This also catches the other direction: a refund that happened
+  //     while Discord was unreachable leaves a badge that should be gone.
+  try {
+    const swept = await sweepMemberRoles({ limit: 25 });
+    summary.discordRolesChecked = swept.checked ?? 0;
+    summary.discordRolesChanged = swept.changed ?? 0;
+  } catch (e) { summary.discordRoleError = e.message; }
+
+  // 12. Expired, unused link intents are junk — they are single-use and live
+  //     ten minutes.
+  try {
+    summary.linkIntentsPurged = await purgeExpiredLinkIntents();
+  } catch (e) { summary.linkIntentError = e.message; }
 
   return summary;
 }

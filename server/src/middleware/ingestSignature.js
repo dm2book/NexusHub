@@ -17,7 +17,17 @@ const REPLAY_WINDOW_MS = 5 * 60_000;
 
 /** Deterministic canonical string for a review payload (must match the sender). */
 export function canonicalReview(b = {}) {
-  return [b.author, b.stars ?? 5, b.body, b.externalId || ''].join('\u0000');
+  const parts = [b.author, b.stars ?? 5, b.body, b.externalId || ''];
+  // The author's Discord id is only appended when it is present, which keeps a
+  // bot that predates it signing exactly what it signed before.
+  //
+  // It has to be inside the signature, not merely alongside it: this id decides
+  // which account receives the reviewer role, so an unsigned one could be
+  // swapped for somebody else's and hand them a badge. Appending it also means
+  // adding a uid to a captured four-part payload makes the server compute five
+  // parts and reject it.
+  if (b.discordUid) parts.push(String(b.discordUid));
+  return parts.join('\u0000');
 }
 
 export function verifyIngest(canonical) {

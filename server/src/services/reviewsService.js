@@ -8,7 +8,7 @@ import { bustSocialCaches } from '../routes/social.js';
 import { postReviewEvent } from './discordService.js';
 
 /** Insert a review. De-dupes on external_id (the Discord message/user id). */
-export async function addReview({ author, avatarUrl, stars, body, product, source = 'discord', externalId }) {
+export async function addReview({ author, avatarUrl, stars, body, product, source = 'discord', externalId, discordUid = null }) {
   const clean = String(body || '').trim().slice(0, 600);
   if (!clean) throw new Error('Empty review');
   const s = Math.min(5, Math.max(1, Number(stars) || 5));
@@ -18,10 +18,11 @@ export async function addReview({ author, avatarUrl, stars, body, product, sourc
   }
   const id = newId('rev');
   await run(
-    `INSERT INTO reviews (id, author, avatar_url, stars, body, product, source, external_id, status, created_at)
-     VALUES (@id, @author, @avatar, @stars, @body, @product, @source, @ext, 'visible', @at)`,
+    `INSERT INTO reviews (id, author, avatar_url, stars, body, product, source, external_id, discord_uid, status, created_at)
+     VALUES (@id, @author, @avatar, @stars, @body, @product, @source, @ext, @duid, 'visible', @at)`,
     { id, author: String(author || 'Anonymous').slice(0, 80), avatar: avatarUrl || null,
-      stars: s, body: clean, product: product || null, source, ext: externalId || null, at: nowIso() });
+      stars: s, body: clean, product: product || null, source, ext: externalId || null,
+      duid: discordUid ? String(discordUid) : null, at: nowIso() });
   bustSocialCaches(); // rating + review count changed → refresh public stats now
   // Mirror into the community. A Discord vouch already lives there, so only
   // reviews from elsewhere are relayed — otherwise the channel echoes itself.
@@ -29,7 +30,26 @@ export async function addReview({ author, avatarUrl, stars, body, product, sourc
     postReviewEvent({ author, stars: s, body: clean, product, verified: false })
       .catch((e) => console.error('[reviews] discord relay:', e.message));
   }
+  // A vouch is what earns the reviewer role, and the Discord id is the only
+  // thing that ties the person who typed /vouch to an account here.
+  if (discordUid) rewardReviewer({ discordUid });
   return { id, deduped: false };
+}
+
+/**
+ * Give the reviewer role, from either side of the ecosystem.
+ *
+ * Fire-and-forget: a review must never fail because Discord is unreachable, and
+ * the maintenance sweep re-syncs anyone this misses. Resolving a Discord id back
+ * to an account is what lets a `/vouch` typed in the server earn a role driven
+ * by the site.
+ */
+function rewardReviewer({ userId = null, discordUid = null }) {
+  (async () => {
+    const { syncMemberRoles, userIdForDiscordUid } = await import('./discordRolesService.js');
+    const id = userId || await userIdForDiscordUid(discordUid);
+    if (id) await syncMemberRoles(id, { reason: 'review published' });
+  })().catch((e) => console.error('[reviews] reviewer role:', e.message));
 }
 
 /**
@@ -54,6 +74,7 @@ export async function addVerifiedReview({ userId, email, orderId, author, stars,
   // This is the one that matters: a review tied to a real, completed order.
   postReviewEvent({ author, stars: s, body: clean, product, verified: true, city })
     .catch((e) => console.error('[reviews] discord relay:', e.message));
+  rewardReviewer({ userId });
   return { id, deduped: false };
 }
 
