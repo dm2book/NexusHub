@@ -36,6 +36,7 @@ Project → **Settings → Environment Variables**:
 | `STRIPE_SECRET_KEY` | optional | enables real card payments via Stripe Checkout (`sk_live_…`/`sk_test_…`) |
 | `STRIPE_WEBHOOK_SECRET` | with Stripe | `whsec_…` — set the webhook endpoint to `https://YOUR-URL/api/payments/stripe/webhook` (event `checkout.session.completed`) |
 | `FRAUD_REVIEW_THRESHOLD` / `FRAUD_BLOCK_THRESHOLD` | optional | default `60` / `85`. At or above review, an order is paid but **no code is delivered** until you approve it in Admin → Security → Fraud review. At or above block, it is refused at checkout. |
+| `LIMIT_CHECKOUT_PER_MINUTE` | optional | default `20` per IP. The first limit a burst hits — raise it before a drop, because everyone behind one NAT (school, office, mobile carrier) shares an address. |
 | `LIMIT_ORDERS_PER_EMAIL_DAY` / `LIMIT_ORDERS_PER_IP_DAY` | optional | default `8` / `15` per rolling 24h. `0` disables. |
 | `LIMIT_VALUE_PER_EMAIL_DAY` / `LIMIT_MAX_ORDER_VALUE` | optional | in cents; default `100000` (€1000/day per customer) and `50000` (€500 max single order). `0` disables. |
 | `DEMO_PAYMENTS` | optional | `true` marks orders paid instantly (no PSP). Used only when Stripe is not configured. |

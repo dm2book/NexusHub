@@ -172,6 +172,20 @@ export const config = {
     fraudReviewThreshold: Number(env.FRAUD_REVIEW_THRESHOLD || 60),
     fraudBlockThreshold: Number(env.FRAUD_BLOCK_THRESHOLD || 85),
 
+    /**
+     * How many orders one address may place per MINUTE.
+     *
+     * Separate from the daily ceilings below, and the wall a burst actually
+     * hits first — measured: with the daily limits disabled entirely, a single
+     * address was still refused at order 21.
+     *
+     * That is correct against one abusive buyer. It is also what a school, an
+     * office or a mobile carrier looks like, because everyone behind one NAT
+     * shares an address — so a genuine group buying during a drop gets a 429 at
+     * the checkout button. Raise it before a drop; there is no code change.
+     */
+    checkoutPerMinute: Number(env.LIMIT_CHECKOUT_PER_MINUTE || 20),
+
     // Hard limits, checked before an order is even created. These are not risk
     // signals — they are ceilings. A shop run by one person has no legitimate
     // buyer placing fifteen orders in a day, and the damage a stolen card can do

@@ -1,0 +1,76 @@
+# Output of `node server/test/load/loadtest.mjs`, kept so the numbers in the
+# pull request can be checked against something. RE-RUN IT rather than trusting
+# this file — the whole point is that these results change when the order path
+# changes. Machine: 4-core container, local Postgres, no network latency.
+
+load test → http://localhost:4000
+database  → postgres://postgres:postgres@127.0.0.1:5432/forge_load
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. 50 concurrent orders
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  placed        50/50 in 616ms  (81.2 orders/s)
+  latency       p50 538ms   p95 547ms   max 587ms
+  order numbers 50 unique ✓
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+2. 100 concurrent orders
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  placed        100/100 in 723ms  (138.3 orders/s)
+  latency       p50 677ms   p95 701ms   max 702ms
+  order numbers 100 unique ✓
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+3. Stock exhaustion — 40 buyers, 10 codes
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  placed        40 orders against 10 codes
+  paid          40 settled, 0 refused
+  delivered     10 codes to 10 orders
+  duplicates    none ✓
+  shelf         0 available, 10 used, 10 in deliveries
+  leaked        none ✓
+  unfulfilled   30 paid orders with no stock left (30 awaiting_fulfillment)
+  …queued       30/30 for hand delivery ✓
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+4. Payment failures — declined, then retried
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  declined      10/10 orders stayed pending and payable ✓
+  retried       10/10 settled on the second attempt
+  duplicates    none ✓
+  cancelled     stayed cancelled when paid ✓ (refused)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+5. Webhook failures — replays, races and garbage
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  replays       5× per order on 15 orders
+  duplicates    none ✓
+  history       one payment_received per order ✓
+  malformed     5 junk webhooks → 200, 200, 200, 200, 200
+  …absorbed     all 200, no retry loop ✓
+  burst         25 concurrent confirmations in 269ms
+  duplicates    none ✓
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+6. What the shipped limits do to a real burst
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  one buyer     20/25 accepted, 5 refused
+  first refusal at order 21: 429 Too many requests
+
+  ⚠️  One address is capped at 20 orders per minute
+     The FIRST wall a burst hits is the per-minute rate limiter on POST /api/orders (checkout bucket, 20/min per IP), not the daily ceiling — this run had the daily ceilings disabled and was still refused at 21. Correct against one abusive buyer, but a school, an office or a mobile network shares one address, so a genuine group buying during a drop looks identical and gets a 429 at the checkout button. Raise the checkout bucket before a drop, or key it on something narrower than the IP alone.
+  50× /api/config in 38ms (cached, no limiter round trip)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FINDINGS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  [HIGH] One address is capped at 20 orders per minute
+           The FIRST wall a burst hits is the per-minute rate limiter on POST /api/orders (checkout bucket, 20/min per IP), not the daily ceiling — this run had the daily ceilings disabled and was still refused at 21. Correct against one abusive buyer, but a school, an office or a mobile network shares one address, so a genuine group buying during a drop looks identical and gets a 429 at the checkout button. Raise the checkout bucket before a drop, or key it on something narrower than the IP alone.
+
+  50 concurrent  p50 538ms  p95 547ms  wall 616ms
+  100 concurrent p50 677ms  p95 701ms  wall 723ms
+
+✅ 0 blocker(s), 1 high, 0 informational
+
+EXIT=0
