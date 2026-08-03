@@ -1,6 +1,35 @@
+# ForgeMarket — https://forgemarket.nl
+#
+# Everything a buyer can browse is open. What is blocked below is blocked
+# because a crawler has nothing to gain from it, not because it is secret:
+# these pages are either private to one person or a step in a checkout, and a
+# search result pointing at somebody's cart helps nobody.
+#
+# The same paths also carry <meta name="robots" content="noindex"> in their
+# HTML. That is not redundant: robots.txt asks a crawler not to LOOK, noindex
+# tells it not to LIST. A page linked from elsewhere can be listed without ever
+# being fetched, so the two rules cover different halves of the problem.
+
 User-agent: *
 Allow: /
+
 Disallow: /account
 Disallow: /admin
+Disallow: /cart
+Disallow: /checkout
+Disallow: /login
+Disallow: /auth/
+Disallow: /wishlist
+
+# Query strings mint endless crawlable duplicates of the same shop page. Every
+# one of them already points its canonical at the clean URL, but not spending
+# the crawl budget on them in the first place is better.
+Disallow: /*?ref=
+Disallow: /*?search=
+Disallow: /*?sort=
+
+# The API returns JSON. There is nothing here for a search engine to index, and
+# some of it is rate-limited.
+Disallow: /api/
 
 Sitemap: https://forgemarket.nl/sitemap.xml

@@ -445,22 +445,54 @@ router.post('/track/:number/review',
 // vercel.json rewrites /sitemap.xml here (the static file is removed).
 router.get('/sitemap.xml', asyncHandler(async (_req, res) => {
   const base = config.appUrl.replace(/\/$/, '');
-  const staticPages = ['', '/shop', '/reviews', '/how-it-works', '/faq', '/about',
-    '/contact', '/track', '/discord', '/payment-methods', '/refunds', '/trust',
-    // The legal pages were missing entirely. They are exactly the pages a buyer
-    // looks for before trusting a shop they have not heard of, and the ones a
-    // search engine reads to decide the site is a real business.
-    '/terms', '/privacy', '/cookies'];
+  // Priority is a hint about relative importance WITHIN this site, not a ranking
+  // lever — search engines have said so for years. It is set from what the page
+  // is for: the shop and the catalogue earn money, the legal pages earn trust,
+  // and the community page is a link.
+  const staticPages = [
+    ['', '1.0', 'daily'],
+    ['/shop', '0.9', 'daily'],
+    // The keyword landing pages — the ones this shop is actually searched for.
+    // Ranked just under the shop itself: each is a real page with its own copy,
+    // not a filtered view.
+    ['/robux', '0.9', 'daily'],
+    ['/v-bucks', '0.9', 'daily'],
+    ['/valorant-points', '0.9', 'daily'],
+    ['/giftcards', '0.9', 'daily'],
+    ['/game-currency', '0.8', 'weekly'],
+    ['/how-it-works', '0.7', 'monthly'],
+    ['/payment-methods', '0.7', 'monthly'],
+    ['/reviews', '0.7', 'weekly'],
+    ['/faq', '0.7', 'monthly'],
+    ['/track', '0.6', 'monthly'],
+    ['/about', '0.6', 'monthly'],
+    ['/contact', '0.6', 'monthly'],
+    ['/trust', '0.6', 'monthly'],
+    ['/drops', '0.5', 'weekly'],
+    ['/discord', '0.5', 'monthly'],
+    // The pages a buyer checks before trusting a shop they have never heard of,
+    // and the ones a search engine reads to decide this is a real business.
+    // They were missing from the sitemap entirely.
+    ['/refunds', '0.5', 'yearly'],
+    ['/terms', '0.4', 'yearly'],
+    ['/privacy', '0.4', 'yearly'],
+    ['/cookies', '0.4', 'yearly'],
+  ];
   const products = await listProducts({ activeOnly: true });
   const urls = [
-    ...staticPages.map((p) => ({ loc: `${base}${p}`, prio: p === '' ? '1.0' : '0.7' })),
-    ...products.map((p) => ({ loc: `${base}/product/${p.id}`, prio: '0.8', mod: p.updated_at })),
+    ...staticPages.map(([p, prio, freq]) => ({ loc: `${base}${p}`, prio, freq })),
+    // Products carry a real lastmod so a price change is re-crawled rather than
+    // waiting for the whole site to be revisited.
+    ...products.map((p) => ({
+      loc: `${base}/product/${p.id}`, prio: '0.8', freq: 'weekly', mod: p.updated_at,
+    })),
   ];
   const xml = `<?xml version="1.0" encoding="UTF-8"?>\n` +
     `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
     urls.map((u) =>
       `  <url><loc>${u.loc}</loc>` +
       (u.mod ? `<lastmod>${String(u.mod).slice(0, 10)}</lastmod>` : '') +
+      (u.freq ? `<changefreq>${u.freq}</changefreq>` : '') +
       `<priority>${u.prio}</priority></url>`).join('\n') +
     `\n</urlset>`;
   res.setHeader('Content-Type', 'application/xml');

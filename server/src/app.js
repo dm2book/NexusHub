@@ -27,6 +27,7 @@ import catalogRoutes from './routes/catalog.js';
 import discordRoutes from './routes/discord.js';
 import paymentRoutes from './routes/payments.js';
 import mollieWebhook, { mollieApi } from './routes/mollie.js';
+import seoRoutes from './routes/seo.js';
 import socialRoutes from './routes/social.js';
 import adminRoutes from './routes/admin/index.js';
 
@@ -166,6 +167,12 @@ export function createApp({ lazyReady = false } = {}) {
   app.use('/api', mollieApi);
   app.use('/api', catalogRoutes);
   app.use('/api/admin', adminRoutes);
+
+  // HTML for product pages, with that product's own title, description, social
+  // image and Product markup in the head. Every other route is a real file
+  // written at build time; a product's content lives in the database, so this
+  // one is rendered per request and cached hard at the edge.
+  app.use(seoRoutes);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

@@ -5,8 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
+    "build": "vite build && node scripts/prerender.mjs",
+    "preview": "vite preview",
+    "prerender": "node scripts/prerender.mjs"
   },
   "//": "Backend deps live here too so a single Vercel install covers both the SPA build and the api/ serverless function (which imports server/src).",
   "dependencies": {

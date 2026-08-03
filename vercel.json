@@ -23,6 +23,10 @@
       "destination": "/api"
     },
     {
+      "source": "/product/(.*)",
+      "destination": "/api"
+    },
+    {
       "source": "/((?!api/).*)",
       "destination": "/index.html"
     }
