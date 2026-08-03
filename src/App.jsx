@@ -1,8 +1,11 @@
 import { Routes, Route } from 'react-router-dom';
 import { lazy, Suspense } from 'react';
 import StoreLayout from './layouts/StoreLayout.jsx';
-import AdminLayout from './layouts/AdminLayout.jsx';
-import AccountLayout from './layouts/AccountLayout.jsx';
+// Split out of the main bundle. Every visitor who came to buy Robux was
+// downloading the admin console's shell and the account dashboard's shell
+// before the shop could render — neither of which they will ever open.
+const AdminLayout = lazy(() => import('./layouts/AdminLayout.jsx'));
+const AccountLayout = lazy(() => import('./layouts/AccountLayout.jsx'));
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 import { PageLoader } from './components/ui.jsx';
 import { usePageViews } from './lib/usePageViews.js';

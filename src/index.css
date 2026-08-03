@@ -1,3 +1,4 @@
+@import './styles/fonts.css';
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -745,13 +746,21 @@ h1, h2, h3, .font-display, .fm-head {
 @keyframes fmSheen { from { background-position: 180% 0; } to { background-position: -80% 0; } }
 
 /* Oversized ghost word behind the content — the "CHILE20" trick. */
+/* The hero watermark. The word lives in `content` rather than in the markup:
+   as a real text node it was the homepage's largest contentful paint, so the
+   browser judged how fast the page loaded by when a decorative outline
+   finished painting. Identical on screen. */
 .fm-ghostword {
   position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%);
   font-weight: 900; letter-spacing: -.04em; white-space: nowrap;
-  font-size: clamp(84px, 20vw, 260px); line-height: .8;
+  /* Capped a little below the hero heading's own area. This is decoration; if
+     it is the biggest thing on the page then Lighthouse grades the site's
+     loading speed on when a watermark finished painting. */
+  font-size: clamp(72px, 17vw, 220px); line-height: .8;
   color: transparent; -webkit-text-stroke: 1.5px rgba(255,255,255,.07);
   pointer-events: none; user-select: none;
 }
+.fm-ghostword::before { content: 'FORGE'; }
 
 /* Each floating icon gets its own drift, so the cluster reads as depth rather
    than as one sprite sheet sliding about. */
@@ -799,4 +808,27 @@ h1, h2, h3, .font-display, .fm-head {
 @media (prefers-reduced-motion: reduce) {
   .fm-progress { display: none; }
   .fm-reveal { filter: none !important; }
+}
+
+/**
+ * Let the browser skip the work for product cards that are off screen.
+ *
+ * The shop renders its whole catalogue in one grid. Every card was being styled,
+ * laid out and painted immediately, including the seventy below the fold that
+ * nobody had scrolled to yet — measured as the bulk of that page's blocking
+ * time. `content-visibility: auto` defers all of it until a card approaches the
+ * viewport, and `contain-intrinsic-size` tells the browser how tall to assume
+ * it is meanwhile, so the scrollbar and the page height stay correct and
+ * nothing jumps when a card is finally rendered.
+ *
+ * The height matches the card's real one (media 122px on phones / 150px from
+ * `sm`, plus its text and padding). A wrong value here trades blocking time for
+ * layout shift, which is a bad deal.
+ */
+.fm-card-slot {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 336px;
+}
+@media (min-width: 640px) {
+  .fm-card-slot { contain-intrinsic-size: auto 372px; }
 }

@@ -7,6 +7,10 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { asyncHandler } from '../middleware/error.js';
 import { requireAuth } from '../middleware/auth.js';
+import { rateLimit } from '../middleware/rateLimit.js';
+import { config } from '../config/env.js';
+import { linkStatus, unlinkDiscord } from '../services/discordLinkService.js';
+import { earnedRolesFor, syncMemberRoles } from '../services/discordRolesService.js';
 import { run, get, all, tx } from '../db/index.js';
 import { notFound, forbidden, badRequest } from '../utils/errors.js';
 import { listOrders, getOrder } from '../services/orderService.js';
@@ -97,6 +101,46 @@ router.put('/cart', asyncHandler(async (req, res) => {
 }));
 
 // ── Wallet / store credit ────────────────────────────────────────────────────
+// ── Discord ────────────────────────────────────────────────────────────────
+// The account side of the ecosystem: whether this account is connected, which
+// roles it has earned, and the ability to disconnect. The link itself is started
+// from /api/auth/oauth/discord/link/start, because it is an OAuth redirect
+// rather than an API call.
+
+router.get('/discord', asyncHandler(async (req, res) => {
+  const status = await linkStatus(req.user.id);
+  // What they have earned, whether or not Discord can currently be reached.
+  // Showing the roles from our own records means the page still tells the truth
+  // when the bot is offline or the member has not joined the server yet.
+  const { earned, why } = await earnedRolesFor(req.user.id);
+  res.json({
+    ...status,
+    inviteUrl: config.discord.inviteUrl,
+    serverName: config.discord.serverName,
+    roles: [...earned],
+    reasons: why,
+  });
+}));
+
+/**
+ * Force a re-sync from the account page.
+ *
+ * Roles arrive on their own — on payment, on review, and from the maintenance
+ * sweep — but "I just joined the server, where is my role" is the one moment
+ * where waiting up to an hour feels broken. Rate-limited because each call is
+ * several Discord API requests.
+ */
+router.post('/discord/sync',
+  rateLimit({ bucket: 'discord_sync', windowMs: 60_000, max: 6 }),
+  asyncHandler(async (req, res) => {
+    const result = await syncMemberRoles(req.user.id, { reason: 'requested by member' });
+    res.json(result);
+  }));
+
+router.delete('/discord', asyncHandler(async (req, res) => {
+  res.json(await unlinkDiscord(req.user.id));
+}));
+
 router.get('/wallet', asyncHandler(async (req, res) => {
   res.json(await walletSummary(req.user.id));
 }));

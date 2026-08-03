@@ -46,7 +46,7 @@ export default function RecentlyDelivered() {
           <div className="text-[13px] font-semibold text-slate-900 truncate">
             <span className="text-violet-600">{who}</span> {t('live.got', 'got')} {r.item}
           </div>
-          <div className="text-[11px] text-slate-400 flex items-center gap-1">
+          <div className="text-[11px] text-slate-500 flex items-center gap-1">
             {delivered
               ? <><Zap size={11} className="text-amber-500" /> {t('live.deliveredIn', 'Delivered in')} {delivered} · {timeAgo(r.secondsAgo)}</>
               : <><CheckCircle2 size={11} className="text-emerald-500" /> {t('live.delivered', 'Delivered')} · {timeAgo(r.secondsAgo)}</>}

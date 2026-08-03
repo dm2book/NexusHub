@@ -149,14 +149,21 @@ const TRUSTPILOT_REVIEW_URL = cleanUrl(process.env.TRUSTPILOT_REVIEW_URL, '') ||
 // Push a /vouch to the website so it appears on the storefront reviews section.
 // Signed with HMAC-SHA256 (x-timestamp + x-signature) so the API can verify
 // authenticity and reject replays — must match the server's canonicalReview().
-async function pushReviewToSite({ author, avatarUrl, stars, body, externalId }) {
+async function pushReviewToSite({ author, avatarUrl, stars, body, externalId, discordUid }) {
   if (!FORGEMARKET_API_URL || !REVIEW_INGEST_SECRET) return;
   try {
-    const payload = { author, avatarUrl, stars, body, externalId };
+    const payload = { author, avatarUrl, stars, body, externalId, ...(discordUid ? { discordUid } : {}) };
     const ts = String(Date.now());
     // NUL separator — must byte-match the server's canonicalReview() exactly,
     // or the HMAC never verifies and vouches fall back to the legacy header.
-    const canonical = [author, stars ?? 5, body, externalId || ''].join('\u0000');
+    //
+    // The Discord id is appended ONLY when present, matching the server: that
+    // keeps this compatible both ways during a rollout, and it puts the id that
+    // decides who gets the reviewer role inside the signature rather than
+    // beside it.
+    const parts = [author, stars ?? 5, body, externalId || ''];
+    if (discordUid) parts.push(String(discordUid));
+    const canonical = parts.join('\u0000');
     const signature = createHmac('sha256', REVIEW_INGEST_SECRET).update(`${ts}.${canonical}`).digest('hex');
     await fetch(`${FORGEMARKET_API_URL.replace(/\/$/, '')}/api/reviews/ingest`, {
       method: 'POST',
@@ -1555,6 +1562,9 @@ async function postVouch(i) {
     author: i.user.username,
     avatarUrl: i.user.displayAvatarURL({ extension: 'png', size: 128 }),
     stars, body: message, externalId: `vouch:${i.user.id}`,
+    // Ties this vouch to a ForgeMarket account, which is what earns the
+    // reviewer role on the site. Signed along with the rest of the payload.
+    discordUid: i.user.id,
   });
   // Someone who just wrote something nice is the only person who will ever
   // bother writing it twice. Asking here — and only here — is why this line is

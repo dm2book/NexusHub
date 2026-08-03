@@ -90,8 +90,24 @@ export const config = {
     // Bot token — lets the API grant Discord roles (Verified vs VIP) to buyers who
     // signed in with Discord. Optional; role automation is skipped without it.
     botToken: env.DISCORD_BOT_TOKEN || '',
-    // Spend (in minor units) at/above which a buyer becomes a VIP Customer.
-    vipThreshold: Number(env.DISCORD_VIP_THRESHOLD_CENTS || 2000),
+    // Lifetime paid spend (in cents) at or above which a buyer becomes VIP.
+    // Lifetime, not per order: this used to compare a SINGLE order total, so
+    // someone who spent €500 across twenty orders was never VIP while a one-off
+    // €20 order was. VIP means a good customer, not a big afternoon.
+    vipThreshold: Number(env.DISCORD_VIP_THRESHOLD_CENTS || 20_000),
+    /**
+     * The role names the site manages, matched in the guild BY NAME.
+     *
+     * Configurable because a server that already has a "Customer" role should
+     * not end up with two. Anything not present in the guild is skipped and
+     * reported by the diagnostics endpoint rather than failing silently — a role
+     * that quietly does nothing is worse than one that says it is missing.
+     */
+    roles: {
+      customer: env.DISCORD_ROLE_CUSTOMER || 'Verified Customer',
+      vip: env.DISCORD_ROLE_VIP || 'VIP Customer',
+      review: env.DISCORD_ROLE_REVIEW || 'Reviewer',
+    },
     // Optional webhook to post order events into an ops/sales channel.
     orderWebhookUrl: env.DISCORD_ORDER_WEBHOOK_URL || '',
     // Optional webhook for the public #drops-and-deals channel (new products,

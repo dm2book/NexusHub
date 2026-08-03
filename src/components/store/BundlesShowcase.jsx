@@ -19,8 +19,36 @@ export default function BundlesShowcase() {
   const { add } = useCart();
   const toast = useToast();
 
-  useEffect(() => { api.get('/api/bundles').then((r) => setBundles(r.bundles || [])).catch(() => setBundles([])); }, []);
-  if (!bundles || bundles.length === 0) return null;
+  useEffect(() => {
+    api.get('/api/bundles')
+      .then((r) => {
+        setBundles(r.bundles || []);
+        // Remember whether this shop has bundles at all, so the next visit knows
+        // whether to hold the space open. See the placeholder below.
+        try { localStorage.setItem('fm_had_bundles', (r.bundles || []).length ? '1' : '0'); } catch { /* private mode */ }
+      })
+      .catch(() => setBundles([]));
+  }, []);
+
+  /**
+   * Hold the space while the bundles are being fetched.
+   *
+   * This block sits ABOVE the product grid, so appearing late shoved the whole
+   * catalogue down the page — measured as 0.31 of a layout shift on /shop, the
+   * single largest on the site and most of what dragged that page's score to 57.
+   *
+   * The height is only reserved when we have reason to think something will
+   * arrive: a shop with no bundles would otherwise open a gap and then close it,
+   * trading one shift for another. First visit assumes yes, which is the common
+   * case and the one where guessing wrong costs least.
+   */
+  if (!bundles) {
+    let expect = true;
+    try { expect = localStorage.getItem('fm_had_bundles') !== '0'; } catch { /* private mode */ }
+    if (!expect) return null;
+    return <div className="mb-10 h-[248px] sm:h-[236px]" aria-hidden />;
+  }
+  if (bundles.length === 0) return null;
 
   const addBundle = (b) => {
     b.products.forEach((p) => add({ id: p.id, name: p.name, price: p.price, currency: b.currency, category: p.category, image: p.image || iconFor(p.category) }, 1));

@@ -43,6 +43,9 @@ Project → **Settings → Environment Variables**:
 | `EMAIL_FROM_NAME` / `EMAIL_FROM_ADDRESS` | optional | branded sender |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | optional | enables Google login |
 | `DISCORD_CLIENT_ID` / `DISCORD_CLIENT_SECRET` | optional | enables Discord login |
+| `DISCORD_BOT_TOKEN` | for roles | lets the site grant and **revoke** the customer / VIP / reviewer / loyalty roles. The bot's own role must sit **above** every managed role in Server Settings → Roles, or Discord refuses the assignment. Check it at Admin → Security → Discord. |
+| `DISCORD_VIP_THRESHOLD_CENTS` | optional | lifetime paid spend for VIP; default `20000` (€200) |
+| `DISCORD_ROLE_CUSTOMER` / `DISCORD_ROLE_VIP` / `DISCORD_ROLE_REVIEW` | optional | rename the managed roles if your server already uses different names |
 | `DISCORD_GUILD_ID` | optional | shows **live** online count + member avatars on `/discord` (enable the server Widget in Discord) |
 | `DISCORD_INVITE_URL` | optional | the `https://discord.gg/…` link behind the Join button |
 | `DISCORD_ORDER_WEBHOOK_URL` | optional | posts order events (received/completed/refunded) to a Discord channel |

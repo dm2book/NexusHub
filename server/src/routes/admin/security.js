@@ -11,6 +11,7 @@ import {
 } from '../../services/orderService.js';
 import { recordChargeback, listChargebacks, chargebackSummary } from '../../services/chargebackService.js';
 import { currentLimits } from '../../services/orderLimitService.js';
+import { roleDiagnostics, ensureRolesExist, sweepMemberRoles } from '../../services/discordRolesService.js';
 import { refundPayment, isEnabled as mollieEnabled } from '../../services/mollieService.js';
 import { publicUser, setUserRoles, getUserById } from '../../services/userService.js';
 import { grantCoins } from '../../services/forgeCoinService.js';
@@ -124,6 +125,36 @@ router.post('/chargebacks', requirePermission('security.manage'),
       actor: req.user,
     });
     res.status(result.duplicate ? 200 : 201).json(result);
+  }));
+
+// ── Discord ────────────────────────────────────────────────────────────────
+/**
+ * Why the roles are or are not working.
+ *
+ * Role automation fails silently on purpose — a missing role must never break an
+ * order — which makes it almost impossible to debug from the outside. This says
+ * which managed roles exist in the guild, which do not, and whether the bot sits
+ * high enough in the hierarchy to assign them. That last one is the mistake
+ * everybody makes once and nobody guesses.
+ */
+router.get('/discord', requirePermission('security.manage'), asyncHandler(async (_req, res) => {
+  res.json(await roleDiagnostics());
+}));
+
+/** Create any managed role that is missing. Existing roles are left untouched. */
+router.post('/discord/roles', requirePermission('security.manage'),
+  asyncHandler(async (req, res) => {
+    const result = await ensureRolesExist();
+    await audit({ actor: req.user, action: 'discord.roles_created',
+      metadata: { created: result.created }, req });
+    res.json(result);
+  }));
+
+/** Reconcile everyone now, rather than waiting for the hourly sweep. */
+router.post('/discord/sync', requirePermission('security.manage'),
+  asyncHandler(async (req, res) => {
+    const result = await sweepMemberRoles({ limit: Math.min(Number(req.body?.limit) || 100, 500) });
+    res.json(result);
   }));
 
 // ── Users & roles ──────────────────────────────────────────────────────────

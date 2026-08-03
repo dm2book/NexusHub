@@ -86,8 +86,11 @@ export default function StoreNav() {
         <div className="flex-1" />
 
         {/* Real global search: opens the ⌘K command palette */}
+        {/* slate-500, not slate-400: this text sits on slate-100, where the
+            lighter grey measures 2.34:1 — well under the 4.5:1 that small text
+            needs. Same visual weight, actually readable. */}
         <button onClick={() => window.dispatchEvent(new CustomEvent('forge:cmdk'))}
-          className="hidden md:flex items-center gap-2 bg-slate-100 rounded-xl px-3.5 h-10 w-[240px] text-slate-400 hover:bg-slate-200/70 transition">
+          className="hidden md:flex items-center gap-2 bg-slate-100 rounded-xl px-3.5 h-10 w-[240px] text-slate-500 hover:bg-slate-200/70 transition">
           <Search size={16} />
           <span className="text-sm">{t('nav.search', 'Search for products...')}</span>
           <kbd className="ml-auto text-[11px] bg-white border border-slate-200 rounded px-1.5 py-0.5">⌘K</kbd>

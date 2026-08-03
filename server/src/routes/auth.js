@@ -18,6 +18,7 @@ import {
   listEnabledProviders, buildAuthUrl, handleOAuthCallback,
 } from '../services/oauthService.js';
 import { publicUser, getUserByEmail, getUserById } from '../services/userService.js';
+import { beginLink, completeLink } from '../services/discordLinkService.js';
 import {
   createTrustedDevice, resolveTrustedDevice, listTrustedDevices, renameTrustedDevice,
   revokeTrustedDevice, revokeAllTrustedDevices, recordLoginAttempt, recentFailures,
@@ -211,7 +212,10 @@ router.post('/otp/verify', otpLimiter, asyncHandler(async (req, res) => {
 router.post('/device-login', rateLimit({ bucket: 'device_login', windowMs: 60_000, max: 10 }),
   asyncHandler(async (req, res) => {
     const deviceToken = req.cookies?.[DEVICE_COOKIE];
-    if (!deviceToken) throw unauthorized('No trusted device');
+    // Same as /refresh: asked by every anonymous visitor on load, so "no" is a
+    // result rather than a failure. A token that exists but does not resolve
+    // stays a 401 — that one IS unexpected.
+    if (!deviceToken) return res.json({ accessToken: null, authenticated: false });
     const ctx = ctxOf(req);
     const userId = await resolveTrustedDevice(deviceToken, ctx);
     if (!userId) throw unauthorized('No trusted device');
@@ -345,10 +349,42 @@ router.get('/oauth/:provider/callback', asyncHandler(async (req, res) => {
   res.redirect(`${config.appUrl}/auth/callback#token=${session.accessToken}`);
 }));
 
+// ── Connecting Discord to an account you are already signed in to ──────────
+// Separate from the login flow above on purpose. That one authenticates you and
+// creates an account from your provider email; this one attaches a Discord
+// account to the account you are already using, without touching your session.
+
+const linkBack = (status, extra = '') =>
+  `${config.appUrl}/account/profile?discord=${status}${extra ? `&reason=${encodeURIComponent(extra)}` : ''}`;
+
+router.get('/oauth/discord/link/start', requireAuth, asyncHandler(async (req, res) => {
+  // The state is the only thing that travels; it resolves to this user id
+  // server-side, so the callback cannot be pointed at somebody else's account.
+  const state = randomToken(24);
+  res.redirect(await beginLink(req.user.id, state));
+}));
+
+router.get('/oauth/discord/link/callback', asyncHandler(async (req, res) => {
+  const { code, state } = req.query;
+  if (!code || !state) return res.redirect(linkBack('failed', 'Discord did not send a code back'));
+  try {
+    await completeLink(String(state), String(code));
+    return res.redirect(linkBack('linked'));
+  } catch (e) {
+    // These messages are written to be read by the person: "already connected to
+    // another account" is something they can act on, unlike a 400.
+    return res.redirect(linkBack('failed', e.message || 'Could not connect Discord'));
+  }
+}));
+
 // ── Session lifecycle ──────────────────────────────────────────────────────
 router.post('/refresh', asyncHandler(async (req, res) => {
   const refreshToken = req.cookies?.[config.auth.cookieName] || req.body?.refreshToken;
-  if (!refreshToken) throw badRequest('No session');
+  // No cookie at all is not an error — it is the answer to "am I signed in?",
+  // and every anonymous visitor asks it on page load. Returning 400 filled the
+  // console of every first-time visitor with failed requests, which Lighthouse
+  // reports and which buries real errors when something is actually wrong.
+  if (!refreshToken) return res.json({ accessToken: null, authenticated: false });
   // Rotation: refreshSession returns a NEW refresh token each time; re-set the
   // cookie so the previous one is single-use. (Previously this wasn't awaited,
   // so the client received an empty body and got logged out.)

@@ -57,7 +57,7 @@ export default function LiveActivity() {
                       <div className="text-sm text-slate-800 truncate">
                         <span className="font-semibold text-violet-600">{r.city ? `${r.name || t('live.someone', 'Someone')} ${t('live.from', 'from')} ${r.city}` : (r.name || t('live.someone', 'Someone'))}</span> {t('live.got', 'got')} {r.item}
                       </div>
-                      <div className="text-[11px] text-slate-400 flex items-center gap-1">
+                      <div className="text-[11px] text-slate-500 flex items-center gap-1">
                         {delivered ? <><Zap size={10} className="text-amber-500" /> {t('live.deliveredIn', 'Delivered in')} {delivered}</> : <>{t('live.delivered', 'Delivered')}</>} · {timeAgo(r.secondsAgo)}
                       </div>
                     </div>

@@ -1,12 +1,13 @@
 import { Outlet, useLocation } from 'react-router-dom';
+import DeferUntilIdle from '../components/DeferUntilIdle.jsx';
 import ScrollProgress from '../components/store/ScrollProgress.jsx';
-import { useEffect } from 'react';
+import { useEffect, lazy, Suspense } from 'react';
 import StoreNav from '../components/store/StoreNav.jsx';
 import StoreFooter from '../components/store/StoreFooter.jsx';
 import RecentlyDelivered from '../components/store/RecentlyDelivered.jsx';
-import CommandPalette from '../components/store/CommandPalette.jsx';
+const CommandPalette = lazy(() => import('../components/store/CommandPalette.jsx'));
 import MobileTabBar from '../components/store/MobileTabBar.jsx';
-import ChatWidget from '../components/ChatWidget.jsx';
+const ChatWidget = lazy(() => import('../components/ChatWidget.jsx'));
 import AnnouncementBar from '../components/store/AnnouncementBar.jsx';
 import { useReveal } from '../lib/useReveal.js';
 
@@ -37,13 +38,13 @@ export default function StoreLayout() {
           was never remapped and read at 2.56:1 on white — measured. */}
       <div className="theme-light"><StoreFooter /></div>
       <RecentlyDelivered />
-      <CommandPalette />
+      <DeferUntilIdle><Suspense fallback={null}><CommandPalette /></Suspense></DeferUntilIdle>
       <MobileTabBar />
       <ScrollProgress />
       {/* The assistant used to exist on the homepage alone. Every page that can
           raise a question — the shop, a product, the cart, checkout, the status
           page — is inside THIS layout, so that is where it has to live. */}
-      <ChatWidget />
+      <DeferUntilIdle><Suspense fallback={null}><ChatWidget /></Suspense></DeferUntilIdle>
     </div>
   );
 }

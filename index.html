@@ -22,12 +22,119 @@
     <meta name="twitter:title" content="ForgeMarket — game top-ups, delivered by a real person" />
     <meta name="twitter:description" content="Robux, V-Bucks, Valorant and gift cards. Money back if it never arrives. Run from the Netherlands." />
     <meta name="twitter:image" content="https://forgemarket.nl/og.png" />
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Bricolage+Grotesque:wght@500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Fonts are self-hosted (see src/styles/fonts.css). They used to be a
+         render-blocking stylesheet on a third-party origin: two extra
+         connections on the critical path for 17 weights of which the site uses
+         seven, and every visitor's IP address handed to a processor our own
+         privacy policy does not list. -->
+    <link rel="preload" href="/fonts/inter-400.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="/fonts/bricolage-700.woff2" as="font" type="font/woff2" crossorigin>
     <title>ForgeMarket — Digital Goods Marketplace</title>
   </head>
   <body>
+    <!-- Measured before this existed: the first six Lighthouse filmstrip frames
+         were byte-identical white, and nothing at all appeared until 14.4s on a
+         throttled mobile connection. An SPA paints nothing until its bundle has
+         downloaded, parsed and executed, and no amount of image or font tuning
+         changes that — the browser simply has nothing to draw.
+
+         So the shell below is drawn from the HTML itself, with its CSS inline,
+         and is on screen in the first frame. It is deliberately only the parts
+         that are genuinely static: the bar, the brand, and the shape of the
+         hero. It states nothing that could turn out to be untrue — no prices,
+         no stock, no counts — because a shell that lies is worse than a blank
+         page. React replaces it the moment it mounts. -->
+    <style>
+      #fm-shell{position:fixed;inset:0;background:#f8fafc;z-index:1;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+      #fm-shell .b{display:flex;align-items:center;gap:10px;height:64px;padding:0 16px;border-bottom:1px solid #e2e8f0;background:#fff}
+      #fm-shell .m{width:36px;height:36px;border-radius:12px;background:linear-gradient(135deg,#7c5cff,#a855f7);flex:none}
+      #fm-shell .n{font-size:20px;font-weight:800;letter-spacing:-.02em;color:#0f172a}
+      #fm-shell .h{padding:40px 20px;max-width:640px}
+      /* These sizes MIRROR the real hero (text-[30px] xs:text-[34px] sm:text-[50px],
+         breakpoints from tailwind.config.js). Not for looks — LCP only moves to
+         a LARGER element, so a shell heading even slightly smaller than the one
+         React renders hands the metric straight back. Same size, and the paint
+         at ~1.2s is the one that counts. */
+      /* Same family as the real heading (see .fm-head in index.css). With a
+         different font the two headings have different text metrics, the
+         React one comes out larger, and LCP jumps to it — measured. The
+         woff2 is preloaded in <head>, so it is there for this paint. */
+      #fm-shell h1{font-family:'Bricolage Grotesque','Inter',system-ui,sans-serif;font-size:30px;line-height:1.06;letter-spacing:-.02em;font-weight:800;color:#0f172a;margin:0}
+      #fm-shell p{font-size:15px;line-height:1.6;color:#475569;margin:16px 0 0;max-width:32rem}
+      #fm-shell .c{width:170px;height:46px;border-radius:12px;background:linear-gradient(135deg,#7c5cff,#a855f7);margin-top:26px;opacity:.85}
+      /* Any route other than the homepage: shapes, no words. */
+      #fm-shell.bare h1,#fm-shell.bare p{background:#e2e8f0;border-radius:10px;color:transparent}
+      #fm-shell.bare h1{height:34px;width:62%}
+      #fm-shell.bare p{height:14px;width:88%}
+      #fm-shell.bare .c{display:none}
+      @media (prefers-color-scheme:dark){#fm-shell.bare h1,#fm-shell.bare p{background:#1b1930}}
+      @media (min-width:400px){#fm-shell h1{font-size:34px}}
+      @media (min-width:640px){#fm-shell h1{font-size:50px}#fm-shell p{font-size:16px}}
+      @media (prefers-color-scheme:dark){
+        #fm-shell{background:#070710}#fm-shell .b{background:#0b0b16;border-color:#1e1b33}
+        #fm-shell .n{color:#fff}#fm-shell h1{color:#fff}#fm-shell p{color:#cbd5e1}
+      }
+    </style>
+    <div id="fm-shell" aria-hidden="true">
+      <div class="b"><span class="m"></span><span class="n">ForgeMarket</span></div>
+      <div class="h">
+        <h1 id="fm-h1"></h1>
+        <p id="fm-sub"></p>
+        <div class="c"></div>
+      </div>
+    </div>
+    <script>
+      /* The homepage heading, painted from the HTML.
+       *
+       * Without it the largest element on the page is text React renders, so
+       * LCP could not happen before the bundle had executed — measured at 4.0s
+       * against an FCP of 1.9s. The heading is static copy: it depends on no
+       * data and no session, so there is no reason for the browser to wait.
+       *
+       * The language is picked with the SAME rule as src/lib/i18n.jsx — stored
+       * choice first, then the browser's. Getting that wrong would flash the
+       * wrong language for a moment, which is worse than a skeleton.
+       *
+       * These two strings are duplicated from the NL/EN dictionaries on purpose;
+       * an inline script cannot import them. server/test/perf-budget.test.mjs
+       * fails if they ever drift apart. */
+      (function () {
+        var nl = false;
+        try { nl = (localStorage.getItem('fm_lang') || (navigator.language || '').slice(0, 2)) === 'nl'; } catch (e) {}
+        document.documentElement.lang = nl ? 'nl' : 'en';
+
+        /* The heading belongs to the homepage and nowhere else. index.html is
+           served for every route, so without this check someone opening /shop
+           or a product link would read the homepage hero for a moment before it
+           was replaced by the page they asked for — a worse experience than the
+           blank screen this replaced. Every other route keeps the bar and the
+           skeleton, which say nothing route-specific. */
+        var path = location.pathname.replace(/\/+$/, '') || '/';
+
+        /* Copy is only painted for the two routes whose heading is genuinely
+           static. Everywhere else gets shapes: index.html is served for every
+           URL, so a hero here would mean someone opening a product link reading
+           the wrong page's title for a moment — worse than the blank screen
+           this replaced. */
+        var COPY = {
+          '/': {
+            h: nl ? 'Game-tegoeden, cadeaukaarten en abonnementen.'
+                  : 'Game currency, gift cards and subscriptions.',
+            p: nl ? 'Robux, V-Bucks, Steam, Discord Nitro en meer. Op voorraad gaat automatisch de deur uit; de rest met de hand, meestal binnen een paar uur.'
+                  : 'Robux, V-Bucks, Steam, Discord Nitro and more. In stock goes out automatically; everything else by hand, usually within a few hours.',
+          },
+          '/shop': {
+            h: nl ? 'Alle producten' : 'All Products',
+            p: nl ? 'Digitale producten, geleverd in je inbox & dashboard.'
+                  : 'Digital goods, delivered to your inbox & dashboard.',
+          },
+        };
+        var copy = COPY[path];
+        if (!copy) { document.getElementById('fm-shell').classList.add('bare'); return; }
+        document.getElementById('fm-h1').textContent = copy.h;
+        document.getElementById('fm-sub').textContent = copy.p;
+      })();
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
