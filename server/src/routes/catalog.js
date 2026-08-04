@@ -13,6 +13,7 @@ import { recommendationsFor } from '../services/recommendationService.js';
 import { pricedBundles } from '../services/bundleService.js';
 import { peekGiftCard } from '../services/giftCardService.js';
 import { createOrder, getOrderByNumber, getOrder, markPaymentReceived, getPspPayment } from '../services/orderService.js';
+import { requestRefund, getRefundRequestForOrder } from '../services/supportService.js';
 import { answer } from '../services/assistantService.js';
 import { withCopy } from '../services/productCopy.js';
 import { submitProof, getOrderProof } from '../services/paymentProofService.js';
@@ -505,6 +506,55 @@ router.get('/sitemap.xml', asyncHandler(async (_req, res) => {
   res.setHeader('Cache-Control', 'public, max-age=3600');
   res.send(xml);
 }));
+
+/**
+ * Request a refund with only an order number and the email it was placed with.
+ *
+ * The refund policy — which forms part of the terms — tells buyers: "Open your
+ * order page and request a refund there. You only need your order number, no
+ * account." That was not true. The only refund route was under /api/account and
+ * required a session, so a guest — the DEFAULT path on a shop that advertises
+ * ordering without an account — had no way to do the thing the terms promised.
+ *
+ * Both the number and the email are required. The number alone is already the
+ * public handle for a status, but a refund request creates work for a person and
+ * lands in a queue, so it asks for something only the buyer knows. Wrong email,
+ * same answer as an unknown order: this must not become a way to test whether an
+ * address ever bought here.
+ */
+router.post('/track/:number/refund-request',
+  rateLimit({ bucket: 'refund_request', windowMs: 60_000, max: 5, shared: true }),
+  asyncHandler(async (req, res) => {
+    const { email, reason } = z.object({
+      email: z.string().email(),
+      reason: z.string().max(2000).optional(),
+    }).parse(req.body || {});
+
+    const order = await getOrderByNumber(req.params.number).catch(() => null);
+    // One message for both cases on purpose — see above.
+    if (!order || order.email.toLowerCase() !== email.toLowerCase()) {
+      throw new ApiError(404, 'We could not find an order with that number and email address.');
+    }
+    if (['refunded', 'cancelled'].includes(order.status)) {
+      return res.json({ alreadyClosed: true, status: order.status });
+    }
+    // Nothing was ever charged, so there is nothing to give back. Putting this in
+    // the queue would have someone open a refund for an order that never took
+    // money — and leave the buyer waiting for a transfer that cannot arrive.
+    if (['pending', 'failed'].includes(order.status)) {
+      return res.json({ notPaid: true, status: order.status });
+    }
+
+    const existing = await getRefundRequestForOrder(order.id).catch(() => null);
+    if (existing) return res.json({ alreadyRequested: true, requestedAt: existing.created_at });
+
+    const r = await requestRefund({ orderId: order.id, userId: order.userId || null, reason });
+    await audit({
+      action: 'refund.request', actor: { email: order.email }, targetType: 'order',
+      targetId: order.id, metadata: { guest: !order.userId }, req,
+    }).catch(() => {});
+    res.status(201).json({ ok: true, id: r.id });
+  }));
 
 // Public tracking by order number (no PII beyond status timeline).
 router.get('/track/:number', asyncHandler(async (req, res) => {

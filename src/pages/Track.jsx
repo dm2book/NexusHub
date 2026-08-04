@@ -283,6 +283,13 @@ export default function Track() {
 
           {result.status === 'completed' && <GuestReview number={result.number} t={t} />}
 
+          {/* Only once money has actually moved. Before that there is nothing to
+              give back, and offering a refund on an unpaid order is a confusing
+              answer to "I changed my mind" — that one is just: don't pay. */}
+          {['payment_received', 'processing', 'awaiting_fulfillment', 'completed'].includes(result.status) && (
+            <GuestRefund number={result.number} t={t} />
+          )}
+
           <Timeline history={result.history} t={t} />
         </div>
       )}
@@ -350,6 +357,103 @@ function GuestReview({ number, t }) {
           {busy ? '…' : t('review.submit', 'Post review')}
         </button>
       </div>
+    </form>
+  );
+}
+
+/**
+ * Request a refund with just the order number and the email it was placed with.
+ *
+ * The refund policy promises exactly this: "Open your order page and request a
+ * refund there. You only need your order number, no account." Guest checkout is
+ * the default here, so without this the promise held for logged-in buyers only
+ * — everyone else was pointed at an email address and told to wait.
+ *
+ * Collapsed by default. It is a real option, not a suggestion, and a refund form
+ * sitting open under a delivered order reads as an invitation to use it.
+ */
+function GuestRefund({ number, t }) {
+  const toast = useToast();
+  const [open, setOpen] = useState(false);
+  const [email, setEmail] = useState('');
+  const [reason, setReason] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState('');
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      const r = await api.post(`/api/track/${encodeURIComponent(number)}/refund-request`, {
+        email: email.trim(), reason: reason.trim() || undefined,
+      });
+      if (r.notPaid) {
+        toast.error(t('refundReq.notPaid', 'This order has not been paid, so there is nothing to refund.'));
+      } else if (r.alreadyClosed) {
+        toast.error(t('refundReq.closed', 'This order is already closed.'));
+      } else {
+        // Pressing it twice is what someone does when they are not sure it
+        // worked. Both answers are a success — the request exists either way.
+        setDone(r.alreadyRequested ? 'already' : 'new');
+        feedback('success');
+      }
+    } catch (err) { toast.error(err.message); }
+    finally { setBusy(false); }
+  };
+
+  if (done) {
+    return (
+      <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-5 mb-6">
+        <div className="text-emerald-200 font-semibold">
+          {done === 'already'
+            ? t('refundReq.dupTitle', '✅ We already have your request')
+            : t('refundReq.doneTitle', '✅ Refund request received')}
+        </div>
+        <p className="text-slate-300 text-sm mt-1">
+          {t('refundReq.doneSub', 'A person reviews every request. You get an answer by email — usually within a few hours during the day, and within 14 days at the latest.')}
+        </p>
+        <Link to="/refunds" className="text-indigo-300 text-sm hover:underline mt-2 inline-block">
+          {t('refundReq.readPolicy', 'Read the refund policy →')}
+        </Link>
+      </div>
+    );
+  }
+
+  if (!open) {
+    return (
+      <div className="mb-6 text-center">
+        <button type="button" onClick={() => setOpen(true)}
+          className="text-slate-400 text-sm hover:text-slate-200 hover:underline">
+          {t('refundReq.open', 'Something wrong? Request a refund')}
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={submit} className="rounded-2xl border border-white/10 bg-white/5 p-5 mb-6">
+      <div className="text-white font-semibold">{t('refundReq.title', 'Request a refund')}</div>
+      <p className="text-slate-400 text-xs mt-0.5">
+        {t('refundReq.sub', 'No account needed. Confirm the email you ordered with, and tell us briefly what went wrong.')}
+      </p>
+      <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
+        placeholder={t('refundReq.email', 'Email used for this order')}
+        className="input mt-3 text-sm" />
+      <textarea rows={2} maxLength={2000} value={reason} onChange={(e) => setReason(e.target.value)}
+        placeholder={t('refundReq.reason', 'What went wrong? (optional, but it speeds things up)')}
+        className="input mt-2 text-sm" />
+      <div className="flex flex-wrap gap-2 mt-3">
+        <button disabled={busy || !email.trim()} className="btn-primary text-sm px-5">
+          {busy ? <Loader2 size={15} className="animate-spin" /> : <RotateCcw size={15} />}
+          {t('refundReq.submit', 'Send request')}
+        </button>
+        <button type="button" onClick={() => setOpen(false)} className="btn-ghost text-sm">
+          {t('refundReq.cancel', 'Cancel')}
+        </button>
+      </div>
+      <p className="text-slate-600 text-xs mt-3">
+        {t('refundReq.legal', 'Sending this does not cancel your order by itself — we review it first. See the refund policy for when a digital code can still be returned.')}
+      </p>
     </form>
   );
 }

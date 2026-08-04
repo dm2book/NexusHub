@@ -338,13 +338,16 @@ export function assertProductionConfig() {
   if (/^test_/.test(config.payments.mollie.apiKey)) {
     missing.push('a LIVE MOLLIE_API_KEY (a test_ key never takes real money)');
   }
+  // Email is not a nicety here — it is the ONLY way a guest receives what they
+  // bought. Without a transport, sendEmail records the message to email_log and
+  // returns happily, so an order completes, the track page tells the buyer to
+  // check their spam folder, and the code is sitting in a database table nobody
+  // is looking at. That used to be a console.warn: a shop can take real money
+  // and deliver nothing, and the only trace is one line in a log.
+  if (!config.email.resendApiKey && !config.email.smtpUrl) {
+    missing.push('RESEND_API_KEY or SMTP_URL (without one, buyers never receive their codes)');
+  }
   if (missing.length) {
     throw new Error(`Refusing to start in production without: ${missing.join(', ')}`);
-  }
-  // Email delivery is optional: without Resend or SMTP, emails are rendered and
-  // recorded in email_log (nothing is dropped). Warn so it's not a silent
-  // surprise — but not when Resend is configured (that path delivers fine).
-  if (!config.email.resendApiKey && !config.email.smtpUrl) {
-    console.warn('[config] No RESEND_API_KEY or SMTP_URL — emails will be recorded to email_log, not delivered.');
   }
 }

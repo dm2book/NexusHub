@@ -864,6 +864,22 @@ const NL = {
   'review.thanksTitle': 'Bedankt voor je review!',
   'review.thanksSub': 'Hij staat nu op onze reviewpagina en helpt andere kopers.',
 
+  // Terugbetaling aanvragen zonder account (track-pagina)
+  'refundReq.open': 'Iets niet in orde? Vraag een terugbetaling aan',
+  'refundReq.title': 'Terugbetaling aanvragen',
+  'refundReq.sub': 'Geen account nodig. Bevestig het e-mailadres waarmee je hebt besteld en vertel kort wat er mis is.',
+  'refundReq.email': 'E-mail van deze bestelling',
+  'refundReq.reason': 'Wat is er misgegaan? (optioneel, maar het gaat er sneller mee)',
+  'refundReq.submit': 'Verzoek versturen',
+  'refundReq.cancel': 'Annuleren',
+  'refundReq.legal': 'Dit verzoek annuleert je bestelling niet automatisch — wij beoordelen het eerst. In ons terugbetalingsbeleid lees je wanneer een digitale code nog retour kan.',
+  'refundReq.doneTitle': '✅ Verzoek ontvangen',
+  'refundReq.dupTitle': '✅ We hebben je verzoek al',
+  'refundReq.doneSub': 'Een mens beoordeelt elk verzoek. Je krijgt antwoord per e-mail — overdag meestal binnen enkele uren, en uiterlijk binnen 14 dagen.',
+  'refundReq.readPolicy': 'Lees het terugbetalingsbeleid →',
+  'refundReq.notPaid': 'Deze bestelling is niet betaald, dus er valt niets terug te betalen.',
+  'refundReq.closed': 'Deze bestelling is al afgesloten.',
+
   // Checkout
   'checkout.title': 'Afrekenen',
   'checkout.back': 'Terug naar winkelwagen',

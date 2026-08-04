@@ -6,23 +6,47 @@
 import { config, manualPayMethods } from '../config/env.js';
 import { get } from '../db/index.js';
 import { botSeenRecently } from './discordService.js';
+import { isEnabled as mollieEnabled, isTestKey as mollieTestKey, SUPPORTED_METHODS as MOLLIE_METHODS } from './mollieService.js';
+// The only place the server reaches into the SPA tree. legalIdentity.js is a
+// dependency-free constants module that both sides must agree on: the storefront
+// renders it on every legal page, and this check is the owner's warning that it
+// is still empty. Duplicating it would guarantee the two drift apart.
+import { LEGAL, legalComplete } from '../../../src/lib/legalIdentity.js';
 
 export async function launchChecks() {
   const checks = [];
   const add = (id, label, status, detail) => checks.push({ id, label, status, detail });
 
   // 1. Payments — the hard blocker: without a way to pay, orders dead-end.
+  //
+  // This has to name the provider the CHECKOUT actually picks, not any provider
+  // that happens to be configured. Mollie wins over everything else there, and
+  // this check predated it: a shop running live on Mollie was told "no way to
+  // pay", and a shop with a Tikkie link but no Mollie key was told it was fine.
+  // A readiness dashboard that disagrees with the checkout is worse than none.
   const manual = manualPayMethods();
   const stripe = !!config.payments.stripe.secretKey;
-  if (manual.length || stripe) {
-    add('payments', 'Payment methods', 'ok',
-      stripe ? 'Stripe active' : `Manual: ${manual.map((m) => m.label).join(', ')}`);
+  if (mollieEnabled()) {
+    // A test_ key is the expensive one. Checkout works, Mollie's sandbox marks
+    // the payment paid, the order delivers — and no money ever moves. It only
+    // surfaces when the bank statement does not match the orders.
+    add('payments', 'Payment methods', mollieTestKey() ? 'fail' : 'ok',
+      mollieTestKey()
+        ? 'MOLLIE_API_KEY is a test_ key — buyers reach Mollie’s sandbox, orders are marked paid and NO money arrives. Swap it for the live key in Vercel.'
+        : `Mollie live — ${MOLLIE_METHODS.join(', ')}${manual.length ? ` (manual fallback: ${manual.map((m) => m.label).join(', ')})` : ''}`);
+  } else if (manual.length || stripe) {
+    // Not a failure — it sells — but every order now waits for a person to read
+    // a bank app, so say that rather than a flat green.
+    add('payments', 'Payment methods', 'warn',
+      stripe
+        ? 'Stripe active — no MOLLIE_API_KEY, so no iDEAL. Most Dutch buyers pay with iDEAL.'
+        : `Manual only: ${manual.map((m) => m.label).join(', ')} — every payment needs confirming by hand. Set MOLLIE_API_KEY for automatic iDEAL.`);
   } else if (config.payments.demoMode) {
     add('payments', 'Payment methods', 'warn',
-      'DEMO mode only — orders are auto-marked paid without real money. Set PAY_TIKKIE / PAY_REVOLUT / PAY_PAYPAL in Vercel before selling.');
+      'DEMO mode only — orders are auto-marked paid without real money. Set MOLLIE_API_KEY in Vercel before selling. (Production refuses to boot in demo mode, so this can only be a dev deployment.)');
   } else {
     add('payments', 'Payment methods', 'fail',
-      'No way to pay: set PAY_TIKKIE / PAY_REVOLUT / PAY_PAYPAL (or Stripe) in Vercel → orders currently dead-end as pending.');
+      'No way to pay: set MOLLIE_API_KEY (iDEAL, Bancontact, card, PayPal) in Vercel → orders currently dead-end as pending.');
   }
 
   // 2. Email — login codes + receipts must actually deliver.
@@ -71,7 +95,25 @@ export async function launchChecks() {
         ? `Configured: ${bits.join(', ')}${relayed ? ' + bot relay' : ''}`
         : 'Start your Discord bot (npm start in discord/) — it connects automatically, no Vercel setup needed.');
 
-  // 7. Two-factor on the accounts that can see everything.
+  // 7. Who is selling.
+  //
+  // Dutch and EU consumer law (Art. 6:230m BW / Consumer Rights Directive)
+  // require a webshop to state a legal name and a geographic address BEFORE the
+  // buyer is bound. The pages already leave unset fields out rather than print a
+  // placeholder, so the site is never wrong — but "not wrong" is not "compliant",
+  // and nothing else on the site tells the owner this is still missing. Nobody
+  // can fill it in for them: it is their own name and address.
+  if (legalComplete()) {
+    add('identity', 'Seller identity', LEGAL.kvk ? 'ok' : 'warn',
+      LEGAL.kvk
+        ? `${LEGAL.legalName} — KvK ${LEGAL.kvk}${LEGAL.vat ? `, BTW ${LEGAL.vat}` : ''}`
+        : `${LEGAL.legalName} — no KvK number yet. Fine while you are not a registered business; add it (and the BTW number) in src/lib/legalIdentity.js after registering.`);
+  } else {
+    add('identity', 'Seller identity', 'fail',
+      'The legal pages cannot say who is selling: legalName / address / postcode / city are empty in src/lib/legalIdentity.js. Dutch law requires a name and a geographic address before a consumer buys.');
+  }
+
+  // 8. Two-factor on the accounts that can see everything.
   //
   // The admin panel shows every order, every buyer's email and every delivered
   // code. Sign-in here is passwordless, so without a second factor an attacker
