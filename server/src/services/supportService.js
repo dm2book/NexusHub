@@ -80,6 +80,18 @@ export async function requestRefund({ orderId, userId, reason, amount } = {}) {
   return get('SELECT * FROM refund_requests WHERE id=@id', { id });
 }
 
+/**
+ * The refund request already on an order, if any.
+ *
+ * Asking twice must not create two rows in the queue: a buyer who does not see
+ * an instant confirmation presses the button again, and the owner should not
+ * have to work out which of three identical requests is real.
+ */
+export function getRefundRequestForOrder(orderId) {
+  return get('SELECT * FROM refund_requests WHERE order_id=@o ORDER BY created_at DESC LIMIT 1',
+    { o: orderId });
+}
+
 export function listRefundRequests({ status } = {}) {
   const clause = status ? 'WHERE rr.status=@status' : '';
   return all(`SELECT rr.*, o.number AS order_number, o.email AS customer
