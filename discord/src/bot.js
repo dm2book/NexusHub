@@ -1405,6 +1405,9 @@ const OUTBOX_CHANNEL = {
   // #reviews has always claimed it fills itself after real orders; the store now
   // actually emits them, so route them there (falling back to #vouches).
   reviews: ['reviews', 'vouches'],
+  // Public delivery proof. Falls back to #reviews so a server built before this
+  // channel existed still shows them rather than silently dropping the event.
+  proof: ['proof-of-delivery', 'reviews', 'vouches'],
 };
 /** Notification roles the bot may ping when relaying a store event. */
 const OUTBOX_PING = { deals: ['Deals', 'Drops & Restocks'] };

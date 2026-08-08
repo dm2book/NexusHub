@@ -62,6 +62,34 @@ export async function relayDm(discordUserId, body) {
  */
 const LEASE_MS = 5 * 60_000;
 
+/** How long an UNDELIVERED event is worth keeping before it is only clutter. */
+const OUTBOX_MAX_AGE_DAYS = 30;
+
+/**
+ * Drop events nobody will ever deliver.
+ *
+ * The only pruning here used to run inside claimOutbox and only touched rows
+ * with a delivered_at — so it required a working bot to clean up after a working
+ * bot. If the bot is never started, which is the state every shop is in before
+ * it is set up, nothing is delivered and therefore nothing is deleted: the table
+ * grows for as long as the shop takes orders.
+ *
+ * That is not only disk. A sale ping carries the buyer's email address
+ * (postOrderEvent → 'Customer'), so an unattended outbox is an unbounded,
+ * unreviewed store of customer data with no retention policy — next to a
+ * maintenance job that carefully expires IPs after 90 days.
+ *
+ * A month-old announcement has no value even if the bot appears tomorrow: the
+ * drop has passed, the restock has sold out, the order is long since delivered.
+ */
+export async function pruneOutbox({ days = OUTBOX_MAX_AGE_DAYS } = {}) {
+  const cutoff = new Date(Date.now() - days * 864e5).toISOString();
+  const r = await run(
+    `DELETE FROM discord_outbox WHERE delivered_at IS NULL AND created_at < @old`,
+    { old: cutoff });
+  return r?.changes ?? 0;
+}
+
 export async function claimOutbox(limit = 20) {
   const staleBefore = new Date(Date.now() - LEASE_MS).toISOString();
   const rows = await all(
@@ -75,6 +103,7 @@ export async function claimOutbox(limit = 20) {
   // Housekeeping: delivered events older than 14 days can go.
   run(`DELETE FROM discord_outbox WHERE delivered_at IS NOT NULL AND delivered_at < @old`,
     { old: new Date(Date.now() - 14 * 864e5).toISOString() }).catch(() => {});
+  pruneOutbox().catch(() => {});
   return rows.map((r) => {
     try { return { id: r.id, channel: r.kind, body: JSON.parse(r.payload) }; }
     catch { return null; }
@@ -193,6 +222,49 @@ export async function postOrderEvent(order, event = 'received') {
 }
 
 /**
+ * A delivery, announced in public.
+ *
+ * #proof-of-delivery has existed in the server plan since it was written, is one
+ * of the few channels marked public, and its topic reads "Screenshots of real,
+ * completed deliveries" — and nothing has ever posted to it. Every order event
+ * went to the private #leads staff channel, so the channel a new visitor opens
+ * to answer "has anyone actually received anything from this shop?" was empty.
+ * For a store nobody has heard of that is the most expensive empty room there is.
+ *
+ * PUBLIC, so it carries no buyer and no order identity: not the email, not the
+ * name, and deliberately not the order number either — that number is the public
+ * lookup key for /track, and posting it would hand every reader the ability to
+ * watch a stranger's order. What is left is the only thing that actually builds
+ * trust: what was delivered, and how quickly.
+ */
+export async function postDeliveryProof(order) {
+  const items = Array.isArray(order.items) ? order.items : [];
+  if (!items.length) return;
+  const placed = Date.parse(order.createdAt || order.created_at || '');
+  const seconds = Number.isFinite(placed) ? Math.max(0, Math.round((Date.now() - placed) / 1000)) : null;
+  // Anything over a day is a manual fulfilment that sat overnight; "1 day" reads
+  // as a slow shop rather than a busy one, so the speed line is simply dropped.
+  const speed = seconds !== null && seconds < 86400
+    ? (seconds < 90 ? `${seconds}s` : `${Math.round(seconds / 60)} min`)
+    : null;
+
+  const lines = items.slice(0, 4)
+    .map((i) => `• ${i.quantity > 1 ? `${i.quantity}× ` : ''}${i.name}`)
+    .join('\n');
+  const more = items.length > 4 ? `\n• …and ${items.length - 4} more` : '';
+
+  await deliver('proof', config.discord.reviewsWebhookUrl, {
+    embeds: [{
+      title: '✅ Delivered',
+      description: `${lines}${more}` + (speed ? `\n\nDelivered in **${speed}**.` : ''),
+      color: 0x10b981,
+      footer: { text: `${config.email.fromName} · every order, as it lands` },
+      timestamp: new Date().toISOString(),
+    }],
+  });
+}
+
+/**
  * Ping staff the moment a customer submits payment proof — manual (Tikkie/
  * PayPal) orders deliver only as fast as the owner confirms them, so an instant
  * heads-up in the staff channel is the difference between minutes and hours.
@@ -294,6 +366,20 @@ export async function postDropEvent(kind, data = {}) {
         `\n[Start shopping](${shop})`,
       color: 0xec4899,
     };
+  } else if (kind === 'drop-scheduled') {
+    // dropService.createDrop has always sent this kind, and nothing here handled
+    // it — the call fell through to `else return` inside a .catch(() => {}), so
+    // staff scheduled a drop, saw no error, and the server was never told. The
+    // drop calendar is the one feature built purely for hype; it was announcing
+    // to nobody.
+    const when = data.startsAt ? Math.floor(new Date(data.startsAt).getTime() / 1000) : null;
+    embed = {
+      title: `⏰ Drop scheduled: ${data.title}`,
+      description: (data.note ? `${data.note}\n\n` : '')
+        + (when ? `Goes live <t:${when}:F> — <t:${when}:R>.\n` : '')
+        + `Grab the 🔔 Drops & Restocks role in #roles so you hear it first.\n[See what's coming](${config.appUrl}/drops)`,
+      color: 0xf59e0b,
+    };
   } else if (kind === 'bundle') {
     embed = {
       title: `🎁 New bundle: ${data.name}`,
@@ -304,7 +390,12 @@ export async function postDropEvent(kind, data = {}) {
 
   // Product announcements show the product's own art when available; every
   // drop gets the brand banner so the channel looks consistently premium.
-  const banner = { product: 'products', restock: 'products', coupon: 'deals', bundle: 'deals' }[kind];
+  // Every kind must be in here: an unmapped kind produced the URL
+  // /discord/banner-undefined.png, which Discord renders as a broken image.
+  const banner = {
+    product: 'products', restock: 'products', coupon: 'deals', bundle: 'deals',
+    'drop-scheduled': 'deals',
+  }[kind] || 'products';
   embed.image = { url: `${config.appUrl}/discord/banner-${banner}.png` };
   embed.thumbnail = { url: (kind === 'product' && data.image) ? data.image : `${config.appUrl}/icon-512.png` };
   embed.footer = { text: `${config.email.fromName} · drops & deals` };

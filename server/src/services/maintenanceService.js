@@ -10,6 +10,7 @@ import { retryPendingFulfillments, drainSupplierQueue, sweepUnfulfilledPaidOrder
 import { retryFailedEmails } from './emailService.js';
 import { sweepMemberRoles } from './discordRolesService.js';
 import { purgeExpiredLinkIntents } from './discordLinkService.js';
+import { pruneOutbox } from './discordService.js';
 
 const HOURS = (n) => new Date(Date.now() - n * 3_600_000).toISOString();
 const DAYS = (n) => new Date(Date.now() - n * 86_400_000).toISOString();
@@ -151,6 +152,17 @@ export async function runMaintenance() {
   try {
     summary.linkIntentsPurged = await purgeExpiredLinkIntents();
   } catch (e) { summary.linkIntentError = e.message; }
+
+  // 13. Discard Discord events nobody is ever going to deliver.
+  //
+  //     The outbox only pruned itself from inside claimOutbox, and only rows the
+  //     bot had already delivered — so cleaning up required a working bot, which
+  //     is exactly the thing that is missing when the queue grows. A sale ping
+  //     carries the buyer's email, so an unattended outbox is an unbounded store
+  //     of customer data sitting next to the IP retention rules above.
+  try {
+    summary.discordOutboxPruned = await pruneOutbox();
+  } catch (e) { summary.discordOutboxError = e.message; }
 
   return summary;
 }

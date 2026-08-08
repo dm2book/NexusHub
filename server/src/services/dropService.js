@@ -11,14 +11,14 @@ import { postDropEvent } from './discordService.js';
 export function listUpcoming(limit = 30) {
   const since = new Date(Date.now() - 24 * 3600_000).toISOString();
   return all(
-    `SELECT id, title, category, note, starts_at AS startsAt FROM drops
+    `SELECT id, title, category, note, starts_at AS "startsAt" FROM drops
       WHERE starts_at >= @since ORDER BY starts_at ASC LIMIT @l`, { since, l: limit });
 }
 
 /** Full list for admin (past + future). */
 export function listAll(limit = 100) {
   return all(
-    `SELECT id, title, category, note, starts_at AS startsAt, created_at AS createdAt
+    `SELECT id, title, category, note, starts_at AS "startsAt", created_at AS "createdAt"
        FROM drops ORDER BY starts_at DESC LIMIT @l`, { l: limit });
 }
 
@@ -31,7 +31,7 @@ export async function createDrop({ title, category, note, startsAt }, actorId = 
     `INSERT INTO drops (id, title, category, note, starts_at, created_by, created_at)
      VALUES (@id, @t, @cat, @note, @s, @by, @at)`,
     { id, t, cat: category || null, note: note || null, s: new Date(startsAt).toISOString(), by: actorId, at: nowIso() });
-  const drop = await get('SELECT id, title, category, note, starts_at AS startsAt FROM drops WHERE id=@id', { id });
+  const drop = await get('SELECT id, title, category, note, starts_at AS "startsAt" FROM drops WHERE id=@id', { id });
   postDropEvent('drop-scheduled', drop).catch(() => {}); // announce in Discord (best-effort)
   return drop;
 }

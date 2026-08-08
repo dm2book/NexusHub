@@ -15,10 +15,15 @@ import { createContext, useContext, useEffect, useState, useCallback, useMemo } 
 const NL = {
   // Navigation
   'nav.home': 'Home',
-  'nav.products': 'Alle producten',
+  // Kort gehouden: dit zijn navigatielabels, geen zinnen. Met de lange
+  // varianten paste de balk in het Nederlands niet op 1024-1280px.
+  'nav.products': 'Producten',
   'nav.reviews': 'Reviews',
   'nav.how': 'Hoe het werkt',
-  'nav.support': 'Klantenservice',
+  // Aparte, kortere variant voor de navigatiebalk. 'nav.how' is ook een kop op
+  // /payment-methods, waar de volledige zin hoort te staan.
+  'nav.howShort': 'Uitleg',
+  'nav.support': 'Support',
   'nav.search': 'Zoek producten...',
   'nav.login': 'Inloggen',
   'nav.signup': 'Account maken',

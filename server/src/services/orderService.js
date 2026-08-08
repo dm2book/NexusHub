@@ -23,7 +23,7 @@ import { scoreOrder } from './fraudService.js';
 import { assertOrderLimits } from './orderLimitService.js';
 import { audit } from './auditService.js';
 import { getProduct } from './productService.js';
-import { postOrderEvent, postFraudHoldAlert } from './discordService.js';
+import { postOrderEvent, postFraudHoldAlert, postDeliveryProof } from './discordService.js';
 import { syncMemberRoles, sendDeliveryDm } from './discordRolesService.js';
 import { availableCount, claimCodes, checkLowStock, releaseCodes } from './codeStockService.js';
 import { memberDiscountPercent } from './membershipService.js';
@@ -347,6 +347,9 @@ export async function transitionOrder(orderId, to, ctx = {}) {
   }
   if (to === 'completed') {
     await postOrderEvent(updated, 'completed').catch(() => {});
+    // …and the public half of the same event: staff get the order in #leads,
+    // the community gets the proof that orders actually land (best-effort).
+    await postDeliveryProof(updated).catch(() => {});
     // Capture a privacy-safe snapshot for the live social-proof feed (best-effort).
     await recordPurchaseEvent(updated).catch(() => {});
     // Delivered count / live feed just changed → refresh the public stats now.

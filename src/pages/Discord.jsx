@@ -9,12 +9,28 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { SectionHeading } from '../components/ui.jsx';
 import { usePageMeta } from '../lib/useMeta.js';
 
+/**
+ * The channels this page promises. Every name here must exist in
+ * `discord/src/config.js` — that file is what the bot actually creates, and it
+ * is the source of truth.
+ *
+ * This list had drifted badly in both directions. It advertised #robux, #nitro,
+ * #giftcards, #orders, #gaming, #screenshots, #customer-reviews, #create-ticket
+ * and #support-chat, none of which the bot builds — so the one page whose job is
+ * to turn a visitor into a member described a different server, and the first
+ * thing a new arrival did was fail to find the channel they came for.
+ *
+ * It also left out the channels that sell the place hardest: #proof-of-delivery,
+ * #restocks, #deals, #price-list and #ask-the-bot. server/test/discord-page.test.mjs
+ * now fails if either half drifts again.
+ */
 const CHANNELS = [
-  { group: 'INFORMATION', icon: Megaphone, items: ['welcome', 'rules', 'announcements', 'faq'] },
-  { group: 'SHOP', icon: ShoppingBag, items: ['products', 'robux', 'nitro', 'giftcards', 'orders'] },
-  { group: 'COMMUNITY', icon: Users, items: ['general', 'gaming', 'screenshots', 'media'] },
-  { group: 'REVIEWS', icon: Star, items: ['customer-reviews', 'vouches'] },
-  { group: 'SUPPORT', icon: Ticket, items: ['create-ticket', 'support-chat'] },
+  { group: 'INFORMATION', icon: Megaphone, items: ['welcome', 'start-here', 'rules', 'links'] },
+  { group: 'ANNOUNCEMENTS', icon: Megaphone, items: ['announcements', 'restocks', 'status'] },
+  { group: 'MARKETPLACE', icon: ShoppingBag, items: ['products', 'price-list', 'how-to-buy', 'deals', 'ask-the-bot'] },
+  { group: 'REVIEWS & TRUST', icon: Star, items: ['reviews', 'vouches', 'proof-of-delivery', 'discount-codes'] },
+  { group: 'SUPPORT', icon: Ticket, items: ['open-a-ticket', 'faq', 'support-info', 'report-a-scam'] },
+  { group: 'COMMUNITY', icon: Users, items: ['general', 'media', 'suggestions', 'starboard', 'giveaways'] },
 ];
 
 const roles = (t) => [
@@ -139,14 +155,25 @@ export default function Discord() {
       <section className="section py-14">
         <SectionHeading eyebrow={t('discord.hierarchy', 'Who’s who')} title={t('discord.rolesTitle', 'Roles & ranks')} center />
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {/* The role colour lives in the swatch, not in the words.
+              These are Discord's own role colours, and they are chosen to sit on
+              Discord's dark chrome. Painted onto the white card this page uses in
+              light mode they measured 2.15:1 (Owner) to 3.96:1 (VIP) against a
+              4.5:1 floor — the role names were the least readable text on the
+              page. The swatch is decoration and carries no contrast requirement;
+              the name it labels is written out beside it, so nothing is conveyed
+              by colour alone. */}
           {roles(t).map(({ name, icon: Icon, color, desc }) => (
             <div key={name} className="card p-5 flex items-center gap-4 hover:border-primary/30 transition">
-              <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0"
-                   style={{ background: `${color}22`, border: `1px solid ${color}55` }}>
-                <Icon size={20} style={{ color }} />
+              <div aria-hidden className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0"
+                   style={{ background: color, boxShadow: `0 6px 18px -8px ${color}` }}>
+                {/* Inline, not `text-white`: the light theme remaps that class to
+                    slate-900 for the whole scope, which turned these into dark
+                    glyphs on a saturated tile. */}
+                <Icon size={20} style={{ color: '#fff' }} strokeWidth={2.4} />
               </div>
               <div>
-                <div className="font-medium" style={{ color }}>{name}</div>
+                <div className="font-medium text-white">{name}</div>
                 <div className="text-slate-500 text-sm">{desc}</div>
               </div>
             </div>

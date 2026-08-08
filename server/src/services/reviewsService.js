@@ -81,8 +81,8 @@ export async function addVerifiedReview({ userId, email, orderId, author, stars,
 /** Visible reviews, newest first. */
 export async function listReviews({ limit = 24 } = {}) {
   return all(
-    `SELECT id, author, avatar_url AS avatarUrl, stars, body, product, source,
-            verified, city, created_at AS createdAt
+    `SELECT id, author, avatar_url AS "avatarUrl", stars, body, product, source,
+            verified, city, created_at AS "createdAt"
        FROM reviews WHERE status='visible' ORDER BY verified DESC, created_at DESC LIMIT @limit`,
     { limit: Math.min(100, Math.max(1, limit)) });
 }
@@ -93,7 +93,7 @@ export async function listReviews({ limit = 24 } = {}) {
 export async function listReviewsAdmin({ limit = 200 } = {}) {
   return all(
     `SELECT id, author, stars, body, product, source, status, verified, city,
-            order_id AS orderId, created_at AS createdAt
+            order_id AS "orderId", created_at AS "createdAt"
        FROM reviews ORDER BY created_at DESC LIMIT @limit`,
     { limit: Math.min(500, Math.max(1, limit)) });
 }

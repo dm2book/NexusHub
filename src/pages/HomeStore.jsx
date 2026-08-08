@@ -6,7 +6,7 @@ import {
   Search, ShoppingCart, Zap, ShieldCheck, Headphones, Tag, Star, ArrowRight,
   Plus, LayoutGrid, Users, CheckCircle2, Clock, MessageCircle, ChevronRight, Sparkles, Shield, Menu, X,
   BadgeCheck,
-  User as UserIcon,
+  User as UserIcon, UserPlus,
 } from 'lucide-react';
 import { useCart } from '../context/CartContext.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -98,7 +98,7 @@ const NAV = [
   { key: 'nav.home', label: 'Home', to: '/' },
   { key: 'nav.products', label: 'All Products', to: '/shop' },
   { key: 'nav.reviews', label: 'Reviews', to: '/reviews' },
-  { key: 'nav.how', label: 'How it works', to: '/how-it-works' },
+  { key: 'nav.howShort', label: 'How it works', to: '/how-it-works' },
   { key: 'nav.support', label: 'Support', to: '/contact' },
 ];
 
@@ -217,26 +217,29 @@ export default function HomeStore() {
 
       {/* ── Top nav ─────────────────────────────────────────────── */}
       <header className={`fm-nav sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-slate-200/70 ${navScrolled ? 'is-scrolled' : ''}`}>
-        <div className="max-w-[1400px] 2xl:max-w-[1560px] mx-auto px-4 lg:px-8 h-[68px] flex items-center gap-3 sm:gap-6">
+        <div className="max-w-[1400px] 2xl:max-w-[1560px] mx-auto px-4 lg:px-8 h-[68px] flex items-center gap-3 sm:gap-4 xl:gap-6">
           <button onClick={() => setMenuOpen((v) => !v)} aria-label={tr('nav.menu', 'Menu')} aria-expanded={menuOpen}
             className="lg:hidden w-11 h-11 shrink-0 -ml-1.5 rounded-xl hover:bg-slate-100 grid place-items-center text-slate-700">
             {menuOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
 
-          <Link to="/" className="flex items-center gap-2.5 shrink-0">
-            <span className="w-9 h-9 rounded-xl flex items-center justify-center text-white shadow-lg shadow-violet-500/30"
+          <Link to="/" className="flex items-center gap-2.5 min-w-0">
+            <span className="w-9 h-9 shrink-0 rounded-xl flex items-center justify-center text-white shadow-lg shadow-violet-500/30"
               style={{ backgroundImage: 'linear-gradient(135deg,#7c5cff,#a855f7)' }}>
               <Zap size={18} fill="white" />
             </span>
-            {/* Hidden on the narrowest screens: with it, the header row measured
-                wider than 390px and clipped the Sign Up button off the edge. */}
-            <span className="hidden xs:inline fm-head text-xl">ForgeMarket</span>
+            {/* Hidden until there is room for the WHOLE word. This nav, unlike
+                StoreNav, keeps a Sign Up button visible at every width, so the
+                wordmark is what gives way. It used to return at 400px and then
+                truncate — "F…" beside the mark reads as a broken page rather
+                than a deliberate one, so it waits for 640px instead. */}
+            <span className="hidden xl:inline fm-head text-xl truncate">ForgeMarket</span>
           </Link>
 
-          <nav className="hidden lg:flex items-center gap-7 text-[15px] font-medium text-slate-600">
+          <nav className="hidden lg:flex items-center gap-5 xl:gap-7 text-[15px] font-medium text-slate-600 min-w-0 overflow-hidden">
             {NAV.map((n, i) => (
               <Link key={n.label} to={n.to}
-                className={`relative py-1 hover:text-slate-900 transition ${i === 0 ? 'text-violet-600' : ''}`}>
+                className={`relative py-1 whitespace-nowrap hover:text-slate-900 transition ${i === 0 ? 'text-violet-600' : ''}`}>
                 {tr(n.key, n.label)}
                 {i === 0 && <span className="absolute -bottom-[22px] left-0 right-0 h-0.5 bg-violet-600 rounded-full" />}
               </Link>
@@ -247,9 +250,9 @@ export default function HomeStore() {
 
           {/* Real global search — opens the ⌘K command palette */}
           <button onClick={() => window.dispatchEvent(new CustomEvent('forge:cmdk'))}
-            className="hidden md:flex items-center gap-2 bg-slate-100 rounded-xl px-3.5 h-10 w-[260px] text-slate-400 hover:bg-slate-200/70 transition">
+            className="hidden md:flex items-center gap-2 bg-slate-100 rounded-xl px-3.5 h-10 w-[190px] xl:w-[260px] text-slate-400 hover:bg-slate-200/70 transition">
             <Search size={16} />
-            <span className="text-sm">{tr('nav.search', 'Search for products...')}</span>
+            <span className="text-sm truncate whitespace-nowrap">{tr('nav.search', 'Search for products...')}</span>
             <kbd className="ml-auto text-[11px] bg-white border border-slate-200 rounded px-1.5 py-0.5 text-slate-400">⌘K</kbd>
           </button>
           <button onClick={() => window.dispatchEvent(new CustomEvent('forge:cmdk'))} aria-label="Search"
@@ -282,12 +285,25 @@ export default function HomeStore() {
               <span className="hidden sm:inline">{tr('nav.account', 'Account')}</span>
             </Link>
           ) : (
-            <Link to="/login" className="hidden sm:inline-flex text-[15px] font-medium text-slate-600 hover:text-slate-900">{tr('nav.login', 'Log in')}</Link>
+            <Link to="/login" className="hidden xl:inline-flex shrink-0 text-[15px] font-medium text-slate-600 hover:text-slate-900">{tr('nav.login', 'Log in')}</Link>
           )}
+          {/* max-w + truncate is the backstop that makes this row unable to
+              overflow in ANY language. "Sign Up" is 7 characters and fitted;
+              "Account maken" is 13 and did not, so the button was clipped by the
+              sticky header at 320, 360, 414, 430, 640, 700, 768, 820 and 1024px
+              — measured. Capping it means a longer translation gets shortened
+              instead of pushing the primary call to action off the screen. */}
           {!user && (
-            <Link to="/login" className="inline-flex items-center gap-1.5 text-white text-[15px] font-semibold rounded-xl px-3.5 sm:px-4 h-10 shrink-0 shadow-lg shadow-violet-500/30 hover:brightness-105 transition"
+            <Link to="/login" aria-label={tr('nav.signup', 'Sign Up')}
+              className="inline-flex items-center justify-center xs:justify-start gap-1.5 text-white text-[15px] font-semibold rounded-xl w-10 xs:w-auto px-0 xs:px-3.5 sm:px-4 h-10 shrink-0 min-w-0 max-w-[46vw] shadow-lg shadow-violet-500/30 hover:brightness-105 transition"
               style={{ backgroundImage: 'linear-gradient(135deg,#7c5cff,#a855f7)' }}>
-              {tr('nav.signup', 'Sign Up')} <span className="hidden sm:inline-flex"><ArrowRight size={16} /></span>
+              {/* Below 400px there is room for roughly 72px here, and a button
+                  reading "Accou…" is worse than no words at all. Same pattern the
+                  account link already uses: the icon always fits, the word
+                  appears when there is space for it. */}
+              <UserPlus size={19} className="xs:hidden shrink-0" />
+              <span className="hidden xs:inline truncate">{tr('nav.signup', 'Sign Up')}</span>
+              <span className="hidden sm:inline-flex shrink-0"><ArrowRight size={16} /></span>
             </Link>
           )}
         </div>

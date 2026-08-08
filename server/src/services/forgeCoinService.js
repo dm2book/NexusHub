@@ -70,7 +70,7 @@ async function lockUser(userId) {
 /** Recent ledger entries for the account page. */
 export function coinHistory(userId, limit = 20) {
   return all(
-    `SELECT delta, reason, ref, created_at AS createdAt FROM forge_coin_ledger
+    `SELECT delta, reason, ref, created_at AS "createdAt" FROM forge_coin_ledger
       WHERE user_id=@u ORDER BY created_at DESC LIMIT @l`, { u: userId, l: limit });
 }
 
