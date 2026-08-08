@@ -46,13 +46,13 @@ export default function StoreNav() {
     { label: t('nav.products', 'All Products'), to: '/shop' },
     { label: t('nav.drops', 'Drops'), to: '/drops' },
     { label: t('nav.reviews', 'Reviews'), to: '/reviews' },
-    { label: t('nav.how', 'How it works'), to: '/how-it-works' },
+    { label: t('nav.howShort', 'How it works'), to: '/how-it-works' },
     { label: t('nav.support', 'Support'), to: '/contact' },
   ];
 
   return (
     <header className={`fm-nav sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-slate-200/70 ${scrolled ? 'is-scrolled' : ''}`}>
-      <div className="max-w-[1400px] mx-auto px-4 lg:px-8 h-[68px] flex items-center gap-6">
+      <div className="max-w-[1400px] mx-auto px-4 lg:px-8 h-[68px] flex items-center gap-3 sm:gap-4 xl:gap-6">
         {/* shrink-0 is load-bearing: this row is over-full at 390px, and without
             it the browser squeezes these 40px buttons down to 20-27px — measured.
             w-11 puts them on the 44px thumb target instead of just under it. */}
@@ -70,13 +70,13 @@ export default function StoreNav() {
             style={{ backgroundImage: 'linear-gradient(135deg,#7c5cff,#a855f7)' }}>
             <Zap size={18} fill="white" />
           </span>
-          <span className="text-xl font-extrabold tracking-tight text-slate-900 truncate">ForgeMarket</span>
+          <span className="hidden xl:inline text-xl font-extrabold tracking-tight text-slate-900 truncate">ForgeMarket</span>
         </Link>
 
-        <nav className="hidden lg:flex items-center gap-7 text-[15px] font-medium text-slate-600">
+        <nav className="hidden lg:flex items-center gap-5 xl:gap-7 text-[15px] font-medium text-slate-600 min-w-0 overflow-hidden">
           {NAV.map((n) => (
             <Link key={n.label} to={n.to}
-              className={`relative py-1 hover:text-slate-900 transition ${active(n.to) ? 'text-violet-600' : ''}`}>
+              className={`relative py-1 whitespace-nowrap hover:text-slate-900 transition ${active(n.to) ? 'text-violet-600' : ''}`}>
               {n.label}
               {active(n.to) && <span className="absolute -bottom-[22px] left-0 right-0 h-0.5 bg-violet-600 rounded-full" />}
             </Link>
@@ -90,9 +90,9 @@ export default function StoreNav() {
             lighter grey measures 2.34:1 — well under the 4.5:1 that small text
             needs. Same visual weight, actually readable. */}
         <button onClick={() => window.dispatchEvent(new CustomEvent('forge:cmdk'))}
-          className="hidden md:flex items-center gap-2 bg-slate-100 rounded-xl px-3.5 h-10 w-[240px] text-slate-500 hover:bg-slate-200/70 transition">
+          className="hidden md:flex items-center gap-2 bg-slate-100 rounded-xl px-3.5 h-10 w-[190px] xl:w-[240px] text-slate-500 hover:bg-slate-200/70 transition">
           <Search size={16} />
-          <span className="text-sm">{t('nav.search', 'Search for products...')}</span>
+          <span className="text-sm truncate whitespace-nowrap">{t('nav.search', 'Search for products...')}</span>
           <kbd className="ml-auto text-[11px] bg-white border border-slate-200 rounded px-1.5 py-0.5">⌘K</kbd>
         </button>
         <button onClick={() => window.dispatchEvent(new CustomEvent('forge:cmdk'))} aria-label={t('nav.search', 'Search for products...')}
@@ -131,12 +131,17 @@ export default function StoreNav() {
             </Link>
           </>
         ) : (
-          <Link to="/login" className="hidden sm:inline-flex text-[15px] font-medium text-slate-600 hover:text-slate-900">{t('nav.login', 'Log in')}</Link>
+          <Link to="/login" className="hidden xl:inline-flex shrink-0 text-[15px] font-medium text-slate-600 hover:text-slate-900">{t('nav.login', 'Log in')}</Link>
         )}
+        {/* Same cap as the homepage nav: in Dutch this row ran 103px over at
+            1024px, where the desktop links appear and the CTA still has to fit
+            beside them. A longer label truncates rather than leaving the
+            viewport. */}
         {!loading && !user && (
-          <Link to="/login" className="hidden sm:inline-flex items-center gap-1.5 text-white text-[15px] font-semibold rounded-xl px-4 h-10 shadow-lg shadow-violet-500/30 hover:brightness-105 transition"
+          <Link to="/login" className="hidden sm:inline-flex items-center gap-1.5 text-white text-[15px] font-semibold rounded-xl px-4 h-10 shrink-0 min-w-0 max-w-[40vw] shadow-lg shadow-violet-500/30 hover:brightness-105 transition"
             style={{ backgroundImage: 'linear-gradient(135deg,#7c5cff,#a855f7)' }}>
-            {t('nav.signup', 'Sign Up')} <ArrowRight size={16} />
+            <span className="truncate">{t('nav.signup', 'Sign Up')}</span>
+            <ArrowRight size={16} className="shrink-0" />
           </Link>
         )}
       </div>

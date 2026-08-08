@@ -27,7 +27,10 @@ async function refresh() {
     method: 'POST', credentials: 'include',
   });
   if (!res.ok) return false;
-  const { accessToken: tok } = await res.json();
+  // Same trap as below: res.json() throws on a non-JSON 200, and this one runs
+  // on the FIRST request of every session. An unparseable body here would break
+  // the whole app before any page had a chance to render its own error.
+  const tok = parseJson(await res.text().catch(() => ''))?.accessToken;
   // The endpoint now answers 200 with a null token when there is no session, so
   // an anonymous visit is not a failed request. Guard against writing that null
   // over a token another tab may have just set.
@@ -81,13 +84,38 @@ async function request(path, { method = 'GET', body, raw = false, retry = true, 
   if (raw) return res;
 
   const text = await res.text();
-  const data = text ? JSON.parse(text) : null;
+  const data = parseJson(text);
+
+  // The body was there but it was not JSON. Something in front of the API
+  // answered instead of the API: Vercel returns the plain text "A server error
+  // has occurred" when a function crashes on boot, a CDN or WAF returns an HTML
+  // block page, a proxy returns a gateway error. Parsing that used to throw
+  // `SyntaxError: Unexpected identifier "A"` straight into the UI — a message
+  // that tells the buyer nothing and points the owner at the wrong layer.
+  if (text && data === UNPARSEABLE) {
+    const err = new Error(res.ok
+      ? 'The server sent an unexpected response. Please try again.'
+      : 'The server is having trouble right now. Please try again in a moment.');
+    err.status = res.status;
+    // Kept off the message on purpose — the buyer gets a sentence, the console
+    // gets the evidence needed to find which layer answered.
+    err.body = text.slice(0, 500);
+    throw err;
+  }
+
   if (!res.ok) {
     const err = new Error(data?.error?.message || `Request failed (${res.status})`);
     err.status = res.status; err.details = data?.error?.details;
     throw err;
   }
   return data;
+}
+
+/** Sentinel: distinguishes "not JSON" from a body that legitimately parsed to null. */
+const UNPARSEABLE = Symbol('unparseable');
+function parseJson(text) {
+  if (!text) return null;
+  try { return JSON.parse(text); } catch { return UNPARSEABLE; }
 }
 
 export const api = {
