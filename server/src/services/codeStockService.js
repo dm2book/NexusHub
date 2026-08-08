@@ -41,9 +41,12 @@ export async function addProductCodes(productId, codes = []) {
  */
 export async function checkLowStock(productId) {
   try {
-    // Without a webhook there is nowhere to alert — don't burn the once-per-cycle
-    // stamp, so alerts start working the moment a webhook is configured.
-    if (!config.discord.stockWebhookUrl && !config.discord.orderWebhookUrl) return;
+    // No webhook does NOT mean nowhere to alert. postStockAlert delivers through
+    // deliver(), which queues to the relay outbox when no webhook is set — and
+    // relay-only ("run the bot, put no Discord secrets on the host") is the setup
+    // this project documents. So this guard silently disabled low-stock alerts on
+    // exactly the configuration most owners run: the shop sold out quietly and
+    // the first sign was an order nobody could fill.
     const remaining = await availableCount(productId);
     if (remaining >= config.discord.lowStockThreshold) return;
     // Claim the alert atomically so concurrent orders produce only one ping.

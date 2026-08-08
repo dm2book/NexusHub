@@ -63,7 +63,7 @@ const luckFor = (units) => Math.min(2, 1 + 0.08 * Math.max(0, units - 1));
 /** Winnings recorded for an order (shown on the order + success page). */
 export function pullsForOrder(orderId) {
   return all(
-    `SELECT id, reward_label AS label, credit_cents AS credit, rerolled_at AS rerolledAt, created_at AS createdAt
+    `SELECT id, reward_label AS label, credit_cents AS credit, rerolled_at AS "rerolledAt", created_at AS "createdAt"
        FROM mystery_pulls WHERE order_id=@o ORDER BY created_at ASC`, { o: orderId });
 }
 

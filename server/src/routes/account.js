@@ -11,6 +11,7 @@ import { rateLimit } from '../middleware/rateLimit.js';
 import { config } from '../config/env.js';
 import { linkStatus, unlinkDiscord } from '../services/discordLinkService.js';
 import { earnedRolesFor, syncMemberRoles } from '../services/discordRolesService.js';
+import { getLiveInviteUrl } from '../services/discordService.js';
 import { run, get, all, tx } from '../db/index.js';
 import { notFound, forbidden, badRequest } from '../utils/errors.js';
 import { listOrders, getOrder } from '../services/orderService.js';
@@ -115,7 +116,11 @@ router.get('/discord', asyncHandler(async (req, res) => {
   const { earned, why } = await earnedRolesFor(req.user.id);
   res.json({
     ...status,
-    inviteUrl: config.discord.inviteUrl,
+    // The LIVE invite, not the env fallback. The bot keeps a permanent invite in
+    // kv and refreshes it every 24h precisely because a default Discord invite
+    // expires after 7 days — serving the env value here handed a signed-in
+    // customer the one link most likely to be dead.
+    inviteUrl: await getLiveInviteUrl(),
     serverName: config.discord.serverName,
     roles: [...earned],
     reasons: why,
@@ -337,7 +342,7 @@ router.get('/reviewable', asyncHandler(async (req, res) => {
 router.get('/orders/:id/review', asyncHandler(async (req, res) => {
   await ownedOrder(req, req.params.id);
   const r = await get(
-    `SELECT id, stars, body, created_at AS createdAt FROM reviews WHERE order_id=@o`,
+    `SELECT id, stars, body, created_at AS "createdAt" FROM reviews WHERE order_id=@o`,
     { o: req.params.id });
   res.json({ review: r || null });
 }));
