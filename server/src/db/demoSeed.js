@@ -182,8 +182,13 @@ const RASTER_ICONS = [
   'cod', 'discord-nitro', 'eafc', 'giftcard', 'playstation', 'robux', 'steam', 'v-bucks',
   'valorant', 'xbox',
 ];
+// Raster brand art is WEBP, not PNG. The PNGs were converted during the
+// performance pass (481KB across ten files became 83KB) and this copy of the
+// rule was never updated — so every product in a raster category was pointed at
+// a file that has not existed since. There are zero .png files under
+// public/products/icons; the frontend's iconPath() has said .webp all along.
 const iconFor = (cat) => (CATS_WITH_ICON.includes(cat)
-  ? `/products/icons/${cat}.${RASTER_ICONS.includes(cat) ? 'png' : 'svg'}` : null);
+  ? `/products/icons/${cat}.${RASTER_ICONS.includes(cat) ? 'webp' : 'svg'}` : null);
 
 // Per-PACK art first (shows the denomination, e.g. "1,000 ROBUX" card), then
 // the category icon as a fallback — so every product gets its own visual.
@@ -215,12 +220,20 @@ export async function syncCatalogImages() {
   for (const cat of CATS_WITH_ICON) {
     const right = iconFor(cat);
     if (!right) continue;
-    const wrong = right.endsWith('.png') ? right.replace(/\.png$/, '.svg') : right.replace(/\.svg$/, '.png');
-    const r = await run(
-      `UPDATE products SET metadata = REPLACE(metadata, @wrong, @right), updated_at = @at
-        WHERE metadata LIKE @like`,
-      { wrong, right, at: nowIso(), like: `%${wrong}%` }).catch(() => null);
-    repointed += r?.changes || 0;
+    // Every extension this icon has ever been stored as, so a row written by an
+    // older build heals instead of rendering a broken image forever. The .png
+    // entry matters most: those files are gone, and the previous version of this
+    // loop actively rewrote WORKING .svg paths into that dead .png.
+    const stale = ['.svg', '.png', '.webp']
+      .map((ext) => `/products/icons/${cat}${ext}`)
+      .filter((u) => u !== right);
+    for (const wrong of stale) {
+      const r = await run(
+        `UPDATE products SET metadata = REPLACE(metadata, @wrong, @right), updated_at = @at
+          WHERE metadata LIKE @like`,
+        { wrong, right, at: nowIso(), like: `%${wrong}%` }).catch(() => null);
+      repointed += r?.changes || 0;
+    }
   }
   if (repointed) console.log(`[catalog] icon paths repointed on ${repointed} product(s)`);
 
