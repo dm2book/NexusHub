@@ -898,6 +898,11 @@ const NL = {
   'checkout.payByLink': 'Betalen via link',
   'checkout.credit': 'Winkeltegoed',
   'checkout.pay': 'Bestelling plaatsen',
+  // Getoond wanneer de server geen bestelling kan aannemen (geen leverkanaal,
+  // demo-betalingen aan, of een Mollie-testsleutel).
+  'checkout.pausedTitle': '⏸ Bestellen staat even uit',
+  'checkout.pausedSub': 'We kunnen op dit moment geen bestellingen aannemen, er is dus niets afgeschreven. Je winkelwagen blijft bewaard — probeer het zo nog eens, of vraag het ons op Discord.',
+  'checkout.pausedBtn': 'Bestellen staat uit',
   'checkout.placeOrder': 'Bestelling plaatsen',
   'checkout.placePay': 'Bestellen & betalen',
   'checkout.payCard': 'Betalen met kaart',

@@ -1,7 +1,7 @@
 /** Public storefront routes: browse catalog, place an order, track by number. */
 import { Router } from 'express';
 import { z } from 'zod';
-import { config, manualPayMethods } from '../config/env.js';
+import { config, manualPayMethods, commerceBlockers } from '../config/env.js';
 import { asyncHandler } from '../middleware/error.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 import { listProducts, getProduct, trendingProducts, priceHistory } from '../services/productService.js';
@@ -147,6 +147,10 @@ router.get('/config', asyncHandler(async (_req, res) => {
   const categoryLogos = await getCategoryLogos().catch(() => ({}));
   res.json({
     paymentProvider: paymentProvider(),
+    // True when the shop cannot currently honour an order, so the storefront can
+    // say so up front instead of letting someone fill a cart and hit a wall at
+    // the last step. The reasons themselves name env vars and stay server-side.
+    orderingPaused: commerceBlockers().length > 0,
     demoPayments: config.payments.demoMode,
     paymentMethods: manual,                 // [{id,label,target,kind}]
     // What the buyer may end up seeing on Mollie's page. Which of these is
@@ -325,6 +329,19 @@ router.post('/orders',
     max: config.security.checkoutPerMinute, shared: true,
   }),
   asyncHandler(async (req, res) => {
+    // Refuse the order rather than the whole site. See commerceBlockers(): a
+    // shop that cannot deliver must not take the money, but it can still be
+    // browsed, still show existing orders, and still let its owner sign in to
+    // fix the setting that is blocking it.
+    const blockers = commerceBlockers();
+    if (blockers.length) {
+      // The reasons name unset environment variables, so they go to the log the
+      // owner reads, not to whoever is standing at the checkout.
+      console.error('[checkout] refused — cannot fulfil an order:', blockers.join('; '));
+      throw new ApiError(503,
+        'Ordering is paused right now. Nothing has been charged — please try again shortly.',
+        'commerce_paused');
+    }
     const body = z.object({
       email: z.string().email(),
       items: z.array(z.object({

@@ -49,6 +49,8 @@ export default function Checkout() {
     el.querySelector('input')?.focus({ preventScroll: true });
   };
   const [provider, setProvider] = useState('none');     // mollie | stripe | demo | manual | none
+  // True when the server says it cannot fulfil an order right now.
+  const [paused, setPaused] = useState(false);
   const [methods, setMethods] = useState([]);
   const [mollieOffered, setMollieOffered] = useState([]); // ['ideal','bancontact',…]
   const [mollieMethod, setMollieMethod] = useState('');   // '' = choose on Mollie's page
@@ -141,6 +143,10 @@ export default function Checkout() {
       setMethods(c.paymentMethods || []);
       setNote(c.paymentNote || '');
       setMollieOffered(c.mollieMethods || []);
+      // The shop cannot honour an order right now (no way to email a code, demo
+      // payments still on, a Mollie test key). Say it here rather than letting
+      // someone fill in their details and meet a 503 at the last step.
+      setPaused(!!c.orderingPaused);
       if ((c.paymentMethods || []).length) setMethodId(c.paymentMethods[0].id);
     }).catch(() => {});
   }, []);
@@ -438,8 +444,19 @@ export default function Checkout() {
               className="mt-0.5 shrink-0 w-4 h-4 accent-violet-600" />
             <span>{consentSentence}</span>
           </label>
-          <button disabled={busy || !consent} className="btn-primary w-full py-3">
+          {/* The server will refuse this order (503) — say so before the buyer
+              types anything, not after. */}
+          {paused && (
+            <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 mb-3">
+              <div className="text-amber-200 font-semibold">{t('checkout.pausedTitle', '⏸ Ordering is paused')}</div>
+              <p className="text-slate-300 text-[12.5px] mt-1">
+                {t('checkout.pausedSub', 'We cannot take orders at this moment, so nothing has been charged. Your cart is saved — please try again shortly, or ask us on Discord.')}
+              </p>
+            </div>
+          )}
+          <button disabled={busy || !consent || paused} className="btn-primary w-full py-3">
             {busy ? <Loader2 size={18} className="animate-spin" />
+              : paused ? <>{t('checkout.pausedBtn', 'Ordering paused')}</>
               : provider === 'mollie' ? <>{t('checkout.payNow', 'Pay {amount} securely', { amount: money(grandTotal, currency) })}</>
               : provider === 'stripe' ? <>{t('checkout.payCard', 'Pay with card')}</>
               : provider === 'manual' ? <>{t('checkout.placePay', 'Place order & pay')}</>
@@ -479,7 +496,7 @@ export default function Checkout() {
                 {t('checkout.reviewFirst', 'Confirm delivery to continue')}
               </button>
             ) : (
-              <button type="submit" disabled={busy} className="btn-primary flex-1 py-3 fm-tap">
+              <button type="submit" disabled={busy || paused} className="btn-primary flex-1 py-3 fm-tap">
                 {busy ? <Loader2 size={18} className="animate-spin" />
                   : provider === 'mollie' ? <>{t('checkout.payNowShort', 'Pay securely')}</>
                   : provider === 'stripe' ? <>{t('checkout.payCard', 'Pay with card')}</>
