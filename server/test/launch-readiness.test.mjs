@@ -54,18 +54,24 @@ const paidOrder = async (email) => {
   return o;
 };
 
-// ── 1. Email is not optional in production ──────────────────────────────────
-console.log('— Production config refuses to boot without a way to deliver —');
+// ── 1. Email is not optional for SELLING ────────────────────────────────────
+console.log('— A shop that cannot deliver must not take the money —');
 {
-  const { assertProductionConfig } = await import('../src/config/env.js');
+  const { assertProductionConfig, commerceBlockers } = await import('../src/config/env.js');
   const src = fs.readFileSync(new URL('../src/config/env.js', import.meta.url), 'utf8');
 
-  ok('a missing email transport is listed as a required production setting',
-    /RESEND_API_KEY|SMTP_URL/.test(src) && /missing\.push[\s\S]{0,200}(RESEND_API_KEY|SMTP_URL)/.test(src),
-    'no missing.push for the email transport');
-  ok('it is a hard failure, not a console.warn',
+  // This started as a console.warn, became a refusal to boot, and is now a
+  // refusal to sell. The middle version was right about the danger and wrong
+  // about the blast radius: it took the storefront, order tracking and the admin
+  // panel down over one unset variable. See commerce-blockers.test.mjs.
+  ok('a missing email transport still blocks orders',
+    /commerceBlockers[\s\S]{0,600}(RESEND_API_KEY|SMTP_URL)/.test(src),
+    'nothing stops the shop selling without a way to deliver');
+  ok('it is not merely a console.warn',
     !/console\.warn\([\s\S]{0,200}(RESEND_API_KEY|SMTP_URL)/.test(src),
-    'still only warning about a missing transport');
+    'back to only warning about a missing transport');
+  ok('…and it really does refuse right now', commerceBlockers().length > 0,
+    'no blocker reported despite no transport being configured');
   ok('assertProductionConfig is exported and callable', typeof assertProductionConfig === 'function');
 
   // Both entry points must run it, or the check only guards one deployment.

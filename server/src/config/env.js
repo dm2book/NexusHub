@@ -327,27 +327,52 @@ export function manualPayMethods() {
 export function assertProductionConfig() {
   if (!isProd) return;
   const missing = [];
+  // Only what leaves the application unsafe or inert at EVERY level. A dev JWT
+  // secret is committed to this repository, so anyone who reads it can mint a
+  // session for any account; without a database nothing responds anyway. There
+  // is no useful degraded mode for either, so refusing to start is honest.
   if (config.auth.jwtSecret.startsWith('dev-only')) missing.push('JWT_SECRET');
   if (!config.db.url) missing.push('DATABASE_URL (or POSTGRES_URL)');
-  // Demo payments mark orders paid without any money arriving. Shipping that
-  // live would hand out codes for free, so it is a hard failure, not a warning.
-  if (config.payments.demoMode) missing.push('DEMO_PAYMENTS=false (demo mode marks orders paid without payment)');
-  // A test key on a live shop takes real buyers to Mollie's sandbox: the order
-  // is marked paid and no money ever moves. Silent, and only discovered when the
-  // bank statement does not match the orders.
-  if (/^test_/.test(config.payments.mollie.apiKey)) {
-    missing.push('a LIVE MOLLIE_API_KEY (a test_ key never takes real money)');
-  }
-  // Email is not a nicety here — it is the ONLY way a guest receives what they
-  // bought. Without a transport, sendEmail records the message to email_log and
-  // returns happily, so an order completes, the track page tells the buyer to
-  // check their spam folder, and the code is sitting in a database table nobody
-  // is looking at. That used to be a console.warn: a shop can take real money
-  // and deliver nothing, and the only trace is one line in a log.
-  if (!config.email.resendApiKey && !config.email.smtpUrl) {
-    missing.push('RESEND_API_KEY or SMTP_URL (without one, buyers never receive their codes)');
-  }
   if (missing.length) {
     throw new Error(`Refusing to start in production without: ${missing.join(', ')}`);
   }
+}
+
+/**
+ * Reasons this shop must not accept an order right now.
+ *
+ * These used to live in assertProductionConfig, which meant a missing email key
+ * took the ENTIRE site down: no storefront, no order tracking, and — worst of
+ * all — no admin panel, so the owner could not sign in to discover why. The
+ * function crashed at module scope, Vercel answered every request with the plain
+ * text "A server error has occurred", and the only visible symptom was a JSON
+ * parse error in the browser. A boot-time absolute for a runtime concern.
+ *
+ * The thing actually worth preventing is narrower than "the site exists": it is
+ * TAKING MONEY the shop cannot honour. So refuse the checkout and leave
+ * everything else running. Nobody is charged, the owner can still log in and
+ * fix it, and buyers can still track the orders they already placed.
+ */
+export function commerceBlockers() {
+  const reasons = [];
+  // The only way a guest receives what they bought. Without a transport
+  // sendEmail records to email_log and resolves happily, so an order completes,
+  // the track page says to check the spam folder, and the code sits in a table
+  // nobody reads.
+  if (!config.email.resendApiKey && !config.email.smtpUrl) {
+    reasons.push('there is no way to email the buyer their code (set RESEND_API_KEY or SMTP_URL)');
+  }
+  if (isProd) {
+    // Demo mode marks orders paid without any money arriving — live, that hands
+    // out codes for free.
+    if (config.payments.demoMode) {
+      reasons.push('demo payments are on, which marks orders paid without any money arriving (set DEMO_PAYMENTS=false)');
+    }
+    // A test key takes real buyers to Mollie's sandbox: the order is marked paid
+    // and nothing moves. Silent until the bank statement disagrees.
+    if (/^test_/.test(config.payments.mollie.apiKey)) {
+      reasons.push('MOLLIE_API_KEY is a test key, so no payment would be real (use the live key)');
+    }
+  }
+  return reasons;
 }
