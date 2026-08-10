@@ -78,7 +78,11 @@ async function mysteryBox() {
       name: 'Forge Mystery Box',
       desc: 'Every box wins a real prize, paid out instantly as store credit — up to a €150 jackpot. ' +
         'Buy more boxes in one order for better odds, and every box comes with one free risk-free reroll.',
-      meta: JSON.stringify({ featured: true }),
+      // The one seeded product that shipped without a cover, so it rendered the
+      // generic gradient placeholder while all 71 others had real art — on the
+      // highest-margin item in the shop. mystery.svg has been sitting in
+      // public/products/icons the whole time.
+      meta: JSON.stringify({ featured: true, image: '/products/icons/mystery.svg' }),
       at,
     });
   if (!inserted.changes) return; // another instance just created it
