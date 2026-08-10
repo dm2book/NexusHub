@@ -53,7 +53,37 @@ function startBackgroundUpkeep(wasSeeded) {
       await syncCatalogImages();
       console.log('[boot] background upkeep done in', Date.now() - t, 'ms');
     } catch (e) { console.error('[boot] background upkeep:', e.message); }
+    await logReadiness();
   });
+}
+
+/**
+ * Print the launch checklist into the boot log, once per cold start.
+ *
+ * Everything needed to diagnose a misconfigured shop already exists — the
+ * /admin dashboard computes exactly this. It is just unreachable at the moment
+ * it matters most: reading it requires signing in, signing in requires an email
+ * transport, and a missing email transport is one of the things it reports. The
+ * owner is locked out of the page that would explain why.
+ *
+ * The boot log has no such circularity, so the same answers go there too. Names
+ * of settings and a status word only — never a value, never a secret. Entirely
+ * best-effort: this is diagnostics, and diagnostics must never be the reason a
+ * request fails.
+ */
+async function logReadiness() {
+  try {
+    const { launchChecks } = await import('./services/launchCheckService.js');
+    const { ready, summary, checks } = await launchChecks();
+    const mark = { ok: '✓', warn: '!', fail: '✗' };
+    console.log(
+      `\n[readiness] ${ready ? 'ready to sell' : summary}\n`
+      + checks.map((c) => `  ${mark[c.status] || '?'} ${c.label}: ${c.detail}`).join('\n')
+      + '\n',
+    );
+  } catch (e) {
+    console.error('[readiness] could not run the launch checks:', e.message);
+  }
 }
 
 /**

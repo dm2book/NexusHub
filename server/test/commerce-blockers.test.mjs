@@ -167,6 +167,32 @@ console.log('\n— A misconfiguration must not look like a crash —');
     'a non-JSON body here is what produced the original parse error');
 }
 
+// ── 7. The owner can diagnose without first being able to log in ────────────
+console.log('\n— The checklist reaches the one place that has no login wall —');
+{
+  const appSrc = read('../src/app.js');
+
+  // Everything needed to diagnose a broken shop already existed on /admin. It
+  // is just unreachable exactly when it matters: reading it needs a sign-in,
+  // signing in needs an email transport, and a missing transport is one of the
+  // things it reports. The boot log has no such circularity.
+  ok('the launch checks are printed into the boot log',
+    /async function logReadiness\(\)[\s\S]{0,600}launchChecks\(\)/.test(appSrc),
+    'the readiness picture is still only behind the admin login');
+  ok('…once the process is up, not on every request',
+    /startBackgroundUpkeep[\s\S]{0,600}logReadiness\(\)/.test(appSrc));
+  ok('diagnostics can never fail a request',
+    /logReadiness\(\)[\s\S]{0,900}catch \(e\)[\s\S]{0,160}readiness/.test(appSrc),
+    'an error in the checklist could break serving');
+
+  // Status words and setting names, never a value.
+  const { launchChecks } = await import('../src/services/launchCheckService.js');
+  const dump = JSON.stringify((await launchChecks()).checks);
+  ok('the log never contains a secret value',
+    !dump.includes(config.auth.jwtSecret) && !/re_[A-Za-z0-9]{10,}/.test(dump),
+    'a secret value reached the readiness output');
+}
+
 srv.close();
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
