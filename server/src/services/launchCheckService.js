@@ -43,7 +43,7 @@ export async function launchChecks() {
         : `Manual only: ${manual.map((m) => m.label).join(', ')} — every payment needs confirming by hand. Set MOLLIE_API_KEY for automatic iDEAL.`);
   } else if (config.payments.demoMode) {
     add('payments', 'Payment methods', 'warn',
-      'DEMO mode only — orders are auto-marked paid without real money. Set MOLLIE_API_KEY in Vercel before selling. (Production refuses to boot in demo mode, so this can only be a dev deployment.)');
+      'DEMO mode only — orders are auto-marked paid without real money. Set MOLLIE_API_KEY in Vercel before selling. (In production the checkout refuses orders while this is on, so nothing is given away.)');
   } else {
     add('payments', 'Payment methods', 'fail',
       'No way to pay: set MOLLIE_API_KEY (iDEAL, Bancontact, card, PayPal) in Vercel → orders currently dead-end as pending.');
