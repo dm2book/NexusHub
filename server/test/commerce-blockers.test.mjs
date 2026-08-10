@@ -129,6 +129,44 @@ console.log('\n— The launch dashboard still flags it —');
   ok('…and says what buyers lose', /login codes|order emails|receive/i.test(email?.detail || ''), email?.detail);
 }
 
+// ── 6. A broken configuration explains itself ───────────────────────────────
+console.log('\n— A misconfiguration must not look like a crash —');
+{
+  const entry = read('../../api/index.js');
+
+  // Bare at module scope, a throw here leaves Vercel with nothing to invoke, so
+  // it answers with its own page: "This Serverless Function has crashed /
+  // FUNCTION_INVOCATION_FAILED". That page cannot name the missing setting, so
+  // the one fact the owner needs is reachable only by digging through logs.
+  ok('the boot check is caught rather than thrown at the platform',
+    /try \{\s*assertProductionConfig\(\);/.test(entry),
+    'assertProductionConfig still crashes the function');
+
+  // Catching must not soften it: every request still has to fail, or a dev JWT
+  // secret would start authenticating people.
+  ok('a broken config still refuses every request',
+    /if \(bootError\)[\s\S]{0,400}statusCode = 503/.test(entry), 'requests are served anyway');
+  ok('…and the app is never even constructed',
+    /app = createApp\(\{ lazyReady: true \}\);\s*\} catch/.test(entry), 'the app boots on a broken config');
+  // A module that throws on import fails identically from the outside and used
+  // to produce the same uninformative crash page.
+  ok('building the app is inside the same guard',
+    /try \{[\s\S]{0,700}createApp\([\s\S]{0,80}\} catch/.test(entry),
+    'only the config check is guarded — any other boot error still crashes opaquely');
+
+  ok('the reason is logged where the owner will see it',
+    /console\.error\([\s\S]{0,400}err\.message/.test(entry));
+  ok('…and points at where to fix it',
+    /Environment Variables/.test(entry));
+  ok('the response does NOT name the setting',
+    /message: 'This shop is temporarily unavailable/.test(entry)
+      && !/message: `[^`]*\$\{(err|bootError)/.test(entry),
+    'the failure reason is echoed to the public');
+  ok('the refusal is JSON, so the API client can read it',
+    /content-type', 'application\/json/.test(entry),
+    'a non-JSON body here is what produced the original parse error');
+}
+
 srv.close();
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
