@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Copy, Check, Search, MessageSquare } from 'lucide-react';
+import { Copy, Check, Search, MessageSquare, AlertTriangle } from 'lucide-react';
 import LegalDoc from '../../components/LegalDoc.jsx';
 import { usePageMeta } from '../../lib/useMeta.js';
 import { useI18n } from '../../lib/i18n.jsx';
@@ -63,10 +63,23 @@ function WithdrawalForm({ form, nl }) {
         </div>
       </div>
       {!legalComplete() && (
-        <p className="text-amber-300/90 text-[13px] mt-3">
-          {nl
-            ? 'Het adres van de verkoper ontbreekt nog. Stuur het formulier naar het e-mailadres hierboven; wij bevestigen de ontvangst.'
-            : 'The seller’s address is not published yet. Send the form to the email address above; we will confirm receipt.'}
+        /* A notice, not a whisper. This told a buyer where to send a statutory
+           withdrawal form because the seller's address is not published yet —
+           and it was the least readable text on the page: pale amber on the
+           white card measures 1.31:1, against a 4.5:1 floor.
+           `text-amber-300/90` is why. The light theme remaps `.text-amber-300`,
+           but Tailwind's opacity modifier makes that a different class name and
+           the exact selector silently misses it. Rather than widen that selector
+           — `[class*="text-amber-300"]` would also catch every `hover:` variant
+           and repaint it permanently — this stops relying on the remap and takes
+           the treatment a legal notice should have had anyway. */
+        <p className="mt-3 flex items-start gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 text-[13px] text-amber-800">
+          <AlertTriangle size={15} className="shrink-0 mt-0.5" aria-hidden />
+          <span>
+            {nl
+              ? 'Het adres van de verkoper ontbreekt nog. Stuur het formulier naar het e-mailadres hierboven; wij bevestigen de ontvangst.'
+              : 'The seller’s address is not published yet. Send the form to the email address above; we will confirm receipt.'}
+          </span>
         </p>
       )}
     </section>
