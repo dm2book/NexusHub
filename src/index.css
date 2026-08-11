@@ -275,7 +275,9 @@ h1, h2, h3, .font-display, .fm-head {
 .theme-light .label { color:#64748b; }
 .theme-light .chip { background:#f1f5f9; border-color:#e2e8f0; color:#475569; }
 .theme-light .chip:hover { background:#ede9fe; color:#6d28d9; }
-.theme-light .chip-active { background:#7c5cff; color:#fff; border-color:#7c5cff; box-shadow:none; }
+/* #7c5cff put white text at 4.35:1 — under the 4.5 floor, on the control that
+   shows which category you are browsing. Same hue, two steps darker, 5.15:1. */
+.theme-light .chip-active { background:#6d4aff; color:#fff; border-color:#6d4aff; box-shadow:none; }
 .theme-light .btn-ghost { background:#fff; border-color:#e2e8f0; color:#334155; }
 .theme-light .btn-ghost:hover { background:#f8fafc; }
 .theme-light .eyebrow { background:#f1f5f9; border:1px solid #e2e8f0; color:#7c3aed; }
@@ -292,8 +294,11 @@ h1, h2, h3, .font-display, .fm-head {
 .theme-light [style*="gradient"].text-white { color:#fff; }
 .theme-light .text-slate-200 { color:#334155; }
 .theme-light .text-slate-300 { color:#475569; }
-.theme-light .text-slate-400 { color:#64748b; }
-.theme-light .text-slate-500 { color:#94a3b8; }
+/* slate-400 and slate-500 are NOT set here. They used to be, with values that
+   fail AA on their own (#94a3b8 is 2.4:1 on white), and were saved only by a
+   second pair of rules 30 lines below overriding them. One reorder away from
+   every caption on the site becoming unreadable. Declared once, further down,
+   next to the note explaining the values. */
 .theme-light .border-white\/5 { border-color:#eef0f4; }
 .theme-light .border-white\/10 { border-color:#e7e9ee; }
 .theme-light .divide-white\/5 > :not([hidden]) ~ :not([hidden]) { border-color:#eef0f4; }
@@ -320,9 +325,13 @@ h1, h2, h3, .font-display, .fm-head {
 .theme-light .text-violet-300, .theme-light .text-violet-400  { color:#6d28d9; }
 .theme-light .text-blue-200,   .theme-light .text-blue-300    { color:#1d4ed8; }
 .theme-light .text-fuchsia-300 { color:#a21caf; }
-/* Both landed just under AA at 4.45:1 and 1.19:1 respectively. */
+/* These were left "just under AA" on the assumption the surface was pure white.
+   Measured against the actual page ground (#f6f7fb) they were 4.24:1, so the
+   timestamps, captions and hint lines across /reviews, /refunds and /drops all
+   failed. Darkened until they pass on the ground they actually sit on: 5.36 and
+   5.05 respectively. */
 .theme-light .text-slate-400 { color:#5b6779; }
-.theme-light .text-slate-500 { color:#6b7789; }
+.theme-light .text-slate-500 { color:#5f6b7d; }
 
 /* …except where the surface really is dark. Anything inside the hero stage, a
    gradient brand card or an explicitly dark panel keeps the light-on-dark

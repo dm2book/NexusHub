@@ -68,7 +68,7 @@ export default function StoreFooter() {
           <p className="text-slate-500 text-sm mt-4 leading-relaxed">
             {t('footer.tagline', 'The marketplace for digital goods — fair prices, real support, every order tracked.')}
           </p>
-          <Link to="/discord" className="inline-flex items-center gap-2 mt-4 text-sm font-semibold text-violet-600 hover:text-violet-700">
+          <Link to="/discord" className="inline-flex items-center gap-2 mt-4 py-1 min-h-[24px] text-sm font-semibold text-violet-600 hover:text-violet-700">
             {t('footer.discord', '💬 ForgeMarket Support on Discord')}
           </Link>
           {/* The footer is where a hesitant buyer looks for proof a human is
@@ -77,7 +77,7 @@ export default function StoreFooter() {
               so it never advertises a route that goes nowhere. */}
           {SUPPORT_EMAIL && (
             <a href={`mailto:${SUPPORT_EMAIL}`}
-              className="block mt-2 text-sm text-slate-500 hover:text-violet-600 transition">
+              className="inline-block py-1 min-h-[24px] mt-1.5 text-sm text-slate-500 hover:text-violet-600 transition">
               ✉️ {SUPPORT_EMAIL}
             </a>
           )}
@@ -87,7 +87,7 @@ export default function StoreFooter() {
               than one who never saw a link at all. */}
           {trustpilot && (
             <a href={trustpilot} target="_blank" rel="noreferrer"
-              className="block mt-2 text-sm text-slate-500 hover:text-emerald-600 transition">
+              className="inline-block py-1 min-h-[24px] mt-1.5 text-sm text-slate-500 hover:text-emerald-600 transition">
               ⭐ {t('footer.trustpilot', 'Read our Trustpilot reviews')}
             </a>
           )}
@@ -102,9 +102,14 @@ export default function StoreFooter() {
         {COLS.map((c) => (
           <div key={c.title}>
             <div className="text-[12px] font-bold tracking-wider text-slate-400 uppercase mb-3">{c.title}</div>
-            <ul className="space-y-2">
+            {/* space-y-1 + inline-block padding, not space-y-2 on bare inline
+                links: these rendered 17px tall, under the 24px WCAG 2.2 asks for
+                a touch target. The footer is where the refund policy and the
+                terms live — the pages a buyer reaches for when something has
+                gone wrong, on a phone, in a hurry. */}
+            <ul className="space-y-1">
               {c.links.map(([label, to]) => (
-                <li key={label}><Link to={to} className="text-[14px] text-slate-600 hover:text-violet-600">{label}</Link></li>
+                <li key={label}><Link to={to} className="inline-block py-1 min-h-[24px] text-[14px] text-slate-600 hover:text-violet-600">{label}</Link></li>
               ))}
             </ul>
           </div>

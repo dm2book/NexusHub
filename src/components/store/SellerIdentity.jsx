@@ -37,7 +37,7 @@ export default function SellerIdentity({ compact = false }) {
         {LEGAL.kvk && <div>{t('seller.kvk', 'KvK')}: {LEGAL.kvk}</div>}
         {LEGAL.vat && <div>{t('seller.vat', 'VAT')}: {LEGAL.vat}</div>}
         <div className="mt-1">
-          <a href={`mailto:${SUPPORT_EMAIL}`} className="hover:text-violet-600 transition">{SUPPORT_EMAIL}</a>
+          <a href={`mailto:${SUPPORT_EMAIL}`} className="inline-block py-1 min-h-[24px] hover:text-violet-600 transition">{SUPPORT_EMAIL}</a>
         </div>
       </div>
     );

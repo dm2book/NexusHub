@@ -163,8 +163,9 @@ export default function Shop({ landingCategory = null, landingTitle = null, land
           <div className="fm-rail flex gap-2 overflow-x-auto pb-1 snap-x">
             <button onClick={() => setCategory('')}
               className={`snap-start shrink-0 inline-flex items-center gap-2 h-11 px-3.5 rounded-xl border text-[14px] font-semibold transition fm-press ${
-                !category ? 'bg-violet-600 text-white border-violet-600' : 'bg-white text-slate-600 border-slate-200'}`}>
-              <LayoutGrid size={16} className={category ? 'text-violet-600' : 'text-white'} />
+                !category ? 'chip-active' : 'bg-white text-slate-600 border-slate-200'}`}>
+              <LayoutGrid size={16} className={category ? 'text-violet-600' : ''}
+                style={category ? undefined : { color: '#fff' }} />
               {t('shop.all', 'All Products')}
             </button>
             {categories.map((c) => {
@@ -173,7 +174,7 @@ export default function Shop({ landingCategory = null, landingTitle = null, land
               return (
                 <button key={c} onClick={() => setCategory(c)}
                   className={`snap-start shrink-0 inline-flex items-center gap-2 h-11 pl-2 pr-3.5 rounded-xl border text-[14px] font-semibold transition fm-press ${
-                    on ? 'bg-violet-600 text-white border-violet-600' : 'bg-white text-slate-600 border-slate-200'}`}>
+                    on ? 'chip-active' : 'bg-white text-slate-600 border-slate-200'}`}>
                   {img ? <img src={img} alt="" className="w-7 h-7 object-contain" />
                     : <span className={`w-7 h-7 rounded-lg bg-gradient-to-br ${v.grad} grid place-items-center`}><Icon size={14} className="text-white" /></span>}
                   <span className="whitespace-nowrap">{v.label}</span>

@@ -65,7 +65,9 @@ export default function StoreNav() {
             32px wider than the screen and EVERY page scrolled sideways — measured
             on /faq and /about as well as the legal pages. The logo is the one
             thing here that can give way without losing a function. */}
-        <Link to="/" className="flex items-center gap-2.5 min-w-0">
+        {/* Named explicitly: the wordmark is hidden below xl, so on a phone this
+            link is a lone icon and a screen reader announces nothing at all. */}
+          <Link to="/" aria-label="ForgeMarket" className="flex items-center gap-2.5 min-w-0">
           <span className="w-9 h-9 shrink-0 rounded-xl flex items-center justify-center text-white shadow-lg shadow-violet-500/30"
             style={{ backgroundImage: 'linear-gradient(135deg,#7c5cff,#a855f7)' }}>
             <Zap size={18} fill="white" />
