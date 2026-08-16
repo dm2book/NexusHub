@@ -870,6 +870,15 @@ const NL = {
   'review.thanksSub': 'Hij staat nu op onze reviewpagina en helpt andere kopers.',
 
   // Terugbetaling aanvragen zonder account (track-pagina)
+  // Cookietoestemming. Weigeren staat bewust even prominent als accepteren:
+  // toestemming die niet vrij is, is geen toestemming.
+  'cookie.title': 'Cookies op ForgeMarket',
+  'cookie.body': 'Wat de winkel nodig heeft slaan we altijd op: ingelogd blijven, je winkelwagen en je taal. Daarnaast willen we graag meten welke pagina\u2019s bezocht worden. Dat deel is aan jou — de winkel werkt hoe dan ook.',
+  'cookie.accept': 'Accepteren',
+  'cookie.reject': 'Alleen het noodzakelijke',
+  'cookie.more': 'Wat we precies opslaan',
+  'cookie.change': 'Cookievoorkeuren',
+
   'refundReq.open': 'Iets niet in orde? Vraag een terugbetaling aan',
   'refundReq.title': 'Terugbetaling aanvragen',
   'refundReq.sub': 'Geen account nodig. Bevestig het e-mailadres waarmee je hebt besteld en vertel kort wat er mis is.',

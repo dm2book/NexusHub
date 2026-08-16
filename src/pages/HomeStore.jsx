@@ -31,6 +31,8 @@ import { useCategoryLogos } from '../lib/useCategoryLogos.js';
 import { useTrustpilot } from '../lib/useTrustpilot.js';
 import { SUPPORT_EMAIL } from '../lib/support.js';
 import { openForgeChat } from '../lib/forgeChat.js';
+import { allowed, onConsentChange } from '../lib/consent.js';
+import CookieConsent from '../components/CookieConsent.jsx';
 const ChatWidget = lazy(() => import('../components/ChatWidget.jsx'));
 
 const ICON = iconPath;
@@ -138,7 +140,15 @@ export default function HomeStore() {
   }, []);
   useEffect(() => {
     const ref = new URLSearchParams(window.location.search).get('ref');
-    if (ref) localStorage.setItem('fm_ref', ref.toUpperCase().slice(0, 40));
+    // Marketing attribution: an identifier stored to credit a referrer later, so
+    // it waits for permission like anything else non-essential.
+    const store = () => {
+      if (ref && allowed('marketing')) localStorage.setItem('fm_ref', ref.toUpperCase().slice(0, 40));
+    };
+    store();
+    // Someone who lands on a referral link and only then accepts is still on
+    // this page — capture it now rather than losing the referrer's credit.
+    return onConsentChange(store);
   }, []);
   // The tab title and the Google result. It carried the same interchangeable
   // slogan the hero used to, in the one place a searcher sees before clicking.
@@ -750,6 +760,7 @@ export default function HomeStore() {
       <RecentlyDelivered />
       <DeferUntilIdle><Suspense fallback={null}><CommandPalette /></Suspense></DeferUntilIdle>
       <MobileTabBar />
+      <CookieConsent />
     </div>
   );
 }
