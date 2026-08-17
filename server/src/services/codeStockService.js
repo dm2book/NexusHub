@@ -67,10 +67,33 @@ export async function availableCount(productId) {
   return Number(r?.n || 0);
 }
 
-/** Available counts for several products → { productId: n }. */
+/**
+ * Available counts for several products → { productId: n }.
+ *
+ * ONE grouped query, not one per product. This was a `for` loop with an `await`
+ * inside it, so /api/products issued 1 + 72 queries — and 1 + N for whatever the
+ * catalogue grows to. Each individual count is a fast index scan
+ * (idx_product_codes_avail), so this was never slow locally; the cost is 72
+ * sequential ROUND TRIPS, and on a managed Postgres in another region at ~25ms
+ * each that is roughly 1.8 seconds of pure waiting before the response starts.
+ *
+ * Promise.all would not have fixed it either: the pool caps at 5 connections,
+ * so 72 parallel counts just become 15 waves instead of 72.
+ *
+ * Products with no rows are absent from the GROUP BY, so they are filled in as
+ * 0 — a missing key here would render as "out of stock" instead of "unlimited",
+ * which are opposite claims.
+ */
 export async function availableCounts(productIds = []) {
   const out = {};
-  for (const id of productIds) out[id] = await availableCount(id);
+  if (!productIds.length) return out;
+  for (const id of productIds) out[id] = 0;
+  const rows = await all(
+    `SELECT product_id, COUNT(*)::int AS n
+       FROM product_codes
+      WHERE status = 'available' AND product_id = ANY(@ids)
+      GROUP BY product_id`, { ids: productIds });
+  for (const r of rows) out[r.product_id] = Number(r.n || 0);
   return out;
 }
 

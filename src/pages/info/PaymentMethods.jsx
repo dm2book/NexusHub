@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Zap, ShieldCheck, Clock, BadgeCheck } from 'lucide-react';
 import { api } from '../../lib/api.js';
+import { getConfig } from '../../lib/useConfig.js';
 import InfoShell from '../../components/InfoShell.jsx';
 import { useI18n } from '../../lib/i18n.jsx';
 import { usePageMeta } from '../../lib/useMeta.js';
@@ -22,7 +23,7 @@ export default function PaymentMethods() {
   usePageMeta('Payment methods', 'Which payment methods ForgeMarket accepts, how to pay, and how your payment is confirmed.');
   const { t, lang } = useI18n();
   const [methods, setMethods] = useState(null);
-  useEffect(() => { api.get('/api/config').then((c) => setMethods(c.paymentMethods || [])).catch(() => setMethods([])); }, []);
+  useEffect(() => { getConfig().then((c) => setMethods(c.paymentMethods || [])); }, []);
   const list = (methods && methods.length ? methods.map((m) => m.id) : ['tikkie', 'revolut', 'paypal']);
 
   return (

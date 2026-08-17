@@ -1065,4 +1065,25 @@ ALTER TABLE reviews ADD COLUMN IF NOT EXISTS discord_uid TEXT;
 CREATE INDEX IF NOT EXISTS idx_reviews_discord_uid ON reviews (discord_uid) WHERE discord_uid IS NOT NULL;
 `,
   },
+  {
+    id: '028_hot_path_indexes',
+    sql: `
+-- Postgres does NOT index a foreign-key column for you, and these two never got
+-- one. Every order hydrate reads order_items and deliveries by order_id, and
+-- both were sequential scans of the whole table.
+--
+-- The track page is where it bites: GET /api/track/:number is deliberately
+-- uncached, and the page polls it every 5 seconds while an order is in flight.
+-- Each poll scanned both tables end to end to return a handful of rows. At a
+-- few hundred orders that is invisible; the cost grows with every order ever
+-- placed and never comes back down. order_status_history already had its index
+-- (idx_status_hist_order) — these two were simply missed.
+CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items (order_id);
+CREATE INDEX IF NOT EXISTS idx_deliveries_order  ON deliveries (order_id);
+
+-- The same table is aggregated by product for trending, recommendations and the
+-- public delivered-count, all of which grouped over a full scan.
+CREATE INDEX IF NOT EXISTS idx_order_items_product ON order_items (product_id);
+`,
+  },
 ];

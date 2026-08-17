@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
+import { getConfig } from '../lib/useConfig.js';
 import { useLiveFeed, deliveryPhrase, timeAgo } from '../lib/useSocialProof.js';
 
 /** Dismissible promo strip above the header (set SITE_ANNOUNCEMENT on the server). */
 export function AnnouncementBar() {
   const [text, setText] = useState('');
   const [closed, setClosed] = useState(() => sessionStorage.getItem('fm_ann_closed') === '1');
-  useEffect(() => { api.get('/api/config').then((c) => setText(c.announcement || '')).catch(() => {}); }, []);
+  useEffect(() => { getConfig().then((c) => setText(c.announcement || '')); }, []);
   if (!text || closed) return null;
   return (
     <div className="relative text-center text-sm text-white py-2 px-8"

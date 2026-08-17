@@ -16,6 +16,7 @@
  */
 import { useEffect, useState } from 'react';
 import { api } from './api.js';
+import { getConfig } from './useConfig.js';
 
 const EMPTY = { profile: '', review: '' };
 let cache = null;      // object once known (either field may legitimately be '')
@@ -24,7 +25,7 @@ let inflight = null;
 function load() {
   if (cache) return Promise.resolve(cache);
   if (!inflight) {
-    inflight = api.get('/api/config')
+    inflight = getConfig()
       .then((c) => {
         cache = {
           profile: String(c?.trustpilotUrl || '').trim(),

@@ -15,6 +15,7 @@ import { useI18n } from '../lib/i18n.jsx';
 import { LangSwitch } from '../components/store/StoreNav.jsx';
 import { flyToCart } from '../lib/flyToCart.js';
 import { api } from '../lib/api.js';
+import { getConfig } from '../lib/useConfig.js';
 import { useStats } from '../lib/useStats.js';
 import { useReviews } from '../lib/useReviews.js';
 import { useReveal } from '../lib/useReveal.js';
@@ -183,7 +184,7 @@ export default function HomeStore() {
   // The homepage renders its own header, which had no mobile menu at all —
   // How it works, Reviews, Drops and Support were unreachable from '/'.
   const [menuOpen, setMenuOpen] = useState(false);
-  useEffect(() => { api.get('/api/config').then((c) => setAnnouncement(c.announcement || '')).catch(() => {}); }, []);
+  useEffect(() => { getConfig().then((c) => setAnnouncement(c.announcement || '')); }, []);
   // Real reviews only — an empty testimonial card costs more trust than it earns.
   const hasReviews = reviews.length > 0;
 

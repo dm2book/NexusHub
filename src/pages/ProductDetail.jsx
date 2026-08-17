@@ -10,7 +10,7 @@ import { useCart } from '../context/CartContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { categoryVisual, money, isCustomImage, productDescription } from '../lib/catalog.js';
 import { iconFor } from '../lib/sampleCatalog.js';
-import { SAMPLE_PRODUCTS, withFallback } from '../lib/sampleCatalog.js';
+import { SAMPLE_PRODUCTS } from '../lib/sampleCatalog.js';
 import { PageLoader } from '../components/ui.jsx';
 import LightProductCard from '../components/store/LightProductCard.jsx';
 import { useReviews } from '../lib/useReviews.js';
@@ -77,7 +77,6 @@ export default function ProductDetail() {
   const { t, lang } = useI18n();
   const { has, toggle } = useWishlist();
   const [product, setProduct] = useState(null);
-  const [all, setAll] = useState([]);
   const [qty, setQty] = useState(1);
   const [notFound, setNotFound] = useState(false);
   const [recs, setRecs] = useState({ crossSell: [], upsell: [] });
@@ -119,7 +118,11 @@ export default function ProductDetail() {
         const sample = SAMPLE_PRODUCTS.find((p) => p.id === id);
         if (sample) setProduct(sample); else setNotFound(true);
       });
-    api.get('/api/products').then((r) => setAll(withFallback(r.products))).catch(() => setAll(SAMPLE_PRODUCTS));
+    // The whole catalogue used to be fetched here — 49 KB of JSON on a page that
+    // shows one product — purely to compute four same-category "related" items as
+    // a fallback. The recommendations endpoint one line down already does exactly
+    // that server-side, including the same-category fallback, and returns six
+    // products instead of seventy-two.
     api.get(`/api/products/${id}/recommendations`).then(setRecs).catch(() => {});
   }, [id]);
 
@@ -151,8 +154,7 @@ export default function ProductDetail() {
 
   const { icon: Icon, grad, label } = categoryVisual(product.category);
   const desc = productDescription(product, lang);
-  const related = all.filter((p) => p.id !== product.id && p.category === product.category).slice(0, 4);
-  const crossSell = (recs.crossSell?.length ? recs.crossSell : related).slice(0, 4);
+  const crossSell = (recs.crossSell || []).slice(0, 4);
   const upsell = recs.upsell?.[0] || null;
   const wished = has(product.id);
 

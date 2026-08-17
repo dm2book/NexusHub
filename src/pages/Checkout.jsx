@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Lock, ShieldCheck, Loader2, ShoppingBag, ExternalLink, Copy, CheckCircle2, Wallet } from 'lucide-react';
 import { api } from '../lib/api.js';
+import { getConfig } from '../lib/useConfig.js';
 import { fileToDataUrl } from '../lib/imageUpload.js';
 import { useI18n } from '../lib/i18n.jsx';
 import { useCart } from '../context/CartContext.jsx';
@@ -138,7 +139,7 @@ export default function Checkout() {
   const method = requiresAccount ? 'account' : (offersChoice ? deliveryMethod : 'code');
   const needsTarget = method === 'account' && deliveryLabels.length > 0;
   useEffect(() => {
-    api.get('/api/config').then((c) => {
+    getConfig().then((c) => {
       setProvider(c.paymentProvider);
       setMethods(c.paymentMethods || []);
       setNote(c.paymentNote || '');

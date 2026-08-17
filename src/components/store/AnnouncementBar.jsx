@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { X, Megaphone } from 'lucide-react';
 import { api } from '../../lib/api.js';
+import { getConfig } from '../../lib/useConfig.js';
 
 /**
  * Site-wide promo bar, driven by the SITE_ANNOUNCEMENT env var — perfect for
@@ -12,7 +13,7 @@ export default function AnnouncementBar() {
   const [hidden, setHidden] = useState(false);
 
   useEffect(() => {
-    api.get('/api/config').then((c) => {
+    getConfig().then((c) => {
       const msg = (c.announcement || '').trim();
       if (!msg) return;
       setText(msg);
