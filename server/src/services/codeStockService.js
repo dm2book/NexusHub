@@ -8,6 +8,7 @@ import { run, get, all, nowIso, tx } from '../db/index.js';
 import { newId } from '../utils/ids.js';
 import { config } from '../config/env.js';
 import { postDropEvent, postStockAlert } from './discordService.js';
+import { notifyOwner } from './notifyService.js';
 
 /** Add a batch of codes (array of strings) to a product's stock. Returns count added. */
 export async function addProductCodes(productId, codes = []) {
@@ -56,7 +57,23 @@ export async function checkLowStock(productId) {
       { at: nowIso(), p: productId });
     if (!r?.changes) return;
     const product = await get(`SELECT id, name FROM products WHERE id = @p`, { p: productId });
-    if (product) await postStockAlert(product, remaining);
+    if (!product) return;
+    await postStockAlert(product, remaining);
+    /* The quiet one. Low stock is a thing to handle today, not tonight, so it
+       goes out silently on Telegram and below normal priority on Pushover — an
+       owner woken by a restock reminder mutes the channel, and then misses the
+       chargeback. The once-per-cycle stamp claimed just above means this fires
+       once per stock cycle rather than once per order. */
+    await notifyOwner('stock.low', {
+      title: remaining === 0 ? `Out of stock: ${product.name}` : `Low stock: ${product.name}`,
+      lines: [
+        `${remaining} code${remaining === 1 ? '' : 's'} left (alert threshold ${config.discord.lowStockThreshold}).`,
+        remaining === 0
+          ? 'New orders for this product will need delivering by hand.'
+          : 'Load more codes before it runs out.',
+      ],
+      url: `${config.appUrl}/admin/products`,
+    }).catch(() => {});
   } catch (err) {
     console.error('[stock] low-stock check failed:', err.message);
   }

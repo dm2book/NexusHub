@@ -153,6 +153,27 @@ export const config = {
     logoUrl: env.EMAIL_LOGO_URL || '',
   },
 
+  /**
+   * Where the OWNER is told a sale, a refund or a chargeback happened.
+   *
+   * Separate from `discord` above on purpose: that one is the shop's public and
+   * ops plumbing, and without a webhook URL its events queue for the bot, which
+   * polls once a minute. These are alerts, and they are worth nothing a minute
+   * late. Every channel is optional and independent — set the one you read.
+   */
+  notify: {
+    // Falls back to the ops webhook so an existing setup keeps working.
+    discordWebhookUrl: env.NOTIFY_DISCORD_WEBHOOK_URL || '',
+    telegram: {
+      botToken: env.TELEGRAM_BOT_TOKEN || '',
+      chatId: env.TELEGRAM_CHAT_ID || '',
+    },
+    pushover: {
+      token: env.PUSHOVER_TOKEN || '',
+      user: env.PUSHOVER_USER || '',
+    },
+  },
+
   security: {
     // Sliding-window rate limit defaults; per-route overrides live in code.
     rateLimitWindowMs: Number(env.RATE_LIMIT_WINDOW_MS || 60_000),

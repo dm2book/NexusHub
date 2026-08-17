@@ -24,6 +24,7 @@ import { assertOrderLimits } from './orderLimitService.js';
 import { audit } from './auditService.js';
 import { getProduct } from './productService.js';
 import { postOrderEvent, postFraudHoldAlert, postDeliveryProof } from './discordService.js';
+import { notifyOwner } from './notifyService.js';
 import { syncMemberRoles, sendDeliveryDm } from './discordRolesService.js';
 import { availableCount, claimCodes, checkLowStock, releaseCodes } from './codeStockService.js';
 import { memberDiscountPercent } from './membershipService.js';
@@ -365,6 +366,32 @@ export async function transitionOrder(orderId, to, ctx = {}) {
     }
   }
   if (to === 'refunded') await postOrderEvent(updated, 'refunded').catch(() => {});
+
+  /* Tell the OWNER, on their phone, within seconds.
+     Hung off the state machine rather than off the call sites: every status
+     change in this system goes through here, so a new payment provider or an
+     admin action added later is covered without anyone remembering to. Wiring
+     it per-call-site is how the Discord events ended up missing three of the
+     places that should have fired them. */
+  const NOTIFY_ON = {
+    payment_received: 'order.paid',
+    failed: 'payment.failed',
+    refunded: 'order.refunded',
+  };
+  if (NOTIFY_ON[to]) {
+    const items = (updated.items || [])
+      .map((i) => `${i.quantity > 1 ? `${i.quantity}× ` : ''}${i.name}`);
+    await notifyOwner(NOTIFY_ON[to], {
+      title: `${updated.number} · ${updated.totalFormatted || formatMoney(updated.total, updated.currency)}`,
+      lines: [
+        items.length ? items.join(', ') : 'no items',
+        `Customer: ${updated.email}`,
+        ...(ctx.reason ? [`Reason: ${ctx.reason}`] : []),
+      ],
+      url: `${config.appUrl}/admin/orders/${updated.id}`,
+    }).catch(() => {});
+  }
+
   // Bring the buyer's Discord roles in line with this order.
   //
   // Fired on the way DOWN as well as up, which is the part that was missing:
