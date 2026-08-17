@@ -5,6 +5,7 @@
  */
 import { useEffect, useState } from 'react';
 import { api } from './api.js';
+import { getConfig } from './useConfig.js';
 import { iconFor } from './sampleCatalog.js';
 
 let cache = null;      // last known map
@@ -13,7 +14,7 @@ let inflight = null;   // shared promise so N components trigger 1 request
 function load() {
   if (cache) return Promise.resolve(cache);
   if (!inflight) {
-    inflight = api.get('/api/config')
+    inflight = getConfig()
       .then((c) => { cache = c?.categoryLogos || {}; return cache; })
       .catch(() => { cache = {}; return cache; })
       .finally(() => { inflight = null; });

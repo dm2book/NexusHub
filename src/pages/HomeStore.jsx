@@ -15,6 +15,7 @@ import { useI18n } from '../lib/i18n.jsx';
 import { LangSwitch } from '../components/store/StoreNav.jsx';
 import { flyToCart } from '../lib/flyToCart.js';
 import { api } from '../lib/api.js';
+import { getConfig } from '../lib/useConfig.js';
 import { useStats } from '../lib/useStats.js';
 import { useReviews } from '../lib/useReviews.js';
 import { useReveal } from '../lib/useReveal.js';
@@ -31,6 +32,8 @@ import { useCategoryLogos } from '../lib/useCategoryLogos.js';
 import { useTrustpilot } from '../lib/useTrustpilot.js';
 import { SUPPORT_EMAIL } from '../lib/support.js';
 import { openForgeChat } from '../lib/forgeChat.js';
+import { allowed, onConsentChange } from '../lib/consent.js';
+import CookieConsent from '../components/CookieConsent.jsx';
 const ChatWidget = lazy(() => import('../components/ChatWidget.jsx'));
 
 const ICON = iconPath;
@@ -138,7 +141,15 @@ export default function HomeStore() {
   }, []);
   useEffect(() => {
     const ref = new URLSearchParams(window.location.search).get('ref');
-    if (ref) localStorage.setItem('fm_ref', ref.toUpperCase().slice(0, 40));
+    // Marketing attribution: an identifier stored to credit a referrer later, so
+    // it waits for permission like anything else non-essential.
+    const store = () => {
+      if (ref && allowed('marketing')) localStorage.setItem('fm_ref', ref.toUpperCase().slice(0, 40));
+    };
+    store();
+    // Someone who lands on a referral link and only then accepts is still on
+    // this page — capture it now rather than losing the referrer's credit.
+    return onConsentChange(store);
   }, []);
   // The tab title and the Google result. It carried the same interchangeable
   // slogan the hero used to, in the one place a searcher sees before clicking.
@@ -173,7 +184,7 @@ export default function HomeStore() {
   // The homepage renders its own header, which had no mobile menu at all —
   // How it works, Reviews, Drops and Support were unreachable from '/'.
   const [menuOpen, setMenuOpen] = useState(false);
-  useEffect(() => { api.get('/api/config').then((c) => setAnnouncement(c.announcement || '')).catch(() => {}); }, []);
+  useEffect(() => { getConfig().then((c) => setAnnouncement(c.announcement || '')); }, []);
   // Real reviews only — an empty testimonial card costs more trust than it earns.
   const hasReviews = reviews.length > 0;
 
@@ -750,6 +761,7 @@ export default function HomeStore() {
       <RecentlyDelivered />
       <DeferUntilIdle><Suspense fallback={null}><CommandPalette /></Suspense></DeferUntilIdle>
       <MobileTabBar />
+      <CookieConsent />
     </div>
   );
 }

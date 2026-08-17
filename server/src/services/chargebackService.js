@@ -13,6 +13,9 @@
 import { run, get, all, nowIso } from '../db/index.js';
 import { newId } from '../utils/ids.js';
 import { audit } from './auditService.js';
+import { notifyOwner } from './notifyService.js';
+import { formatMoney } from '../utils/money.js';
+import { config } from '../config/env.js';
 
 /**
  * Record a chargeback. Idempotent per PSP payment id.
@@ -50,6 +53,23 @@ export async function recordChargeback({
   }).catch(() => {});
 
   console.warn(`[chargeback] ${order?.number || '(no order)'} · ${email} · ${amount} ${currency} · ${reason || source}`);
+
+  /* The loud one, and the reason this feature exists.
+     A chargeback has a deadline — the bank wants the evidence within days, and
+     a defence submitted late is the money gone plus a fee. It is sent at high
+     priority so it gets through a silent phone, and it sits AFTER the duplicate
+     guard above: a PSP that retries its webhook must not buzz the owner twice
+     for the same dispute, or the alerts stop being read. */
+  await notifyOwner('chargeback', {
+    title: `${order?.number || 'Unknown order'} · ${formatMoney(Math.abs(Number(amount) || 0), currency)}`,
+    lines: [
+      `Customer: ${email}`,
+      `Reason: ${reason || source}`,
+      'Gather the delivery proof and answer the bank before the deadline.',
+    ],
+    url: order?.id ? `${config.appUrl}/admin/orders/${order.id}` : `${config.appUrl}/admin/security`,
+  }).catch(() => {});
+
   return { id, duplicate: false };
 }
 

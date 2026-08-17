@@ -6,6 +6,7 @@ import {
   ShoppingBag, Mail, LayoutDashboard, RotateCcw, XCircle,
 } from 'lucide-react';
 import { api } from '../lib/api.js';
+import { getConfig } from '../lib/useConfig.js';
 import { useI18n } from '../lib/i18n.jsx';
 import { StatusBadge, STATUS_META } from '../components/ui.jsx';
 import { useToast } from '../context/ToastContext.jsx';
@@ -45,7 +46,7 @@ export default function Track() {
   const prevStatus = useRef(null);
   const [celebrate, setCelebrate] = useState(false);
 
-  useEffect(() => { api.get('/api/config').then(setCfg).catch(() => {}); }, []);
+  useEffect(() => { getConfig().then(setCfg); }, []);
 
   const lookup = async (num, { silent = false } = {}) => {
     if (!silent) { setBusy(true); setError(''); setResult(null); }

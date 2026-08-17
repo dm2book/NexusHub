@@ -4,6 +4,7 @@ import { Zap } from 'lucide-react';
 import { api } from '../../lib/api.js';
 import { useI18n } from '../../lib/i18n.jsx';
 import { SUPPORT_EMAIL } from '../../lib/support.js';
+import { CookiePreferencesLink } from '../CookieConsent.jsx';
 import { useTrustpilot } from '../../lib/useTrustpilot.js';
 import SellerIdentity from './SellerIdentity.jsx';
 
@@ -118,7 +119,12 @@ export default function StoreFooter() {
       <div className="border-t border-slate-200/70">
         <div className="max-w-[1400px] mx-auto px-4 lg:px-8 py-5 flex flex-wrap items-center justify-between gap-3 text-sm text-slate-400">
           <span>© {new Date().getFullYear()} ForgeMarket · {t('footer.rights', 'Digital goods for gamers')}</span>
-          <SystemStatus />
+          <div className="flex items-center gap-4">
+            {/* Withdrawing consent has to be as easy as giving it, so it cannot
+                live only in a banner that never returns once answered. */}
+            <CookiePreferencesLink className="inline-block py-1 min-h-[24px] underline underline-offset-2 hover:text-violet-600 transition" />
+            <SystemStatus />
+          </div>
         </div>
       </div>
     </footer>

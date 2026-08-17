@@ -6,6 +6,7 @@
 import { config, manualPayMethods } from '../config/env.js';
 import { get } from '../db/index.js';
 import { botSeenRecently } from './discordService.js';
+import { configuredChannels } from './notifyService.js';
 import { isEnabled as mollieEnabled, isTestKey as mollieTestKey, SUPPORTED_METHODS as MOLLIE_METHODS } from './mollieService.js';
 // The only place the server reaches into the SPA tree. legalIdentity.js is a
 // dependency-free constants module that both sides must agree on: the storefront
@@ -142,6 +143,20 @@ export async function launchChecks() {
         `${total - on} of ${total} admin account(s) have no second factor. Anyone who reaches that inbox can read every order and every delivered code — turn it on in Account → Settings.`);
     }
   } catch (e) { add('twofactor', 'Admin two-factor', 'warn', `Could not check: ${e.message}`); }
+
+  // 9. Whether anyone finds out that a sale happened.
+  //
+  // A warning, not a blocker: the shop sells perfectly well with no alerts. What
+  // it cannot do is tell you a chargeback arrived, and a chargeback answered a
+  // week late is the money gone. The Discord ops webhook checked above is a
+  // different thing — without a webhook URL those events queue for the bot,
+  // which polls once a minute — so having that set is not the same as being
+  // told, and this check says so rather than counting it.
+  const notify = configuredChannels();
+  add('notify', 'Owner alerts', notify.length ? 'ok' : 'warn',
+    notify.length
+      ? `${notify.join(' + ')} — paid, failed, refund, chargeback and low stock, within seconds`
+      : 'Nothing set, so a chargeback or a sold-out product waits until you happen to look. Set any one of NOTIFY_DISCORD_WEBHOOK_URL, TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID, or PUSHOVER_TOKEN + PUSHOVER_USER.');
 
   const failing = checks.filter((c) => c.status === 'fail').length;
   const warning = checks.filter((c) => c.status === 'warn').length;

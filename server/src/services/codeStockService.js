@@ -8,6 +8,7 @@ import { run, get, all, nowIso, tx } from '../db/index.js';
 import { newId } from '../utils/ids.js';
 import { config } from '../config/env.js';
 import { postDropEvent, postStockAlert } from './discordService.js';
+import { notifyOwner } from './notifyService.js';
 
 /** Add a batch of codes (array of strings) to a product's stock. Returns count added. */
 export async function addProductCodes(productId, codes = []) {
@@ -56,7 +57,23 @@ export async function checkLowStock(productId) {
       { at: nowIso(), p: productId });
     if (!r?.changes) return;
     const product = await get(`SELECT id, name FROM products WHERE id = @p`, { p: productId });
-    if (product) await postStockAlert(product, remaining);
+    if (!product) return;
+    await postStockAlert(product, remaining);
+    /* The quiet one. Low stock is a thing to handle today, not tonight, so it
+       goes out silently on Telegram and below normal priority on Pushover — an
+       owner woken by a restock reminder mutes the channel, and then misses the
+       chargeback. The once-per-cycle stamp claimed just above means this fires
+       once per stock cycle rather than once per order. */
+    await notifyOwner('stock.low', {
+      title: remaining === 0 ? `Out of stock: ${product.name}` : `Low stock: ${product.name}`,
+      lines: [
+        `${remaining} code${remaining === 1 ? '' : 's'} left (alert threshold ${config.discord.lowStockThreshold}).`,
+        remaining === 0
+          ? 'New orders for this product will need delivering by hand.'
+          : 'Load more codes before it runs out.',
+      ],
+      url: `${config.appUrl}/admin/products`,
+    }).catch(() => {});
   } catch (err) {
     console.error('[stock] low-stock check failed:', err.message);
   }
@@ -67,10 +84,33 @@ export async function availableCount(productId) {
   return Number(r?.n || 0);
 }
 
-/** Available counts for several products → { productId: n }. */
+/**
+ * Available counts for several products → { productId: n }.
+ *
+ * ONE grouped query, not one per product. This was a `for` loop with an `await`
+ * inside it, so /api/products issued 1 + 72 queries — and 1 + N for whatever the
+ * catalogue grows to. Each individual count is a fast index scan
+ * (idx_product_codes_avail), so this was never slow locally; the cost is 72
+ * sequential ROUND TRIPS, and on a managed Postgres in another region at ~25ms
+ * each that is roughly 1.8 seconds of pure waiting before the response starts.
+ *
+ * Promise.all would not have fixed it either: the pool caps at 5 connections,
+ * so 72 parallel counts just become 15 waves instead of 72.
+ *
+ * Products with no rows are absent from the GROUP BY, so they are filled in as
+ * 0 — a missing key here would render as "out of stock" instead of "unlimited",
+ * which are opposite claims.
+ */
 export async function availableCounts(productIds = []) {
   const out = {};
-  for (const id of productIds) out[id] = await availableCount(id);
+  if (!productIds.length) return out;
+  for (const id of productIds) out[id] = 0;
+  const rows = await all(
+    `SELECT product_id, COUNT(*)::int AS n
+       FROM product_codes
+      WHERE status = 'available' AND product_id = ANY(@ids)
+      GROUP BY product_id`, { ids: productIds });
+  for (const r of rows) out[r.product_id] = Number(r.n || 0);
   return out;
 }
 
