@@ -213,6 +213,18 @@ console.log('\n— The launch dashboard agrees with the checkout —');
     legalComplete() ? by.identity.status !== 'fail' : by.identity.status === 'fail',
     `status=${by.identity?.status}`);
   ok('…and it says which file to edit', /legalIdentity\.js/.test(by.identity?.detail || ''));
+
+  // Owner alerts. A shop with none still sells, so this is a warning — but it
+  // is the difference between answering a chargeback and finding out weeks
+  // later, and nothing else on the site would ever mention it.
+  ok('the dashboard says whether anyone is told a sale happened', !!by.notify, 'no owner-alert check');
+  ok('no alert channel is a warning, not a blocker',
+    by.notify.status !== 'fail', `status=${by.notify?.status}`);
+  ok('…and the fix hint names an env var per channel',
+    by.notify.status === 'ok'
+    || ['NOTIFY_DISCORD_WEBHOOK_URL', 'TELEGRAM_BOT_TOKEN', 'PUSHOVER_TOKEN']
+      .every((v) => by.notify.detail.includes(v)),
+    by.notify?.detail);
 }
 
 srv.close();
