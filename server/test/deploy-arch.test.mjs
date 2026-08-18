@@ -179,5 +179,94 @@ console.log('\n— The next public route should not have to reinvent this —');
     'two copies drift, and the forgotten one ships with no cache header');
 }
 
+// ── 7. The product page has to survive the Vercel entry point ───────────────
+console.log('\n— A shared product link must return a page, not JSON —');
+{
+  /* This is the only test that drives api/index.js rather than the Express app
+     underneath it, and it exists because that gap hid a broken page.
+
+     vercel.json routes /product/(.*) to the function with the ORIGINAL path.
+     api/index.js prefixes every non-/api path with /api so Express sees the
+     route it expects — but the product page's handler is mounted at the ROOT
+     (app.use(seoRoutes)), so prefixing sent it to /api/product/:id, which
+     matches nothing, and every direct visit answered 404 JSON.
+
+     Nothing caught it: in-app navigation renders those pages client-side and
+     never asks the server, and every other test calls createApp() directly and
+     so skips the rewrite entirely. Only a shared link, a refresh, or a crawler
+     ever took the broken path — which is exactly the audience this route's
+     per-product metadata is written for. */
+  const http = await import('node:http');
+  const { default: handler } = await import('../../api/index.js');
+  const { get: dbGet } = await import('../src/db/index.js');
+  const product = await dbGet("SELECT id, name FROM products WHERE active=1 LIMIT 1");
+
+  const srv = http.createServer((req, res) => handler(req, res));
+  await new Promise((r) => srv.listen(0, r));
+  const base = `http://127.0.0.1:${srv.address().port}`;
+
+  const page = await fetch(`${base}/product/${product.id}`);
+  const html = await page.text();
+  ok('a direct product URL answers with a page', page.status === 200, `status=${page.status}`);
+  ok('…as HTML, not as a JSON error',
+    (page.headers.get('content-type') || '').startsWith('text/html'),
+    page.headers.get('content-type'));
+  ok('…carrying that product\'s own title',
+    new RegExp(`<title>[^<]*${product.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`).test(html),
+    (html.match(/<title>([^<]*)</) || [])[1]);
+  ok('…and its Product markup, which is the point of rendering it server-side',
+    /"@type"\s*:\s*"Product"/.test(html));
+  ok('…and it is held hard at the edge',
+    /s-maxage=\d+/.test(page.headers.get('cache-control') || ''),
+    page.headers.get('cache-control') || 'NO CACHE HEADER');
+
+  // The rewrite still has to do its job for everything else.
+  const sitemap = await fetch(`${base}/sitemap.xml`);
+  ok('the sitemap still resolves through the /api prefix', sitemap.status === 200, `status=${sitemap.status}`);
+  const products = await fetch(`${base}/api/products?limit=1`);
+  ok('and a normal /api route is untouched', products.status === 200, `status=${products.status}`);
+
+  srv.close();
+}
+
+// ── 8. Nothing outbound may hang a request ──────────────────────────────────
+console.log('\n— Every call that leaves the process has a deadline —');
+{
+  const mollie = read('../src/services/mollieService.js');
+  ok('the Mollie API call can be abandoned',
+    /AbortController/.test(mollie) && /signal: ctrl\.signal/.test(mollie),
+    'a stalled payment API would hold the request until the platform kills it');
+  ok('…and says so plainly when it does', /timed out after 15s/.test(mollie));
+
+  const discord = read('../src/services/discordService.js');
+  ok('the Discord widget call can be abandoned',
+    /getServerInfo[\s\S]{0,1800}signal: ctrl\.signal/.test(discord),
+    'this one sits inside /api/stats, which the homepage requests on first paint');
+}
+
+// ── 9. Independent reads go out together ────────────────────────────────────
+console.log('\n— Waiting in turn for things that do not depend on each other —');
+{
+  const stats = read('../src/services/publicStatsService.js');
+  ok('the eight public-stats reads issue as one wave',
+    /await Promise\.all\(\[/.test(stats) && !/const \w+ = await safe\(/.test(stats),
+    'eight serialized round trips is the whole latency of this endpoint');
+
+  const auth = read('../src/middleware/auth.js');
+  ok('the session check and the user load no longer queue behind each other',
+    /Promise\.all\(\[[\s\S]{0,160}isSessionActive[\s\S]{0,120}publicUser/.test(auth),
+    'a round trip added to every signed-in request');
+
+  const user = read('../src/services/userService.js');
+  ok('the member discount is read off the row already loaded, not fetched again',
+    /membershipActiveFor\(u\)/.test(user) && !/memberDiscountPercent\(userId\)/.test(user),
+    'that query runs once per user in the admin list');
+
+  const mollieRoute = read('../src/routes/mollie.js');
+  ok('the payment-method list is cacheable at the edge',
+    /publicCache\(res, \d+\);[\s\S]{0,80}isEnabled\(\)/.test(mollieRoute),
+    'it is public, identical per amount+locale, and calls Mollie every time');
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
