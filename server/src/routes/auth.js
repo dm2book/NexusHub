@@ -44,7 +44,33 @@ const ctxOf = (req) => ({
   req,
 });
 
+/**
+ * A readable "there is something to restore" flag beside the real cookies.
+ *
+ * The session and device cookies are httpOnly and scoped to /api/auth, which is
+ * correct and also means the storefront cannot see them. So on boot it tried the
+ * silent sign-in ladder blindly: every first-time visitor POSTed /auth/refresh
+ * and then /auth/device-login, learned it was a guest, and moved on — two
+ * requests no CDN can ever answer, on every visit, to reach a foregone
+ * conclusion. Measured on a real page load, they were half of the four origin
+ * hits a visit could not avoid.
+ *
+ * This carries no token and no identity: one character, readable by script, set
+ * whenever a real session cookie is set and cleared whenever they are. Its only
+ * job is to let a guest skip a conversation about a session that does not exist.
+ * A returning customer sees no change — the flag is there, so the ladder runs.
+ * Strictly necessary for authentication, so it needs no consent banner, and it
+ * is useless to anyone who steals it.
+ */
+export const HINT_COOKIE = 'fm_session_hint';
+function setSessionHint(res, on) {
+  const opts = { httpOnly: false, secure: config.isProd, sameSite: config.isProd ? 'none' : 'lax', path: '/' };
+  if (on) res.cookie(HINT_COOKIE, '1', { ...opts, maxAge: 60 * 86_400_000 });
+  else res.clearCookie(HINT_COOKIE, { path: '/' });
+}
+
 function setSessionCookie(res, refreshToken) {
+  setSessionHint(res, true);
   res.cookie(config.auth.cookieName, refreshToken, {
     httpOnly: true,
     secure: config.isProd,
@@ -59,6 +85,7 @@ function setSessionCookie(res, refreshToken) {
 }
 
 function setDeviceCookie(res, token) {
+  setSessionHint(res, true);
   res.cookie(DEVICE_COOKIE, token, {
     httpOnly: true, secure: config.isProd, sameSite: config.isProd ? 'none' : 'lax',
     maxAge: 60 * 86_400_000, path: '/api/auth',
@@ -395,6 +422,7 @@ router.post('/refresh', asyncHandler(async (req, res) => {
 
 router.post('/logout', requireAuth, asyncHandler(async (req, res) => {
   if (req.auth?.sid) await revokeSession(req.auth.sid);
+  setSessionHint(res, false);
   res.clearCookie(config.auth.cookieName, { path: '/api/auth' });
   await audit({ actor: { id: req.user.id, email: req.user.email }, action: 'auth.logout', req });
   res.json({ ok: true });
@@ -450,6 +478,7 @@ router.post('/logout-all', requireAuth, asyncHandler(async (req, res) => {
   await revokeOtherSessions(req.user.id, null);
   if (req.auth?.sid) await revokeSession(req.auth.sid);
   await revokeAllTrustedDevices(req.user.id);
+  setSessionHint(res, false);
   res.clearCookie(config.auth.cookieName, { path: '/api/auth' });
   res.clearCookie(DEVICE_COOKIE, { path: '/api/auth' });
   await audit({ actor: { id: req.user.id, email: req.user.email }, action: 'auth.logout_all', req });

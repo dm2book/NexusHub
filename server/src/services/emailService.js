@@ -7,15 +7,24 @@
  * - Every send (success or failure) is recorded in email_log.
  * - Templates are loaded from the DB so admin edits take effect immediately.
  */
-import nodemailer from 'nodemailer';
 import { config } from '../config/env.js';
 import { get, all, run, nowIso } from '../db/index.js';
 import { newId } from '../utils/ids.js';
 import { renderTemplate, renderTokens, wrapBranded, baseContext } from './templateService.js';
 
+/**
+ * nodemailer is loaded on the first SMTP send, not on import.
+ *
+ * The recommended production transport here is Resend's HTTP API — this file
+ * says so a few lines down, and raw SMTP from a serverless function is often
+ * slow or blocked outright. But the import sat at the top of a module the order
+ * path pulls in, so every cold start spent ~75ms loading an SMTP client that a
+ * Resend deployment never calls.
+ */
 let transporter = null;
-function getTransport() {
+async function getTransport() {
   if (transporter) return transporter;
+  const { default: nodemailer } = await import('nodemailer');
   transporter = config.email.smtpUrl
     ? nodemailer.createTransport(config.email.smtpUrl)
     : nodemailer.createTransport({ jsonTransport: true });
@@ -86,7 +95,7 @@ export async function sendEmail(eventKey, to, context = {}) {
       info = await sendViaResend({ from, to, subject, html }); // HTTP API (serverless-safe)
       status = 'sent';
     } else {
-      info = await getTransport().sendMail({ from, to, subject, html });
+      info = await (await getTransport()).sendMail({ from, to, subject, html });
       status = config.email.smtpUrl ? 'sent' : 'recorded';
     }
     await run(`INSERT INTO email_log (id, template_id, to_email, subject, status, provider_ref, context, created_at)
@@ -170,7 +179,7 @@ export async function sendRawEmail({ to, subject, innerHtml, context = {}, logTa
       info = await sendViaResend({ from, to, subject: subj, html });
       status = 'sent';
     } else {
-      info = await getTransport().sendMail({ from, to, subject: subj, html });
+      info = await (await getTransport()).sendMail({ from, to, subject: subj, html });
       status = config.email.smtpUrl ? 'sent' : 'recorded';
     }
     await run(`INSERT INTO email_log (id, template_id, to_email, subject, status, provider_ref, created_at)

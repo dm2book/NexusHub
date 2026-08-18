@@ -179,8 +179,25 @@ console.log('\n— The checklist reaches the one place that has no login wall �
   ok('the launch checks are printed into the boot log',
     /async function logReadiness\(\)[\s\S]{0,600}launchChecks\(\)/.test(appSrc),
     'the readiness picture is still only behind the admin login');
+  /* Read the function's actual body by counting braces rather than allowing N
+     characters between two strings. The property here is "logReadiness is called
+     from inside startBackgroundUpkeep" — a proximity regex answers a different
+     question, and answered it wrongly the moment a comment was added between
+     the two lines. */
+  const bodyOf = (src, decl) => {
+    const start = src.indexOf(decl);
+    if (start === -1) return '';
+    let depth = 0;
+    const i = src.indexOf('{', start);
+    for (let j = i; j < src.length; j++) {
+      if (src[j] === '{') depth++;
+      else if (src[j] === '}' && --depth === 0) return src.slice(i, j);
+    }
+    return '';
+  };
   ok('…once the process is up, not on every request',
-    /startBackgroundUpkeep[\s\S]{0,600}logReadiness\(\)/.test(appSrc));
+    /logReadiness\(\)/.test(bodyOf(appSrc, 'function startBackgroundUpkeep')),
+    'the checklist would run on every request instead of once per boot');
   ok('diagnostics can never fail a request',
     /logReadiness\(\)[\s\S]{0,900}catch \(e\)[\s\S]{0,160}readiness/.test(appSrc),
     'an error in the checklist could break serving');

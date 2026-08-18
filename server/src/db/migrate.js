@@ -17,9 +17,19 @@ export async function migrate() {
   // any migration is still pending WITHOUT taking the advisory lock. If the
   // schema is already current we return immediately, so a cold start never
   // blocks on a lock that a frozen sibling instance might be holding.
-  await run(`CREATE TABLE IF NOT EXISTS schema_migrations (
-    id TEXT PRIMARY KEY, applied_at TEXT NOT NULL)`);
-  if (await allApplied()) return 0;
+  //
+  // Ask first, and create only if the answer is "no such table". The
+  // unconditional CREATE TABLE IF NOT EXISTS was a second serialized round trip
+  // on every cold start — and a DDL statement against the primary — to discover
+  // something the SELECT on the next line already answers. On a deployed shop
+  // the table exists every single time.
+  try {
+    if (await allApplied()) return 0;
+  } catch (err) {
+    if (!/schema_migrations/.test(err.message)) throw err;   // a real failure
+    await run(`CREATE TABLE IF NOT EXISTS schema_migrations (
+      id TEXT PRIMARY KEY, applied_at TEXT NOT NULL)`);
+  }
 
   // There is real work to do. Serialize with a NON-BLOCKING advisory lock: a
   // blocking pg_advisory_lock is dangerous on serverless because Vercel freezes

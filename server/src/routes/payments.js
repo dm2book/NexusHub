@@ -11,7 +11,7 @@ const router = Router();
 router.post('/stripe/webhook', async (req, res) => {
   let event;
   try {
-    event = constructEvent(req.body, req.get('stripe-signature'));
+    event = await constructEvent(req.body, req.get('stripe-signature'));
   } catch (err) {
     console.error('[stripe] signature verification failed:', err.message);
     return res.status(400).send(`Webhook Error: ${err.message}`);

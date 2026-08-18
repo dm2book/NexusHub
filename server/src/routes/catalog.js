@@ -3,6 +3,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { config, manualPayMethods, commerceBlockers } from '../config/env.js';
 import { asyncHandler } from '../middleware/error.js';
+import { publicCache } from '../utils/httpCache.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 import { listProducts, getProduct, trendingProducts, priceHistory } from '../services/productService.js';
 import { availableCounts, availableCount } from '../services/codeStockService.js';
@@ -58,9 +59,7 @@ let reviewsCache = { at: 0, data: null };
  * windows are a minute, not an hour, and why anything order-specific or
  * user-specific below is deliberately left uncached.
  */
-const publicCache = (res, seconds, swr = seconds * 10) => {
-  res.set('Cache-Control', `public, max-age=0, s-maxage=${seconds}, stale-while-revalidate=${swr}`);
-};
+// Shared with every other public route — see utils/httpCache.js.
 
 router.get('/reviews', asyncHandler(async (_req, res) => {
   publicCache(res, 300);
