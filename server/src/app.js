@@ -12,9 +12,13 @@ import cors from 'cors';
 import { config } from './config/env.js';
 import { get } from './db/index.js';
 import { migrate } from './db/migrate.js';
-import { seed, isSeeded, syncEmailTemplates } from './db/seed.js';
-import { seedDemoCatalog, syncCatalogImages } from './db/demoSeed.js';
-import { seedStarterContent } from './db/starterContent.js';
+/* `isSeeded` is the only thing here that a healthy production boot ever calls,
+   so it is the only one imported eagerly. The rest — the roles/permissions/
+   template seed, the 71-product demo catalog, the starter content — exist to
+   populate an EMPTY database. On a shop that has been running for a day they are
+   dead weight in the module graph of every single cold start, and the module
+   graph is the most expensive part of a cold start. They load if they are used. */
+import { isSeeded } from './db/seed.js';
 import { attachUser } from './middleware/auth.js';
 import { rateLimit } from './middleware/rateLimit.js';
 import { errorHandler, notFoundHandler } from './middleware/error.js';
@@ -48,9 +52,10 @@ function startBackgroundUpkeep(wasSeeded) {
     try {
       // Upgrade improved default email templates on already-seeded databases.
       // (A brand-new DB already got them synchronously via seed().)
-      if (wasSeeded) await syncEmailTemplates();
-      await seedStarterContent();
-      await syncCatalogImages();
+      // Off the request path already, so paying the import here costs nobody.
+      if (wasSeeded) await (await import('./db/seed.js')).syncEmailTemplates();
+      await (await import('./db/starterContent.js')).seedStarterContent();
+      await (await import('./db/demoSeed.js')).syncCatalogImages();
       console.log('[boot] background upkeep done in', Date.now() - t, 'ms');
     } catch (e) { console.error('[boot] background upkeep:', e.message); }
     await logReadiness();
@@ -96,12 +101,20 @@ export function ensureReady() {
   if (!readyPromise) {
     readyPromise = (async () => {
       await migrate();
-      const seeded = await isSeeded();
-      if (!seeded) await seed(); // empty DB needs roles/permissions/templates before serving
+      /* Two independent reads, previously awaited one after the other. On a
+         laptop that is a rounding error; from a function in Frankfurt to a
+         database in Virginia it is a whole extra round trip on the first request
+         after every cold start, to learn two unrelated facts. */
+      const [seeded, products] = await Promise.all([
+        isSeeded(),
+        get('SELECT COUNT(*) AS n FROM products WHERE active = 1').catch(() => ({ n: 1 })),
+      ]);
+      if (!seeded) await (await import('./db/seed.js')).seed(); // empty DB needs roles/permissions/templates first
       // Zero-config: an empty shop must have products before we serve it, else
       // the storefront is blank. An already-stocked store skips this entirely.
-      const { n } = await get('SELECT COUNT(*) AS n FROM products WHERE active = 1').catch(() => ({ n: 1 }));
-      if (config.seedDemo || Number(n) === 0) await seedDemoCatalog();
+      if (config.seedDemo || Number(products.n) === 0) {
+        await (await import('./db/demoSeed.js')).seedDemoCatalog();
+      }
       // Non-critical upkeep runs AFTER we're ready to serve.
       startBackgroundUpkeep(seeded);
     })().catch((err) => {

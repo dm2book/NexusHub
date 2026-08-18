@@ -3,9 +3,17 @@
  * probes the database (connectivity, migrations, every key table) and reports the
  * real configured/connected state of email, SMS, storage and the job queue.
  *
- * GET /api/health        → fast summary (SELECT 1 + table row counts).
- * GET /api/health?deep=1 → also runs a non-destructive write→read→update→delete
- *                          CRUD self-test against a dedicated health_probe table.
+ * GET /api/health          → is it alive? one SELECT 1, cheap enough to call often.
+ * GET /api/health?tables=1 → also lists migrations and counts every key table.
+ * GET /api/health?deep=1   → also runs a non-destructive write→read→update→delete
+ *                            CRUD self-test against a dedicated health_probe table.
+ *
+ * The census used to be the DEFAULT, and the storefront footer calls this
+ * endpoint on every page load to render its status dot. That made the cheapest
+ * possible question — "are you up?" — cost thirteen serialized round trips and a
+ * COUNT(*) over every important table, on every single page view. Measured, not
+ * assumed. The full picture is still one query parameter away for the admin and
+ * for anyone debugging; it is simply no longer what a visitor pays for.
  */
 import { run, get, all, nowIso } from '../db/index.js';
 import { config } from '../config/env.js';
@@ -20,7 +28,7 @@ async function probe(fn) {
   catch (e) { return { ok: false, error: e.message }; }
 }
 
-async function databaseHealth(deep) {
+async function databaseHealth(deep, wantTables = false) {
   const started = Date.now();
   if (!config.db.url) {
     return { ok: false, status: 'not_configured',
@@ -30,15 +38,21 @@ async function databaseHealth(deep) {
   const ping = await probe(() => get('SELECT 1 AS ok'));
   if (!ping.ok) return { ok: false, status: 'down', error: ping.error, latencyMs: Date.now() - started };
 
-  // Migrations applied.
-  const migrations = await probe(async () =>
-    (await all('SELECT id FROM schema_migrations ORDER BY id')).map((r) => r.id));
-
-  // Per-table existence + row counts (each guarded so one missing table is visible).
+  const wantsCensus = wantTables || deep;
+  let migrations = null;
   const tables = {};
-  for (const t of KEY_TABLES) {
-    const r = await probe(async () => Number((await get(`SELECT COUNT(*) AS n FROM ${t}`)).n));
-    tables[t] = r.ok ? { ok: true, rows: r.value } : { ok: false, error: r.error };
+  if (wantsCensus) {
+    migrations = await probe(async () =>
+      (await all('SELECT id FROM schema_migrations ORDER BY id')).map((r) => r.id));
+
+    /* Per-table existence + row counts, each guarded so one missing table is
+       visible rather than fatal — but issued together. Eleven awaits in a for
+       loop is eleven round trips end to end; this is one. */
+    const counts = await Promise.all(KEY_TABLES.map((t) =>
+      probe(async () => Number((await get(`SELECT COUNT(*) AS n FROM ${t}`)).n))));
+    KEY_TABLES.forEach((t, i) => {
+      tables[t] = counts[i].ok ? { ok: true, rows: counts[i].value } : { ok: false, error: counts[i].error };
+    });
   }
 
   // Optional CRUD self-test (read/write/update/delete) on a throwaway table.
@@ -62,8 +76,9 @@ async function databaseHealth(deep) {
     ok: true,
     status: allTablesOk ? 'up' : 'degraded',
     latencyMs: Date.now() - started,
-    migrationsApplied: migrations.ok ? migrations.value : [],
-    tables,
+    // Absent rather than empty when it was not asked for: `migrationsApplied: []`
+    // reads as "no migrations have run", which is a different and alarming claim.
+    ...(wantsCensus ? { migrationsApplied: migrations.ok ? migrations.value : [], tables } : {}),
     ...(crud ? { crud: crud.ok ? crud.value : { ok: false, error: crud.error } } : {}),
   };
 }
@@ -105,8 +120,8 @@ function queueHealth() {
   };
 }
 
-export async function healthSummary({ deep = false } = {}) {
-  const database = await databaseHealth(deep);
+export async function healthSummary({ deep = false, tables = false } = {}) {
+  const database = await databaseHealth(deep, tables);
   const email = emailHealth();
   const sms = smsHealth();
   const storage = storageHealth();

@@ -43,7 +43,34 @@ function getPool() {
     connectionTimeoutMillis: 12_000,
     statement_timeout: 25_000,
     query_timeout: 25_000,
+    // Reuse the socket between invocations of a warm instance. pg closes idle
+    // clients after 10s by default, and on a quiet shop that means almost every
+    // request pays a fresh TCP + TLS + auth handshake to another region — the
+    // most expensive thing a request can do before it does any work at all.
+    idleTimeoutMillis: Number(process.env.PG_IDLE_TIMEOUT_MS || 60_000),
+    // A frozen instance's socket looks alive to us and dead to the network in
+    // between. Keepalives make the OS notice rather than the next query.
+    keepAlive: true,
+    keepAliveInitialDelayMillis: 10_000,
   });
+
+  /* An idle connection dying must not take the shop with it.
+
+     `pg.Pool` is an EventEmitter, and it emits 'error' when a client sitting
+     idle in the pool is dropped — which is exactly what Neon's and Vercel's
+     poolers do to connections they reclaim, and what happens to the socket of
+     an instance that has been frozen. With no listener, Node's default for an
+     unhandled 'error' event is to throw, so the WHOLE function process dies and
+     the next visitor gets 500 FUNCTION_INVOCATION_FAILED.
+
+     Measured, not reasoned about: terminating one idle backend from another
+     session killed the process outright. The pool recovers by itself — it
+     discards the dead client and opens a new one on the next query — so the
+     only thing missing was somebody listening. */
+  _pool.on('error', (err) => {
+    console.error(`[db] idle connection dropped (${err.message}) — the pool will reopen one`);
+  });
+
   return _pool;
 }
 

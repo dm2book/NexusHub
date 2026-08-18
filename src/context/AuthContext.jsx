@@ -4,6 +4,22 @@ import { api, setAccessToken, getAccessToken } from '../lib/api.js';
 const AuthContext = createContext(null);
 export const useAuth = () => useContext(AuthContext);
 
+/**
+ * Is there any sign this browser has ever had a session here?
+ *
+ * The server sets `fm_session_hint` alongside the httpOnly session and trusted
+ * device cookies, and clears it with them. It holds no token and identifies
+ * nobody — it exists so a genuine first-time visitor can skip the silent
+ * sign-in ladder instead of paying two uncacheable POSTs to be told they are a
+ * guest. Reading it can fail (cookies disabled, a sandboxed frame); when it
+ * does, assume there IS a session and take the slow path — being logged out by
+ * accident is far worse than one extra request.
+ */
+function hasSessionHint() {
+  try { return /(?:^|;\s*)fm_session_hint=/.test(document.cookie); }
+  catch { return true; }
+}
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -23,12 +39,22 @@ export function AuthProvider({ children }) {
       //  1. access token in this tab (fast path)
       //  2. refresh-session cookie (30 days, sliding)
       //  3. trusted-device cookie (60 days, sliding) → brand-new session
-      if (!getAccessToken()) await api.refresh().catch(() => {});
-      if (!getAccessToken()) {
-        try {
-          const { accessToken } = await api.post('/api/auth/device-login');
-          if (accessToken) setAccessToken(accessToken);
-        } catch { /* no trusted device — stay guest */ }
+      // Nothing to restore? Then do not ask. Both calls below are POSTs, so no
+      // cache can ever answer them: for a first-time visitor they were two
+      // guaranteed round trips to a possibly-cold serverless function, to be
+      // told what the absence of the hint cookie already says. The real session
+      // cookies are httpOnly and invisible here, which is why the hint exists;
+      // the server sets it whenever a session or trusted device is set, so a
+      // returning customer still takes the full ladder and still never sees a
+      // login screen.
+      if (!getAccessToken() && hasSessionHint()) {
+        await api.refresh().catch(() => {});
+        if (!getAccessToken()) {
+          try {
+            const { accessToken } = await api.post('/api/auth/device-login');
+            if (accessToken) setAccessToken(accessToken);
+          } catch { /* no trusted device — stay guest */ }
+        }
       }
       if (getAccessToken()) {
         try {

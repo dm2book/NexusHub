@@ -11,7 +11,16 @@ const router = Router();
 // Health & diagnostics: { database, email, sms, storage, queue }.
 // ?deep=1 also runs a read/write/update/delete DB self-test.
 router.get('/health', asyncHandler(async (req, res) => {
-  const h = await healthSummary({ deep: req.query.deep === '1' });
+  const h = await healthSummary({ deep: req.query.deep === '1', tables: req.query.tables === '1' });
+  /* The storefront footer polls this on every page view to decide whether to
+     show "systems normal". Thirty seconds of edge caching turns that from an
+     origin hit per visitor into one per half minute, which is well inside how
+     long anyone would tolerate a stale dot. Deliberately NO
+     stale-while-revalidate: a status that keeps serving "up" out of a stale
+     cache during a real outage is worse than showing no status at all. */
+  if (!req.query.deep && !req.query.tables) {
+    res.set('Cache-Control', 'public, max-age=0, s-maxage=30');
+  }
   res.status(h.ok ? 200 : 503).json(h);
 }));
 

@@ -9,13 +9,25 @@
  * Activated by setting STRIPE_SECRET_KEY; otherwise isEnabled() is false and the
  * storefront falls back to demo or pending payments.
  */
-import Stripe from 'stripe';
 import { config } from '../config/env.js';
 
+/**
+ * The SDK is loaded on first use, not on import.
+ *
+ * `routes/catalog.js` imports this module, so it sits in the module graph of
+ * every cold start — and loading the Stripe SDK cost about 150ms of the ~360ms
+ * this function spent evaluating JavaScript before it could serve anything.
+ * This shop runs on Mollie, which needs no SDK at all (it is plain fetch), so on
+ * the normal deployment that 150ms bought nothing whatsoever. Behind a dynamic
+ * import it is paid by the first Stripe checkout and by nobody else.
+ */
 let client = null;
-function stripe() {
+async function stripe() {
   if (!config.payments.stripe.secretKey) return null;
-  if (!client) client = new Stripe(config.payments.stripe.secretKey);
+  if (!client) {
+    const { default: Stripe } = await import('stripe');
+    client = new Stripe(config.payments.stripe.secretKey);
+  }
   return client;
 }
 
@@ -23,7 +35,7 @@ export const isEnabled = () => !!config.payments.stripe.secretKey;
 
 /** Create a Checkout Session for an order. Returns { id, url }. */
 export async function createCheckoutSession(order) {
-  const s = stripe();
+  const s = await stripe();
   if (!s) throw new Error('Stripe is not configured');
 
   const session = await s.checkout.sessions.create({
@@ -60,8 +72,8 @@ export async function createCheckoutSession(order) {
 }
 
 /** Verify a webhook payload (raw Buffer) and return the Stripe event. */
-export function constructEvent(rawBody, signature) {
-  const s = stripe();
+export async function constructEvent(rawBody, signature) {
+  const s = await stripe();
   const secret = config.payments.stripe.webhookSecret;
   if (!s || !secret) throw new Error('Stripe webhook not configured');
   return s.webhooks.constructEvent(rawBody, signature, secret);
