@@ -156,6 +156,16 @@ export default function ProductDetail() {
   const desc = productDescription(product, lang);
   const crossSell = (recs.crossSell || []).slice(0, 4);
   const upsell = recs.upsell?.[0] || null;
+  /* Other sizes of the same thing, for the pack switcher.
+     This used to be `related`, computed from a fetch of the WHOLE catalogue that
+     was removed as an obvious waste — 49 KB of JSON to pick four items the
+     recommendations endpoint already returns. The fetch went; two references to
+     `related` did not, and a ReferenceError in render does not degrade, it
+     blanks the page. Every product page on the site rendered an empty body.
+     Recommendations may cross categories (they include co-purchases), so the
+     switcher takes only the same-category ones — which is exactly what the old
+     variable held. */
+  const packSiblings = (recs.crossSell || []).filter((p) => p.category === product?.category);
   const wished = has(product.id);
 
   const addToCart = () => {
@@ -265,13 +275,13 @@ export default function ProductDetail() {
           <DeliveryFacts product={product} t={t} />
 
           {/* Pack switcher — jump between sizes of the same category in one tap */}
-          {related.length > 0 && (
+          {packSiblings.length > 0 && (
             <div className="mt-5">
               <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">
                 {t('product.chooseAmount', 'Choose your amount')}
               </div>
               <div className="flex flex-wrap gap-2">
-                {[product, ...related]
+                {[product, ...packSiblings]
                   .sort((a, b) => a.price - b.price)
                   .map((p) => {
                     const current = p.id === product.id;
