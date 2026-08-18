@@ -56,8 +56,30 @@ export const EVENTS = {
   'payment.failed':  { emoji: '⚠️', color: 0xf59e0b, priority: 0,  label: 'Payment failed' },
   'order.refunded':  { emoji: '↩️', color: 0xec4899, priority: 0,  label: 'Refund' },
   'chargeback':      { emoji: '🚨', color: 0xef4444, priority: 1,  label: 'Chargeback' },
+  /* Three rungs of the same ladder, deliberately not equally loud.
+
+     "Ten left" is a note for whenever you next sit down. "Out of stock" means
+     the shop is selling something nobody can deliver, and every hour it stays
+     that way is orders that have to be filled by hand or refunded — so that one
+     is allowed to make a phone ring at 3am, and the other two are not. An owner
+     woken by a restock reminder mutes the channel and then misses this. */
   'stock.low':       { emoji: '📉', color: 0xf97316, priority: -1, label: 'Low stock' },
+  'stock.critical':  { emoji: '🟠', color: 0xf59e0b, priority: 0,  label: 'Stock critical' },
+  'stock.out':       { emoji: '🔴', color: 0xef4444, priority: 1,  label: 'Out of stock' },
 };
+
+/**
+ * Which Discord webhook the owner alerts would use, or '' when none is set.
+ *
+ * Exported so a caller that ALSO posts to Discord by another route can tell
+ * whether the two would land in the same channel. The stock alert does exactly
+ * that: it has its own staff webhook, and when that is unset it falls back to
+ * the order webhook — which is the same place these alerts go, so the owner got
+ * every stock warning twice in one channel.
+ */
+export function discordTarget() {
+  return config.notify.discordWebhookUrl || config.discord.orderWebhookUrl || '';
+}
 
 /** fetch with a deadline, so one dead endpoint cannot hold an order open. */
 async function timedFetch(url, init = {}, ms = TIMEOUT_MS) {

@@ -8,7 +8,7 @@ import { run, get, all, nowIso, tx } from '../db/index.js';
 import { newId } from '../utils/ids.js';
 import { config } from '../config/env.js';
 import { postDropEvent, postStockAlert } from './discordService.js';
-import { notifyOwner } from './notifyService.js';
+import { notifyOwner, discordTarget } from './notifyService.js';
 
 /** Add a batch of codes (array of strings) to a product's stock. Returns count added. */
 export async function addProductCodes(productId, codes = []) {
@@ -25,8 +25,8 @@ export async function addProductCodes(productId, codes = []) {
   });
   if (added > 0) {
     // Restock: re-arm the low-stock alert and announce it to the community.
-    await run(`UPDATE products SET low_stock_alerted_at = NULL WHERE id = @p`, { p: productId })
-      .catch(() => {});
+    await run(`UPDATE products SET low_stock_alerted_at = NULL, low_stock_alert_level = NULL
+                WHERE id = @p`, { p: productId }).catch(() => {});
     const product = await get(`SELECT id, name, price, currency, active FROM products WHERE id = @p`, { p: productId });
     if (product?.active) {
       await postDropEvent('restock', { ...product, added }).catch(() => {});
@@ -36,9 +36,59 @@ export async function addProductCodes(productId, codes = []) {
 }
 
 /**
- * After codes are claimed, alert staff once when a product's remaining stock
- * falls below the threshold. The products.low_stock_alerted_at stamp keeps it
- * to a single alert per stock cycle (cleared again on restock). Best-effort.
+ * Which alert tier a remaining count falls into, or null for "plenty".
+ *
+ * The most SEVERE matching tier wins, so a product that drops from 12 to 3 in
+ * one order announces "critical", not "low" and then "critical" — the owner
+ * wants to know where the stock is now, not to be walked down the ladder.
+ *
+ * 0 is exact rather than "below": `remaining < 0` is impossible, and "out of
+ * stock" is a different statement from "nearly out".
+ */
+export function stockTierFor(remaining, tiers = config.stock.alertTiers) {
+  const ascending = [...tiers].sort((a, b) => a - b);
+  for (const t of ascending) {
+    if (t === 0 ? remaining === 0 : remaining < t) return t;
+  }
+  return null;
+}
+
+/** The event name and wording that belong to a tier. */
+function tierMessage(tier, product, remaining) {
+  if (tier === 0) {
+    return {
+      event: 'stock.out',
+      title: `Out of stock: ${product.name}`,
+      lines: [
+        'No codes left. New orders for this product cannot be delivered automatically.',
+        'Load codes now, or take the product offline until you can.',
+      ],
+    };
+  }
+  const critical = tier <= 5;
+  return {
+    event: critical ? 'stock.critical' : 'stock.low',
+    title: `${critical ? 'Stock critical' : 'Low stock'}: ${product.name}`,
+    lines: [
+      `${remaining} code${remaining === 1 ? '' : 's'} left — below the ${tier} mark.`,
+      critical
+        ? 'This runs out in the next few orders. Load more today.'
+        : 'Worth topping up before it becomes urgent.',
+    ],
+  };
+}
+
+/**
+ * After codes are claimed, walk the stock-alert ladder.
+ *
+ * One alert per tier per stock cycle: crossing 10 says so, crossing 5 says so
+ * again, hitting 0 says so once more, and none of them repeats while the stock
+ * stays there. Restocking clears the ladder and re-arms every rung.
+ *
+ * The gate is a single conditional UPDATE, so this is safe under concurrency:
+ * two orders that cross the same tier at the same moment race on one row, and
+ * only the one that changes it sends. Best-effort throughout — a stock alert
+ * must never be the reason an order fails.
  */
 export async function checkLowStock(productId) {
   try {
@@ -49,29 +99,44 @@ export async function checkLowStock(productId) {
     // exactly the configuration most owners run: the shop sold out quietly and
     // the first sign was an order nobody could fill.
     const remaining = await availableCount(productId);
-    if (remaining >= config.discord.lowStockThreshold) return;
-    // Claim the alert atomically so concurrent orders produce only one ping.
-    const r = await run(
-      `UPDATE products SET low_stock_alerted_at = @at
-        WHERE id = @p AND low_stock_alerted_at IS NULL`,
-      { at: nowIso(), p: productId });
-    if (!r?.changes) return;
+    const tier = stockTierFor(remaining);
+    if (tier === null) return;
+
+    /* Claim this rung atomically.
+
+       `low_stock_alert_level` holds the lowest tier already announced for the
+       current stock cycle, so the condition below answers three questions at
+       once: has anything been announced yet, is this rung more severe than the
+       last one, and did a concurrent order just claim it. Exactly one caller
+       gets changes > 0. */
+    const claimed = await run(
+      `UPDATE products SET low_stock_alert_level = @tier, low_stock_alerted_at = @at
+        WHERE id = @p AND (low_stock_alert_level IS NULL OR low_stock_alert_level > @tier)`,
+      { tier, at: nowIso(), p: productId });
+    if (!claimed?.changes) return;
+
     const product = await get(`SELECT id, name FROM products WHERE id = @p`, { p: productId });
     if (!product) return;
-    await postStockAlert(product, remaining);
-    /* The quiet one. Low stock is a thing to handle today, not tonight, so it
-       goes out silently on Telegram and below normal priority on Pushover — an
-       owner woken by a restock reminder mutes the channel, and then misses the
-       chargeback. The once-per-cycle stamp claimed just above means this fires
-       once per stock cycle rather than once per order. */
-    await notifyOwner('stock.low', {
-      title: remaining === 0 ? `Out of stock: ${product.name}` : `Low stock: ${product.name}`,
-      lines: [
-        `${remaining} code${remaining === 1 ? '' : 's'} left (alert threshold ${config.discord.lowStockThreshold}).`,
-        remaining === 0
-          ? 'New orders for this product will need delivering by hand.'
-          : 'Load more codes before it runs out.',
-      ],
+    const { event, title, lines: body } = tierMessage(tier, product, remaining);
+
+    /* Two Discord paths exist, and they can be the same channel.
+
+       postStockAlert is the staff one: it has its own webhook and, with none
+       set, queues to the relay outbox for the community bot — the setup this
+       project documents, and the only path that works with no Discord secrets
+       on the host. notifyOwner is the owner's direct one, and its fallback is
+       the order webhook. When the staff alert would land exactly where the owner
+       alert already goes, sending both means every stock warning arrives twice
+       in one channel. Skip the duplicate and keep the richer message, which is
+       also the one carrying Telegram. */
+    const staffUrl = config.discord.stockWebhookUrl || config.discord.orderWebhookUrl;
+    const ownerUrl = discordTarget();
+    if (!(staffUrl && staffUrl === ownerUrl)) {
+      await postStockAlert(product, remaining, tier).catch(() => {});
+    }
+    await notifyOwner(event, {
+      title,
+      lines: body,
       url: `${config.appUrl}/admin/products`,
     }).catch(() => {});
   } catch (err) {

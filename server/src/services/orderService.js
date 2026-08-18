@@ -496,8 +496,19 @@ export async function autoDispenseFromStock(orderId, ctx = {}) {
     return false;
   }
   await deliverOrder(orderId, deliveries, { ...ctx, reason: 'Auto-delivered from stock' });
-  // Stock just moved — ping staff once if any item is now running low.
-  for (const it of order.items) checkLowStock(it.product_id).catch(() => {});
+  /* Stock just moved — walk the alert ladder for anything now running low.
+
+     Awaited, not fired and forgotten. On a serverless platform the function can
+     be frozen the moment the response is sent, which kills anything still in
+     flight — and this is a webhook path, so the response goes out the instant
+     delivery finishes. An unawaited alert here is an alert that sometimes never
+     leaves the process, which is indistinguishable from not having the feature.
+
+     Both are bounded and neither can throw: checkLowStock swallows its own
+     errors, and the notifications inside it are budgeted per channel. The items
+     go together rather than one after another — an order with several products
+     should not pay for each of them in turn. */
+  await Promise.all(order.items.map((it) => checkLowStock(it.product_id).catch(() => {})));
   return true;
 }
 

@@ -195,9 +195,17 @@ console.log('\n— All five events are connected to real state changes —');
   ok('…after the duplicate guard, so a retried PSP webhook buzzes once',
     /if \(existing\) return \{ id: existing\.id, duplicate: true \}[\s\S]*notifyOwner\('chargeback'/.test(cb),
     'a PSP retry would notify repeatedly');
-  ok('low stock notifies', /notifyOwner\('stock\.low'/.test(stock));
-  ok('…after the once-per-cycle claim, so it fires per stock cycle not per order',
-    /low_stock_alerted_at IS NULL[\s\S]*notifyOwner\('stock\.low'/.test(stock));
+  /* Stock is a LADDER now — 10, 5, 0 — so the event name is chosen per rung
+     rather than hard-coded. Assert the property (every rung has an event, and
+     nothing sends before the rung is claimed) instead of one literal string,
+     which is what this pair used to do and why it broke on a change that kept
+     the behaviour intact. */
+  ok('low stock notifies', /notifyOwner\(event,/.test(stock)
+    && ['stock.low', 'stock.critical', 'stock.out'].every((e) => stock.includes(`'${e}'`)),
+    'the three rungs must each have an event to send');
+  ok('…after the rung is claimed, so it fires per stock cycle not per order',
+    /low_stock_alert_level IS NULL OR low_stock_alert_level > @tier[\s\S]*notifyOwner\(event,/.test(stock),
+    'without the conditional claim, concurrent orders each send the same warning');
 
   // The launch dashboard has to admit when nobody is being told anything.
   const launch = read('../src/services/launchCheckService.js');

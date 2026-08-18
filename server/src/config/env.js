@@ -161,6 +161,29 @@ export const config = {
    * polls once a minute. These are alerts, and they are worth nothing a minute
    * late. Every channel is optional and independent — set the one you read.
    */
+  /**
+   * The stock levels worth interrupting someone about.
+   *
+   * Descending, most severe last. 0 is special and means exactly zero rather
+   * than "below zero": it is the point at which the shop is selling something it
+   * cannot deliver, which is the one that costs money.
+   *
+   * LOW_STOCK_THRESHOLD predates this and is still honoured — an owner who tuned
+   * it to 20 gets a tier at 20 as well as the defaults, rather than silently
+   * losing the setting they chose.
+   */
+  stock: {
+    alertTiers: (() => {
+      const raw = env.STOCK_ALERT_TIERS
+        ? env.STOCK_ALERT_TIERS.split(',').map((n) => Number(String(n).trim()))
+        : [10, 5, 0];
+      const legacy = env.LOW_STOCK_THRESHOLD ? [Number(env.LOW_STOCK_THRESHOLD)] : [];
+      return [...new Set([...raw, ...legacy])]
+        .filter((n) => Number.isFinite(n) && n >= 0)
+        .sort((a, b) => b - a);
+    })(),
+  },
+
   notify: {
     // Falls back to the ops webhook so an existing setup keeps working.
     discordWebhookUrl: env.NOTIFY_DISCORD_WEBHOOK_URL || '',
