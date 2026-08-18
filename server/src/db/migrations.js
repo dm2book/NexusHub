@@ -1086,4 +1086,20 @@ CREATE INDEX IF NOT EXISTS idx_deliveries_order  ON deliveries (order_id);
 CREATE INDEX IF NOT EXISTS idx_order_items_product ON order_items (product_id);
 `,
   },
+  {
+    id: '029_stock_alert_level',
+    sql: `
+-- Stock alerts used to be one flag: alerted, or not. That is enough for a single
+-- threshold and useless for a ladder of them — an owner told "10 left" would
+-- hear nothing further as the product went to 4, and nothing at all when it hit
+-- zero and orders started needing hand delivery.
+--
+-- This column records the LOWEST tier already announced for the current stock
+-- cycle. The claim is a conditional UPDATE against it, so concurrent orders
+-- crossing the same tier produce exactly one alert, a drop straight past a tier
+-- announces the severe one rather than both, and a tier already passed is never
+-- repeated. Cleared on restock, which re-arms the whole ladder.
+ALTER TABLE products ADD COLUMN IF NOT EXISTS low_stock_alert_level INTEGER;
+`,
+  },
 ];

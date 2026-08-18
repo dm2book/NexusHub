@@ -473,14 +473,23 @@ export async function postErrorAlert(route, message) {
 }
 
 /** Ping staff that a product's pre-loaded code stock is running low. */
-export async function postStockAlert(product, remaining) {
+export async function postStockAlert(product, remaining, tier = null) {
   const url = config.discord.stockWebhookUrl || config.discord.orderWebhookUrl;
+  // `tier` is the rung that was just crossed. Naming it beats naming a single
+  // configured threshold, which stopped being the whole story once the alerts
+  // became a ladder: "below the 5 mark" says which warning this is.
+  const crossed = tier === null ? config.discord.lowStockThreshold : tier;
+  const out = remaining === 0;
+  const critical = !out && crossed <= 5;
   const embed = {
-    title: remaining === 0 ? `🔴 OUT OF STOCK: ${product.name}` : `🟠 Low stock: ${product.name}`,
-    description: `**${remaining}** code${remaining === 1 ? '' : 's'} left` +
-      ` (threshold ${config.discord.lowStockThreshold}).\n` +
-      `Top up in the admin panel → Products → Codes.`,
-    color: remaining === 0 ? 0xef4444 : 0xf59e0b,
+    title: out ? `🔴 OUT OF STOCK: ${product.name}`
+      : `${critical ? '🟠' : '📉'} ${critical ? 'Stock critical' : 'Low stock'}: ${product.name}`,
+    description: out
+      ? `**No codes left.** New orders cannot be delivered automatically.\n`
+        + `Load codes in the admin panel → Products → Codes, or take it offline.`
+      : `**${remaining}** code${remaining === 1 ? '' : 's'} left — below the ${crossed} mark.\n`
+        + `Top up in the admin panel → Products → Codes.`,
+    color: out ? 0xef4444 : critical ? 0xf59e0b : 0xf97316,
     footer: { text: `${config.email.fromName} · stock monitor` },
     timestamp: new Date().toISOString(),
   };
