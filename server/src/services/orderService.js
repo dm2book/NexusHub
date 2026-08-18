@@ -25,6 +25,7 @@ import { audit } from './auditService.js';
 import { getProduct } from './productService.js';
 import { postOrderEvent, postFraudHoldAlert, postDeliveryProof } from './discordService.js';
 import { notifyOwner } from './notifyService.js';
+import { assertLaunched } from './launchGateService.js';
 import { syncMemberRoles, sendDeliveryDm } from './discordRolesService.js';
 import { availableCount, claimCodes, checkLowStock, releaseCodes } from './codeStockService.js';
 import { memberDiscountPercent } from './membershipService.js';
@@ -70,6 +71,16 @@ export function canTransition(from, to) {
 // ── Creation ───────────────────────────────────────────────────────────────
 
 export async function createOrder(input, ctx = {}) {
+  /* The pre-launch gate, at the choke point rather than at the routes.
+
+     Every purchase in this system becomes an order here — the checkout, a
+     mystery box, a bundle, a gift card, an admin creating one by hand. Guarding
+     the routes instead would mean remembering to guard the next one, which is
+     exactly how the Discord events ended up missing three of their call sites.
+     `ctx.user` is the same object the auth middleware attached, so staff are
+     recognised here the same way they are everywhere else. */
+  assertLaunched(ctx.user, 'The checkout', { money: true });
+
   const email = String(input.email || '').toLowerCase();
   if (!email) throw badRequest('Customer email is required');
   if (!Array.isArray(input.items) || input.items.length === 0) {

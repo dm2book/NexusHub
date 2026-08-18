@@ -1102,4 +1102,29 @@ CREATE INDEX IF NOT EXISTS idx_order_items_product ON order_items (product_id);
 ALTER TABLE products ADD COLUMN IF NOT EXISTS low_stock_alert_level INTEGER;
 `,
   },
+  {
+    id: '030_newsletter_signups',
+    sql: `
+-- Somewhere for a visitor to say "tell me when you open".
+--
+-- A pre-launch site that cannot capture interest is a pre-launch site that
+-- wastes every visit it gets, and this shop had no signup of any kind — only an
+-- admin broadcast tool with nobody to broadcast to.
+--
+-- Deliberately thin: an address, where it was typed, and the exact sentence the
+-- person agreed to. Marketing email is consent-based under the GDPR and the
+-- burden of proof is the trader's, so the wording is stored rather than assumed
+-- — the same reason order consent is stored with the order. No IP, because
+-- nothing here needs one and this project deletes the ones it does keep.
+CREATE TABLE IF NOT EXISTS newsletter_signups (
+  id          TEXT PRIMARY KEY,
+  email       TEXT NOT NULL UNIQUE,
+  source      TEXT,
+  consent_text TEXT,
+  created_at  TEXT NOT NULL,
+  unsubscribed_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_newsletter_created ON newsletter_signups (created_at DESC);
+`,
+  },
 ];

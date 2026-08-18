@@ -162,6 +162,22 @@ export const config = {
    * late. Every channel is optional and independent — set the one you read.
    */
   /**
+   * When the shop opens for business.
+   *
+   * Before this moment the site is fully browsable and sells nothing: no orders,
+   * no new accounts, no checkout. Staff are exempt. The gate lifts on its own at
+   * the configured moment — the comparison happens per request, so nothing has
+   * to be redeployed on the day.
+   *
+   * Blank switches the gate off entirely, which is what an already-launched shop
+   * wants. An unreadable value also switches it off, loudly: see
+   * services/launchGateService.js for why that direction is the safe one.
+   */
+  launch: {
+    date: env.LAUNCH_DATE === undefined ? '2026-09-24T00:00:00Z' : env.LAUNCH_DATE,
+  },
+
+  /**
    * The stock levels worth interrupting someone about.
    *
    * Descending, most severe last. 0 is special and means exactly zero rather

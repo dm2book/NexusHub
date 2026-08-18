@@ -154,6 +154,24 @@ export default function Checkout() {
 
   const amountEur = (grandTotal / 100).toFixed(2);
 
+  /* Before launch the checkout is not a form, it is an explanation.
+
+     The cart cannot normally be filled yet, but one saved in localStorage
+     before the gate went up would still be here — and letting someone fill in
+     an email and a payment method only to be refused by the server is the worst
+     possible order to tell them in. The banner above already carries the date
+     and the signup, so this stays short. */
+  if (prelaunch && !placed) {
+    return (
+      <div className="section py-16">
+        <h1 className="text-3xl text-white mb-8">{t('checkout.title', 'Checkout')}</h1>
+        <EmptyState icon={ShoppingBag}
+          title={t('launch.checkoutClosed', 'The shop is not open yet')}
+          action={<Link to="/shop" className="btn-primary">{t('cart.browse', 'Browse shop')}</Link>} />
+      </div>
+    );
+  }
+
   if (items.length === 0 && !placed) {
     return (
       <div className="section py-16">

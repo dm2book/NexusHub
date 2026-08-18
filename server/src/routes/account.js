@@ -23,6 +23,7 @@ import { coinBalance, coinHistory, redeemReward, forgeShopCatalog, spendCoins } 
 import { pullsForOrder, rerollPull } from '../services/mysteryBoxService.js';
 import { getMembership, grantMembership, FORGE_PLUS, MEMBERSHIP_DAYS } from '../services/membershipService.js';
 import { saveCart, getCart } from '../services/cartService.js';
+import { requireLaunched } from '../services/launchGateService.js';
 import { walletSummary, balanceOf, debit } from '../services/walletService.js';
 import { redeemGiftCard } from '../services/giftCardService.js';
 import { requestPhoneOtp } from '../services/authService.js';
@@ -96,7 +97,12 @@ router.post('/membership/purchase', asyncHandler(async (req, res) => {
 router.get('/cart', asyncHandler(async (req, res) => {
   res.json({ items: await getCart(req.user.id) });
 }));
-router.put('/cart', asyncHandler(async (req, res) => {
+/* The cart itself lives in localStorage, so "block add to cart" is mostly a
+   storefront concern — the button is what has to stop. This is the server-side
+   mirror kept for signed-in shoppers, and refusing it before launch means a
+   pre-launch basket is never persisted here either. Reading a cart stays open,
+   so nobody's existing basket disappears. */
+router.put('/cart', requireLaunched('Your cart'), asyncHandler(async (req, res) => {
   const { items } = z.object({ items: z.array(z.any()).max(50) }).parse(req.body || {});
   res.json({ items: await saveCart(req.user.id, items) });
 }));

@@ -160,10 +160,16 @@ export default function ProductDetail() {
 
   const addToCart = () => {
     flyToCart(document.querySelector('[data-pd-media]'));
-    add(product, qty); toast.success(`${qty}× ${product.name} ${t('cart.addedToCart', 'added to cart')}`);
+    // `add` refuses before launch and says so by returning false — a button that
+    // silently does nothing is worse than one that explains itself.
+    if (!add(product, qty)) {
+      toast(t('launch.cartClosed', 'ForgeMarket opens on launch day — you can browse everything until then.'));
+      return;
+    }
+    toast.success(`${qty}× ${product.name} ${t('cart.addedToCart', 'added to cart')}`);
   };
   // Straight to checkout — the cart is a dead screen on the highest-intent click.
-  const buyNow = () => { add(product, qty); navigate('/checkout'); };
+  const buyNow = () => { if (add(product, qty)) navigate('/checkout'); };
 
   return (
     <div className="section pt-10 pb-28 lg:pb-10">

@@ -4,6 +4,8 @@ import { z } from 'zod';
 import { config, manualPayMethods, commerceBlockers } from '../config/env.js';
 import { asyncHandler } from '../middleware/error.js';
 import { publicCache } from '../utils/httpCache.js';
+import { requireLaunched, launchAtIso } from '../services/launchGateService.js';
+import { subscribe } from '../services/newsletterService.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 import { listProducts, getProduct, trendingProducts, priceHistory } from '../services/productService.js';
 import { availableCounts, availableCount } from '../services/codeStockService.js';
@@ -140,11 +142,43 @@ const paymentProvider = () =>
         : config.payments.demoMode ? 'demo' : 'none';
 
 // Public runtime config the SPA can read (feature flags, enabled providers).
+/**
+ * "Tell me when you open."
+ *
+ * Deliberately NOT behind the launch gate — it is the one thing a pre-launch
+ * visitor is here to do, and it keeps working afterwards for anyone who wants
+ * the drops. Rate limited per IP because it writes, and shared so the limit
+ * means the same thing on every instance.
+ */
+router.post('/newsletter',
+  rateLimit({ bucket: 'newsletter', windowMs: 60_000, max: 5, shared: true }),
+  asyncHandler(async (req, res) => {
+    const body = z.object({
+      email: z.string().email().max(200),
+      // The sentence the visitor actually agreed to. Marketing consent has to be
+      // provable and the wording is the evidence, so it is stored rather than
+      // reconstructed later from whatever the form says today.
+      consentText: z.string().max(400).optional(),
+      source: z.string().max(40).optional(),
+    }).parse(req.body || {});
+    const r = await subscribe(body.email, { source: body.source || 'prelaunch', consentText: body.consentText });
+    // Same answer either way: a different one would turn this into a way to ask
+    // whether an address is already on the list.
+    res.status(201).json({ ok: true, subscribed: true, alreadySubscribed: r.alreadySubscribed });
+  }));
+
 router.get('/config', asyncHandler(async (_req, res) => {
   publicCache(res, 60);
   // Owner-set per-category logos (best-effort — never fail config on a DB hiccup).
   const categoryLogos = await getCategoryLogos().catch(() => ({}));
   res.json({
+    /* The launch MOMENT, not a "we are closed" flag.
+       This response is held at the edge for a minute, and a cached verdict would
+       still be saying "not open yet" after the shop opened. A timestamp cannot
+       go stale that way: the browser compares it to its own clock, so the banner
+       and the countdown flip at exactly the right second on a copy that was
+       cached a minute earlier. Null once there is nothing left to wait for. */
+    launchAt: launchAtIso(),
     paymentProvider: paymentProvider(),
     // True when the shop cannot currently honour an order, so the storefront can
     // say so up front instead of letting someone fill a cart and hit a wall at
@@ -323,6 +357,13 @@ router.get('/gift-cards/:code', asyncHandler(async (req, res) => {
 // The first wall a burst meets, and the one worth being able to move without a
 // deploy — see LIMIT_CHECKOUT_PER_MINUTE in config/env.js for why.
 router.post('/orders',
+  /* Before the commerce blockers below, on purpose. Both refuse the order, but
+     they are not equally true: before launch the honest answer is "we open on
+     the 24th", and a visitor who reads "ordering is paused, try again shortly"
+     will come back in an hour and find it still paused. The more specific
+     reason wins. `createOrder` carries the same check as a backstop, so a route
+     added later cannot slip past it. */
+  requireLaunched('The checkout', { money: true }),
   rateLimit({
     bucket: 'checkout', windowMs: 60_000,
     max: config.security.checkoutPerMinute, shared: true,
@@ -372,7 +413,8 @@ router.post('/orders',
   }));
 
 // Create a Stripe Checkout Session for an order and return its redirect URL.
-router.post('/orders/:id/checkout', rateLimit({ bucket: 'pay', windowMs: 60_000, max: 30, shared: true }),
+router.post('/orders/:id/checkout', requireLaunched('Payment', { money: true }),
+  rateLimit({ bucket: 'pay', windowMs: 60_000, max: 30, shared: true }),
   asyncHandler(async (req, res) => {
     if (!stripeEnabled()) throw new ApiError(400, 'Card payments are not configured');
     const order = await getOrder(req.params.id);

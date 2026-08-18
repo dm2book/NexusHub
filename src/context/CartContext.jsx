@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../lib/api.js';
 import { useAuth } from './AuthContext.jsx';
+import { useLaunch } from '../lib/useLaunch.js';
 
 const CartContext = createContext(null);
 export const useCart = () => useContext(CartContext);
@@ -9,6 +10,7 @@ const KEY = 'fm_cart';
 
 export function CartProvider({ children }) {
   const { user } = useAuth();
+  const { prelaunch } = useLaunch();
   const [items, setItems] = useState(() => {
     try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch { return []; }
   });
@@ -44,7 +46,20 @@ export function CartProvider({ children }) {
     return () => clearTimeout(t);
   }, [items, user?.id, syncReady]);
 
+  /**
+   * Adding to the cart, refused before launch.
+   *
+   * Guarded here rather than on the buttons: "add to cart" is reachable from the
+   * product page, the bundles row, the command palette and the mobile bar, and
+   * disabling four buttons means remembering the fifth. One refusal at the point
+   * every one of them passes through covers the lot — the same reasoning the
+   * server uses for `createOrder`.
+   *
+   * It returns false rather than throwing, so a caller can tell the difference
+   * between "added" and "not yet" and say something useful.
+   */
   const add = (product, qty = 1) => {
+    if (prelaunch) return false;
     setItems((cur) => {
       const found = cur.find((i) => i.id === product.id);
       if (found) return cur.map((i) => (i.id === product.id ? { ...i, qty: i.qty + qty } : i));
@@ -53,6 +68,7 @@ export function CartProvider({ children }) {
         currency: product.currency || 'EUR', category: product.category, qty,
       }];
     });
+    return true;
   };
   const setQty = (id, qty) =>
     setItems((cur) => cur.map((i) => (i.id === id ? { ...i, qty: Math.max(1, qty) } : i)));
@@ -64,7 +80,7 @@ export function CartProvider({ children }) {
   const currency = items[0]?.currency || 'EUR';
 
   return (
-    <CartContext.Provider value={{ items, add, setQty, remove, clear, count, subtotal, currency }}>
+    <CartContext.Provider value={{ items, add, setQty, remove, clear, count, subtotal, currency, prelaunch }}>
       {children}
     </CartContext.Provider>
   );
