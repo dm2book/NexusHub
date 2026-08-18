@@ -18,24 +18,38 @@ async function safe(fn, fallback) {
 }
 
 export async function publicStats() {
-  const delivered = await safe(async () => {
+  /* Eight independent reads, previously awaited one after another.
+
+     Nothing here depends on anything else here — they are separate aggregates
+     over separate tables, plus one outbound call to Discord — so the sequence
+     cost eight serialized round trips end to end where one wave does. That is
+     invisible on a laptop and is essentially the whole latency of this endpoint
+     from a function talking to a database in another region.
+
+     `safe()` still wraps each one individually, so a single failing aggregate
+     falls back to its own default and every other number still renders. */
+  const [
+    delivered, customers, products, avgDeliverySeconds,
+    recent, discordMembers, successRate, rev,
+  ] = await Promise.all([
+  safe(async () => {
     const r = await get(`SELECT COUNT(*) AS n FROM orders WHERE status='completed'`);
     return Number(r?.n || 0);
-  }, 0);
+  }, 0),
 
   // Real customers = distinct people who have actually ordered (incl. guests).
-  const customers = await safe(async () => {
+  safe(async () => {
     const r = await get(`SELECT COUNT(DISTINCT email) AS n FROM orders`);
     return Number(r?.n || 0);
-  }, 0);
+  }, 0),
 
-  const products = await safe(async () => {
+  safe(async () => {
     const r = await get(`SELECT COUNT(*) AS n FROM products WHERE active = 1`);
     return Number(r?.n || 0);
-  }, 0);
+  }, 0),
 
   // Average delivery time = completed_at − created_at over recent completed orders.
-  const avgDeliverySeconds = await safe(async () => {
+  safe(async () => {
     const rows = await all(
       `SELECT created_at, updated_at FROM orders WHERE status='completed' ORDER BY updated_at DESC LIMIT 200`);
     if (!rows?.length) return null;
@@ -44,10 +58,10 @@ export async function publicStats() {
       .filter((s) => s > 0 && s < 86_400);
     if (!secs.length) return null;
     return Math.max(1, Math.round(secs.reduce((a, b) => a + b, 0) / secs.length));
-  }, null);
+  }, null),
 
   // Recent real deliveries for the ticker (empty when there are none).
-  const recent = await safe(async () => {
+  safe(async () => {
     const rows = await all(
       `SELECT oi.name AS item, p.category AS cat, o.updated_at AS at
          FROM orders o
@@ -61,7 +75,7 @@ export async function publicStats() {
       cat: r.cat || '',
       secondsAgo: Math.max(3, Math.round((now - new Date(r.at)) / 1000)),
     }));
-  }, []);
+  }, []),
 
   // The homepage renders this with a pulsing green dot and the word "online", so
   // it had better be live. It used to read only DISCORD_MEMBER_COUNT — a number
@@ -69,14 +83,14 @@ export async function publicStats() {
   // already available two files away and simply unused. Live first, cached by
   // getServerInfo(); the env var stays as the fallback for a guild with its
   // widget switched off.
-  const discordMembers = await safe(async () => {
+  safe(async () => {
     const info = await getServerInfo();
     return Number(info?.online ?? 0) || Number(config.discord?.memberCount || 0);
-  }, Number(config.discord?.memberCount || 0));
+  }, Number(config.discord?.memberCount || 0)),
 
   // Real fulfilment success rate = completed ÷ (completed + refunded + cancelled
   // + failed). Null until there are finished orders (so the UI can hide it).
-  const successRate = await safe(async () => {
+  safe(async () => {
     const r = await get(
       `SELECT COUNT(*) FILTER (WHERE status='completed') AS ok,
               COUNT(*) FILTER (WHERE status IN ('completed','refunded','cancelled','failed')) AS finished
@@ -84,10 +98,11 @@ export async function publicStats() {
     const finished = Number(r?.finished || 0);
     if (!finished) return null;
     return Math.round((Number(r.ok) / finished) * 1000) / 10;
-  }, null);
+  }, null),
 
   // Real review aggregates only.
-  const rev = await safe(() => reviewStats(), { count: 0, average: 0 });
+  safe(() => reviewStats(), { count: 0, average: 0 }),
+  ]);
 
   return {
     delivered,

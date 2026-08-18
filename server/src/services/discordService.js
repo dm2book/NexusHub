@@ -174,7 +174,24 @@ export async function getServerInfo() {
   if (cache.data && Date.now() - cache.at < TTL_MS) return cache.data;
 
   try {
-    const res = await fetch(`https://discord.com/api/guilds/${config.discord.guildId}/widget.json`);
+    /* A deadline, because this sits on the homepage's critical path.
+       getServerInfo() is called by publicStats(), which serves /api/stats, which
+       the storefront requests on first paint. An endpoint that accepts the
+       connection and then never answers does not fail — it hangs, and takes the
+       whole request with it until the platform kills the function, at which
+       point the visitor gets a platform error page instead of JSON. Discord's
+       widget is a nice-to-have; three seconds is already generous, and the catch
+       below degrades to the static info exactly as it does for a widget that is
+       switched off. */
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 3_000);
+    let res;
+    try {
+      res = await fetch(`https://discord.com/api/guilds/${config.discord.guildId}/widget.json`,
+        { signal: ctrl.signal });
+    } finally {
+      clearTimeout(timer);
+    }
     if (!res.ok) throw new Error(`widget ${res.status}`);
     const w = await res.json();
     const data = {

@@ -55,10 +55,35 @@ async function call(path, { method = 'GET', body, idempotencyKey } = {}) {
   // request bills the buyer twice.
   if (idempotencyKey) headers['idempotency-key'] = idempotencyKey;
 
-  const res = await fetch(`${API}${path}`, {
-    method, headers,
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
+  /* A deadline on every call to Mollie.
+
+     These run inside request handlers — the checkout starting a payment, the
+     webhook confirming one, the method list the payment step renders. An
+     endpoint that accepts the connection and then never answers does not fail;
+     it hangs, and holds the request until the platform kills the function at
+     maxDuration, at which point the caller gets a platform error page rather
+     than JSON. Fifteen seconds is generous for a payment API and still half the
+     function's budget, so there is room left to answer properly.
+
+     The abort surfaces as an ordinary Error, which every caller here already
+     handles: the webhook path is idempotent and Mollie retries it, and the
+     checkout path reports a failure the buyer can retry. */
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 15_000);
+  let res;
+  try {
+    res = await fetch(`${API}${path}`, {
+      method, headers,
+      body: body === undefined ? undefined : JSON.stringify(body),
+      signal: ctrl.signal,
+    });
+  } catch (e) {
+    throw new Error(e.name === 'AbortError'
+      ? `Mollie ${method} ${path}: timed out after 15s`
+      : `Mollie ${method} ${path}: ${e.message}`);
+  } finally {
+    clearTimeout(timer);
+  }
   const text = await res.text();
   let data = null;
   try { data = text ? JSON.parse(text) : null; } catch { /* non-JSON error page */ }

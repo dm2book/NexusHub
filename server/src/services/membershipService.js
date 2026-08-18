@@ -21,9 +21,22 @@ export const FORGE_PLUS = {
   ],
 };
 
+/**
+ * Is this user row a paying member right now?
+ *
+ * Takes the ROW, not an id, so a caller that already loaded the user does not go
+ * back to the database for two columns it is holding. publicUser() did exactly
+ * that — and it is called once per user in the admin list, where it turned a
+ * 200-row page into 200 extra queries against a five-connection pool.
+ */
+export function membershipActiveFor(row) {
+  return !!row?.membership_tier
+    && (!row.membership_until || new Date(row.membership_until) > new Date());
+}
+
 export async function getMembership(userId) {
   const u = await get('SELECT membership_tier, membership_until FROM users WHERE id=@u', { u: userId });
-  const active = !!u?.membership_tier && (!u.membership_until || new Date(u.membership_until) > new Date());
+  const active = membershipActiveFor(u);
   return {
     active,
     tier: active ? u.membership_tier : null,
