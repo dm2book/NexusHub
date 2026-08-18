@@ -12,6 +12,7 @@ import express from 'express';
 import { z } from 'zod';
 import { config } from '../config/env.js';
 import { asyncHandler } from '../middleware/error.js';
+import { publicCache } from '../utils/httpCache.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 import { ApiError } from '../utils/errors.js';
 import {
@@ -197,6 +198,13 @@ export const mollieApi = Router();
  * the last step of the funnel.
  */
 mollieApi.get('/mollie/methods', asyncHandler(async (req, res) => {
+  /* Public, and identical for everyone who asks the same question: the answer
+     depends only on `amount` and `locale`, both of which are in the query string
+     and therefore part of the cache key. Without a header this was a round trip
+     to Mollie's API on every checkout view, with no edge cache and no
+     per-instance cache either. Which methods a shop offers changes on the order
+     of never, so five minutes is conservative. */
+  publicCache(res, 300);
   if (!isEnabled()) return res.json({ methods: [] });
   const cents = Number(req.query.amount) || 0;
   const methods = await availableMethods({

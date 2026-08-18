@@ -20,9 +20,19 @@ export async function attachUser(req, _res, next) {
   if (!token) return next();
   try {
     const claims = verifyAccess(token);
-    if (claims.sid && !(await isSessionActive(claims.sid))) return next();
+    /* Both lookups depend only on `claims`, which verifyAccess returns
+       synchronously — so waiting for the session check before starting the user
+       load added a round trip to every signed-in request for no reason. The
+       trade is that a token whose session was just revoked still loads a user we
+       then throw away: one wasted read on a rare path, against a saved round
+       trip on the common one. */
+    const [sessionOk, user] = await Promise.all([
+      claims.sid ? isSessionActive(claims.sid) : true,
+      publicUser(claims.sub),
+    ]);
+    if (!sessionOk) return next();
     req.auth = claims;
-    req.user = await publicUser(claims.sub);
+    req.user = user;
   } catch {
     /* invalid/expired token → treat as anonymous */
   }

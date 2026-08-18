@@ -70,9 +70,30 @@ export default function handler(req, res) {
       },
     }));
   }
-  // Vercel routes /api/* here via a rewrite. Make sure Express always sees the
-  // full, /api-prefixed path regardless of how the rewrite presents req.url.
-  if (req.url && !req.url.startsWith('/api')) {
+  /* Vercel routes /api/* here via a rewrite. Make sure Express always sees the
+     full, /api-prefixed path regardless of how the rewrite presents req.url.
+
+     ROOT_PATHS is the exception, and it was a real bug: vercel.json also routes
+     `/product/(.*)` to this function, and that page's handler is mounted at the
+     ROOT of the Express app (app.use(seoRoutes) -> router.get('/product/:id')),
+     not under /api. Prefixing it turned every product-page request into
+     `/api/product/:id`, which matches nothing — catalog.js only registers the
+     plural `/products/:id` — so it fell through to notFoundHandler.
+
+     Measured by driving this handler the way Vercel does: a direct visit to
+     /product/<id> answered `404 {"error":{"message":"Route not found"}}` with no
+     Cache-Control, where that product's HTML should have been. In-app navigation
+     hid it completely, because the SPA renders those pages client-side and never
+     asks the server. What did NOT hide it: a shared link, a refresh while on the
+     page, and every crawler — which is the entire reason that route renders
+     per-product titles and Product markup in the first place.
+
+     /sitemap.xml deliberately stays out of this list: it is registered under the
+     /api mount as well, so prefixing already resolves it here, and the
+     root-level alias in app.js is what serves it on the standalone server, where
+     paths arrive unprefixed. */
+  const ROOT_PATHS = ['/product/'];
+  if (req.url && !req.url.startsWith('/api') && !ROOT_PATHS.some((p) => req.url.startsWith(p))) {
     req.url = '/api' + (req.url === '/' ? '' : req.url);
   }
   return app(req, res);
