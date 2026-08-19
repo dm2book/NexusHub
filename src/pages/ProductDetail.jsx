@@ -8,7 +8,7 @@ import { deliveryInfo } from '../lib/deliveryInfo.js';
 import { api } from '../lib/api.js';
 import { useCart } from '../context/CartContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
-import { categoryVisual, money, isCustomImage, productDescription } from '../lib/catalog.js';
+import { categoryVisual, money, carriesOwnBackground, productDescription } from '../lib/catalog.js';
 import { iconFor } from '../lib/sampleCatalog.js';
 import { SAMPLE_PRODUCTS } from '../lib/sampleCatalog.js';
 import { PageLoader } from '../components/ui.jsx';
@@ -193,9 +193,13 @@ export default function ProductDetail() {
         <div style={{ viewTransitionName: 'product-hero' }}
           className={`shine-host group relative rounded-3xl bg-gradient-to-br ${grad} h-full overflow-hidden animate-fade-in ${product.featured ? 'ring-featured' : ''}`}>
           {product.image && !heroBroken ? (
-            isCustomImage(product.image) ? (
-              // Owner-supplied artwork: blurred fill behind + the full image on
-              // top, so a logo with its own background sits cleanly (no crop).
+            carriesOwnBackground(product.image) ? (
+              /* Artwork with its own background: blurred fill behind + the whole
+                 image on top, so nothing is cropped.
+                 The question used to be about the file's PATH, which sent the
+                 shop's own .webp renders down the `object-cover` branch below —
+                 built to fill a hero with a wide photograph, and wrong for a
+                 square logo, which it cropped to fit a 420px-tall panel. */
               <>
                 <img src={product.image} alt="" aria-hidden="true"
                   className="absolute inset-0 w-full h-full object-cover scale-125 blur-3xl opacity-90" />
