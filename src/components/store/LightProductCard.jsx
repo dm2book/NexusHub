@@ -57,7 +57,7 @@ export default function LightProductCard({ product, onAdd }) {
           gets clean contrast instead of a muddy wash. */}
       <a href={to} onClick={openWithMorph}
         className={`fm-card-media relative rounded-xl h-[122px] sm:h-[150px] grid place-items-center mb-3 overflow-hidden ${
-          photoArt ? 'bg-white border border-slate-200/60' : 'fm-logo-plinth'}`}
+          photoArt ? 'bg-slate-50 border border-slate-200/60' : 'fm-logo-plinth'}`}
         style={photoArt ? undefined : { '--card-glow': `radial-gradient(circle, ${glowFor(product.category)}45, transparent 70%)` }}>
         <div className="absolute top-2.5 left-2.5 z-10 flex flex-col items-start gap-1">
           {onSale && (
@@ -110,17 +110,33 @@ export default function LightProductCard({ product, onAdd }) {
                treatment written for it never reached it. And the picture itself
                gets a radius and a real shadow, so a rectangle reads as an object
                resting on the plinth rather than a crop pasted over it. */
-            /* Nothing behind it. The blurred copy that used to sit here was
-               trying to reconcile a photo with a tinted plinth; with the plinth
-               gone there is nothing to reconcile, and the wash only ever made
-               dark art murky. The picture is given the room instead — it fills
-               the tile rather than floating in the middle of it.
+            /* The tile takes the artwork's OWN background.
+
+               There is no one right colour behind a product photo, which is what
+               the last two attempts each got half right. A white tile is perfect
+               for a gift card shot on white and turns a Roblox card — black, with
+               a colour collage — into a hard dark box. A tinted plinth does the
+               reverse. Both leave a visible edge, because the edge is between the
+               picture's background and whatever is behind it.
+
+               A blurred, scaled copy of the picture removes the question. Whatever
+               the artwork's own background is, the tile becomes it: white behind a
+               white card, black behind a Roblox card, gold behind a coin render.
+               There is nothing left to see a seam against, and it needs no
+               knowledge of the image at all — which matters, because the shop's
+               art is uploaded by hand and nobody is going to tag it.
+
                data-morph is forced position:relative by .fm-card-media (see
                index.css), so centre it with the grid + cap its size. Fixed-px
                max-height: a % one resolves against the auto grid track. */
-            <img data-morph src={img} alt={product.name} loading="lazy" decoding="async" onError={() => setImgBroken(true)}
-              className="relative z-[1] w-full h-full max-h-[150px] object-contain p-2
-                         group-hover:scale-105 transition-transform duration-500" />
+            <>
+              <img src={img} alt="" aria-hidden="true" loading="lazy" decoding="async"
+                className="absolute inset-0 w-full h-full object-cover scale-[1.35] blur-2xl" />
+              <img data-morph src={img} alt={product.name} loading="lazy" decoding="async" onError={() => setImgBroken(true)}
+                className="relative z-[1] max-w-[88%] max-h-[92%] object-contain
+                           drop-shadow-[0_6px_14px_rgba(15,23,42,.35)]
+                           group-hover:scale-105 transition-transform duration-500" />
+            </>
           ) : (
             <img data-morph src={img} alt={product.name} loading="lazy" decoding="async" onError={() => setImgBroken(true)}
               className="fm-logo w-[92px] h-[92px] group-hover:scale-105 transition-transform" />
