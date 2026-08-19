@@ -16,6 +16,22 @@ const hydrate = (r) => {
     ...r, metadata, active: !!r.active,
     featured: !!metadata.featured,
     image: metadata.image || null,
+    /* How this product's artwork should be framed in a tile.
+       A composition belongs to the picture, not to the brand — so this is a
+       product field the owner can set, not a rule in CSS that says "Robux is
+       different". Absent means the default (whole picture, centred), which is
+       right for almost everything; a banner that should fill the tile sets
+       imageFit:'cover' and, if its subject is off-centre, a focal point. */
+    imagePosition: (() => {
+      const p = metadata.imagePosition;
+      if (!p || typeof p !== 'object') return null;
+      const num = (v) => (Number.isFinite(Number(v)) ? Math.min(100, Math.max(0, Number(v))) : null);
+      const x = num(p.x), y = num(p.y);
+      return x === null && y === null ? null : { x: x ?? 50, y: y ?? 50 };
+    })(),
+    imageFit: ['cover', 'contain'].includes(metadata.imageFit) ? metadata.imageFit : null,
+    imageScale: Number.isFinite(Number(metadata.imageScale))
+      ? Math.min(2, Math.max(0.5, Number(metadata.imageScale))) : null,
     compareAtPrice: compareAt > r.price ? compareAt : null,
     // How paid orders for this product are delivered: 'auto' pulls a code from
     // stock instantly; 'manual' always waits for staff to deliver by hand.

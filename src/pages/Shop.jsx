@@ -202,9 +202,11 @@ export default function Shop({ landingCategory = null, landingTitle = null, land
               <h2 className="font-extrabold text-lg text-slate-900">{t('shop.trending', 'Trending now')}</h2>
             </div>
             <div className="fm-rail flex gap-4 overflow-x-auto pb-2 snap-x">
-              {trending.slice(0, 8).map((p) => (
+              {trending.slice(0, 8).map((p, i) => (
                 <div key={p.id} className="snap-start shrink-0 w-[210px] flex fm-reveal">
-                  <LightProductCard product={p} onAdd={onAdd} />
+                  {/* The first few are why the page looks loaded; they are not
+                      lazy. Everything past the fold still is. */}
+                  <LightProductCard product={p} onAdd={onAdd} priority={i < 4} />
                 </div>
               ))}
             </div>
@@ -257,7 +259,7 @@ export default function Shop({ landingCategory = null, landingTitle = null, land
               // Stagger capped at 8 so a 74-product grid does not end with a
               // card waiting two seconds for its turn.
               <div key={p.id} className="flex fm-reveal fm-card-slot" style={{ transitionDelay: `${Math.min(i, 8) * 45}ms` }}>
-                <LightProductCard product={p} onAdd={onAdd} />
+                <LightProductCard product={p} onAdd={onAdd} priority={i < 8} />
               </div>
             ))}
           </div>

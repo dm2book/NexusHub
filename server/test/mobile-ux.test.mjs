@@ -107,10 +107,17 @@ console.log('\n— A phone does not download the whole catalogue —');
   ok('the window resets when the filter changes',
     /useEffect\(\(\) => \{ setShown\(PAGE\); \}, \[category, sort, search\]\)/.test(shop));
 
-  const card = read('src/components/store/LightProductCard.jsx');
-  const imgs = (card.match(/<img/g) || []).length;
-  const lazy = (card.match(/loading="lazy"/g) || []).length;
-  ok('every product image defers until it is needed', imgs > 0 && lazy === imgs, `${lazy}/${imgs}`);
+  /* The card no longer renders an <img> itself — ProductMedia does, once, for
+     every surface. And "lazy on everything" turned out to be the wrong rule: it
+     applied to the first row too, so the images a visitor is actually looking at
+     were the ones the browser deferred. The property that matters on a phone is
+     that the LONG TAIL defers, which is what this checks now. */
+  const media = read('src/components/store/ProductMedia.jsx');
+  ok('images below the fold still defer', /loading=\{priority \? 'eager' : 'lazy'\}/.test(media),
+    'a 74-product grid must not fetch 74 pictures');
+  ok('…and only the first screenful is eager',
+    /priority=\{i < 8\}/.test(shop) && /priority=\{i < 4\}/.test(shop),
+    'eager everywhere is the same as lazy nowhere');
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

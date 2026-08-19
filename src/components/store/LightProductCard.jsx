@@ -1,10 +1,10 @@
-import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ShoppingCart, Zap, Clock } from 'lucide-react';
 import { categoryVisual, money, carriesOwnBackground, productDescription } from '../../lib/catalog.js';
 import { useI18n } from '../../lib/i18n.jsx';
 import { useCart } from '../../context/CartContext.jsx';
 import { iconFor } from '../../lib/sampleCatalog.js';
+import ProductMedia from './ProductMedia.jsx';
 import { navigateWithTransition } from '../../lib/viewTransition.js';
 import { flyToCart } from '../../lib/flyToCart.js';
 
@@ -18,17 +18,18 @@ const GLOW = {
 const glowFor = (cat) => GLOW[cat] || '#7c5cff';
 
 /** Light-theme product card matching the storefront design. */
-export default function LightProductCard({ product, onAdd }) {
+export default function LightProductCard({ product, onAdd, priority = false }) {
   const { t, lang } = useI18n();
   const desc = productDescription(product, lang);
   const v = categoryVisual(product.category);
   const Icon = v.icon;
-  const [imgBroken, setImgBroken] = useState(false);
   // Same answer the cart gives everywhere else: before launch, and not staff.
   const { prelaunch } = useCart();
-  // A broken product image falls back to the category logo, never a broken icon.
-  const img = (!imgBroken && product.image) ? product.image : iconFor(product.category);
-  const photoArt = carriesOwnBackground(img);
+  /* Which kind of tile: a plinth for a generated badge, a neutral ground for a
+     photo. Decided from the artwork the product INTENDS to use — if that art
+     fails, ProductMedia swaps in the category icon and the tile stays as it is,
+     which is a far smaller wrong than a tile that changes shape on a 404. */
+  const photoArt = carriesOwnBackground(product.image || iconFor(product.category));
   const navigate = useNavigate();
   const to = `/product/${product.id}`;
   const onSale = product.compareAtPrice > product.price;
@@ -94,63 +95,10 @@ export default function LightProductCard({ product, onAdd }) {
             ? <><Zap size={10} className="fill-current" /> {t('card.inStock', 'In stock')}</>
             : <><Clock size={10} /> {t('card.byHand', 'By hand')}</>}
         </span>
-        {img ? (
-          photoArt ? (
-            /* Artwork that brings its own background: the shop's 3D renders and
-               anything the owner uploads.
-
-               The question is not where the file came from — it is whether the
-               picture already has a background baked into it. A generated icon is
-               a transparent badge drawn FOR the plinth below, so it needs nothing
-               else. A render or a photo is a rectangle with its own colour to the
-               very edge, and dropping that raw onto a soft white plinth is what
-               made half the catalogue look like stickers stuck on a card: a hard
-               green Xbox box and a hard blue PlayStation box in a row of icons
-               that float.
-
-               Two things fix it and both are needed. A blurred copy behind picks
-               up the artwork's own colour so the tile and the picture share a
-               background instead of arguing about it — the earlier condition
-               keyed on the file's PATH, which excluded exactly this art, so the
-               treatment written for it never reached it. And the picture itself
-               gets a radius and a real shadow, so a rectangle reads as an object
-               resting on the plinth rather than a crop pasted over it. */
-            /* The tile takes the artwork's OWN background.
-
-               There is no one right colour behind a product photo, which is what
-               the last two attempts each got half right. A white tile is perfect
-               for a gift card shot on white and turns a Roblox card — black, with
-               a colour collage — into a hard dark box. A tinted plinth does the
-               reverse. Both leave a visible edge, because the edge is between the
-               picture's background and whatever is behind it.
-
-               A blurred, scaled copy of the picture removes the question. Whatever
-               the artwork's own background is, the tile becomes it: white behind a
-               white card, black behind a Roblox card, gold behind a coin render.
-               There is nothing left to see a seam against, and it needs no
-               knowledge of the image at all — which matters, because the shop's
-               art is uploaded by hand and nobody is going to tag it.
-
-               data-morph is forced position:relative by .fm-card-media (see
-               index.css), so centre it with the grid + cap its size. Fixed-px
-               max-height: a % one resolves against the auto grid track. */
-            <>
-              <img src={img} alt="" aria-hidden="true" loading="lazy" decoding="async"
-                className="absolute inset-0 w-full h-full object-cover scale-[1.35] blur-2xl" />
-              <img data-morph src={img} alt={product.name} loading="lazy" decoding="async" onError={() => setImgBroken(true)}
-                className="relative z-[1] max-w-[88%] max-h-[92%] object-contain
-                           drop-shadow-[0_6px_14px_rgba(15,23,42,.35)]
-                           group-hover:scale-105 transition-transform duration-500" />
-            </>
-          ) : (
-            <img data-morph src={img} alt={product.name} loading="lazy" decoding="async" onError={() => setImgBroken(true)}
-              className="fm-logo w-[92px] h-[92px] group-hover:scale-105 transition-transform" />
-          )
-        ) : (
-          <div data-morph className={`w-20 h-20 rounded-2xl bg-gradient-to-br ${v.grad} grid place-items-center`}>
-            <Icon size={34} className="text-white" />
-          </div>
-        )}
+        {/* One element, one request, one decode — see ProductMedia.jsx for what
+            the two-layer version was costing. The badges above keep their own
+            z-10 and sit over it. */}
+        <ProductMedia product={product} priority={priority} className="absolute inset-0" />
       </a>
       <div className="text-[11px] font-semibold uppercase tracking-wide text-violet-700">{v.label}</div>
       <Link to={to} className="font-bold text-[15px] text-slate-900 mt-0.5 hover:text-violet-600 line-clamp-2">{product.name}</Link>
