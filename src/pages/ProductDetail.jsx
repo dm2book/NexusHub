@@ -69,7 +69,7 @@ const productFaq = (product, t) => {
 
 export default function ProductDetail() {
   const { id } = useParams();
-  const { add } = useCart();
+  const { add, prelaunch } = useCart();
   const toast = useToast();
   const navigate = useNavigate();
   const reviews = useReviews();
@@ -191,18 +191,25 @@ export default function ProductDetail() {
         {/* visual — shared-element morph target, with pointer-driven 3D tilt */}
         <Tilt max={6} className="h-80 lg:h-[420px]">
         <div style={{ viewTransitionName: 'product-hero' }}
-          className={`shine-host group relative rounded-3xl bg-gradient-to-br ${grad} h-full overflow-hidden animate-fade-in ${product.featured ? 'ring-featured' : ''}`}>
+          className={`shine-host group relative rounded-3xl h-full overflow-hidden animate-fade-in ${
+            carriesOwnBackground(product.image) && !heroBroken ? 'bg-slate-100' : `bg-gradient-to-br ${grad}`
+          } ${product.featured ? 'ring-featured' : ''}`}>
           {product.image && !heroBroken ? (
             carriesOwnBackground(product.image) ? (
-              /* Artwork with its own background: blurred fill behind + the whole
-                 image on top, so nothing is cropped.
-                 The question used to be about the file's PATH, which sent the
-                 shop's own .webp renders down the `object-cover` branch below —
-                 built to fill a hero with a wide photograph, and wrong for a
-                 square logo, which it cropped to fit a 420px-tall panel. */
+              /* Artwork with its own background: a hint of its colour behind it,
+                 and the whole image on top so nothing is cropped.
+
+                 A hint, not a wall. The same blurred-copy trick that makes a
+                 150px tile take its artwork's colour becomes a 420px panel of
+                 saturated mush at hero size — a gold coin render turned the
+                 whole left half of the page orange. Low opacity over a neutral
+                 base keeps the association with the artwork's colour without
+                 the page having to shout it, and the category gradient is
+                 dropped here too: two colour sources arguing under one picture
+                 is what made it muddy. */
               <>
                 <img src={product.image} alt="" aria-hidden="true"
-                  className="absolute inset-0 w-full h-full object-cover scale-125 blur-3xl opacity-90" />
+                  className="absolute inset-0 w-full h-full object-cover scale-125 blur-3xl opacity-30" />
                 <img data-pd-media src={product.image} alt={product.name} onError={() => setHeroBroken(true)}
                   className="absolute inset-0 w-full h-full object-contain p-8 drop-shadow-2xl transition-transform duration-700 group-hover:scale-105" />
               </>
@@ -328,9 +335,23 @@ export default function ProductDetail() {
               </div>
               <span className="text-slate-500 text-sm font-rajdhani uppercase tracking-wide">{t('product.qty', 'Quantity')}</span>
             </div>
+            {/* Before launch the shop cannot take this order, and a button that
+                looks ready and then refuses is worse than no button. The
+                wishlist stays: saving something for the day is exactly what a
+                visitor is here to do. */}
             <div className="grid grid-cols-[1fr_1fr_auto] gap-3">
-              <button onClick={addToCart} className="btn-ghost py-3"><ShoppingCart size={18} /> {t('product.addToCart', 'Add to cart')}</button>
-              <button onClick={buyNow} className="btn-primary py-3">{t('product.buyNow', 'Buy now')}</button>
+              {prelaunch ? (
+                <div className="col-span-2 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-center">
+                  <span className="text-sm font-semibold text-violet-700">
+                    {t('launch.ctaClosed', 'Opens on launch day')}
+                  </span>
+                </div>
+              ) : (
+                <>
+                  <button onClick={addToCart} className="btn-ghost py-3"><ShoppingCart size={18} /> {t('product.addToCart', 'Add to cart')}</button>
+                  <button onClick={buyNow} className="btn-primary py-3">{t('product.buyNow', 'Buy now')}</button>
+                </>
+              )}
               <button onClick={() => toggle(product)} aria-label="Wishlist"
                 className={`btn-ghost px-3.5 ${wished ? 'text-pink-500' : ''}`}>
                 <Heart size={18} fill={wished ? 'currentColor' : 'none'} />
@@ -542,7 +563,13 @@ export default function ProductDetail() {
           <div className="text-[11px] text-slate-400 truncate">{product.name}</div>
           <div className="text-lg font-extrabold text-violet-600 leading-tight">{money(product.price * qty, product.currency)}</div>
         </div>
-        <button onClick={addToCart} className="btn-primary flex-1 py-3 fm-tap"><ShoppingCart size={17} /> {t('product.addToCart', 'Add to cart')}</button>
+        {prelaunch ? (
+          <span className="flex-1 py-3 text-center text-sm font-semibold text-violet-700 bg-violet-50 rounded-xl border border-violet-200">
+            {t('launch.ctaClosed', 'Opens on launch day')}
+          </span>
+        ) : (
+          <button onClick={addToCart} className="btn-primary flex-1 py-3 fm-tap"><ShoppingCart size={17} /> {t('product.addToCart', 'Add to cart')}</button>
+        )}
       </div>
     </div>
   );

@@ -30,6 +30,7 @@ const base = `http://127.0.0.1:${srv.address().port}`;
 const { createProduct } = await import('../src/services/productService.js');
 const { get } = await import('../src/db/index.js');
 const gate = await import('../src/services/launchGateService.js');
+const fs = await import('node:fs');
 
 const tag = process.pid;
 const product = await createProduct({ name: `Gate Pack ${tag}`, category: 'giftcard', price: 500, announce: false });
@@ -122,6 +123,19 @@ console.log('\n— Staff are not locked out of their own shop —');
   ok('an admin bypasses the gate', gate.isStaff({ roles: ['admin'] }));
   ok('a customer does not', !gate.isStaff({ roles: ['customer'] }));
   ok('and neither does nobody', !gate.isStaff(null));
+
+  /* The STOREFRONT has to ask the same question the server does. `prelaunch` is
+     about the clock; whether this visitor is stopped by it is a different thing,
+     and a UI that only checks the clock hides the checkout from the one person
+     who needs it before launch — the owner, testing the shop they are about to
+     open. Checked here because that gap is invisible to every server test. */
+  const cart = fs.readFileSync(new URL('../../src/context/CartContext.jsx', import.meta.url), 'utf8');
+  ok('the storefront gate also lets staff through',
+    /const gated = prelaunch && !isStaff;/.test(cart),
+    'the owner would see a closed shop the API is happy to serve');
+  ok('…and every button asks that same question, not the raw clock',
+    /prelaunch: gated/.test(cart) && /if \(gated\) return false;/.test(cart),
+    'two different answers to "are we open" is how they drift apart');
 
   ok('an address on the admin list may still create its account',
     gate.isAdminEmail('boss@forgemarket.nl'),

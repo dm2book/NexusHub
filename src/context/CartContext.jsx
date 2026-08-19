@@ -9,8 +9,15 @@ export const useCart = () => useContext(CartContext);
 const KEY = 'fm_cart';
 
 export function CartProvider({ children }) {
-  const { user } = useAuth();
+  const { user, isStaff } = useAuth();
   const { prelaunch } = useLaunch();
+  /* Staff walk through the gate, exactly as they do on the server.
+     `prelaunch` alone is about the clock; whether THIS visitor is stopped by it
+     is a different question, and answering only the first one would hide the
+     checkout from the one person who needs it before launch — the owner, testing
+     the shop they are about to open. Computed once here so every button in the
+     storefront asks the same question. */
+  const gated = prelaunch && !isStaff;
   const [items, setItems] = useState(() => {
     try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch { return []; }
   });
@@ -59,7 +66,7 @@ export function CartProvider({ children }) {
    * between "added" and "not yet" and say something useful.
    */
   const add = (product, qty = 1) => {
-    if (prelaunch) return false;
+    if (gated) return false;
     setItems((cur) => {
       const found = cur.find((i) => i.id === product.id);
       if (found) return cur.map((i) => (i.id === product.id ? { ...i, qty: i.qty + qty } : i));
@@ -80,7 +87,7 @@ export function CartProvider({ children }) {
   const currency = items[0]?.currency || 'EUR';
 
   return (
-    <CartContext.Provider value={{ items, add, setQty, remove, clear, count, subtotal, currency, prelaunch }}>
+    <CartContext.Provider value={{ items, add, setQty, remove, clear, count, subtotal, currency, prelaunch: gated }}>
       {children}
     </CartContext.Provider>
   );

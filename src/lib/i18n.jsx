@@ -324,6 +324,8 @@ const NL = {
   'launch.failed': 'Dat lukte niet. Controleer het adres en probeer het opnieuw.',
   'launch.cartClosed': 'ForgeMarket opent op de lanceerdag — tot dan kun je alles bekijken.',
   'launch.checkoutClosed': 'De winkel is nog niet open',
+  'launch.ctaClosed': 'Gaat open op de lanceerdag',
+  'launch.cardCta': 'Bekijken',
   'product.qtyLess': 'Eén minder',
   'product.qtyMore': 'Eén meer',
   'track.find': 'Zoek mijn bestelling',
