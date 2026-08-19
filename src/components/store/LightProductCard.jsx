@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { ShoppingCart, Zap, Clock } from 'lucide-react';
 import { categoryVisual, money, carriesOwnBackground, productDescription } from '../../lib/catalog.js';
 import { useI18n } from '../../lib/i18n.jsx';
+import { useCart } from '../../context/CartContext.jsx';
 import { iconFor } from '../../lib/sampleCatalog.js';
 import { navigateWithTransition } from '../../lib/viewTransition.js';
 import { flyToCart } from '../../lib/flyToCart.js';
@@ -23,6 +24,8 @@ export default function LightProductCard({ product, onAdd }) {
   const v = categoryVisual(product.category);
   const Icon = v.icon;
   const [imgBroken, setImgBroken] = useState(false);
+  // Same answer the cart gives everywhere else: before launch, and not staff.
+  const { prelaunch } = useCart();
   // A broken product image falls back to the category logo, never a broken icon.
   const img = (!imgBroken && product.image) ? product.image : iconFor(product.category);
   const photoArt = carriesOwnBackground(img);
