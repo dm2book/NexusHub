@@ -76,11 +76,19 @@ export default function LightProductCard({ product, onAdd }) {
         </span>
         {img ? (
           isCustomImage(img) ? (
-            // Owner-supplied photo/logo: fill the tile with a soft blurred copy
-            // so any baked-in background blends in instead of floating as a box.
+            /* Owner-supplied photo or logo.
+               A blurred copy still sits behind it so any baked-in background
+               blends instead of floating as a hard box — but at a fraction of
+               the opacity it used to have. At full strength it painted over the
+               plinth every other tile shows, so a shop with some photo art and
+               some built-in icons rendered two visibly different kinds of card
+               side by side: one with a coloured wash, one with a soft white
+               plinth. Now the plinth reads through both and the photo only
+               tints it, which is what makes a mixed catalogue look like one
+               catalogue. */
             <>
               <img src={img} alt="" aria-hidden="true" loading="lazy" decoding="async"
-                className="absolute inset-0 w-full h-full object-cover scale-125 blur-2xl opacity-90" />
+                className="absolute inset-0 w-full h-full object-cover scale-110 blur-2xl opacity-25" />
               {/* data-morph is forced position:relative by .fm-card-media (see index.css),
                   so centre it with the grid + cap its size. Fixed-px max-height —
                   a % one resolves against the auto grid track and is ignored. */}

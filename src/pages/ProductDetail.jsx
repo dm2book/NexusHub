@@ -156,14 +156,30 @@ export default function ProductDetail() {
   const desc = productDescription(product, lang);
   const crossSell = (recs.crossSell || []).slice(0, 4);
   const upsell = recs.upsell?.[0] || null;
+  /* Other sizes of the same thing, for the pack switcher.
+     This used to be `related`, computed from a fetch of the WHOLE catalogue that
+     was removed as an obvious waste — 49 KB of JSON to pick four items the
+     recommendations endpoint already returns. The fetch went; two references to
+     `related` did not, and a ReferenceError in render does not degrade, it
+     blanks the page. Every product page on the site rendered an empty body.
+     Recommendations may cross categories (they include co-purchases), so the
+     switcher takes only the same-category ones — which is exactly what the old
+     variable held. */
+  const packSiblings = (recs.crossSell || []).filter((p) => p.category === product?.category);
   const wished = has(product.id);
 
   const addToCart = () => {
     flyToCart(document.querySelector('[data-pd-media]'));
-    add(product, qty); toast.success(`${qty}× ${product.name} ${t('cart.addedToCart', 'added to cart')}`);
+    // `add` refuses before launch and says so by returning false — a button that
+    // silently does nothing is worse than one that explains itself.
+    if (!add(product, qty)) {
+      toast(t('launch.cartClosed', 'ForgeMarket opens on launch day — you can browse everything until then.'));
+      return;
+    }
+    toast.success(`${qty}× ${product.name} ${t('cart.addedToCart', 'added to cart')}`);
   };
   // Straight to checkout — the cart is a dead screen on the highest-intent click.
-  const buyNow = () => { add(product, qty); navigate('/checkout'); };
+  const buyNow = () => { if (add(product, qty)) navigate('/checkout'); };
 
   return (
     <div className="section pt-10 pb-28 lg:pb-10">
@@ -259,13 +275,13 @@ export default function ProductDetail() {
           <DeliveryFacts product={product} t={t} />
 
           {/* Pack switcher — jump between sizes of the same category in one tap */}
-          {related.length > 0 && (
+          {packSiblings.length > 0 && (
             <div className="mt-5">
               <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">
                 {t('product.chooseAmount', 'Choose your amount')}
               </div>
               <div className="flex flex-wrap gap-2">
-                {[product, ...related]
+                {[product, ...packSiblings]
                   .sort((a, b) => a.price - b.price)
                   .map((p) => {
                     const current = p.id === product.id;

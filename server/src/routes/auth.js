@@ -30,7 +30,8 @@ import { attributeSignup } from '../services/affiliateService.js';
 import { audit } from '../services/auditService.js';
 import { sendEmailAsync } from '../services/emailService.js';
 import { notify } from '../services/notificationService.js';
-import { badRequest, tooMany, unauthorized } from '../utils/errors.js';
+import { badRequest, tooMany, unauthorized, ApiError } from '../utils/errors.js';
+import { isPrelaunch, isAdminEmail, closedMessage } from '../services/launchGateService.js';
 
 const DEVICE_COOKIE = 'fm_device';
 const isEmail = (s) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(s || ''));
@@ -115,6 +116,20 @@ router.post('/start', otpLimiter, asyncHandler(async (req, res) => {
   // Brute-force gate (per identifier / IP).
   if (await recentFailures(identifier, ctx.ip) >= 10) {
     throw tooMany('Too many attempts. Please wait a few minutes and try again.');
+  }
+
+  /* Before launch, say so BEFORE sending a code.
+     The account is not created until the code is verified, so without this the
+     gate still holds — but only after emailing a one-time code to somebody we
+     were always going to refuse, who then hits the wall at the last step. An
+     existing account signs in exactly as before, which is what keeps the owner
+     and their staff able to work on a shop that is not open yet; an address on
+     the admin list may still create its account, because on a fresh deployment
+     that sign-in IS the admin account.
+     The lookup is skipped entirely once the shop has opened. */
+  if (isPrelaunch() && !isAdminEmail(identifier)) {
+    const known = await userForIdentifier(identifier);
+    if (!known) throw new ApiError(503, closedMessage('Signing up'), 'prelaunch');
   }
 
   // Already signed in on this browser? If the session cookie belongs to the

@@ -1,33 +1,50 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" fill="none">
-
   <defs><radialGradient id="nintendo-sh1" cx="0.5" cy="0.5" r="0.5">
     <stop offset="0" stop-color="#0b1220" stop-opacity="0.4"/>
-    <stop offset="0.6" stop-color="#0b1220" stop-opacity="0.16000000000000003"/>
+    <stop offset="0.6" stop-color="#0b1220" stop-opacity="0.16"/>
     <stop offset="1" stop-color="#0b1220" stop-opacity="0"/>
   </radialGradient></defs>
-  <ellipse cx="256" cy="388" rx="120" ry="24" fill="url(#nintendo-sh1)"/>
+  <ellipse cx="256" cy="388" rx="118" ry="24" fill="url(#nintendo-sh1)"/>
   <defs>
     <linearGradient id="nintendo-g2" x1="0.15" y1="0" x2="0.85" y2="1">
-      <stop offset="0" stop-color="#ed8a90"/>
-      <stop offset="0.5" stop-color="#e0353f"/>
-      <stop offset="1" stop-color="#b32a32"/>
+      <stop offset="0" stop-color="#ff8a8a"/><stop offset="0.5" stop-color="#e60012"/><stop offset="1" stop-color="#a3000d"/>
     </linearGradient>
-    <clipPath id="nintendo-c3"><path d="M202 172H310A64 64 0 0 1 374 236V256A64 64 0 0 1 310 320H202A64 64 0 0 1 138 256V236A64 64 0 0 1 202 172Z"/></clipPath>
+    <clipPath id="nintendo-c3"><path d="M196 126H316A52 52 0 0 1 368 178V298A52 52 0 0 1 316 350H196A52 52 0 0 1 144 298V178A52 52 0 0 1 196 126Z"/></clipPath>
     <radialGradient id="nintendo-p4" cx="0.5" cy="0.5" r="0.5">
-      <stop offset="0" stop-color="#fff" stop-opacity="0.72"/>
-      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+      <stop offset="0" stop-color="#fff" stop-opacity="0.72"/><stop offset="1" stop-color="#fff" stop-opacity="0"/>
     </radialGradient>
   </defs>
-  <defs><path id="nintendo-s5" d="M202 172H310A64 64 0 0 1 374 236V256A64 64 0 0 1 310 320H202A64 64 0 0 1 138 256V236A64 64 0 0 1 202 172Z"/></defs><use href="#nintendo-s5" y="26" fill="#65181c"/><use href="#nintendo-s5" y="25" fill="#67191d"/><use href="#nintendo-s5" y="24" fill="#6a191d"/><use href="#nintendo-s5" y="23" fill="#6c1a1e"/><use href="#nintendo-s5" y="22" fill="#6e1a1f"/><use href="#nintendo-s5" y="21" fill="#711b1f"/><use href="#nintendo-s5" y="20" fill="#731b20"/><use href="#nintendo-s5" y="19" fill="#751c21"/><use href="#nintendo-s5" y="18" fill="#771c21"/><use href="#nintendo-s5" y="17" fill="#7a1d22"/><use href="#nintendo-s5" y="16" fill="#7c1d23"/><use href="#nintendo-s5" y="15" fill="#7e1e23"/><use href="#nintendo-s5" y="14" fill="#811e24"/><use href="#nintendo-s5" y="13" fill="#831f25"/><use href="#nintendo-s5" y="12" fill="#852025"/><use href="#nintendo-s5" y="11" fill="#882026"/><use href="#nintendo-s5" y="10" fill="#8a2126"/><use href="#nintendo-s5" y="9" fill="#8c2127"/><use href="#nintendo-s5" y="8" fill="#8f2228"/><use href="#nintendo-s5" y="7" fill="#912228"/><use href="#nintendo-s5" y="6" fill="#932329"/><use href="#nintendo-s5" y="5" fill="#95232a"/><use href="#nintendo-s5" y="4" fill="#98242a"/><use href="#nintendo-s5" y="3" fill="#9a242b"/><use href="#nintendo-s5" y="2" fill="#9c252c"/><use href="#nintendo-s5" y="1" fill="#9f252c"/>
-  <path d="M202 172H310A64 64 0 0 1 374 236V256A64 64 0 0 1 310 320H202A64 64 0 0 1 138 256V236A64 64 0 0 1 202 172Z" fill="url(#nintendo-g2)"/>
-  <path d="M202 172H310A64 64 0 0 1 374 236V256A64 64 0 0 1 310 320H202A64 64 0 0 1 138 256V236A64 64 0 0 1 202 172Z" fill="none" stroke="#f1a4a9" stroke-opacity="0.75" stroke-width="3"/>
-  <g clip-path="url(#nintendo-c3)"><ellipse cx="216" cy="172" rx="96" ry="54"
-      fill="url(#nintendo-p4)" transform="rotate(-24 216 172)"/></g><g fill="#701b20" opacity="0.9">
-    <rect x="178" y="230" width="52" height="14" rx="7"/>
-    <rect x="197" y="211" width="14" height="52" rx="7"/>
-    <circle cx="312" cy="226" r="12"/>
-    <circle cx="340" cy="250" r="12"/>
-    <circle cx="284" cy="250" r="12"/>
-    <circle cx="312" cy="274" r="12"/>
-  </g>
+  <defs><path id="nintendo-s5" d="M196 126H316A52 52 0 0 1 368 178V298A52 52 0 0 1 316 350H196A52 52 0 0 1 144 298V178A52 52 0 0 1 196 126Z"/></defs>
+<use href="#nintendo-s5" y="26" fill="#5a0007"/>
+<use href="#nintendo-s5" y="25" fill="#5b0007"/>
+<use href="#nintendo-s5" y="24" fill="#5c0007"/>
+<use href="#nintendo-s5" y="23" fill="#5d0007"/>
+<use href="#nintendo-s5" y="22" fill="#5f0008"/>
+<use href="#nintendo-s5" y="21" fill="#600008"/>
+<use href="#nintendo-s5" y="20" fill="#610008"/>
+<use href="#nintendo-s5" y="19" fill="#620008"/>
+<use href="#nintendo-s5" y="18" fill="#640008"/>
+<use href="#nintendo-s5" y="17" fill="#650008"/>
+<use href="#nintendo-s5" y="16" fill="#660008"/>
+<use href="#nintendo-s5" y="15" fill="#670008"/>
+<use href="#nintendo-s5" y="14" fill="#690008"/>
+<use href="#nintendo-s5" y="13" fill="#6a0008"/>
+<use href="#nintendo-s5" y="12" fill="#6b0009"/>
+<use href="#nintendo-s5" y="11" fill="#6c0009"/>
+<use href="#nintendo-s5" y="10" fill="#6e0009"/>
+<use href="#nintendo-s5" y="9" fill="#6f0009"/>
+<use href="#nintendo-s5" y="8" fill="#700009"/>
+<use href="#nintendo-s5" y="7" fill="#710009"/>
+<use href="#nintendo-s5" y="6" fill="#730009"/>
+<use href="#nintendo-s5" y="5" fill="#740009"/>
+<use href="#nintendo-s5" y="4" fill="#750009"/>
+<use href="#nintendo-s5" y="3" fill="#760009"/>
+<use href="#nintendo-s5" y="2" fill="#78000a"/>
+<use href="#nintendo-s5" y="1" fill="#79000a"/>
+  <path d="M196 126H316A52 52 0 0 1 368 178V298A52 52 0 0 1 316 350H196A52 52 0 0 1 144 298V178A52 52 0 0 1 196 126Z" fill="url(#nintendo-g2)"/>
+  <path d="M196 126H316A52 52 0 0 1 368 178V298A52 52 0 0 1 316 350H196A52 52 0 0 1 144 298V178A52 52 0 0 1 196 126Z" fill="none" stroke="#ffb3b3" stroke-opacity="0.75" stroke-width="3"/>
+  <g clip-path="url(#nintendo-c3)"><ellipse cx="216" cy="172" rx="96" ry="54" fill="url(#nintendo-p4)" transform="rotate(-24 216 172)"/></g>
+  <path d="M172 216h168l-14 116a22 22 0 0 1-22 19H208a22 22 0 0 1-22-19Z" fill="#fff2f2"/>
+  <path d="M214 216v-16a42 42 0 0 1 84 0v16" fill="none" stroke="#fff2f2" stroke-width="14" stroke-linecap="round"/>
+  <path d="M206 250h100" stroke="#e60012" stroke-width="10" stroke-linecap="round" opacity="0.45"/>
 </svg>

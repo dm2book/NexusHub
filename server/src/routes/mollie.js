@@ -13,6 +13,7 @@ import { z } from 'zod';
 import { config } from '../config/env.js';
 import { asyncHandler } from '../middleware/error.js';
 import { publicCache } from '../utils/httpCache.js';
+import { requireLaunched } from '../services/launchGateService.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 import { ApiError } from '../utils/errors.js';
 import {
@@ -222,7 +223,10 @@ mollieApi.get('/mollie/methods', asyncHandler(async (req, res) => {
  * covers the create, and an open payment we already stored short-circuits it
  * entirely.
  */
-mollieApi.post('/orders/:id/mollie',
+/* Deliberately NOT applied to the webhook below: that one confirms money that
+   has already moved, and refusing it would strand a real payment. The gate is
+   about starting new business, not about abandoning business in flight. */
+mollieApi.post('/orders/:id/mollie', requireLaunched('Payment', { money: true }),
   rateLimit({ bucket: 'pay', windowMs: 60_000, max: 30, shared: true }),
   asyncHandler(async (req, res) => {
     if (!isEnabled()) throw new ApiError(400, 'Mollie is not configured');

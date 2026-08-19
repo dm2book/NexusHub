@@ -1,6 +1,7 @@
 /** User CRUD + RBAC resolution helpers. */
 import { run, get, all, nowIso, tx } from '../db/index.js';
 import { membershipActiveFor, FORGE_PLUS } from './membershipService.js';
+import { assertLaunched, isAdminEmail } from './launchGateService.js';
 import { newId } from '../utils/ids.js';
 import { config } from '../config/env.js';
 
@@ -32,6 +33,16 @@ export async function upsertUserByEmail(email, profile = {}) {
     await ensureAdmin(existing.id, e);
     return { user: await getUserById(existing.id), created: false };
   }
+  /* New accounts wait for launch; existing ones sign in as normal.
+
+     This sits AFTER the `existing` branch above on purpose: the gate is on
+     registration, not on logging in, so everyone who already has an account —
+     including the owner — keeps their key to the door. An address listed in
+     ADMIN_EMAILS is allowed through even as a brand-new account, because on a
+     fresh deployment there is no admin yet to bypass anything, and refusing
+     would lock the owner out of the shop they are about to open. */
+  if (!isAdminEmail(e)) assertLaunched(null, 'Signing up');
+
   const id = newId('usr');
   await run(`INSERT INTO users (id, email, email_verified, display_name, avatar_url, created_at, updated_at)
        VALUES (@id, @e, @ev, @dn, @av, @at, @at)`, {
@@ -54,6 +65,10 @@ export async function upsertUserByPhone(phone, profile = {}) {
     if (!existing.phone_verified) await run('UPDATE users SET phone_verified = 1 WHERE id = @id', { id: existing.id });
     return { user: await getUserById(existing.id), created: false };
   }
+  // Same gate as the email path: a phone number cannot be on the admin list, so
+  // a phone-first signup simply waits for launch day.
+  assertLaunched(null, 'Signing up');
+
   // Phone-first signup: email is required+unique, so seed a clearly-marked
   // placeholder the customer can change in Settings.
   const id = newId('usr');

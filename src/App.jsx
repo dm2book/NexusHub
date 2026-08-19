@@ -13,6 +13,7 @@ import RouteProgress from './components/RouteProgress.jsx';
 
 // Eager: first-paint storefront pages (small, instant).
 import HomeStore from './pages/HomeStore.jsx';
+import LaunchBanner from './components/store/LaunchBanner.jsx';
 import Shop from './pages/Shop.jsx';
 import ProductDetail from './pages/ProductDetail.jsx';
 import Login from './pages/Login.jsx';
@@ -73,6 +74,13 @@ export default function App() {
   usePageViews();   // anonymous, privacy-friendly visitor analytics
   return (
     <>
+    {/* Above <Routes>, not inside a layout.
+        The storefront home is deliberately self-contained and sits OUTSIDE
+        StoreLayout, so a banner mounted there appears on every page except the
+        one that matters most — which is exactly the mistake StoreLayout's own
+        comment records about the previous banner. One mount here cannot drift
+        away from the routes, and it renders nothing once the shop is open. */}
+    <LaunchBanner />
     <RouteProgress />
     <Suspense fallback={<PageLoader />}>
       <Routes>
