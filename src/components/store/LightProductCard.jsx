@@ -48,17 +48,19 @@ export default function LightProductCard({ product, onAdd }) {
           the soft gradient, the tinted glow and the little shadow disc beneath
           it, and it gets them.
 
-          A photo or a render brings its own background, and the plinth is what
-          makes it look wrong. A product shot on white laid over a violet-tinted
-          plinth shows its own white rectangle with a hard edge — a sticker on a
-          card, which is what the shop looked like. Dropping the tint and the
-          glow removes the edge entirely: the photo's white and the tile's white
-          are the same white, so there is nothing to see a seam against. Dark art
-          gets clean contrast instead of a muddy wash. */}
+          A photo or a render brings its own background, and takes neither. It
+          also has to switch the glow OFF explicitly rather than just not setting
+          it: `.fm-card-media::before` falls back to a violet radial when
+          `--card-glow` is undefined, so leaving it unset does not remove the
+          glow — it picks the default one. That is a violet disc at 55% sitting
+          over every product photo in the shop, which is the haze on the artwork.
+          `none` is the only way to actually mean none. */}
       <a href={to} onClick={openWithMorph}
         className={`fm-card-media relative rounded-xl h-[122px] sm:h-[150px] grid place-items-center mb-3 overflow-hidden ${
-          photoArt ? 'bg-slate-50 border border-slate-200/60' : 'fm-logo-plinth'}`}
-        style={photoArt ? undefined : { '--card-glow': `radial-gradient(circle, ${glowFor(product.category)}45, transparent 70%)` }}>
+          photoArt ? 'border border-slate-200/60' : 'fm-logo-plinth'}`}
+        style={photoArt
+          ? { '--card-glow': 'none' }
+          : { '--card-glow': `radial-gradient(circle, ${glowFor(product.category)}45, transparent 70%)` }}>
         <div className="absolute top-2.5 left-2.5 z-10 flex flex-col items-start gap-1">
           {onSale && (
             <span className="text-[10px] font-black text-white bg-rose-500 rounded-full px-2 py-0.5 shadow-sm">-{discountPct}%</span>
