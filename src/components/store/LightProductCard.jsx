@@ -25,6 +25,7 @@ export default function LightProductCard({ product, onAdd }) {
   const [imgBroken, setImgBroken] = useState(false);
   // A broken product image falls back to the category logo, never a broken icon.
   const img = (!imgBroken && product.image) ? product.image : iconFor(product.category);
+  const photoArt = carriesOwnBackground(img);
   const navigate = useNavigate();
   const to = `/product/${product.id}`;
   const onSale = product.compareAtPrice > product.price;
@@ -41,9 +42,23 @@ export default function LightProductCard({ product, onAdd }) {
 
   return (
     <div className="group w-full bg-white rounded-2xl border border-slate-200/70 shadow-sm fm-lift p-3 sm:p-4 flex flex-col">
+      {/* Two kinds of tile, because there are two kinds of artwork.
+
+          A generated icon is a transparent badge drawn FOR the plinth: it wants
+          the soft gradient, the tinted glow and the little shadow disc beneath
+          it, and it gets them.
+
+          A photo or a render brings its own background, and the plinth is what
+          makes it look wrong. A product shot on white laid over a violet-tinted
+          plinth shows its own white rectangle with a hard edge — a sticker on a
+          card, which is what the shop looked like. Dropping the tint and the
+          glow removes the edge entirely: the photo's white and the tile's white
+          are the same white, so there is nothing to see a seam against. Dark art
+          gets clean contrast instead of a muddy wash. */}
       <a href={to} onClick={openWithMorph}
-        className="fm-card-media fm-logo-plinth relative rounded-xl h-[122px] sm:h-[150px] grid place-items-center mb-3"
-        style={{ '--card-glow': `radial-gradient(circle, ${glowFor(product.category)}45, transparent 70%)` }}>
+        className={`fm-card-media relative rounded-xl h-[122px] sm:h-[150px] grid place-items-center mb-3 overflow-hidden ${
+          photoArt ? 'bg-white border border-slate-200/60' : 'fm-logo-plinth'}`}
+        style={photoArt ? undefined : { '--card-glow': `radial-gradient(circle, ${glowFor(product.category)}45, transparent 70%)` }}>
         <div className="absolute top-2.5 left-2.5 z-10 flex flex-col items-start gap-1">
           {onSale && (
             <span className="text-[10px] font-black text-white bg-rose-500 rounded-full px-2 py-0.5 shadow-sm">-{discountPct}%</span>
@@ -75,7 +90,7 @@ export default function LightProductCard({ product, onAdd }) {
             : <><Clock size={10} /> {t('card.byHand', 'By hand')}</>}
         </span>
         {img ? (
-          carriesOwnBackground(img) ? (
+          photoArt ? (
             /* Artwork that brings its own background: the shop's 3D renders and
                anything the owner uploads.
 
@@ -95,21 +110,17 @@ export default function LightProductCard({ product, onAdd }) {
                treatment written for it never reached it. And the picture itself
                gets a radius and a real shadow, so a rectangle reads as an object
                resting on the plinth rather than a crop pasted over it. */
-            <>
-              <img src={img} alt="" aria-hidden="true" loading="lazy" decoding="async"
-                className="absolute inset-0 w-full h-full object-cover scale-125 blur-3xl opacity-45 saturate-150" />
-              {/* A second, softer wash of white on top: without it a dark render
-                  (the CoD wordmark, the EA FC pitch) turns the whole tile murky
-                  and the light card stops matching its neighbours. */}
-              <span aria-hidden="true" className="absolute inset-0 bg-white/45" />
-              {/* data-morph is forced position:relative by .fm-card-media (see index.css),
-                  so centre it with the grid + cap its size. Fixed-px max-height —
-                  a % one resolves against the auto grid track and is ignored. */}
-              <img data-morph src={img} alt={product.name} loading="lazy" decoding="async" onError={() => setImgBroken(true)}
-                className="relative z-[1] max-w-[80%] max-h-[112px] object-contain rounded-xl
-                           shadow-[0_10px_22px_-8px_rgba(15,23,42,.45)]
-                           group-hover:scale-105 transition-transform duration-500" />
-            </>
+            /* Nothing behind it. The blurred copy that used to sit here was
+               trying to reconcile a photo with a tinted plinth; with the plinth
+               gone there is nothing to reconcile, and the wash only ever made
+               dark art murky. The picture is given the room instead — it fills
+               the tile rather than floating in the middle of it.
+               data-morph is forced position:relative by .fm-card-media (see
+               index.css), so centre it with the grid + cap its size. Fixed-px
+               max-height: a % one resolves against the auto grid track. */
+            <img data-morph src={img} alt={product.name} loading="lazy" decoding="async" onError={() => setImgBroken(true)}
+              className="relative z-[1] w-full h-full max-h-[150px] object-contain p-2
+                         group-hover:scale-105 transition-transform duration-500" />
           ) : (
             <img data-morph src={img} alt={product.name} loading="lazy" decoding="async" onError={() => setImgBroken(true)}
               className="fm-logo w-[92px] h-[92px] group-hover:scale-105 transition-transform" />
