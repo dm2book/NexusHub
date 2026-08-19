@@ -176,12 +176,24 @@ const CATS_WITH_ICON = [
   'rocketleague', 'rust', 'spotify', 'standoff', 'steam', 'telegram', 'tiktok', 'twitch',
   'ubisoft', 'v-bucks', 'valorant', 'voucher', 'wildrift', 'wow', 'xbox', 'youtube', 'zenless',
 ];
-// Categories using the owner's own brand artwork are raster; the generated 3D
-// icons are SVG — keep in sync with RASTER_ICONS in src/lib/sampleCatalog.js.
-const RASTER_ICONS = [
-  'cod', 'discord-nitro', 'eafc', 'giftcard', 'playstation', 'robux', 'steam', 'v-bucks',
-  'valorant', 'xbox',
-];
+// Every category now uses the generated 3D icon set.
+//
+// Ten categories used to point at raster brand art instead, and that was the
+// single thing making the catalogue look untidy: ten flat, differently-lit
+// trademark logos — a black Call of Duty wordmark, a pale blue V-Bucks pile, a
+// photograph of a gift card — sitting in a grid with fifty-four icons that share
+// one light source, one plinth and one shadow. Each was fine alone; together
+// they read as three different shops.
+//
+// An SVG exists for all ten, so this is a one-line switch rather than new
+// artwork, and syncCatalogImages() below repoints every product still stored
+// against the old .webp path on the next boot — the live catalogue heals itself
+// with no manual editing.
+//
+// The mechanism stays: put a category back in this list and it goes back to its
+// raster file, which is what you want the day someone supplies proper art in
+// the same style.
+const RASTER_ICONS = [];
 // Raster brand art is WEBP, not PNG. The PNGs were converted during the
 // performance pass (481KB across ten files became 83KB) and this copy of the
 // rule was never updated — so every product in a raster category was pointed at

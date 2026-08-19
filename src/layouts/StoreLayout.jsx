@@ -3,7 +3,6 @@ import DeferUntilIdle from '../components/DeferUntilIdle.jsx';
 import ScrollProgress from '../components/store/ScrollProgress.jsx';
 import { useEffect, lazy, Suspense } from 'react';
 import StoreNav from '../components/store/StoreNav.jsx';
-import LaunchBanner from '../components/store/LaunchBanner.jsx';
 import { allowed, onConsentChange } from '../lib/consent.js';
 import CookieConsent from '../components/CookieConsent.jsx';
 import StoreFooter from '../components/store/StoreFooter.jsx';
@@ -40,10 +39,6 @@ export default function StoreLayout() {
 
   return (
     <div className="min-h-screen flex flex-col bg-[#f6f7fb]">
-      {/* Above the nav, not below it: this is the first thing to know about the
-          site, and a countdown that scrolls away with the page is a countdown
-          nobody sees. It renders nothing at all once the shop has opened. */}
-      <LaunchBanner />
       <AnnouncementBar />
       <StoreNav />
       <main key={pathname} className="theme-light flex-1 fm-page pb-20 lg:pb-0">

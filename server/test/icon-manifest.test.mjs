@@ -71,11 +71,18 @@ console.log('\n— Every mapped category resolves to a file that exists —');
   const missing = a.filter((c) => !onDisk.has(c));
   ok('no category points at a missing icon', missing.length === 0, `missing: [${missing}]`);
 
-  // The extension is chosen from RASTER_ICONS, so a slug in the wrong set
-  // produces a 404 that only shows up as a blank tile in the shop.
-  const wrongExt = a.filter((c) => raster.has(c) !== rasterOnDisk.has(c));
-  ok('every slug is in the raster set iff its file is a raster one',
-    wrongExt.length === 0, `mismatched: [${wrongExt}]`);
+  /* The extension is chosen from RASTER_ICONS, so a slug in that set with no
+     .webp on disk is a 404 that shows up as a blank tile in the shop.
+
+     The check runs one way only, and that is deliberate. It used to demand the
+     set and the disk match EXACTLY, which quietly forbade the thing that made
+     the catalogue look tidy: every category now uses the generated 3D icon, and
+     the ten .webp brand logos stay on disk unused rather than being deleted, so
+     putting a category back is a one-word change. What must never happen is a
+     category asking for a file that is not there. */
+  const missingRaster = a.filter((c) => raster.has(c) && !rasterOnDisk.has(c));
+  ok('every raster-set slug has its raster file',
+    missingRaster.length === 0, `no .webp on disk for: [${missingRaster}]`);
 }
 
 console.log('\n— Nothing on disk is stranded —');

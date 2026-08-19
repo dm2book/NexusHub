@@ -72,7 +72,12 @@ console.log('\n— The browser and the seeder compose the same path —');
   // The rule is only right if the files agree with it.
   const rasterList = server.match(/const RASTER_ICONS = \[([\s\S]*?)\];/)?.[1] || '';
   const raster = [...rasterList.matchAll(/'([a-z0-9-]+)'/g)].map((m) => m[1]);
-  ok('the raster list is not empty', raster.length > 0, `n=${raster.length}`);
+  /* No lower bound on this list any more.
+     It is empty on purpose — see RASTER_ICONS in demoSeed.js — because ten flat
+     trademark logos among fifty-four shaded icons is what made the shop look
+     untidy. Asserting "not empty" was asserting a decision rather than a
+     property; what actually matters is below: anything IN the list must exist
+     on disk, and the client and server must agree on the list. */
   const wrongExt = raster.filter((cat) => !exists(`/products/icons/${cat}.${s?.[1]}`));
   ok(`every raster category has a .${s?.[1]} file on disk`, wrongExt.length === 0, wrongExt.join(', '));
 

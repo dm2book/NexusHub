@@ -174,7 +174,13 @@ export const config = {
    * services/launchGateService.js for why that direction is the safe one.
    */
   launch: {
-    date: env.LAUNCH_DATE === undefined ? '2026-09-24T00:00:00Z' : env.LAUNCH_DATE,
+    /* Off unless you say otherwise.
+       The gate closes the checkout, and a default that ships closed would shut a
+       LIVE shop the moment this deploys — a feature nobody asked for at that
+       moment, and one whose fix is another deploy. Set LAUNCH_DATE to open the
+       gate's mouth: `LAUNCH_DATE=2026-09-24T00:00:00Z`. Blank means "we are
+       open", which is the only safe thing for a value nobody has set yet. */
+    date: env.LAUNCH_DATE || '',
   },
 
   /**

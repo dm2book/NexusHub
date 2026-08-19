@@ -1,27 +1,49 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" fill="none">
-
   <defs><radialGradient id="playstation-sh1" cx="0.5" cy="0.5" r="0.5">
     <stop offset="0" stop-color="#0b1220" stop-opacity="0.4"/>
-    <stop offset="0.6" stop-color="#0b1220" stop-opacity="0.16000000000000003"/>
+    <stop offset="0.6" stop-color="#0b1220" stop-opacity="0.16"/>
     <stop offset="1" stop-color="#0b1220" stop-opacity="0"/>
   </radialGradient></defs>
-  <ellipse cx="256" cy="388" rx="112" ry="22" fill="url(#playstation-sh1)"/>
+  <ellipse cx="256" cy="388" rx="118" ry="24" fill="url(#playstation-sh1)"/>
   <defs>
     <linearGradient id="playstation-g2" x1="0.15" y1="0" x2="0.85" y2="1">
-      <stop offset="0" stop-color="#7dabe4"/>
-      <stop offset="0.5" stop-color="#1f6fd0"/>
-      <stop offset="1" stop-color="#1959a6"/>
+      <stop offset="0" stop-color="#5b9ce8"/><stop offset="0.5" stop-color="#1d5fb0"/><stop offset="1" stop-color="#123f78"/>
     </linearGradient>
-    <clipPath id="playstation-c3"><path d="M178 156H334A26 26 0 0 1 360 182V326A26 26 0 0 1 334 352H178A26 26 0 0 1 152 326V182A26 26 0 0 1 178 156Z"/></clipPath>
+    <clipPath id="playstation-c3"><path d="M196 126H316A52 52 0 0 1 368 178V298A52 52 0 0 1 316 350H196A52 52 0 0 1 144 298V178A52 52 0 0 1 196 126Z"/></clipPath>
     <radialGradient id="playstation-p4" cx="0.5" cy="0.5" r="0.5">
-      <stop offset="0" stop-color="#fff" stop-opacity="0.72"/>
-      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+      <stop offset="0" stop-color="#fff" stop-opacity="0.72"/><stop offset="1" stop-color="#fff" stop-opacity="0"/>
     </radialGradient>
   </defs>
-  <defs><path id="playstation-s5" d="M178 156H334A26 26 0 0 1 360 182V326A26 26 0 0 1 334 352H178A26 26 0 0 1 152 326V182A26 26 0 0 1 178 156Z"/></defs><use href="#playstation-s5" y="26" fill="#0e325e"/><use href="#playstation-s5" y="25" fill="#0e3360"/><use href="#playstation-s5" y="24" fill="#0f3462"/><use href="#playstation-s5" y="23" fill="#0f3564"/><use href="#playstation-s5" y="22" fill="#0f3767"/><use href="#playstation-s5" y="21" fill="#103869"/><use href="#playstation-s5" y="20" fill="#10396b"/><use href="#playstation-s5" y="19" fill="#103a6d"/><use href="#playstation-s5" y="18" fill="#103b6f"/><use href="#playstation-s5" y="17" fill="#113c71"/><use href="#playstation-s5" y="16" fill="#113e74"/><use href="#playstation-s5" y="15" fill="#113f76"/><use href="#playstation-s5" y="14" fill="#124078"/><use href="#playstation-s5" y="13" fill="#12417a"/><use href="#playstation-s5" y="12" fill="#12427c"/><use href="#playstation-s5" y="11" fill="#13437e"/><use href="#playstation-s5" y="10" fill="#134480"/><use href="#playstation-s5" y="9" fill="#134683"/><use href="#playstation-s5" y="8" fill="#144785"/><use href="#playstation-s5" y="7" fill="#144887"/><use href="#playstation-s5" y="6" fill="#144989"/><use href="#playstation-s5" y="5" fill="#144a8b"/><use href="#playstation-s5" y="4" fill="#154b8d"/><use href="#playstation-s5" y="3" fill="#154d90"/><use href="#playstation-s5" y="2" fill="#154e92"/><use href="#playstation-s5" y="1" fill="#164f94"/>
-  <path d="M178 156H334A26 26 0 0 1 360 182V326A26 26 0 0 1 334 352H178A26 26 0 0 1 152 326V182A26 26 0 0 1 178 156Z" fill="url(#playstation-g2)"/>
-  <path d="M178 156H334A26 26 0 0 1 360 182V326A26 26 0 0 1 334 352H178A26 26 0 0 1 152 326V182A26 26 0 0 1 178 156Z" fill="none" stroke="#9abeea" stroke-opacity="0.75" stroke-width="3"/>
-  <g clip-path="url(#playstation-c3)"><ellipse cx="216" cy="172" rx="96" ry="54"
-      fill="url(#playstation-p4)" transform="rotate(-24 216 172)"/></g><path d="M206 162v-26a52 52 0 0 1 100 0v26"
-    fill="none" stroke="#629ade" stroke-width="18" stroke-linecap="round"/>
+  <defs><path id="playstation-s5" d="M196 126H316A52 52 0 0 1 368 178V298A52 52 0 0 1 316 350H196A52 52 0 0 1 144 298V178A52 52 0 0 1 196 126Z"/></defs>
+<use href="#playstation-s5" y="26" fill="#0a2342"/>
+<use href="#playstation-s5" y="25" fill="#0a2343"/>
+<use href="#playstation-s5" y="24" fill="#0a2444"/>
+<use href="#playstation-s5" y="23" fill="#0a2445"/>
+<use href="#playstation-s5" y="22" fill="#0a2546"/>
+<use href="#playstation-s5" y="21" fill="#0b2547"/>
+<use href="#playstation-s5" y="20" fill="#0b2648"/>
+<use href="#playstation-s5" y="19" fill="#0b2648"/>
+<use href="#playstation-s5" y="18" fill="#0b2749"/>
+<use href="#playstation-s5" y="17" fill="#0b274a"/>
+<use href="#playstation-s5" y="16" fill="#0b274b"/>
+<use href="#playstation-s5" y="15" fill="#0b284c"/>
+<use href="#playstation-s5" y="14" fill="#0c284d"/>
+<use href="#playstation-s5" y="13" fill="#0c294e"/>
+<use href="#playstation-s5" y="12" fill="#0c294f"/>
+<use href="#playstation-s5" y="11" fill="#0c2a50"/>
+<use href="#playstation-s5" y="10" fill="#0c2a51"/>
+<use href="#playstation-s5" y="9" fill="#0c2b52"/>
+<use href="#playstation-s5" y="8" fill="#0c2b53"/>
+<use href="#playstation-s5" y="7" fill="#0d2c54"/>
+<use href="#playstation-s5" y="6" fill="#0d2c54"/>
+<use href="#playstation-s5" y="5" fill="#0d2d55"/>
+<use href="#playstation-s5" y="4" fill="#0d2d56"/>
+<use href="#playstation-s5" y="3" fill="#0d2e57"/>
+<use href="#playstation-s5" y="2" fill="#0d2e58"/>
+<use href="#playstation-s5" y="1" fill="#0d2f59"/>
+  <path d="M196 126H316A52 52 0 0 1 368 178V298A52 52 0 0 1 316 350H196A52 52 0 0 1 144 298V178A52 52 0 0 1 196 126Z" fill="url(#playstation-g2)"/>
+  <path d="M196 126H316A52 52 0 0 1 368 178V298A52 52 0 0 1 316 350H196A52 52 0 0 1 144 298V178A52 52 0 0 1 196 126Z" fill="none" stroke="#9abeea" stroke-opacity="0.75" stroke-width="3"/>
+  <g clip-path="url(#playstation-c3)"><ellipse cx="216" cy="172" rx="96" ry="54" fill="url(#playstation-p4)" transform="rotate(-24 216 172)"/></g>
+  <path d="M232 176v148l34 11V214c0-9 5-13 12-11 16 5 22 15 22 33 0 20-9 28-24 24l-10-3v34l14 4c33 9 55-6 55-45 0-38-19-58-58-70Z" fill="#eef5ff"/>
+  <path d="M196 300c-14 5-18 11-6 15 15 5 38 5 54 0l30-10v-27l-52 17c-9 3-14 2-16 0-2-3 2-6 10-9l58-19v-28l-64 21c-9 3-14 5-14 5Z" fill="#eef5ff" opacity="0.85"/>
 </svg>

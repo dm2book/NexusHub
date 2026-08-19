@@ -112,12 +112,16 @@ const CATS_WITH_ICON = [
   'ubisoft', 'v-bucks', 'valorant', 'voucher', 'wildrift', 'wow', 'xbox', 'youtube', 'zenless',
 ];
 export const CATEGORY_ICON = Object.fromEntries(CATS_WITH_ICON.map((c) => [c, c]));
-// Categories using the owner's own brand artwork (raster). The rest use the
-// generated 3D icons, which are SVG — so the extension differs per category.
-export const RASTER_ICONS = new Set([
-  'cod', 'discord-nitro', 'eafc', 'giftcard', 'playstation', 'robux', 'steam', 'v-bucks',
-  'valorant', 'xbox',
-]);
+/**
+ * Categories that use raster brand art instead of the generated 3D icon.
+ *
+ * Empty, and deliberately so — see RASTER_ICONS in server/src/db/demoSeed.js for
+ * the reasoning. Ten flat trademark logos in a grid of fifty-four icons that
+ * share one light source made the shop look like three shops. Keep this in sync
+ * with the server list: the two decide the same thing and a disagreement means
+ * the storefront asks for a file the catalogue was never pointed at.
+ */
+export const RASTER_ICONS = new Set([]);
 /**
  * Path to the built-in icon for a category name (not the file's own slug).
  *

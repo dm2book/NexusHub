@@ -1,58 +1,50 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" fill="none">
-
   <defs><radialGradient id="robux-sh1" cx="0.5" cy="0.5" r="0.5">
     <stop offset="0" stop-color="#0b1220" stop-opacity="0.4"/>
-    <stop offset="0.6" stop-color="#0b1220" stop-opacity="0.16000000000000003"/>
+    <stop offset="0.6" stop-color="#0b1220" stop-opacity="0.16"/>
     <stop offset="1" stop-color="#0b1220" stop-opacity="0"/>
   </radialGradient></defs>
-  <ellipse cx="256" cy="388" rx="132" ry="26" fill="url(#robux-sh1)"/>
+  <ellipse cx="256" cy="388" rx="118" ry="24" fill="url(#robux-sh1)"/>
   <defs>
     <linearGradient id="robux-g2" x1="0.15" y1="0" x2="0.85" y2="1">
-      <stop offset="0" stop-color="#83cca5"/>
-      <stop offset="0.5" stop-color="#29a763"/>
-      <stop offset="1" stop-color="#21864f"/>
+      <stop offset="0" stop-color="#ffe08a"/><stop offset="0.5" stop-color="#e6a913"/><stop offset="1" stop-color="#9c6f05"/>
     </linearGradient>
-    <clipPath id="robux-c3"><path d="M172 218L236.09 255L236.09 329L172 366L107.91 329L107.91 255Z"/></clipPath>
+    <clipPath id="robux-c3"><path d="M196 126H316A52 52 0 0 1 368 178V298A52 52 0 0 1 316 350H196A52 52 0 0 1 144 298V178A52 52 0 0 1 196 126Z"/></clipPath>
     <radialGradient id="robux-p4" cx="0.5" cy="0.5" r="0.5">
-      <stop offset="0" stop-color="#fff" stop-opacity="0.72"/>
-      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+      <stop offset="0" stop-color="#fff" stop-opacity="0.72"/><stop offset="1" stop-color="#fff" stop-opacity="0"/>
     </radialGradient>
   </defs>
-  <defs><path id="robux-s5" d="M172 218L236.09 255L236.09 329L172 366L107.91 329L107.91 255Z"/></defs><use href="#robux-s5" y="20" fill="#124b2d"/><use href="#robux-s5" y="19" fill="#134d2e"/><use href="#robux-s5" y="18" fill="#135030"/><use href="#robux-s5" y="17" fill="#145231"/><use href="#robux-s5" y="16" fill="#145432"/><use href="#robux-s5" y="15" fill="#155634"/><use href="#robux-s5" y="14" fill="#165935"/><use href="#robux-s5" y="13" fill="#165b36"/><use href="#robux-s5" y="12" fill="#175d37"/><use href="#robux-s5" y="11" fill="#175f39"/><use href="#robux-s5" y="10" fill="#18623a"/><use href="#robux-s5" y="9" fill="#19643b"/><use href="#robux-s5" y="8" fill="#19663d"/><use href="#robux-s5" y="7" fill="#1a683e"/><use href="#robux-s5" y="6" fill="#1a6b3f"/><use href="#robux-s5" y="5" fill="#1b6d41"/><use href="#robux-s5" y="4" fill="#1c6f42"/><use href="#robux-s5" y="3" fill="#1c7143"/><use href="#robux-s5" y="2" fill="#1d7444"/><use href="#robux-s5" y="1" fill="#1d7646"/>
-  <path d="M172 218L236.09 255L236.09 329L172 366L107.91 329L107.91 255Z" fill="url(#robux-g2)"/>
-  <path d="M172 218L236.09 255L236.09 329L172 366L107.91 329L107.91 255Z" fill="none" stroke="#9fd7b9" stroke-opacity="0.75" stroke-width="3"/>
-  
-  <defs>
-    <linearGradient id="robux-g6" x1="0.15" y1="0" x2="0.85" y2="1">
-      <stop offset="0" stop-color="#82c6a1"/>
-      <stop offset="0.5" stop-color="#279c5d"/>
-      <stop offset="1" stop-color="#1f7d4a"/>
-    </linearGradient>
-    <clipPath id="robux-c7"><path d="M342 238L395.69 269L395.69 331L342 362L288.31 331L288.31 269Z"/></clipPath>
-    <radialGradient id="robux-p8" cx="0.5" cy="0.5" r="0.5">
-      <stop offset="0" stop-color="#fff" stop-opacity="0.72"/>
-      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
-    </radialGradient>
-  </defs>
-  <defs><path id="robux-s9" d="M342 238L395.69 269L395.69 331L342 362L288.31 331L288.31 269Z"/></defs><use href="#robux-s9" y="16" fill="#12462a"/><use href="#robux-s9" y="15" fill="#13492c"/><use href="#robux-s9" y="14" fill="#134b2d"/><use href="#robux-s9" y="13" fill="#144e2f"/><use href="#robux-s9" y="12" fill="#155130"/><use href="#robux-s9" y="11" fill="#155332"/><use href="#robux-s9" y="10" fill="#165633"/><use href="#robux-s9" y="9" fill="#165835"/><use href="#robux-s9" y="8" fill="#175b37"/><use href="#robux-s9" y="7" fill="#185e38"/><use href="#robux-s9" y="6" fill="#18603a"/><use href="#robux-s9" y="5" fill="#19633b"/><use href="#robux-s9" y="4" fill="#1a663d"/><use href="#robux-s9" y="3" fill="#1a683e"/><use href="#robux-s9" y="2" fill="#1b6b40"/><use href="#robux-s9" y="1" fill="#1b6d41"/>
-  <path d="M342 238L395.69 269L395.69 331L342 362L288.31 331L288.31 269Z" fill="url(#robux-g6)"/>
-  <path d="M342 238L395.69 269L395.69 331L342 362L288.31 331L288.31 269Z" fill="none" stroke="#9ed2b6" stroke-opacity="0.75" stroke-width="3"/>
-  
-  <defs>
-    <linearGradient id="robux-g10" x1="0.15" y1="0" x2="0.85" y2="1">
-      <stop offset="0" stop-color="#86d9ad"/>
-      <stop offset="0.5" stop-color="#2fbe71"/>
-      <stop offset="1" stop-color="#26985a"/>
-    </linearGradient>
-    <clipPath id="robux-c11"><path d="M256 116L361.66 177L361.66 299L256 360L150.34 299L150.34 177Z"/></clipPath>
-    <radialGradient id="robux-p12" cx="0.5" cy="0.5" r="0.5">
-      <stop offset="0" stop-color="#fff" stop-opacity="0.72"/>
-      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
-    </radialGradient>
-  </defs>
-  <defs><path id="robux-s13" d="M256 116L361.66 177L361.66 299L256 360L150.34 299L150.34 177Z"/></defs><use href="#robux-s13" y="30" fill="#155533"/><use href="#robux-s13" y="29" fill="#155734"/><use href="#robux-s13" y="28" fill="#165835"/><use href="#robux-s13" y="27" fill="#165a36"/><use href="#robux-s13" y="26" fill="#175c37"/><use href="#robux-s13" y="25" fill="#175e38"/><use href="#robux-s13" y="24" fill="#185f39"/><use href="#robux-s13" y="23" fill="#18613a"/><use href="#robux-s13" y="22" fill="#18633b"/><use href="#robux-s13" y="21" fill="#19653c"/><use href="#robux-s13" y="20" fill="#19663d"/><use href="#robux-s13" y="19" fill="#1a683e"/><use href="#robux-s13" y="18" fill="#1a6a3f"/><use href="#robux-s13" y="17" fill="#1b6c40"/><use href="#robux-s13" y="16" fill="#1b6d41"/><use href="#robux-s13" y="15" fill="#1c6f42"/><use href="#robux-s13" y="14" fill="#1c7143"/><use href="#robux-s13" y="13" fill="#1c7244"/><use href="#robux-s13" y="12" fill="#1d7445"/><use href="#robux-s13" y="11" fill="#1d7646"/><use href="#robux-s13" y="10" fill="#1e7847"/><use href="#robux-s13" y="9" fill="#1e7948"/><use href="#robux-s13" y="8" fill="#1f7b49"/><use href="#robux-s13" y="7" fill="#1f7d4a"/><use href="#robux-s13" y="6" fill="#1f7f4b"/><use href="#robux-s13" y="5" fill="#20804c"/><use href="#robux-s13" y="4" fill="#20824d"/><use href="#robux-s13" y="3" fill="#21844e"/><use href="#robux-s13" y="2" fill="#21864f"/><use href="#robux-s13" y="1" fill="#228750"/>
-  <path d="M256 116L361.66 177L361.66 299L256 360L150.34 299L150.34 177Z" fill="url(#robux-g10)"/>
-  <path d="M256 116L361.66 177L361.66 299L256 360L150.34 299L150.34 177Z" fill="none" stroke="#a1e2bf" stroke-opacity="0.75" stroke-width="3"/>
-  <g clip-path="url(#robux-c11)"><ellipse cx="216" cy="172" rx="96" ry="54"
-      fill="url(#robux-p12)" transform="rotate(-24 216 172)"/></g><path d="M226 196H286A12 12 0 0 1 298 208V268A12 12 0 0 1 286 280H226A12 12 0 0 1 214 268V208A12 12 0 0 1 226 196Z" fill="#12482b"/><path d="M229 203H283A8 8 0 0 1 291 211V265A8 8 0 0 1 283 273H229A8 8 0 0 1 221 265V211A8 8 0 0 1 229 203Z" fill="#1f7d4b"/>
+  <defs><path id="robux-s5" d="M196 126H316A52 52 0 0 1 368 178V298A52 52 0 0 1 316 350H196A52 52 0 0 1 144 298V178A52 52 0 0 1 196 126Z"/></defs>
+<use href="#robux-s5" y="26" fill="#563d03"/>
+<use href="#robux-s5" y="25" fill="#573e03"/>
+<use href="#robux-s5" y="24" fill="#583f03"/>
+<use href="#robux-s5" y="23" fill="#594003"/>
+<use href="#robux-s5" y="22" fill="#5b4003"/>
+<use href="#robux-s5" y="21" fill="#5c4103"/>
+<use href="#robux-s5" y="20" fill="#5d4203"/>
+<use href="#robux-s5" y="19" fill="#5e4303"/>
+<use href="#robux-s5" y="18" fill="#5f4403"/>
+<use href="#robux-s5" y="17" fill="#614503"/>
+<use href="#robux-s5" y="16" fill="#624603"/>
+<use href="#robux-s5" y="15" fill="#634603"/>
+<use href="#robux-s5" y="14" fill="#644703"/>
+<use href="#robux-s5" y="13" fill="#654803"/>
+<use href="#robux-s5" y="12" fill="#674903"/>
+<use href="#robux-s5" y="11" fill="#684a03"/>
+<use href="#robux-s5" y="10" fill="#694b03"/>
+<use href="#robux-s5" y="9" fill="#6a4c03"/>
+<use href="#robux-s5" y="8" fill="#6b4c03"/>
+<use href="#robux-s5" y="7" fill="#6d4d03"/>
+<use href="#robux-s5" y="6" fill="#6e4e04"/>
+<use href="#robux-s5" y="5" fill="#6f4f04"/>
+<use href="#robux-s5" y="4" fill="#705004"/>
+<use href="#robux-s5" y="3" fill="#715104"/>
+<use href="#robux-s5" y="2" fill="#735204"/>
+<use href="#robux-s5" y="1" fill="#745204"/>
+  <path d="M196 126H316A52 52 0 0 1 368 178V298A52 52 0 0 1 316 350H196A52 52 0 0 1 144 298V178A52 52 0 0 1 196 126Z" fill="url(#robux-g2)"/>
+  <path d="M196 126H316A52 52 0 0 1 368 178V298A52 52 0 0 1 316 350H196A52 52 0 0 1 144 298V178A52 52 0 0 1 196 126Z" fill="none" stroke="#ffeab3" stroke-opacity="0.75" stroke-width="3"/>
+  <g clip-path="url(#robux-c3)"><ellipse cx="216" cy="172" rx="96" ry="54" fill="url(#robux-p4)" transform="rotate(-24 216 172)"/></g>
+  <circle cx="256" cy="238" r="76" fill="#fff8e1"/>
+  <circle cx="256" cy="238" r="62" fill="none" stroke="#e6a913" stroke-width="7"/>
+  <path d="M226 196h44a34 34 0 0 1 6 67l24 37h-34l-20-34h-8v34h-30v-96Zm30 26v22h12a11 11 0 0 0 0-22Z" fill="#a8790a"/>
 </svg>
