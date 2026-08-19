@@ -72,12 +72,28 @@ console.log('\n— The browser and the seeder compose the same path —');
   // The rule is only right if the files agree with it.
   const rasterList = server.match(/const RASTER_ICONS = \[([\s\S]*?)\];/)?.[1] || '';
   const raster = [...rasterList.matchAll(/'([a-z0-9-]+)'/g)].map((m) => m[1]);
-  /* No lower bound on this list any more.
-     It is empty on purpose — see RASTER_ICONS in demoSeed.js — because ten flat
-     trademark logos among fifty-four shaded icons is what made the shop look
-     untidy. Asserting "not empty" was asserting a decision rather than a
-     property; what actually matters is below: anything IN the list must exist
-     on disk, and the client and server must agree on the list. */
+  /* The owner's own art must stay the owner's own art.
+     These ten categories use 3D renders the shop owner made and supplied; the
+     rest use the generated icon set. Emptying this list swaps all ten for
+     generated icons in one line and the shop still builds, still passes, and
+     still looks fine — just not like the shop somebody designed. That is exactly
+     what happened once, so it is a test now rather than a comment. */
+  const OWNER_ART = ['cod', 'discord-nitro', 'eafc', 'giftcard', 'playstation',
+    'robux', 'steam', 'v-bucks', 'valorant', 'xbox'];
+  const dropped = OWNER_ART.filter((c) => !raster.includes(c));
+  ok('the owner-supplied art is still what those categories use',
+    dropped.length === 0, `silently swapped for generated icons: [${dropped}]`);
+
+  /* And nothing may point back at the flat banners under /products/.
+     Six gradient rectangles with the brand name typeset in a corner, from before
+     the icon set existed. syncCatalogImages moves any product still on one over
+     to the proper art; this makes sure nothing puts them back. */
+  const FLAT = ['playstation', 'xbox', 'steam', 'robux', 'vbucks', 'nitro'];
+  // `image:` entries only — LEGACY_ART names the same paths on purpose, because
+  // it is the thing that moves products OFF them.
+  const catalogueArt = [...(server + client).matchAll(/image:\s*'([^']+)'/g)].map((m) => m[1]);
+  const revived = FLAT.filter((n) => catalogueArt.includes(`/products/${n}.svg`));
+  ok('no catalogue entry points at the old flat banners', revived.length === 0, `[${revived}]`);
   const wrongExt = raster.filter((cat) => !exists(`/products/icons/${cat}.${s?.[1]}`));
   ok(`every raster category has a .${s?.[1]} file on disk`, wrongExt.length === 0, wrongExt.join(', '));
 

@@ -103,21 +103,21 @@ const CATALOG = [
 
   // ── Discord Nitro (market price; not on Eldorado) ────────────────────────
   { sku: 'NITRO-1M', name: 'Discord Nitro — 1 Month', category: 'discord-nitro', price: 899,
-    image: '/products/nitro.svg', description: 'Full Nitro for a month: HD streaming, emojis, boosts.' },
+    image: '/products/icons/discord-nitro.webp', description: 'Full Nitro for a month: HD streaming, emojis, boosts.' },
   { sku: 'NITRO-1Y', name: 'Discord Nitro — 1 Year', category: 'discord-nitro', price: 8499, featured: true,
-    image: '/products/nitro.svg', description: 'A full year of Discord Nitro.' },
+    image: '/products/icons/discord-nitro.webp', description: 'A full year of Discord Nitro.' },
 
   // ── Gift cards (face value + small margin; not on Eldorado) ──────────────
   { sku: 'STEAM-10', name: 'Steam Wallet €10', category: 'giftcard', price: 1199,
-    image: '/products/steam.svg', description: 'Add €10 to your Steam Wallet via redeem code.' },
+    image: '/products/icons/steam.webp', description: 'Add €10 to your Steam Wallet via redeem code.' },
   { sku: 'STEAM-25', name: 'Steam Wallet €25', category: 'giftcard', price: 2699,
-    image: '/products/steam.svg', description: 'Add €25 to your Steam Wallet via redeem code.' },
+    image: '/products/icons/steam.webp', description: 'Add €25 to your Steam Wallet via redeem code.' },
   { sku: 'STEAM-50', name: 'Steam Wallet €50', category: 'giftcard', price: 5199,
-    image: '/products/steam.svg', description: 'Add €50 to your Steam Wallet via redeem code.' },
+    image: '/products/icons/steam.webp', description: 'Add €50 to your Steam Wallet via redeem code.' },
   { sku: 'PSN-25', name: 'PlayStation Store €25', category: 'giftcard', price: 2699,
-    image: '/products/playstation.svg', description: 'PSN gift card for games, DLC and PS Plus.' },
+    image: '/products/icons/playstation.webp', description: 'PSN gift card for games, DLC and PS Plus.' },
   { sku: 'XBOX-25', name: 'Xbox Gift Card €25', category: 'giftcard', price: 2699,
-    image: '/products/xbox.svg', description: 'Spend on games and add-ons across Xbox & PC.' },
+    image: '/products/icons/xbox.webp', description: 'Spend on games and add-ons across Xbox & PC.' },
 
   // ── More games (no per-pack art yet → storefront shows a category tile) ───
   { sku: 'LOL-1380', name: '1,380 RP — League of Legends', category: 'league', price: 899, description: 'Riot Points for champions, skins and the Battle Pass.' },
@@ -176,24 +176,14 @@ const CATS_WITH_ICON = [
   'rocketleague', 'rust', 'spotify', 'standoff', 'steam', 'telegram', 'tiktok', 'twitch',
   'ubisoft', 'v-bucks', 'valorant', 'voucher', 'wildrift', 'wow', 'xbox', 'youtube', 'zenless',
 ];
-// Every category now uses the generated 3D icon set.
-//
-// Ten categories used to point at raster brand art instead, and that was the
-// single thing making the catalogue look untidy: ten flat, differently-lit
-// trademark logos — a black Call of Duty wordmark, a pale blue V-Bucks pile, a
-// photograph of a gift card — sitting in a grid with fifty-four icons that share
-// one light source, one plinth and one shadow. Each was fine alone; together
-// they read as three different shops.
-//
-// An SVG exists for all ten, so this is a one-line switch rather than new
-// artwork, and syncCatalogImages() below repoints every product still stored
-// against the old .webp path on the next boot — the live catalogue heals itself
-// with no manual editing.
-//
-// The mechanism stays: put a category back in this list and it goes back to its
-// raster file, which is what you want the day someone supplies proper art in
-// the same style.
-const RASTER_ICONS = [];
+// Categories whose art is the owner's own 3D renders rather than a generated
+// icon. These are raster (WEBP) and they carry their own background, which is
+// what the tile has to accommodate — see the raster branch in
+// LightProductCard.jsx. Keep in sync with RASTER_ICONS in src/lib/sampleCatalog.js.
+const RASTER_ICONS = [
+  'cod', 'discord-nitro', 'eafc', 'giftcard', 'playstation', 'robux', 'steam', 'v-bucks',
+  'valorant', 'xbox',
+];
 // Raster brand art is WEBP, not PNG. The PNGs were converted during the
 // performance pass (481KB across ten files became 83KB) and this copy of the
 // rule was never updated — so every product in a raster category was pointed at
@@ -248,6 +238,33 @@ export async function syncCatalogImages() {
     }
   }
   if (repointed) console.log(`[catalog] icon paths repointed on ${repointed} product(s)`);
+
+  /* Retire the six flat banners under /products/.
+     They predate the icon set and are not part of it: a gradient rectangle with
+     the brand name typeset small in a corner, sitting in a grid of shaded 3D art.
+     Every product still pointing at one has a proper piece of art waiting under
+     /products/icons/, so this is a rename rather than a redesign — and the
+     extension repointer above never touched them, because it only knows about
+     paths that already live in the icons folder.
+     Owner uploads and external links are untouched: only these six exact paths
+     are rewritten, and only to art that exists. */
+  const LEGACY_ART = {
+    '/products/playstation.svg': '/products/icons/playstation.webp',
+    '/products/xbox.svg': '/products/icons/xbox.webp',
+    '/products/steam.svg': '/products/icons/steam.webp',
+    '/products/robux.svg': '/products/icons/robux.webp',
+    '/products/vbucks.svg': '/products/icons/v-bucks.webp',
+    '/products/nitro.svg': '/products/icons/discord-nitro.webp',
+  };
+  let retired = 0;
+  for (const [was, now] of Object.entries(LEGACY_ART)) {
+    const r = await run(
+      `UPDATE products SET metadata = REPLACE(metadata, @was, @now), updated_at = @at
+        WHERE metadata LIKE @like`,
+      { was, now, at: nowIso(), like: `%"${was}"%` }).catch(() => null);
+    retired += r?.changes || 0;
+  }
+  if (retired) console.log(`[catalog] ${retired} product(s) moved off the old flat banners`);
 
   let updated = 0;
   for (const p of CATALOG) {

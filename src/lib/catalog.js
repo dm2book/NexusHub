@@ -60,6 +60,21 @@ export const normalizeSearch = (s) => String(s || '').toLowerCase().replace(/[^a
 // them with a blurred backdrop instead of the bare logo-on-plinth treatment.
 export const isCustomImage = (src) => !!src && !String(src).startsWith('/products/');
 
+/**
+ * Does this picture bring its own background?
+ *
+ * The tile treats those two kinds of art differently, and the useful question is
+ * about the FILE, not about who supplied it. A generated icon is a transparent
+ * SVG badge drawn for the plinth beneath it. A 3D render or an uploaded photo is
+ * a rectangle with colour to the edge, and it needs the tile to meet it halfway.
+ *
+ * Keying on the path instead — "does it live under /products/?" — put the shop's
+ * own renders on the wrong side of that line, so the blending written for
+ * exactly this art never applied to it.
+ */
+export const carriesOwnBackground = (src) =>
+  isCustomImage(src) || /\.(webp|png|jpe?g|avif)(\?|$)/i.test(String(src || ''));
+
 export { CreditCard };
 
 /**

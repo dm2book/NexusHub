@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ShoppingCart, Zap, Clock } from 'lucide-react';
-import { categoryVisual, money, isCustomImage, productDescription } from '../../lib/catalog.js';
+import { categoryVisual, money, carriesOwnBackground, productDescription } from '../../lib/catalog.js';
 import { useI18n } from '../../lib/i18n.jsx';
 import { iconFor } from '../../lib/sampleCatalog.js';
 import { navigateWithTransition } from '../../lib/viewTransition.js';
@@ -75,25 +75,40 @@ export default function LightProductCard({ product, onAdd }) {
             : <><Clock size={10} /> {t('card.byHand', 'By hand')}</>}
         </span>
         {img ? (
-          isCustomImage(img) ? (
-            /* Owner-supplied photo or logo.
-               A blurred copy still sits behind it so any baked-in background
-               blends instead of floating as a hard box — but at a fraction of
-               the opacity it used to have. At full strength it painted over the
-               plinth every other tile shows, so a shop with some photo art and
-               some built-in icons rendered two visibly different kinds of card
-               side by side: one with a coloured wash, one with a soft white
-               plinth. Now the plinth reads through both and the photo only
-               tints it, which is what makes a mixed catalogue look like one
-               catalogue. */
+          carriesOwnBackground(img) ? (
+            /* Artwork that brings its own background: the shop's 3D renders and
+               anything the owner uploads.
+
+               The question is not where the file came from — it is whether the
+               picture already has a background baked into it. A generated icon is
+               a transparent badge drawn FOR the plinth below, so it needs nothing
+               else. A render or a photo is a rectangle with its own colour to the
+               very edge, and dropping that raw onto a soft white plinth is what
+               made half the catalogue look like stickers stuck on a card: a hard
+               green Xbox box and a hard blue PlayStation box in a row of icons
+               that float.
+
+               Two things fix it and both are needed. A blurred copy behind picks
+               up the artwork's own colour so the tile and the picture share a
+               background instead of arguing about it — the earlier condition
+               keyed on the file's PATH, which excluded exactly this art, so the
+               treatment written for it never reached it. And the picture itself
+               gets a radius and a real shadow, so a rectangle reads as an object
+               resting on the plinth rather than a crop pasted over it. */
             <>
               <img src={img} alt="" aria-hidden="true" loading="lazy" decoding="async"
-                className="absolute inset-0 w-full h-full object-cover scale-110 blur-2xl opacity-25" />
+                className="absolute inset-0 w-full h-full object-cover scale-125 blur-3xl opacity-45 saturate-150" />
+              {/* A second, softer wash of white on top: without it a dark render
+                  (the CoD wordmark, the EA FC pitch) turns the whole tile murky
+                  and the light card stops matching its neighbours. */}
+              <span aria-hidden="true" className="absolute inset-0 bg-white/45" />
               {/* data-morph is forced position:relative by .fm-card-media (see index.css),
                   so centre it with the grid + cap its size. Fixed-px max-height —
                   a % one resolves against the auto grid track and is ignored. */}
               <img data-morph src={img} alt={product.name} loading="lazy" decoding="async" onError={() => setImgBroken(true)}
-                className="relative z-[1] max-w-[86%] max-h-[118px] object-contain drop-shadow-md group-hover:scale-105 transition-transform duration-500" />
+                className="relative z-[1] max-w-[80%] max-h-[112px] object-contain rounded-xl
+                           shadow-[0_10px_22px_-8px_rgba(15,23,42,.45)]
+                           group-hover:scale-105 transition-transform duration-500" />
             </>
           ) : (
             <img data-morph src={img} alt={product.name} loading="lazy" decoding="async" onError={() => setImgBroken(true)}
