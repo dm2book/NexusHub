@@ -60,7 +60,26 @@ export default function LightProductCard({ product, onAdd, priority = false }) {
           over every product photo in the shop, which is the haze on the artwork.
           `none` is the only way to actually mean none. */}
       <a href={to} onClick={openWithMorph}
-        className={`fm-card-media relative rounded-xl h-[122px] sm:h-[150px] grid place-items-center mb-3 overflow-hidden ${
+        /* One shape at every width, and it is the shape the artwork needs.
+
+           This box used to be h-[122px] on a phone and h-[150px] from `sm` up.
+           That is not a size difference, it is a RATIO difference: 184×122 is
+           1.51 — wide and short — where the desktop box is 1.17, nearly square.
+           Measured with the shop's real artwork in a phone viewport, that short
+           box is the whole mobile complaint:
+
+             · a portrait gift card (0.68) is height-limited to 83×122, a narrow
+               strip with wide empty margins — "large portions disappear";
+             · a 1280×720 screenshot becomes a 184×103 band, so text set at 86px
+               in the source renders about 12px tall — "barely visible";
+             · nothing is actually clipped (measured: 0% outside the container),
+               which is why chasing overflow and object-position found nothing.
+
+           An aspect ratio rather than a height: it reserves the space before a
+           single byte arrives, it is identical on every screen, and it gives
+           portrait artwork about 50% more area on a phone without touching the
+           desktop proportions the design was built around. */
+        className={`fm-card-media relative rounded-xl aspect-[7/6] w-full grid place-items-center mb-3 overflow-hidden ${
           photoArt ? 'border border-slate-200/60' : 'fm-logo-plinth'}`}
         style={photoArt
           ? { '--card-glow': 'none' }

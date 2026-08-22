@@ -30,6 +30,26 @@ const hydrate = (r) => {
       return x === null && y === null ? null : { x: x ?? 50, y: y ?? 50 };
     })(),
     imageFit: ['cover', 'contain'].includes(metadata.imageFit) ? metadata.imageFit : null,
+    /* The grouped form, for owners who would rather write one object than three
+       fields. Validated to the same values — an unknown fit or a position that
+       is neither a CSS keyword nor a pair of numbers is dropped rather than
+       handed to the browser to interpret. */
+    imageDisplay: (() => {
+      const d = metadata.imageDisplay;
+      if (!d || typeof d !== 'object') return null;
+      const out = {};
+      if (['cover', 'contain'].includes(d.fit)) out.fit = d.fit;
+      const WORDS = ['center', 'top', 'bottom', 'left', 'right',
+        'top left', 'top right', 'bottom left', 'bottom right'];
+      if (typeof d.position === 'string' && WORDS.includes(d.position.trim().toLowerCase())) {
+        out.position = d.position.trim().toLowerCase();
+      } else if (d.position && typeof d.position === 'object') {
+        const num = (v) => (Number.isFinite(Number(v)) ? Math.min(100, Math.max(0, Number(v))) : null);
+        const x = num(d.position.x), y = num(d.position.y);
+        if (x !== null || y !== null) out.position = { x: x ?? 50, y: y ?? 50 };
+      }
+      return Object.keys(out).length ? out : null;
+    })(),
     imageScale: Number.isFinite(Number(metadata.imageScale))
       ? Math.min(2, Math.max(0.5, Number(metadata.imageScale))) : null,
     compareAtPrice: compareAt > r.price ? compareAt : null,
