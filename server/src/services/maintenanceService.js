@@ -121,11 +121,16 @@ export async function runMaintenance() {
     summary.supplierQueue = (await drainSupplierQueue({ actorId: 'system' })).processed || 0;
   } catch (e) { summary.supplierQueueError = e.message; }
 
-  // 9. Backfill: any paid order still without a fulfillment request (no stock,
-  //    no auto-supplier — e.g. a P2P top-up) is queued for hand delivery so it
-  //    surfaces in the manual queue instead of sitting invisible.
+  // 9. The net under the pipeline: any paid order nothing has picked up.
+  //    Delivery is started without being awaited, so on a serverless host it can
+  //    simply never run — the order sits paid, in stock and undelivered. The
+  //    automatic path is retried first; only what genuinely cannot be dispensed
+  //    (no stock, no auto-supplier — e.g. a P2P top-up) goes to the hand queue,
+  //    so it surfaces there instead of sitting invisible.
   try {
-    summary.manualQueued = await sweepUnfulfilledPaidOrders({ limit: 50 });
+    const sweep = await sweepUnfulfilledPaidOrders({ limit: 50 });
+    summary.manualQueued = sweep.queued;
+    summary.autoDispensed = sweep.dispensed;
   } catch (e) { summary.manualQueueError = e.message; }
 
   // 10. Re-send transactional emails that failed on a transient provider error

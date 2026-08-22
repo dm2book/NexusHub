@@ -15,7 +15,7 @@ import { newId } from '../utils/ids.js';
 import { notFound, conflict, badRequest } from '../utils/errors.js';
 import { createConnector } from './supplier/registry.js';
 import { resolveFulfillmentSupplier, getSupplier } from './supplier/supplierService.js';
-import { getOrder, transitionOrder, canTransition } from './orderService.js';
+import { getOrder, transitionOrder, canTransition, autoDispenseFromStock, insertDeliveries } from './orderService.js';
 import { notify } from './notificationService.js';
 
 const parse = (s) => { try { return JSON.parse(s || 'null'); } catch { return null; } };
@@ -111,17 +111,11 @@ async function persistResult(reqId, order, item, result) {
       { st: status, ref: result.externalRef || null,
         res: JSON.stringify(result.raw ?? result), at: nowIso(), id: reqId });
 
-  for (const d of result.deliveries || []) {
-    await createDelivery(order.id, item.id, d);
-  }
-}
-
-async function createDelivery(orderId, itemId, d) {
-  await run(`INSERT INTO deliveries (id, order_id, order_item_id, type, content, filename, max_downloads, created_at)
-       VALUES (@id, @oid, @iid, @type, @content, @file, @max, @at)`,
-      { id: newId('dlv'), oid: orderId, iid: itemId, type: d.type || 'code',
-        content: d.content || null, file: d.filename || null,
-        max: d.maxDownloads ?? null, at: nowIso() });
+  /* Once each. retryPendingFulfillments re-reads every in-progress auto request
+     on each maintenance pass, and this ran on every one of them — so a supplier
+     that returns the code again on a status check wrote it to the order again,
+     hourly, for as long as the request stayed in progress. */
+  await insertDeliveries(order.id, (result.deliveries || []).map((d) => ({ ...d, orderItemId: item.id })));
 }
 
 async function openManualFulfillment(order, item, ctx) {
@@ -145,7 +139,12 @@ export async function completeManualFulfillment(requestId, { deliveries = [], no
   if (!req) throw notFound('Fulfillment request not found');
   if (req.mode !== 'manual') throw badRequest('Not a manual fulfillment request');
 
-  for (const d of deliveries) await createDelivery(req.order_id, req.order_item_id, d);
+  /* The staff "deliver" button is one click, and one click is easy to make
+     twice. Same writer as every other door into an order's deliveries, so a
+     second press records nothing new instead of showing the buyer their code
+     twice. */
+  await insertDeliveries(req.order_id,
+    deliveries.map((d) => ({ ...d, orderItemId: req.order_item_id })));
   await run(`UPDATE fulfillment_requests SET status='fulfilled', assigned_to=@by,
         result=@res, updated_at=@at WHERE id=@id`,
       { by: ctx.actorId || null, res: JSON.stringify({ deliveries, note }),
@@ -275,9 +274,24 @@ async function queueForHandDelivery(order, ctx = {}) {
 }
 
 /**
- * Backfill sweep (maintenance): find paid orders that have been sitting without
- * any fulfillment request and queue them for manual delivery. Backstop for the
- * payment-time call, and for orders paid before this path existed.
+ * Backfill sweep (maintenance): paid orders that nothing has picked up.
+ *
+ * This is the net under the whole pipeline. transitionOrder starts the delivery
+ * without awaiting it — deliberately, so the payment webhook answers fast — and
+ * on a serverless host the function can be frozen the instant that 200 is
+ * written. The work simply never runs. The order sits paid, in stock, and
+ * undelivered, and nothing in the system is waiting for it.
+ *
+ * It used to hand every one of those to a person. That recovered the order from
+ * silence, which is the important half, but it also meant a shop holding three
+ * codes on the shelf made the buyer wait hours for something it could have sent
+ * in a second — and gave staff a queue item that was never theirs to do.
+ *
+ * So the automatic path is retried first, and only what genuinely cannot be
+ * dispensed goes to the queue. autoDispenseFromStock is idempotent (claimCodes
+ * hands an order back the codes it already holds, deliverOrder ignores content
+ * it has already written), so running it again on an order that half-finished
+ * is safe; it either completes it or leaves it exactly where it was.
  */
 export async function sweepUnfulfilledPaidOrders({ limit = 50 } = {}) {
   const rows = await all(
@@ -285,12 +299,18 @@ export async function sweepUnfulfilledPaidOrders({ limit = 50 } = {}) {
       WHERE o.status IN ('payment_received','processing','awaiting_fulfillment')
         AND NOT EXISTS (SELECT 1 FROM fulfillment_requests fr WHERE fr.order_id = o.id)
       ORDER BY o.created_at ASC LIMIT @l`, { l: limit });
-  let queued = 0;
+  let queued = 0, dispensed = 0;
   for (const r of rows) {
-    try { if (await ensureManualFulfillment(r.id, { actorId: 'system' })) queued++; }
-    catch (e) { console.error('[fulfillment:sweep]', e.message); }
+    try {
+      if (await autoDispenseFromStock(r.id, { actorId: 'system', reason: 'Recovered by maintenance sweep' })) {
+        dispensed++;
+        continue;
+      }
+      if (await ensureManualFulfillment(r.id, { actorId: 'system' })) queued++;
+    } catch (e) { console.error('[fulfillment:sweep]', e.message); }
   }
-  return queued;
+  if (dispensed) console.log(`[fulfillment:sweep] auto-delivered ${dispensed} stuck order(s) from stock`);
+  return { queued, dispensed };
 }
 
 /**

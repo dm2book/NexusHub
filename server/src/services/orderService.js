@@ -295,6 +295,49 @@ export async function createOrder(input, ctx = {}) {
 
 /** Staff: attach delivery code(s) to an order and complete it — the codes are
  *  e-mailed to the customer via the order_completed template (deliveriesHtml). */
+/**
+ * Write deliveries onto an order, once each, all or nothing.
+ *
+ * Exported because there are two doors into an order's deliveries — this file's
+ * deliverOrder (staff, auto-dispense) and fulfillmentService's persistResult
+ * (supplier connectors) — and both were bare INSERTs. Anything that ran either
+ * step again wrote the same content a second time: a double-clicked button, a
+ * retried dispense, and worst of all retryPendingFulfillments, which re-reads an
+ * in-progress supplier request on every maintenance pass and persisted its
+ * deliveries again each time.
+ *
+ * Returns only what was actually new, so a caller can tell "delivered" from
+ * "already had it" — the difference between emailing a buyer their codes and
+ * emailing them a second time about codes they already have.
+ */
+export async function insertDeliveries(orderId, list = []) {
+  const already = new Set((await all(
+    'SELECT content FROM deliveries WHERE order_id=@o', { o: orderId })).map((d) => d.content));
+  const fresh = [];
+  for (const d of list) {
+    const content = String(d.content ?? '').trim();
+    // A delivery with no content is a file or a done-on-the-supplier's-side
+    // top-up; there is nothing to compare, so it is written as given.
+    if (content && already.has(content)) continue;
+    if (content) already.add(content);
+    fresh.push({ ...d, content: content || null });
+  }
+  if (!fresh.length) return [];
+  // One transaction: a loop of separate INSERTs that throws halfway leaves the
+  // earlier rows written and the order never completed, which is a paid order
+  // showing part of its codes with no way to tell that is what happened.
+  await tx(async () => {
+    for (const d of fresh) {
+      await run(`INSERT INTO deliveries (id, order_id, order_item_id, type, content, filename, max_downloads, created_at)
+           VALUES (@id, @oid, @iid, @type, @c, @file, @max, @at)`,
+          { id: newId('dlv'), oid: orderId, iid: d.orderItemId || d.order_item_id || null,
+            type: d.type || 'code', c: d.content, file: d.filename || null,
+            max: d.maxDownloads ?? null, at: nowIso() });
+    }
+  });
+  return fresh;
+}
+
 export async function deliverOrder(orderId, deliveries = [], ctx = {}) {
   const order = await getOrderRow(orderId);
   if (!order) throw notFound('Order not found');
@@ -316,25 +359,21 @@ export async function deliverOrder(orderId, deliveries = [], ctx = {}) {
   if (order.fraud_hold) {
     throw conflict('This order is held for fraud review — approve it before delivering');
   }
-  for (const d of deliveries) {
-    const content = String(d.content || '').trim();
-    if (!content) continue;
-    await run(`INSERT INTO deliveries (id, order_id, order_item_id, type, content, created_at)
-         VALUES (@id, @oid, @iid, @type, @c, @at)`,
-        { id: newId('dlv'), oid: orderId, iid: d.orderItemId || null, type: d.type || 'code', c: content, at: nowIso() });
-  }
+  const fresh = await insertDeliveries(orderId, deliveries);
   // Already completed (e.g. staff sends a replacement code)? The transition
   // below would early-return and the customer would never be emailed the new
-  // code — send the delivery email explicitly instead.
-  if (order.status === 'completed' && deliveries.length) {
-    const fresh = await getOrder(orderId);
-    await sendEmailAsync('order_completed', fresh.email, emailContext(fresh, ctx));
-    if (fresh.userId) {
-      await notify(fresh.userId, { type: 'delivery', title: `Order ${fresh.number}: new delivery`,
+  // code — send the delivery email explicitly instead. Only for content that is
+  // actually new: re-sending "here is your code" for a code the buyer already
+  // has reads as a second order.
+  if (order.status === 'completed' && fresh.length) {
+    const current = await getOrder(orderId);
+    await sendEmailAsync('order_completed', current.email, emailContext(current, ctx));
+    if (current.userId) {
+      await notify(current.userId, { type: 'delivery', title: `Order ${current.number}: new delivery`,
         body: 'A new code was added to your order — check your email and dashboard.',
         link: `/account/orders/${orderId}` }).catch(() => {});
     }
-    return fresh;
+    return current;
   }
   // Force-complete from any state — staff is explicitly fulfilling the order.
   return transitionOrder(orderId, 'completed', { ...ctx, force: true, reason: ctx.reason || 'Delivered by staff' });
@@ -348,6 +387,24 @@ export async function transitionOrder(orderId, to, ctx = {}) {
     throw conflict(`Cannot move order from "${order.status}" to "${to}"`);
   }
 
+  /* The one thing `force` may never do.
+
+     Money that has gone back has gone back. Auto-dispense runs in the
+     background from the moment an order is paid, so a refund landing seconds
+     later races it — and deliverOrder force-completes. Its own guard reads the
+     status first, but a refund arriving between that read and the UPDATE was
+     still able to lose: the order ended `completed`, the buyer had the code and
+     the money, and nothing in the dashboard would ever have shown it.
+
+     Measured directly: forcing the transition to retry after losing a race
+     turned that from occasional into reliable — four rounds out of six went
+     refunded → completed. So the rule belongs here, at the choke point every
+     status change passes through, rather than in the callers that happen to
+     remember it. */
+  if (['refunded', 'cancelled'].includes(order.status) && ['completed', 'payment_received'].includes(to)) {
+    throw conflict(`Order is ${order.status} — it cannot become "${to}"`);
+  }
+
   let paymentSet = '';
   if (to === 'payment_received') paymentSet = ", payment_status='paid'";
   if (to === 'refunded') paymentSet = ", payment_status='refunded'";
@@ -357,13 +414,43 @@ export async function transitionOrder(orderId, to, ctx = {}) {
   // racing a manual confirm, a double-clicked button) that lose the race get
   // changes=0 and return WITHOUT re-running the side-effects below — so an order
   // can never be dispensed / emailed / completed twice.
-  const moved = await tx(async () => {
+  /* One attempt, guarded on the status we observed. A caller that loses the race
+     gets changes=0 and returns without re-running any of the side-effects below,
+     which is what stops an order being dispensed or emailed twice. */
+  const attempt = async (from) => tx(async () => {
     const r = await run(`UPDATE orders SET status=@status, updated_at=@at${paymentSet} WHERE id=@id AND status=@from`,
-        { status: to, at: nowIso(), id: orderId, from: order.status });
+        { status: to, at: nowIso(), id: orderId, from });
     if (!r?.changes) return false;
-    await appendHistory(orderId, order.status, to, ctx.actorId || 'system', ctx.reason);
+    await appendHistory(orderId, from, to, ctx.actorId || 'system', ctx.reason);
     return true;
   });
+
+  let moved = await attempt(order.status);
+
+  /* `force` means the caller has decided, so losing a race must not silently
+     drop the decision.
+     Measured: a refund arriving while auto-dispense was completing the same
+     order read `payment_received`, and by the time its UPDATE ran the row said
+     `completed`. changes=0, and transitionOrder returned the order unchanged —
+     no error, no history row, nothing to notice. The money had gone back and the
+     order still read completed. Mollie's refund path carries its own retry loop
+     for exactly this, which is what made it survivable there and nowhere else.
+     A forced transition now re-reads and tries again against what it finds. */
+  if (!moved && ctx.force) {
+    for (let i = 0; i < 4 && !moved; i++) {
+      const now = await getOrderRow(orderId);
+      if (!now || now.status === to) return getOrder(orderId);
+      // Re-checked on every pass: the race we are retrying through is exactly
+      // how an order reaches one of these while we are looping.
+      if (['refunded', 'cancelled'].includes(now.status) && ['completed', 'payment_received'].includes(to)) {
+        throw conflict(`Order is ${now.status} — it cannot become "${to}"`);
+      }
+      moved = await attempt(now.status);
+    }
+    if (!moved) {
+      console.error(`[order] forced transition to ${to} kept losing races on ${order.number || orderId}`);
+    }
+  }
   if (!moved) return getOrder(orderId); // another transition already moved this order
 
   const updated = await getOrder(orderId);
@@ -506,9 +593,29 @@ export async function autoDispenseFromStock(orderId, ctx = {}) {
     if (await availableCount(it.product_id) < it.quantity) return false; // not enough stock → leave for manual
   }
   const deliveries = [];
+  let short = null;
   for (const it of order.items) {
     const codes = await claimCodes(it.product_id, it.quantity, orderId);
+    if (codes.length < it.quantity) { short = { it, got: codes.length }; break; }
     for (const c of codes) deliveries.push({ orderItemId: it.id, content: c, type: 'code' });
+  }
+  /* Half an order is not an order.
+
+     The count above and the claim below are two separate reads, and claimCodes
+     takes rows FOR UPDATE SKIP LOCKED — so two orders for two copies each,
+     against three codes, both pass the availability check and one of them comes
+     back with a single code. Before this, that order was delivered and marked
+     completed: the buyer paid for two, received one, and the dashboard said
+     fulfilled. Nothing anywhere would ever have shown it.
+
+     So the claim result is the authority, not the count. Anything short goes
+     back on the shelf and the whole order falls through to the queue, where a
+     person delivers all of it. */
+  if (short) {
+    const freed = await releaseCodes(orderId).catch(() => 0);
+    console.warn(`[autodispense] ${order.number}: only ${short.got}/${short.it.quantity} `
+      + `code(s) available for ${short.it.name} — returned ${freed} to stock, leaving the order for manual delivery`);
+    return false;
   }
   if (!deliveries.length) return false;
   // Re-read: claiming the codes above took time, and a refund or cancellation
@@ -958,11 +1065,22 @@ export function labelFor(status) {
   }[status] || status;
 }
 
+/**
+ * What the buyer is told, in words they can act on.
+ *
+ * "Your order is awaiting fulfillment" is what the database calls it, not what
+ * happened. A buyer reading that has no idea whether something went wrong, what
+ * comes next, or whether they need to do anything — and this is the status an
+ * order lands in whenever it cannot be auto-delivered, which now includes the
+ * case where stock ran out between the check and the claim. So it says what is
+ * actually going on: a person is getting it, and it arrives by email.
+ */
 function statusBlurb(status) {
   return {
     payment_received: 'We confirmed your payment and are preparing your order.',
-    processing: 'Your order is being processed.',
-    awaiting_fulfillment: 'Your order is awaiting fulfillment.',
+    processing: 'Your order is being processed — we will email you the moment it is ready.',
+    awaiting_fulfillment:
+      'We are getting this one for you by hand. It arrives by email, usually within a few hours during the day; orders placed late at night go out first thing in the morning.',
     completed: 'Your order is complete — check your deliveries & downloads.',
     refunded: 'A refund has been issued for your order.',
     cancelled: 'Your order has been cancelled.',
