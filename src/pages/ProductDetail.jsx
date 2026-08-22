@@ -129,11 +129,18 @@ export default function ProductDetail() {
       '@type': 'Offer',
       price: ((product.price || 0) / 100).toFixed(2),
       priceCurrency: product.currency || 'EUR',
-      availability: typeof product.stock === 'number' && product.stock <= 0
-        ? 'https://schema.org/OutOfStock' : 'https://schema.org/InStock',
+      /* The same rule the server writes into this page's head, off the same
+         field. It used to read `product.stock`, a column nothing enforces,
+         nothing decrements and nothing displays — so this block claimed InStock
+         for products with no code in stock at all, next to a server-rendered
+         block that said PreOrder. `instant` is true only when the product
+         auto-delivers AND a code is on the shelf right now, which is the one
+         case where "in stock" is a promise the shop can keep. */
+      availability: product.instant
+        ? 'https://schema.org/InStock' : 'https://schema.org/PreOrder',
       url: typeof window !== 'undefined' ? window.location.href : undefined,
     },
-  });
+  }, { serverFor: product?.id });
 
   useEffect(() => {
     /* Keep a server-inlined product on screen while it revalidates.
