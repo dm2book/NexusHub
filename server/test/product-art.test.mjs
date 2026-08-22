@@ -30,7 +30,7 @@ const { ensureReady } = await import('../src/app.js');
 await ensureReady();
 // syncCatalogImages runs in background upkeep; give it room to finish.
 await new Promise((r) => setTimeout(r, 4000));
-const { all } = await import('../src/db/index.js');
+const { all, get } = await import('../src/db/index.js');
 
 // ── 1. Every seeded product resolves to a real file ─────────────────────────
 console.log('— Every product in the shop has art that exists —');
@@ -129,6 +129,89 @@ console.log('\n— Per-denomination pack art —');
   ok('the seed references pack art', paths.length > 20, `n=${paths.length}`);
   const gone = [...new Set(paths)].filter((p) => !exists(p));
   ok('every referenced pack file exists', gone.length === 0, gone.join(', '));
+}
+
+// ── 5. The shipped-art manifest matches the directory ──────────────────────
+//
+// src/lib/shippedArt.js is what the serverless API consults, because public/ is
+// CDN-served and not in the function's bundle. A generated list is only worth
+// anything while it still describes reality.
+console.log('\n— The generated art manifest still matches public/products —');
+{
+  const { spawnSync } = await import('node:child_process');
+  const r = spawnSync(process.execPath,
+    [new URL('../../scripts/gen-art-manifest.mjs', import.meta.url).pathname, '--check'],
+    { encoding: 'utf8' });
+  ok('shippedArt.js is up to date', r.status === 0,
+    `${(r.stdout || '') + (r.stderr || '')}`.trim());
+
+  const { SHIPPED_ART, artStatus } = await import('../../src/lib/shippedArt.js');
+  ok('the manifest is populated', SHIPPED_ART.size > 100, `n=${SHIPPED_ART.size}`);
+  // Every path it claims must open, and nothing on disk may be absent from it.
+  const phantom = [...SHIPPED_ART].filter((p) => !exists(p));
+  ok('every listed path is a real file', phantom.length === 0, phantom.slice(0, 5).join(', '));
+  ok('a known icon resolves', artStatus('/products/icons/robux.webp') === 'ok');
+  ok('an invented path does not', artStatus('/products/icons/nope.svg') === 'missing');
+  ok('a link is reported as remote, not verified', artStatus('https://cdn.example/x.png') === 'remote');
+  ok('an upload is reported as uploaded', artStatus('data:image/webp;base64,AAAA') === 'uploaded');
+  ok('nothing at all is "none"', artStatus(null) === 'none' && artStatus('') === 'none');
+}
+
+// ── 6. No two categories wear the same picture ─────────────────────────────
+//
+// Tiers of one currency sharing a look is the design. A gift card and a battle
+// pass sharing one picture is a wiring mistake, and it is invisible until a
+// customer sees two different products with identical art.
+console.log('\n— Duplicated imagery —');
+{
+  const rows = await all(`SELECT name, category, metadata FROM products WHERE active = 1`);
+  const parse = (s) => { try { return JSON.parse(s || '{}'); } catch { return {}; } };
+  const byImage = new Map();
+  for (const r of rows) {
+    const img = parse(r.metadata).image;
+    if (!img) continue;
+    if (!byImage.has(img)) byImage.set(img, []);
+    byImage.get(img).push(r);
+  }
+  const crossed = [...byImage.entries()]
+    .filter(([, rs]) => new Set(rs.map((r) => r.category)).size > 1);
+  ok('no picture is shared across categories', crossed.length === 0,
+    crossed.map(([img, rs]) => `${img} → ${rs.map((r) => r.name).join(' + ')}`).join(' | '));
+
+  // And within a category, every denomination got its own cover — that is what
+  // the pack generator exists for.
+  const shared = [...byImage.entries()].filter(([, rs]) => rs.length > 1);
+  ok('every product has a picture of its own', shared.length === 0,
+    shared.map(([img, rs]) => `${rs.length}× ${img}`).join(', '));
+}
+
+// ── 7. The launch dashboard refuses to go green on a blank tile ────────────
+console.log('\n— Launch readiness sees missing art —');
+{
+  const { launchChecks } = await import('../src/services/launchCheckService.js');
+  const { run, nowIso } = await import('../src/db/index.js');
+
+  const clean = (await launchChecks()).checks.find((c) => c.id === 'productart');
+  ok('the check exists', !!clean, 'no productart check in launchChecks()');
+  ok('a fully-covered catalog reports ok', clean?.status === 'ok', clean?.detail);
+
+  // Point one product at a file that does not exist, and the check must say so
+  // by name — the dashboard is only useful if it names the product to fix.
+  const victim = await get(`SELECT id, name, metadata FROM products WHERE active = 1 LIMIT 1`);
+  const before = victim.metadata;
+  const meta = JSON.parse(before || '{}');
+  await run(`UPDATE products SET metadata = @m, updated_at = @at WHERE id = @id`,
+    { m: JSON.stringify({ ...meta, image: '/products/icons/definitely-not-here.svg' }),
+      at: nowIso(), id: victim.id });
+
+  const broken = (await launchChecks()).checks.find((c) => c.id === 'productart');
+  ok('a missing image is a launch blocker', broken?.status === 'fail', broken?.detail);
+  ok('…and it names the product', broken?.detail.includes(victim.name), broken?.detail);
+
+  await run(`UPDATE products SET metadata = @m, updated_at = @at WHERE id = @id`,
+    { m: before, at: nowIso(), id: victim.id });
+  const restored = (await launchChecks()).checks.find((c) => c.id === 'productart');
+  ok('and it goes green again once fixed', restored?.status === 'ok', restored?.detail);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
