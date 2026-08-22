@@ -43,7 +43,7 @@ export function CookieConsent() {
  * fabricate a purchase. Data comes from /api/social/feed.
  */
 export function SocialProof() {
-  const feed = useLiveFeed();
+  const feed = useLiveFeed({ delay: 3000 });
   const [idx, setIdx] = useState(-1);
   useEffect(() => {
     if (!feed?.length) return undefined;

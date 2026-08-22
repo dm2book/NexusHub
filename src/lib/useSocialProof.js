@@ -9,18 +9,27 @@ import { api } from './api.js';
 let feedCache = null;
 let statsCache = null;
 
-/** Live purchases feed: [{ name, city, item, category, deliverySeconds, secondsAgo }]. */
-export function useLiveFeed({ poll = 60_000 } = {}) {
+/**
+ * Live purchases feed: [{ name, city, item, category, deliverySeconds, secondsAgo }].
+ *
+ * Deliberately late. Nothing that reads this feed shows anything before 2.5
+ * seconds — the tickers rotate in on their own timers — and the request used to
+ * go out in the same wave as the product itself, on a phone connection already
+ * carrying the bundle, the fonts and the artwork. So the default waits, and a
+ * caller whose first frame is even later (SiteExtras: six seconds) says so.
+ */
+export function useLiveFeed({ poll = 60_000, delay = 1500 } = {}) {
   const [feed, setFeed] = useState(feedCache || []);
   useEffect(() => {
     let live = true;
+    let t = null;
     const load = () => api.get('/api/social/feed')
       .then((r) => { if (live && Array.isArray(r?.feed)) { feedCache = r.feed; setFeed(r.feed); } })
       .catch(() => {});
-    load();
-    const t = poll ? setInterval(load, poll) : null;
-    return () => { live = false; if (t) clearInterval(t); };
-  }, [poll]);
+    const start = () => { load(); if (poll) t = setInterval(load, poll); };
+    const first = delay ? setTimeout(start, delay) : (start(), null);
+    return () => { live = false; if (first) clearTimeout(first); if (t) clearInterval(t); };
+  }, [poll, delay]);
   return feed;
 }
 
