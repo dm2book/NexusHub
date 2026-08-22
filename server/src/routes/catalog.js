@@ -420,10 +420,19 @@ router.post('/orders/:id/checkout', requireLaunched('Payment', { money: true }),
 // Demo payment — marks an order paid without a real PSP, gated by DEMO_PAYMENTS.
 router.post('/orders/:id/pay', rateLimit({ bucket: 'pay', windowMs: 60_000, max: 30, shared: true }),
   asyncHandler(async (req, res) => {
-    // Demo self-pay is a dev convenience only. Refuse it whenever a real payment
-    // method is configured — otherwise a live deploy that forgot NODE_ENV would
-    // let any buyer mark their own order paid and auto-receive stock.
-    const realPaymentConfigured = manualPayMethods().length > 0 || !!config.payments.stripe.secretKey;
+    /* Demo self-pay is a dev convenience only. Refuse it whenever a real payment
+       method is configured — otherwise a live deploy that forgot NODE_ENV would
+       let any buyer mark their own order paid and auto-receive stock.
+
+       Mollie was missing from this list, which is the one provider this shop is
+       actually launching on. A deployment running live iDEAL with DEMO_PAYMENTS
+       still set handed anyone a working "mark my own order paid" endpoint —
+       verified: it answered 200 and moved the order to payment_received. The
+       only thing that stopped stock going out in that run was the fraud engine
+       happening to hold the order, which is luck rather than a guard. */
+    const realPaymentConfigured = mollieEnabled()
+      || manualPayMethods().length > 0
+      || !!config.payments.stripe.secretKey;
     if (!config.payments.demoMode || realPaymentConfigured) throw new ApiError(404, 'Not found');
     const order = await getOrder(req.params.id);
     if (!order) throw new ApiError(404, 'Order not found');

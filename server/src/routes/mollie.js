@@ -143,9 +143,24 @@ export async function applyPayment(paymentId, ctx = {}) {
     return { ok: true, effect };
   }
 
-  // partial_refund and retryable both leave the order where it is on purpose:
-  // a partial refund is not a cancelled order, and a declined card is a buyer
-  // who may simply pick another method. See orderEffect() for the reasoning.
+  /* partial_refund and retryable both leave the order where it is on purpose:
+     a partial refund is not a cancelled order, and a declined card is a buyer
+     who may simply pick another method. See orderEffect() for the reasoning.
+
+     Recorded, though. Nothing anywhere used to note that a payment had failed:
+     no audit row, no counter, nothing — the order simply stayed pending until
+     the fourteen-day sweep cancelled it. A shop losing a quarter of its iDEAL
+     attempts to one broken bank would have no way to find that out. Not an
+     owner alert: a buyer abandoning a bank app is ordinary, and an alert per
+     abandonment is noise that teaches people to ignore alerts. */
+  if (effect === 'retryable' || effect === 'partial_refund') {
+    await audit({
+      actor: { id: 'mollie', email: 'mollie' },
+      action: effect === 'partial_refund' ? 'order.partial_refund' : 'order.payment_failed',
+      targetType: 'order', targetId: order.id,
+      metadata: { provider: 'mollie', paymentId: payment.id, status: payment.status, reason },
+    }).catch(() => {});
+  }
   return { ok: true, effect, note: reason };
 }
 
@@ -177,9 +192,23 @@ router.post('/mollie/webhook',
       if (!result.ok) console.warn(`[mollie] webhook ${id}: ${result.reason}`);
       return res.status(200).send('ok');
     } catch (err) {
-      // A 500 asks Mollie to try again, which is what we want for a transient
-      // failure — their API being down, or ours losing the database for a
-      // moment. Missing this confirmation entirely is the worse outcome.
+      /* Retry only what a retry could fix.
+
+         A 500 asks Mollie to try again, which is what we want when their API is
+         down or we lost the database for a moment: missing a real confirmation
+         is the worse outcome by far. But Mollie answering "No payment exists" is
+         a permanent answer, and this route takes its id from an unauthenticated
+         caller — anyone can post a well-formed `tr_` that was never issued.
+         Answering 500 to that put Mollie's retry schedule behind a payment that
+         will never exist, and burned an API call on every attempt for hours.
+
+         4xx is Mollie's own verdict and cannot improve on a retry; 429 is the
+         one exception, because that IS a "come back later". */
+      const permanent = err.status >= 400 && err.status < 500 && err.status !== 429;
+      if (permanent) {
+        console.warn(`[mollie] webhook ${id}: ${err.message} — not retryable, dropping`);
+        return res.status(200).send('ignored');
+      }
       console.error('[mollie] webhook failed:', err.message);
       return res.status(500).send('retry');
     }
