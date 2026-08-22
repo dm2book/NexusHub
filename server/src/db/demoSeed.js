@@ -103,48 +103,48 @@ const CATALOG = [
 
   // ── Discord Nitro (market price; not on Eldorado) ────────────────────────
   { sku: 'NITRO-1M', name: 'Discord Nitro — 1 Month', category: 'discord-nitro', price: 899,
-    image: '/products/icons/discord-nitro.webp', description: 'Full Nitro for a month: HD streaming, emojis, boosts.' },
+    image: '/products/packs/discord-nitro-1-month.svg', description: 'Full Nitro for a month: HD streaming, emojis, boosts.' },
   { sku: 'NITRO-1Y', name: 'Discord Nitro — 1 Year', category: 'discord-nitro', price: 8499, featured: true,
-    image: '/products/icons/discord-nitro.webp', description: 'A full year of Discord Nitro.' },
+    image: '/products/packs/discord-nitro-1-year.svg', description: 'A full year of Discord Nitro.' },
 
   // ── Gift cards (face value + small margin; not on Eldorado) ──────────────
   { sku: 'STEAM-10', name: 'Steam Wallet €10', category: 'giftcard', price: 1199,
-    image: '/products/icons/steam.webp', description: 'Add €10 to your Steam Wallet via redeem code.' },
+    image: '/products/packs/steam-10.svg', description: 'Add €10 to your Steam Wallet via redeem code.' },
   { sku: 'STEAM-25', name: 'Steam Wallet €25', category: 'giftcard', price: 2699,
-    image: '/products/icons/steam.webp', description: 'Add €25 to your Steam Wallet via redeem code.' },
+    image: '/products/packs/steam-25.svg', description: 'Add €25 to your Steam Wallet via redeem code.' },
   { sku: 'STEAM-50', name: 'Steam Wallet €50', category: 'giftcard', price: 5199,
-    image: '/products/icons/steam.webp', description: 'Add €50 to your Steam Wallet via redeem code.' },
+    image: '/products/packs/steam-50.svg', description: 'Add €50 to your Steam Wallet via redeem code.' },
   { sku: 'PSN-25', name: 'PlayStation Store €25', category: 'giftcard', price: 2699,
     image: '/products/icons/playstation.webp', description: 'PSN gift card for games, DLC and PS Plus.' },
   { sku: 'XBOX-25', name: 'Xbox Gift Card €25', category: 'giftcard', price: 2699,
     image: '/products/icons/xbox.webp', description: 'Spend on games and add-ons across Xbox & PC.' },
 
   // ── More games (no per-pack art yet → storefront shows a category tile) ───
-  { sku: 'LOL-1380', name: '1,380 RP — League of Legends', category: 'league', price: 899, description: 'Riot Points for champions, skins and the Battle Pass.' },
-  { sku: 'LOL-3500', name: '3,500 RP — League of Legends', category: 'league', price: 2099, featured: true, description: 'Best-value RP bundle, instant delivery.' },
-  { sku: 'LOL-8000', name: '8,000 RP — League of Legends', category: 'league', price: 4299, description: 'Large Riot Points top-up.' },
-  { sku: 'FF-530', name: '530 Diamonds — Free Fire', category: 'freefire', price: 449, description: 'Free Fire Diamonds for skins, characters and the Pass.' },
-  { sku: 'FF-1080', name: '1,080 Diamonds — Free Fire', category: 'freefire', price: 849, featured: true, description: 'Popular Free Fire diamond bundle.' },
-  { sku: 'FF-2200', name: '2,200 Diamonds — Free Fire', category: 'freefire', price: 1699, description: 'Big Free Fire diamond stack.' },
-  { sku: 'PUBG-660', name: '660 UC — PUBG Mobile', category: 'pubg', price: 849, description: 'Unknown Cash for crates, skins and the Royale Pass.' },
-  { sku: 'PUBG-1800', name: '1,800 UC — PUBG Mobile', category: 'pubg', price: 2099, featured: true, description: 'Great-value PUBG Mobile UC bundle.' },
-  { sku: 'PUBG-3850', name: '3,850 UC — PUBG Mobile', category: 'pubg', price: 4199, description: 'Large PUBG Mobile UC top-up.' },
-  { sku: 'MLBB-275', name: '275 Diamonds — Mobile Legends', category: 'mlbb', price: 449, description: 'MLBB Diamonds for heroes, skins and the Pass.' },
-  { sku: 'MLBB-565', name: '565 Diamonds — Mobile Legends', category: 'mlbb', price: 799, featured: true, description: 'Popular Mobile Legends diamond bundle.' },
-  { sku: 'MLBB-1155', name: '1,155 Diamonds — Mobile Legends', category: 'mlbb', price: 1699, description: 'Big Mobile Legends diamond stack.' },
-  { sku: 'EAFC-1600', name: '1,600 FC Points — EA FC', category: 'eafc', price: 1299, description: 'FC Points for Ultimate Team packs and drafts.' },
-  { sku: 'EAFC-4600', name: '4,600 FC Points — EA FC', category: 'eafc', price: 3399, featured: true, description: 'Best-value FC Points bundle.' },
-  { sku: 'EAFC-12000', name: '12,000 FC Points — EA FC', category: 'eafc', price: 7999, description: 'Maximum FC Points stack.' },
-  { sku: 'GTA-GREAT', name: 'Great White Shark Card — GTA', category: 'gta', price: 1299, description: '$1,250,000 in-game cash for GTA Online.' },
-  { sku: 'GTA-WHALE', name: 'Whale Shark Card — GTA', category: 'gta', price: 2999, featured: true, description: '$3,500,000 in-game cash for GTA Online.' },
-  { sku: 'GTA-MEGALODON', name: 'Megalodon Shark Card — GTA', category: 'gta', price: 5499, description: '$8,000,000 in-game cash for GTA Online.' },
-  { sku: 'MC-1720', name: '1,720 Minecoins — Minecraft', category: 'minecraft', price: 849, description: 'Minecoins for skins, worlds and texture packs.' },
-  { sku: 'MC-3500', name: '3,500 Minecoins — Minecraft', category: 'minecraft', price: 1649, featured: true, description: 'Popular Minecoins bundle.' },
-  { sku: 'CR-500', name: '500 Gems — Clash Royale', category: 'clashroyale', price: 449, description: 'Clash Royale gems for chests and the Pass Royale.' },
-  { sku: 'CR-1200', name: '1,200 Gems — Clash Royale', category: 'clashroyale', price: 849, featured: true, description: 'Popular Clash Royale gem bundle.' },
-  { sku: 'CR-2500', name: '2,500 Gems — Clash Royale', category: 'clashroyale', price: 1699, description: 'Big Clash Royale gem stack.' },
-  { sku: 'PGO-550', name: '550 PokéCoins — Pokémon GO', category: 'pokemongo', price: 449, description: 'PokéCoins for items, storage and raids.' },
-  { sku: 'PGO-1200', name: '1,200 PokéCoins — Pokémon GO', category: 'pokemongo', price: 849, featured: true, description: 'Popular PokéCoins bundle.' },
+  { sku: 'LOL-1380', name: '1,380 RP — League of Legends', category: 'league', price: 899, image: '/products/packs/league-1380.svg', description: 'Riot Points for champions, skins and the Battle Pass.' },
+  { sku: 'LOL-3500', name: '3,500 RP — League of Legends', category: 'league', price: 2099, featured: true, image: '/products/packs/league-3500.svg', description: 'Best-value RP bundle, instant delivery.' },
+  { sku: 'LOL-8000', name: '8,000 RP — League of Legends', category: 'league', price: 4299, image: '/products/packs/league-8000.svg', description: 'Large Riot Points top-up.' },
+  { sku: 'FF-530', name: '530 Diamonds — Free Fire', category: 'freefire', price: 449, image: '/products/packs/freefire-530.svg', description: 'Free Fire Diamonds for skins, characters and the Pass.' },
+  { sku: 'FF-1080', name: '1,080 Diamonds — Free Fire', category: 'freefire', price: 849, featured: true, image: '/products/packs/freefire-1080.svg', description: 'Popular Free Fire diamond bundle.' },
+  { sku: 'FF-2200', name: '2,200 Diamonds — Free Fire', category: 'freefire', price: 1699, image: '/products/packs/freefire-2200.svg', description: 'Big Free Fire diamond stack.' },
+  { sku: 'PUBG-660', name: '660 UC — PUBG Mobile', category: 'pubg', price: 849, image: '/products/packs/pubg-660.svg', description: 'Unknown Cash for crates, skins and the Royale Pass.' },
+  { sku: 'PUBG-1800', name: '1,800 UC — PUBG Mobile', category: 'pubg', price: 2099, featured: true, image: '/products/packs/pubg-1800.svg', description: 'Great-value PUBG Mobile UC bundle.' },
+  { sku: 'PUBG-3850', name: '3,850 UC — PUBG Mobile', category: 'pubg', price: 4199, image: '/products/packs/pubg-3850.svg', description: 'Large PUBG Mobile UC top-up.' },
+  { sku: 'MLBB-275', name: '275 Diamonds — Mobile Legends', category: 'mlbb', price: 449, image: '/products/packs/mlbb-275.svg', description: 'MLBB Diamonds for heroes, skins and the Pass.' },
+  { sku: 'MLBB-565', name: '565 Diamonds — Mobile Legends', category: 'mlbb', price: 799, featured: true, image: '/products/packs/mlbb-565.svg', description: 'Popular Mobile Legends diamond bundle.' },
+  { sku: 'MLBB-1155', name: '1,155 Diamonds — Mobile Legends', category: 'mlbb', price: 1699, image: '/products/packs/mlbb-1155.svg', description: 'Big Mobile Legends diamond stack.' },
+  { sku: 'EAFC-1600', name: '1,600 FC Points — EA FC', category: 'eafc', price: 1299, image: '/products/packs/eafc-1600.svg', description: 'FC Points for Ultimate Team packs and drafts.' },
+  { sku: 'EAFC-4600', name: '4,600 FC Points — EA FC', category: 'eafc', price: 3399, featured: true, image: '/products/packs/eafc-4600.svg', description: 'Best-value FC Points bundle.' },
+  { sku: 'EAFC-12000', name: '12,000 FC Points — EA FC', category: 'eafc', price: 7999, image: '/products/packs/eafc-12000.svg', description: 'Maximum FC Points stack.' },
+  { sku: 'GTA-GREAT', name: 'Great White Shark Card — GTA', category: 'gta', price: 1299, image: '/products/packs/gta-great-white.svg', description: '$1,250,000 in-game cash for GTA Online.' },
+  { sku: 'GTA-WHALE', name: 'Whale Shark Card — GTA', category: 'gta', price: 2999, featured: true, image: '/products/packs/gta-whale.svg', description: '$3,500,000 in-game cash for GTA Online.' },
+  { sku: 'GTA-MEGALODON', name: 'Megalodon Shark Card — GTA', category: 'gta', price: 5499, image: '/products/packs/gta-megalodon.svg', description: '$8,000,000 in-game cash for GTA Online.' },
+  { sku: 'MC-1720', name: '1,720 Minecoins — Minecraft', category: 'minecraft', price: 849, image: '/products/packs/minecraft-1720.svg', description: 'Minecoins for skins, worlds and texture packs.' },
+  { sku: 'MC-3500', name: '3,500 Minecoins — Minecraft', category: 'minecraft', price: 1649, featured: true, image: '/products/packs/minecraft-3500.svg', description: 'Popular Minecoins bundle.' },
+  { sku: 'CR-500', name: '500 Gems — Clash Royale', category: 'clashroyale', price: 449, image: '/products/packs/clashroyale-500.svg', description: 'Clash Royale gems for chests and the Pass Royale.' },
+  { sku: 'CR-1200', name: '1,200 Gems — Clash Royale', category: 'clashroyale', price: 849, featured: true, image: '/products/packs/clashroyale-1200.svg', description: 'Popular Clash Royale gem bundle.' },
+  { sku: 'CR-2500', name: '2,500 Gems — Clash Royale', category: 'clashroyale', price: 1699, image: '/products/packs/clashroyale-2500.svg', description: 'Big Clash Royale gem stack.' },
+  { sku: 'PGO-550', name: '550 PokéCoins — Pokémon GO', category: 'pokemongo', price: 449, image: '/products/packs/pokemongo-550.svg', description: 'PokéCoins for items, storage and raids.' },
+  { sku: 'PGO-1200', name: '1,200 PokéCoins — Pokémon GO', category: 'pokemongo', price: 849, featured: true, image: '/products/packs/pokemongo-1200.svg', description: 'Popular PokéCoins bundle.' },
 
   // ── Subscriptions ────────────────────────────────────────────────────────
   { sku: 'SPOTIFY-3M', name: 'Spotify Premium — 3 Months', category: 'spotify', price: 2499, description: 'Ad-free music, offline listening and better quality.' },
@@ -189,7 +189,7 @@ const RASTER_ICONS = [
 // rule was never updated — so every product in a raster category was pointed at
 // a file that has not existed since. There are zero .png files under
 // public/products/icons; the frontend's iconPath() has said .webp all along.
-const iconFor = (cat) => (CATS_WITH_ICON.includes(cat)
+export const iconFor = (cat) => (CATS_WITH_ICON.includes(cat)
   ? `/products/icons/${cat}.${RASTER_ICONS.includes(cat) ? 'webp' : 'svg'}` : null);
 
 // Per-PACK art first (shows the denomination, e.g. "1,000 ROBUX" card), then

@@ -4,7 +4,8 @@
  * { id, label, status: 'ok'|'warn'|'fail', detail } with a concrete fix hint.
  */
 import { config, manualPayMethods } from '../config/env.js';
-import { get } from '../db/index.js';
+import { get, all } from '../db/index.js';
+import { iconFor } from '../db/demoSeed.js';
 import { botSeenRecently } from './discordService.js';
 import { configuredChannels } from './notifyService.js';
 import { isEnabled as mollieEnabled, isTestKey as mollieTestKey, SUPPORTED_METHODS as MOLLIE_METHODS } from './mollieService.js';
@@ -13,6 +14,7 @@ import { isEnabled as mollieEnabled, isTestKey as mollieTestKey, SUPPORTED_METHO
 // renders it on every legal page, and this check is the owner's warning that it
 // is still empty. Duplicating it would guarantee the two drift apart.
 import { LEGAL, legalComplete } from '../../../src/lib/legalIdentity.js';
+import { artStatus } from '../../../src/lib/shippedArt.js';
 
 export async function launchChecks() {
   const checks = [];
@@ -71,6 +73,55 @@ export async function launchChecks() {
   if (!nProducts) add('catalog', 'Catalog', 'fail', 'No active products.');
   else add('catalog', 'Catalog', nStocked ? 'ok' : 'warn',
     `${nProducts} active products, ${nStocked} with pre-loaded codes${nStocked ? '' : ' — without codes every order needs manual delivery'}.`);
+
+  // 3b. Every active product has a picture — checked, not assumed.
+  //
+  // A product with no art still sells; it just looks like a mistake, and a
+  // shopper deciding whether to hand over money to a shop they have never heard
+  // of reads a blank tile as one. Nothing else fails when this breaks: a missing
+  // image renders as an empty box and the page returns 200.
+  //
+  // The paths are matched against src/lib/shippedArt.js rather than the disk on
+  // purpose — public/ is served by the CDN and is not in the serverless
+  // function's bundle, so asking the filesystem here would report every icon in
+  // the catalogue as missing. Owner uploads and pasted links are counted as set
+  // but not verified: we can see that a link is there, not that it still loads.
+  try {
+    const rows = await all(`SELECT name, category, metadata FROM products WHERE active = 1`);
+    const seen = new Map();          // image src → categories using it
+    const blank = [];
+    let remote = 0, uploaded = 0;
+    for (const r of rows) {
+      let meta = {}; try { meta = JSON.parse(r.metadata || '{}'); } catch { /* keep {} */ }
+      const src = meta.image || iconFor(r.category);
+      const status = artStatus(src);
+      if (status === 'none' || status === 'missing') blank.push(`${r.name}${status === 'missing' ? ` → ${src}` : ''}`);
+      if (status === 'remote') remote++;
+      if (status === 'uploaded') uploaded++;
+      if (src) {
+        if (!seen.has(src)) seen.set(src, new Set());
+        seen.get(src).add(r.category);
+      }
+    }
+    // The same picture on products from different categories is a wiring
+    // mistake, not a family of tiers sharing a look.
+    const crossed = [...seen.entries()].filter(([, cats]) => cats.size > 1);
+    const extra = [remote && `${remote} external link(s)`, uploaded && `${uploaded} upload(s)`]
+      .filter(Boolean).join(', ');
+
+    if (!rows.length) {
+      add('productart', 'Product images', 'warn', 'No active products to check.');
+    } else if (blank.length) {
+      add('productart', 'Product images', 'fail',
+        `${blank.length} of ${rows.length} active products have no usable image: ${blank.slice(0, 5).join(', ')}${blank.length > 5 ? ` and ${blank.length - 5} more` : ''}. Run: DATABASE_URL=… node scripts/audit-product-art.mjs`);
+    } else if (crossed.length) {
+      add('productart', 'Product images', 'warn',
+        `All ${rows.length} products have art, but ${crossed.length} picture(s) are shared across different categories — likely the wrong image on one of them. Run scripts/audit-product-art.mjs to see which.`);
+    } else {
+      add('productart', 'Product images', 'ok',
+        `All ${rows.length} active products have art${extra ? ` (${extra} — set, not fetch-tested)` : ''}`);
+    }
+  } catch (e) { add('productart', 'Product images', 'warn', `Could not check: ${e.message}`); }
 
   // 4. Security — production must not run on the dev JWT secret.
   add('security', 'Auth secret', config.auth.jwtSecret.startsWith('dev-only') ? 'fail' : 'ok',
