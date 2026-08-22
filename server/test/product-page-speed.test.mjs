@@ -116,6 +116,22 @@ if (built) {
     !/in stock|instant|voorraad|direct/i.test(shell), shell.slice(0, 120));
 }
 
+console.log('\n— Art the hero draws differently keeps the grey shell —');
+{
+  /* A transparent icon sits on a category GRADIENT in the real hero, not on the
+     neutral panel. Painting it on the panel would change colour under the
+     picture a second later, which is exactly what a shell must not do. */
+  const icon = products.find((p) => /\/products\/icons\/[a-z0-9-]+\.svg$/i.test(p.image || ''));
+  ok('the catalogue still has an icon-art product', !!icon, 'nothing to check');
+  if (icon && built) {
+    const h = await fetch(`${base}/product/${icon.id}`).then((r) => r.text());
+    ok('its shell is left as shapes', !h.includes('<div class="hero">'), 'the panel was painted anyway');
+    ok('…but it still preloads its artwork',
+      h.includes(`<link rel="preload" as="image" href="${icon.image}"`));
+    ok('…and still inlines its product', h.includes('window.__FM_BOOT__='));
+  }
+}
+
 console.log('\n— Nothing was traded away for it —');
 if (built) {
   // The whole point of rendering this route server-side was the crawler.

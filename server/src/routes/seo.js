@@ -134,13 +134,20 @@ function withHead(html, { title, description, canonical, image, ld, preloadImage
  * only ever moves to a LARGER element — settles here instead of jumping to
  * whatever React paints a second later.
  */
-const CARRIES_OWN_BG = /\.(webp|png|jpe?g|avif|svg)(\?|$)/i;
+/* Mirrors carriesOwnBackground() in src/lib/catalog.js, which is what the real
+   hero branches on. A looser rule here would paint the neutral panel React is
+   about to replace with a category gradient — the picture would not move, but
+   the panel behind it would change colour a second later, which is the one
+   thing a shell like this must never do. Bare .svg is the icon set: transparent
+   badges drawn for a gradient plinth. */
+const CARRIES_OWN_BG = (src) =>
+  /\.(webp|png|jpe?g|avif)(\?|$)/i.test(src) || /^\/products\/packs\//.test(src);
 
 function withProductShell(html, product) {
   // Only artwork that brings its own background can sit on the neutral panel
   // the real hero uses. Anything else keeps the grey skeleton rather than
   // guessing a gradient and flashing a different colour a moment later.
-  if (!product?.image || product.image.startsWith('data:') || !CARRIES_OWN_BG.test(product.image)) return html;
+  if (!product?.image || product.image.startsWith('data:') || !CARRIES_OWN_BG(product.image)) return html;
 
   const shell = `<div id="fm-shell" aria-hidden="true">
       <div class="b"><span class="m"></span><span class="n">${esc(config.email.fromName)}</span></div>
