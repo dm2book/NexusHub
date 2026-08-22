@@ -316,17 +316,43 @@ export async function deliverOrder(orderId, deliveries = [], ctx = {}) {
   if (order.fraud_hold) {
     throw conflict('This order is held for fraud review — approve it before delivering');
   }
+  /* The same code must never appear on an order twice.
+
+     This used to be a bare INSERT per delivery, so anything that ran the
+     delivery step again wrote a second row with the same content: a
+     double-clicked staff button, a retried auto-dispense, the supplier queue
+     arriving behind a manual delivery. claimCodes is idempotent — it hands the
+     order back the codes it already holds — which meant a retry produced
+     identical rows rather than being caught by anything.
+
+     One transaction as well as one read: a loop of separate INSERTs that throws
+     halfway leaves the earlier rows written and the order never completed,
+     which is a paid order showing part of its codes and no way to tell that is
+     what happened. */
+  const already = new Set((await all(
+    'SELECT content FROM deliveries WHERE order_id=@o', { o: orderId })).map((d) => d.content));
+  const fresh = [];
   for (const d of deliveries) {
     const content = String(d.content || '').trim();
-    if (!content) continue;
-    await run(`INSERT INTO deliveries (id, order_id, order_item_id, type, content, created_at)
-         VALUES (@id, @oid, @iid, @type, @c, @at)`,
-        { id: newId('dlv'), oid: orderId, iid: d.orderItemId || null, type: d.type || 'code', c: content, at: nowIso() });
+    if (!content || already.has(content)) continue;
+    already.add(content);
+    fresh.push({ ...d, content });
+  }
+  if (fresh.length) {
+    await tx(async () => {
+      for (const d of fresh) {
+        await run(`INSERT INTO deliveries (id, order_id, order_item_id, type, content, created_at)
+             VALUES (@id, @oid, @iid, @type, @c, @at)`,
+            { id: newId('dlv'), oid: orderId, iid: d.orderItemId || null, type: d.type || 'code', c: d.content, at: nowIso() });
+      }
+    });
   }
   // Already completed (e.g. staff sends a replacement code)? The transition
   // below would early-return and the customer would never be emailed the new
-  // code — send the delivery email explicitly instead.
-  if (order.status === 'completed' && deliveries.length) {
+  // code — send the delivery email explicitly instead. Only for content that is
+  // actually new: re-sending "here is your code" for a code the buyer already
+  // has reads as a second order.
+  if (order.status === 'completed' && fresh.length) {
     const fresh = await getOrder(orderId);
     await sendEmailAsync('order_completed', fresh.email, emailContext(fresh, ctx));
     if (fresh.userId) {
@@ -506,9 +532,29 @@ export async function autoDispenseFromStock(orderId, ctx = {}) {
     if (await availableCount(it.product_id) < it.quantity) return false; // not enough stock → leave for manual
   }
   const deliveries = [];
+  let short = null;
   for (const it of order.items) {
     const codes = await claimCodes(it.product_id, it.quantity, orderId);
+    if (codes.length < it.quantity) { short = { it, got: codes.length }; break; }
     for (const c of codes) deliveries.push({ orderItemId: it.id, content: c, type: 'code' });
+  }
+  /* Half an order is not an order.
+
+     The count above and the claim below are two separate reads, and claimCodes
+     takes rows FOR UPDATE SKIP LOCKED — so two orders for two copies each,
+     against three codes, both pass the availability check and one of them comes
+     back with a single code. Before this, that order was delivered and marked
+     completed: the buyer paid for two, received one, and the dashboard said
+     fulfilled. Nothing anywhere would ever have shown it.
+
+     So the claim result is the authority, not the count. Anything short goes
+     back on the shelf and the whole order falls through to the queue, where a
+     person delivers all of it. */
+  if (short) {
+    const freed = await releaseCodes(orderId).catch(() => 0);
+    console.warn(`[autodispense] ${order.number}: only ${short.got}/${short.it.quantity} `
+      + `code(s) available for ${short.it.name} — returned ${freed} to stock, leaving the order for manual delivery`);
+    return false;
   }
   if (!deliveries.length) return false;
   // Re-read: claiming the codes above took time, and a refund or cancellation
