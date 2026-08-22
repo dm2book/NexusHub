@@ -87,9 +87,6 @@ function withHead(html, { title, description, canonical, image, ld, preloadImage
        image is four serial hops for one picture, and the last one is the thing
        the visitor is actually waiting to see. The server already knows the URL —
        it is three lines above, in the og:image tag. */
-    ...(preloadImage
-      ? [`<link rel="preload" as="image" href="${esc(preloadImage)}" fetchpriority="high" />`]
-      : []),
     ...(ld || []).map((d) => `<script type="application/ld+json">${JSON.stringify(d)}</script>`),
     /* The product itself, so React draws it on its first render.
        Same object /api/products/:id returns, from the same two queries this
@@ -103,7 +100,17 @@ function withHead(html, { title, description, canonical, image, ld, preloadImage
       : []),
   ].join('\n    ');
 
-  return out.replace('</head>', `    ${head}\n  </head>`);
+  out = out.replace('</head>', `    ${head}\n  </head>`);
+
+  /* The picture goes at the TOP of the head, ahead of the module script Vite
+     puts there. The preload scanner reads the whole head before anything
+     executes, so it was found either way — measured: the image left at 191ms
+     and the bundle at 197ms. But the order is what the browser ranks by when it
+     has to choose between them, and the page has nothing to show without the
+     picture. */
+  return preloadImage
+    ? out.replace('<head>', `<head>\n    <link rel="preload" as="image" href="${esc(preloadImage)}" fetchpriority="high" />`)
+    : out;
 }
 
 /**
