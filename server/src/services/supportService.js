@@ -4,6 +4,8 @@ import { newId, newTicketNumber } from '../utils/ids.js';
 import { notFound, badRequest } from '../utils/errors.js';
 import { notify } from './notificationService.js';
 import { getOrder } from './orderService.js';
+import { sendEmailAsync } from './emailService.js';
+import { config } from '../config/env.js';
 
 // ── Tickets ──────────────────────────────────────────────────────────────
 
@@ -35,11 +37,56 @@ export async function replyTicket(ticketId, { authorId, authorKind = 'staff', bo
         body, at: nowIso() });
   await run(`UPDATE support_tickets SET status=@st, updated_at=@at WHERE id=@id`,
       { st: authorKind === 'staff' ? 'pending' : 'open', at: nowIso(), id: ticketId });
-  if (authorKind === 'staff' && t.user_id) {
-    await notify(t.user_id, { type: 'support', title: `Reply on ticket ${t.number}`,
-      body: 'Support replied to your ticket.', link: `/account/tickets/${ticketId}` });
+  if (authorKind === 'staff') {
+    if (t.user_id) {
+      await notify(t.user_id, { type: 'support', title: `Reply on ticket ${t.number}`,
+        body: 'Support replied to your ticket.', link: `/account/tickets/${ticketId}` });
+    }
+    /* And by email, which is the only route that reaches everyone.
+       This used to be the in-app notification alone: a customer had to log back
+       in and go looking to discover they had been answered, and a guest — who
+       ordered by email and has no account at all — could not be told at any
+       price. The reply simply sat in the shop's own database. */
+    await emailTicketReply(t, body).catch((e) => console.error('[support] reply email:', e.message));
   }
   return getTicket(ticketId);
+}
+
+/**
+ * Where a ticket's owner can actually be reached.
+ *
+ * An account address if there is an account, otherwise the address the order
+ * was placed with — which is the whole point: a guest ticket has no user row
+ * and is exactly the case that was silently unreachable.
+ */
+async function ticketRecipient(t) {
+  if (t.user_id) {
+    const u = await get('SELECT email, display_name FROM users WHERE id=@id', { id: t.user_id });
+    if (u?.email) return { email: u.email, name: u.display_name || u.email.split('@')[0] };
+  }
+  if (t.order_id) {
+    const o = await get('SELECT email FROM orders WHERE id=@id', { id: t.order_id });
+    if (o?.email) return { email: o.email, name: o.email.split('@')[0] };
+  }
+  return null;
+}
+
+async function emailTicketReply(t, body) {
+  const to = await ticketRecipient(t);
+  if (!to) return;
+  const order = t.order_id
+    ? await get('SELECT number FROM orders WHERE id=@id', { id: t.order_id }) : null;
+  await sendEmailAsync('support_reply', to.email, {
+    user: { name: to.name },
+    reply: body,
+    ticket: {
+      number: t.number,
+      subject: t.subject,
+      // Rendered as text, so it carries its own leading space or nothing at all.
+      orderLine: order ? ` about order ${order.number}` : '',
+      url: `${config.appUrl}/account/tickets/${t.id}`,
+    },
+  });
 }
 
 export async function setTicketStatus(ticketId, status, assignedTo) {

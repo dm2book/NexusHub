@@ -19,10 +19,17 @@ const esc = (s) => String(s).replace(/[&<>"']/g, (c) =>
  *  Without this, customer-controlled fields (e.g. billing.full_name → user.name)
  *  would inject raw HTML into branded emails sent from our verified domain,
  *  turning checkout into a phishing relay to any address. */
-export function renderTokens(str, ctx) {
+export function renderTokens(str, ctx, { where = 'template' } = {}) {
   return String(str).replace(/\{\{\s*([\w.]+)\s*\}\}/g, (_, pathExpr) => {
     const val = pathExpr.split('.').reduce((o, k) => (o == null ? undefined : o[k]), ctx);
-    if (val == null) return '';
+    if (val == null) {
+      /* An empty string is still the right OUTPUT — half a subject line beats a
+         raw {{token}} in someone's inbox — but it must not be silent. A caller
+         that forgets a field ships mail like " is your ForgeMarket login code",
+         and nothing anywhere notices; this is the only place that can see it. */
+      console.warn(`[email] ${where}: {{${pathExpr}}} had no value — rendered as empty`);
+      return '';
+    }
     return /Html$/.test(pathExpr.split('.').pop()) ? String(val) : esc(String(val));
   });
 }
@@ -48,6 +55,7 @@ export const EMAIL_THEMES = {
   order_completed:   { accent: '#34d399', accent2: '#10b981', eyebrow: 'Delivered',         pills: ['🛡 Money back if undelivered', '💬 Something wrong? Reply'] },
   refund_issued:     { accent: '#a855f7', accent2: '#d946ef', eyebrow: 'Refund issued',     pills: ['↩️ Refund on its way'] },
   custom_message:    { accent: '#7c5cff', accent2: '#a855f7', eyebrow: 'Message from support', pills: ['💬 Just reply to reach a human'] },
+  support_reply:     { accent: '#7c5cff', accent2: '#a855f7', eyebrow: 'Support reply',      pills: ['💬 Just reply to reach a human'] },
   cart_reminder:     { accent: '#7c5cff', accent2: '#d946ef', eyebrow: 'Still in your cart', pills: ['🛒 No account needed', '💸 No hidden fees'] },
   review_request:    { accent: '#f59e0b', accent2: '#f97316', eyebrow: 'How did we do?',    pills: ['⭐ Takes 20 seconds'] },
   gift_card:         { accent: '#d946ef', accent2: '#a855f7', eyebrow: 'Gift card',         pills: ['🎁 Never expires unused'] },
@@ -158,8 +166,8 @@ export function baseContext(extra = {}) {
 
 /** Render a stored template row → { subject, html }. */
 export function renderTemplate(template, ctx) {
-  const subject = renderTokens(template.subject, ctx);
-  const inner = renderTokens(template.body_html, ctx);
+  const subject = renderTokens(template.subject, ctx, { where: `${template.id} subject` });
+  const inner = renderTokens(template.body_html, ctx, { where: `${template.id} body` });
   // First line of text content doubles as the hidden inbox preview (preheader).
   const preheader = inner.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 110);
   const theme = EMAIL_THEMES[template.id] || DEFAULT_THEME;

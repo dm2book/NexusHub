@@ -36,7 +36,7 @@ async function getTransport() {
  * stalls. Throws with Resend's own message on failure (e.g. unverified sender),
  * which we record + log so the cause is never a mystery.
  */
-async function sendViaResend({ from, to, subject, html }) {
+async function sendViaResend({ from, to, subject, html, text, replyTo }) {
   // Hard timeout: without it a slow/unreachable Resend call hangs the whole
   // request until Vercel kills the function at maxDuration, and the client gets
   // a non-JSON platform error page instead of a normal response.
@@ -50,7 +50,11 @@ async function sendViaResend({ from, to, subject, html }) {
         Authorization: `Bearer ${config.email.resendApiKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ from, to, subject, html }),
+      body: JSON.stringify({
+        from, to, subject, html,
+        ...(text ? { text } : {}),
+        ...(replyTo ? { reply_to: replyTo } : {}),
+      }),
       signal: ctrl.signal,
     });
   } catch (e) {
@@ -61,6 +65,39 @@ async function sendViaResend({ from, to, subject, html }) {
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data?.message || data?.name || `Resend API error ${res.status}`);
   return { messageId: data?.id || null };
+}
+
+/**
+ * A readable plain-text version of the message.
+ *
+ * Not a stripped-tags dump: the parts that carry the value — a login code, a
+ * delivered game code, the order total — are exactly the parts that turn into
+ * unlabelled digits when the markup is thrown away. Block boundaries become
+ * line breaks, links keep their destination, and the invisible preheader is
+ * dropped rather than repeated as the first line.
+ */
+export function htmlToText(html) {
+  return String(html)
+    // The hidden inbox-preview line, and anything that is not content.
+    .replace(/<span class="preheader">[\s\S]*?<\/span>/gi, '')
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<head[\s\S]*?<\/head>/gi, '')
+    // A link is worth nothing in text unless the address comes with it.
+    .replace(/<a\b[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/gi,
+      (_, href, label) => {
+        const t = label.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+        return !t ? href : t === href ? t : `${t} (${href})`;
+      })
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/(p|div|tr|h1|h2|h3|li|table)>/gi, '\n')
+    .replace(/<li\b[^>]*>/gi, '· ')
+    .replace(/<td\b[^>]*>/gi, '\t')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+    // Tidy: no runs of blank lines, no trailing spaces, no leading tabs on a line.
+    .split('\n').map((l) => l.replace(/\t+/g, '  ').replace(/[ \t]+$/, '').trim())
+    .join('\n').replace(/\n{3,}/g, '\n\n').trim();
 }
 
 function loadTemplate(eventKey) {
@@ -87,15 +124,24 @@ export async function sendEmail(eventKey, to, context = {}) {
   const ctx = baseContext(context);
   const { subject, html } = renderTemplate(tpl, ctx);
   const from = `${config.email.fromName} <${config.email.fromAddress}>`;
+  const replyTo = config.email.replyTo || undefined;
+  /* A plain-text alternative on every message.
+     Checked on the wire: these went out as `Content-Type: text/html` with no
+     multipart/alternative. That is a spam-filter penalty on transactional mail
+     that must arrive, and it is the only thing a watch preview, a screen reader
+     in text mode, or a client with images-and-HTML off has to show. The codes
+     in particular are the whole point of the mail and were unreadable without
+     an HTML renderer. */
+  const text = htmlToText(html);
 
   try {
     let info;
     let status;
     if (config.email.resendApiKey) {
-      info = await sendViaResend({ from, to, subject, html }); // HTTP API (serverless-safe)
+      info = await sendViaResend({ from, to, subject, html, text, replyTo }); // HTTP API (serverless-safe)
       status = 'sent';
     } else {
-      info = await (await getTransport()).sendMail({ from, to, subject, html });
+      info = await (await getTransport()).sendMail({ from, to, subject, html, text, replyTo });
       status = config.email.smtpUrl ? 'sent' : 'recorded';
     }
     await run(`INSERT INTO email_log (id, template_id, to_email, subject, status, provider_ref, context, created_at)

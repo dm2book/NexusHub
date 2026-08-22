@@ -151,6 +151,20 @@ export const config = {
     fromAddress: env.EMAIL_FROM_ADDRESS || 'onboarding@resend.dev',
     brandColor: env.EMAIL_BRAND_COLOR || '#6366f1',
     logoUrl: env.EMAIL_LOGO_URL || '',
+    /**
+     * Where a reply goes.
+     *
+     * Every transactional mail this shop sends ends with "Just reply to this
+     * email or open a ticket in our Discord — real humans, fast." Checked on the
+     * wire: there was no Reply-To header on any of them, so that reply went to
+     * the sending address — `onboarding@resend.dev` by default, and a
+     * no-reply@ once a domain is verified. The mail invited a conversation and
+     * the headers refused it.
+     *
+     * Defaults to the address the storefront already advertises (see
+     * src/lib/support.js), so it is right without anyone setting anything.
+     */
+    replyTo: env.EMAIL_REPLY_TO || 'support@forgemarket.nl',
   },
 
   /**

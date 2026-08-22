@@ -138,6 +138,19 @@ export const DEFAULT_TEMPLATES = [
       the same person who sent it. Prefer chat? Our Discord ticket is linked at the bottom.</p>`,
   },
   {
+    id: 'support_reply',
+    name: 'Support Reply',
+    subject: 'Re: {{ticket.subject}} · ticket {{ticket.number}}',
+    body_html: `
+      <h1>We replied to your ticket</h1>
+      <p>Hi <strong>{{user.name}}</strong>, someone from the shop answered ticket
+      <strong>{{ticket.number}}</strong>{{ticket.orderLine}}:</p>
+      <div class="quote">{{reply}}</div>
+      <p><a class="btn" href="{{ticket.url}}">Read the whole thread</a></p>
+      <p style="color:#8b93a7;font-size:13px">Reply straight to this email and it lands back on the
+      same ticket — no account needed.</p>`,
+  },
+  {
     id: 'cart_reminder',
     name: 'Abandoned Cart',
     subject: 'You left something in your cart 🛒',
