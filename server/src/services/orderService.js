@@ -110,6 +110,20 @@ export async function createOrder(input, ctx = {}) {
     const product = await getProduct(li.productId);
     if (!product) throw badRequest(`Unknown product: ${li.productId}`);
     if (!product.active) throw conflict(`Product not available: ${product.name}`);
+    /* A mystery box pays out as store credit, and store credit lives in an
+       account. A guest could buy one: the checkout takes the money, and then
+       settleMysteryForOrder() begins `if (!order.userId) return []` — no roll,
+       no prize, no pull recorded, and nothing a human in the fulfillment queue
+       can do about it either, because there is no wallet to credit. The product
+       page meanwhile promises that every box wins a real prize.
+
+       Refused here rather than hidden in the UI: this is the choke point every
+       purchase passes through, and a product that cannot be fulfilled must not
+       be sellable, not merely hard to reach. */
+    if (product.kind === 'mystery' && !input.userId) {
+      throw badRequest(
+        `${product.name} pays out as store credit, so it needs an account — please sign in or create one first.`);
+    }
     const qty = Math.max(1, Number(li.quantity || 1));
     const unit = product.price;
     subtotal += unit * qty;

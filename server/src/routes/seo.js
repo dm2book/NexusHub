@@ -52,7 +52,7 @@ const SITE_URL = () => config.appUrl.replace(/\/+$/, '');
  * would leave two `og:title` tags and the scraper takes whichever it reads
  * first — a bug that only ever shows up in somebody else's chat window.
  */
-function withHead(html, { title, description, canonical, image, ld, preloadImage, boot }) {
+function withHead(html, { title, description, canonical, image, ld, ldProductId, preloadImage, boot }) {
   const drop = [
     /\s*<title>[\s\S]*?<\/title>/,
     /\s*<meta name="description"[^>]*>/,
@@ -87,7 +87,24 @@ function withHead(html, { title, description, canonical, image, ld, preloadImage
        image is four serial hops for one picture, and the last one is the thing
        the visitor is actually waiting to see. The server already knows the URL —
        it is three lines above, in the og:image tag. */
-    ...(ld || []).map((d) => `<script type="application/ld+json">${JSON.stringify(d)}</script>`),
+    /* The Product block is tagged with the id the SPA writes to, and with the
+       product it describes.
+
+       Without that there were two Product blocks on every product page saying
+       different things: this one said PreOrder (honest — no code in stock, so
+       it is delivered by hand) while React appended a second saying InStock,
+       off a `products.stock` column nothing enforces and nothing displays.
+       Google reads one of them, and a contradiction between two blocks on one
+       page is the kind of thing that earns a manual action.
+
+       The id alone would have let React replace this block with its own,
+       thinner one — no seller, no return policy, no @id. The data-product
+       attribute is what lets it tell "this describes the product I am showing"
+       from "this is left over from the page the visitor arrived on". */
+    ...(ld || []).map((d) => `<script type="application/ld+json"${
+      d['@type'] === 'Product' && ldProductId
+        ? ` id="jsonld-product" data-product="${esc(ldProductId)}"` : ''
+    }>${JSON.stringify(d)}</script>`),
     /* The product itself, so React draws it on its first render.
        Same object /api/products/:id returns, from the same two queries this
        handler already ran. The page still refetches in the background — the
@@ -286,6 +303,7 @@ router.get('/product/:id', asyncHandler(async (req, res, next) => {
     canonical,
     image,
     ld,
+    ldProductId: product.id,
     /* Preload the picture the PAGE shows, not the social card. `image` above is
        absolutised for scrapers; the browser wants the same URL the <img> will
        ask for, or it downloads it twice. Owner-uploaded data URIs are skipped —

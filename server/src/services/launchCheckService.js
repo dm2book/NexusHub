@@ -15,6 +15,7 @@ import { isEnabled as mollieEnabled, isTestKey as mollieTestKey, SUPPORTED_METHO
 // is still empty. Duplicating it would guarantee the two drift apart.
 import { LEGAL, legalComplete } from '../../../src/lib/legalIdentity.js';
 import { artStatus } from '../../../src/lib/shippedArt.js';
+import { auditCatalog } from './catalogAuditService.js';
 
 export async function launchChecks() {
   const checks = [];
@@ -122,6 +123,28 @@ export async function launchChecks() {
         `All ${rows.length} active products have art${extra ? ` (${extra} — set, not fetch-tested)` : ''}`);
     }
   } catch (e) { add('productart', 'Product images', 'warn', `Could not check: ${e.message}`); }
+
+  // 3c. Nothing on the shelf that cannot be delivered.
+  //
+  // The catalogue audit's own words, so the dashboard and
+  // `node scripts/audit-catalog.mjs` can never disagree about whether the shop
+  // is ready. Image problems are left to the check above rather than said
+  // twice; everything else it calls a blocker is one here.
+  try {
+    const audit = await auditCatalog();
+    const blockers = audit.findings.filter((f) => f.level === 'FAIL' && f.check !== 'art');
+    const warnings = audit.findings.filter((f) => f.level === 'WARN');
+    if (blockers.length) {
+      const first = blockers.slice(0, 3).map((f) => `${f.subject}: ${f.detail}`).join(' · ');
+      add('fulfilment', 'Sellable catalog', 'fail',
+        `${blockers.length} product(s) can be bought and not delivered. ${first}`
+        + `${blockers.length > 3 ? ` (+${blockers.length - 3} more)` : ''} — run: node scripts/audit-catalog.mjs`);
+    } else {
+      add('fulfilment', 'Sellable catalog', 'ok',
+        `Every one of the ${audit.checked.active} active products can be delivered`
+        + `${warnings.length ? ` — ${warnings.length} warning(s), see node scripts/audit-catalog.mjs` : ''}`);
+    }
+  } catch (e) { add('fulfilment', 'Sellable catalog', 'warn', `Could not check: ${e.message}`); }
 
   // 4. Security — production must not run on the dev JWT secret.
   add('security', 'Auth secret', config.auth.jwtSecret.startsWith('dev-only') ? 'fail' : 'ok',

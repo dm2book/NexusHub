@@ -89,11 +89,24 @@ export function usePageMeta(title, description, { image, type = 'website' } = {}
  * Product block still sitting on the checkout is the kind of mismatch that
  * earns a manual action rather than a rich result.
  */
-export function useJsonLd(id, data) {
+/**
+ * Structured data for the current page.
+ *
+ * `serverFor` names the thing the server may already have described in this
+ * HTML — a product id. /product/:id is rendered server-side and its block is
+ * the richer one (seller, return policy, @id, an availability that comes from
+ * real code stock). When it is already about the same thing, leave it: this
+ * hook's job on that route is only to keep the head correct after a
+ * client-side navigation, where the server's block still describes the page
+ * the visitor arrived on.
+ */
+export function useJsonLd(id, data, { serverFor } = {}) {
   const json = data ? JSON.stringify(data) : '';
   useEffect(() => {
     if (!json) return undefined;
     let tag = document.getElementById(`jsonld-${id}`);
+    // The server already said this, and said it better.
+    if (tag && serverFor && tag.dataset.product === String(serverFor)) return undefined;
     if (!tag) {
       tag = document.createElement('script');
       tag.type = 'application/ld+json';
@@ -101,6 +114,8 @@ export function useJsonLd(id, data) {
       document.head.appendChild(tag);
     }
     tag.textContent = json;
+    // Whatever it described before, it describes this now.
+    delete tag.dataset.product;
     return () => tag.remove();
-  }, [id, json]);
+  }, [id, json, serverFor]);
 }
