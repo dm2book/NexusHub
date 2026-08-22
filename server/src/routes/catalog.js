@@ -19,6 +19,7 @@ import { createOrder, getOrderByNumber, getOrder, markPaymentReceived, getPspPay
 import { requestRefund, getRefundRequestForOrder } from '../services/supportService.js';
 import { answer } from '../services/assistantService.js';
 import { withCopy } from '../services/productCopy.js';
+import { productPayload, stockLeftFor, instantFor } from '../services/productPayload.js';
 import { submitProof, getOrderProof } from '../services/paymentProofService.js';
 import { listEnabledProviders } from '../services/oauthService.js';
 import { isEnabled as stripeEnabled, createCheckoutSession } from '../services/stripeService.js';
@@ -251,16 +252,6 @@ export async function assertOwnsOrder(req, order, email) {
   if (!owns) throw forbidden('This order is not yours');
 }
 
-// Only surface a "left" count for products that actually sell from finite code
-// stock (auto delivery). This keeps "almost sold out" honest — manual/made-to-
-// order products, and auto products with plenty of stock, show nothing.
-const LOW_STOCK = 6;
-const stockLeftFor = (product, count) =>
-  (product.deliveryMode === 'auto' && count > 0 && count <= LOW_STOCK) ? count : null;
-// True only when a code is sitting in stock right now and the product is set to
-// auto-deliver — i.e. the one case where "instant" is a promise we can keep.
-// Everything else is fulfilled by hand and must say so.
-const instantFor = (product, count) => product.deliveryMode === 'auto' && count > 0;
 
 router.get('/products', asyncHandler(async (_req, res) => {
   publicCache(res, 60);
@@ -288,7 +279,7 @@ router.get('/products/:id', asyncHandler(async (req, res) => {
   const p = await getProduct(req.params.id);
   if (!p || !p.active) throw new ApiError(404, 'Product not found');
   const count = await availableCount(p.id);
-  res.json({ product: withCopy({ ...p, stockLeft: stockLeftFor(p, count), instant: instantFor(p, count) }) });
+  res.json({ product: productPayload(p, count) });
 }));
 
 // Price history for the product-page chart.

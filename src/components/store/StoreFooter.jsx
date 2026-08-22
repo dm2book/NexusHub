@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Zap } from 'lucide-react';
 import { api } from '../../lib/api.js';
 import { useI18n } from '../../lib/i18n.jsx';
@@ -8,16 +8,39 @@ import { CookiePreferencesLink } from '../CookieConsent.jsx';
 import { useTrustpilot } from '../../lib/useTrustpilot.js';
 import SellerIdentity from './SellerIdentity.jsx';
 
-/** Real system status from /api/health (no fake claims). */
+/**
+ * Real system status from /api/health (no fake claims).
+ *
+ * Asked for only once this line is close to being read. It sits in the footer,
+ * a screen or two below anything a visitor has looked at yet, and it used to
+ * fire in the same breath as the requests that decide whether the page has any
+ * content — measured on a product page: /api/health went out alongside the
+ * product itself and finished 250ms after it, on a connection carrying both.
+ * A status dot nobody has scrolled to is not worth a slot in that queue.
+ */
 export function SystemStatus() {
   const { t } = useI18n();
   const [ok, setOk] = useState(null);   // null = loading → show nothing
+  const [seen, setSeen] = useState(false);
+  const ref = useRef(null);
   useEffect(() => {
+    const el = ref.current;
+    // No IntersectionObserver (or no element yet) → ask straight away rather
+    // than never showing the status at all.
+    if (!el || typeof IntersectionObserver === 'undefined') { setSeen(true); return; }
+    const io = new IntersectionObserver((entries) => {
+      if (entries.some((e) => e.isIntersecting)) { setSeen(true); io.disconnect(); }
+    }, { rootMargin: '300px' });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+  useEffect(() => {
+    if (!seen) return undefined;
     let live = true;
     fetch(`${api.base}/api/health`).then((r) => { if (live) setOk(r.ok); }).catch(() => { if (live) setOk(false); });
     return () => { live = false; };
-  }, []);
-  if (ok === null) return null;
+  }, [seen]);
+  if (ok === null) return <span ref={ref} aria-hidden="true" />;
   return ok
     ? <span className="text-emerald-700">{t('status.ok', '● All systems operational')}</span>
     : <span className="text-amber-700">{t('status.degraded', '● Partial degradation — orders may be delayed')}</span>;

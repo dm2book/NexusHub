@@ -67,6 +67,31 @@ const productFaq = (product, t) => {
   return out;
 };
 
+/**
+ * The product the server already put in this page, if it is this product.
+ *
+ * /product/:id is rendered by the API (see server/src/routes/seo.js), which has
+ * to load the product anyway to write the title, the og:image and the JSON-LD.
+ * It now inlines the same object /api/products/:id returns, so the first React
+ * render has something to draw instead of a spinner.
+ *
+ * Read out of `window` once, at module load, and dropped the moment the visitor
+ * asks for a different product: without that, every product page after the
+ * first would flash the one they originally landed on. It is never the last
+ * word — the effect below refetches immediately, because this HTML is
+ * edge-cached for five minutes and a price must not be.
+ */
+let BOOT = null;
+if (typeof window !== 'undefined') {
+  BOOT = window.__FM_BOOT__?.product || null;
+  delete window.__FM_BOOT__;
+}
+function bootProduct(id) {
+  if (!BOOT) return null;
+  if (BOOT.id !== id) { BOOT = null; return null; }
+  return BOOT;
+}
+
 export default function ProductDetail() {
   const { id } = useParams();
   const { add, prelaunch } = useCart();
@@ -76,7 +101,7 @@ export default function ProductDetail() {
   const stats = useStats();
   const { t, lang } = useI18n();
   const { has, toggle } = useWishlist();
-  const [product, setProduct] = useState(null);
+  const [product, setProduct] = useState(() => bootProduct(id));
   const [qty, setQty] = useState(1);
   const [notFound, setNotFound] = useState(false);
   const [recs, setRecs] = useState({ crossSell: [], upsell: [] });
@@ -111,7 +136,14 @@ export default function ProductDetail() {
   });
 
   useEffect(() => {
-    setProduct(null); setQty(1); setNotFound(false); setRecs({ crossSell: [], upsell: [] }); setHeroBroken(false);
+    /* Keep a server-inlined product on screen while it revalidates.
+       Blanking it here would throw away the whole point: the HTML is edge-cached
+       for five minutes, so the fetch below is what makes the price current — but
+       the visitor should be reading the product while that happens, not watching
+       a spinner. On a client-side navigation there is no inlined product and
+       this clears as before. */
+    setProduct(bootProduct(id)); setQty(1); setNotFound(false);
+    setRecs({ crossSell: [], upsell: [] }); setHeroBroken(false);
     api.get(`/api/products/${id}`)
       .then((r) => setProduct(r.product))
       .catch(() => {
@@ -126,21 +158,29 @@ export default function ProductDetail() {
     api.get(`/api/products/${id}/recommendations`).then(setRecs).catch(() => {});
   }, [id]);
 
+  /* These three used to depend on the product OBJECT, which was fine while the
+     object arrived exactly once. It now arrives twice — the server's copy on
+     first render, then the revalidating fetch — and a new object identity for
+     the same product fired every one of them again: two /price-history calls,
+     two /mystery calls, two recorded views of one visit. Depending on the id is
+     what was always meant; the object was standing in for it. */
   // Record this visit in the customer's own recently-viewed history.
   const recentlyViewed = useRecentlyViewed();
-  useEffect(() => { if (product && !product.sample) recordProductView(product); }, [product]);
+  useEffect(() => { if (product && !product.sample) recordProductView(product); },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [product?.id, product?.sample]);
 
   // Mystery box: load the reward pool + odds to show "what's inside".
   useEffect(() => {
     if (product?.kind !== 'mystery') { setMysteryPool(null); return; }
     api.get(`/api/products/${product.id}/mystery`).then((r) => setMysteryPool(r.rewards || [])).catch(() => setMysteryPool([]));
-  }, [product]);
+  }, [product?.id, product?.kind]);
 
   // Price history for the chart.
   useEffect(() => {
     if (!product?.id || product.sample) { setPriceHist([]); return; }
     api.get(`/api/products/${product.id}/price-history`).then((r) => setPriceHist(r.history || [])).catch(() => setPriceHist([]));
-  }, [product]);
+  }, [product?.id, product?.sample]);
 
   if (notFound) {
     return (
@@ -208,13 +248,15 @@ export default function ProductDetail() {
                  dropped here too: two colour sources arguing under one picture
                  is what made it muddy. */
               <>
-                <img src={product.image} alt="" aria-hidden="true"
+                <img src={product.image} alt="" aria-hidden="true" decoding="async"
                   className="absolute inset-0 w-full h-full object-cover scale-125 blur-3xl opacity-30" />
                 <img data-pd-media src={product.image} alt={product.name} onError={() => setHeroBroken(true)}
+                  fetchpriority="high" decoding="async"
                   className="absolute inset-0 w-full h-full object-contain p-8 drop-shadow-2xl transition-transform duration-700 group-hover:scale-105" />
               </>
             ) : (
               <img data-pd-media src={product.image} alt={product.name} onError={() => setHeroBroken(true)}
+                fetchpriority="high" decoding="async"
                 className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
             )
           ) : iconFor(product.category) ? (

@@ -73,7 +73,15 @@ export const isCustomImage = (src) => !!src && !String(src).startsWith('/product
  * exactly this art never applied to it.
  */
 export const carriesOwnBackground = (src) =>
-  isCustomImage(src) || /\.(webp|png|jpe?g|avif)(\?|$)/i.test(String(src || ''));
+  isCustomImage(src)
+  || /\.(webp|png|jpe?g|avif)(\?|$)/i.test(String(src || ''))
+  /* The generated pack covers are SVG, and they are rectangles with colour to
+     the edge — the denomination card, not a badge. Extension alone put them on
+     the icon side of this line, so the product hero cropped them with
+     object-cover: "INSTANT TOP-UP" lost its first four letters and the coin lost
+     its left edge. The path is what separates the two kinds of generated SVG,
+     because that is what scripts/gen-pack-covers.mjs vs. the icon set decides. */
+  || /^\/products\/packs\//.test(String(src || ''));
 
 export { CreditCard };
 
