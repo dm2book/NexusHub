@@ -41,7 +41,26 @@ export const DEFAULT_POSITION = { x: 50, y: 50 };
  * composition belongs to the picture, not to the brand.
  */
 export function focalOf(product, { isPhoto = false } = {}) {
-  const p = product?.imagePosition || {};
+  /* Two ways to say the same thing, because both are natural to write.
+
+       product.imageDisplay = { fit: 'cover', position: 'center' }   // one object
+       product.imageFit = 'cover'; product.imagePosition = { x, y }  // flat fields
+
+     `imageDisplay` wins where both are set. `position` accepts the CSS words
+     ('center', 'top', 'bottom left') as well as a percentage pair, because a
+     person configuring a product thinks in words and a focal-point picker
+     thinks in numbers. */
+  const display = product?.imageDisplay || {};
+  const WORDS = {
+    center: { x: 50, y: 50 }, top: { x: 50, y: 0 }, bottom: { x: 50, y: 100 },
+    left: { x: 0, y: 50 }, right: { x: 100, y: 50 },
+    'top left': { x: 0, y: 0 }, 'top right': { x: 100, y: 0 },
+    'bottom left': { x: 0, y: 100 }, 'bottom right': { x: 100, y: 100 },
+  };
+  const fromWords = typeof display.position === 'string'
+    ? WORDS[display.position.trim().toLowerCase()] : null;
+  const p = fromWords || (typeof display.position === 'object' ? display.position : null)
+    || product?.imagePosition || {};
   const x = Number.isFinite(p.x) ? Math.min(100, Math.max(0, p.x)) : DEFAULT_POSITION.x;
   const y = Number.isFinite(p.y) ? Math.min(100, Math.max(0, p.y)) : DEFAULT_POSITION.y;
   /* The whole picture, by default.
@@ -57,7 +76,7 @@ export function focalOf(product, { isPhoto = false } = {}) {
      the banner-shaped art where filling the tile IS the intent. A generated icon
      is always contained: it is a transparent badge with no background of its
      own, drawn to sit inside the plinth with padding. */
-  const fit = product?.imageFit || 'contain';
+  const fit = display.fit || product?.imageFit || 'contain';
   return {
     fit: fit === 'cover' ? 'cover' : 'contain',
     position: `${x}% ${y}%`,
@@ -144,9 +163,12 @@ export default function ProductMedia({
           setFailed(true);
         }}
         style={{ objectFit: fit, objectPosition: position, transform: scale !== 1 ? `scale(${scale})` : undefined }}
+        /* Less padding on a phone. 24px on a 122px-tall box left a 512px icon
+           rendering at 74px — a quarter of the tile spent on air. The desktop
+           inset is unchanged. */
         className={`relative z-[1] w-full h-full transition-opacity duration-300 ${
           loaded ? 'opacity-100' : 'opacity-0'
-        } ${isPhoto ? '' : 'p-6 sm:p-7'}`}
+        } ${isPhoto ? '' : 'p-4 sm:p-7'}`}
       />
     </div>
   );

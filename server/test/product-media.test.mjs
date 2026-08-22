@@ -110,12 +110,42 @@ console.log('\n— Composition belongs to the picture —');
     ok('focalOf is exported for products to configure framing', /export function focalOf/.test(media));
     ok('…with a documented default', /export const DEFAULT_POSITION/.test(media));
   }
+  /* The grouped shape, which is what a person configuring a product writes. */
+  if (typeof focalOf === 'function') {
+    ok('imageDisplay sets the fit', focalOf({ imageDisplay: { fit: 'cover' } }).fit === 'cover');
+    ok('…and accepts CSS words for the position',
+      focalOf({ imageDisplay: { position: 'top' } }).position === '50% 0%');
+    ok('…and a numeric focal point',
+      focalOf({ imageDisplay: { position: { x: 25, y: 75 } } }).position === '25% 75%');
+    ok('…and wins over the flat fields',
+      focalOf({ imageDisplay: { fit: 'cover' }, imageFit: 'contain' }).fit === 'cover');
+    ok('an unknown word falls back to centred',
+      focalOf({ imageDisplay: { position: 'diagonally' } }).position === '50% 50%');
+  }
+
   ok('no brand is special-cased in the component',
     !/robux|minecraft|pokemon/i.test(media),
     'a rule about Robux is a rule that breaks on the next product');
 }
 
-// ── 6. The API carries the framing ──────────────────────────────────────────
+// ── 6. One box shape at every width ─────────────────────────────────────────
+console.log('\n— The tile is the same shape on a phone as on a desktop —');
+{
+  // `card` is already comment-stripped: the explanation above the class names
+  // the very heights it replaced, and a raw read fails on its own documentation.
+  const cardSrc = card;
+  ok('the media box is an aspect ratio, not a pair of heights',
+    /aspect-\[7\/6\]/.test(cardSrc) && !/h-\[122px\]/.test(cardSrc),
+    'a phone box of 184x122 is ratio 1.51 against the desktop 1.17 — that ratio '
+    + 'difference is what shrank portrait artwork to a narrow strip on mobile');
+  ok('…so the space is reserved before the picture loads',
+    /aspect-\[7\/6\] w-full/.test(cardSrc), 'an aspect box cannot shift when the image arrives');
+  const mediaSrc = media;
+  ok('icons are not padded away on a phone', /p-4 sm:p-7/.test(mediaSrc),
+    '24px of padding on a 122px box left a 512px icon rendering at 74px');
+}
+
+// ── 7. The API carries the framing ──────────────────────────────────────────
 console.log('\n— The server sends what the tile needs —');
 {
   const svc = read('../src/services/productService.js');
@@ -124,6 +154,8 @@ console.log('\n— The server sends what the tile needs —');
   ok('imageFit is exposed and restricted to the two it supports',
     /\['cover', 'contain'\]\.includes\(metadata\.imageFit\)/.test(svc));
   ok('imageScale is bounded', /Math\.min\(2, Math\.max\(0\.5/.test(svc));
+  ok('imageDisplay is exposed and validated', /imageDisplay: \(\(\) => \{/.test(svc)
+    && /WORDS\.includes\(d\.position\.trim\(\)\.toLowerCase\(\)\)/.test(svc));
 
   // Round-trip through the real serializer, against a real schema.
   const { ensureReady } = await import('../src/app.js');
