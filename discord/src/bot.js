@@ -52,6 +52,64 @@ const OWNER_ONLY = { content: 'That one is owner/admin only.', ephemeral: true }
 const isTicketChannel = (ch) =>
   ch?.topic?.startsWith('ticket-owner:') || /(^|-)ticket-/.test(ch?.name || '');
 
+/**
+ * Durable state for the things a restart must not erase.
+ *
+ * These used to be JSON files next to this source, and the comments said "so it
+ * survives a restart". They survive a process restart. They do not survive a
+ * DEPLOY: the target is Railway (discord/railway.json), where the container
+ * filesystem is the build image and every push replaces it. So every code
+ * change silently reset every member's level, desynced the level roles granted
+ * from it, and dropped every running giveaway — entrants had entered something
+ * that no longer existed and no prize was ever drawn.
+ *
+ * The store keeps it now, over the signed channel this bot already uses. The
+ * local file stays as the fallback: a bot pointed at no site still works, and a
+ * site that is briefly unreachable costs nothing, because the file is written
+ * too and read when the store has nothing to say.
+ */
+async function stateGet(key, file) {
+  if (FORGEMARKET_API_URL && REVIEW_INGEST_SECRET) {
+    try {
+      const ts = String(Date.now());
+      const signature = createHmac('sha256', REVIEW_INGEST_SECRET)
+        .update(`${ts}.state:get:${key}`).digest('hex');
+      const res = await fetch(`${FORGEMARKET_API_URL.replace(/\/$/, '')}/api/discord/state/get`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-timestamp': ts, 'x-signature': signature },
+        body: JSON.stringify({ key }),
+      });
+      if (res.ok) {
+        const { value } = await res.json();
+        if (value !== null && value !== undefined) return value;
+      } else if (res.status !== 404) {
+        console.error(`[state] get ${key}: ${res.status}`);
+      }
+    } catch (e) { console.error(`[state] get ${key} failed:`, e.message); }
+  }
+  // Nothing stored yet (or no store at all) — fall back to the file, which is
+  // also how an existing bot's state migrates on its first boot after this.
+  try { if (file && existsSync(file)) return JSON.parse(readFileSync(file, 'utf8')); } catch { /* ignore */ }
+  return null;
+}
+
+async function stateSet(key, value, file) {
+  // The file first: it is instant, and it is what makes a site outage free.
+  try { if (file) writeFileSync(file, JSON.stringify(value)); } catch { /* ignore */ }
+  if (!FORGEMARKET_API_URL || !REVIEW_INGEST_SECRET) return;
+  try {
+    const ts = String(Date.now());
+    const signature = createHmac('sha256', REVIEW_INGEST_SECRET)
+      .update(`${ts}.state:set:${key}:${JSON.stringify(value ?? null)}`).digest('hex');
+    const res = await fetch(`${FORGEMARKET_API_URL.replace(/\/$/, '')}/api/discord/state/set`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-timestamp': ts, 'x-signature': signature },
+      body: JSON.stringify({ key, value }),
+    });
+    if (!res.ok && res.status !== 404) console.error(`[state] set ${key}: ${res.status}`);
+  } catch (e) { console.error(`[state] set ${key} failed:`, e.message); }
+}
+
 // Giveaway store — persisted to giveaways.json so active giveaways (and their
 // entries) survive a bot restart; timers are re-armed on boot.
 const GIVEAWAYS = new Map(); // messageId -> { prize, entries:Set, endsAt, channelId, msgId, winnersCount, hostId, guildId }
@@ -63,13 +121,13 @@ function saveGiveaways() {
   gwSaveTimer = setTimeout(() => {
     try {
       const data = [...GIVEAWAYS.entries()].map(([id, g]) => ({ ...g, msgId: id, entries: [...g.entries] }));
-      writeFileSync(GW_FILE, JSON.stringify(data));
+      stateSet('giveaways', data, GW_FILE);
     } catch { /* ignore */ }
   }, 1500);
 }
 async function restoreGiveaways(c) {
-  let data = [];
-  try { if (existsSync(GW_FILE)) data = JSON.parse(readFileSync(GW_FILE, 'utf8')); } catch { return; }
+  const data = (await stateGet('giveaways', GW_FILE)) || [];
+  if (!Array.isArray(data)) return;
   for (const g of data) {
     const guild = c.guilds.cache.get(g.guildId) || c.guilds.cache.first();
     if (!guild) continue;
@@ -91,9 +149,36 @@ async function restoreGiveaways(c) {
 // ── Leveling / XP (persisted to xp.json so it survives restarts) ─────────────
 const XP_FILE = new URL('../xp.json', import.meta.url);
 let XP = {};
-try { if (existsSync(XP_FILE)) XP = JSON.parse(readFileSync(XP_FILE, 'utf8')); } catch { XP = {}; }
-let xpSaveTimer = null;
-function saveXP() { clearTimeout(xpSaveTimer); xpSaveTimer = setTimeout(() => { try { writeFileSync(XP_FILE, JSON.stringify(XP)); } catch { /* ignore */ } }, 4000); }
+/* Loaded on ready rather than at import: the store is a network call, and a
+   module that awaits one at import time delays the login it is racing. Until it
+   lands XP is empty, which costs at most the first few seconds of chat — and
+   loses nothing, because the merge below never drops a stored score. */
+async function loadXP() {
+  const stored = await stateGet('xp', XP_FILE);
+  if (!stored || typeof stored !== 'object') return;
+  // Anything earned in those first seconds is kept: the higher of the two wins,
+  // so a boot-time race cannot roll somebody's level backwards.
+  for (const [uid, rec] of Object.entries(stored)) {
+    const live = XP[uid];
+    XP[uid] = !live || (rec?.xp || 0) >= (live.xp || 0) ? rec : live;
+  }
+}
+/* Two cadences, because they cost different things.
+   The file is local and instant, so it can be written on every lull in the
+   conversation. The store is a signed HTTP round trip carrying the WHOLE map —
+   on a busy server a four-second debounce would mean posting every member's
+   score again and again, all day. A minute is often enough: the only thing at
+   risk in between is a minute of chat XP, and the flush on shutdown below
+   covers the one moment that actually erases things. */
+let xpFileTimer = null;
+let xpStoreAt = 0;
+function saveXP() {
+  clearTimeout(xpFileTimer);
+  xpFileTimer = setTimeout(() => {
+    try { writeFileSync(XP_FILE, JSON.stringify(XP)); } catch { /* ignore */ }
+    if (Date.now() - xpStoreAt > 60_000) { xpStoreAt = Date.now(); stateSet('xp', XP, null); }
+  }, 4000);
+}
 const levelFor = (xp) => Math.floor(0.18 * Math.sqrt(xp));
 const xpForLevel = (lvl) => Math.ceil((lvl / 0.18) ** 2);
 const xpCooldown = new Map();
@@ -605,7 +690,11 @@ client.once(Events.ClientReady, (c) => {
     maybePostWeeklyDigest(g);
   }), 60 * 60_000);
 
-  // Resume any giveaways that were live before a restart.
+  /* Pull back everything a deploy would otherwise have erased, then resume any
+     giveaways that were live before it. XP and the weekly bookkeeping load in
+     parallel; none of them gate the rest of boot. */
+  loadXP();
+  loadMeta();
   restoreGiveaways(c);
 
   // Self-heal the channel panels: verify banner URLs, then edit banners into
@@ -1753,8 +1842,11 @@ function celebrateMilestone(guild) {
 // ── Weekly XP leaderboard → #general every Monday evening ────────────────────
 const META_FILE = new URL('../bot-meta.json', import.meta.url);
 let META = {};
-try { if (existsSync(META_FILE)) META = JSON.parse(readFileSync(META_FILE, 'utf8')); } catch { META = {}; }
-const saveMeta = () => { try { writeFileSync(META_FILE, JSON.stringify(META)); } catch { /* ignore */ } };
+async function loadMeta() {
+  const stored = await stateGet('meta', META_FILE);
+  if (stored && typeof stored === 'object') META = { ...stored, ...META };
+}
+const saveMeta = () => { stateSet('meta', META, META_FILE); };
 
 function maybePostWeeklyLeaderboard(guild) {
   const now = new Date();
@@ -2246,6 +2338,35 @@ process.on('uncaughtException', (err) => {
   console.error('[uncaughtException]', err?.stack || err?.message || err);
   // Stay alive — a single bad event must not knock the whole bot offline.
 });
+
+/**
+ * Flush before the container goes away.
+ *
+ * Railway sends SIGTERM on every deploy, and there was nothing listening. The
+ * saves above are debounced — up to four seconds of XP, a giveaway entry, a
+ * suggestion vote — so the one moment that reliably erases state was also the
+ * one moment nothing was written. Discord is told we are going, too, instead of
+ * leaving the bot showing green until the gateway times the session out.
+ */
+let goingDown = false;
+async function shutdown(signal) {
+  if (goingDown) return;
+  goingDown = true;
+  console.log(`↩︎  ${signal} — flushing state…`);
+  clearTimeout(xpFileTimer);
+  clearTimeout(gwSaveTimer);
+  const giveaways = [...GIVEAWAYS.entries()]
+    .map(([id, g]) => ({ ...g, msgId: id, entries: [...g.entries] }));
+  await Promise.allSettled([
+    stateSet('xp', XP, XP_FILE),
+    stateSet('giveaways', giveaways, GW_FILE),
+    stateSet('meta', META, META_FILE),
+  ]);
+  await client.destroy().catch(() => {});
+  console.log('✅ state flushed');
+  process.exit(0);
+}
+for (const sig of ['SIGTERM', 'SIGINT']) process.on(sig, () => { shutdown(sig); });
 
 client.on('error', (e) => console.error('[client error]', e?.message || e));
 client.on('shardError', (e) => console.error('[shard error]', e?.message || e));
