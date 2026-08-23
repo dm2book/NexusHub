@@ -10,9 +10,15 @@ This folder is **implementation-ready**: the entire server is defined as data
 
 > **Owner control:** the server Owner is never created or modified by any script.
 > Discord guarantees the Owner full permissions, full visibility and complete
-> management access at all times. The bot only manages roles **below** its own and
-> is invited with Administrator so it can build the server — the Owner still
-> outranks it.
+> management access at all times. The bot only manages roles **below** its own.
+>
+> **The bot is not an Administrator.** It is invited with exactly the fifteen
+> permissions it uses (`npm run invite` prints the link). Administrator would
+> bypass every channel overwrite this setup applies — including the ones that
+> make each support ticket private — so a bot holding it could read every
+> ticket in the server, and anyone holding its token could delete the guild's
+> channels or ban its members. Its only moderation action is deleting a scam
+> message.
 
 ---
 
@@ -34,9 +40,11 @@ never duplicated, so it's safe to re-run after every update.
 
 **Create the bot:** discord.com/developers → New Application → Bot → copy token.
 Enable **Server Members Intent** and **Message Content Intent** (required for
-verify, leveling and automod). Invite with the `bot` + `applications.commands`
-scopes and **Administrator** permission, and drag the bot's role **above** your
-normal roles so it can manage them. (Optional) add `ANTHROPIC_API_KEY` for the AI
+verify, leveling and automod). Then run `npm run invite` and open the link it
+prints: `bot` + `applications.commands`, with the fifteen permissions the bot
+actually uses and nothing else. Drag the bot's role **above** every role it
+manages (Verified Customer, the loyalty tiers, the level roles) — Discord
+refuses to grant a role that sits above the bot's own. (Optional) add `ANTHROPIC_API_KEY` for the AI
 assistant and `FORGEMARKET_API_URL` for live recommendations + order lookups —
 without them the bot still works (rule-based FAQ + sample replies).
 
@@ -123,7 +131,7 @@ Channel **descriptions/topics** are set automatically from `config.js`.
 | **VIP Customer** | Member + exclusive access | Loyal buyers: early drops, exclusive channels, better giveaway odds. |
 | **Partner** | Member + partner channel | Affiliates/collaborators; co-marketing. |
 | **Verified Customer** | Base member access | Default tier after verification; full community access. |
-| **Bot** | (Administrator via integration) | Automation: onboarding, tickets, AI, logging. |
+| **Bot** | Fifteen scoped permissions (`npm run invite`) — never Administrator | Automation: onboarding, tickets, AI, logging. |
 
 Permissions are applied via **category & channel overwrites** (least-privilege):
 `@everyone` is denied view on gated categories; tiers are granted upward.

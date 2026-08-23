@@ -6,7 +6,12 @@
  *
  * Resilient: a failure on one item is logged and skipped, never aborting the run.
  * Safe to re-run — it reuses anything that already exists and fills in what's
- * missing. The Owner is never touched; invite the bot with Administrator.
+ * missing. The Owner is never touched.
+ *
+ * Invite the bot with the link printed by `npm run invite` — the exact powers it
+ * uses and nothing more. It used to say "invite with Administrator", which
+ * bypasses every overwrite this file so carefully sets, including the ones that
+ * keep each ticket private.
  *
  *   npm run setup
  */
@@ -17,6 +22,7 @@ import {
 } from 'discord.js';
 import { ROLES, CATEGORIES, STAFF, MEMBERS, GAME_ROLES, NOTIFY_ROLES, LEVEL_ROLES } from './config.js';
 import { buildPanels } from './panels.js';
+import { resolveOverwrites, DANGEROUS_FOR_BOT, botInviteUrl } from './permissions.js';
 
 const { DISCORD_TOKEN, DISCORD_GUILD_ID } = process.env;
 let STORE_URL = process.env.STORE_URL || 'https://forgemarket.nl';
@@ -75,6 +81,18 @@ client.once(Events.ClientReady, async () => {
       P.EmbedLinks, P.AttachFiles, P.AddReactions, P.ManageMessages, P.ManageChannels,
       P.ManageThreads, P.Connect,
     ] };
+    /* Administrator bypasses every overwrite below — including the ones that
+       keep each ticket private — so a bot holding it makes this whole file
+       decorative, and a leaked token total. Said out loud rather than refused:
+       an owner mid-setup should not be blocked, but they should know. */
+    const me = await guild.members.fetchMe();
+    const risky = DANGEROUS_FOR_BOT.filter((name) => me.permissions.has(P[name]));
+    if (risky.length) {
+      console.warn(`\n⚠️  I was invited with more than I need: ${risky.join(', ')}.`);
+      console.warn('   Nothing here uses them — I never kick, ban or time anyone out.');
+      console.warn(`   Re-invite with exactly what I use:\n   ${botInviteUrl(client.user.id)}\n`);
+    }
+
     console.log(`▶ Building "${guild.name}"`);
 
     // 1) Roles ───────────────────────────────────────────────────────────────
@@ -171,13 +189,13 @@ client.once(Events.ClientReady, async () => {
     // Voice fix: gated categories also grant Connect/Speak explicitly to the
     // allowed roles (and deny Connect to everyone), so voice channels are
     // joinable regardless of how the server's base @everyone permissions are set.
-    const categoryOverwrites = (access) => access === 'public'
-      ? [{ id: everyone, allow: [P.ViewChannel] }, botOW]
-      : [{ id: everyone, deny: [P.ViewChannel, P.Connect] }, botOW,
-         ...viewers(access).filter((k) => roleIds[k]).map((k) => ({
-           id: roleIds[k],
-           allow: [P.ViewChannel, P.Connect, P.Speak, P.Stream, P.UseVAD],
-         }))];
+    // One definition, used for the category and for every channel inside it —
+    // the two used to be written out separately, and a rule fixed in one of them
+    // was a rule still broken in the other.
+    const categoryOverwrites = (access) => resolveOverwrites({
+      category: { access }, channel: {}, everyoneId: everyone, roleIds,
+      botOverwrite: botOW, staffKeys: STAFF, memberKeys: MEMBERS, P,
+    });
 
     /**
      * The same policy, applied to the CHANNEL itself.
@@ -193,28 +211,14 @@ client.once(Events.ClientReady, async () => {
      * prove the shop is real (#faq, #how-to-buy, #reviews, #proof-of-delivery)
      * can be read by someone still deciding whether to trust us.
      */
-    const channelOverwrites = (cat, ch) => {
-      const byId = new Map();
-      const put = (ow) => {
-        const cur = byId.get(ow.id) || { id: ow.id, allow: [], deny: [] };
-        cur.allow = [...new Set([...cur.allow, ...(ow.allow || [])])];
-        cur.deny = [...new Set([...cur.deny, ...(ow.deny || [])])].filter((f) => !cur.allow.includes(f));
-        byId.set(ow.id, cur);
-      };
-      const access = ch.public ? 'public' : cat.access;
-      categoryOverwrites(access).forEach(put);
-      // A public channel inside a gated category still needs every gated role to
-      // keep its Connect/Speak grants; harmless for text channels.
-      if (ch.public && cat.access !== 'public') {
-        viewers(cat.access).filter((k) => roleIds[k])
-          .forEach((k) => put({ id: roleIds[k], allow: [P.ViewChannel, P.Connect, P.Speak] }));
-      }
-      if (ch.readOnly) {
-        put({ id: everyone, deny: [P.SendMessages, P.SendMessagesInThreads, P.CreatePublicThreads] });
-        for (const k of STAFF) if (roleIds[k]) put({ id: roleIds[k], allow: [P.SendMessages] });
-      }
-      return [...byId.values()];
-    };
+    // Lives in permissions.js so the boundary it draws can be tested without
+    // building a real guild: server-blueprint.test.mjs runs this same function
+    // over the blueprint and asserts no customer-tier role can view a staff
+    // channel. It was a closure here, where nothing could reach it.
+    const channelOverwrites = (cat, ch) => resolveOverwrites({
+      category: cat, channel: ch, everyoneId: everyone, roleIds, botOverwrite: botOW,
+      staffKeys: STAFF, memberKeys: MEMBERS, P,
+    });
 
     // 2) Categories + channels ────────────────────────────────────────────────
     const channelByName = {};
