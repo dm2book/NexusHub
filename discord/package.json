@@ -7,7 +7,8 @@
   "scripts": {
     "setup": "node src/setup.js",
     "start": "node src/bot.js",
-    "register": "node src/register-commands.js"
+    "register": "node src/register-commands.js",
+    "invite": "node src/invite.js"
   },
   "engines": {
     "node": ">=18"
