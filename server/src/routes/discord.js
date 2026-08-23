@@ -11,6 +11,7 @@ import { coinBalance } from '../services/forgeCoinService.js';
 import { balanceOf } from '../services/walletService.js';
 import { loyaltyFor } from '../services/loyaltyService.js';
 import { getOrderByNumber, setOrderPayLink } from '../services/orderService.js';
+import { getSetting, setSetting } from '../services/settingsService.js';
 
 const router = Router();
 
@@ -39,6 +40,51 @@ router.post('/outbox/ack',
   verifyIngest(canonicalAck)(config.discord.reviewIngestSecret),
   asyncHandler(async (req, res) => {
     res.json({ acked: await ackOutbox(req.body?.ids || []) });
+  }));
+
+/**
+ * Where the bot keeps what it cannot afford to lose.
+ *
+ * The bot persisted XP, running giveaways and its weekly-leaderboard bookkeeping
+ * to JSON files next to its own source — and the comments next to those writes
+ * say "so it survives a restart". It survives a process restart. It does not
+ * survive a DEPLOY: the documented target is Railway (see discord/railway.json),
+ * where the container filesystem is the build image and every push replaces it.
+ *
+ * So every code change silently reset every member's level, desynced the level
+ * roles that were granted from it, and dropped every running giveaway on the
+ * floor — entrants had entered something that no longer existed and no prize was
+ * ever drawn.
+ *
+ * This is the store the shop already has, reached over the channel the bot
+ * already uses, on the table the settings service already owns. The key is
+ * bound into the signature, so a captured write cannot be replayed against a
+ * different key.
+ */
+const STATE_PREFIX = 'discord_bot_state:';
+// Named keys only. Without this an attacker who ever saw one signed request
+// could not forge another, but a bug in the bot could still scribble over
+// `category_logos` or any other setting sharing this table.
+const STATE_KEYS = new Set(['xp', 'giveaways', 'meta']);
+
+export const canonicalStateGet = (b = {}) => `state:get:${b.key || ''}`;
+router.post('/state/get',
+  verifyIngest(canonicalStateGet)(config.discord.reviewIngestSecret),
+  asyncHandler(async (req, res) => {
+    const key = String(req.body?.key || '');
+    if (!STATE_KEYS.has(key)) return res.status(400).json({ error: 'unknown state key' });
+    res.json({ key, value: await getSetting(STATE_PREFIX + key, null) });
+  }));
+
+export const canonicalStateSet = (b = {}) =>
+  `state:set:${b.key || ''}:${JSON.stringify(b.value ?? null)}`;
+router.post('/state/set',
+  verifyIngest(canonicalStateSet)(config.discord.reviewIngestSecret),
+  asyncHandler(async (req, res) => {
+    const key = String(req.body?.key || '');
+    if (!STATE_KEYS.has(key)) return res.status(400).json({ error: 'unknown state key' });
+    await setSetting(STATE_PREFIX + key, req.body?.value ?? null);
+    res.json({ ok: true });
   }));
 
 /**

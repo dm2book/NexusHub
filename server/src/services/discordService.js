@@ -35,9 +35,23 @@ async function enqueueOutbox(channel, body) {
   }
 }
 
-/** Direct webhook when configured, otherwise queue for the bot relay. */
+/**
+ * Direct webhook when configured, otherwise queue for the bot relay.
+ *
+ * And queue it anyway when the direct post fails. The outbox exists because a
+ * lost event is worth more than the queue costs — its own comment says "a lost
+ * ping means a paid order nobody knows about" — but the webhook path was
+ * bypassing it entirely: one 500 from Discord, one rate limit, one network
+ * blip, and the sale ping, the chargeback alert or the out-of-stock warning was
+ * simply gone, best-effort all the way down to nothing.
+ *
+ * A queued event is not lost, it is late: the bot polls, and if no bot is
+ * running it is pruned after thirty days like any other.
+ */
 async function deliver(channel, url, body) {
-  if (url) return postWebhook(url, body);
+  if (!url) return enqueueOutbox(channel, body);
+  if (await postWebhook(url, body)) return true;
+  console.warn(`[discord] ${channel} webhook failed — queued for the bot relay instead`);
   return enqueueOutbox(channel, body);
 }
 
@@ -334,19 +348,36 @@ export async function postFraudHoldAlert(order, { score, signals = [] } = {}) {
 }
 
 /** Fire a webhook payload; best-effort, logs and swallows every failure. */
+/**
+ * Post to a Discord webhook, with a deadline.
+ *
+ * Every other outbound call in this codebase carries one — Mollie 15s, Resend
+ * 10s — for the same reason, written out next to each: these run inside request
+ * handlers, and a call that is accepted and then never answered does not fail,
+ * it hangs, holding the function until the platform kills it at maxDuration.
+ * This one is reached from transitionOrder, which is the payment path: a sales
+ * ping to a Discord that has stopped answering must not be able to stall an
+ * order being marked paid.
+ */
 async function postWebhook(url, payload) {
   if (!url) return false;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 5_000);
   try {
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username: config.email.fromName, ...payload }),
+      signal: ctrl.signal,
     });
     if (!res.ok) throw new Error(`webhook ${res.status}`);
     return true;
   } catch (err) {
-    console.error('[discord] webhook failed:', err.message);
+    console.error('[discord] webhook failed:',
+      err.name === 'AbortError' ? 'timed out after 5s' : err.message);
     return false;
+  } finally {
+    clearTimeout(timer);
   }
 }
 
