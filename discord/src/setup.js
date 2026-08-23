@@ -19,10 +19,12 @@ import 'dotenv/config';
 import {
   Client, GatewayIntentBits, PermissionFlagsBits, ChannelType, Events,
   EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle,
+  StringSelectMenuBuilder, StringSelectMenuOptionBuilder,
 } from 'discord.js';
 import { ROLES, CATEGORIES, STAFF, MEMBERS, GAME_ROLES, NOTIFY_ROLES, LEVEL_ROLES } from './config.js';
 import { buildPanels } from './panels.js';
 import { resolveOverwrites, DANGEROUS_FOR_BOT, botInviteUrl } from './permissions.js';
+import { TICKET_TYPES } from './tickets.js';
 
 const { DISCORD_TOKEN, DISCORD_GUILD_ID } = process.env;
 let STORE_URL = process.env.STORE_URL || 'https://forgemarket.nl';
@@ -337,12 +339,18 @@ client.once(Events.ClientReady, async () => {
       storeUrl: STORE_URL, guildName: guild.name, channelIdByName, trustpilotUrl: TRUSTPILOT_URL,
     });
 
-    const ticketButtons = [
-      new ButtonBuilder().setCustomId('ticket:order').setLabel('Order issue').setEmoji('🛒').setStyle(ButtonStyle.Primary),
-      new ButtonBuilder().setCustomId('ticket:payment').setLabel('Payment').setEmoji('💳').setStyle(ButtonStyle.Secondary),
-      new ButtonBuilder().setCustomId('ticket:partner').setLabel('Partnership').setEmoji('🤝').setStyle(ButtonStyle.Secondary),
-      new ButtonBuilder().setCustomId('ticket:other').setLabel('Other').setEmoji('❓').setStyle(ButtonStyle.Secondary),
-    ];
+    /* A picker, not four buttons.
+       A row holds five buttons and support has eight things it needs to tell
+       apart — "my order never arrived" and "the code does not work" were both
+       "Order issue", so the one where money is missing arrived looking like the
+       one where it is not. A select menu also shows each option's blurb, which
+       is what stops someone picking the wrong lane. */
+    const ticketPicker = new StringSelectMenuBuilder()
+      .setCustomId('ticket:pick')
+      .setPlaceholder('What do you need help with?')
+      .addOptions(TICKET_TYPES.map((t) => new StringSelectMenuOptionBuilder()
+        .setValue(t.key).setLabel(t.label).setEmoji(t.emoji).setDescription(t.blurb.slice(0, 100))));
+    const ticketButtons = [ticketPicker];
     const verifyButton = new ButtonBuilder().setCustomId('verify').setLabel('Verify me').setEmoji('✅').setStyle(ButtonStyle.Success);
 
     const PANELS = [
@@ -374,7 +382,12 @@ client.once(Events.ClientReady, async () => {
       ['suggestions'],
       ['starboard'],
       ['giveaways'],
-      ['partners', [ticketButtons[2]]],
+      /* Its own button rather than an index into the picker row — that index
+         was the Partnership button before this became a select menu, and an
+         index into a list whose shape changed is how #partners ends up opening
+         a payment ticket. */
+      ['partners', [new ButtonBuilder().setCustomId('ticket:partner')
+        .setLabel('Apply as a partner').setEmoji('\u{1F91D}').setStyle(ButtonStyle.Primary)]],
       ['staff-announcements'],
     ];
 

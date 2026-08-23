@@ -768,6 +768,11 @@ client.on(Events.GuildMemberAdd, async (member) => {
 client.on(Events.InteractionCreate, async (i) => {
   try {
     if (i.isButton()) return await handleButton(i);
+    // The ticket panel is a select menu now — eight things support needs to
+    // tell apart do not fit in a row of five buttons.
+    if (i.isStringSelectMenu?.() && i.customId === 'ticket:pick') {
+      return await openTicketModal(i, i.values?.[0] || 'general');
+    }
     if (i.isModalSubmit() && i.customId.startsWith('tmodal:')) {
       return await openTicket(i, i.customId.split(':')[1], {
         orderNumber: (i.fields.fields.get('ordernum')?.value || '').trim(),
@@ -842,9 +847,19 @@ async function handleButton(i) {
 
   if (i.customId.startsWith('role:')) return toggleRole(i, i.customId.split(':')[1]);
   if (i.customId === 'ticket:close') return closeTicket(i);
+  if (i.customId === 'ticket:close:yes') return confirmClose(i);
+  if (i.customId === 'ticket:close:no') {
+    return i.update({
+      embeds: [new EmbedBuilder().setColor(0x10b981).setDescription('\u{1F44D} Left open.')],
+      components: [],
+    }).catch(() => {});
+  }
   if (i.customId === 'ticket:claim') return claimTicket(i);
   if (i.customId.startsWith('ticket:')) return openTicketModal(i, i.customId.split(':')[1]);
-  if (i.customId.startsWith('rate:')) return rateSupport(i, Number(i.customId.split(':')[1]));
+  if (i.customId.startsWith('rate:')) {
+    const [, n, ticket] = i.customId.split(':');
+    return rateSupport(i, Number(n), ticket || null);
+  }
   if (i.customId.startsWith('gw:enter:')) return enterGiveaway(i, i.customId.split(':')[2]);
   if (i.customId.startsWith('sug:')) return voteSuggestion(i, i.customId.split(':')[1]);
   if (i.customId.startsWith('sugmod:')) return moderateSuggestion(i, i.customId.split(':')[1]);
@@ -852,14 +867,16 @@ async function handleButton(i) {
 
 // Step 1 of a ticket: a small form. An order number up front means staff can
 // help immediately instead of opening with "what's your order number?".
-const TICKET_LABEL = { order: '🛒 Order issue', payment: '💳 Payment', partner: '🤝 Partnership', other: '❓ Other' };
+
 async function openTicketModal(i, type) {
   // One open ticket per member — check BEFORE showing the form.
-  const existing = i.guild.channels.cache.find((c) => c.topic?.includes(`ticket-owner:${i.user.id} `));
+  const existing = i.guild.channels.cache.find((c) => isOwnedBy(c.topic, i.user.id));
   if (existing) return i.reply({ content: `You already have an open ticket: <#${existing.id}>`, ephemeral: true });
 
-  const modal = new ModalBuilder().setCustomId(`tmodal:${type}`).setTitle(TICKET_LABEL[type] || '🎫 Support');
-  if (type === 'order' || type === 'payment') {
+  const spec = ticketType(type);
+  const modal = new ModalBuilder().setCustomId(`tmodal:${type}`)
+    .setTitle(ticketLabel(type).slice(0, 45));
+  if (spec?.order) {
     modal.addComponents(new ActionRowBuilder().addComponents(
       new TextInputBuilder().setCustomId('ordernum').setLabel('Order number (e.g. FM-2026-XXXX)')
         .setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(30)
@@ -887,7 +904,7 @@ async function claimTicket(i) {
     return i.reply({ content: 'This isn’t a ticket channel.', ephemeral: true });
   }
   if (!isStaff(i.member)) return i.reply({ content: 'Only staff can claim tickets.', ephemeral: true });
-  if (i.channel.topic.includes('claimed:')) {
+  if (parseTopic(i.channel.topic)?.claimedBy) {
     return i.reply({ content: 'This ticket is already claimed.', ephemeral: true });
   }
   await i.deferUpdate().catch(() => {});
@@ -942,7 +959,7 @@ async function openTicket(i, type, { orderNumber = '', details = '' } = {}) {
     (c) => c.type === ChannelType.GuildCategory && c.name === '🎫 TICKETS') || support?.parent;
 
   // One open ticket per member.
-  const existing = i.guild.channels.cache.find((c) => c.topic?.includes(`ticket-owner:${i.user.id} `));
+  const existing = i.guild.channels.cache.find((c) => isOwnedBy(c.topic, i.user.id));
   if (existing) return i.editReply(`You already have an open ticket: <#${existing.id}>`);
 
   const staffRoles = ['Support', 'Admin', 'Moderator'].map((n) => findRole(i.guild, n)).filter(Boolean);
@@ -952,9 +969,9 @@ async function openTicket(i, type, { orderNumber = '', details = '' } = {}) {
   let channel;
   try {
     channel = await i.guild.channels.create({
-      name: `ticket-${i.user.username}`.toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 90) || `ticket-${i.user.id}`,
+      name: ticketChannelName(type, i.user.username),
       type: ChannelType.GuildText, parent: category?.id,
-      topic: `ticket-owner:${i.user.id} · type:${type} · opened:${Date.now()}`,
+      topic: buildTopic({ ownerId: i.user.id, type, openedAt: Date.now() }),
       permissionOverwrites: [
         { id: i.guild.roles.everyone.id, deny: [P.ViewChannel] },
         ...memberRoles.map((r) => ({ id: r.id, deny: [P.ViewChannel] })),
@@ -969,8 +986,10 @@ async function openTicket(i, type, { orderNumber = '', details = '' } = {}) {
     return i.editReply('⚠️ I couldn’t create your ticket — make sure my role has **Manage Channels** and is high in the list. Ask an admin.');
   }
 
-  const label = TICKET_LABEL[type] || '🎫 Support';
-  const embed = new EmbedBuilder().setColor(0x6366f1)
+  const label = ticketLabel(type);
+  const prio = priorityOf(type);
+  const embed = new EmbedBuilder()
+    .setColor(prio.key === 'high' ? 0xef4444 : prio.key === 'normal' ? 0x6366f1 : 0x64748b)
     .setTitle(`${label}`)
     .setDescription(
       `Hi <@${i.user.id}>, thanks for reaching out! A team member will be with you shortly. ⚡` +
@@ -983,8 +1002,32 @@ async function openTicket(i, type, { orderNumber = '', details = '' } = {}) {
   const controls = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('ticket:claim').setLabel('Claim').setEmoji('🛠️').setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId('ticket:close').setLabel('Close ticket').setEmoji('🔒').setStyle(ButtonStyle.Danger));
-  const supportPing = findRole(i.guild, 'Support');
-  await channel.send({ content: supportPing ? `<@&${supportPing.id}> — new ticket` : '', embeds: [embed], components: [controls] }).catch(() => {});
+  /* The Support ping is spent only where waiting costs the buyer money — an
+     order that never arrived, a payment that went wrong, a bank reversal. A
+     ping on every ticket is a ping nobody reads, and then the one that mattered
+     sits in the same pile as "which pack should I buy". */
+  const supportPing = ticketType(type)?.ping ? findRole(i.guild, 'Support') : null;
+  await channel.send({
+    content: supportPing ? `<@&${supportPing.id}> \u2014 ${prio.dot} ${prio.label}` : '',
+    embeds: [embed], components: [controls],
+  }).catch(() => {});
+
+  /* Log the OPEN, not only the close.
+     #ticket-logs held transcripts and nothing else, so a ticket still running
+     left no trace outside its own channel — and one deleted before it was
+     archived (a staff member removing the channel by hand) left none at all. */
+  const openLog = findChannel(i.guild, 'ticket-logs');
+  if (openLog) {
+    await openLog.send({ embeds: [new EmbedBuilder()
+      .setColor(prio.key === 'high' ? 0xef4444 : 0x6366f1)
+      .setTitle(`${prio.dot} Ticket opened \u00b7 ${label}`)
+      .addFields(
+        { name: 'Channel', value: `<#${channel.id}>`, inline: true },
+        { name: 'Member', value: `<@${i.user.id}>`, inline: true },
+        { name: 'Priority', value: `${prio.dot} ${prio.label}`, inline: true },
+        ...(orderNumber ? [{ name: 'Order', value: `\`${orderNumber.slice(0, 40)}\``, inline: true }] : []))
+      .setTimestamp()] }).catch(() => {});
+  }
   // Order number in the form? Post the live status right away, before staff arrive.
   const num = orderNumber.match(ORDER_RE)?.[0]?.toUpperCase();
   if (num) {
@@ -1009,8 +1052,8 @@ async function archiveTicket(ch, closedByText, dmLabel = null) {
     return `[${when}] ${m.author.tag}: ${m.content}${emb}${atts}`;
   }).join('\n') : 'No messages.';
 
-  const ownerId = ch.topic.match(/ticket-owner:(\d+)/)?.[1];
-  const openedAt = Number(ch.topic.match(/opened:(\d+)/)?.[1]) || null;
+  const meta = parseTopic(ch.topic) || {};
+  const { ownerId, openedAt, type: ticketKind, claimedBy } = meta;
   const mins = openedAt ? Math.max(1, Math.round((Date.now() - openedAt) / 60000)) : null;
   const file = new AttachmentBuilder(Buffer.from(lines, 'utf8'), { name: `${ch.name}.txt` });
 
@@ -1021,6 +1064,8 @@ async function archiveTicket(ch, closedByText, dmLabel = null) {
         { name: 'Channel', value: `#${ch.name}`, inline: true },
         { name: 'Owner', value: ownerId ? `<@${ownerId}>` : 'unknown', inline: true },
         { name: 'Closed by', value: closedByText, inline: true },
+        ...(ticketKind ? [{ name: 'About', value: ticketLabel(ticketKind), inline: true }] : []),
+        ...(claimedBy ? [{ name: 'Claimed by', value: `<@${claimedBy}>`, inline: true }] : []),
         ...(mins ? [{ name: 'Open for', value: `${mins} min`, inline: true }] : []))
       .setTimestamp();
     await logs.send({ embeds: [logEmbed], files: [file] }).catch(() => {});
@@ -1030,8 +1075,14 @@ async function archiveTicket(ch, closedByText, dmLabel = null) {
     const owner = await ch.guild.members.fetch(ownerId).catch(() => null);
     if (owner) {
       const stars = new ActionRowBuilder().addComponents(
+        /* The ticket travels with the rating. Without it the log read
+           "Support rated 3/5 by @someone" with nothing to attach it to — and
+           since these buttons live in a DM that stays in the member's history,
+           an old transcript could be rated again months later and land in the
+           log as if it were about whatever had just closed. */
         ...[1, 2, 3, 4, 5].map((n) => new ButtonBuilder()
-          .setCustomId(`rate:${n}`).setLabel('⭐'.repeat(n)).setStyle(n >= 4 ? ButtonStyle.Success : ButtonStyle.Secondary)));
+          .setCustomId(`rate:${n}:${ch.name}`.slice(0, 100))
+          .setLabel('\u2B50'.repeat(n)).setStyle(n >= 4 ? ButtonStyle.Success : ButtonStyle.Secondary)));
       await owner.send({
         content: `Here’s the transcript of your ForgeMarket ticket (closed by ${dmLabel || 'our team'}).\n\n**How was our support?** Tap a rating below 👇`,
         files: [file], components: [stars],
@@ -1041,13 +1092,50 @@ async function archiveTicket(ch, closedByText, dmLabel = null) {
   setTimeout(() => ch.delete().catch(() => {}), 5000);
 }
 
+/**
+ * Ask before destroying the channel.
+ *
+ * Close was a single red button that deleted the channel five seconds later.
+ * It sits next to Claim, it is the last thing in the row, and a misclick took
+ * the conversation with it — the transcript is saved, but the room the customer
+ * was mid-sentence in is gone and cannot be reopened.
+ *
+ * The confirmation is ephemeral, so it does not clutter the ticket for the
+ * person on the other side of it.
+ */
 async function closeTicket(i) {
   const ch = i.channel;
-  if (!ch?.topic?.startsWith('ticket-owner:')) {
-    return i.reply({ content: 'This isn’t a ticket channel.', ephemeral: true });
+  const t = parseTopic(ch?.topic);
+  if (!t) return i.reply({ content: 'This isn\u2019t a ticket channel.', ephemeral: true });
+  const rows = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('ticket:close:yes').setLabel('Yes, close it')
+      .setEmoji('\u{1F512}').setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId('ticket:close:no').setLabel('Keep it open')
+      .setStyle(ButtonStyle.Secondary));
+  return i.reply({
+    ephemeral: true,
+    embeds: [new EmbedBuilder().setColor(0xf59e0b)
+      .setTitle('Close this ticket?')
+      .setDescription('The channel is deleted a few seconds after closing. '
+        + `${t.ownerId ? `<@${t.ownerId}> gets` : 'The member gets'} the transcript by DM, `
+        + 'and a copy goes to #ticket-logs \u2014 but the conversation cannot be reopened here.')],
+    components: [rows],
+  });
+}
+
+/** They meant it. */
+async function confirmClose(i) {
+  const ch = i.channel;
+  if (!parseTopic(ch?.topic)) {
+    return i.update({ content: 'This isn\u2019t a ticket channel.', embeds: [], components: [] }).catch(() => {});
   }
-  await i.reply({ embeds: [new EmbedBuilder().setColor(0xef4444)
-    .setDescription('🔒 Closing this ticket and saving a transcript… (channel deletes in a few seconds)')] });
+  await i.update({
+    embeds: [new EmbedBuilder().setColor(0xef4444).setDescription('\u{1F512} Closing\u2026')],
+    components: [],
+  }).catch(() => {});
+  await ch.send({ embeds: [new EmbedBuilder().setColor(0xef4444)
+    .setDescription(`\u{1F512} Ticket closed by <@${i.user.id}> \u2014 saving a transcript. `
+      + 'The channel disappears in a few seconds.')] }).catch(() => {});
   await archiveTicket(ch, `<@${i.user.id}>`, i.user.tag);
 }
 
@@ -1059,20 +1147,20 @@ async function closeTicket(i) {
 async function sweepIdleTickets(guild) {
   for (const ch of guild.channels.cache.values()) {
     try {
-      if (ch.type !== ChannelType.GuildText || !ch.topic?.startsWith('ticket-owner:')) continue;
+      const meta = parseTopic(ch.topic);
+      if (ch.type !== ChannelType.GuildText || !meta) continue;
       const msgs = await ch.messages.fetch({ limit: 1 }).catch(() => null);
-      const lastTs = msgs?.first()?.createdTimestamp
-        || Number(ch.topic.match(/opened:(\d+)/)?.[1]) || Date.now();
+      const lastTs = msgs?.first()?.createdTimestamp || meta.openedAt || Date.now();
       const idleHours = (Date.now() - lastTs) / 3_600_000;
       if (idleHours < 24) continue;
 
-      if (ch.topic.includes('idlewarned')) {
+      if (meta.idleWarned) {
         // Warned 24h+ ago and still silence → close it (warning was the last message).
         await ch.send({ embeds: [new EmbedBuilder().setColor(0xef4444)
           .setDescription('🔒 Closing this ticket due to inactivity. You can always open a new one in #open-a-ticket.')] }).catch(() => {});
         await archiveTicket(ch, 'Auto-close (inactive)');
       } else {
-        const ownerId = ch.topic.match(/ticket-owner:(\d+)/)?.[1];
+        const ownerId = meta.ownerId;
         await ch.setTopic(`${ch.topic} · idlewarned`).catch(() => {});
         await ch.send({
           content: ownerId ? `<@${ownerId}>` : '',
@@ -1085,7 +1173,7 @@ async function sweepIdleTickets(guild) {
   }
 }
 
-async function rateSupport(i, stars) {
+async function rateSupport(i, stars, ticket) {
   // Runs from a DM, so search the bot's guilds for the log channel.
   let logs = null;
   for (const g of i.client.guilds.cache.values()) {
@@ -1094,7 +1182,9 @@ async function rateSupport(i, stars) {
   }
   await i.update({ content: `Thanks for your feedback — you rated us ${'⭐'.repeat(stars)} (${stars}/5)! 💜`, components: [] }).catch(() => {});
   if (logs) await logs.send({ embeds: [new EmbedBuilder().setColor(stars >= 4 ? 0x10b981 : 0xf5b324)
-    .setDescription(`⭐ Support rated **${stars}/5** by <@${i.user.id}>`)] }).catch(() => {});
+    .setDescription(`\u2B50 Support rated **${stars}/5** by <@${i.user.id}>`
+      + (ticket ? ` \u2014 ticket \`${ticket}\`` : ''))
+    .setTimestamp()] }).catch(() => {});
 }
 
 /**
