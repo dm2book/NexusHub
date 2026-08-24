@@ -10,6 +10,7 @@ import {
 } from '../../services/socialProofService.js';
 import {
   listReviewsAdmin, setReviewStatus, setReviewVerified, deleteReview,
+  listPendingReviews, reviewInsights,
 } from '../../services/reviewsService.js';
 import { bustSocialCaches } from '../social.js';
 
@@ -26,7 +27,7 @@ router.get('/', asyncHandler(async (_req, res) => {
 
 router.patch('/events/:id', asyncHandler(async (req, res) => {
   const { status, pinned } = z.object({
-    status: z.enum(['visible', 'hidden']).optional(),
+    status: z.enum(['visible', 'hidden', 'pending']).optional(),
     pinned: z.boolean().optional(),
   }).parse(req.body || {});
   let ok = false;
@@ -48,9 +49,24 @@ router.delete('/events/:id', asyncHandler(async (req, res) => {
 }));
 
 // ── Reviews ──────────────────────────────────────────────────────────────────
+/**
+ * The queue, and the numbers behind the star rating.
+ *
+ * A vouch typed in Discord no longer publishes itself, so there has to be
+ * somewhere the waiting ones are visible — a moderation gate with no queue is
+ * just a place reviews go to die.
+ */
+router.get('/reviews/pending', asyncHandler(async (_req, res) => {
+  res.json({ reviews: await listPendingReviews({ limit: 100 }) });
+}));
+
+router.get('/reviews/insights', asyncHandler(async (_req, res) => {
+  res.json({ insights: await reviewInsights() });
+}));
+
 router.patch('/reviews/:id', asyncHandler(async (req, res) => {
   const { status, verified } = z.object({
-    status: z.enum(['visible', 'hidden']).optional(),
+    status: z.enum(['visible', 'hidden', 'pending']).optional(),
     verified: z.boolean().optional(),
   }).parse(req.body || {});
   let ok = false;

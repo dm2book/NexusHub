@@ -145,11 +145,28 @@ console.log('\n— Public rating —');
   ok('an unverified Discord vouch does not move the rating',
     after.count === before.count, `${before.count} → ${after.count}`);
 
-  // And it is still on the site — it just does not vote.
+  /* And it is not on the site yet at all.
+     It used to publish itself and merely not vote on the rating. That still let
+     one message typed in the server go live on the storefront, under the shop's
+     own name, next to reviews from real orders — so an unverified review now
+     waits for a moderator. Once approved it is published, and it still does not
+     vote. */
   const stored = await get(`SELECT status, verified FROM reviews WHERE external_id=@e`,
     { e: `vouch:test${tag}` });
-  ok('the vouch is still published, just not counted',
-    stored?.status === 'visible' && !stored?.verified, JSON.stringify(stored));
+  ok('the vouch waits for approval rather than publishing itself',
+    stored.status === 'pending' && stored.verified === 0, JSON.stringify(stored));
+
+  // Approving it publishes it — and it still does not move the rating.
+  const { setReviewStatus } = await import('../src/services/reviewsService.js');
+  await setReviewStatus(
+    (await get(`SELECT id FROM reviews WHERE external_id=@e`, { e: `vouch:test${tag}` })).id,
+    'visible');
+  const published = await get(`SELECT status FROM reviews WHERE external_id=@e`,
+    { e: `vouch:test${tag}` });
+  const afterApproval = await reviewStats();
+  ok('once approved it is on the site', published.status === 'visible', published.status);
+  ok('…and still does not vote on the rating',
+    afterApproval.count === before.count, `${before.count} → ${afterApproval.count}`);
 }
 
 // ── 5. A payment screenshot is actually accepted ───────────────────────────
