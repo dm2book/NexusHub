@@ -8,7 +8,8 @@
     "setup": "node src/setup.js",
     "start": "node src/bot.js",
     "register": "node src/register-commands.js",
-    "invite": "node src/invite.js"
+    "invite": "node src/invite.js",
+    "env:example": "node --input-type=module -e \"import {ENV_SPEC} from './src/runtime.js';import {writeFileSync} from 'node:fs';const w=t=>t.match(/.{1,72}(\\\\s|$)/g).map(l=>'# '+l.trim()).join('\\\\n');const s=(t,r)=>t+'\\\\n'+r.map(([k,y])=>w(y)+'\\\\n'+k+'=').join('\\\\n\\\\n');writeFileSync('.env.example',['# ForgeMarket Discord bot — environment','#','# Copy to .env for a local run; on Railway set these as service variables','# instead (see README.md → Railway). Never commit a filled-in copy.','#','# GENERATED from ENV_SPEC in src/runtime.js — the same list the bot validates','# against at startup, so this file cannot drift from what the code expects.','# Regenerate with: npm run env:example','',s('# --- Required ---------------------------------------------------------',ENV_SPEC.required),'',s('# --- Strongly recommended: without these, features silently stay off ---',ENV_SPEC.recommended),'',s('# --- Optional ---------------------------------------------------------',ENV_SPEC.optional),''].join('\\\\n'))\""
   },
   "engines": {
     "node": ">=18"

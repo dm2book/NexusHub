@@ -343,15 +343,68 @@ REPOST=1 npm run setup
 
 Then deploy the always-on bot (`npm start`) with one of:
 
-### Option A — Railway (easiest, recommended)
+### Option A — Railway (recommended, 24/7)
+
 1. Push this repo to GitHub (already done).
 2. [railway.app](https://railway.app) → **New Project → Deploy from GitHub repo**
    → pick this repo.
-3. **Settings → Root Directory:** `discord`  (so it builds this folder only).
-4. **Variables** → add: `DISCORD_TOKEN`, `DISCORD_CLIENT_ID`, `DISCORD_GUILD_ID`,
-   `STORE_URL`, and (optional) `ANTHROPIC_API_KEY`, `FORGEMARKET_API_URL`.
-5. Deploy. `railway.json` sets the start command + auto-restart. Watch the
-   **Deploy Logs** for `Logged in as ForgeMarket`. Done — it's online 24/7.
+3. **Settings → Root Directory:** `discord` (so it builds this folder only).
+4. **Variables** → paste the block below. Every one of them is explained in
+   [`.env.example`](.env.example), which is generated from the same list the bot
+   validates against at startup, so the two cannot drift.
+5. **Deploy.** `railway.json` sets `npm start` and restarts on failure.
+
+**The variables Railway needs**
+
+| | Variable | Without it |
+|---|---|---|
+| **Required** | `DISCORD_TOKEN` | The bot refuses to start. |
+| Strongly recommended | `DISCORD_CLIENT_ID` | `npm run invite` and command registration cannot run. |
+| | `DISCORD_GUILD_ID` | Commands register globally — up to an hour to appear. |
+| | `STORE_URL` | Every link the bot posts has nowhere to go. |
+| | `FORGEMARKET_API_URL` | `/price`, `/order` and the store relay are off. |
+| | `REVIEW_INGEST_SECRET` | **The relay is silent**: no order pings, no drops, no delivery DMs, and no durable state. Must match Vercel exactly. |
+| Optional | `ANTHROPIC_API_KEY` | A rule-based FAQ answers instead of the AI. |
+| | `PORT` | Railway sets this itself — it turns on the health endpoint. |
+| | `LOG_LEVEL`, `LOG_FORMAT` | Defaults are `info` and JSON off a terminal. |
+
+The bot logs a warning naming every recommended variable it is missing, and what
+stops working. A missing token is fatal and exits `1`, so a half-configured
+deploy shows as crashed rather than as a bot that is quietly doing nothing.
+
+**Health check.** Railway → **Settings → Healthcheck Path: `/health`**. The bot
+serves it on `$PORT`:
+
+```json
+{ "ok": true, "status": "connected", "uptimeSeconds": 3812,
+  "gateway": { "ping": 41, "guilds": 1 }, "bot": "ForgeMarket#1234" }
+```
+
+It answers **503 while the gateway is not connected**. That distinction is the
+whole point: a Discord bot holds a websocket, not a port, so a process that is
+running but disconnected looks perfectly healthy to anything that only checks
+whether it exists — and the server just sits silent. With the health check
+configured, Railway restarts it instead.
+
+**Logs.** JSON, one line per event, so Railway's log search can filter them:
+
+```json
+{"lvl":"info","msg":"health endpoint listening","at":"…","port":8080}
+{"lvl":"warn","msg":"gateway disconnected","at":"…","shard":0,"code":1006,"terminal":false}
+```
+
+`LOG_FORMAT=pretty` gives human output for a local run; a terminal gets that by
+default.
+
+**What to watch on the first deploy**
+
+- `connecting to Discord…` then `gateway ready` — it is online.
+- `login failed: the token is invalid` / `privileged intents are off` — these do
+  not retry, because a retry cannot fix them. Fix the cause and redeploy.
+- `login failed — retrying` — Discord or the network is having a moment. It
+  backs off up to six times before giving up and letting Railway restart it.
+- `running without REVIEW_INGEST_SECRET` — the bot is up but the shop cannot
+  reach it. Copy the value from Vercel.
 
 ### Option B — Render
 1. [render.com](https://render.com) → **New → Background Worker** → connect repo.
@@ -372,6 +425,17 @@ docker run -d --name forgemarket-bot --restart unless-stopped \
 Or without Docker, keep it alive with **pm2**: `npm i -g pm2 && pm2 start npm --name forgemarket-bot -- start && pm2 save`.
 
 > **Secrets:** never commit `.env`. Set every secret in the host's dashboard
-> (or `-e` flags). `.env`, `xp.json` and `guild-map.json` are git-ignored.
-> On hosts with an ephemeral filesystem, `xp.json` (leveling) resets on redeploy;
-> attach a small persistent volume mounted at `/app` if you want XP to survive.
+> (or `-e` flags). `.env` and the local state files are git-ignored.
+>
+> **No volume needed.** XP, running giveaways and the weekly bookkeeping are
+> kept in the store, over the signed relay, and read back on boot — so a
+> redeploy loses none of it. The JSON files next to the source are a fallback
+> for a bot pointed at no site, and a container that throws its disk away on
+> every deploy costs nothing. (This used to be untrue: the files were the only
+> copy, and every deploy reset every member's level and dropped every running
+> giveaway. Set `REVIEW_INGEST_SECRET` and it cannot happen again.)
+>
+> **Graceful shutdown.** Railway sends `SIGTERM` before replacing a container.
+> The bot flushes its state, closes the health endpoint, tells Discord it is
+> going, and exits — rather than leaving the member list showing it green until
+> the gateway times the session out.
