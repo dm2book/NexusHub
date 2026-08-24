@@ -204,9 +204,16 @@ console.log('— The reviewer role —');
   ok('a Discord id resolves back to the account', (await userIdForDiscordUid(uid)) === u);
 
   ok('no reviewer role yet', !(await earnedRolesFor(u)).earned.has('Reviewer'));
-  await addReview({ author: 'Tester', stars: 5, body: 'Fast and friendly.',
+  const vouch = await addReview({ author: 'Tester', stars: 5, body: 'Fast and friendly.',
     source: 'discord', externalId: `msg_${tag}`, discordUid: uid });
-  ok('a vouch carrying the author id earns the reviewer role',
+  /* The role comes with publication, not with posting.
+     An unverified review waits for a moderator now, and paying out on arrival
+     meant a vouch that was then hidden had already earned its badge. */
+  ok('a pending vouch has not earned anything yet',
+    !(await earnedRolesFor(u)).earned.has('Reviewer'));
+  const { setReviewStatus } = await import('../src/services/reviewsService.js');
+  await setReviewStatus(vouch.id, 'visible');
+  ok('a vouch carrying the author id earns the reviewer role once approved',
     (await earnedRolesFor(u)).earned.has('Reviewer'));
 
   // An older bot that does not send the id must keep working, just without the
