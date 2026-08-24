@@ -27,7 +27,11 @@ export async function addProductCodes(productId, codes = []) {
     // Restock: re-arm the low-stock alert and announce it to the community.
     await run(`UPDATE products SET low_stock_alerted_at = NULL, low_stock_alert_level = NULL
                 WHERE id = @p`, { p: productId }).catch(() => {});
-    const product = await get(`SELECT id, name, price, currency, active FROM products WHERE id = @p`, { p: productId });
+    // `category` rides along so the community bot can ping the game role for
+    // this product rather than everyone who opted into any drop at all.
+    const product = await get(
+      `SELECT id, name, price, currency, active, category FROM products WHERE id = @p`,
+      { p: productId });
     if (product?.active) {
       await postDropEvent('restock', { ...product, added }).catch(() => {});
     }

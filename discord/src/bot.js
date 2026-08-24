@@ -19,7 +19,8 @@ import {
   ModalBuilder, TextInputBuilder, TextInputStyle, MessageType,
 } from 'discord.js';
 import Anthropic from '@anthropic-ai/sdk';
-import { FAQ, GAME_ROLES, NOTIFY_ROLES, LEVEL_ROLES, DELIVERY_INFO } from './config.js';
+import { FAQ, GAME_ROLES, NOTIFY_ROLES, LEVEL_ROLES, DELIVERY_INFO, CATEGORY_GAME_ROLE,
+} from './config.js';
 import { orderStatusView } from './orderStatus.js';
 import { buildPanels, panelNeedsUpdate } from './panels.js';
 import { scamReason } from './scamGuard.js';
@@ -1591,6 +1592,26 @@ const OUTBOX_CHANNEL = {
 /** Notification roles the bot may ping when relaying a store event. */
 const OUTBOX_PING = { deals: ['Deals', 'Drops & Restocks'] };
 
+/**
+ * The game role for a store event, when it is about one game.
+ *
+ * A restock carries its product's category (fmPing.category from the store).
+ * Someone who ticked "Roblox" in #roles gets the Robux restock; someone who did
+ * not, does not. Without this every restock pinged everyone who opted into any
+ * drop, which is the fastest way to teach a server to mute a role.
+ *
+ * The broad Drops & Restocks role still gets everything — that is what it says
+ * on the tin, and it is a separate tick box.
+ */
+function gameRoleFor(guild, body) {
+  const category = body?.fmPing?.category;
+  if (!category) return null;
+  const key = CATEGORY_GAME_ROLE[String(category).toLowerCase()];
+  if (!key) return null;
+  const spec = GAME_ROLES.find((g) => g.key === key);
+  return spec ? findRole(guild, spec.label) : null;
+}
+
 /** Tell the store which events really landed, so the rest can be retried. */
 async function ackOutbox(ids) {
   try {
@@ -1647,13 +1668,21 @@ async function pollOutbox(c) {
         // Members opt into "Drops & Restocks" / "Deals" in #roles and, until now,
         // nothing ever pinged those roles — the opt-in led nowhere. The roles are
         // not mentionable by members, so this ping is ours alone to make.
-        const pingRoles = (OUTBOX_PING[ev.channel] || [])
-          .map((n) => findRole(guild, n)).filter(Boolean);
-        const body = pingRoles.length
-          ? { ...ev.body,
-              content: [...pingRoles.map((r) => `<@&${r.id}>`), ev.body.content].filter(Boolean).join(' '),
-              allowedMentions: { roles: pingRoles.map((r) => r.id) } }
-          : ev.body;
+        const game = gameRoleFor(guild, ev.body);
+        const pingRoles = [
+          ...(OUTBOX_PING[ev.channel] || []).map((n) => findRole(guild, n)),
+          game,
+        ].filter(Boolean);
+        // De-duplicated by id: a role that is both the broad one and the game
+        // one would otherwise be mentioned twice in the same line.
+        const pingIds = [...new Set(pingRoles.map((r) => r.id))];
+        // `fmPing` is ours; Discord never sees it.
+        const { fmPing, ...payload } = ev.body || {};
+        const body = pingIds.length
+          ? { ...payload,
+              content: [...pingIds.map((id) => `<@&${id}>`), payload.content].filter(Boolean).join(' '),
+              allowedMentions: { roles: pingIds } }
+          : payload;
         const sent = await ch.send(body).catch((e) => {
           console.error(`[outbox] #${ch.name} send failed:`, e.message);
           return null;

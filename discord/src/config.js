@@ -203,6 +203,37 @@ export const GAME_ROLES = [
   { key: 'clash', label: 'Clash of Clans', emoji: '🟪', color: '#a78bfa' },
   { key: 'giftcards', label: 'Gift Cards', emoji: '🎁', color: '#14b8a6' },
 ];
+/**
+ * Which self-assignable game role a shop category belongs to.
+ *
+ * #roles has offered these since the server was built and nothing ever pinged
+ * one: every restock went to everyone who opted into any drop at all, so
+ * somebody who only buys Robux was pinged for every Steam restock. That is how
+ * an opt-in role becomes an opt-out.
+ *
+ * Keys are the storefront's category slugs. A category with no entry pings
+ * nobody in particular — it still reaches the Drops & Restocks role, which is
+ * the whole point of that one.
+ */
+export const CATEGORY_GAME_ROLE = {
+  robux: 'robux',
+  'v-bucks': 'fortnite',
+  valorant: 'valorant',
+  cod: 'cod',
+  apex: 'apex',
+  genshin: 'genshin',
+  brawl: 'brawl',
+  clash: 'clash',
+  clashroyale: 'clash',
+  giftcard: 'giftcards',
+  steam: 'giftcards',
+  playstation: 'giftcards',
+  xbox: 'giftcards',
+  nintendo: 'giftcards',
+  netflix: 'giftcards',
+  spotify: 'giftcards',
+};
+
 export const NOTIFY_ROLES = [
   { key: 'drops', label: 'Drops & Restocks', emoji: '🔔', color: '#6366f1' },
   { key: 'deals', label: 'Deals', emoji: '🔥', color: '#ec4899' },

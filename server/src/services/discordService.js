@@ -50,7 +50,12 @@ async function enqueueOutbox(channel, body) {
  */
 async function deliver(channel, url, body) {
   if (!url) return enqueueOutbox(channel, body);
-  if (await postWebhook(url, body)) return true;
+  /* `fmPing` is ours, not Discord's — it tells the relay bot which opt-in role
+     this event belongs to. A webhook has no roles to resolve and no member list
+     to be careful with, so it is dropped here rather than posted as an unknown
+     field. */
+  const { fmPing, ...forDiscord } = body || {};
+  if (await postWebhook(url, forDiscord)) return true;
   console.warn(`[discord] ${channel} webhook failed — queued for the bot relay instead`);
   return enqueueOutbox(channel, body);
 }
@@ -448,7 +453,17 @@ export async function postDropEvent(kind, data = {}) {
   embed.thumbnail = { url: (kind === 'product' && data.image) ? data.image : `${config.appUrl}/icon-512.png` };
   embed.footer = { text: `${config.email.fromName} · drops & deals` };
   embed.timestamp = new Date().toISOString();
-  await deliver('deals', url, { embeds: [embed] });
+
+  /* Which game this is about, so the bot can ping the people who asked about
+     THAT game.
+     #roles has offered a self-assignable role per game since the server was
+     built, and nothing has ever pinged one: every restock went to everybody who
+     opted into any drop at all. Someone who only buys Robux was pinged for
+     every Steam restock, which is how an opt-in role becomes an opt-out. */
+  await deliver('deals', url, {
+    embeds: [embed],
+    ...(data.category ? { fmPing: { category: String(data.category) } } : {}),
+  });
 }
 
 /**

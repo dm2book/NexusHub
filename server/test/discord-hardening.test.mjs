@@ -129,7 +129,14 @@ console.log('\n— A Discord that stops answering cannot stall an order —');
     /AbortController/.test(src) && /signal: ctrl\.signal/.test(src));
   ok('…and says so when it trips', /timed out after/.test(src));
   ok('a failed direct post falls through to the queue',
-    /if \(await postWebhook\(url, body\)\) return true;[\s\S]{0,200}enqueueOutbox\(channel, body\)/.test(src));
+    /if \(await postWebhook\(url, forDiscord\)\) return true;[\s\S]{0,300}enqueueOutbox\(channel, body\)/.test(src));
+  /* The queued copy keeps `fmPing` — the routing hint the relay bot needs to
+     pick a game role — while the webhook copy never sees it. Queue the stripped
+     one and a restock that failed over would reach everybody instead of the
+     people who asked about that game. */
+  ok('…keeping the routing hint the bot needs',
+    /const \{ fmPing, \.\.\.forDiscord \} = body/.test(src)
+    && /enqueueOutbox\(channel, body\);\s*\n\}/.test(src));
 }
 
 console.log('\n— The bot writes its state where a deploy cannot reach it —');
