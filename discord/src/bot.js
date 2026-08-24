@@ -264,6 +264,82 @@ async function pushReviewToSite({ author, avatarUrl, stars, body, externalId, di
   } catch (e) { console.error('[review->site]', e?.message || e); }
 }
 
+/**
+ * Is the shop open for business yet, and what should a button therefore say?
+ *
+ * Every link the bot posts pointed at the shop and said "Buy now" or "Open the
+ * shop". Before launch that is a promise the site refuses to keep: the
+ * catalogue is browsable on purpose, but the checkout is closed, so a member
+ * who followed the call to action arrived somewhere that would not sell to
+ * them. A dead end at the end of the funnel is worse than no funnel.
+ *
+ * The store already publishes the launch MOMENT on /api/config (launchAt) —
+ * unsigned, edge-cached, and the same value the storefront banner counts down
+ * to. Read it here so both sides say the same thing on the same day, without
+ * anyone editing the bot on the 24th.
+ *
+ * Unreachable store, or no launch date set? Then the shop is open — that is the
+ * post-launch state and the default the site itself uses, and being wrong in
+ * that direction shows a working shop rather than hiding one.
+ */
+let launchCache = { at: 0, openAt: null };
+async function shopOpensAt() {
+  if (Date.now() - launchCache.at < 300_000) return launchCache.openAt;
+  let openAt = null;
+  try {
+    const res = await fetch(`${FORGEMARKET_API_URL.replace(/\/$/, '')}/api/config`,
+      { signal: AbortSignal.timeout(8000) });
+    if (res.ok) {
+      const cfg = await res.json();
+      const t = cfg?.launchAt ? Date.parse(cfg.launchAt) : NaN;
+      openAt = Number.isFinite(t) ? t : null;
+    }
+  } catch { /* unreachable — treated as open, see above */ }
+  launchCache = { at: Date.now(), openAt };
+  return openAt;
+}
+
+const shopIsOpen = async () => {
+  const at = await shopOpensAt();
+  return at === null || Date.now() >= at;
+};
+
+/**
+ * What the shop button says, and where it goes.
+ *
+ * `productUrl` deep-links a specific product when we know which one they asked
+ * about — sending someone who typed `/price robux` to a grid of seventy-two
+ * products is a step they should never have had to take.
+ */
+async function shopCta(productUrl = null) {
+  const open = await shopIsOpen();
+  const at = await shopOpensAt();
+  const when = at
+    ? new Date(at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', timeZone: 'UTC' })
+    : null;
+  return {
+    open,
+    url: productUrl || `${STORE_URL}/shop`,
+    // Before launch the label describes what the page actually does.
+    label: open ? (productUrl ? 'Buy now' : 'Open the shop')
+      : (productUrl ? 'See it on the site' : 'Browse the catalogue'),
+    note: open ? null : `🗓️ Opens ${when || 'soon'} — have a look around in the meantime.`,
+  };
+}
+
+/** The shop button, labelled for whether the shop is actually open. */
+async function shopButton(productUrl = null) {
+  const cta = await shopCta(productUrl);
+  return new ButtonBuilder().setLabel(`\u{1F6CD}\uFE0F ${cta.label}`)
+    .setStyle(ButtonStyle.Link).setURL(cta.url);
+}
+
+/** A markdown link that tells the truth about what happens when it is clicked. */
+async function shopLink(productUrl = null) {
+  const cta = await shopCta(productUrl);
+  return `[${cta.label}](${cta.url})${cta.note ? `\n${cta.note}` : ''}`;
+}
+
 // ── Permanent invite ─────────────────────────────────────────────────────────
 // Default Discord invites expire after 7 days; a dead link on the storefront
 // silently kills sign-ups. On boot (and daily) we make sure a NON-expiring
@@ -499,7 +575,7 @@ async function updatePriceList(guild) {
       .setFooter({ text: 'ForgeMarket · auto-updated every 10 min' })
       .setTimestamp();
     const shopRow = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setLabel('🛍️ Open the shop').setStyle(ButtonStyle.Link).setURL(`${STORE_URL}/shop`));
+      await shopButton());
 
     // Edit our previous price-list message so the channel stays clean.
     const msgs = await ch.messages.fetch({ limit: 25 }).catch(() => null);
@@ -746,7 +822,7 @@ client.on(Events.GuildMemberAdd, async (member) => {
       "Money back if it never arrives · a real person on support · no account needed to buy.")
     .setFooter({ text: 'ForgeMarket · game top-ups & gift cards' });
   const dmButtons = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setLabel('🛍️ Open the shop').setStyle(ButtonStyle.Link).setURL(`${STORE_URL}/shop`),
+    await shopButton(),
     new ButtonBuilder().setLabel('📦 Track an order').setStyle(ButtonStyle.Link).setURL(`${STORE_URL}/track`));
   member.send({ embeds: [dm], components: [dmButtons] }).catch(() => {});
   leadLog(member.guild, `🟢 New member joined: <@${member.id}> (${member.guild.memberCount} total)`);
@@ -838,11 +914,24 @@ async function handleButton(i) {
         embeds: [], components: [],
       }).catch(() => {});
     }
-    leadLog(i.guild, `✅ Verified: <@${i.user.id}>`);
+    leadLog(i.guild, `\u2705 Verified: <@${i.user.id}>`);
+    /* The step after verifying used to be two channel names and nothing else.
+       A member who has just proved they are here to buy something was handed a
+       reading list; the route to the thing they came for was a search away. The
+       buttons are the same ones the rest of the server uses, and they say what
+       the site will actually do today. */
+    const cta = await shopCta();
     return i.update({
-      content: `✅ **Verified!** Welcome in — the full server is now unlocked. ` +
-        `Start at ${chanRef(i.guild, 'products')} and ${chanRef(i.guild, 'ask-the-bot')}. 🎮`,
-      embeds: [], components: [],
+      content: `\u2705 **Verified!** Welcome in \u2014 the full server is now unlocked.\n`
+        + `${cta.note ? `${cta.note}\n` : ''}`
+        + `Ask me anything in ${chanRef(i.guild, 'ask-the-bot')}, or browse `
+        + `${chanRef(i.guild, 'products')} and pick your games in ${chanRef(i.guild, 'roles')} `
+        + 'so you hear about restocks first. \u{1F3AE}',
+      embeds: [],
+      components: [new ActionRowBuilder().addComponents(
+        await shopButton(),
+        new ButtonBuilder().setLabel('\u{1F4E6} Track an order')
+          .setStyle(ButtonStyle.Link).setURL(`${STORE_URL}/track`))],
     }).catch(() => {});
   }
 
@@ -1245,7 +1334,7 @@ async function handleCommand(i) {
                '`/announce` · `/clearpins`' });
     }
     const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setLabel('Open the shop').setStyle(ButtonStyle.Link).setURL(`${STORE_URL}/shop`),
+      await shopButton(),
       new ButtonBuilder().setLabel('Track an order').setStyle(ButtonStyle.Link).setURL(`${STORE_URL}/track`),
     );
     return i.reply({ ephemeral: true, embeds: [e], components: [row] });
@@ -1293,7 +1382,7 @@ async function handleCommand(i) {
     return closeTicket(i);
   }
   if (i.commandName === 'shop') {
-    return i.reply({ ephemeral: true, content: `🛍️ Browse the shop: ${STORE_URL}/shop` });
+    return i.reply({ ephemeral: true, content: `\u{1F6CD}\uFE0F ${await shopLink()}` });
   }
   if (i.commandName === 'invite') {
     return i.reply({ ephemeral: true, content: `📨 Invite friends with this link: ${PERMANENT_INVITE || FALLBACK_INVITE}` });
@@ -1811,12 +1900,18 @@ async function priceCmd(i) {
   const top = scored.slice(0, 5);
   const best = top[0].p;
   const d = deliveryFor(best.category);
+  const cta = await shopLink(`${STORE_URL}/product/${best.id}`);
   const e = new EmbedBuilder().setColor(0x6366f1)
     .setTitle(`🏷️ ${best.name}`)
     .setDescription(
-      `**${money(best.price, best.currency)}**\n[Buy now](${STORE_URL}/product/${best.id})` +
+      `**${money(best.price, best.currency)}**\n${cta}` +
+      /* The other matches were plain text.
+         Someone who typed /price robux and wanted the 2,000 pack could see it
+         listed, with its price, and then had to go and find it themselves —
+         one search away from a product we had already identified for them. */
       (top.length > 1
-        ? `\n\n**Also matching:**\n${top.slice(1).map(({ p }) => `• ${p.name} — ${money(p.price, p.currency)}`).join('\n')}`
+        ? `\n\n**Also matching:**\n${top.slice(1).map(({ p }) =>
+          `• [${p.name}](${STORE_URL}/product/${p.id}) — ${money(p.price, p.currency)}`).join('\n')}`
         : ''))
     // The store already computes an honest availability flag per product —
     // `instant` is true only when a code is in stock AND the product
