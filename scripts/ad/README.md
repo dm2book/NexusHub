@@ -47,6 +47,80 @@ on those marks — so a slow page makes a slower cut, not a cut in the wrong pla
 5. buy · 6. checkout · 7. the purchase completes · 8. order confirmation ·
 9-11. the delivery email, opened, with the order in it · 12. end card
 
+## Eight creative variants from one recording
+
+One real purchase, cut eight ways — not eight purchases (which would also trip
+the shop's order limiter).
+
+```bash
+DATABASE_URL=…  node scripts/ad/make-ad.mjs \
+  --base=https://forgemarket.nl --sku=ROBUX-1000 \
+  --email=ads@yourdomain --variants=all
+```
+
+| | variant | leads on | needs |
+|---|---|---|---|
+| **A** | Price hook | the number, then buys at it | a price |
+| **B** | Speed / delivery hook | how fast it lands | a completed order |
+| **C** | Product showcase | the product itself | a price |
+| **D** | Problem → solution | the annoyance, then the fix | a price |
+| **E** | Website purchase demo | the whole flow, start to finish | a completed order |
+| **F** | Customer proof | a real published review | a verified review |
+| **G** | Restock / limited | a real low-stock count | `stockLeft` ≤ 6 |
+| **H** | Mystery box reveal | the box, then the prize | a real rolled prize |
+
+`--variant=A` builds one; `--variants=A,B,E` builds a few; `--variants=all`
+walks the set.
+
+### A variant that cannot tell the truth skips itself
+
+Each declares what has to be **real** before it may be made. No published
+review? F skips. Plenty of stock? G skips — the storefront only ever publishes
+a count of six or fewer, so anything else would be a scarcity claim the shop
+itself refuses to make. Not a mystery box? H skips.
+
+```
+⏭  F Customer proof: skipped — no published verified review to quote.
+⏭  G Restock / limited availability: skipped — no real value for {stockLeft}.
+```
+
+The run carries on; one product without a review should not cost you the other
+seven adverts. Exit code 2 means *honestly skipped*, not broken.
+
+Captions are templates: `{price}`, `{name}`, `{delivery}`, `{orderNumber}`,
+`{stockLeft}`, `{reviewBody}`, `{prize}` and so on. **A token with no real value
+drops its whole line** rather than rendering a gap or a guess.
+
+`{delivery}` is the shop's own promise for that product — "Sent the moment your
+payment clears" only when it auto-delivers *and* a code is on the shelf;
+otherwise "Bought in for you, delivered by hand". No advert ever says instant
+about a product that is not.
+
+### Adding a variant
+
+Add an entry to `scripts/ad/variants.mjs`. Nothing else changes:
+
+```js
+{
+  id: 'I', slug: 'bundle-value', name: 'Bundle value',
+  target: 18,
+  scenes: [S.browse, S.toProduct, S.product, S.buy, S.confirmed],
+  hook: 'Two games, one order',
+  captions: [{ at: 'the product', text: '{price}', style: 'big' }],
+  needs: ['price'],
+}
+```
+
+`S` is the shared scene grammar — each entry names the beats it runs between,
+how fast it may play and how much of the running time it gets. Caption styles
+are `hook`, `big`, `small`, `quote`.
+
+### The mystery box
+
+H needs a **signed-in** recording: a box pays out as store credit, credit needs
+an account, and `createOrder` refuses a guest one. The recorder says so before
+it starts rather than being turned away at the checkout.
+
 ## Payment
 
 `--pay` decides how the money moves. **The fulfilment is real either way** —
