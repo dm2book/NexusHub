@@ -27,6 +27,7 @@
  * every managed role in the guild's role list, and the member to have joined.
  */
 import { config } from '../config/env.js';
+import { launchAtIso } from './launchGateService.js';
 import { run, get, all, nowIso } from '../db/index.js';
 import { TIERS, loyaltyFor } from './loyaltyService.js';
 import { relayDm } from './discordService.js';
@@ -374,6 +375,21 @@ async function dmUser(uid, payload) {
  * completes — instant delivery where the customer already is — and close the
  * loop with a /vouch prompt that feeds the on-site reviews.
  */
+/**
+ * A line pointing back at the shop that is true on the day it is read.
+ *
+ * Before the launch moment the storefront browses but will not sell, so this
+ * says so rather than sending a happy customer at a checkout that refuses them.
+ */
+function shopInviteLine() {
+  const at = launchAtIso();
+  const open = !at || Date.now() >= Date.parse(at);
+  if (open) return `[Browse the shop again](${config.appUrl}/shop) — most orders go out the same day.`;
+  const when = new Date(at).toLocaleDateString('en-GB',
+    { day: 'numeric', month: 'long', timeZone: 'UTC' });
+  return `[Have a look at what else we stock](${config.appUrl}/shop) — the shop opens ${when}.`;
+}
+
 export async function sendDeliveryDm(order) {
   try {
     if (!order?.userId) return;
@@ -394,6 +410,12 @@ export async function sendDeliveryDm(order) {
         + '📧 A copy is in your email. Keep your codes private and never share them in public channels.\n\n'
         + '💚 Happy with your order? Type **/vouch** in the server — it posts in #vouchers *and* on the website, '
         + 'and it gets you the reviewer role here.'
+        /* The end of the funnel had no way back into it.
+           This is the one message a buyer reads holding a code that just
+           worked, which is the cheapest repeat purchase there is — and it asked
+           for a review and stopped. The link respects the launch gate: before
+           the shop opens it invites a look, not a purchase it cannot complete. */
+        + `\n🛍️ ${shopInviteLine()}`
         // The one message a buyer reads while the order is still in their
         // hands. Links the form rather than the profile: this is an ask.
         + (config.shop.trustpilotReviewUrl
