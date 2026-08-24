@@ -23,6 +23,7 @@ import { FAQ, GAME_ROLES, NOTIFY_ROLES, LEVEL_ROLES, DELIVERY_INFO, CATEGORY_GAM
 } from './config.js';
 import { orderStatusView } from './orderStatus.js';
 import { buildPanels, panelNeedsUpdate } from './panels.js';
+import { log, reportEnv, startHealthServer, loginWithRetry } from './runtime.js';
 import { scamReason } from './scamGuard.js';
 
 // Delivery explanation for a product category (falls back to a generic one).
@@ -2563,10 +2564,16 @@ process.on('uncaughtException', (err) => {
  * leaving the bot showing green until the gateway times the session out.
  */
 let goingDown = false;
+/* Declared before the shutdown handler that closes it, and assigned at the
+   bottom once the client exists. A `const` further down would sit in the
+   temporal dead zone for the moment between registering the signal handlers
+   and reaching it — a SIGTERM in that window would have thrown instead of
+   flushing. */
+let healthServer = null;
 async function shutdown(signal) {
   if (goingDown) return;
   goingDown = true;
-  console.log(`↩︎  ${signal} — flushing state…`);
+  log.info('shutdown signal received', { signal });
   clearTimeout(xpFileTimer);
   clearTimeout(gwSaveTimer);
   const giveaways = [...GIVEAWAYS.entries()]
@@ -2577,36 +2584,51 @@ async function shutdown(signal) {
     stateSet('meta', META, META_FILE),
   ]);
   await client.destroy().catch(() => {});
-  console.log('✅ state flushed');
+  await new Promise((r) => (healthServer ? healthServer.close(r) : r()));
+  log.info('state flushed, shutting down', { signal });
   process.exit(0);
 }
 for (const sig of ['SIGTERM', 'SIGINT']) process.on(sig, () => { shutdown(sig); });
 
-client.on('error', (e) => console.error('[client error]', e?.message || e));
-client.on('shardError', (e) => console.error('[shard error]', e?.message || e));
-client.on(Events.ShardDisconnect, () => console.warn('⚠️  Gateway disconnected — discord.js will auto-reconnect…'));
-client.on(Events.ShardReconnecting, () => console.log('🔄 Reconnecting to Discord…'));
+client.on('error', (e) => log.error('client error', { err: e?.message || String(e) }));
+client.on('shardError', (e) => log.error('shard error', { err: e?.message || String(e) }));
+client.on(Events.ShardReconnecting, (id) => log.warn('reconnecting to Discord', { shard: id }));
+client.on(Events.ShardResume, (id, replayed) => log.info('gateway resumed', { shard: id, replayed }));
+client.on(Events.ShardReady, (id) => log.info('gateway ready', { shard: id }));
 
-if (!DISCORD_TOKEN) {
-  console.error('\n❌ DISCORD_TOKEN is missing. Create a .env file in discord/ with:\n' +
-    '   DISCORD_TOKEN=your-bot-token\n   DISCORD_CLIENT_ID=...\n   DISCORD_GUILD_ID=...\n');
-  process.exit(1);
-}
-
-console.log('⏳ Connecting to Discord…');
-client.login(DISCORD_TOKEN).catch((err) => {
-  const msg = String(err?.message || err);
-  if (/disallowed intents/i.test(msg)) {
-    console.error('\n❌ Login failed: privileged intents are not enabled.\n' +
-      '   Open https://discord.com/developers/applications → your app → Bot, and turn ON:\n' +
-      '     • SERVER MEMBERS INTENT\n     • MESSAGE CONTENT INTENT\n   Then run the bot again.\n');
-  } else if (/token/i.test(msg)) {
-    console.error('\n❌ Login failed: the DISCORD_TOKEN is invalid.\n' +
-      '   Reset it in the Developer Portal (Bot → Reset Token) and update discord/.env.\n');
-  } else {
-    console.error('\n❌ Login failed:', msg);
-    console.error('   Most common causes: wrong DISCORD_TOKEN, or the privileged intents\n' +
-      '   (Server Members + Message Content) are not enabled in the Developer Portal.\n');
+/**
+ * A disconnect discord.js will not come back from.
+ *
+ * It reconnects on its own for almost everything, and logging was the right
+ * response to that. But some close codes are terminal — the token was reset,
+ * the intents were switched off, we were rate limited into the ground — and on
+ * those the library stops trying and the process sits there forever, alive,
+ * connected to nothing, looking healthy to anything that only checks whether it
+ * is running. Exiting hands it to the platform, which is the thing that knows
+ * how to start it again with fresh state.
+ */
+client.on(Events.ShardDisconnect, (event, id) => {
+  const code = event?.code;
+  const terminal = [4004, 4010, 4011, 4012, 4013, 4014].includes(code);
+  log.warn('gateway disconnected', { shard: id, code, terminal });
+  if (terminal) {
+    log.error('gateway closed permanently — exiting so the platform restarts us', { code });
+    shutdown(`gateway ${code}`);
   }
-  process.exit(1);
 });
+
+/* Everything the host needs to know before a single packet is sent.
+   A missing token was already fatal; what was silent is a missing
+   REVIEW_INGEST_SECRET, which switches off the whole store relay — order pings,
+   drops, delivery DMs, durable state — and reads from the outside as a quiet
+   shop rather than a bot that is not listening. */
+if (!reportEnv()) process.exit(1);
+
+/* Answers "is the gateway actually up?" on the port Railway hands us. A bot
+   holds a websocket, not a port, so without this a supervisor cannot tell a
+   working bot from a live process with a dead connection — and the second one
+   looks perfectly healthy while the server sits silent. */
+healthServer = startHealthServer(client);
+
+log.info('connecting to Discord…');
+loginWithRetry(client, DISCORD_TOKEN);
