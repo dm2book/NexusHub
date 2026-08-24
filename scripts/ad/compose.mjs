@@ -24,6 +24,8 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
+import { variantById, tokensFor, fill, blockedReason } from './variants.mjs';
+import { renderCaptions } from './captions.mjs';
 
 const require = createRequire(import.meta.url);
 let FFMPEG; let FFPROBE;
@@ -38,8 +40,12 @@ const arg = (k, d = null) => {
 const IN = path.resolve(arg('in') || path.join('scripts', 'ad', 'out'));
 const SFX = path.resolve(arg('sfx') || path.join('scripts', 'ad', 'sfx'));
 const RAW = path.join(IN, 'raw.webm');
-const OUT = path.join(IN, arg('name', 'ad.mp4'));
-const TARGET = Number(arg('target', '20'));          // seconds to aim for
+const VARIANT = arg('variant', null);
+const variant = VARIANT ? variantById(VARIANT) : null;
+if (VARIANT && !variant) { console.error(`No variant "${VARIANT}".`); process.exit(1); }
+const TARGET = Number(arg('target', String(variant?.target || 20)));
+// Named after the variant so eight of them can live side by side.
+const OUT = path.join(IN, arg('name', variant ? `ad-${variant.id}-${variant.slug}.mp4` : 'ad.mp4'));
 const W = 1080; const H = 1920;
 
 for (const f of [RAW, path.join(IN, 'beats.json')]) {
@@ -109,11 +115,40 @@ const SCENES = [
   { from: 'email-detail', to: 'end', speed: 1.2, weight: 1.4, zoom: 'in', label: 'the code' },
 ];
 
+/* A variant supplies its own scene list; without one this is the full walk. */
+/**
+ * Everything a caption is allowed to say, read back from what actually happened.
+ *
+ * order.json is the real order the recorder placed; extras.json is anything the
+ * recorder could only learn from the shop (a published review, a mystery prize,
+ * the stock count at the moment of purchase). A fact that is not here does not
+ * get said — variants.mjs drops the line rather than filling the gap.
+ */
+const readJson = (f, d = null) => {
+  try { return JSON.parse(fs.readFileSync(path.join(IN, f), 'utf8')); } catch { return d; }
+};
+const order = readJson('order.json');
+const extras = readJson('extras.json', {});
+const tokens = tokensFor({
+  product: { ...manifest.product, instant: extras.instant },
+  order, review: extras.review, stock: extras.stockLeft, mystery: extras.mystery,
+});
+
+if (variant) {
+  const why = blockedReason(variant, { tokens, order, review: extras.review, mystery: extras.mystery });
+  if (why) {
+    console.error(`\n⏭  ${variant.id} ${variant.name}: skipped — ${why}.\n`);
+    process.exit(2);                    // 2 = honestly skipped, not broken
+  }
+}
+
+const PLAN = variant ? variant.scenes : SCENES;
+
 /* Resolve each scene against the beats that actually exist. A recording that
    skipped a step (a product with no cart step, say) simply has fewer scenes
    rather than an edit full of frozen frames. */
 const cuts = [];
-for (const s of SCENES) {
+for (const s of PLAN) {
   let a = at(s.from); let b = at(s.to);
   /* A run without DATABASE_URL has no email beats, and the scene that bridges
      to them would vanish with them — so the last scene falls back to `end`.
@@ -134,7 +169,7 @@ if (!cuts.length) { console.error('No usable scenes in beats.json.'); process.ex
    thing exists to show was the frame that got dropped. Now the budget is
    DISTRIBUTED: each scene gets a share of the target by weight, and a scene
    with little footage is slowed rather than cut. */
-const CARD = 2.6;
+let CARD = 2.6;
 const MIN = 15;                                       // the floor the brief allows
 const room = Math.max(MIN - CARD, TARGET - CARD);
 const totalWeight = cuts.reduce((n, c) => n + (c.weight || 1), 0);
@@ -165,9 +200,45 @@ if (used > room) {
   used = cuts.reduce((n, c) => n + c.played, 0);
 }
 
+/* A variant with little footage — a showcase has no checkout to film — would
+   otherwise come in under the fifteen seconds the brief asks for. The end card
+   takes up the slack rather than the footage being stretched: brand time is
+   honest time, and half a second of slow motion on a screen recording is not. */
+const footageTotal = cuts.reduce((n, c) => n + c.played, 0);
+if (footageTotal + CARD < MIN) CARD = Math.min(4.5, MIN - footageTotal);
+
 const total = cuts.reduce((n, c) => n + c.played, 0) + CARD;
 console.log(`\n🎬 ${cuts.length} scenes · ${total.toFixed(1)}s (target ${TARGET}s)`);
 for (const c of cuts) console.log(`   ${c.played.toFixed(2)}s  ${c.label} (${c.speed.toFixed(1)}×)`);
+
+/* ── Captions ───────────────────────────────────────────────────────────────
+   Most of these are watched with the sound off, so the captions carry the copy.
+   Each line is pinned to a SCENE rather than to a timecode, so it stays put when
+   a scene's length changes — which it does on every recording. */
+const capLines = [];
+if (variant) {
+  const hook = fill(variant.hook, tokens);
+  // The first two seconds, over whatever the variant opens on.
+  if (hook) capLines.push({ text: hook, style: 'hook', scene: 0, hook: true });
+  for (const c of variant.captions || []) {
+    const text = fill(c.text, tokens);
+    if (!text) continue;                          // a token had no real value
+    const scene = cuts.findIndex((x) => x.label === c.at);
+    if (scene < 0) continue;                      // that beat is not in this cut
+    capLines.push({ text, style: c.style || 'small', scene, late: !!c.late });
+  }
+}
+
+const caps = capLines.length
+  ? await renderCaptions({
+    lines: capLines,
+    out: path.join(IN, 'captions'),
+    base: (arg('base') || manifest.base || 'http://localhost:5000').replace(/\/+$/, ''),
+    chrome: arg('chrome') || process.env.AD_CHROME
+      || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+  })
+  : [];
+if (caps.length) console.log(`   ${caps.length} caption(s)`);
 
 // ── Video graph ─────────────────────────────────────────────────────────────
 const priceCard = path.join(IN, 'price.png');
@@ -175,11 +246,22 @@ const endCard = path.join(IN, 'endcard.png');
 const hasPrice = fs.existsSync(priceCard);
 if (!fs.existsSync(endCard)) { console.error(`Missing ${endCard} — run cards.mjs first.`); process.exit(1); }
 
-const inputs = ['-i', RAW];
-const endIdx = 1;
-inputs.push('-loop', '1', '-t', String(CARD), '-i', endCard);
-const priceIdx = hasPrice ? 2 : null;
-if (hasPrice) inputs.push('-loop', '1', '-i', priceCard);
+/* Input indices are counted, not inferred.
+   They were derived from inputs.length/2, which is only right when every input
+   is exactly two arguments — and the end card is six (`-loop 1 -t N -i file`).
+   Every caption and every sound then addressed a stream that was not there, and
+   ffmpeg answered with a two-thousand-character filtergraph and "matches no
+   streams". */
+const inputs = [];
+let nInputs = 0;
+const addInput = (...args) => { inputs.push(...args); return nInputs++; };
+
+const rawIdx = addInput('-i', RAW);
+const endIdx = addInput('-loop', '1', '-t', String(CARD), '-i', endCard);
+const priceIdx = hasPrice ? addInput('-loop', '1', '-i', priceCard) : null;
+
+// One input per caption; each is overlaid onto the scene it belongs to.
+const capIdx = caps.map((c) => addInput('-loop', '1', '-i', c.file));
 
 const FPS = 30;
 const parts = [];
@@ -201,7 +283,7 @@ cuts.forEach((c, i) => {
   }[c.zoom] || '';
 
   parts.push(
-    `[0:v]trim=start=${c.start.toFixed(3)}:duration=${c.srcLen.toFixed(3)},setpts=PTS-STARTPTS,`
+    `[${rawIdx}:v]trim=start=${c.start.toFixed(3)}:duration=${c.srcLen.toFixed(3)},setpts=PTS-STARTPTS,`
     + `setpts=${(1 / c.speed).toFixed(5)}*PTS,fps=${FPS},scale=${W}:${H}:force_original_aspect_ratio=increase:flags=lanczos,`
     + `crop=${W}:${H},`
     /* Motion blur. Averaging frames after a speed ramp is what stops a 3×
@@ -215,7 +297,11 @@ cuts.forEach((c, i) => {
 
 /* The price badge rides the scene that shows the product page, punching in and
    holding. It is the one number the whole advert exists to communicate. */
-if (hasPrice) {
+/* The price badge and a caption on the same scene fight for the same third of
+   the frame — the customer quote in F landed straight on top of it. A variant
+   that already says something there turns the badge off. */
+const wantsPriceCard = variant ? variant.priceCard !== false : true;
+if (hasPrice && wantsPriceCard) {
   const idx = cuts.findIndex((c) => c.price);
   if (idx >= 0) {
     const d = cuts[idx].played;
@@ -226,6 +312,28 @@ if (hasPrice) {
     names[idx] = `v${idx}p`;
   }
 }
+
+/* Captions, laid over the scene each belongs to.
+   Faded rather than cut in: a caption that appears on the same frame as the
+   flash competes with it, and both lose. `late` holds the line back so two
+   captions on one scene read one after the other instead of on top of each
+   other. */
+caps.forEach((c, ci) => {
+  const i = c.scene;
+  if (i < 0 || i >= cuts.length) return;
+  const d = cuts[i].played;
+  const start = c.late ? Math.min(d * 0.55, Math.max(0.2, d - 0.9)) : (c.hook ? 0.06 : 0.18);
+  const hold = Math.max(0.45, d - start - 0.16);
+  const nm = `cap${ci}`;
+  parts.push(`[${capIdx[ci]}:v]scale=${W}:${H},format=rgba,`
+    + `fade=t=in:st=0:d=0.18:alpha=1,fade=t=out:st=${Math.max(0.2, hold - 0.20).toFixed(2)}:d=0.20:alpha=1,`
+    + `trim=duration=${hold.toFixed(3)},setpts=PTS-STARTPTS+${start.toFixed(3)}/TB[${nm}]`);
+  const src = names[i];
+  const dst = `${src}c${ci}`;
+  parts.push(`[${src}][${nm}]overlay=0:0:enable='between(t,${start.toFixed(3)},${(start + hold).toFixed(3)})':`
+    + `format=auto,format=yuv420p[${dst}]`);
+  names[i] = dst;
+});
 
 // The end card, held and faded in.
 parts.push(`[${endIdx}:v]scale=${W}:${H},fps=${FPS},trim=duration=${CARD},setpts=PTS-STARTPTS,`
@@ -262,17 +370,17 @@ if (missing.length) {
 const aInputs = [];
 const aParts = [];
 const aNames = [];
-let ai = hasPrice ? 3 : 2;
+/* Audio inputs are appended after every video input, so they continue the same
+   count rather than guessing where the video ones stopped. */
+const addAudio = (file) => { aInputs.push('-i', file); return nInputs++; };
 
-const bedIdx = ai++;
-aInputs.push('-i', sfx('bed'));
+const bedIdx = addAudio(sfx('bed'));
 aParts.push(`[${bedIdx}:a]atrim=duration=${total.toFixed(3)},asetpts=PTS-STARTPTS,`
   + `volume=0.34,afade=t=out:st=${(total - 0.6).toFixed(2)}:d=0.6[bed]`);
 
 /** Put one sound at one moment. */
 const place = (file, tSec, vol) => {
-  const idx = ai++;
-  aInputs.push('-i', file);
+  const idx = addAudio(file);
   const nm = `s${idx}`;
   aParts.push(`[${idx}:a]adelay=${Math.max(0, Math.round(tSec * 1000))}|${Math.max(0, Math.round(tSec * 1000))},`
     + `volume=${vol}[${nm}]`);

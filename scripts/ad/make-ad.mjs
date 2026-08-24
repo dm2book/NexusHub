@@ -24,9 +24,10 @@
  *     DATABASE_URL=… node scripts/ad/make-ad.mjs --base=… --sku=$sku --email=… || break
  *   done
  */
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { VARIANTS, variantById } from './variants.mjs';
 
 const arg = (k, d = null) => {
   const hit = process.argv.find((a) => a.startsWith(`--${k}=`));
@@ -44,7 +45,8 @@ const OUT = path.resolve(arg('out') || path.join('scripts', 'ad', 'out', slug));
 /* Anything the wrapper does not consume itself belongs to the recorder. Listing
    the pass-throughs instead would mean this file needing an edit every time
    record.mjs grows a flag. */
-const MINE = new Set(['sku', 'product', 'base', 'target', 'out', 'name', 'price', 'cta', 'tagline']);
+const MINE = new Set(['sku', 'product', 'base', 'target', 'out', 'name', 'price', 'cta',
+  'tagline', 'variant', 'variants']);
 const passthrough = process.argv.slice(2)
   .filter((a) => a.startsWith('--') && !MINE.has(a.slice(2).split('=')[0]));
 
@@ -70,7 +72,8 @@ step('recording a real purchase', 'record.mjs',
 // 3. Cards, named from the product the recorder actually bought.
 const manifest = JSON.parse(fs.readFileSync(path.join(OUT, 'beats.json'), 'utf8'));
 const p = manifest.product;
-const money = new Intl.NumberFormat('nl-NL',
+// Same formatting as the storefront and the captions — see variants.mjs.
+const money = new Intl.NumberFormat('en-IE',
   { style: 'currency', currency: p.currency || 'EUR' }).format((p.price || 0) / 100);
 step('cards', 'cards.mjs', [
   `--out=${OUT}`, `--base=${BASE}`,
@@ -80,15 +83,47 @@ step('cards', 'cards.mjs', [
   ...(arg('tagline') ? [`--tagline=${arg('tagline')}`] : []),
 ]);
 
-// 4. The edit.
-step('composing', 'compose.mjs', [`--in=${OUT}`, `--target=${TARGET}`]);
+/* 4. The edits.
+   One recording, many cuts. `--variants=all` walks the whole set; a variant
+   that cannot honestly be made from this footage skips itself with a reason
+   (exit code 2) and the run carries on — one product without a published
+   review should not cost you the other seven adverts. */
+const want = arg('variants') === 'all' ? VARIANTS.map((v) => v.id)
+  : (arg('variants') || arg('variant') || '').split(',').map((x) => x.trim()).filter(Boolean);
 
-const file = path.join(OUT, 'ad.mp4');
-console.log('\n' + '─'.repeat(60));
-console.log(`🎥 ${file}`);
-console.log(`   ${p.name} · ${money} · order ${manifest.beats.find((b) => b.orderNumber)?.orderNumber || '?'}`);
+const made = []; const skipped = [];
+if (!want.length) {
+  step('composing', 'compose.mjs', [`--in=${OUT}`, `--target=${TARGET}`, `--base=${BASE}`]);
+  made.push({ id: '—', file: path.join(OUT, 'ad.mp4') });
+} else {
+  for (const id of want) {
+    const v = variantById(id);
+    if (!v) { console.warn(`\n⚠ no variant "${id}"`); continue; }
+    console.log(`\n━━ ${v.id} · ${v.name}`);
+    const r = spawnSync(process.execPath,
+      [path.join('scripts', 'ad', 'compose.mjs'),
+        `--in=${OUT}`, `--variant=${v.id}`, `--base=${BASE}`,
+        ...(arg('target') ? [`--target=${TARGET}`] : [])],
+      { stdio: 'inherit' });
+    if (r.status === 0) made.push({ id: v.id, name: v.name, file: path.join(OUT, `ad-${v.id}-${v.slug}.mp4`) });
+    else if (r.status === 2) skipped.push(v);      // honestly not possible
+    else {
+      console.error(`\n✖ ${v.id} failed to render.\n`);
+      process.exit(1);
+    }
+  }
+}
+
+const orderNumber = manifest.beats.find((b) => b.orderNumber)?.orderNumber || '?';
+console.log('\n' + '─'.repeat(64));
+console.log(`🎥 ${p.name} · ${money} · order ${orderNumber}`);
+for (const m of made) console.log(`   ${String(m.id).padEnd(2)} ${path.basename(m.file)}`);
+if (skipped.length) {
+  console.log(`\n   skipped, because the footage does not support the claim:`);
+  for (const v of skipped) console.log(`   ${v.id}  ${v.name}`);
+}
 console.log(manifest.realPayment
-  ? '   Real payment. Caption it as you like.'
-  : `   TEST purchase (${manifest.payment}). The delivery was real; the payment was not —\n`
+  ? '\n   Real payment. Caption it as you like.'
+  : `\n   TEST purchase (${manifest.payment}). The delivery was real; the payment was not —\n`
     + '   do not caption this as a live sale.');
-console.log('─'.repeat(60) + '\n');
+console.log('─'.repeat(64) + '\n');

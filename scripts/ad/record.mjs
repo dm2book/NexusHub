@@ -90,6 +90,16 @@ if (!product) {
 }
 console.log(`  product: ${product.name} — €${(product.price / 100).toFixed(2)}\n`);
 
+/* A mystery box pays out as store credit, and store credit needs an account —
+   createOrder refuses a guest one outright. This recorder buys as a guest, the
+   way most of the shop's customers do, so it would reach the checkout and be
+   turned away there. Said here instead, where the reason is obvious. */
+if (product.kind === 'mystery') {
+  console.error('This is a mystery box, which pays out as store credit and therefore needs');
+  console.error('an account. Record it from a signed-in session, or pick another product.');
+  process.exit(1);
+}
+
 const browser = await chromium.launch({ executablePath: CHROME, args: ['--force-device-scale-factor=1'] });
 /* Record at the CSS viewport size, not at the delivery size.
    Playwright paints the page at its CSS width and then places that image in a
@@ -225,9 +235,29 @@ try {
     await emailField.fill(EMAIL);
     await page.waitForTimeout(200);
   }
-  // Consent is a legal checkbox, not decoration — tick the real one.
+  /* Consent is a legal checkbox, not decoration, and the submit stays disabled
+     until it is ticked. Clicking it can miss — the real input often sits under a
+     styled label — so `check()` is used, which asserts the resulting state
+     instead of hoping the click landed. */
   const consent = page.locator('input[type="checkbox"]').first();
-  if (await consent.count() && !(await consent.isChecked())) await tap(consent, 'consent');
+  if (await consent.count()) {
+    const box = await consent.boundingBox().catch(() => null);
+    if (box) {
+      await page.evaluate(([x, y]) => window.__adMove?.(x, y),
+        [box.x + box.width / 2, box.y + box.height / 2]).catch(() => {});
+      await page.evaluate(() => window.__adTap?.()).catch(() => {});
+    }
+    beat('consent', { click: true });
+    await consent.check({ force: true, timeout: 5000 }).catch(async () => {
+      // Hidden behind its label: click the label instead, then verify.
+      await page.locator('label').filter({ hasText: /agree|akkoord|consent|direct/i })
+        .first().click({ timeout: 3000 }).catch(() => {});
+    });
+    if (!(await consent.isChecked().catch(() => false))) {
+      console.warn('  ⚠ consent box would not tick — the checkout will refuse the order');
+    }
+    await page.waitForTimeout(SLOW);
+  }
 
   /* The checkout renders its submit twice — inline and in a sticky bar — so
      "the last one" is a coin toss between a button that is on screen and one
@@ -374,6 +404,36 @@ fs.writeFileSync(path.join(OUT, 'beats.json'), JSON.stringify({
   beats,
 }, null, 2));
 fs.writeFileSync(path.join(OUT, 'order.json'), JSON.stringify(order, null, 2));
+
+/* The facts a caption is allowed to state, read from the shop at the moment of
+   the purchase.
+ *
+ * Kept next to the footage because they are only true of THAT recording: the
+ * stock count moves, a review is published or hidden, a mystery box rolls a
+ * different prize every time. A variant that has no real value for what it
+ * wants to say is skipped rather than filled in — see variants.mjs.
+ */
+const extras = { instant: product.instant ?? null, stockLeft: product.stockLeft ?? null };
+try {
+  const fresh = (await api('/api/products?limit=200')).products.find((p) => p.id === product.id);
+  if (fresh) { extras.instant = fresh.instant ?? null; extras.stockLeft = fresh.stockLeft ?? null; }
+} catch { /* keep what the first read gave us */ }
+try {
+  // Published reviews only, and the shop only publishes verified ones — so a
+  // quote in an advert is a quote from somebody who actually bought something.
+  const { reviews = [] } = await api('/api/reviews');
+  const best = reviews.find((r) => r.verified && String(r.body || '').length > 24)
+    || reviews.find((r) => r.verified);
+  if (best) extras.review = { author: best.author, body: best.body, stars: best.stars };
+} catch { /* no review: variant F skips itself */ }
+if (product.kind === 'mystery') {
+  try {
+    const pulls = await api(`/api/track/${encodeURIComponent(order.number)}`);
+    const won = pulls?.mystery?.[0] || pulls?.pulls?.[0] || null;
+    if (won?.label) extras.mystery = { label: won.label, credit: won.credit ?? won.credit_cents ?? null };
+  } catch { /* no prize read: variant H skips itself */ }
+}
+fs.writeFileSync(path.join(OUT, 'extras.json'), JSON.stringify(extras, null, 2));
 
 console.log(`\n✅ ${path.join(OUT, 'raw.webm')}`);
 console.log(`   ${beats.length} beats · order ${order.number} · ${order.status}`);

@@ -26,7 +26,12 @@ export default function Checkout() {
   usePageMeta('Checkout', 'Complete your order — guest checkout, no account needed.');
   useStickyBarLift(); // keep the chat bubble off the sticky pay bar
   const { t, lang } = useI18n();
-  const { items, subtotal, currency, clear } = useCart();
+  /* `prelaunch` is read a hundred lines down to decide whether this page is a
+     form or an explanation, and it was never destructured — so Checkout.jsx
+     threw a ReferenceError on every render and the checkout was a blank page
+     for everybody, gate open or closed. Found by driving a real purchase
+     through it rather than by reading it. */
+  const { items, subtotal, currency, clear, prelaunch } = useCart();
   const { user } = useAuth();
   const toast = useToast();
   const navigate = useNavigate();
