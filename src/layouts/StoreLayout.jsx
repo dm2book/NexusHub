@@ -41,7 +41,20 @@ export default function StoreLayout() {
     <div className="min-h-screen flex flex-col bg-[#f6f7fb]">
       <AnnouncementBar />
       <StoreNav />
-      <main key={pathname} className="theme-light flex-1 fm-page pb-20 lg:pb-0">
+      {/* min-h-screen, not just flex-1.
+
+          flex-1 makes main fill whatever is left of the viewport, which puts
+          the footer exactly at the bottom edge while a page is still loading.
+          The moment the real content arrives the page grows and the footer is
+          shoved hundreds of pixels down — a layout shift scored against a
+          footer that was never meant to be on screen. Measured on the desktop
+          cart: 0.147, almost all of it this one move, on a page whose own
+          content had not shifted at all.
+
+          A minimum of one screen keeps the footer just below the fold from the
+          first frame, so growing the page moves something nobody is looking
+          at. */}
+      <main key={pathname} className="theme-light flex-1 min-h-screen fm-page pb-20 lg:pb-0">
         <Outlet />
       </main>
       {/* theme-light too: the footer is a sibling of <main>, so its slate text

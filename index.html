@@ -27,9 +27,63 @@
          connections on the critical path for 17 weights of which the site uses
          seven, and every visitor's IP address handed to a processor our own
          privacy policy does not list. -->
-    <link rel="preload" href="/fonts/inter-400.woff2" as="font" type="font/woff2" crossorigin>
+    <!-- One face preloaded, not two.
+
+         Both used to be, and that put 45 KB at the highest priority on a
+         1.6 Mbps connection, ahead of the JavaScript everything else was
+         waiting for: measured, the entry bundle landed at 1399 ms and hydration
+         — and therefore the catalogue's LCP — waited behind it.
+
+         Preloading neither was faster still (FCP 328 → 244 ms) and cost
+         something real: the display face then swapped in after the page was on
+         screen, headings re-wrapped, and the Discord page's content moved 40 px
+         — CLS 0 → 0.045 on a page that had none.
+
+         So: the display face, which sets the headings whose re-wrap is what
+         moves a page, is preloaded. Inter is not — body text swapping changes
+         line widths, not line counts, and it is 23 KB off the critical path. -->
     <link rel="preload" href="/fonts/bricolage-700.woff2" as="font" type="font/woff2" crossorigin>
     <title>ForgeMarket — Digital Goods Marketplace</title>
+    <!-- Start the content requests here, while the HTML is still parsing.
+
+         Every API call in this app is issued from a useEffect, which cannot run
+         until the bundle has downloaded, parsed and executed. Measured on Slow
+         4G: the last chunk landed at 1381 ms, React mounted at ~1400 ms, and
+         /api/products was requested at 1420 ms — a URL that was knowable before
+         the page existed. The connection sat idle for over a second waiting for
+         JavaScript to ask a question it could have asked immediately.
+
+         A <link rel="preload" as="fetch"> was the obvious tool and the wrong
+         one: it only matches a later request whose credentials mode matches
+         too, and a mismatch fetches twice instead of failing loudly. A real
+         fetch whose promise is handed to the app has exactly one request.
+
+         Only what the route genuinely needs. Prefetching everything would put
+         the catalogue on the wire for someone opening the login page. -->
+    <script>
+      (function () {
+        try {
+          var path = location.pathname.replace(/\/+$/, '') || '/';
+          var take = function (u) {
+            return fetch(u, { credentials: 'omit' })
+              .then(function (r) { return r.ok ? r.json() : null; })
+              .catch(function () { return null; });
+          };
+          var early = { config: take('/api/config') };
+          /* The catalogue, for the two routes that render it.
+
+             Preloading the first product IMAGES from this response was tried
+             too, and measured out: the images arrived at 577 ms instead of
+             1534 ms and the LCP did not move, because nothing can paint until
+             hydration either way. All it bought was four image decodes landing
+             inside the hydration window — 60 ms of extra blocking time on a
+             throttled phone for no gain. Removed rather than kept because it
+             looked clever. The data prefetch below is the part that works. */
+          if (path === '/' || path === '/shop') early.products = take('/api/products');
+          window.__FM_EARLY = early;
+        } catch (e) { /* the app fetches normally when this is missing */ }
+      })();
+    </script>
   </head>
   <body>
     <!-- Measured before this existed: the first six Lighthouse filmstrip frames

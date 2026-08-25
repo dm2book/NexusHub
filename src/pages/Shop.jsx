@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Search, SlidersHorizontal, PackageX, LayoutGrid } from 'lucide-react';
 import { api } from '../lib/api.js';
+import { withEarly } from '../lib/earlyFetch.js';
 import { useCart } from '../context/CartContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { categoryVisual, normalizeSearch } from '../lib/catalog.js';
@@ -51,7 +52,8 @@ export default function Shop({ landingCategory = null, landingTitle = null, land
   usePageMeta();
 
   useEffect(() => {
-    api.get('/api/products')
+    // Handed over by the shell when it started this during HTML parse.
+    withEarly('products', () => api.get('/api/products'))
       .then((r) => setProducts(withFallback(r.products)))
       .catch(() => setProducts(withFallback([])));
   }, []);
@@ -82,7 +84,13 @@ export default function Shop({ landingCategory = null, landingTitle = null, land
   };
 
   const trending = useTrending();
-  const onAdd = (p) => { add(p); toast.success(`${p.name} ${t('cart.addedToCart', 'added to cart')}`); };
+  /* Stable identity, so the memoised cards below are not all invalidated by
+     every keystroke in the search box. A new function on each render made
+     React.memo on LightProductCard a no-op — twenty-four cards re-rendered for
+     a state change none of them depend on. */
+  const onAdd = useCallback(
+    (p) => { add(p); toast.success(`${p.name} ${t('cart.addedToCart', 'added to cart')}`); },
+    [add, toast, t]);
   const showTrending = !category && !search.trim() && trending?.length > 0;
 
   return (

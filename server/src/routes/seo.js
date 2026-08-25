@@ -33,6 +33,13 @@ async function appShell() {
   if (shell !== null) return shell;
   try {
     ({ APP_SHELL: shell } = await import('../generated/appShell.js'));
+    /* Same build step writes both, so this cannot be stale relative to the
+       shell it is injected into — a modulepreload for a hash that no longer
+       exists would be a wasted 404 on the critical path. */
+    try {
+      const { ROUTE_CHUNKS } = await import('../generated/routeChunks.js');
+      chunks = ROUTE_CHUNKS?.product || [];
+    } catch { chunks = []; }
   } catch {
     shell = '';
     console.warn('[seo] no built app shell — run `npm run build`; product pages will fall through');
@@ -125,10 +132,29 @@ function withHead(html, { title, description, canonical, image, ld, ldProductId,
      and the bundle at 197ms. But the order is what the browser ranks by when it
      has to choose between them, and the page has nothing to show without the
      picture. */
-  return preloadImage
-    ? out.replace('<head>', `<head>\n    <link rel="preload" as="image" href="${esc(preloadImage)}" fetchpriority="high" />`)
+  /* The product page's own chunk, announced in its own HTML.
+     ProductDetail is lazily imported so the homepage does not carry it. On a
+     prerendered route scripts/prerender.mjs writes this link at build time;
+     product pages are rendered here at request time, so the same link has to be
+     added here from the same generated map. Without it the split would cost the
+     money page an extra round trip on the slowest connection — the exact page
+     the adverts land on. */
+  const preloads = [
+    ...(preloadImage
+      ? [`<link rel="preload" as="image" href="${esc(preloadImage)}" fetchpriority="high" />`]
+      : []),
+    ...routeChunks().map((f) => `<link rel="modulepreload" crossorigin href="/${esc(f)}">`),
+  ];
+  return preloads.length
+    ? out.replace('<head>', `<head>\n    ${preloads.join('\n    ')}`)
     : out;
 }
+
+/* Primed by appShell(), which is awaited on every path that reaches withHead.
+   Read synchronously here because withHead is synchronous, and made a no-op
+   when the frontend has never been built — the same rule the shell follows. */
+let chunks = [];
+function routeChunks() { return chunks; }
 
 /**
  * Paint the product into the pre-React shell.
