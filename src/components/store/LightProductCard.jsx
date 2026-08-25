@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ShoppingCart, Zap, Clock } from 'lucide-react';
 import { categoryVisual, money, carriesOwnBackground, productDescription } from '../../lib/catalog.js';
@@ -18,7 +19,7 @@ const GLOW = {
 const glowFor = (cat) => GLOW[cat] || '#7c5cff';
 
 /** Light-theme product card matching the storefront design. */
-export default function LightProductCard({ product, onAdd, priority = false }) {
+function LightProductCard({ product, onAdd, priority = false }) {
   const { t, lang } = useI18n();
   const desc = productDescription(product, lang);
   const v = categoryVisual(product.category);
@@ -143,3 +144,10 @@ export default function LightProductCard({ product, onAdd, priority = false }) {
     </div>
   );
 }
+
+/* Memoised. The catalogue renders twenty-four of these, and every keystroke in
+   the search box, every sort change and every scroll that grows the page used
+   to re-render all of them — profiled at a meaningful slice of the catalogue's
+   blocking time on a throttled phone. The props are a product object and two
+   stable values, so equality by reference is exactly right here. */
+export default memo(LightProductCard);

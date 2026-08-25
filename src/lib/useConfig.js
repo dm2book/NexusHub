@@ -20,6 +20,7 @@
  */
 import { useEffect, useState } from 'react';
 import { api } from './api.js';
+import { withEarly } from './earlyFetch.js';
 
 const EMPTY = {};
 let cache = null;
@@ -29,7 +30,10 @@ let inflight = null;
 export function getConfig() {
   if (cache) return Promise.resolve(cache);
   if (!inflight) {
-    inflight = api.get('/api/config')
+    /* The shell may already have this in flight — it starts during HTML parse,
+       about 1.2 s before any effect can run. withEarly falls back to a normal
+       request when it does not, so this is never the reason config is missing. */
+    inflight = withEarly('config', () => api.get('/api/config'))
       .then((c) => { cache = c && typeof c === 'object' ? c : EMPTY; return cache; })
       .catch(() => { cache = EMPTY; return cache; })
       .finally(() => { inflight = null; });

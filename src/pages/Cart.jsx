@@ -160,7 +160,10 @@ function EmptyCartTrending({ onAdd }) {
     <div className="mt-12">
       <h2 className="text-xl font-extrabold text-slate-900 mb-5">{t('cart.popular', 'Popular right now')}</h2>
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 fm-grid-in">
-        {trending.slice(0, 4).map((p) => <LightProductCard key={p.id} product={p} onAdd={(x) => { onAdd(x); toast.success(`${x.name} ${t('cart.added', 'added')}`); }} />)}
+        {/* The first row is above the fold on a phone and was the cart's LCP
+            element — measured at 2.9 s, most of it spent fading in. Marked
+            priority so it paints on its first frame like the catalogue's. */}
+        {trending.slice(0, 4).map((p, i) => <LightProductCard key={p.id} product={p} priority={i < 2} onAdd={(x) => { onAdd(x); toast.success(`${x.name} ${t('cart.added', 'added')}`); }} />)}
       </div>
     </div>
   );

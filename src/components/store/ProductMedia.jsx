@@ -138,8 +138,12 @@ export default function ProductMedia({
       <div aria-hidden className={`absolute inset-0 ${isPhoto ? 'bg-slate-50' : ''}`} />
 
       {/* Skeleton only while we are genuinely waiting. It is a shimmer over the
-          real background, never a grey box that then jumps. */}
-      {!loaded && (
+          real background, never a grey box that then jumps.
+
+          Never for a priority tile: those are the ones the shell preloads, so
+          they are usually decoded before this renders and the shimmer would be
+          a flash of "loading" over an image that is already here. */}
+      {!loaded && !priority && (
         <div aria-hidden className="absolute inset-0 fm-skeleton opacity-60" />
       )}
 
@@ -166,8 +170,18 @@ export default function ProductMedia({
         /* Less padding on a phone. 24px on a 122px-tall box left a 512px icon
            rendering at 74px — a quarter of the tile spent on air. The desktop
            inset is unchanged. */
-        className={`relative z-[1] w-full h-full transition-opacity duration-300 ${
-          loaded ? 'opacity-100' : 'opacity-0'
+        /* The fade is for tiles that arrive while you are already reading the
+           page. It must not apply to the first few.
+
+           Measured: the catalogue's and the cart's LCP element was this image,
+           and the fade was inside the number. The sequence was bytes arrive →
+           onLoad → React state → re-render → 300 ms transition → visible, and
+           LCP is recorded at the end of it. Three hundred milliseconds and a
+           render cycle of "polish" on the one element the score is made of, on
+           a page whose images the shell now preloads specifically so they can
+           be early. A priority tile paints at full opacity on its first frame. */
+        className={`relative z-[1] w-full h-full ${
+          priority ? 'opacity-100' : `transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'}`
         } ${isPhoto ? '' : 'p-4 sm:p-7'}`}
       />
     </div>

@@ -15,6 +15,7 @@ import { useI18n } from '../lib/i18n.jsx';
 import { LangSwitch } from '../components/store/StoreNav.jsx';
 import { flyToCart } from '../lib/flyToCart.js';
 import { api } from '../lib/api.js';
+import { withEarly } from '../lib/earlyFetch.js';
 import { getConfig } from '../lib/useConfig.js';
 import { useStats } from '../lib/useStats.js';
 import { useReviews } from '../lib/useReviews.js';
@@ -193,7 +194,9 @@ export default function HomeStore() {
   // cheapest REAL product in that category (no fabricated items/prices).
   const [products, setProducts] = useState([]);
   useEffect(() => {
-    api.get('/api/products').then((r) => setProducts(withFallback(r.products))).catch(() => setProducts(SAMPLE_PRODUCTS));
+    // Handed over by the shell when it started this during HTML parse.
+    withEarly('products', () => api.get('/api/products'))
+      .then((r) => setProducts(withFallback(r.products))).catch(() => setProducts(SAMPLE_PRODUCTS));
   }, []);
   /* Each pillar resolved against the live catalogue: a category appears only if
      it has active products, with its real cheapest price and real pack count. A

@@ -12,12 +12,28 @@ import { usePageViews } from './lib/usePageViews.js';
 import { useAdAttribution } from './lib/useAdAttribution.js';
 import RouteProgress from './components/RouteProgress.jsx';
 
-// Eager: first-paint storefront pages (small, instant).
-import HomeStore from './pages/HomeStore.jsx';
+/* Eager: the launch banner, and nothing else with a page in it.
+   Shop, ProductDetail and Login used to be eager too, on the reasoning that
+   they are first-paint storefront pages. They are — but only ever one of them
+   at a time, and bundling all four meant somebody landing on the homepage
+   downloaded the catalogue page, the product page and the sign-in form before
+   the homepage could render. Measured: 64 KB of compressed JavaScript in one
+   entry chunk, arriving at 1420 ms on Slow 4G with everything waiting on it.
+
+   The homepage went the same way for the same reason in reverse: it was the
+   one page kept eager, which meant /login, /cart and /discord each parsed and
+   compiled fifty kilobytes of homepage they would never render.
+
+   Split, each of them costs a round trip to discover — which is why
+   scripts/prerender.mjs announces the right chunk in each route's HTML, and
+   server/src/routes/seo.js does the same for product pages. The chunk is then
+   already in flight before the main bundle has finished parsing, and the split
+   costs nothing on the page that needs it. */
 import LaunchBanner from './components/store/LaunchBanner.jsx';
-import Shop from './pages/Shop.jsx';
-import ProductDetail from './pages/ProductDetail.jsx';
-import Login from './pages/Login.jsx';
+const HomeStore = lazy(() => import('./pages/HomeStore.jsx'));
+const Shop = lazy(() => import('./pages/Shop.jsx'));
+const ProductDetail = lazy(() => import('./pages/ProductDetail.jsx'));
+const Login = lazy(() => import('./pages/Login.jsx'));
 
 // Lazy: everything else is split into its own chunk so customers never download
 // the admin console / account / info code on first load.
