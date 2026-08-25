@@ -331,5 +331,37 @@ console.log('\n── Wiring ─────────────────
     && rd('server/src/routes/admin/analytics.js').includes("'/attribution'"));
 }
 
+console.log('\n── When the reporting breaks ───────────────────────────────');
+
+{
+  /* Attribution is reporting. A shop that cannot take a paid-for order because
+     its advert bookkeeping fell over is a far worse outcome than not knowing
+     which advert sold it — so every path here swallows its own errors and the
+     order goes through regardless.
+     Asserted by removing the tables outright, which is the bluntest version of
+     every failure this could have. LAST in the file on purpose: nothing below
+     this point has an ad_visits table to query. */
+  const { exec } = await import('../src/db/index.js');
+  await exec('DROP TABLE ad_events; DROP TABLE ad_visits;');
+  const quiet = console.error; console.error = () => {};   // the noise is the point
+
+  ok('recordVisit degrades to nothing',
+    (await A.recordVisit({ sessionId: 'v_x', query: { utm_source: 'tiktok' }, path: '/' })) === null);
+  ok('recordEvent degrades to nothing',
+    (await A.recordEvent({ sessionId: 'v_x', kind: 'product_view' })) === null);
+  ok('adoptVisit degrades to nothing', (await A.adoptVisit('adv_x', 'v_x')) === null);
+
+  const oid = newId('ord');
+  await run(
+    `INSERT INTO orders (id, number, email, status, currency, subtotal, total, created_at, updated_at)
+     VALUES (@id, 'FM-TEST-NOATTR', 'buyer@example.test', 'pending', 'EUR', 100, 100, @at, @at)`,
+    { id: oid, at: nowIso() });
+  ok('attachOrder degrades to nothing', (await A.attachOrder(oid, { sessionId: 'v_x' })) === null);
+  ok('…and the order is still there, untouched',
+    (await get('SELECT status FROM orders WHERE id=@id', { id: oid }))?.status === 'pending');
+
+  console.error = quiet;
+}
+
 console.log(`\n${fail === 0 ? '✅' : '❌'} ad attribution: ${pass} passed, ${fail} failed\n`);
 process.exit(fail === 0 ? 0 : 1);
