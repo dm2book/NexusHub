@@ -124,8 +124,27 @@ console.log('— Fonts —');
   // Was four families and seventeen weights; the site uses seven.
   ok(`…and weigh under 200KB in total (now ${KB(total)}KB across ${fonts.length})`, total < 200 * 1024);
 
-  ok('the two fonts needed for the first paint are preloaded',
-    /rel="preload"[^>]*inter-400\.woff2/.test(html) && /rel="preload"[^>]*bricolage-700\.woff2/.test(html));
+  /* CHANGED, and deliberately: this used to require BOTH inter-400 and
+     bricolage-700 to be preloaded. Measured on Slow 4G, that put 45 KB at the
+     highest priority ahead of the JavaScript everything else was waiting for —
+     the entry bundle landed at 1399 ms and hydration, and so the catalogue's
+     LCP, queued behind it.
+
+     Preloading neither was faster still (FCP 328 → 244 ms) and cost something
+     real: the display face then swapped in after paint, headings re-wrapped,
+     and the Discord page's content moved 40 px — CLS 0 → 0.045 on a page that
+     had none.
+
+     So: exactly one, and it is the display face, because a heading re-wrap is
+     what moves a page and body text swapping changes line widths rather than
+     line counts. */
+  const fontPreloads = [...html.matchAll(/<link\b[^>]*>/g)]
+    .map((m) => m[0])
+    .filter((tag) => /rel="preload"/.test(tag) && /as="font"/.test(tag));
+  ok('exactly one font is preloaded for the first paint',
+    fontPreloads.length === 1, `${fontPreloads.length}: ${fontPreloads.join(' ')}`);
+  ok('…and it is the display face, whose re-wrap is what moves a page',
+    /bricolage-700\.woff2/.test(fontPreloads[0] || ''), fontPreloads[0]);
 
   const fontCss = readFileSync(join(ROOT, 'src/styles/fonts.css'), 'utf8');
   const faces = (fontCss.match(/@font-face/g) || []).length;
