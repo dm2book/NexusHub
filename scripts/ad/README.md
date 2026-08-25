@@ -198,6 +198,74 @@ overwrites that one only.
 | `--chrome=` | bundled path | a Chrome/Chromium binary |
 | `FFMPEG_PATH` | `ffmpeg-static` | your own ffmpeg |
 
+## Measuring which one worked
+
+An advert everybody clicks and nobody buys from and an advert nine people see
+and two buy from look identical in a view count. `links.mjs` prints the tagged
+destination for each variant, and the shop's admin analytics groups purchases by
+the creative id in that link.
+
+```bash
+DATABASE_URL=…  node scripts/ad/links.mjs \
+  --sku=ROBUX-1000 --variants=all --network=tiktok --campaign=launch-week
+```
+
+One line per variant, ready to paste into the destination field:
+
+```
+  B  Speed / delivery hook
+     creative  robux-1000-b
+     https://forgemarket.nl/product/prd_…?utm_source=tiktok&utm_medium=organic
+       &utm_campaign=launch-week&utm_content=robux-1000-b&creative_id=robux-1000-b
+       &product=ROBUX-1000
+```
+
+The creative id is `{sku}-{variant}` — derived, not random, so re-running this
+for a re-upload prints the same id and the advert does not split its own numbers
+in two.
+
+| flag | | |
+|---|---|---|
+| `--style=short` | `src` / `cid` / `crid` | for a bio link somebody types by hand |
+| `--macros` | `__CID__`, `{creative}` | let the platform fill in its own ids on a paid placement |
+| `--network=` | tiktok | also youtube, google, meta |
+| `--campaign=` | launch | whatever you are calling this push |
+| `--path=/shop` | the product page | a different landing page |
+
+The link points at the product page, not the homepage: the advert has just spent
+fifteen seconds on one product, and every step between the click and that
+product is a step some viewers do not take. The product id is looked up from the
+database, so `--sku` that does not exist refuses to print a link rather than
+printing one that 404s.
+
+On a paid placement prefer `--macros`: TikTok substitutes `__CID__` and Google
+substitutes `{creative}` at click time, so the report follows the platform's own
+splits. A macro that never expands is discarded server-side rather than stored,
+so a misconfigured placement loses its attribution instead of inventing a
+creative that outsells every real one.
+
+### What the report shows
+
+Admin → Analytics → **Advertising**: visits, product views, checkouts,
+purchases and revenue per creative, sorted by revenue. Sorted by revenue on
+purpose — a creative with four hundred visits and no sales belongs below one
+with nine visits and two sales.
+
+Three things it will not do:
+
+- **It does not report ad clicks.** The click happens on TikTok's servers. What
+  this measures is the arrival it produced, and calling those clicks would
+  silently absorb every click that never finished loading the page.
+- **It shows "—", not 0%, for a creative with no visits.** An advert nobody has
+  seen does not have a conversion rate.
+- **It counts visitors who refused marketing storage, and says so.** They cannot
+  be followed to a purchase, so they sit in the visit column and are reported
+  separately rather than quietly dropped or quietly folded in.
+
+No IP, user agent, fingerprint or platform click id is stored. `ttclid` and
+`gclid` are read for the network name and the value is discarded before anything
+is written.
+
 ## Before launch
 
 The site refuses to sell before `LAUNCH_DATE` when the gate is on. Recording

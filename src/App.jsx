@@ -9,6 +9,7 @@ const AccountLayout = lazy(() => import('./layouts/AccountLayout.jsx'));
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 import { PageLoader } from './components/ui.jsx';
 import { usePageViews } from './lib/usePageViews.js';
+import { useAdAttribution } from './lib/useAdAttribution.js';
 import RouteProgress from './components/RouteProgress.jsx';
 
 // Eager: first-paint storefront pages (small, instant).
@@ -71,7 +72,8 @@ const AdminMonetization = lazy(() => import('./pages/admin/Monetization.jsx'));
 const AdminCategories = lazy(() => import('./pages/admin/Categories.jsx'));
 
 export default function App() {
-  usePageViews();   // anonymous, privacy-friendly visitor analytics
+  usePageViews();      // anonymous, privacy-friendly visitor analytics
+  useAdAttribution();  // which advert this visitor arrived from, if any
   return (
     <>
     {/* Above <Routes>, not inside a layout.

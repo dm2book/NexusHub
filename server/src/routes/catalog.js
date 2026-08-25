@@ -28,6 +28,7 @@ import { countryOf } from '../utils/netRisk.js';
 import { holdMessage } from '../services/fraudService.js';
 import { publicStats } from '../services/publicStatsService.js';
 import { recordPageView } from '../services/trackingService.js';
+import { recordVisit, recordEvent, attachOrder, adoptVisit } from '../services/attributionService.js';
 import { getCategoryLogos } from '../services/settingsService.js';
 import { addReview, listReviews, addVerifiedReview } from '../services/reviewsService.js';
 import { verifyIngest, canonicalReview } from '../middleware/ingestSignature.js';
@@ -110,6 +111,67 @@ router.post('/track', rateLimit({ bucket: 'track', windowMs: 60_000, max: 120 })
       ref: z.string().max(300).optional(),
     }).parse(req.body || {});
     await recordPageView({ sessionId: body.sid, path: body.path, referrer: body.ref, userId: req.user?.id });
+    res.status(204).end();
+  }));
+
+/**
+ * Advertising attribution.
+ *
+ * Two beacons, both best-effort and both answering 204 whatever happens — an
+ * advert report is never worth failing a page load over, and a visitor must not
+ * be able to tell from the response whether they were counted.
+ *
+ * `sid` is OPTIONAL on purpose. Without marketing consent the browser has no id
+ * to send, and the arrival is still counted; it simply cannot be followed to a
+ * purchase. See attributionService for why that trade is made this way round.
+ *
+ * The query object is passed through whole rather than field by field: the
+ * service owns which parameters are recognised, and listing them here as well
+ * would mean two places to update every time a network invents another one.
+ */
+router.post('/attribution/visit',
+  rateLimit({ bucket: 'track', windowMs: 60_000, max: 120 }),
+  asyncHandler(async (req, res) => {
+    const body = z.object({
+      sid: z.string().min(8).max(64).optional(),
+      // Bounded: a query object is attacker-controlled, and the service clips
+      // each value, but nothing else would stop a thousand junk keys arriving.
+      params: z.record(z.string().max(300)).optional(),
+      path: z.string().max(300).optional(),
+      ref: z.string().max(300).optional(),
+      /* The visit this page load already recorded before the banner was
+         answered. Sent when the visitor then says yes, so consent attaches an
+         id to the arrival already on file instead of filing it a second time. */
+      adopt: z.string().max(64).optional(),
+    }).parse(req.body || {});
+
+    if (body.adopt && body.sid) {
+      const adopted = await adoptVisit(body.adopt, body.sid);
+      if (adopted) return res.json({ visit: adopted, adopted: true });
+      // Fell through: the visit is gone or already belongs to someone. Record
+      // the arrival normally rather than losing it.
+    }
+
+    const params = Object.fromEntries(Object.entries(body.params || {}).slice(0, 30));
+    const visit = await recordVisit({
+      sessionId: body.sid, query: params, path: body.path, referrer: body.ref });
+    // The id goes back so the checkout can quote it against the order even if
+    // the visitor's storage is cleared between the landing and the purchase.
+    res.json({ visit: visit?.id || null });
+  }));
+
+router.post('/attribution/event',
+  rateLimit({ bucket: 'track', windowMs: 60_000, max: 120 }),
+  asyncHandler(async (req, res) => {
+    const body = z.object({
+      sid: z.string().min(8).max(64).optional(),
+      visit: z.string().max(64).optional(),
+      kind: z.enum(['product_view', 'checkout']),
+      productId: z.string().max(64).optional(),
+    }).parse(req.body || {});
+    await recordEvent({
+      visitId: body.visit, sessionId: body.sid,
+      kind: body.kind, productId: body.productId });
     res.status(204).end();
   }));
 
@@ -391,6 +453,12 @@ router.post('/orders',
       // the one piece of evidence a chargeback turns on.
       consent: z.literal(true),
       consentText: z.string().max(400).optional(),
+      /* Which advert this sale belongs to. Both optional and both harmless if
+         absent or wrong: attachOrder only accepts a visit that exists and is
+         still inside the window, so a forged id attributes a sale to a visit
+         somebody would have to have created first. */
+      adVisit: z.string().max(64).optional(),
+      adSession: z.string().min(8).max(64).optional(),
     }).parse(req.body);
 
     // The IP and country are the only fraud signals that exist solely at the
@@ -400,6 +468,12 @@ router.post('/orders',
     const order = await createOrder(
       { ...body, userId: req.user?.id || null },
       { user: req.user, actorId: req.user?.id, ip: req.ip || null, country: countryOf(req) });
+
+    /* After the order exists, and outside its transaction. Attribution is
+       reporting: it must never be the reason a paid-for order fails to be
+       created, and attachOrder swallows its own errors for the same reason. */
+    await attachOrder(order.id, { visitId: body.adVisit, sessionId: body.adSession });
+
     res.status(201).json({ order });
   }));
 

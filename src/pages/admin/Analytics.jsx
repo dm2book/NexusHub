@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { TrendingUp, ShoppingCart, Percent, Users, Trophy, Rocket, CheckCircle2, AlertTriangle, XCircle, ChevronDown, MailCheck } from 'lucide-react';
+import { TrendingUp, ShoppingCart, Percent, Users, Trophy, Rocket, CheckCircle2, AlertTriangle, XCircle, ChevronDown, MailCheck, Megaphone, EyeOff } from 'lucide-react';
 import { api } from '../../lib/api.js';
 import { money } from '../../lib/format.js';
 import { PageLoader } from '../../components/ui.jsx';
@@ -66,6 +66,7 @@ export default function Analytics() {
   const [top, setTop] = useState(null);
   const [ret, setRet] = useState(null);
   const [rec, setRec] = useState(null);
+  const [attr, setAttr] = useState(null);
 
   useEffect(() => {
     api.get('/api/admin/analytics/overview?days=30').then(setData).catch(() => {});
@@ -73,6 +74,7 @@ export default function Analytics() {
     api.get('/api/admin/analytics/top-products').then((r) => setTop(r.products)).catch(() => {});
     api.get('/api/admin/analytics/retention').then(setRet).catch(() => {});
     api.get('/api/admin/analytics/recovery?days=30').then(setRec).catch(() => {});
+    api.get('/api/admin/analytics/attribution?days=30').then(setAttr).catch(() => {});
   }, []);
 
   if (!data) return <PageLoader />;
@@ -176,6 +178,9 @@ export default function Analytics() {
       {/* Abandoned-payment recovery — what the reminder emails actually bring back */}
       {rec && <RecoveryCard rec={rec} />}
 
+      {/* Which advert sold something */}
+      {attr && <AttributionCard attr={attr} />}
+
       {/* Product performance */}
       <div className="card p-6 mt-6">
         <h3 className="text-white mb-4 flex items-center gap-2"><Trophy size={16} className="text-amber-400" /> Product performance (90 days)</h3>
@@ -271,6 +276,177 @@ function RecoveryCard({ rec }) {
           <div className="text-sm">
             <span className="text-amber-200 font-semibold">{p.notSentYet} unpaid {p.notSentYet === 1 ? 'order has' : 'orders have'} had no reminder yet</span>
             <span className="text-slate-300"> — {p.notSentValueFormatted} not being chased. The reminder runs on the hourly cron; if this number keeps growing, the cron is not running.</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Which advert actually generated purchases.
+ *
+ * Sorted by revenue, because that is the question. A creative with four hundred
+ * visits and no sales is not a good advert with a checkout problem — it belongs
+ * below the one with nine visits and two sales, and sorting by traffic is how a
+ * shop ends up spending more on the loud one.
+ *
+ * Three rules the numbers here follow, all of them the same rule:
+ *
+ *  · a rate over zero visits is null, shown as "—", never 0%. An advert that
+ *    has not run yet does not have a conversion rate, and printing 0% for it
+ *    reads as a verdict on an advert nobody has seen.
+ *  · the funnel's first stage is "website visit", not "ad click". The click
+ *    happens on TikTok's servers and we cannot see it; calling arrivals clicks
+ *    would silently absorb every click that never finished loading.
+ *  · visitors who refused marketing storage are counted and reported as
+ *    uncounted, rather than folded into the denominator. A funnel that narrows
+ *    sharply is a different problem from a funnel measuring people it is not
+ *    allowed to follow, and the difference is worth a line.
+ */
+function AttributionCard({ attr }) {
+  const { funnel: f, creatives, campaigns } = attr;
+  const pct = (v) => (v == null ? '—' : `${v}%`);
+  const top = Math.max(1, ...f.stages.map((s) => s.count));
+  const sellers = creatives.filter((c) => c.purchases > 0).length;
+
+  return (
+    <div className="card p-6 mt-6">
+      <h3 className="text-white mb-1 flex items-center gap-2">
+        <Megaphone size={16} className="text-fuchsia-400" /> Advertising ({f.rangeDays} days)
+      </h3>
+      <p className="text-slate-500 text-xs mb-5">
+        Tagged links only. {sellers > 0
+          ? `${sellers} of ${creatives.length} ${creatives.length === 1 ? 'creative' : 'creatives'} `
+            + `${sellers === 1 ? 'has' : 'have'} produced a sale.`
+          : 'No tagged link has produced a sale yet.'}
+      </p>
+
+      {creatives.length === 0 ? (
+        <div className="rounded-xl border border-white/10 bg-white/5 p-5 text-sm text-slate-300">
+          <p>
+            Nothing has arrived from a tagged link yet. Build one with{' '}
+            <code className="text-slate-200">node scripts/ad/links.mjs --sku=… --variants=all</code>{' '}
+            and put it behind the advert — an untagged link cannot be measured, however well it performs.
+          </p>
+          {/* The accepted spellings, in front of whoever is building a link by
+              hand, rather than in a source file they would have to go and find. */}
+          {attr.recognisedParams?.length > 0 && (
+            <p className="text-slate-500 text-xs mt-3 leading-relaxed">
+              Parameters read from the address:{' '}
+              {attr.recognisedParams.join(', ')}. Click ids are read for the network
+              name only and never stored.
+            </p>
+          )}
+        </div>
+      ) : (
+        <>
+          {/* The funnel */}
+          <div className="grid sm:grid-cols-4 gap-3 mb-6">
+            {f.stages.map((st, i) => (
+              <div key={st.id} className="rounded-xl bg-white/5 border border-white/10 p-4">
+                <div className="text-slate-400 text-xs font-semibold uppercase tracking-wide">{st.label}</div>
+                <div className="text-2xl text-white font-semibold mt-1">{st.count}</div>
+                <div className="h-1.5 rounded-full bg-white/10 overflow-hidden mt-2">
+                  <div className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-fuchsia-500"
+                       style={{ width: `${Math.max(2, (st.count / top) * 100)}%` }} />
+                </div>
+                <div className="text-slate-500 text-xs mt-2">
+                  {i === 0 ? 'from a tagged link' : `${pct(st.ofPrevious)} of ${f.stages[i - 1].label.toLowerCase()}`}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="grid sm:grid-cols-3 gap-4 mb-6">
+            <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/25 p-4">
+              <div className="text-emerald-300 text-xs font-semibold uppercase tracking-wide">Revenue from adverts</div>
+              <div className="text-2xl text-white font-semibold mt-1">{money(f.revenue)}</div>
+            </div>
+            <div className="rounded-xl bg-white/5 border border-white/10 p-4">
+              <div className="text-slate-300 text-xs font-semibold uppercase tracking-wide">Visit → purchase</div>
+              <div className="text-2xl text-white font-semibold mt-1">{pct(f.conversionRate)}</div>
+            </div>
+            <div className="rounded-xl bg-white/5 border border-white/10 p-4">
+              <div className="text-slate-300 text-xs font-semibold uppercase tracking-wide">Attribution window</div>
+              <div className="text-2xl text-white font-semibold mt-1">{attr.windowDays} days</div>
+              <div className="text-slate-400 text-xs mt-1">last click before the order</div>
+            </div>
+          </div>
+
+          {/* The table that answers the question */}
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[680px]">
+              <thead className="text-left text-slate-400 border-b border-white/5">
+                <tr>
+                  <th className="py-2 font-medium">Creative</th>
+                  <th className="py-2 font-medium">Campaign</th>
+                  <th className="py-2 font-medium text-right">Visits</th>
+                  <th className="py-2 font-medium text-right">Product views</th>
+                  <th className="py-2 font-medium text-right">Checkouts</th>
+                  <th className="py-2 font-medium text-right">Purchases</th>
+                  <th className="py-2 font-medium text-right">Conv.</th>
+                  <th className="py-2 font-medium text-right">Revenue</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {creatives.map((c) => (
+                  <tr key={`${c.creative}|${c.campaign}|${c.network}`}
+                      className={c.purchases > 0 ? '' : 'opacity-70'}>
+                    <td className="py-2 text-slate-200 whitespace-nowrap">
+                      {c.creative}
+                      {c.network && <span className="text-slate-500 ml-2 text-xs">{c.network}</span>}
+                    </td>
+                    <td className="py-2 text-slate-400">{c.campaign}</td>
+                    <td className="py-2 text-right text-slate-300">{c.visits}</td>
+                    <td className="py-2 text-right text-slate-300">{c.productViews}</td>
+                    <td className="py-2 text-right text-slate-300">{c.checkouts}</td>
+                    <td className="py-2 text-right text-white font-semibold">{c.purchases}</td>
+                    <td className="py-2 text-right text-slate-300">{pct(c.conversionRate)}</td>
+                    <td className={`py-2 text-right ${c.revenue ? 'text-emerald-300 font-semibold' : 'text-slate-500'}`}>
+                      {money(c.revenue)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {campaigns.length > 1 && (
+            <div className="mt-6">
+              <h4 className="text-slate-300 text-sm mb-3">By campaign</h4>
+              {campaigns.map((c) => (
+                <div key={c.campaign} className="flex items-center justify-between py-1.5 text-sm">
+                  <span className="text-slate-400">
+                    {c.campaign}
+                    <span className="text-slate-600 ml-2 text-xs">
+                      {c.creatives} {c.creatives === 1 ? 'creative' : 'creatives'}
+                      {c.networks.length ? ` · ${c.networks.join(', ')}` : ''}
+                    </span>
+                  </span>
+                  <span className="text-white font-semibold">
+                    {money(c.revenue)} <span className="text-slate-500 font-normal">· {c.purchases} sold</span>
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
+      {f.notFollowed > 0 && (
+        <div className="mt-5 rounded-xl border border-white/10 bg-white/5 p-4 flex items-start gap-3">
+          <EyeOff size={17} className="text-slate-400 shrink-0 mt-0.5" />
+          <div className="text-sm">
+            <span className="text-slate-200 font-semibold">
+              {f.notFollowed} {f.notFollowed === 1 ? 'arrival is' : 'arrivals are'} counted but not followed
+            </span>
+            <span className="text-slate-400">
+              {' '}— those visitors refused marketing storage, so their click is in the visit
+              column and cannot appear in the purchase one. They are excluded from nothing and
+              added to nothing; the conversion rates above are simply measured over everybody,
+              including people we are not allowed to follow.
+            </span>
           </div>
         </div>
       )}

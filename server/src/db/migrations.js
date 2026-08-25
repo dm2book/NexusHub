@@ -1127,4 +1127,80 @@ CREATE TABLE IF NOT EXISTS newsletter_signups (
 CREATE INDEX IF NOT EXISTS idx_newsletter_created ON newsletter_signups (created_at DESC);
 `,
   },
+  {
+    id: '031_ad_attribution',
+    sql: `
+-- Which advert actually sold something.
+--
+-- The shop can already tell you how many people visited and how much it took.
+-- It could not tell you which of the eight creatives the ad workflow cuts was
+-- responsible for either, which makes the ad spend a guess with a receipt.
+--
+-- Two tables and one column:
+--
+--   ad_visits   one row per arrival that carried campaign parameters. The click
+--               itself lives on the platform; this is our end of it.
+--   ad_events   the steps between arriving and buying — a product looked at, a
+--               checkout reached. Deduplicated, so re-reading a product page
+--               four times is one product view, not four.
+--   orders.ad_visit_id
+--               the purchase. Kept on the order rather than as a fourth event
+--               kind because "did it sell" already has one authority in this
+--               codebase — the order's paid status — and a second copy of that
+--               fact is a second copy that can disagree.
+--
+-- WHAT IS DELIBERATELY NOT HERE. No IP, no user agent, no device fingerprint,
+-- no email, and no platform click id (ttclid, gclid, wbraid…). A click id is a
+-- per-person handle whose only use is sending conversions back to the advertising
+-- network; nobody asked for that, and collecting an identifier "in case" is the
+-- thing the rule exists to stop. Which network the click came from is derived
+-- from its presence and the id itself is dropped before anything is written.
+--
+-- session_id is NULLABLE on purpose. Without marketing consent nothing may be
+-- stored on the visitor's device, so there is no id to key a funnel on — but the
+-- arrival can still be counted, because a bare campaign counter with no
+-- identifier is not personal data. Consent buys the funnel, not the count.
+CREATE TABLE IF NOT EXISTS ad_visits (
+  id            TEXT PRIMARY KEY,
+  session_id    TEXT,                 -- anonymous, marketing-consent only; NULL = counted, not followed
+  network       TEXT,                 -- tiktok | youtube | google | meta | discord | other
+  source        TEXT,                 -- utm_source
+  medium        TEXT,                 -- utm_medium
+  campaign      TEXT,                 -- utm_campaign
+  content       TEXT,                 -- utm_content
+  term          TEXT,                 -- utm_term
+  campaign_id   TEXT,
+  adgroup_id    TEXT,
+  creative_id   TEXT,                 -- the one that answers "which advert"
+  placement     TEXT,
+  product_id    TEXT REFERENCES products(id) ON DELETE SET NULL,
+  landing_path  TEXT,
+  referrer_host TEXT,                 -- host only — a full referrer can carry a query string
+  created_at    TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_ad_visits_session  ON ad_visits (session_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_ad_visits_creative ON ad_visits (creative_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_ad_visits_campaign ON ad_visits (campaign_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_ad_visits_time     ON ad_visits (created_at DESC);
+
+CREATE TABLE IF NOT EXISTS ad_events (
+  id         TEXT PRIMARY KEY,
+  visit_id   TEXT NOT NULL REFERENCES ad_visits(id) ON DELETE CASCADE,
+  kind       TEXT NOT NULL,           -- product_view | checkout
+  product_id TEXT REFERENCES products(id) ON DELETE SET NULL,
+  created_at TEXT NOT NULL
+);
+-- One of each per visit. COALESCE rather than a plain unique index because
+-- Postgres treats NULLs as distinct, which would let 'checkout' insert forever.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_ad_events_once
+  ON ad_events (visit_id, kind, COALESCE(product_id, ''));
+CREATE INDEX IF NOT EXISTS idx_ad_events_visit ON ad_events (visit_id);
+
+-- Set once, at order creation, from the visit the buyer arrived on. On the order
+-- rather than in a session lookup so it survives the visitor clearing their
+-- browser, and so a purchase stays attributed after the visit rows are pruned.
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS ad_visit_id TEXT;
+CREATE INDEX IF NOT EXISTS idx_orders_ad_visit ON orders (ad_visit_id) WHERE ad_visit_id IS NOT NULL;
+`,
+  },
 ];

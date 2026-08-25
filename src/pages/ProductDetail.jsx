@@ -19,6 +19,7 @@ import { useWishlist } from '../lib/wishlist.js';
 import { usePageMeta, useJsonLd } from '../lib/useMeta.js';
 import { useI18n } from '../lib/i18n.jsx';
 import { recordProductView, useRecentlyViewed } from '../lib/recentlyViewed.js';
+import { reportStep } from '../lib/attribution.js';
 import { flyToCart } from '../lib/flyToCart.js';
 import Tilt from '../components/Tilt.jsx';
 import { DeliveryFacts, TrustRow } from '../components/store/ProductDelivery.jsx';
@@ -173,7 +174,16 @@ export default function ProductDetail() {
      what was always meant; the object was standing in for it. */
   // Record this visit in the customer's own recently-viewed history.
   const recentlyViewed = useRecentlyViewed();
-  useEffect(() => { if (product && !product.sample) recordProductView(product); },
+  useEffect(() => {
+    if (!product || product.sample) return;
+    recordProductView(product);
+    /* The second funnel step, for visitors who arrived from an advert. Silent
+       for everyone else — reportStep sends nothing without a stored visit, so
+       this costs the other 99% of traffic no request. Sample products are
+       excluded for the same reason they are excluded above: they are the
+       offline placeholder catalogue, not something anyone can buy. */
+    reportStep('product_view', product.id);
+  },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [product?.id, product?.sample]);
 
