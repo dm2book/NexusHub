@@ -1,7 +1,7 @@
 import InfoShell from './InfoShell.jsx';
 import { useI18n } from '../lib/i18n.jsx';
 import { SUPPORT_EMAIL } from '../lib/support.js';
-import { LEGAL, legalComplete, legalAddressLine } from '../lib/legalIdentity.js';
+import { LEGAL, legalComplete, legalAddressLine, vatStatement } from '../lib/legalIdentity.js';
 
 /**
  * Renders one legal document from src/content.
@@ -65,6 +65,13 @@ function Body({ items, nl }) {
       return <p key={i} className="text-slate-400 leading-relaxed"><RichText>{item}</RichText></p>;
     }
     if (item.identity) return <SellerIdentity key={i} nl={nl} />;
+    /* A sentence the seller identity decides, not the document.
+       The terms used to assert "all prices include VAT" flatly, in both
+       languages, with nothing in the system to back it. Now the claim is made
+       only when a BTW number is actually published — see vatStatement(). */
+    if (item.token === 'vatStatement') {
+      return <p key={i} className="text-slate-400 leading-relaxed"><RichText>{vatStatement(nl)}</RichText></p>;
+    }
     if (item.note) {
       return (
         <div key={i} className="rounded-xl border border-indigo-400/30 bg-indigo-400/10 px-4 py-3.5 text-slate-300 leading-relaxed">

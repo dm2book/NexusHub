@@ -64,7 +64,7 @@ export const LEGAL_DOCS = {
           h: 'Artikel 3 — Het aanbod',
           body: [
             'Elk aanbod bevat een omschrijving die volledig genoeg is om te beoordelen wat je koopt: om welk product, welke regio en welk platform het gaat, en hoe het geleverd wordt.',
-            'Alle prijzen zijn in euro’s en **inclusief btw**. De prijs die op het moment van bestellen wordt getoond, is de prijs die geldt. Wij rekenen geen toeslagen af bij de kassa: het bedrag dat je ziet, is het bedrag dat je betaalt.',
+            { token: 'vatStatement' },
             'Kennelijke vergissingen of fouten in het aanbod binden ons niet. Denk aan een prijs die overduidelijk verkeerd is door een type- of systeemfout. Gebeurt dat, dan laten we het je weten vóór levering en betalen we volledig terug als je de bestelling dan niet meer wilt.',
           ],
         },
@@ -199,7 +199,7 @@ export const LEGAL_DOCS = {
           h: 'Article 3 — The offer',
           body: [
             'Every offer contains a description complete enough to judge what you are buying: which product, which region and platform, and how it is delivered.',
-            'All prices are in euros and **include VAT**. The price shown at the moment you order is the price that applies. We add no fees at checkout: the amount you see is the amount you pay.',
+            { token: 'vatStatement' },
             'Obvious errors in an offer do not bind us — a price that is clearly wrong through a typing or system mistake, for instance. If that happens we will tell you before delivering and refund you in full if you no longer want the order.',
           ],
         },
