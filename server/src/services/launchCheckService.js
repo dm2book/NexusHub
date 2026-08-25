@@ -188,6 +188,36 @@ export async function launchChecks() {
       'The legal pages cannot say who is selling: legalName / address / postcode / city are empty in src/lib/legalIdentity.js. Dutch law requires a name and a geographic address before a consumer buys.');
   }
 
+  /* 7b. The compliance audit, folded into the same dashboard.
+
+     Seller identity above is one of nine legal checks, and it was the only one
+     the owner ever saw. A shop can have a filled-in address and still be
+     publishing a VAT claim it cannot back, mailing customers from a domain it
+     does not own, or naming a data processor it no longer uses. Those live in
+     complianceCheckService and are summarised here so the readiness panel and
+     `node scripts/audit-compliance.mjs` cannot disagree.
+
+     Deliberately a summary with a pointer, not nine more rows: this panel is
+     read at a glance before selling, and the compliance report is read once,
+     carefully, with a list of things to go and do. */
+  try {
+    const { auditCompliance } = await import('./complianceCheckService.js');
+    const { summary } = await auditCompliance();
+    const blocking = summary.fail;
+    add('compliance', 'Legal & tax',
+      blocking ? 'fail' : summary.warn ? 'warn' : 'ok',
+      blocking
+        ? `${blocking} blocking issue(s) — run node scripts/audit-compliance.mjs for the list. `
+          + `${summary.owner} more need your own business information.`
+        : summary.warn
+          ? `${summary.warn} warning(s), ${summary.owner} item(s) need your own business information — node scripts/audit-compliance.mjs`
+          : `Automated checks clear. ${summary.owner} item(s) still need your own business `
+            + 'information (registration, processing agreements, a lawyer\'s read) — '
+            + 'node scripts/audit-compliance.mjs');
+  } catch (e) {
+    add('compliance', 'Legal & tax', 'warn', `Could not run the compliance audit: ${e.message}`);
+  }
+
   // 8. Two-factor on the accounts that can see everything.
   //
   // The admin panel shows every order, every buyer's email and every delivered
