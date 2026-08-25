@@ -579,7 +579,8 @@ export const LEGAL_DOCS = {
         {
           body: [
             'De meeste webshops openen met een banner die om toestemming vraagt voor tientallen cookies. Deze niet, en dat is geen nalatigheid.',
-            'Wij plaatsen **één** cookie, en die is strikt noodzakelijk om je ingelogd te houden. Voor zulke cookies is volgens artikel 11.7a van de Telecommunicatiewet geen toestemming vereist. Wij plaatsen geen advertentiecookies, geen analytics van derden en geen trackers die je over andere websites volgen — dus is er niets om toestemming voor te vragen.',
+            'Wij plaatsen **één** cookie, en die is strikt noodzakelijk om je ingelogd te houden. Voor zulke cookies is volgens artikel 11.7a van de Telecommunicatiewet geen toestemming vereist.',
+            'Wij plaatsen geen advertentiecookies van derden, geen analytics van derden en geen trackers die je over andere websites volgen. Wél bewaren wij twee dingen in je eigen browser die niet strikt noodzakelijk zijn: een bezoekersteller en, als je via een van onze advertenties binnenkomt, een advertentiekenmerk. Daar vragen wij toestemming voor — dat is de balk die je bij je eerste bezoek ziet, en je kunt je keuze op elk moment wijzigen.',
             'Daarom heeft deze site **geen cookiebanner**. Niet omdat wij de regels omzeilen, maar omdat er niets is waarvoor wij die toestemming nodig hebben.',
           ],
         },
@@ -635,10 +636,20 @@ export const LEGAL_DOCS = {
           ],
         },
         {
+          h: 'Advertentiemeting',
+          body: [
+            'Kom je binnen via een link onder een van onze eigen advertenties, dan staan daar herkenningscodes in de webadresregel: welke campagne en welke video. Die noteren wij, zodat wij weten welke advertentie iets oplevert en welke wij kunnen stoppen.',
+            'Wat wij daarbij **niet** bewaren: geen IP-adres, geen browserkenmerken, geen e-mailadres, en niet de klik-code die TikTok of Google zelf aan het adres toevoegt (`ttclid`, `gclid`). Die laatste lezen wij alleen om te zien van welk platform je komt; de code zelf gooien wij weg voordat er iets wordt opgeslagen. Van de verwijzende site bewaren wij alleen de domeinnaam, niet het volledige adres.',
+            'Om die klik aan een eventuele bestelling te kunnen koppelen, zetten wij één willekeurig nummer in de opslag van je browser (`fm_attr`). Dat is geen strikt noodzakelijke opslag, dus daar vragen wij toestemming voor onder "marketing".',
+            'Zeg je nee, dan gebeurt er dit: wij tellen dat er iemand via die advertentie binnenkwam — een teller zonder kenmerk is geen persoonsgegeven — maar er komt niets in je browser te staan en wij kunnen die klik niet aan een bestelling koppelen. Trek je je toestemming later in, dan wordt `fm_attr` van je apparaat verwijderd.',
+            'Wij sturen niets terug naar TikTok, Google of Meta. Er verlaat geen enkel gegeven onze eigen systemen voor advertentiedoeleinden.',
+          ],
+        },
+        {
           h: 'Cookies weigeren of verwijderen',
           body: [
             'Je kunt cookies blokkeren of verwijderen via de instellingen van je browser. Blokkeer je onze sessiecookie, dan kun je nog steeds bestellen als gast — je kunt alleen niet ingelogd blijven.',
-            'Omdat wij geen toestemmingsplichtige cookies plaatsen, is er geen toestemming die je bij ons hoeft in te trekken.',
+            'De toestemming die je in de cookiebalk gaf, kun je op elk moment intrekken via "Cookievoorkeuren" onder aan elke pagina. Wat je weigert wordt niet alleen niet meer opgeslagen: wat er al staat, wordt op dat moment van je apparaat verwijderd.',
           ],
         },
         {
@@ -658,7 +669,8 @@ export const LEGAL_DOCS = {
         {
           body: [
             'Most webshops open with a banner asking consent for dozens of cookies. This one does not, and that is not an oversight.',
-            'We set **one** cookie, and it is strictly necessary to keep you signed in. Under Article 11.7a of the Dutch Telecommunications Act, no consent is required for such cookies. We set no advertising cookies, no third-party analytics and no trackers that follow you across other websites — so there is nothing to ask consent for.',
+            'We set **one** cookie, and it is strictly necessary to keep you signed in. Under Article 11.7a of the Dutch Telecommunications Act, no consent is required for such cookies.',
+            'We set no third-party advertising cookies, no third-party analytics and no trackers that follow you across other websites. We do keep two things in your own browser that are not strictly necessary: a visitor counter and, if you arrive through one of our adverts, an advertising label. We ask permission for those — that is the bar you see on your first visit, and you can change your answer at any time.',
             'That is why this site has **no cookie banner**. Not because we are working around the rules, but because there is nothing we need your consent for.',
             { note: 'Dutch is the authoritative version of this policy. This English translation is provided for convenience.' },
           ],
@@ -715,10 +727,20 @@ export const LEGAL_DOCS = {
           ],
         },
         {
+          h: 'Advertising measurement',
+          body: [
+            'If you arrive through a link under one of our own adverts, that link carries labels in the address: which campaign, and which video. We record those, so we know which advert is worth running and which one to stop.',
+            'What we do **not** keep: no IP address, no browser characteristics, no email address, and not the click code TikTok or Google adds to the address itself (`ttclid`, `gclid`). We read that last one only to see which platform you came from, and the code is discarded before anything is written. From the referring site we keep the domain name only, not the full address.',
+            'To be able to connect that click to an order, we put one random number in your browser’s storage (`fm_attr`). That is not strictly necessary storage, so we ask permission for it under "marketing".',
+            'If you say no, this happens: we count that somebody arrived through that advert — a counter with no identifier is not personal data — but nothing is placed in your browser and we cannot connect that click to an order. Withdraw your consent later and `fm_attr` is removed from your device.',
+            'We send nothing back to TikTok, Google or Meta. No data leaves our own systems for advertising purposes.',
+          ],
+        },
+        {
           h: 'Refusing or deleting cookies',
           body: [
             'You can block or delete cookies through your browser settings. If you block our session cookie you can still order as a guest — you just cannot stay signed in.',
-            'Because we set no consent-requiring cookies, there is no consent for you to withdraw with us.',
+            'The consent you gave in the cookie bar can be withdrawn at any time through "Cookie preferences" at the bottom of every page. What you refuse is not merely no longer stored: whatever is already there is removed from your device at that moment.',
           ],
         },
         {

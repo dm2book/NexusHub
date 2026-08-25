@@ -36,7 +36,13 @@ const ESSENTIAL_KEYS = ['fm_token', 'fm_cart', 'fm_lang', 'fm_consent'];
 /** Storage written per non-essential category, purged when that category is refused. */
 const CATEGORY_KEYS = {
   analytics: ['fm_sid'],
-  marketing: ['fm_ref'],
+  // fm_attr lives in sessionStorage rather than localStorage, which
+  // purgeRefused() also has to be told about — a key listed here but removed
+  // from only one of the two stores is a key that survives the refusal that was
+  // supposed to delete it.
+  // fm_attr holds both the ad-attribution visit id and the anonymous id used to
+  // join it to a purchase. One key, so one removal clears both.
+  marketing: ['fm_ref', 'fm_attr'],
 };
 
 const read = () => {
@@ -94,7 +100,10 @@ function purgeRefused(choice) {
     if (choice[cat]) continue;
     for (const k of keys) {
       if (ESSENTIAL_KEYS.includes(k)) continue;
+      // Both stores: which one a key happens to live in is an implementation
+      // detail, and "we deleted it" has to be true of wherever it actually is.
       try { localStorage.removeItem(k); } catch { /* ignore */ }
+      try { sessionStorage.removeItem(k); } catch { /* ignore */ }
     }
   }
 }

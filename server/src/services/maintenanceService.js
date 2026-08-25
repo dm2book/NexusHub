@@ -11,6 +11,7 @@ import { retryFailedEmails } from './emailService.js';
 import { sweepMemberRoles } from './discordRolesService.js';
 import { purgeExpiredLinkIntents } from './discordLinkService.js';
 import { pruneOutbox } from './discordService.js';
+import { pruneAttribution } from './attributionService.js';
 
 const HOURS = (n) => new Date(Date.now() - n * 3_600_000).toISOString();
 const DAYS = (n) => new Date(Date.now() - n * 86_400_000).toISOString();
@@ -168,6 +169,16 @@ export async function runMaintenance() {
   try {
     summary.discordOutboxPruned = await pruneOutbox();
   } catch (e) { summary.discordOutboxError = e.message; }
+
+  // 14. Ad attribution past its retention window.
+  //
+  //     Every table that keeps something about a visitor needs the thing that
+  //     eventually deletes it, and a retention policy nothing enforces is a
+  //     sentence in a privacy policy rather than a property of the system. The
+  //     orders keep their revenue either way — only the visit rows go.
+  try {
+    summary.adVisitsPruned = (await pruneAttribution()).removed;
+  } catch (e) { summary.adVisitsError = e.message; }
 
   return summary;
 }

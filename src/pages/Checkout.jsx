@@ -16,6 +16,7 @@ import { usePageMeta } from '../lib/useMeta.js';
 import { matchBundle } from '../lib/bundles.js';
 import { useStickyBarLift } from '../lib/useStickyBarLift.js';
 import { rememberOrder, recallOrder, forgetOrder } from '../lib/lastOrder.js';
+import { reportStep, attributionForOrder } from '../lib/attribution.js';
 
 const METHOD_ICON = { tikkie: '🟢', revolut: '⚫', paypal: '🔵' };
 
@@ -116,6 +117,13 @@ export default function Checkout() {
     return () => { alive = false; };
   }, [placed]);
 
+  /* Third funnel step. Reaching the checkout with something in the cart is the
+     last thing that happens before the money, so it is the drop-off worth
+     knowing about: an advert that fills carts and loses them at the payment
+     screen is a different problem from one that never fills a cart at all.
+     Fires once per visit — the server's unique index enforces that, not this. */
+  useEffect(() => { if (items.length) reportStep('checkout'); }, [items.length]);
+
   useEffect(() => { if (user?.email) setEmail(user.email); }, [user]);
   useEffect(() => {
     if (!user) { setCreditBalance(0); return; }
@@ -206,6 +214,11 @@ export default function Checkout() {
         // sentence travels with it because the wording is what was agreed to.
         consent: true,
         consentText: consentSentence,
+        /* Which advert this sale belongs to, when the visitor allowed us to
+           remember. Spread rather than set: with marketing refused this is an
+           empty object and the order carries no attribution at all, which is
+           the honest outcome — an unattributed sale, not a guessed one. */
+        ...attributionForOrder(),
       });
 
       if (provider === 'mollie') {
