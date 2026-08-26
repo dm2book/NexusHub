@@ -24,7 +24,7 @@ import { assertOrderLimits } from './orderLimitService.js';
 import { audit } from './auditService.js';
 import { getProduct } from './productService.js';
 import { postOrderEvent, postFraudHoldAlert, postDeliveryProof } from './discordService.js';
-import { notifyOwner } from './notifyService.js';
+import { alertOwner } from './notifyService.js';
 import { assertLaunched } from './launchGateService.js';
 import { syncMemberRoles, sendDeliveryDm } from './discordRolesService.js';
 import { availableCount, claimCodes, checkLowStock, releaseCodes } from './codeStockService.js';
@@ -493,7 +493,7 @@ export async function transitionOrder(orderId, to, ctx = {}) {
   if (NOTIFY_ON[to]) {
     const items = (updated.items || [])
       .map((i) => `${i.quantity > 1 ? `${i.quantity}× ` : ''}${i.name}`);
-    await notifyOwner(NOTIFY_ON[to], {
+    await alertOwner(NOTIFY_ON[to], {
       title: `${updated.number} · ${updated.totalFormatted || formatMoney(updated.total, updated.currency)}`,
       lines: [
         items.length ? items.join(', ') : 'no items',
@@ -501,6 +501,12 @@ export async function transitionOrder(orderId, to, ctx = {}) {
         ...(ctx.reason ? [`Reason: ${ctx.reason}`] : []),
       ],
       url: `${config.appUrl}/admin/orders/${updated.id}`,
+      /* One alert per order per transition, not per call.
+         transitionOrder is reached from the checkout, the PSP webhook, the
+         admin panel and the retry sweep, and a replayed webhook walks the same
+         path again. The order number plus the state it moved to is the event;
+         anything else is the same event described twice. */
+      key: `${updated.number}:${to}`,
     }).catch(() => {});
   }
 

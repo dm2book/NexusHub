@@ -17,6 +17,8 @@ import { createConnector } from './supplier/registry.js';
 import { resolveFulfillmentSupplier, getSupplier } from './supplier/supplierService.js';
 import { getOrder, transitionOrder, canTransition, autoDispenseFromStock, insertDeliveries } from './orderService.js';
 import { notify } from './notificationService.js';
+import { alertOwner } from './notifyService.js';
+import { config } from '../config/env.js';
 
 const parse = (s) => { try { return JSON.parse(s || 'null'); } catch { return null; } };
 
@@ -99,6 +101,28 @@ async function runAutoFulfillment(order, item, { supplier, supplierProduct }, ct
         { r: JSON.stringify({ error: err.message }), at: nowIso(), id: reqId });
     await logFulfillment('error', { requestId: reqId, orderId: order.id, actor: supplier.id,
       detail: { error: err.message } });
+
+    /* Tell the owner, because nobody else will.
+
+       A failed fulfilment is the quietest expensive thing this shop does: the
+       buyer has paid, the order sits in the queue, and the first sign is a
+       ticket some hours later asking where the code is. Every other failure
+       here already had a log line, and a log line is only read by someone who
+       already suspects there is a problem.
+
+       Keyed on the request, so the maintenance sweep re-reading the same failed
+       request does not page again for a failure that has not changed. */
+    await alertOwner('fulfillment.failed', {
+      title: `${order.number} · ${item.name || 'item'} could not be fulfilled`,
+      lines: [
+        `Supplier: ${supplier.name || supplier.id}`,
+        `Error: ${String(err.message || 'unknown').slice(0, 200)}`,
+        `Customer: ${order.email}`,
+        'The order stays in the queue — deliver it by hand or refund it.',
+      ],
+      url: `${config.appUrl}/admin/orders/${order.id}`,
+      key: reqId,
+    }).catch(() => {});
   }
   return get('SELECT * FROM fulfillment_requests WHERE id=@id', { id: reqId });
 }

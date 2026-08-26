@@ -12,6 +12,7 @@ import { sweepMemberRoles } from './discordRolesService.js';
 import { purgeExpiredLinkIntents } from './discordLinkService.js';
 import { pruneOutbox } from './discordService.js';
 import { pruneAttribution } from './attributionService.js';
+import { sweepAlerts, pruneAlerts } from './notifyService.js';
 
 const HOURS = (n) => new Date(Date.now() - n * 3_600_000).toISOString();
 const DAYS = (n) => new Date(Date.now() - n * 86_400_000).toISOString();
@@ -179,6 +180,28 @@ export async function runMaintenance() {
   try {
     summary.adVisitsPruned = (await pruneAttribution()).removed;
   } catch (e) { summary.adVisitsError = e.message; }
+
+  /* 15. Owner alerts that never got through, and storms that have blown over.
+   *
+   *     An alert whose channels were all down for ninety seconds used to be
+   *     gone. It is now a row, and this is the thing that comes back for it —
+   *     with backoff, and giving up after six attempts so a deleted webhook
+   *     becomes an hourly reminder rather than an infinite queue.
+   *
+   *     The same pass closes out suppressed bursts: everything held back during
+   *     a storm is summarised in one line per event, which is the only reason
+   *     suppressing them is honest rather than just quieter. */
+  try {
+    const swept = await sweepAlerts({ limit: 20 });
+    summary.alertsRetried = swept.retried;
+    summary.alertsDelivered = swept.delivered;
+    if (swept.givenUp) summary.alertsGivenUp = swept.givenUp;
+    if (swept.summarised) summary.alertStormsSummarised = swept.summarised;
+  } catch (e) { summary.alertSweepError = e.message; }
+
+  try {
+    summary.alertsPruned = await pruneAlerts();
+  } catch (e) { summary.alertPruneError = e.message; }
 
   return summary;
 }

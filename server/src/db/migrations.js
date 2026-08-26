@@ -1203,4 +1203,60 @@ ALTER TABLE orders ADD COLUMN IF NOT EXISTS ad_visit_id TEXT;
 CREATE INDEX IF NOT EXISTS idx_orders_ad_visit ON orders (ad_visit_id) WHERE ad_visit_id IS NOT NULL;
 `,
   },
+  {
+    id: '032_owner_alerts',
+    sql: `
+-- Owner alerts, on paper rather than in the air.
+--
+-- notifyService already sends to Discord, Telegram and Pushover in parallel,
+-- with a timeout and one retry, and it never throws. What it could not do is
+-- remember. If every channel was down for the ninety seconds a chargeback
+-- arrived in, that chargeback was never mentioned again — the one alert whose
+-- whole value is that it reaches a human.
+--
+-- This table is what makes the other three requirements possible at all:
+--
+--   deduplication   a unique key per real-world event, enforced by an index
+--                   rather than by a SELECT that races itself
+--   retry           a row that has not been delivered is still there for the
+--                   maintenance sweep to try again, with backoff
+--   storm control   the count of recent rows of one kind is the thing that
+--                   decides whether the next one is sent or folded into a
+--                   summary; you cannot rate-limit what you did not record
+--
+-- Kept for 30 days and then pruned. Long enough to see what happened during an
+-- incident, short enough that it is not a second copy of the order history.
+CREATE TABLE IF NOT EXISTS owner_alerts (
+  id           TEXT PRIMARY KEY,
+  event        TEXT NOT NULL,          -- key of notifyService EVENTS
+  dedupe_key   TEXT NOT NULL,          -- one real-world occurrence; see below
+  priority     INTEGER NOT NULL DEFAULT 0,
+  title        TEXT NOT NULL,
+  lines        TEXT NOT NULL DEFAULT '[]',
+  url          TEXT,
+  -- pending → sent, or → failed once the attempts run out. 'suppressed' is a
+  -- storm that was folded into another alert rather than sent on its own.
+  status       TEXT NOT NULL DEFAULT 'pending',
+  attempts     INTEGER NOT NULL DEFAULT 0,
+  last_error   TEXT,
+  channels     TEXT,                   -- JSON: which channels took it
+  next_try_at  TEXT,                   -- when the sweep may try again
+  created_at   TEXT NOT NULL,
+  updated_at   TEXT NOT NULL
+);
+
+-- THE dedup guarantee. Two callers racing on the same event insert the same
+-- key and exactly one wins; the loser gets a constraint violation and knows to
+-- stay quiet. A SELECT-then-INSERT would let both through under load, which is
+-- precisely when duplicate pages are least welcome.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_owner_alerts_dedupe ON owner_alerts (dedupe_key);
+
+-- The sweep's query: anything not yet delivered whose backoff has elapsed.
+CREATE INDEX IF NOT EXISTS idx_owner_alerts_retry
+  ON owner_alerts (next_try_at) WHERE status = 'pending';
+-- Storm control counts by event over a window.
+CREATE INDEX IF NOT EXISTS idx_owner_alerts_event ON owner_alerts (event, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_owner_alerts_time  ON owner_alerts (created_at DESC);
+`,
+  },
 ];

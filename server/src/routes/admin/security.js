@@ -158,6 +158,37 @@ router.post('/discord/sync', requirePermission('security.manage'),
   }));
 
 // ── Users & roles ──────────────────────────────────────────────────────────
+/**
+ * Owner alerts, including the ones that never arrived.
+ *
+ * The point of recording alerts is that a failure is visible somewhere. Without
+ * this the table was write-only: a page that no channel accepted, or one folded
+ * into a storm summary, existed only as a row nobody could reach.
+ *
+ * Ordered by what is wrong first — anything not delivered, then the rest by
+ * time — because that is the order this is read in.
+ */
+router.get('/alerts', requirePermission('security.manage'), asyncHandler(async (req, res) => {
+  const limit = Math.min(Number(req.query.limit) || 50, 200);
+  const rows = await all(
+    `SELECT id, event, dedupe_key, priority, title, lines, url, status, attempts,
+            last_error, channels, next_try_at, created_at
+       FROM owner_alerts
+      ORDER BY CASE status WHEN 'pending' THEN 0 WHEN 'failed' THEN 1 ELSE 2 END,
+               created_at DESC
+      LIMIT @limit`, { limit });
+  const counts = await all(
+    `SELECT status, COUNT(*) AS n FROM owner_alerts GROUP BY status`);
+  res.json({
+    alerts: rows.map((r) => ({
+      ...r,
+      lines: (() => { try { return JSON.parse(r.lines || '[]'); } catch { return []; } })(),
+      channels: (() => { try { return JSON.parse(r.channels || '[]'); } catch { return []; } })(),
+    })),
+    counts: Object.fromEntries(counts.map((c) => [c.status, Number(c.n)])),
+  });
+}));
+
 router.get('/roles', requirePermission('users.read'), asyncHandler(async (_req, res) => {
   const roles = await all(`SELECT r.*,
     (SELECT string_agg(permission_id, ',') FROM role_permissions WHERE role_id=r.id) AS perms

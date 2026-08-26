@@ -11,6 +11,7 @@ import { config } from '../config/env.js';
 import { get, all, run, nowIso } from '../db/index.js';
 import { newId } from '../utils/ids.js';
 import { renderTemplate, renderTokens, wrapBranded, baseContext } from './templateService.js';
+import { alertOwner } from './notifyService.js';
 
 /**
  * nodemailer is loaded on the first SMTP send, not on import.
@@ -157,6 +158,28 @@ export async function sendEmail(eventKey, to, context = {}) {
          VALUES (@id, @t, @to, @subj, 'failed', @err, @ctx, @at)`,
         { id, t: eventKey, to, subj: subject, err: err.message,
           ctx: JSON.stringify(context), at });
+
+    /* A delivery mail that does not send is a paid-for code sitting in a
+       database table nobody reads. The row above records it and the retry
+       sweep will try again, but both of those are invisible: if the mailer is
+       misconfigured every order fails the same way and the shop looks fine
+       from the outside until the tickets arrive.
+
+       Deliberately keyed on the TEMPLATE, not the recipient. One bounced
+       address is the address; every order_completed failing is the mailer, and
+       that is the alert worth having. The storm rules then fold the rest of a
+       broken-mailer burst into one summary rather than one page per order. */
+    alertOwner('email.failed', {
+      title: `Email "${eventKey}" could not be sent`,
+      lines: [
+        `Recipient: ${String(to).replace(/(.).*(@.*)/, '$1•••$2')}`,
+        `Error: ${String(err.message || 'unknown').slice(0, 200)}`,
+        'The message is in email_log and the hourly sweep will retry it.',
+      ],
+      url: `${config.appUrl}/admin/emails`,
+      key: `${eventKey}:${at.slice(0, 13)}`,
+    }).catch(() => {});
+
     throw err;
   }
 }

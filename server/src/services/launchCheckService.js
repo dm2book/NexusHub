@@ -7,7 +7,7 @@ import { config, manualPayMethods } from '../config/env.js';
 import { get, all } from '../db/index.js';
 import { iconFor } from '../db/demoSeed.js';
 import { botSeenRecently } from './discordService.js';
-import { configuredChannels } from './notifyService.js';
+import { configuredChannels, EVENTS as NOTIFY_EVENTS } from './notifyService.js';
 import { isEnabled as mollieEnabled, isTestKey as mollieTestKey, SUPPORTED_METHODS as MOLLIE_METHODS } from './mollieService.js';
 // The only place the server reaches into the SPA tree. legalIdentity.js is a
 // dependency-free constants module that both sides must agree on: the storefront
@@ -257,10 +257,32 @@ export async function launchChecks() {
   // which polls once a minute — so having that set is not the same as being
   // told, and this check says so rather than counting it.
   const notify = configuredChannels();
-  add('notify', 'Owner alerts', notify.length ? 'ok' : 'warn',
-    notify.length
-      ? `${notify.join(' + ')} — paid, failed, refund, chargeback and low stock, within seconds`
-      : 'Nothing set, so a chargeback or a sold-out product waits until you happen to look. Set any one of NOTIFY_DISCORD_WEBHOOK_URL, TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID, or PUSHOVER_TOKEN + PUSHOVER_USER.');
+  /* The count comes from EVENTS rather than a sentence, because the sentence
+     was already out of date: it promised five events after four more had been
+     added, and a readiness panel that lists fewer alerts than exist teaches the
+     owner not to trust it. */
+  const eventCount = Object.keys(NOTIFY_EVENTS).length;
+  if (!notify.length) {
+    add('notify', 'Owner alerts', 'warn',
+      'Nothing set, so a chargeback, a failed fulfilment or a sold-out product waits until you '
+      + 'happen to look. Set any one of NOTIFY_DISCORD_WEBHOOK_URL, TELEGRAM_BOT_TOKEN + '
+      + 'TELEGRAM_CHAT_ID, or PUSHOVER_TOKEN + PUSHOVER_USER.');
+  } else {
+    /* Undelivered alerts are the thing worth surfacing here. Channels being
+       configured says the plumbing exists; a queue of pending ones says it is
+       not working, which is exactly what an owner cannot otherwise see. */
+    let stuck = 0;
+    try {
+      stuck = Number((await get(
+        `SELECT COUNT(*) AS n FROM owner_alerts WHERE status IN ('pending','failed')`))?.n || 0);
+    } catch { /* table not migrated yet — the channels line is still true */ }
+    add('notify', 'Owner alerts', stuck ? 'warn' : 'ok',
+      stuck
+        ? `${notify.join(' + ')} configured, but ${stuck} alert(s) have not been delivered — `
+          + 'GET /api/admin/alerts shows why.'
+        : `${notify.join(' + ')} — ${eventCount} events, deduplicated, retried, `
+          + 'and rate-limited so a burst cannot bury the one that matters');
+  }
 
   const failing = checks.filter((c) => c.status === 'fail').length;
   const warning = checks.filter((c) => c.status === 'warn').length;

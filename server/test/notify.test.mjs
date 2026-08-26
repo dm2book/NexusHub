@@ -191,20 +191,20 @@ console.log('\n— All five events are connected to real state changes —');
     'wiring them per-call-site would drift from TRANSITIONS');
   ok('…inside transitionOrder, which every status change goes through',
     /transitionOrder[\s\S]*NOTIFY_ON/.test(orders));
-  ok('chargeback notifies', /notifyOwner\('chargeback'/.test(cb));
+  ok('chargeback notifies', /alertOwner\('chargeback'/.test(cb));
   ok('…after the duplicate guard, so a retried PSP webhook buzzes once',
-    /if \(existing\) return \{ id: existing\.id, duplicate: true \}[\s\S]*notifyOwner\('chargeback'/.test(cb),
+    /if \(existing\) return \{ id: existing\.id, duplicate: true \}[\s\S]*alertOwner\('chargeback'/.test(cb),
     'a PSP retry would notify repeatedly');
   /* Stock is a LADDER now — 10, 5, 0 — so the event name is chosen per rung
      rather than hard-coded. Assert the property (every rung has an event, and
      nothing sends before the rung is claimed) instead of one literal string,
      which is what this pair used to do and why it broke on a change that kept
      the behaviour intact. */
-  ok('low stock notifies', /notifyOwner\(event,/.test(stock)
+  ok('low stock notifies', /alertOwner\(event,/.test(stock)
     && ['stock.low', 'stock.critical', 'stock.out'].every((e) => stock.includes(`'${e}'`)),
     'the three rungs must each have an event to send');
   ok('…after the rung is claimed, so it fires per stock cycle not per order',
-    /low_stock_alert_level IS NULL OR low_stock_alert_level > @tier[\s\S]*notifyOwner\(event,/.test(stock),
+    /low_stock_alert_level IS NULL OR low_stock_alert_level > @tier[\s\S]*alertOwner\(event,/.test(stock),
     'without the conditional claim, concurrent orders each send the same warning');
 
   // The launch dashboard has to admit when nobody is being told anything.
@@ -213,7 +213,7 @@ console.log('\n— All five events are connected to real state changes —');
     /configuredChannels\(\)/.test(launch), 'configuredChannels would be dead code');
 
   /**
-   * Find what follows each notifyOwner(...) call.
+   * Find what follows each alertOwner(...) call.
    *
    * Counting brackets rather than matching a closing `})`: the messages contain
    * things like `(alert threshold ${config…})`, so a regex stops inside the
@@ -222,8 +222,8 @@ console.log('\n— All five events are connected to real state changes —');
    */
   const callTails = (src) => {
     const tails = [];
-    for (let i = src.indexOf('notifyOwner('); i !== -1; i = src.indexOf('notifyOwner(', i + 1)) {
-      let depth = 0, j = i + 'notifyOwner'.length;
+    for (let i = src.indexOf('alertOwner('); i !== -1; i = src.indexOf('alertOwner(', i + 1)) {
+      let depth = 0, j = i + 'alertOwner'.length;
       for (; j < src.length; j++) {
         if (src[j] === '(') depth++;
         else if (src[j] === ')' && --depth === 0) { j++; break; }
