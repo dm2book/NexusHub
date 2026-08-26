@@ -1,6 +1,7 @@
 /** Supplier auto-fulfillment activation: paid order with a mapped supplier is
  *  auto-sourced + delivered + completed; margin guard + no-supplier + async
  *  re-poll all behave. Uses an in-memory TestConnector registered at runtime. */
+import './_selling-shop.mjs';   // must come first — see that file
 import { ensureReady } from '../src/app.js';
 import { get, all, nowIso } from '../src/db/index.js';
 import { SupplierConnector } from '../src/services/supplier/SupplierConnector.js';

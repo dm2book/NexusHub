@@ -19,6 +19,17 @@
 process.env.DATABASE_URL ||= 'postgres://postgres:postgres@127.0.0.1:5432/forge_mollie';
 process.env.NODE_ENV ||= 'development';
 process.env.APP_URL ||= 'https://forgemarket.nl';
+/* This suite exercises a shop that SELLS, so it says so.
+ *
+ * The launch gate's default changed: with no LAUNCH_DATE and no LAUNCH_MODE, a
+ * shop that has never taken a payment refuses orders. That is the point — it is
+ * what stops a deployment opening to the public by accident — and a fresh test
+ * database is, by definition, a shop that has never taken a payment.
+ *
+ * Declaring the intent here is better than the gate having a special case for
+ * tests: the production behaviour is the behaviour under test everywhere else. */
+process.env.LAUNCH_MODE ||= 'open';
+
 process.env.MOLLIE_API_KEY = 'test_stubbedkey';
 
 let pass = 0, fail = 0;
