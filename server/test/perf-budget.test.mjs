@@ -239,7 +239,11 @@ console.log('— Background polling —');
   ok('polling stops while the tab is hidden',
     /visibilityState === 'hidden'/.test(feed) && /visibilitychange/.test(feed));
   ok('an empty feed backs the interval off instead of asking again every minute',
-    /MAX_POLL/.test(feed) && /emptyRuns/.test(feed));
+    /MAX_POLL/.test(feed) && /quietRuns/.test(feed));
+  // The one caller still knocking on the API every minute during the quota
+  // outage was this ticker, and every knock was a cold start.
+  ok('a failing feed backs off too, instead of hammering a broken API',
+    /\.catch\(\(\) => backOff\(true\)\)/.test(feed));
 
   const consumers = ['src/components/SiteExtras.jsx',
     'src/components/store/LiveActivity.jsx',

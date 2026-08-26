@@ -32,13 +32,14 @@ let statsCache = null;
  *
  *   hidden tab   a tab in the background is not showing a ticker to anybody.
  *                Left open overnight it was still asking every minute.
- *   empty feed   the feed only changes when an order completes. Before the shop
- *                opens that never happens, so after a few empty answers the
- *                interval backs off rather than asking the same question of the
- *                database 1,440 times a day.
+ *   nothing to  the feed only changes when an order completes. Before the shop
+ *   report      opens that never happens, so after a few empty answers — or a
+ *               few failed ones — the interval backs off rather than asking the
+ *               same question of the database 1,440 times a day.
  *
- * The back-off resets the moment an answer is non-empty, so a shop that starts
- * selling returns to a live ticker without a reload.
+ * The back-off resets the moment an answer arrives with something in it, so a
+ * shop that starts selling, or a database that comes back, returns to a live
+ * ticker without a reload.
  */
 const BASE_POLL = 60_000;
 const MAX_POLL = 10 * 60_000;
@@ -46,7 +47,7 @@ const MAX_POLL = 10 * 60_000;
 const subscribers = new Set();
 let timer = null;
 let interval = BASE_POLL;
-let emptyRuns = 0;
+let quietRuns = 0;
 let inFlight = null;
 
 const hidden = () => typeof document !== 'undefined' && document.visibilityState === 'hidden';
@@ -58,16 +59,29 @@ function fetchFeed() {
     .then((r) => {
       if (!Array.isArray(r?.feed)) return;
       feedCache = r.feed;
-      emptyRuns = r.feed.length ? 0 : emptyRuns + 1;
-      // Back off geometrically while there is nothing to show; snap back the
-      // instant there is.
-      interval = r.feed.length ? BASE_POLL
-        : Math.min(MAX_POLL, BASE_POLL * 2 ** Math.min(4, emptyRuns));
+      backOff(r.feed.length === 0);
       for (const fn of subscribers) fn(r.feed);
     })
-    .catch(() => { /* a ticker is not worth an error */ })
+    /* A ticker is not worth an error — but it is also not worth a request a
+       minute at a server that is failing. Read from the production logs during
+       the quota outage: /api/social/feed at 22:43, 22:44, 22:45, 22:46, 22:47,
+       every one a 500, every one a cold start that tried to run the migrations
+       against a database refusing connections. The one caller still knocking on
+       a dead API was the ticker nobody was watching. */
+    .catch(() => backOff(true))
     .finally(() => { inFlight = null; reschedule(); });
   return inFlight;
+}
+
+/**
+ * Back off geometrically while there is nothing to show — or nothing answering
+ * — and snap back to the normal rhythm the moment there is.
+ */
+function backOff(quiet) {
+  quietRuns = quiet ? quietRuns + 1 : 0;
+  interval = quiet
+    ? Math.min(MAX_POLL, BASE_POLL * 2 ** Math.min(4, quietRuns))
+    : BASE_POLL;
 }
 
 function reschedule() {
