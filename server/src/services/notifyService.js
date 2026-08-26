@@ -66,6 +66,56 @@ export const EVENTS = {
   'stock.low':       { emoji: '📉', color: 0xf97316, priority: -1, label: 'Low stock' },
   'stock.critical':  { emoji: '🟠', color: 0xf59e0b, priority: 0,  label: 'Stock critical' },
   'stock.out':       { emoji: '🔴', color: 0xef4444, priority: 1,  label: 'Out of stock' },
+
+  /* The four things that break quietly.
+
+     Everything above is an event in the shop's own story — a sale, a refund, a
+     shelf running out. These four are the shop failing to do its job, and they
+     share a property that makes them worse than the ones above: nobody
+     complains about them. A buyer whose payment failed tries again. A buyer
+     whose fulfilment failed just waits, and the first anyone hears is a ticket
+     hours later; a webhook Mollie could not deliver is money that arrived with
+     no order to attach it to; an email that did not send is a code sitting in a
+     database table nobody reads.
+
+     All four are priority 1 except email, because a single bounced address is
+     usually the address and not the mailer — it becomes loud through the storm
+     rules instead, when it turns out to be all of them. */
+  'fulfillment.failed': { emoji: '📦', color: 0xdc2626, priority: 1, label: 'Fulfilment failed' },
+  'webhook.failed':     { emoji: '🔌', color: 0xdc2626, priority: 1, label: 'Payment webhook failed' },
+  'email.failed':       { emoji: '📧', color: 0xf59e0b, priority: 0, label: 'Email delivery failed' },
+  'system.error':       { emoji: '🚨', color: 0xef4444, priority: 1, label: 'System error' },
+};
+
+/**
+ * How many of one event may be sent before the rest are folded together.
+ *
+ * A storm is not a volume problem, it is an attention problem: thirty pages in
+ * two minutes is thirty pages nobody reads, and the thirty-first — the one that
+ * was different — arrives to a muted phone. So each event gets a small budget
+ * per window, and past it the alerts are recorded and suppressed, with one
+ * summary sent at the end saying how many there were.
+ *
+ * The budgets differ because the events do. Ten paid orders in five minutes is
+ * a good day and every one of them is worth seeing. Ten system errors in five
+ * minutes is one outage, and the tenth adds nothing the first did not.
+ */
+export const STORM = {
+  windowMs: 5 * 60_000,
+  perEvent: {
+    'order.paid': 20,
+    'payment.failed': 5,
+    'order.refunded': 10,
+    chargeback: 10,              // rare and expensive: almost never suppress
+    'stock.low': 5,
+    'stock.critical': 5,
+    'stock.out': 10,
+    'fulfillment.failed': 3,
+    'webhook.failed': 3,
+    'email.failed': 3,
+    'system.error': 3,
+  },
+  default: 5,
 };
 
 /**
@@ -226,6 +276,229 @@ export async function notifyOwner(event, message) {
   });
   if (failed.length) console.error(`[notify] ${event}: ${sent.length} sent, failed on ${failed.join(', ')}`);
   return { sent, failed, configured: started.length };
+}
+
+// ── The durable layer ───────────────────────────────────────────────────────
+//
+// Everything above is the sending. This is the remembering, and it is what
+// turns three best-effort HTTP calls into something an owner can rely on.
+
+/**
+ * Record, deduplicate, rate-limit, send, and remember the outcome.
+ *
+ * This is the entry point every call site should use. `notifyOwner` still
+ * exists and still only sends — it is what the retry sweep calls once a row
+ * already exists, and using it directly means an alert nobody will ever miss
+ * the absence of.
+ *
+ * @param {keyof EVENTS} event
+ * @param {{title: string, lines: string[], url?: string, key?: string}} message
+ *   `key` identifies the real-world occurrence. Two calls with the same key are
+ *   the same event, however far apart the code paths are: a chargeback observed
+ *   by both the webhook and the nightly reconciliation should page once. When
+ *   it is omitted the title is used, which deduplicates the common accidents
+ *   and nothing else.
+ * @returns {Promise<{status: 'sent'|'failed'|'duplicate'|'suppressed'|'unrecorded', id?: string}>}
+ */
+export async function alertOwner(event, message) {
+  const meta = EVENTS[event];
+  if (!meta) {
+    console.error(`[notify] unknown event "${event}"`);
+    return { status: 'failed' };
+  }
+
+  /* Everything below is wrapped, and the catch does NOT rethrow.
+
+     This runs inside order transitions and payment webhooks. A missing table, a
+     database that has just gone away, a constraint nobody anticipated — none of
+     them may be the reason a paid order fails to settle. When the bookkeeping
+     is unavailable the alert is still SENT, just not remembered: losing the
+     audit trail is bad, losing the page is worse. */
+  let db;
+  try {
+    db = await import('../db/index.js');
+  } catch {
+    const r = await notifyOwner(event, message);
+    return { status: r.sent.length ? 'sent' : 'failed' };
+  }
+
+  const { run, get, all, nowIso } = db;
+  const key = `${event}:${message.key || message.title}`.slice(0, 300);
+  const id = (await import('../utils/ids.js')).newId('oal');
+  const at = nowIso();
+
+  try {
+    /* The dedup guarantee, and the only correct place for it.
+       ON CONFLICT DO NOTHING plus a rowcount check: two workers racing on the
+       same event both insert, exactly one row survives, and the loser learns it
+       lost from the database rather than from a SELECT it ran a moment earlier. */
+    const ins = await run(
+      `INSERT INTO owner_alerts
+         (id, event, dedupe_key, priority, title, lines, url, status, next_try_at, created_at, updated_at)
+       VALUES (@id, @ev, @key, @pri, @title, @lines, @url, 'pending', @at, @at, @at)
+       ON CONFLICT (dedupe_key) DO NOTHING`,
+      { id, ev: event, key, pri: meta.priority, title: String(message.title || meta.label),
+        lines: JSON.stringify(message.lines || []), url: message.url || null, at });
+    // `changes`, not `rowCount` — db/index.js normalises the driver's shape, and
+    // reading the wrong field would have made every alert look like a duplicate
+    // and sent nothing at all.
+    if (!ins?.changes) return { status: 'duplicate' };
+  } catch (e) {
+    // Bookkeeping unavailable. Send anyway; see above.
+    console.error('[notify] could not record alert:', e.message);
+    const r = await notifyOwner(event, message);
+    return { status: r.sent.length ? 'sent' : 'unrecorded' };
+  }
+
+  // ── Storm control ─────────────────────────────────────────────────────────
+  try {
+    const budget = STORM.perEvent[event] ?? STORM.default;
+    const since = new Date(Date.now() - STORM.windowMs).toISOString();
+    const recent = Number((await get(
+      `SELECT COUNT(*) AS n FROM owner_alerts
+        WHERE event = @ev AND created_at > @since AND status IN ('sent','suppressed')`,
+      { ev: event, since }))?.n || 0);
+
+    if (recent >= budget) {
+      /* Over budget. The alert is kept — it is in the table and readable in the
+         admin panel — but it does not ring. One summary is sent when the window
+         closes instead, by the sweep, so the owner learns "fourteen more of
+         these" in a single line rather than fourteen times. */
+      await run(`UPDATE owner_alerts SET status='suppressed', updated_at=@at WHERE id=@id`,
+        { at: nowIso(), id });
+      return { status: 'suppressed', id };
+    }
+  } catch (e) {
+    // Cannot count: send rather than silently swallow.
+    console.error('[notify] storm check failed:', e.message);
+  }
+
+  return deliverAlert({ id, event, message, run, get, all, nowIso });
+}
+
+/** Send one recorded alert and write down what happened. */
+async function deliverAlert({ id, event, message, run, nowIso }) {
+  const r = await notifyOwner(event, message);
+  const ok = r.sent.length > 0;
+  try {
+    if (ok) {
+      await run(
+        `UPDATE owner_alerts SET status='sent', attempts=attempts+1, channels=@ch,
+                last_error=NULL, next_try_at=NULL, updated_at=@at WHERE id=@id`,
+        { ch: JSON.stringify(r.sent), at: nowIso(), id });
+    } else if (r.configured === 0) {
+      /* No channels at all. Not a failure to retry — retrying an unconfigured
+         shop forever fills the table with rows that can never succeed. The row
+         stays as the record that something happened and nobody was told. */
+      await run(
+        `UPDATE owner_alerts SET status='failed', last_error='no channels configured',
+                next_try_at=NULL, updated_at=@at WHERE id=@id`, { at: nowIso(), id });
+    } else {
+      await run(
+        `UPDATE owner_alerts SET attempts=attempts+1, last_error=@err,
+                next_try_at=@next, updated_at=@at WHERE id=@id`,
+        { err: `no channel accepted it (${r.failed.join(', ')})`.slice(0, 300),
+          next: backoff(1), at: nowIso(), id });
+    }
+  } catch (e) { console.error('[notify] could not record outcome:', e.message); }
+  return { status: ok ? 'sent' : 'failed', id };
+}
+
+/**
+ * When to try again.
+ *
+ * Doubling from a minute, capped at an hour. The cap matters more than the
+ * curve: an alert that has failed six times is probably failing because the
+ * webhook was deleted, and an hourly retry is a reminder to fix it rather than
+ * a queue that quietly gives up.
+ */
+const backoff = (attempts) =>
+  new Date(Date.now() + Math.min(60, 2 ** Math.max(0, attempts - 1)) * 60_000).toISOString();
+
+/** Alerts are given up on after this many attempts. */
+export const MAX_ATTEMPTS = 6;
+
+/**
+ * Retry what did not get through, and close out any storm windows.
+ *
+ * Called by the maintenance sweep. Two jobs in one pass because they share the
+ * same table and the same "what happened while nobody was looking" question.
+ */
+export async function sweepAlerts({ limit = 20 } = {}) {
+  const { run, get, all, nowIso } = await import('../db/index.js');
+  const out = { retried: 0, delivered: 0, givenUp: 0, summarised: 0 };
+
+  const due = await all(
+    `SELECT * FROM owner_alerts
+      WHERE status = 'pending' AND (next_try_at IS NULL OR next_try_at <= @now)
+      ORDER BY priority DESC, created_at ASC LIMIT @limit`,
+    { now: nowIso(), limit });
+
+  for (const row of due) {
+    if (row.attempts >= MAX_ATTEMPTS) {
+      await run(`UPDATE owner_alerts SET status='failed', updated_at=@at WHERE id=@id`,
+        { at: nowIso(), id: row.id });
+      out.givenUp++;
+      continue;
+    }
+    out.retried++;
+    let lines = [];
+    try { lines = JSON.parse(row.lines || '[]'); } catch { /* keep it sendable */ }
+    const r = await notifyOwner(row.event, { title: row.title, lines, url: row.url || undefined });
+    if (r.sent.length) {
+      await run(
+        `UPDATE owner_alerts SET status='sent', attempts=attempts+1, channels=@ch,
+                last_error=NULL, next_try_at=NULL, updated_at=@at WHERE id=@id`,
+        { ch: JSON.stringify(r.sent), at: nowIso(), id: row.id });
+      out.delivered++;
+    } else {
+      await run(
+        `UPDATE owner_alerts SET attempts=attempts+1, last_error=@err, next_try_at=@next,
+                updated_at=@at WHERE id=@id`,
+        { err: `retry failed (${r.failed.join(', ') || 'no channels'})`.slice(0, 300),
+          next: backoff(row.attempts + 1), at: nowIso(), id: row.id });
+    }
+  }
+
+  /* Close out storms. Anything suppressed and now outside its window is
+     summarised in one line per event type — the owner is told the count and
+     where to read the detail, which is the whole point of suppressing them. */
+  const cutoff = new Date(Date.now() - STORM.windowMs).toISOString();
+  const storms = await all(
+    `SELECT event, COUNT(*) AS n, MIN(created_at) AS first, MAX(created_at) AS last
+       FROM owner_alerts WHERE status = 'suppressed' AND created_at <= @cutoff
+      GROUP BY event`, { cutoff });
+  for (const st of storms) {
+    const meta = EVENTS[st.event] || { label: st.event };
+    const n = Number(st.n);
+    await notifyOwner(st.event, {
+      title: `${n} more ${meta.label.toLowerCase()} alert${n === 1 ? '' : 's'} were held back`,
+      lines: [
+        `${n} further ${st.event} alert${n === 1 ? '' : 's'} arrived in a short burst and were not sent individually.`,
+        `First ${String(st.first).slice(0, 19)}Z, last ${String(st.last).slice(0, 19)}Z.`,
+        // Names what exists. An earlier draft pointed at an admin page that was
+        // never built, which is the same class of mistake this whole file is
+        // about: an alert that tells you where to look and is wrong.
+        'All of them are recorded — GET /api/admin/alerts lists them.',
+      ],
+    });
+    await run(`UPDATE owner_alerts SET status='summarised', updated_at=@at
+                WHERE status='suppressed' AND event=@ev AND created_at <= @cutoff`,
+      { at: nowIso(), ev: st.event, cutoff });
+    out.summarised += n;
+  }
+
+  return out;
+}
+
+/** Drop alerts past the retention window. */
+export async function pruneAlerts({ days = 30 } = {}) {
+  const { run, get, nowIso } = await import('../db/index.js');
+  const cutoff = new Date(Date.now() - days * 86_400_000).toISOString();
+  const n = Number((await get('SELECT COUNT(*) AS n FROM owner_alerts WHERE created_at <= @c',
+    { c: cutoff }))?.n || 0);
+  await run('DELETE FROM owner_alerts WHERE created_at <= @c', { c: cutoff });
+  return n;
 }
 
 /** Which channels are wired up — used by the launch dashboard. */

@@ -8,7 +8,7 @@ import { run, get, all, nowIso, tx } from '../db/index.js';
 import { newId } from '../utils/ids.js';
 import { config } from '../config/env.js';
 import { postDropEvent, postStockAlert } from './discordService.js';
-import { notifyOwner, discordTarget } from './notifyService.js';
+import { alertOwner, discordTarget } from './notifyService.js';
 
 /** Add a batch of codes (array of strings) to a product's stock. Returns count added. */
 export async function addProductCodes(productId, codes = []) {
@@ -113,10 +113,11 @@ export async function checkLowStock(productId) {
        once: has anything been announced yet, is this rung more severe than the
        last one, and did a concurrent order just claim it. Exactly one caller
        gets changes > 0. */
+    const claimedAt = nowIso();
     const claimed = await run(
       `UPDATE products SET low_stock_alert_level = @tier, low_stock_alerted_at = @at
         WHERE id = @p AND (low_stock_alert_level IS NULL OR low_stock_alert_level > @tier)`,
-      { tier, at: nowIso(), p: productId });
+      { tier, at: claimedAt, p: productId });
     if (!claimed?.changes) return;
 
     const product = await get(`SELECT id, name FROM products WHERE id = @p`, { p: productId });
@@ -138,10 +139,27 @@ export async function checkLowStock(productId) {
     if (!(staffUrl && staffUrl === ownerUrl)) {
       await postStockAlert(product, remaining, tier).catch(() => {});
     }
-    await notifyOwner(event, {
+    await alertOwner(event, {
       title,
       lines: body,
       url: `${config.appUrl}/admin/products`,
+      /* Keyed on the CLAIM, not on the rung.
+
+         The conditional UPDATE above is already the race guard: exactly one
+         concurrent order wins the rung, and the loser returns before reaching
+         this line. So the only thing left for a dedup key to do is survive a
+         retry of the same claim — which means it has to identify the claim.
+
+         Two weaker keys were tried and both were wrong in the same direction.
+         `product:event:tier` is permanent, so after a restock and a fresh
+         sell-down the same rung was a real second event silenced forever.
+         Adding a minute bucket did not fix it either: a restock and the sell
+         down after it happen well inside one minute, which is exactly what the
+         stock-alerts suite does and exactly how this was caught, twice.
+
+         The claim timestamp changes every cycle, which is the property needed.
+         A dedup window must never outlive the thing it deduplicates. */
+      key: `${product.id}:${event}:${claimedAt}`,
     }).catch(() => {});
   } catch (err) {
     console.error('[stock] low-stock check failed:', err.message);

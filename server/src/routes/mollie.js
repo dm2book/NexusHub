@@ -23,6 +23,7 @@ import { getOrder, markPaymentReceived, transitionOrder, setPspPayment } from '.
 import { audit } from '../services/auditService.js';
 import { recordChargeback } from '../services/chargebackService.js';
 import { get } from '../db/index.js';
+import { alertOwner } from '../services/notifyService.js';
 
 const router = Router();
 
@@ -210,6 +211,26 @@ router.post('/mollie/webhook',
         return res.status(200).send('ignored');
       }
       console.error('[mollie] webhook failed:', err.message);
+
+      /* A webhook we asked Mollie to retry is money that has arrived with
+         nothing attached to it yet. Mollie gives up eventually, and when it
+         does the payment is settled on their side and the order is still
+         pending on ours — the single worst state this shop can be in, and one
+         that produces no customer complaint until the buyer notices.
+
+         Keyed on the payment id, so Mollie's own retry schedule pages once per
+         payment rather than once per attempt. */
+      alertOwner('webhook.failed', {
+        title: `Mollie webhook failed for ${id}`,
+        lines: [
+          `Error: ${String(err.message || 'unknown').slice(0, 200)}`,
+          'Mollie will retry; we answered 500 so that it does.',
+          'If this repeats, the payment may be settled with no order to match it.',
+        ],
+        url: `${config.appUrl}/admin/payments`,
+        key: id,
+      }).catch(() => {});
+
       return res.status(500).send('retry');
     }
   });

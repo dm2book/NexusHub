@@ -13,7 +13,7 @@
 import { run, get, all, nowIso } from '../db/index.js';
 import { newId } from '../utils/ids.js';
 import { audit } from './auditService.js';
-import { notifyOwner } from './notifyService.js';
+import { alertOwner } from './notifyService.js';
 import { formatMoney } from '../utils/money.js';
 import { config } from '../config/env.js';
 
@@ -60,7 +60,7 @@ export async function recordChargeback({
      priority so it gets through a silent phone, and it sits AFTER the duplicate
      guard above: a PSP that retries its webhook must not buzz the owner twice
      for the same dispute, or the alerts stop being read. */
-  await notifyOwner('chargeback', {
+  await alertOwner('chargeback', {
     title: `${order?.number || 'Unknown order'} · ${formatMoney(Math.abs(Number(amount) || 0), currency)}`,
     lines: [
       `Customer: ${email}`,
@@ -68,6 +68,9 @@ export async function recordChargeback({
       'Gather the delivery proof and answer the bank before the deadline.',
     ],
     url: order?.id ? `${config.appUrl}/admin/orders/${order.id}` : `${config.appUrl}/admin/security`,
+    // The dispute, not the notification. A bank that reports the same
+    // chargeback through two routes is still one chargeback.
+    key: id,
   }).catch(() => {});
 
   return { id, duplicate: false };
