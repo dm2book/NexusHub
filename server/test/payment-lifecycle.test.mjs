@@ -23,6 +23,13 @@
  */
 process.env.DATABASE_URL ||= 'postgres://postgres:postgres@127.0.0.1:5432/forge_pay_test';
 process.env.NODE_ENV ||= 'development';
+/* A shop that SELLS: this drives the whole payment lifecycle over HTTP.
+ *
+ * The launch gate refuses orders on a shop that has never taken a payment, and
+ * a fresh test database is exactly that. Missed on the first sweep because that
+ * sweep looked for calls to createOrder, and this suite posts to /api/orders —
+ * the check is "does this suite make an order", by any route. */
+process.env.LAUNCH_MODE ||= 'open';
 process.env.MOLLIE_API_KEY = 'test_fake_key_for_the_harness';
 process.env.APP_URL = 'http://localhost:3000';
 
