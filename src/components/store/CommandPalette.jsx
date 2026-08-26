@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { api } from '../../lib/api.js';
 import { money, normalizeSearch } from '../../lib/catalog.js';
-import { iconFor, SAMPLE_PRODUCTS, withFallback } from '../../lib/sampleCatalog.js';
+import { iconFor, withFallback } from '../../lib/sampleCatalog.js';
 import { useCart } from '../../context/CartContext.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
 import { useI18n } from '../../lib/i18n.jsx';
@@ -61,7 +61,10 @@ export default function CommandPalette() {
     if (!fresh) {
       api.get('/api/products')
         .then((r) => { productCache = withFallback(r.products); productCacheAt = Date.now(); setProducts(productCache); })
-        .catch(() => { if (!productCache) { productCache = SAMPLE_PRODUCTS; setProducts(productCache); } });
+        /* No sample shelf on failure. Search that answers a real query with
+           products the shop cannot sell is worse than search that finds
+           nothing, and productCache is left unset so the next open retries. */
+        .catch(() => { if (!productCache) setProducts([]); });
     }
   }, [open]);
 

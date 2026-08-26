@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Search, SlidersHorizontal, PackageX, LayoutGrid } from 'lucide-react';
+import { Search, SlidersHorizontal, PackageX, LayoutGrid, CloudOff } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { withEarly } from '../lib/earlyFetch.js';
 import { useCart } from '../context/CartContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { categoryVisual, normalizeSearch } from '../lib/catalog.js';
-import { withFallback, iconFor } from '../lib/sampleCatalog.js';
+import { withFallback, iconFor, CATALOG_UNAVAILABLE } from '../lib/sampleCatalog.js';
 import { useCategoryLogos, logoFor } from '../lib/useCategoryLogos.js';
 import LightProductCard from '../components/store/LightProductCard.jsx';
 import { SkeletonCard } from '../components/ui.jsx';
@@ -39,6 +39,7 @@ export default function Shop({ landingCategory = null, landingTitle = null, land
      footer — where the seller identity and the refund policy live — unreachable. */
   const PAGE = 24;
   const [shown, setShown] = useState(PAGE);
+  const [unavailable, setUnavailable] = useState(false);
   const categoryLogos = useCategoryLogos(); // owner-set logos (Admin → Categories)
   // A landing route (/robux, /giftcards…) pins the category; the sidebar and the
   // rail still work, they just start from here. One component, one catalogue —
@@ -54,8 +55,13 @@ export default function Shop({ landingCategory = null, landingTitle = null, land
   useEffect(() => {
     // Handed over by the shell when it started this during HTML parse.
     withEarly('products', () => api.get('/api/products'))
-      .then((r) => setProducts(withFallback(r.products)))
-      .catch(() => setProducts(withFallback([])));
+      .then((r) => { setProducts(withFallback(r.products)); setUnavailable(false); })
+      /* A failure is not an empty shop.
+         This used to call withFallback([]), which rendered the built-in
+         showcase — so during a real outage the catalogue looked stocked, every
+         tile was clickable, and nothing on the page suggested the API behind it
+         was returning 500. Seen exactly that way in production. */
+      .catch(() => { setProducts([]); setUnavailable(true); });
   }, []);
 
   const categories = useMemo(
@@ -154,7 +160,9 @@ export default function Shop({ landingCategory = null, landingTitle = null, land
           <div className="flex flex-wrap items-center gap-2 mt-4">
             <span className="text-[11.5px] font-semibold bg-white/15 border border-white/25 rounded-full px-2.5 py-1">🛡 {t('shop.badgeProtected', 'Money back if undelivered')}</span>
             <span className="text-[11.5px] font-semibold bg-white/15 border border-white/25 rounded-full px-2.5 py-1">🛡 {t('product.protected', 'Buyer protected')}</span>
-            {products !== null && (
+            {/* Not during an outage: "0 items" is a claim about the catalogue,
+                and the catalogue is exactly what we failed to read. */}
+            {products !== null && !unavailable && (
               <span className="text-[11.5px] font-semibold bg-white/15 border border-white/25 rounded-full px-2.5 py-1">
                 {visible.length} {t('shop.items', 'items')}
               </span>
@@ -227,7 +235,8 @@ export default function Shop({ landingCategory = null, landingTitle = null, land
         {/* controls */}
         <div className="flex flex-col sm:flex-row gap-3 sm:items-center justify-between mb-5">
           <div className="text-slate-600 text-sm">
-            {products === null ? t('shop.loading', 'Loading…') : `${visible.length} ${t('shop.items', 'products')}`}
+            {products === null ? t('shop.loading', 'Loading…')
+              : unavailable ? '' : `${visible.length} ${t('shop.items', 'products')}`}
           </div>
           <div className="flex gap-3">
             <div className="relative flex-1 sm:w-60">
@@ -252,6 +261,24 @@ export default function Shop({ landingCategory = null, landingTitle = null, land
         {products === null ? (
           <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
             {Array.from({ length: 8 }).map((_, i) => <SkeletonCard key={i} />)}
+          </div>
+        ) : unavailable ? (
+          /* Three states, not two. "Nothing matches your filter", "this shop has
+             no products yet" and "we could not reach the shop" are different
+             things to be told, and the last one used to be dressed up as the
+             second — or worse, as a full catalogue. */
+          <div className="bg-white rounded-2xl border border-amber-300/70 p-14 text-center">
+            <CloudOff className="mx-auto text-amber-500 mb-3" size={40} />
+            <p className="font-semibold text-slate-700">
+              {t('shop.unavailable', CATALOG_UNAVAILABLE.title.en)}
+            </p>
+            <p className="text-slate-500 text-sm mt-1 max-w-md mx-auto">
+              {t('shop.unavailableSub', CATALOG_UNAVAILABLE.hint.en)}
+            </p>
+            <button type="button" onClick={() => window.location.reload()}
+              className="btn-primary mt-5 min-h-[44px]">
+              {t('shop.retry', 'Try again')}
+            </button>
           </div>
         ) : visible.length === 0 ? (
           <div className="bg-white rounded-2xl border border-slate-200/70 p-14 text-center">

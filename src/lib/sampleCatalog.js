@@ -157,7 +157,35 @@ export const SAMPLE_PRODUCTS = P.map(([sku, name, category, price, featured, pac
   sample: true,
 }));
 
-/** Return the API list when it has products, otherwise the built-in showcase. */
+/**
+ * The API answered and the shop has nothing on the shelf yet — show the
+ * showcase so a brand-new deployment is not a blank page.
+ *
+ * ONLY for that case. It used to be reached from `.catch()` as well, which
+ * conflated two completely different situations: "this shop has no products"
+ * and "this shop cannot be reached". During a real outage the storefront
+ * therefore rendered a full catalogue of products that may not exist, with
+ * working-looking tiles, while every API call behind it was returning 500 — so
+ * the failure was invisible from the front page and a visitor could click into
+ * a product that was never there.
+ *
+ * A request that FAILED must say so. See `catalogUnavailable` below.
+ */
 export function withFallback(list) {
   return Array.isArray(list) && list.length > 0 ? list : SAMPLE_PRODUCTS;
 }
+
+/**
+ * What to show when the catalogue could not be loaded at all.
+ *
+ * Deliberately not a product list. This shop's whole position is that it does
+ * not make things up, and a fabricated shelf during an outage is the most
+ * expensive place to break that: the visitor believes they can buy.
+ */
+export const CATALOG_UNAVAILABLE = {
+  title: { en: 'We cannot load the shop right now', nl: 'We kunnen de winkel nu niet laden' },
+  hint: {
+    en: 'This is on our side, not yours. Nothing is wrong with your connection — please try again in a few minutes.',
+    nl: 'Dit ligt aan ons, niet aan jou. Er is niets mis met je verbinding — probeer het over een paar minuten opnieuw.',
+  },
+};

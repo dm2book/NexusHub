@@ -20,7 +20,7 @@ export default function Wishlist() {
   usePageMeta('Wishlist', 'Your saved items.');
 
   useEffect(() => {
-    api.get('/api/products').then((r) => setProducts(withFallback(r.products))).catch(() => setProducts(withFallback([])));
+    api.get('/api/products').then((r) => setProducts(withFallback(r.products))).catch(() => setProducts([])); // a failed load is not an empty wishlist of samples
   }, []);
 
   const items = (products || []).filter((p) => wl.has(p.id));
