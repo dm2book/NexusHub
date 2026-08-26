@@ -41,7 +41,7 @@ export async function upsertUserByEmail(email, profile = {}) {
      ADMIN_EMAILS is allowed through even as a brand-new account, because on a
      fresh deployment there is no admin yet to bypass anything, and refusing
      would lock the owner out of the shop they are about to open. */
-  if (!isAdminEmail(e)) assertLaunched(null, 'Signing up');
+  if (!isAdminEmail(e)) await assertLaunched(null, 'Signing up');
 
   const id = newId('usr');
   await run(`INSERT INTO users (id, email, email_verified, display_name, avatar_url, created_at, updated_at)
@@ -67,7 +67,7 @@ export async function upsertUserByPhone(phone, profile = {}) {
   }
   // Same gate as the email path: a phone number cannot be on the admin list, so
   // a phone-first signup simply waits for launch day.
-  assertLaunched(null, 'Signing up');
+  await assertLaunched(null, 'Signing up');
 
   // Phone-first signup: email is required+unique, so seed a clearly-marked
   // placeholder the customer can change in Settings.

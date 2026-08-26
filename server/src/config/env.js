@@ -195,6 +195,12 @@ export const config = {
        gate's mouth: `LAUNCH_DATE=2026-09-24T00:00:00Z`. Blank means "we are
        open", which is the only safe thing for a value nobody has set yet. */
     date: env.LAUNCH_DATE || '',
+    /* A deliberate override, in either direction.
+       `open` sells whatever the date says; `prelaunch` refuses whatever it
+       says. Neither is a default — the default is worked out from evidence in
+       launchGateService, and this is the manual release for the times when a
+       rule with no manual release would trap somebody. */
+    mode: (env.LAUNCH_MODE || '').trim().toLowerCase(),
   },
 
   /**

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { TrendingUp, ShoppingCart, Percent, Users, Trophy, Rocket, CheckCircle2, AlertTriangle, XCircle, ChevronDown, MailCheck, Megaphone, EyeOff } from 'lucide-react';
+import { TrendingUp, ShoppingCart, Percent, Users, Trophy, Rocket, CheckCircle2, AlertTriangle, XCircle, ChevronDown, MailCheck, Megaphone, EyeOff, Lock } from 'lucide-react';
 import { api } from '../../lib/api.js';
 import { money } from '../../lib/format.js';
 import { PageLoader } from '../../components/ui.jsx';
@@ -9,6 +9,63 @@ import { PageLoader } from '../../components/ui.jsx';
  * cron, Discord) so "can I sell today?" is answered at a glance, with the fix
  * for anything red right next to it.
  */
+/**
+ * Which phase is this shop in, and is that the phase it is supposed to be in?
+ *
+ * The readiness checklist below answers "can I sell today?". It cannot answer
+ * this one, because a shop that has quietly opened three weeks early looks
+ * perfectly healthy to it — everything is green, and that is the problem.
+ *
+ * So this sits above it and says one thing plainly: open or shut, and why.
+ * Green while shut before launch is the correct state, which is why "closed" is
+ * not styled as a fault.
+ */
+function LaunchPhase() {
+  const [p, setP] = useState(null);
+  useEffect(() => { api.get('/api/admin/launch-plan').then(setP).catch(() => {}); }, []);
+  if (!p) return null;
+
+  const shut = p.prelaunch;
+  const todo = shut ? p.blockingNow : p.blockingOnTheDay;
+  const tone = todo
+    ? 'border-red-500/40 bg-red-500/10'
+    : shut ? 'border-indigo-500/30 bg-indigo-500/10' : 'border-emerald-500/30 bg-emerald-500/10';
+
+  return (
+    <div className={`rounded-2xl border ${tone} mb-4 p-5 fm-pop`}>
+      <div className="flex items-start gap-3">
+        <span className="w-11 h-11 rounded-xl grid place-items-center shrink-0 bg-white/10">
+          {shut ? <Lock size={20} className="text-indigo-300" />
+            : <Rocket size={20} className="text-emerald-300" />}
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="text-white font-semibold">
+            {shut ? 'Closed to the public' : 'Open to the public'}
+          </div>
+          <div className="text-slate-400 text-sm mt-0.5">{p.reason}.</div>
+          <div className="text-slate-400 text-sm mt-2">
+            {shut
+              ? <>Discord runs as normal. {p.blockingNow
+                ? <span className="text-red-300">{p.blockingNow} thing(s) wrong for today.</span>
+                : 'Nothing wrong for today.'}{' '}
+                {p.blockingOnTheDay
+                  ? `${p.blockingOnTheDay} still to sort before launch day.`
+                  : 'The launch-day list is clear too.'}</>
+              : (p.blockingOnTheDay
+                ? <span className="text-red-300">
+                  {p.blockingOnTheDay} thing(s) needed to serve a customer are wrong.
+                </span>
+                : 'Payment, fulfilment, email and alerts all check out.')}
+          </div>
+          <div className="text-slate-500 text-xs mt-2">
+            Full list: <code className="text-slate-400">node scripts/launch-status.mjs</code>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function LaunchChecklist() {
   const [data, setData] = useState(null);
   const [open, setOpen] = useState(false);
@@ -95,6 +152,7 @@ export default function Analytics() {
     <div>
       <h1 className="text-2xl text-white mb-6">Analytics</h1>
 
+      <LaunchPhase />
       <LaunchChecklist />
 
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-8">

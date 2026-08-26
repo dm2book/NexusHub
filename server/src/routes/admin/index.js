@@ -16,6 +16,7 @@ import monetization from './monetization.js';
 import categories from './categories.js';
 import { asyncHandler } from '../../middleware/error.js';
 import { launchChecks } from '../../services/launchCheckService.js';
+import { launchPlan } from '../../services/launchPlanService.js';
 import { listAll as listAllDrops, createDrop, deleteDrop } from '../../services/dropService.js';
 import { z } from 'zod';
 import { get } from '../../db/index.js';
@@ -26,6 +27,19 @@ router.use(requireAuth, requireStaff);
 // Live "can I sell today?" readiness report for the admin dashboard.
 router.get('/launch-check', asyncHandler(async (_req, res) => {
   res.json(await launchChecks());
+}));
+
+/**
+ * The launch plan: what has to be true today, and what has to be true on the day.
+ *
+ * Separate from /launch-check on purpose. That one answers "can I sell today?"
+ * for a shop that is meant to be selling; this one answers "am I in the phase I
+ * think I am in?", which before launch is a different and more urgent question —
+ * a shop that has quietly opened early looks perfectly healthy to the other
+ * report.
+ */
+router.get('/launch-plan', asyncHandler(async (_req, res) => {
+  res.json(await launchPlan());
 }));
 
 // Action-item counts for the admin sidebar badges, so open tickets / pending

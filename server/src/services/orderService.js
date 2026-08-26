@@ -79,7 +79,7 @@ export async function createOrder(input, ctx = {}) {
      exactly how the Discord events ended up missing three of their call sites.
      `ctx.user` is the same object the auth middleware attached, so staff are
      recognised here the same way they are everywhere else. */
-  assertLaunched(ctx.user, 'The checkout', { money: true });
+  await assertLaunched(ctx.user, 'The checkout', { money: true });
 
   const email = String(input.email || '').toLowerCase();
   if (!email) throw badRequest('Customer email is required');

@@ -17,6 +17,10 @@
  */
 process.env.DATABASE_URL ||= 'postgres://postgres:postgres@127.0.0.1:5432/forge_email_test';
 process.env.NODE_ENV ||= 'development';
+/* A shop that SELLS: this drives a real order over HTTP from checkout to inbox.
+ * The launch gate refuses orders on a shop that has never taken a payment, and
+ * a fresh test database is exactly that. */
+process.env.LAUNCH_MODE ||= 'open';
 process.env.DEMO_MODE = 'true';
 
 import net from 'node:net';

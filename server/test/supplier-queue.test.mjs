@@ -1,6 +1,7 @@
 /** Serial supplier queue: paid orders are sourced ONE AT A TIME, oldest first;
  *  the listing URL is stored + passed to the connector; the lease keeps a second
  *  drain from running concurrently. */
+import './_selling-shop.mjs';   // must come first — see that file
 import { ensureReady } from '../src/app.js';
 import { get, all, run, nowIso } from '../src/db/index.js';
 import { SupplierConnector } from '../src/services/supplier/SupplierConnector.js';

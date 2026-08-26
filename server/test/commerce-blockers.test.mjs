@@ -22,6 +22,13 @@
  */
 process.env.DATABASE_URL ||= 'postgres://postgres:postgres@127.0.0.1:5432/forge_blockers';
 process.env.NODE_ENV ||= 'development';
+/* A LAUNCHED shop that cannot currently deliver — which is the scenario here.
+ *
+ * The route checks the launch gate before the commerce blockers, deliberately:
+ * before launch the honest answer is "we open on the 24th", not "ordering is
+ * paused, try again shortly". So without this the gate answers first and this
+ * suite tests the wrong refusal. */
+process.env.LAUNCH_MODE ||= 'open';
 
 let pass = 0, fail = 0;
 const ok = (name, cond, extra = '') => { if (cond) { pass++; console.log(`  ✅ ${name}`); } else { fail++; console.log(`  ❌ ${name} ${extra}`); } };
