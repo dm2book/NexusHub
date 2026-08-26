@@ -2,12 +2,7 @@ import { useEffect, useState, useRef, useMemo, lazy, Suspense } from 'react';
 import DeferUntilIdle from '../components/DeferUntilIdle.jsx';
 import ScrollProgress from '../components/store/ScrollProgress.jsx';
 import { Link } from 'react-router-dom';
-import {
-  Search, ShoppingCart, Zap, ShieldCheck, Headphones, Tag, Star, ArrowRight,
-  Plus, LayoutGrid, Users, CheckCircle2, Clock, MessageCircle, ChevronRight, Sparkles, Shield, Menu, X,
-  BadgeCheck,
-  User as UserIcon, UserPlus,
-} from 'lucide-react';
+import { Search, ShoppingCart, Zap, ShieldCheck, Headphones, Tag, Star, ArrowRight, Plus, LayoutGrid, Users, CheckCircle2, Clock, MessageCircle, ChevronRight, Sparkles, Shield, Menu, X, BadgeCheck, User as UserIcon, UserPlus, CloudOff } from 'lucide-react';
 import { useCart } from '../context/CartContext.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { usePageMeta, useJsonLd } from '../lib/useMeta.js';
@@ -28,7 +23,7 @@ import AnnouncementBar from '../components/store/AnnouncementBar.jsx';
 import StoreFooter from '../components/store/StoreFooter.jsx';
 import SellerIdentity from '../components/store/SellerIdentity.jsx';
 import { money } from '../lib/catalog.js';
-import { withFallback, SAMPLE_PRODUCTS, iconPath } from '../lib/sampleCatalog.js';
+import { withFallback, SAMPLE_PRODUCTS, iconPath, CATALOG_UNAVAILABLE } from '../lib/sampleCatalog.js';
 import { useCategoryLogos } from '../lib/useCategoryLogos.js';
 import { useTrustpilot } from '../lib/useTrustpilot.js';
 import { SUPPORT_EMAIL } from '../lib/support.js';
@@ -193,10 +188,17 @@ export default function HomeStore() {
   // Real catalog → tiles show the true "From" price; add-to-cart adds the
   // cheapest REAL product in that category (no fabricated items/prices).
   const [products, setProducts] = useState([]);
+  const [unavailable, setUnavailable] = useState(false);
   useEffect(() => {
     // Handed over by the shell when it started this during HTML parse.
     withEarly('products', () => api.get('/api/products'))
-      .then((r) => setProducts(withFallback(r.products))).catch(() => setProducts(SAMPLE_PRODUCTS));
+      .then((r) => { setProducts(withFallback(r.products)); setUnavailable(false); })
+      /* Not SAMPLE_PRODUCTS. A failed request used to fill the homepage with the
+         built-in showcase, so an outage looked exactly like a healthy shop —
+         categories, tiles, prices — while every call behind it returned 500.
+         The pillars below already drop a category with nothing behind it, so an
+         empty list degrades on its own; what was missing was telling anyone. */
+      .catch(() => { setProducts([]); setUnavailable(true); });
   }, []);
   /* Each pillar resolved against the live catalogue: a category appears only if
      it has active products, with its real cheapest price and real pack count. A
@@ -437,6 +439,28 @@ export default function HomeStore() {
             white. The hero inside keeps its dark palette via the .fm-stage
             exceptions in index.css. */}
         <main className="theme-light flex-1 min-w-0 space-y-6">
+          {/* Say it out loud when the shop cannot be reached.
+
+              Above the hero on purpose: the hero is static copy and renders
+              perfectly during an outage, which is exactly why the page looked
+              healthy while nothing behind it worked. */}
+          {unavailable && (
+            <div className="rounded-2xl border border-amber-300/70 bg-amber-50 px-5 py-4 flex items-start gap-3">
+              <CloudOff size={20} className="text-amber-600 shrink-0 mt-0.5" aria-hidden />
+              <div className="text-sm">
+                {/* `tr`, not `t` — this component renames the hook's output.
+                    Writing `t` here compiled fine and threw ReferenceError at
+                    render, blanking the entire homepage. Caught by loading the
+                    page against a failing API rather than by reading the diff. */}
+                <p className="font-semibold text-slate-800">
+                  {tr('shop.unavailable', CATALOG_UNAVAILABLE.title.en)}
+                </p>
+                <p className="text-slate-600 mt-0.5">
+                  {tr('shop.unavailableSub', CATALOG_UNAVAILABLE.hint.en)}
+                </p>
+              </div>
+            </div>
+          )}
           {/* Hero */}
           {/* The one place on the shop that is allowed to be theatre. Dark
               stage, a single coloured beam, oversized ghost type — the rest of

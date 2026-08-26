@@ -123,5 +123,78 @@ console.log('\n— Who is selling —');
   ok('the Trust Center names the seller', /SellerIdentity/.test(trust));
 }
 
+console.log('\n— An outage is not a catalogue —');
+{
+  /* Measured in production, during a real one: every /api/ call was returning
+     500 because the database had hit its transfer quota, and the storefront
+     showed a full shelf of products with working Buy buttons — because a failed
+     fetch fell through to the built-in sample catalogue. The outage was
+     invisible from the front page, and every price on it was fiction.
+
+     A shop with nothing loaded and a shop that could not be reached are
+     different things to say, and only one of them may show products. */
+  const catchBodies = (src) => {
+    const out = [];
+    for (const m of src.matchAll(/\.catch\(/g)) {
+      let i = m.index + m[0].length, depth = 1;
+      while (i < src.length && depth > 0) {
+        if (src[i] === '(') depth++;
+        else if (src[i] === ')') depth--;
+        i++;
+      }
+      out.push(src.slice(m.index, i));
+    }
+    return out;
+  };
+
+  const CATALOGUE_READERS = [
+    'src/pages/Shop.jsx',
+    'src/pages/HomeStore.jsx',
+    'src/pages/ProductDetail.jsx',
+    'src/pages/Wishlist.jsx',
+    'src/lib/useTrending.js',
+    'src/components/store/CommandPalette.jsx',
+  ];
+  for (const f of CATALOGUE_READERS) {
+    const bodies = catchBodies(codeOf(join(ROOT, f)));
+    const invents = bodies.filter((b) => /SAMPLE_PRODUCTS|withFallback/.test(b)
+      // …unless the handler has already returned for everything but a 404.
+      && !/status !== 404\) \{ setUnavailable\(true\); return; \}/.test(b));
+    ok(`${f.split('/').pop()} shows no products when the catalogue could not be loaded`,
+      invents.length === 0, invents.join(' ').slice(0, 120));
+  }
+
+  /* The product page keeps a lookup into the showcase, but only behind a 404:
+     an empty deployment shows sample tiles and clicking one has to land
+     somewhere. The check above would have failed on it — which is how this
+     was found — because inside a catch it is indistinguishable from the
+     behaviour being removed. Gated on the status code, it is not: an outage
+     never reaches it. */
+  const pdp = codeOf(join(ROOT, 'src/pages/ProductDetail.jsx'));
+  ok('a direct link to a sample product still resolves by id',
+    /SAMPLE_PRODUCTS\.find\(\(p\) => p\.id === id\)/.test(pdp));
+  ok('but only after the shop answered 404, never after it failed to answer',
+    /status !== 404\) \{ setUnavailable\(true\); return; \}/.test(pdp));
+
+  // And the visitor has to be told, in words, that this is our fault.
+  const shop = codeOf(join(ROOT, 'src/pages/Shop.jsx'));
+  const home = codeOf(join(ROOT, 'src/pages/HomeStore.jsx'));
+  ok('the catalogue says so when it cannot be reached', /shop\.unavailable/.test(shop));
+  ok('the homepage says so too', /shop\.unavailable/.test(home));
+  ok('the product page says so too', /product\.unavailable/.test(pdp));
+  ok('the notice offers a way to try again', /shop\.retry/.test(shop));
+
+  // "0 products" during an outage is a claim about the catalogue, and the
+  // catalogue is precisely what we failed to read.
+  ok('no product count is printed while the catalogue is unreachable',
+    /!unavailable && \(/.test(shop) && /unavailable \? '' :/.test(shop));
+
+  const copy = readFileSync(join(ROOT, 'src', 'lib', 'i18n.jsx'), 'utf8');
+  for (const key of ['shop.unavailable', 'shop.unavailableSub', 'shop.retry',
+    'product.unavailable', 'product.unavailableSub']) {
+    ok(`${key} is translated`, new RegExp(`'${key.replace('.', '\\.')}':`).test(copy));
+  }
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

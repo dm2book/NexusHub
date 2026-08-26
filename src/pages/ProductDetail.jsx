@@ -105,6 +105,7 @@ export default function ProductDetail() {
   const [product, setProduct] = useState(() => bootProduct(id));
   const [qty, setQty] = useState(1);
   const [notFound, setNotFound] = useState(false);
+  const [unavailable, setUnavailable] = useState(false);
   const [recs, setRecs] = useState({ crossSell: [], upsell: [] });
   const [mysteryPool, setMysteryPool] = useState(null);
   const [priceHist, setPriceHist] = useState([]);
@@ -154,7 +155,20 @@ export default function ProductDetail() {
     setRecs({ crossSell: [], upsell: [] }); setHeroBroken(false);
     api.get(`/api/products/${id}`)
       .then((r) => setProduct(r.product))
-      .catch(() => {
+      .catch((err) => {
+        /* A 404 and an outage are different answers and deserve different
+           words. Both used to land on "not found", which tells someone their
+           link is wrong when in fact the shop is down — and sends them away
+           instead of back in five minutes.
+
+           The sample lookup is allowed on a 404 only. A brand-new deployment
+           with an empty catalogue shows the built-in showcase, and clicking a
+           tile there has to arrive somewhere: the shop answered, it simply has
+           no such product. An outage is the opposite case — the shop did not
+           answer, so we know nothing about this id, and matching it against the
+           showcase would put a price and a Buy button on a page during the one
+           moment we cannot tell whether either is true. */
+        if (err?.status !== 404) { setUnavailable(true); return; }
         const sample = SAMPLE_PRODUCTS.find((p) => p.id === id);
         if (sample) setProduct(sample); else setNotFound(true);
       });
@@ -199,6 +213,23 @@ export default function ProductDetail() {
     api.get(`/api/products/${product.id}/price-history`).then((r) => setPriceHist(r.history || [])).catch(() => setPriceHist([]));
   }, [product?.id, product?.sample]);
 
+  if (unavailable) {
+    return (
+      <div className="section py-24 text-center">
+        <h1 className="text-2xl text-white mb-2">
+          {t('product.unavailable', 'We cannot load this product right now')}
+        </h1>
+        <p className="text-slate-400 max-w-md mx-auto">
+          {t('product.unavailableSub',
+            'This is on our side. The link is fine — please try again in a few minutes.')}
+        </p>
+        <button type="button" onClick={() => window.location.reload()}
+          className="btn-primary mt-5 inline-flex min-h-[44px]">
+          {t('shop.retry', 'Try again')}
+        </button>
+      </div>
+    );
+  }
   if (notFound) {
     return (
       <div className="section py-24 text-center">

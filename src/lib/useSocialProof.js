@@ -18,18 +18,105 @@ let statsCache = null;
  * carrying the bundle, the fonts and the artwork. So the default waits, and a
  * caller whose first frame is even later (SiteExtras: six seconds) says so.
  */
-export function useLiveFeed({ poll = 60_000, delay = 1500 } = {}) {
+/**
+ * ONE poller for the whole page, and only while it can do something useful.
+ *
+ * Three components read this feed — the activity ticker, the recently-delivered
+ * strip and SiteExtras — and each used to run its own `setInterval`. Three
+ * requests a minute, per open tab, for one shared answer. Seen in the
+ * production logs at one a minute per component, indefinitely, on a shop that
+ * had not sold anything yet.
+ *
+ * So the timer lives here, once, and subscribers are notified from it. It also
+ * stops in the two cases where polling is pointless:
+ *
+ *   hidden tab   a tab in the background is not showing a ticker to anybody.
+ *                Left open overnight it was still asking every minute.
+ *   nothing to  the feed only changes when an order completes. Before the shop
+ *   report      opens that never happens, so after a few empty answers — or a
+ *               few failed ones — the interval backs off rather than asking the
+ *               same question of the database 1,440 times a day.
+ *
+ * The back-off resets the moment an answer arrives with something in it, so a
+ * shop that starts selling, or a database that comes back, returns to a live
+ * ticker without a reload.
+ */
+const BASE_POLL = 60_000;
+const MAX_POLL = 10 * 60_000;
+
+const subscribers = new Set();
+let timer = null;
+let interval = BASE_POLL;
+let quietRuns = 0;
+let inFlight = null;
+
+const hidden = () => typeof document !== 'undefined' && document.visibilityState === 'hidden';
+
+function fetchFeed() {
+  // One request even if three components mount in the same frame.
+  if (inFlight) return inFlight;
+  inFlight = api.get('/api/social/feed')
+    .then((r) => {
+      if (!Array.isArray(r?.feed)) return;
+      feedCache = r.feed;
+      backOff(r.feed.length === 0);
+      for (const fn of subscribers) fn(r.feed);
+    })
+    /* A ticker is not worth an error — but it is also not worth a request a
+       minute at a server that is failing. Read from the production logs during
+       the quota outage: /api/social/feed at 22:43, 22:44, 22:45, 22:46, 22:47,
+       every one a 500, every one a cold start that tried to run the migrations
+       against a database refusing connections. The one caller still knocking on
+       a dead API was the ticker nobody was watching. */
+    .catch(() => backOff(true))
+    .finally(() => { inFlight = null; reschedule(); });
+  return inFlight;
+}
+
+/**
+ * Back off geometrically while there is nothing to show — or nothing answering
+ * — and snap back to the normal rhythm the moment there is.
+ */
+function backOff(quiet) {
+  quietRuns = quiet ? quietRuns + 1 : 0;
+  interval = quiet
+    ? Math.min(MAX_POLL, BASE_POLL * 2 ** Math.min(4, quietRuns))
+    : BASE_POLL;
+}
+
+function reschedule() {
+  if (timer) { clearTimeout(timer); timer = null; }
+  if (!subscribers.size || hidden()) return;
+  timer = setTimeout(fetchFeed, interval);
+}
+
+function onVisibility() {
+  if (hidden()) { if (timer) { clearTimeout(timer); timer = null; } return; }
+  // Coming back: refresh once, then resume the normal rhythm.
+  fetchFeed();
+}
+
+export function useLiveFeed({ delay = 1500 } = {}) {
   const [feed, setFeed] = useState(feedCache || []);
   useEffect(() => {
-    let live = true;
-    let t = null;
-    const load = () => api.get('/api/social/feed')
-      .then((r) => { if (live && Array.isArray(r?.feed)) { feedCache = r.feed; setFeed(r.feed); } })
-      .catch(() => {});
-    const start = () => { load(); if (poll) t = setInterval(load, poll); };
-    const first = delay ? setTimeout(start, delay) : (start(), null);
-    return () => { live = false; if (first) clearTimeout(first); if (t) clearInterval(t); };
-  }, [poll, delay]);
+    subscribers.add(setFeed);
+    if (subscribers.size === 1 && typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', onVisibility);
+    }
+    // The first fetch is still deliberately late (see above); a second
+    // subscriber arriving later does not start another one.
+    const first = setTimeout(() => { if (!hidden()) fetchFeed(); else reschedule(); }, delay);
+    return () => {
+      clearTimeout(first);
+      subscribers.delete(setFeed);
+      if (!subscribers.size) {
+        if (timer) { clearTimeout(timer); timer = null; }
+        if (typeof document !== 'undefined') {
+          document.removeEventListener('visibilitychange', onVisibility);
+        }
+      }
+    };
+  }, [delay]);
   return feed;
 }
 

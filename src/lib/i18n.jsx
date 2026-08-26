@@ -15,6 +15,14 @@ import { createContext, useContext, useEffect, useState, useCallback, useMemo } 
 const NL = {
   // Navigation
   'nav.home': 'Home',
+
+  // Storing: de winkel kan niet geladen worden. Bewust andere woorden dan
+  // "geen producten" — dat is een andere mededeling en stuurt iemand weg.
+  'shop.unavailable': 'We kunnen de winkel nu niet laden',
+  'shop.unavailableSub': 'Dit ligt aan ons, niet aan jou. Er is niets mis met je verbinding — probeer het over een paar minuten opnieuw.',
+  'shop.retry': 'Opnieuw proberen',
+  'product.unavailable': 'We kunnen dit product nu niet laden',
+  'product.unavailableSub': 'Dit ligt aan ons. De link klopt — probeer het over een paar minuten opnieuw.',
   // Kort gehouden: dit zijn navigatielabels, geen zinnen. Met de lange
   // varianten paste de balk in het Nederlands niet op 1024-1280px.
   'nav.products': 'Producten',

@@ -226,5 +226,37 @@ console.log('— Regressions worth catching early —');
   ok('the HTML loads nothing from another origin', externalHosts.length === 0, [...new Set(externalHosts)].join(','));
 }
 
+console.log('— Background polling —');
+{
+  /* Three components each ran their own one-minute timer, so an idle open tab
+     asked the API for the same activity feed three times a minute, forever, and
+     kept doing it while minimised. That traffic is visible in the production
+     database logs. One shared poller, paused when the tab is hidden, backing off
+     while there is nothing to show. */
+  const feed = readFileSync(join(ROOT, 'src/lib/useSocialProof.js'), 'utf8');
+  ok('the activity feed is polled by one shared timer, not one per component',
+    /const subscribers = new Set\(\)/.test(feed) && (feed.match(/setTimeout\(/g) || []).length <= 2);
+  ok('polling stops while the tab is hidden',
+    /visibilityState === 'hidden'/.test(feed) && /visibilitychange/.test(feed));
+  ok('an empty feed backs the interval off instead of asking again every minute',
+    /MAX_POLL/.test(feed) && /quietRuns/.test(feed));
+  // The one caller still knocking on the API every minute during the quota
+  // outage was this ticker, and every knock was a cold start.
+  ok('a failing feed backs off too, instead of hammering a broken API',
+    /\.catch\(\(\) => backOff\(true\)\)/.test(feed));
+
+  const consumers = ['src/components/SiteExtras.jsx',
+    'src/components/store/LiveActivity.jsx',
+    'src/components/store/RecentlyDelivered.jsx'];
+  for (const f of consumers) {
+    /* Their own setInterval is fine and stays — it rotates which line of the
+       feed is on screen and touches nothing. What must not come back is a
+       component fetching the feed for itself, which is what multiplied one
+       request into three. */
+    ok(`${f.split('/').pop()} takes the feed from the shared poller instead of fetching it`,
+      !/api\.get\(\s*['"`]\/api\/social/.test(readFileSync(join(ROOT, f), 'utf8')));
+  }
+}
+
 console.log(`\n${fail === 0 ? '✅' : '❌'} perf budget: ${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);
