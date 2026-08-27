@@ -196,5 +196,34 @@ console.log('\n— An outage is not a catalogue —');
   }
 }
 
+console.log('\n— What a failure says to the person reading it —');
+{
+  /* Seen on the live login form during the database outage: a Dutch page with
+     "Internal server error" in a red box, and a banner underneath telling the
+     visitor to check their email address for a typo. Both were wrong in the
+     same way — they hand our failure to the customer as though it were theirs. */
+  const api = codeOf(join(ROOT, 'src/lib/api.js'));
+  ok('a 5xx with no specific message is rewritten as a sentence',
+    /res\.status >= 500 && generic/.test(api));
+  ok('and the server\'s own words are kept for a 4xx, which are written for the reader',
+    /fromServer \|\| `Request failed/.test(api));
+  ok('the original is kept for the console rather than thrown away',
+    /err\.serverMessage = fromServer/.test(api));
+  ok('the literal "Internal server error" never reaches a buyer',
+    /=== 'Internal server error'/.test(api));
+
+  // These sentences are the only copy in the app written outside a component,
+  // so they need the standalone lookup or they stay English on a Dutch shop.
+  ok('failure copy is translated like everything else', /translate\(/.test(api));
+  const copy = readFileSync(join(ROOT, 'src', 'lib', 'i18n.jsx'), 'utf8');
+  for (const key of ['err.server', 'err.network', 'err.timeout', 'err.unexpected']) {
+    ok(`${key} has Dutch`, new RegExp(`'${key.replace('.', '\\.')}':`).test(copy));
+  }
+
+  const banner = codeOf(join(ROOT, 'src/components/store/LaunchBanner.jsx'));
+  ok('the notify form blames the address only when the address was refused',
+    /err\?\.status >= 500 \|\| err\?\.status === 0/.test(banner));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -5,6 +5,11 @@
  */
 // Default to same-origin (''), so the Vite dev proxy and same-domain prod
 // deploys work with no config. Set VITE_API_URL for a separate API domain.
+/* The dictionary, not the hook — this file runs outside React. i18n.jsx is
+   already in the entry bundle (main.jsx wraps the app in its provider) and
+   imports nothing but React, so this costs nothing and cannot cycle. */
+import { translate } from './i18n.jsx';
+
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
 let accessToken = null;
@@ -71,8 +76,8 @@ async function request(path, { method = 'GET', body, raw = false, retry = true, 
       return request(path, { method, body, raw, retry, timeout, _coldRetry: false });
     }
     const err = new Error(e.name === 'AbortError'
-      ? 'The server took too long to respond. Please try again.'
-      : 'Network error. Please check your connection and try again.');
+      ? translate('err.timeout', 'The server took too long to respond. Please try again.')
+      : translate('err.network', 'Network error. Please check your connection and try again.'));
     err.status = 0;
     throw err;
   }
@@ -94,8 +99,8 @@ async function request(path, { method = 'GET', body, raw = false, retry = true, 
   // that tells the buyer nothing and points the owner at the wrong layer.
   if (text && data === UNPARSEABLE) {
     const err = new Error(res.ok
-      ? 'The server sent an unexpected response. Please try again.'
-      : 'The server is having trouble right now. Please try again in a moment.');
+      ? translate('err.unexpected', 'The server sent an unexpected response. Please try again.')
+      : translate('err.server', 'Something is wrong on our side. Please try again in a few minutes.'));
     err.status = res.status;
     // Kept off the message on purpose — the buyer gets a sentence, the console
     // gets the evidence needed to find which layer answered.
@@ -104,8 +109,23 @@ async function request(path, { method = 'GET', body, raw = false, retry = true, 
   }
 
   if (!res.ok) {
-    const err = new Error(data?.error?.message || `Request failed (${res.status})`);
+    /* A 4xx carries a message written for the person reading it — "That code has
+       expired", "This opens on 24 September" — and it must survive untouched.
+       A 5xx does not: the server's generic fallback is the literal string
+       "Internal server error", and during the database outage that is what a
+       buyer got, in English, in a red box under the login form. It names a layer
+       they cannot see and reads as though they had done something wrong.
+
+       So the sentence is replaced for 5xx only, and only where the server had
+       nothing specific to say. A 503 from the launch gate still speaks for
+       itself; err.serverMessage keeps the original for the console. */
+    const fromServer = data?.error?.message;
+    const generic = !fromServer || fromServer === 'Internal server error';
+    const err = new Error(res.status >= 500 && generic
+      ? translate('err.server', 'Something is wrong on our side. Please try again in a few minutes.')
+      : (fromServer || `Request failed (${res.status})`));
     err.status = res.status; err.details = data?.error?.details;
+    if (fromServer) err.serverMessage = fromServer;
     throw err;
   }
   return data;
