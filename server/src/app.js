@@ -143,9 +143,25 @@ export function createApp({ lazyReady = false } = {}) {
   app.use(express.json({ limit: '3mb' }));
   app.use(cookieParser());
 
-  // On serverless, make sure the schema exists before handling API traffic.
+  /* On serverless, make sure the schema exists before handling API traffic —
+     with one exception, which the outage of 26 August is the argument for.
+
+     /api/config needs no database. Every field in it comes from the
+     environment, and the single row it would like (the owner's category logos)
+     already falls back to {} on its own. But it sat behind this gate like
+     everything else, so when Neon started refusing connections the storefront
+     could not read its own configuration, and the field it lost mattered most:
+     `launchAt`. Without it the browser has no launch moment to compare its
+     clock against, so the countdown vanishes and the purchase buttons render as
+     though the shop were open — at the exact moment nothing works.
+
+     The server still refuses to sell (that check reads the clock, not the
+     database), so this was never a way to buy. It just meant the site lied
+     about its state to the one visitor who came to look. */
+  const NO_DATABASE = new Set(['/api/config']);
   if (lazyReady) {
-    app.use(async (_req, _res, next) => {
+    app.use(async (req, _res, next) => {
+      if (NO_DATABASE.has(req.path)) return next();
       try { await ensureReady(); next(); } catch (err) { next(err); }
     });
   }
