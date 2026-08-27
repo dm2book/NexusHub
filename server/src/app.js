@@ -157,8 +157,15 @@ export function createApp({ lazyReady = false } = {}) {
 
      The server still refuses to sell (that check reads the clock, not the
      database), so this was never a way to buy. It just meant the site lied
-     about its state to the one visitor who came to look. */
-  const NO_DATABASE = new Set(['/api/config']);
+     about its state to the one visitor who came to look.
+
+     /api/health is the same argument, sharper. It exists to answer "what is
+     wrong", it already reports a dead database as `database.status: "down"`
+     rather than throwing, and it reports whether email, SMS and the queue are
+     configured — none of which needs a row. Behind this gate it answered 500
+     during the one outage it was written for, which is the least useful moment
+     for a health check to be silent. Neither endpoint returns a secret. */
+  const NO_DATABASE = new Set(['/api/config', '/api/health']);
   if (lazyReady) {
     app.use(async (req, _res, next) => {
       if (NO_DATABASE.has(req.path)) return next();

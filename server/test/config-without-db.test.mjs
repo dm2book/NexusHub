@@ -59,6 +59,26 @@ console.log('— /api/config answers while the database is unreachable —');
     r.body && typeof r.body.categoryLogos === 'object' && r.body.categoryLogos !== null);
 }
 
+console.log('\n— /api/health reports the outage instead of becoming it —');
+{
+  const r = await call('/api/health');
+  /* 503, because the database really is down — but with a readable body saying
+     so, which is the entire job. Behind the schema gate it answered 500 with
+     {"error":{"message":"Internal server error"}}, during the one outage a
+     health check exists for. */
+  ok('it answers rather than throwing', r.status === 503 || r.status === 200, `status ${r.status}`);
+  ok('and names the database as the thing that is down',
+    r.body?.database?.status === 'down', JSON.stringify(r.body?.database || {}).slice(0, 120));
+  // The question this suite was written to answer from the outside: is a mailer
+  // configured? Without it a login code is recorded and never sent, and the
+  // owner cannot get into their own shop.
+  ok('it says whether email can actually be delivered',
+    r.body?.email?.status === 'configured' || r.body?.email?.status === 'not_configured',
+    JSON.stringify(r.body?.email || {}).slice(0, 120));
+  ok('without ever printing a key',
+    !JSON.stringify(r.body || {}).includes('re_') && !/apiKey/i.test(JSON.stringify(r.body || {})));
+}
+
 console.log('\n— and everything that genuinely needs the database still fails —');
 {
   const r = await call('/api/products');
