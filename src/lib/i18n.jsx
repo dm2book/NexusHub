@@ -15,6 +15,12 @@ import { createContext, useContext, useEffect, useState, useCallback, useMemo } 
 const NL = {
   // Navigation
   'nav.home': 'Home',
+  // What a buyer reads when a request fails. Written by api.js, which runs
+  // outside the provider — see translate() below.
+  'err.server': 'Het ligt even aan ons. Probeer het over een paar minuten opnieuw.',
+  'err.network': 'Geen verbinding. Controleer je internet en probeer het opnieuw.',
+  'err.timeout': 'De server deed er te lang over. Probeer het opnieuw.',
+  'err.unexpected': 'De server gaf een onverwacht antwoord. Probeer het opnieuw.',
 
   // Storing: de winkel kan niet geladen worden. Bewust andere woorden dan
   // "geen producten" — dat is een andere mededeling en stuurt iemand weg.
@@ -996,4 +1002,22 @@ export function LanguageProvider({ children }) {
 
 export function useI18n() {
   return useContext(LanguageContext);
+}
+
+/**
+ * The same lookup, for code that runs outside React.
+ *
+ * api.js writes the sentences a buyer reads when a request fails, and it has no
+ * provider above it — so those were English on a Dutch shop. Seen on the live
+ * login form during the database outage: a Dutch page with "Internal server
+ * error" in a red box.
+ *
+ * Reads the stored language directly, which is the same source the provider
+ * starts from, so the two cannot disagree about which language this is.
+ */
+export function translate(key, en, vars) {
+  const lang = initialLang();
+  let s = lang === 'nl' ? (NL[key] ?? en) : en;
+  if (vars) for (const [k, v] of Object.entries(vars)) s = s.replaceAll(`{${k}}`, String(v));
+  return s;
 }

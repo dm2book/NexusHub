@@ -23,6 +23,7 @@ export default function LaunchBanner() {
   const { t, lang } = useI18n();
   const [email, setEmail] = useState('');
   const [state, setState] = useState('idle');   // idle | sending | done | error
+  const [failure, setFailure] = useState('');
 
   if (!prelaunch) return null;
 
@@ -43,7 +44,14 @@ export default function LaunchBanner() {
     try {
       await api.post('/api/newsletter', { email: email.trim(), consentText, source: 'prelaunch-banner' });
       setState('done');
-    } catch {
+    } catch (err) {
+      /* Two failures, two sentences. A 4xx means the address; a 5xx or a dead
+         connection means us. Both used to read "check the address and try
+         again", so during the database outage this banner sent people off to
+         hunt for a typo in an email they had spelled correctly. */
+      setFailure(err?.status >= 500 || err?.status === 0
+        ? err.message
+        : t('launch.failed', 'That did not go through. Please check the address and try again.'));
       setState('error');
     }
   };
@@ -97,7 +105,7 @@ export default function LaunchBanner() {
                 {t('launch.emailLabel', 'Your email address')}
               </label>
               <input id="launch-email" type="email" required value={email} autoComplete="email"
-                onChange={(e) => { setEmail(e.target.value); if (state === 'error') setState('idle'); }}
+                onChange={(e) => { setEmail(e.target.value); if (state === 'error') { setState('idle'); setFailure(''); } }}
                 placeholder={t('launch.placeholder', 'you@example.com')}
                 className="min-w-0 flex-1 lg:max-w-[15rem] h-11 rounded-xl px-3 text-slate-900 text-sm
                            placeholder:text-slate-500 bg-white border border-white/40" />
@@ -113,7 +121,7 @@ export default function LaunchBanner() {
       </div>
       {state === 'error' && (
         <p role="alert" className="max-w-[1400px] mx-auto px-4 lg:px-8 pb-3 text-sm text-white">
-          {t('launch.failed', 'That did not go through. Please check the address and try again.')}
+          {failure || t('launch.failed', 'That did not go through. Please check the address and try again.')}
         </p>
       )}
     </section>
