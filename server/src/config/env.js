@@ -323,7 +323,73 @@ export const config = {
       note: env.PAY_NOTE || '',
     },
   },
+
+  /**
+   * Market intelligence: how the pricing engine is allowed to think.
+   *
+   * Every number here is a lever the owner turns, and the FORMULA itself is one
+   * of them. A hardcoded rule is a rule that gets argued with once and then
+   * worked around, so MARKET_PRICE_FORMULA is an expression evaluated against
+   * the named variables below — the default states the intent in one line, and
+   * a shop with a different strategy changes the line rather than the code.
+   *
+   * The defaults are deliberately conservative: they refuse more often than
+   * they publish. A pricing engine that guesses wrong in public is worse than
+   * one that asks.
+   */
+  market: {
+    // ── The formula, and its inputs ──────────────────────────────────────────
+    formula: env.MARKET_PRICE_FORMULA
+      || 'max(minimum_profitable_price, competitive_market_price * target_position)',
+    targetMargin: num(env.TARGET_MARGIN, 0.18),                 // 18% gross
+    minimumProfitEur: num(env.MINIMUM_PROFIT_EUR, 0.50),
+    maxCompetitorUndercutPercent: num(env.MAX_COMPETITOR_UNDERCUT_PERCENT, 5),
+    targetMarketPosition: num(env.TARGET_MARKET_POSITION, 0.98),
+    promotionMargin: num(env.PROMOTION_MARGIN, 0.08),
+    paymentFeePercent: num(env.PAYMENT_FEE_PERCENT, 2.9),
+    paymentFixedFee: num(env.PAYMENT_FIXED_FEE, 0.29),
+    fulfillmentCostEur: num(env.FULFILLMENT_COST_EUR, 0),
+    sourceCostPercent: num(env.SOURCE_COST_PERCENT, 0),
+    // Which competitor statistic "the market price" means. low | median | high.
+    marketBasis: (env.MARKET_PRICE_BASIS || 'median').toLowerCase(),
+
+    // ── VAT ─────────────────────────────────────────────────────────────────
+    // Off by default and it stays off: this shop publishes no VAT number, and a
+    // pricing engine that quietly adds 21% to every price would be inventing a
+    // tax position the business has not taken. See legalIdentity / compliance.
+    vatPercent: num(env.VAT_PERCENT, 0),
+    pricesIncludeVat: env.PRICES_INCLUDE_VAT !== 'false',
+
+    // ── Safety: when NOT to publish ─────────────────────────────────────────
+    maxObservationAgeHours: num(env.MARKET_MAX_AGE_HOURS, 24),
+    minCompetitors: Math.max(1, Math.round(num(env.MARKET_MIN_COMPETITORS, 3))),
+    maxPriceChangePercent: num(env.MARKET_MAX_PRICE_CHANGE_PERCENT, 25),
+    minConfidence: num(env.MARKET_MIN_CONFIDENCE, 0.6),
+    // A price this far below the cheapest competitor is more likely a parsing
+    // bug or a mispriced listing than an opportunity.
+    suspiciousBelowLowPercent: num(env.MARKET_SUSPICIOUS_BELOW_PERCENT, 40),
+
+    // ── Refresh cadence ─────────────────────────────────────────────────────
+    // Customer-facing prices are not a live ticker. These are minimum intervals;
+    // the maintenance runner will not do the work more often than this.
+    discoveryIntervalHours: num(env.MARKET_DISCOVERY_INTERVAL_HOURS, 24),
+    priceRefreshIntervalHours: num(env.MARKET_PRICE_REFRESH_HOURS, 6),
+
+    // Comma-separated source keys the owner has an agreement for. Empty means
+    // every automated source reports UNAVAILABLE, which is the safe default.
+    enabledSources: (env.MARKET_SOURCES || '')
+      .split(',').map((x) => x.trim().toLowerCase()).filter(Boolean),
+    userAgent: env.MARKET_USER_AGENT
+      || 'ForgeMarketBot/1.0 (+https://forgemarket.nl/about; market research)',
+  },
 };
+
+/** A number from the environment, or the default when it is absent or junk. */
+function num(raw, fallback) {
+  if (raw === undefined || raw === null || String(raw).trim() === '') return fallback;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : fallback;
+}
 
 /** Parse "FORGE10:10,WELCOME5:5" → { FORGE10: 10, WELCOME5: 5 } (percent off). */
 function parseCoupons(s) {

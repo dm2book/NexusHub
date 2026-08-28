@@ -203,6 +203,44 @@ export async function runMaintenance() {
     summary.alertsPruned = await pruneAlerts();
   } catch (e) { summary.alertPruneError = e.message; }
 
+  /* ── Market intelligence ────────────────────────────────────────────────
+     Five jobs, each of which decides for ITSELF whether it is due — the
+     interval lives in configuration and is checked against a stored timestamp,
+     so piggybacking on live traffic cannot turn a daily job into a per-request
+     one. That matters more here than anywhere else in this file: these jobs
+     call other people's APIs, and a shop with steady traffic would otherwise
+     hammer a partner every minute and lose the agreement that permits it.
+
+     Customer-facing prices are untouched by all five. The most any of them does
+     is write a recommendation with a status of requires_review; publishing is a
+     separate, human, audited action. */
+  try {
+    const market = await import('./market/engine.js');
+    summary.marketSources = (await market.refreshSources({ checkRobots: false })).length;
+
+    const discovery = await market.runProductDiscovery();
+    if (!discovery.skipped) {
+      summary.marketObservations = discovery.collected?.recorded || 0;
+      summary.marketClassified = discovery.classified?.classified || 0;
+      summary.marketNewCandidates = discovery.newCandidates || 0;
+      if (discovery.collected?.unavailable?.length) {
+        summary.marketSourcesUnavailable = discovery.collected.unavailable.length;
+      }
+    }
+
+    const pricing = await market.refreshRecommendations();
+    if (!pricing.skipped) {
+      summary.marketPriced = pricing.priced;
+      summary.marketNeedsReview = pricing.requiresReview;
+    }
+
+    const stale = await market.detectStaleData();
+    summary.marketStale = stale.stale;
+
+    const { pruneObservations } = await import('./market/observations.js');
+    summary.marketObservationsPruned = await pruneObservations();
+  } catch (e) { summary.marketError = e.message; }
+
   return summary;
 }
 

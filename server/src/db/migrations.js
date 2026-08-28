@@ -1259,4 +1259,168 @@ CREATE INDEX IF NOT EXISTS idx_owner_alerts_event ON owner_alerts (event, create
 CREATE INDEX IF NOT EXISTS idx_owner_alerts_time  ON owner_alerts (created_at DESC);
 `,
   },
+  {
+    id: '033_market_intelligence',
+    sql: `
+-- ── Market intelligence: what the market sells, and for how much ───────────
+--
+-- Four ideas, and the schema follows them.
+--
+-- 1. AN OBSERVATION IS EVIDENCE, NOT A FACT ABOUT THE WORLD. Every price this
+--    system knows came from somewhere at some moment, so market_observations
+--    stores the source, the URL and the timestamp on the same row as the
+--    number. There is deliberately no "current price" column anywhere: a
+--    current price is a query over observations, and a query can tell you it
+--    has nothing fresh to say. A cached scalar cannot.
+--
+-- 2. THE CANONICAL PRODUCT IS THE JOIN KEY, AND IT IS STRICT. Two listings are
+--    the same product only when game, edition, platform, region, type AND
+--    denomination all match. canonical_key is that tuple, made into a string,
+--    and it is UNIQUE — so "1050 FC Points PS5 EU" and "1050 FC Points PC EU"
+--    cannot collapse into one row by accident, which is the failure that turns
+--    a pricing engine into a mispricing engine.
+--
+-- 3. DISCOVERY IS A WORKFLOW WITH A HUMAN IN IT. market_candidates is a state
+--    machine from discovered to published, and nothing crosses into the
+--    customer-facing catalogue without a row recording who approved it and
+--    when. Thousands of auto-created products is the outcome this table exists
+--    to prevent.
+--
+-- 4. A RECOMMENDATION CARRIES ITS OWN REASONS. market_price_recommendations
+--    keeps the inputs and the blockers as JSON beside the number, so a price
+--    can be argued with months later without re-running anything.
+
+CREATE TABLE IF NOT EXISTS market_sources (
+  key                TEXT PRIMARY KEY,          -- 'eldorado', 'g2a', 'manual', …
+  label              TEXT NOT NULL,
+  kind               TEXT NOT NULL,             -- api | feed | manual
+  -- Why we are allowed to ask. Written down rather than assumed, because the
+  -- answer differs per source and changes over time.
+  legal_basis        TEXT NOT NULL DEFAULT '',
+  terms_url          TEXT,
+  robots_url         TEXT,
+  robots_allows      INTEGER,                   -- NULL = never checked
+  robots_checked_at  TEXT,
+  requires_credentials INTEGER NOT NULL DEFAULT 1,
+  -- available | unavailable | disabled. 'unavailable' is a first-class answer:
+  -- a source we may not query automatically is reported, never worked around.
+  status             TEXT NOT NULL DEFAULT 'unavailable',
+  status_reason      TEXT NOT NULL DEFAULT '',
+  enabled            INTEGER NOT NULL DEFAULT 0,
+  last_run_at        TEXT,
+  last_error         TEXT,
+  created_at         TEXT NOT NULL,
+  updated_at         TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS market_products (
+  id             TEXT PRIMARY KEY,
+  canonical_key  TEXT NOT NULL UNIQUE,
+  product_type   TEXT NOT NULL,                 -- points | currency | giftcard | key | subscription
+  game           TEXT NOT NULL,                 -- 'ea-fc', 'roblox', 'minecraft', …
+  edition        TEXT NOT NULL DEFAULT '',
+  platform       TEXT NOT NULL,                 -- playstation | xbox | pc | nintendo | mobile | any
+  region         TEXT NOT NULL,                 -- eu | us | uk | global | …
+  denomination   BIGINT,                        -- 1050 (points), 25 (a €25 card)
+  denom_unit     TEXT NOT NULL DEFAULT '',      -- 'points', 'robux', 'EUR', …
+  quantity       INTEGER NOT NULL DEFAULT 1,
+  title          TEXT NOT NULL,                 -- a readable name for humans
+  created_at     TEXT NOT NULL,
+  updated_at     TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_market_products_game ON market_products (game, platform, region);
+
+CREATE TABLE IF NOT EXISTS market_observations (
+  id                TEXT PRIMARY KEY,
+  market_product_id TEXT NOT NULL REFERENCES market_products(id) ON DELETE CASCADE,
+  source_key        TEXT NOT NULL,
+  source_product_id TEXT,
+  raw_title         TEXT NOT NULL,
+  price_cents       BIGINT NOT NULL,
+  currency          TEXT NOT NULL,
+  -- The converted figure and the rate that produced it, so a comparison can be
+  -- re-checked. NULL when no rate was available — never a guessed number.
+  price_eur_cents   BIGINT,
+  fx_rate           NUMERIC,
+  fx_as_of          TEXT,
+  availability      TEXT NOT NULL DEFAULT 'unknown',  -- in_stock | out_of_stock | unknown
+  is_official       INTEGER NOT NULL DEFAULT 0,       -- publisher store reference price
+  url               TEXT NOT NULL,
+  observed_at       TEXT NOT NULL,
+  created_at        TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_market_obs_product ON market_observations (market_product_id, observed_at DESC);
+CREATE INDEX IF NOT EXISTS idx_market_obs_source ON market_observations (source_key, observed_at DESC);
+
+CREATE TABLE IF NOT EXISTS market_candidates (
+  id                TEXT PRIMARY KEY,
+  market_product_id TEXT NOT NULL UNIQUE REFERENCES market_products(id) ON DELETE CASCADE,
+  -- discovered → normalized → needs_review → approved → product_created → published
+  -- with already_listed / possible_duplicate / unavailable / rejected as exits.
+  status            TEXT NOT NULL DEFAULT 'discovered',
+  reason            TEXT NOT NULL DEFAULT '',
+  forge_product_id  TEXT,                        -- set once a real product exists
+  duplicate_of      TEXT,                        -- products.id we think it repeats
+  match_confidence  NUMERIC,
+  decided_by        TEXT,
+  decided_at        TEXT,
+  created_at        TEXT NOT NULL,
+  updated_at        TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_market_candidates_status ON market_candidates (status, updated_at DESC);
+
+CREATE TABLE IF NOT EXISTS market_price_recommendations (
+  id                TEXT PRIMARY KEY,
+  market_product_id TEXT NOT NULL REFERENCES market_products(id) ON DELETE CASCADE,
+  forge_product_id  TEXT,
+  low_cents         BIGINT,
+  median_cents      BIGINT,
+  high_cents        BIGINT,
+  official_cents    BIGINT,
+  competitor_count  INTEGER NOT NULL DEFAULT 0,
+  freshest_at       TEXT,
+  confidence        NUMERIC NOT NULL DEFAULT 0,
+  recommended_cents BIGINT,
+  margin_pct        NUMERIC,
+  profit_cents      BIGINT,
+  -- recommended | requires_review | approved | rejected | published
+  status            TEXT NOT NULL DEFAULT 'requires_review',
+  blockers          TEXT NOT NULL DEFAULT '[]',
+  inputs            TEXT NOT NULL DEFAULT '{}',
+  decided_by        TEXT,
+  decided_at        TEXT,
+  created_at        TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_market_reco_status ON market_price_recommendations (status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_market_reco_product ON market_price_recommendations (market_product_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS market_price_history (
+  id                TEXT PRIMARY KEY,
+  market_product_id TEXT,
+  forge_product_id  TEXT,
+  old_cents         BIGINT,
+  new_cents         BIGINT,
+  source            TEXT NOT NULL DEFAULT '',
+  reason            TEXT NOT NULL DEFAULT '',
+  margin_pct        NUMERIC,
+  approval_status   TEXT NOT NULL DEFAULT '',
+  actor             TEXT,
+  created_at        TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_market_price_history ON market_price_history (forge_product_id, created_at DESC);
+
+-- Exchange rates, with the moment and the source they came from. A conversion
+-- with no rate is a refusal, not a fallback to 1.0.
+CREATE TABLE IF NOT EXISTS fx_rates (
+  id          TEXT PRIMARY KEY,
+  base        TEXT NOT NULL,
+  quote       TEXT NOT NULL,
+  rate        NUMERIC NOT NULL,
+  as_of       TEXT NOT NULL,
+  source      TEXT NOT NULL,
+  created_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_fx_pair ON fx_rates (base, quote, as_of DESC);
+`,
+  },
 ];

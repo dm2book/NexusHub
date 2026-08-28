@@ -14,6 +14,7 @@ import support from './support.js';
 import social from './social.js';
 import monetization from './monetization.js';
 import categories from './categories.js';
+import market from './market.js';
 import { asyncHandler } from '../../middleware/error.js';
 import { launchChecks } from '../../services/launchCheckService.js';
 import { launchPlan } from '../../services/launchPlanService.js';
@@ -86,5 +87,6 @@ router.use('/support', support);
 router.use('/social', social);
 router.use('/monetization', monetization);
 router.use('/categories', categories);
+router.use('/market', market);
 
 export default router;
