@@ -85,6 +85,19 @@ export const EVENTS = {
   'webhook.failed':     { emoji: '🔌', color: 0xdc2626, priority: 1, label: 'Payment webhook failed' },
   'email.failed':       { emoji: '📧', color: 0xf59e0b, priority: 0, label: 'Email delivery failed' },
   'system.error':       { emoji: '🚨', color: 0xef4444, priority: 1, label: 'System error' },
+
+  /* Market intelligence. All of these are decisions to make, not fires to put
+     out, so none of them is priority 1 — a pricing observation that wakes
+     somebody at 3am is a pricing observation that gets the whole channel muted.
+     They are deduplicated by canonical product and day, because the job that
+     raises them runs on a schedule and would otherwise repeat itself forever. */
+  'market.new_product':      { emoji: '🆕', color: 0x6366f1, priority: -1, label: 'New product on the market' },
+  'market.price_moved':      { emoji: '📊', color: 0x0ea5e9, priority: 0,  label: 'Competitor price moved' },
+  'market.uncompetitive':    { emoji: '🐢', color: 0xf59e0b, priority: 0,  label: 'We are uncompetitive' },
+  'market.margin_low':       { emoji: '📉', color: 0xf97316, priority: 0,  label: 'Margin below target' },
+  'market.unavailable':      { emoji: '🚫', color: 0x94a3b8, priority: -1, label: 'Product unavailable in market' },
+  'market.suspicious_price': { emoji: '🧐', color: 0xef4444, priority: 0,  label: 'Suspicious price' },
+  'market.stale':            { emoji: '🕰️', color: 0x94a3b8, priority: -1, label: 'Price evidence stale' },
 };
 
 /**
@@ -114,6 +127,16 @@ export const STORM = {
     'webhook.failed': 3,
     'email.failed': 3,
     'system.error': 3,
+    // Market events arrive in batches by nature — a discovery run finds twenty
+    // new products at once — so the budgets are small and the summary does the
+    // talking.
+    'market.new_product': 5,
+    'market.price_moved': 5,
+    'market.uncompetitive': 5,
+    'market.margin_low': 5,
+    'market.unavailable': 5,
+    'market.suspicious_price': 5,
+    'market.stale': 3,
   },
   default: 5,
 };

@@ -78,6 +78,7 @@ const AdminProducts = lazy(() => import('./pages/admin/Products.jsx'));
 const AdminUsers = lazy(() => import('./pages/admin/Users.jsx'));
 const AdminPayments = lazy(() => import('./pages/admin/Payments.jsx'));
 const AdminSuppliers = lazy(() => import('./pages/admin/Suppliers.jsx'));
+const AdminMarket = lazy(() => import('./pages/admin/Market.jsx'));
 const AdminFulfillment = lazy(() => import('./pages/admin/Fulfillment.jsx'));
 const AdminEmails = lazy(() => import('./pages/admin/Emails.jsx'));
 const AdminSupport = lazy(() => import('./pages/admin/Support.jsx'));
@@ -181,6 +182,7 @@ export default function App() {
           <Route path="/admin/categories" element={<AdminCategories />} />
           <Route path="/admin/users" element={<AdminUsers />} />
           <Route path="/admin/suppliers" element={<AdminSuppliers />} />
+          <Route path="/admin/market" element={<AdminMarket />} />
           <Route path="/admin/fulfillment" element={<AdminFulfillment />} />
           <Route path="/admin/emails" element={<AdminEmails />} />
           <Route path="/admin/support" element={<AdminSupport />} />
