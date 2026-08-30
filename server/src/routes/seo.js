@@ -183,8 +183,17 @@ function routeChunks() { return chunks; }
    the panel behind it would change colour a second later, which is the one
    thing a shell like this must never do. Bare .svg is the icon set: transparent
    badges drawn for a gradient plinth. */
-const CARRIES_OWN_BG = (src) =>
-  /\.(webp|png|jpe?g|avif)(\?|$)/i.test(src) || /^\/products\/packs\//.test(src);
+/* Kept in step with carriesOwnBackground() in src/lib/catalog.js. The two
+   decide the same thing on two sides of the wire, and they HAVE drifted: when
+   the generated /products/art/ system landed, the client painted those covers
+   full-bleed and this shell did not, so a product page rendered a grey skeleton
+   and then swapped in art that filled the panel. Path first, extension last —
+   the icon set is logos whatever container they ship in. */
+const CARRIES_OWN_BG = (src) => {
+  if (/^\/products\/icons\//.test(src)) return false;
+  if (/^\/products\/(art|packs)\//.test(src)) return true;
+  return /\.(webp|png|jpe?g|avif)(\?|$)/i.test(src);
+};
 
 function withProductShell(html, product) {
   // Only artwork that brings its own background can sit on the neutral panel

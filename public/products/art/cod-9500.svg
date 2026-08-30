@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 600" width="700" height="600" role="img" aria-label="9,500 CP — Call of Duty">
+<title>9,500 CP — Call of Duty</title>
+<defs>
+<linearGradient id="abase" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="700" y2="600">
+<stop offset="0" stop-color="#07060f"/><stop offset=".55" stop-color="#0e0b1e"/><stop offset="1" stop-color="#07060f"/></linearGradient>
+<radialGradient id="abloom" gradientUnits="userSpaceOnUse" cx="350" cy="236" r="400">
+<stop offset="0" stop-color="#a855f7" stop-opacity=".42"/>
+<stop offset=".45" stop-color="#6366f1" stop-opacity=".20"/>
+<stop offset="1" stop-color="#6366f1" stop-opacity="0"/></radialGradient>
+<radialGradient id="acat" gradientUnits="userSpaceOnUse" cx="574" cy="108" r="320">
+<stop offset="0" stop-color="#f97316" stop-opacity=".22"/>
+<stop offset="1" stop-color="#f97316" stop-opacity="0"/></radialGradient>
+<radialGradient id="avig" gradientUnits="userSpaceOnUse" cx="350" cy="300" r="504">
+<stop offset=".5" stop-color="#04030c" stop-opacity="0"/><stop offset="1" stop-color="#04030c" stop-opacity=".62"/></radialGradient>
+<radialGradient id="afade" gradientUnits="userSpaceOnUse" cx="350" cy="252" r="434">
+<stop offset="0" stop-color="#fff" stop-opacity=".85"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+<mask id="amfade"><rect width="700" height="600" fill="url(#afade)"/></mask>
+<pattern id="agrid" width="70" height="70" patternUnits="userSpaceOnUse">
+<path d="M70 0V70M0 70H70" fill="none" stroke="#c7d2fe" stroke-width="1.1"/></pattern>
+<linearGradient id="anum" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#cdc2f7"/></linearGradient>
+<linearGradient id="arim" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="700" y2="0">
+<stop offset="0" stop-color="#6366f1"/><stop offset=".5" stop-color="#a855f7"/><stop offset="1" stop-color="#f97316"/></linearGradient>
+<filter id="ahalo" x="-40%" y="-70%" width="180%" height="240%"><feGaussianBlur stdDeviation="18"/></filter>
+</defs>
+<rect width="700" height="600" fill="url(#abase)"/>
+<rect width="700" height="600" fill="url(#abloom)"/>
+<rect width="700" height="600" fill="url(#acat)"/>
+<rect width="700" height="600" fill="url(#agrid)" mask="url(#amfade)" opacity=".11"/>
+<rect width="700" height="600" fill="url(#avig)"/>
+<path transform="translate(322 44) scale(1.7)" opacity="0.08" fill="#ddd6fe" d="M9 6 L4.6 18.6 h5.1 l-2.2 8.4 L23.4 12.2 h-6.4 l2.2-6.2 z"/>
+<ellipse cx="350" cy="344" rx="132" ry="17" fill="#f97316" opacity=".16"/>
+<circle cx="350" cy="238" r="122" fill="none" stroke="url(#arim)" stroke-width="3" opacity=".6"/>
+<image x="262" y="150" width="176" height="176" preserveAspectRatio="xMidYMid meet" href="data:image/webp;base64,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"/>
+<text x="350" y="456" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="112" font-weight="800" letter-spacing="-1" fill="#a855f7" filter="url(#ahalo)" opacity=".55">9,500</text>
+<text x="350" y="456" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="112" font-weight="800" letter-spacing="-1" fill="url(#anum)">9,500</text>
+
+<rect x="0" y="595" width="700" height="5" fill="url(#arim)" opacity=".75"/>
+</svg>

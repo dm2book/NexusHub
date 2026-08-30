@@ -15,6 +15,9 @@
  * Categories without Eldorado listings are priced ~15-25% under the official
  * in-game store. Adjust anytime in Admin → Products.
  */
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { run, get, nowIso } from './index.js';
 import { migrate } from './migrate.js';
 import { newId } from '../utils/ids.js';
@@ -192,9 +195,35 @@ const RASTER_ICONS = [
 export const iconFor = (cat) => (CATS_WITH_ICON.includes(cat)
   ? `/products/icons/${cat}.${RASTER_ICONS.includes(cat) ? 'webp' : 'svg'}` : null);
 
-// Per-PACK art first (shows the denomination, e.g. "1,000 ROBUX" card), then
-// the category icon as a fallback — so every product gets its own visual.
-const imageFor = (p) => p.image || iconFor(p.category) || null;
+/**
+ * The generated ForgeMarket artboard, when one exists for this SKU.
+ *
+ * scripts/art/generate.mjs writes /products/art/<sku>.svg for every product:
+ * one dark, purple/blue, ForgeMarket-branded system authored at 7:6 — exactly
+ * the ratio of the card that displays it. Preferring it here means a fresh
+ * deployment seeds the current art rather than the two older systems (480x300
+ * pack covers and 512x512 logos) that never matched the tile and left the grid
+ * with three different painted sizes.
+ *
+ * Falls back to the old art when the file is absent, so a checkout that has not
+ * run the generator still seeds a complete catalogue rather than a blank one.
+ */
+/* Relative to THIS file, not to cwd: the API runs from server/, so
+   process.cwd() + public/ pointed at a directory that does not exist and the
+   lookup silently found nothing. Measured by seeding a fresh database and
+   counting how many products landed on the new art: 0 of 72. */
+const ART_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..',
+  'public', 'products', 'art');
+const generatedArt = (sku) => {
+  if (!sku) return null;
+  const file = `${String(sku).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}.svg`;
+  try { return fs.existsSync(path.join(ART_DIR, file)) ? `/products/art/${file}` : null; }
+  catch { return null; }
+};
+
+// Generated artboard first, then per-PACK art, then the category icon — so
+// every product gets its own visual whichever of the three is available.
+const imageFor = (p) => generatedArt(p.sku) || p.image || iconFor(p.category) || null;
 
 /**
  * Keep product covers in sync on every boot: any seeded product whose stored

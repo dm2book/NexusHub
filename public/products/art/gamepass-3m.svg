@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 600" width="700" height="600" role="img" aria-label="Xbox Game Pass Ultimate — 3 Months">
+<title>Xbox Game Pass Ultimate — 3 Months</title>
+<defs>
+<linearGradient id="abase" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="700" y2="600">
+<stop offset="0" stop-color="#07060f"/><stop offset=".55" stop-color="#0e0b1e"/><stop offset="1" stop-color="#07060f"/></linearGradient>
+<radialGradient id="abloom" gradientUnits="userSpaceOnUse" cx="350" cy="236" r="400">
+<stop offset="0" stop-color="#a855f7" stop-opacity=".42"/>
+<stop offset=".45" stop-color="#6366f1" stop-opacity=".20"/>
+<stop offset="1" stop-color="#6366f1" stop-opacity="0"/></radialGradient>
+<radialGradient id="acat" gradientUnits="userSpaceOnUse" cx="574" cy="108" r="320">
+<stop offset="0" stop-color="#4ade80" stop-opacity=".22"/>
+<stop offset="1" stop-color="#4ade80" stop-opacity="0"/></radialGradient>
+<radialGradient id="avig" gradientUnits="userSpaceOnUse" cx="350" cy="300" r="504">
+<stop offset=".5" stop-color="#04030c" stop-opacity="0"/><stop offset="1" stop-color="#04030c" stop-opacity=".62"/></radialGradient>
+<radialGradient id="afade" gradientUnits="userSpaceOnUse" cx="350" cy="252" r="434">
+<stop offset="0" stop-color="#fff" stop-opacity=".85"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+<mask id="amfade"><rect width="700" height="600" fill="url(#afade)"/></mask>
+<pattern id="agrid" width="70" height="70" patternUnits="userSpaceOnUse">
+<path d="M70 0V70M0 70H70" fill="none" stroke="#c7d2fe" stroke-width="1.1"/></pattern>
+<linearGradient id="anum" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#cdc2f7"/></linearGradient>
+<linearGradient id="arim" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="700" y2="0">
+<stop offset="0" stop-color="#6366f1"/><stop offset=".5" stop-color="#a855f7"/><stop offset="1" stop-color="#4ade80"/></linearGradient>
+<filter id="ahalo" x="-40%" y="-70%" width="180%" height="240%"><feGaussianBlur stdDeviation="18"/></filter>
+</defs>
+<rect width="700" height="600" fill="url(#abase)"/>
+<rect width="700" height="600" fill="url(#abloom)"/>
+<rect width="700" height="600" fill="url(#acat)"/>
+<rect width="700" height="600" fill="url(#agrid)" mask="url(#amfade)" opacity=".11"/>
+<rect width="700" height="600" fill="url(#avig)"/>
+<path transform="translate(322 44) scale(1.7)" opacity="0.08" fill="#ddd6fe" d="M9 6 L4.6 18.6 h5.1 l-2.2 8.4 L23.4 12.2 h-6.4 l2.2-6.2 z"/>
+<ellipse cx="350" cy="344" rx="132" ry="17" fill="#4ade80" opacity=".16"/>
+<circle cx="350" cy="238" r="122" fill="none" stroke="url(#arim)" stroke-width="3" opacity=".6"/>
+<svg x="262" y="150" width="176" height="176" viewBox="0 0 512 512" preserveAspectRatio="xMidYMid meet" overflow="visible">
+  <defs><radialGradient id="gamepass-sh1" cx="0.5" cy="0.5" r="0.5">
+    <stop offset="0" stop-color="#0b1220" stop-opacity="0.4"/>
+    <stop offset="0.6" stop-color="#0b1220" stop-opacity="0.16"/>
+    <stop offset="1" stop-color="#0b1220" stop-opacity="0"/>
+  </radialGradient></defs>
+  <ellipse cx="256" cy="388" rx="118" ry="24" fill="url(#gamepass-sh1)"/>
+  <defs>
+    <linearGradient id="gamepass-g2" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#8ce88c"/><stop offset="0.5" stop-color="#107c10"/><stop offset="1" stop-color="#0a4f0a"/>
+    </linearGradient>
+    <clipPath id="gamepass-c3"><path d="M196 126H316A52 52 0 0 1 368 178V298A52 52 0 0 1 316 350H196A52 52 0 0 1 144 298V178A52 52 0 0 1 196 126Z"/></clipPath>
+    <radialGradient id="gamepass-p4" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.72"/><stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <defs><path id="gamepass-s5" d="M196 126H316A52 52 0 0 1 368 178V298A52 52 0 0 1 316 350H196A52 52 0 0 1 144 298V178A52 52 0 0 1 196 126Z"/></defs>
+<use href="#gamepass-s5" y="26" fill="#062b06"/>
+<use href="#gamepass-s5" y="25" fill="#062c06"/>
+<use href="#gamepass-s5" y="24" fill="#062d06"/>
+<use href="#gamepass-s5" y="23" fill="#062d06"/>
+<use href="#gamepass-s5" y="22" fill="#062e06"/>
+<use href="#gamepass-s5" y="21" fill="#062e06"/>
+<use href="#gamepass-s5" y="20" fill="#062f06"/>
+<use href="#gamepass-s5" y="19" fill="#063006"/>
+<use href="#gamepass-s5" y="18" fill="#063006"/>
+<use href="#gamepass-s5" y="17" fill="#063106"/>
+<use href="#gamepass-s5" y="16" fill="#063206"/>
+<use href="#gamepass-s5" y="15" fill="#063206"/>
+<use href="#gamepass-s5" y="14" fill="#063306"/>
+<use href="#gamepass-s5" y="13" fill="#073307"/>
+<use href="#gamepass-s5" y="12" fill="#073407"/>
+<use href="#gamepass-s5" y="11" fill="#073507"/>
+<use href="#gamepass-s5" y="10" fill="#073507"/>
+<use href="#gamepass-s5" y="9" fill="#073607"/>
+<use href="#gamepass-s5" y="8" fill="#073607"/>
+<use href="#gamepass-s5" y="7" fill="#073707"/>
+<use href="#gamepass-s5" y="6" fill="#073807"/>
+<use href="#gamepass-s5" y="5" fill="#073807"/>
+<use href="#gamepass-s5" y="4" fill="#073907"/>
+<use href="#gamepass-s5" y="3" fill="#073907"/>
+<use href="#gamepass-s5" y="2" fill="#073a07"/>
+<use href="#gamepass-s5" y="1" fill="#073b07"/>
+  <path d="M196 126H316A52 52 0 0 1 368 178V298A52 52 0 0 1 316 350H196A52 52 0 0 1 144 298V178A52 52 0 0 1 196 126Z" fill="url(#gamepass-g2)"/>
+  <path d="M196 126H316A52 52 0 0 1 368 178V298A52 52 0 0 1 316 350H196A52 52 0 0 1 144 298V178A52 52 0 0 1 196 126Z" fill="none" stroke="#a8f0a8" stroke-opacity="0.75" stroke-width="3"/>
+  <g clip-path="url(#gamepass-c3)"><ellipse cx="216" cy="172" rx="96" ry="54" fill="url(#gamepass-p4)" transform="rotate(-24 216 172)"/></g>
+  <circle cx="256" cy="238" r="74" fill="#effbef"/>
+  <path d="M212 190c26-18 62-18 88 0-24 14-40 30-44 44-4-14-20-30-44-44Z" fill="#107c10"/>
+  <path d="M198 206c-12 22-12 48 0 70 14-16 24-28 30-35-6-7-16-19-30-35Z" fill="#107c10"/>
+  <path d="M314 206c12 22 12 48 0 70-14-16-24-28-30-35 6-7 16-19 30-35Z" fill="#107c10"/>
+  <path d="M212 292c26 18 62 18 88 0-24-14-40-24-44-32-4 8-20 18-44 32Z" fill="#107c10"/>
+</svg>
+<text x="350" y="440" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="112" font-weight="800" letter-spacing="-1" fill="#a855f7" filter="url(#ahalo)" opacity=".55">3</text>
+<text x="350" y="440" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="112" font-weight="800" letter-spacing="-1" fill="url(#anum)">3</text>
+<text x="350" y="488" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="28" font-weight="700" letter-spacing="8" fill="#a9a3c9">MONTHS</text>
+<rect x="0" y="595" width="700" height="5" fill="url(#arim)" opacity=".75"/>
+</svg>

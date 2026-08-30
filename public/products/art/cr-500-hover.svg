@@ -1,0 +1,96 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 600" width="700" height="600" role="img" aria-label="500 Gems — Clash Royale">
+<title>500 Gems — Clash Royale</title>
+<defs>
+<linearGradient id="abase" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="700" y2="600">
+<stop offset="0" stop-color="#07060f"/><stop offset=".55" stop-color="#0e0b1e"/><stop offset="1" stop-color="#07060f"/></linearGradient>
+<radialGradient id="abloom" gradientUnits="userSpaceOnUse" cx="350" cy="236" r="400">
+<stop offset="0" stop-color="#a855f7" stop-opacity=".60"/>
+<stop offset=".45" stop-color="#6366f1" stop-opacity=".30"/>
+<stop offset="1" stop-color="#6366f1" stop-opacity="0"/></radialGradient>
+<radialGradient id="acat" gradientUnits="userSpaceOnUse" cx="574" cy="108" r="320">
+<stop offset="0" stop-color="#60a5fa" stop-opacity=".34"/>
+<stop offset="1" stop-color="#60a5fa" stop-opacity="0"/></radialGradient>
+<radialGradient id="avig" gradientUnits="userSpaceOnUse" cx="350" cy="300" r="504">
+<stop offset=".5" stop-color="#04030c" stop-opacity="0"/><stop offset="1" stop-color="#04030c" stop-opacity=".62"/></radialGradient>
+<radialGradient id="afade" gradientUnits="userSpaceOnUse" cx="350" cy="252" r="434">
+<stop offset="0" stop-color="#fff" stop-opacity=".85"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+<mask id="amfade"><rect width="700" height="600" fill="url(#afade)"/></mask>
+<pattern id="agrid" width="70" height="70" patternUnits="userSpaceOnUse">
+<path d="M70 0V70M0 70H70" fill="none" stroke="#c7d2fe" stroke-width="1.1"/></pattern>
+<linearGradient id="anum" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#cdc2f7"/></linearGradient>
+<linearGradient id="arim" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="700" y2="0">
+<stop offset="0" stop-color="#6366f1"/><stop offset=".5" stop-color="#a855f7"/><stop offset="1" stop-color="#60a5fa"/></linearGradient>
+<filter id="ahalo" x="-40%" y="-70%" width="180%" height="240%"><feGaussianBlur stdDeviation="18"/></filter>
+</defs>
+<rect width="700" height="600" fill="url(#abase)"/>
+<rect width="700" height="600" fill="url(#abloom)"/>
+<rect width="700" height="600" fill="url(#acat)"/>
+<rect width="700" height="600" fill="url(#agrid)" mask="url(#amfade)" opacity=".16"/>
+<rect width="700" height="600" fill="url(#avig)"/>
+<path transform="translate(322 44) scale(1.7)" opacity="0.14" fill="#ddd6fe" d="M9 6 L4.6 18.6 h5.1 l-2.2 8.4 L23.4 12.2 h-6.4 l2.2-6.2 z"/>
+<ellipse cx="350" cy="344" rx="132" ry="17" fill="#60a5fa" opacity=".28"/>
+<circle cx="350" cy="238" r="126" fill="none" stroke="url(#arim)" stroke-width="3" opacity=".95"/>
+<svg x="262" y="150" width="176" height="176" viewBox="0 0 512 512" preserveAspectRatio="xMidYMid meet" overflow="visible">
+
+  <defs><radialGradient id="clashroyale-sh1" cx="0.5" cy="0.5" r="0.5">
+    <stop offset="0" stop-color="#0b1220" stop-opacity="0.4"/>
+    <stop offset="0.6" stop-color="#0b1220" stop-opacity="0.16000000000000003"/>
+    <stop offset="1" stop-color="#0b1220" stop-opacity="0"/>
+  </radialGradient></defs>
+  <ellipse cx="256" cy="388" rx="132" ry="26" fill="url(#clashroyale-sh1)"/>
+  <defs>
+    <linearGradient id="clashroyale-g2" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#94acdd"/>
+      <stop offset="0.5" stop-color="#4670c5"/>
+      <stop offset="1" stop-color="#385a9e"/>
+    </linearGradient>
+    <clipPath id="clashroyale-c3"><path d="M98 296a70 70 0 1 0 140 0a70 70 0 1 0 -140 0Z"/></clipPath>
+    <radialGradient id="clashroyale-p4" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.72"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <defs><path id="clashroyale-s5" d="M98 296a70 70 0 1 0 140 0a70 70 0 1 0 -140 0Z"/></defs><use href="#clashroyale-s5" y="20" fill="#203259"/><use href="#clashroyale-s5" y="19" fill="#21345c"/><use href="#clashroyale-s5" y="18" fill="#22355e"/><use href="#clashroyale-s5" y="17" fill="#233761"/><use href="#clashroyale-s5" y="16" fill="#243864"/><use href="#clashroyale-s5" y="15" fill="#253a66"/><use href="#clashroyale-s5" y="14" fill="#253b69"/><use href="#clashroyale-s5" y="13" fill="#263d6c"/><use href="#clashroyale-s5" y="12" fill="#273e6e"/><use href="#clashroyale-s5" y="11" fill="#284071"/><use href="#clashroyale-s5" y="10" fill="#294274"/><use href="#clashroyale-s5" y="9" fill="#2a4376"/><use href="#clashroyale-s5" y="8" fill="#2b4579"/><use href="#clashroyale-s5" y="7" fill="#2c467b"/><use href="#clashroyale-s5" y="6" fill="#2d487e"/><use href="#clashroyale-s5" y="5" fill="#2e4981"/><use href="#clashroyale-s5" y="4" fill="#2e4b83"/><use href="#clashroyale-s5" y="3" fill="#2f4c86"/><use href="#clashroyale-s5" y="2" fill="#304e89"/><use href="#clashroyale-s5" y="1" fill="#314f8b"/>
+  <path d="M98 296a70 70 0 1 0 140 0a70 70 0 1 0 -140 0Z" fill="url(#clashroyale-g2)"/>
+  <path d="M98 296a70 70 0 1 0 140 0a70 70 0 1 0 -140 0Z" fill="none" stroke="#acbfe5" stroke-opacity="0.75" stroke-width="3"/>
+  
+  <defs>
+    <linearGradient id="clashroyale-g6" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#91a7d6"/>
+      <stop offset="0.5" stop-color="#4168b8"/>
+      <stop offset="1" stop-color="#345393"/>
+    </linearGradient>
+    <clipPath id="clashroyale-c7"><path d="M288 304a58 58 0 1 0 116 0a58 58 0 1 0 -116 0Z"/></clipPath>
+    <radialGradient id="clashroyale-p8" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.72"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <defs><path id="clashroyale-s9" d="M288 304a58 58 0 1 0 116 0a58 58 0 1 0 -116 0Z"/></defs><use href="#clashroyale-s9" y="16" fill="#1d2f53"/><use href="#clashroyale-s9" y="15" fill="#1e3156"/><use href="#clashroyale-s9" y="14" fill="#1f3359"/><use href="#clashroyale-s9" y="13" fill="#20345c"/><use href="#clashroyale-s9" y="12" fill="#22365f"/><use href="#clashroyale-s9" y="11" fill="#233862"/><use href="#clashroyale-s9" y="10" fill="#243a65"/><use href="#clashroyale-s9" y="9" fill="#253b68"/><use href="#clashroyale-s9" y="8" fill="#263d6c"/><use href="#clashroyale-s9" y="7" fill="#273f6f"/><use href="#clashroyale-s9" y="6" fill="#284172"/><use href="#clashroyale-s9" y="5" fill="#294275"/><use href="#clashroyale-s9" y="4" fill="#2b4478"/><use href="#clashroyale-s9" y="3" fill="#2c467b"/><use href="#clashroyale-s9" y="2" fill="#2d487e"/><use href="#clashroyale-s9" y="1" fill="#2e4981"/>
+  <path d="M288 304a58 58 0 1 0 116 0a58 58 0 1 0 -116 0Z" fill="url(#clashroyale-g6)"/>
+  <path d="M288 304a58 58 0 1 0 116 0a58 58 0 1 0 -116 0Z" fill="none" stroke="#aabbdf" stroke-opacity="0.75" stroke-width="3"/>
+  
+  <defs>
+    <linearGradient id="clashroyale-g10" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#99b5ed"/>
+      <stop offset="0.5" stop-color="#4f7fe0"/>
+      <stop offset="1" stop-color="#3f66b3"/>
+    </linearGradient>
+    <clipPath id="clashroyale-c11"><path d="M138 238a118 118 0 1 0 236 0a118 118 0 1 0 -236 0Z"/></clipPath>
+    <radialGradient id="clashroyale-p12" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.72"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <defs><path id="clashroyale-s13" d="M138 238a118 118 0 1 0 236 0a118 118 0 1 0 -236 0Z"/></defs><use href="#clashroyale-s13" y="30" fill="#243965"/><use href="#clashroyale-s13" y="29" fill="#253a67"/><use href="#clashroyale-s13" y="28" fill="#253b69"/><use href="#clashroyale-s13" y="27" fill="#263c6b"/><use href="#clashroyale-s13" y="26" fill="#273e6d"/><use href="#clashroyale-s13" y="25" fill="#283f6f"/><use href="#clashroyale-s13" y="24" fill="#284071"/><use href="#clashroyale-s13" y="23" fill="#294173"/><use href="#clashroyale-s13" y="22" fill="#2a4275"/><use href="#clashroyale-s13" y="21" fill="#2a4377"/><use href="#clashroyale-s13" y="20" fill="#2b4479"/><use href="#clashroyale-s13" y="19" fill="#2c457b"/><use href="#clashroyale-s13" y="18" fill="#2c477d"/><use href="#clashroyale-s13" y="17" fill="#2d487f"/><use href="#clashroyale-s13" y="16" fill="#2e4981"/><use href="#clashroyale-s13" y="15" fill="#2f4a83"/><use href="#clashroyale-s13" y="14" fill="#2f4b85"/><use href="#clashroyale-s13" y="13" fill="#304c87"/><use href="#clashroyale-s13" y="12" fill="#314d89"/><use href="#clashroyale-s13" y="11" fill="#314f8b"/><use href="#clashroyale-s13" y="10" fill="#32508d"/><use href="#clashroyale-s13" y="9" fill="#33518f"/><use href="#clashroyale-s13" y="8" fill="#335291"/><use href="#clashroyale-s13" y="7" fill="#345393"/><use href="#clashroyale-s13" y="6" fill="#355495"/><use href="#clashroyale-s13" y="5" fill="#365597"/><use href="#clashroyale-s13" y="4" fill="#365699"/><use href="#clashroyale-s13" y="3" fill="#37589b"/><use href="#clashroyale-s13" y="2" fill="#38599d"/><use href="#clashroyale-s13" y="1" fill="#385a9f"/>
+  <path d="M138 238a118 118 0 1 0 236 0a118 118 0 1 0 -236 0Z" fill="url(#clashroyale-g10)"/>
+  <path d="M138 238a118 118 0 1 0 236 0a118 118 0 1 0 -236 0Z" fill="none" stroke="#b0c5f1" stroke-opacity="0.75" stroke-width="3"/>
+  <g clip-path="url(#clashroyale-c11)"><ellipse cx="216" cy="172" rx="96" ry="54"
+      fill="url(#clashroyale-p12)" transform="rotate(-24 216 172)"/></g><path d="M158 238a98 98 0 1 0 196 0a98 98 0 1 0 -196 0Z" fill="none" stroke="#95b2ec" stroke-opacity="0.55" stroke-width="5"/><path d="M194 278L182 192L226 230L256 180L286 230L330 192L318 278Z" fill="#eef4ff" opacity="0.95"/>
+</svg>
+<text x="350" y="440" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="112" font-weight="800" letter-spacing="-1" fill="#a855f7" filter="url(#ahalo)" opacity=".85">500</text>
+<text x="350" y="440" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="112" font-weight="800" letter-spacing="-1" fill="url(#anum)">500</text>
+<text x="350" y="488" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="28" font-weight="700" letter-spacing="8" fill="#a9a3c9">GEMS</text>
+<rect x="0" y="595" width="700" height="5" fill="url(#arim)" opacity="1"/>
+</svg>
