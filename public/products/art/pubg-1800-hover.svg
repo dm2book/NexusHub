@@ -1,0 +1,99 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 600" width="700" height="600" role="img" aria-label="1,800 UC — PUBG Mobile">
+<title>1,800 UC — PUBG Mobile</title>
+<defs>
+<linearGradient id="abase" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="700" y2="600">
+<stop offset="0" stop-color="#07060f"/><stop offset=".55" stop-color="#0e0b1e"/><stop offset="1" stop-color="#07060f"/></linearGradient>
+<radialGradient id="abloom" gradientUnits="userSpaceOnUse" cx="350" cy="236" r="400">
+<stop offset="0" stop-color="#a855f7" stop-opacity=".60"/>
+<stop offset=".45" stop-color="#6366f1" stop-opacity=".30"/>
+<stop offset="1" stop-color="#6366f1" stop-opacity="0"/></radialGradient>
+<radialGradient id="acat" gradientUnits="userSpaceOnUse" cx="574" cy="108" r="320">
+<stop offset="0" stop-color="#fb923c" stop-opacity=".34"/>
+<stop offset="1" stop-color="#fb923c" stop-opacity="0"/></radialGradient>
+<radialGradient id="avig" gradientUnits="userSpaceOnUse" cx="350" cy="300" r="504">
+<stop offset=".5" stop-color="#04030c" stop-opacity="0"/><stop offset="1" stop-color="#04030c" stop-opacity=".62"/></radialGradient>
+<radialGradient id="afade" gradientUnits="userSpaceOnUse" cx="350" cy="252" r="434">
+<stop offset="0" stop-color="#fff" stop-opacity=".85"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+<mask id="amfade"><rect width="700" height="600" fill="url(#afade)"/></mask>
+<pattern id="agrid" width="70" height="70" patternUnits="userSpaceOnUse">
+<path d="M70 0V70M0 70H70" fill="none" stroke="#c7d2fe" stroke-width="1.1"/></pattern>
+<linearGradient id="anum" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#cdc2f7"/></linearGradient>
+<linearGradient id="arim" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="700" y2="0">
+<stop offset="0" stop-color="#6366f1"/><stop offset=".5" stop-color="#a855f7"/><stop offset="1" stop-color="#fb923c"/></linearGradient>
+<filter id="ahalo" x="-40%" y="-70%" width="180%" height="240%"><feGaussianBlur stdDeviation="18"/></filter>
+</defs>
+<rect width="700" height="600" fill="url(#abase)"/>
+<rect width="700" height="600" fill="url(#abloom)"/>
+<rect width="700" height="600" fill="url(#acat)"/>
+<rect width="700" height="600" fill="url(#agrid)" mask="url(#amfade)" opacity=".16"/>
+<rect width="700" height="600" fill="url(#avig)"/>
+<path transform="translate(322 44) scale(1.7)" opacity="0.14" fill="#ddd6fe" d="M9 6 L4.6 18.6 h5.1 l-2.2 8.4 L23.4 12.2 h-6.4 l2.2-6.2 z"/>
+<ellipse cx="350" cy="344" rx="132" ry="17" fill="#fb923c" opacity=".28"/>
+<circle cx="350" cy="238" r="126" fill="none" stroke="url(#arim)" stroke-width="3" opacity=".95"/>
+<svg x="262" y="150" width="176" height="176" viewBox="0 0 512 512" preserveAspectRatio="xMidYMid meet" overflow="visible">
+
+  <defs><radialGradient id="pubg-sh1" cx="0.5" cy="0.5" r="0.5">
+    <stop offset="0" stop-color="#0b1220" stop-opacity="0.4"/>
+    <stop offset="0.6" stop-color="#0b1220" stop-opacity="0.16000000000000003"/>
+    <stop offset="1" stop-color="#0b1220" stop-opacity="0"/>
+  </radialGradient></defs>
+  <ellipse cx="256" cy="388" rx="132" ry="26" fill="url(#pubg-sh1)"/>
+  <defs>
+    <linearGradient id="pubg-g2" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#e3c76f"/>
+      <stop offset="0.5" stop-color="#ce9e07"/>
+      <stop offset="1" stop-color="#a57e06"/>
+    </linearGradient>
+    <clipPath id="pubg-c3"><path d="M98 296a70 70 0 1 0 140 0a70 70 0 1 0 -140 0Z"/></clipPath>
+    <radialGradient id="pubg-p4" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.72"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <defs><path id="pubg-s5" d="M98 296a70 70 0 1 0 140 0a70 70 0 1 0 -140 0Z"/></defs><use href="#pubg-s5" y="20" fill="#5d4703"/><use href="#pubg-s5" y="19" fill="#604903"/><use href="#pubg-s5" y="18" fill="#634b03"/><use href="#pubg-s5" y="17" fill="#654d03"/><use href="#pubg-s5" y="16" fill="#685003"/><use href="#pubg-s5" y="15" fill="#6b5204"/><use href="#pubg-s5" y="14" fill="#6e5404"/><use href="#pubg-s5" y="13" fill="#705604"/><use href="#pubg-s5" y="12" fill="#735804"/><use href="#pubg-s5" y="11" fill="#765a04"/><use href="#pubg-s5" y="10" fill="#795d04"/><use href="#pubg-s5" y="9" fill="#7b5f04"/><use href="#pubg-s5" y="8" fill="#7e6104"/><use href="#pubg-s5" y="7" fill="#816304"/><use href="#pubg-s5" y="6" fill="#846504"/><use href="#pubg-s5" y="5" fill="#866705"/><use href="#pubg-s5" y="4" fill="#896905"/><use href="#pubg-s5" y="3" fill="#8c6c05"/><use href="#pubg-s5" y="2" fill="#8f6e05"/><use href="#pubg-s5" y="1" fill="#917005"/>
+  <path d="M98 296a70 70 0 1 0 140 0a70 70 0 1 0 -140 0Z" fill="url(#pubg-g2)"/>
+  <path d="M98 296a70 70 0 1 0 140 0a70 70 0 1 0 -140 0Z" fill="none" stroke="#e9d38f" stroke-opacity="0.75" stroke-width="3"/>
+  
+  <defs>
+    <linearGradient id="pubg-g6" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#dac06f"/>
+      <stop offset="0.5" stop-color="#c09307"/>
+      <stop offset="1" stop-color="#9a7606"/>
+    </linearGradient>
+    <clipPath id="pubg-c7"><path d="M288 304a58 58 0 1 0 116 0a58 58 0 1 0 -116 0Z"/></clipPath>
+    <radialGradient id="pubg-p8" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.72"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <defs><path id="pubg-s9" d="M288 304a58 58 0 1 0 116 0a58 58 0 1 0 -116 0Z"/></defs><use href="#pubg-s9" y="16" fill="#564203"/><use href="#pubg-s9" y="15" fill="#594503"/><use href="#pubg-s9" y="14" fill="#5d4703"/><use href="#pubg-s9" y="13" fill="#604a03"/><use href="#pubg-s9" y="12" fill="#634c04"/><use href="#pubg-s9" y="11" fill="#664f04"/><use href="#pubg-s9" y="10" fill="#6a5104"/><use href="#pubg-s9" y="9" fill="#6d5404"/><use href="#pubg-s9" y="8" fill="#705604"/><use href="#pubg-s9" y="7" fill="#735904"/><use href="#pubg-s9" y="6" fill="#775b04"/><use href="#pubg-s9" y="5" fill="#7a5e04"/><use href="#pubg-s9" y="4" fill="#7d6005"/><use href="#pubg-s9" y="3" fill="#806305"/><use href="#pubg-s9" y="2" fill="#846505"/><use href="#pubg-s9" y="1" fill="#876805"/>
+  <path d="M288 304a58 58 0 1 0 116 0a58 58 0 1 0 -116 0Z" fill="url(#pubg-g6)"/>
+  <path d="M288 304a58 58 0 1 0 116 0a58 58 0 1 0 -116 0Z" fill="none" stroke="#e3ce8f" stroke-opacity="0.75" stroke-width="3"/>
+  
+  <defs>
+    <linearGradient id="pubg-g10" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#f3d370"/>
+      <stop offset="0.5" stop-color="#eab308"/>
+      <stop offset="1" stop-color="#bb8f06"/>
+    </linearGradient>
+    <clipPath id="pubg-c11"><path d="M138 238a118 118 0 1 0 236 0a118 118 0 1 0 -236 0Z"/></clipPath>
+    <radialGradient id="pubg-p12" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.72"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <defs><path id="pubg-s13" d="M138 238a118 118 0 1 0 236 0a118 118 0 1 0 -236 0Z"/></defs><use href="#pubg-s13" y="30" fill="#695104"/><use href="#pubg-s13" y="29" fill="#6b5304"/><use href="#pubg-s13" y="28" fill="#6d5404"/><use href="#pubg-s13" y="27" fill="#6f5604"/><use href="#pubg-s13" y="26" fill="#715704"/><use href="#pubg-s13" y="25" fill="#745904"/><use href="#pubg-s13" y="24" fill="#765b04"/><use href="#pubg-s13" y="23" fill="#785c04"/><use href="#pubg-s13" y="22" fill="#7a5e05"/><use href="#pubg-s13" y="21" fill="#7c5f05"/><use href="#pubg-s13" y="20" fill="#7e6105"/><use href="#pubg-s13" y="19" fill="#806305"/><use href="#pubg-s13" y="18" fill="#826405"/><use href="#pubg-s13" y="17" fill="#846605"/><use href="#pubg-s13" y="16" fill="#866705"/><use href="#pubg-s13" y="15" fill="#896905"/><use href="#pubg-s13" y="14" fill="#8b6b05"/><use href="#pubg-s13" y="13" fill="#8d6c05"/><use href="#pubg-s13" y="12" fill="#8f6e05"/><use href="#pubg-s13" y="11" fill="#916f05"/><use href="#pubg-s13" y="10" fill="#937105"/><use href="#pubg-s13" y="9" fill="#957305"/><use href="#pubg-s13" y="8" fill="#977405"/><use href="#pubg-s13" y="7" fill="#997606"/><use href="#pubg-s13" y="6" fill="#9b7706"/><use href="#pubg-s13" y="5" fill="#9e7906"/><use href="#pubg-s13" y="4" fill="#a07b06"/><use href="#pubg-s13" y="3" fill="#a27c06"/><use href="#pubg-s13" y="2" fill="#a47e06"/><use href="#pubg-s13" y="1" fill="#a67f06"/>
+  <path d="M138 238a118 118 0 1 0 236 0a118 118 0 1 0 -236 0Z" fill="url(#pubg-g10)"/>
+  <path d="M138 238a118 118 0 1 0 236 0a118 118 0 1 0 -236 0Z" fill="none" stroke="#f6dd90" stroke-opacity="0.75" stroke-width="3"/>
+  <g clip-path="url(#pubg-c11)"><ellipse cx="216" cy="172" rx="96" ry="54"
+      fill="url(#pubg-p12)" transform="rotate(-24 216 172)"/></g><path d="M158 238a98 98 0 1 0 196 0a98 98 0 1 0 -196 0Z" fill="none" stroke="#f2d16b" stroke-opacity="0.55" stroke-width="5"/><g fill="none" stroke="#fffbea" stroke-width="12" opacity="0.95">
+    <circle cx="256" cy="238" r="52"/><circle cx="256" cy="238" r="22"/>
+    <path d="M256 164v26M256 286v26M182 238h26M304 238h26" stroke-linecap="round"/>
+  </g>
+</svg>
+<text x="350" y="456" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="112" font-weight="800" letter-spacing="-1" fill="#a855f7" filter="url(#ahalo)" opacity=".85">1,800</text>
+<text x="350" y="456" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="112" font-weight="800" letter-spacing="-1" fill="url(#anum)">1,800</text>
+
+<rect x="0" y="595" width="700" height="5" fill="url(#arim)" opacity="1"/>
+</svg>

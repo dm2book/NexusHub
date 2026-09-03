@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" width="1600" height="900" role="img" aria-label="ForgeMarket — Amazon Gift Card €25">
+<title>ForgeMarket — Amazon Gift Card €25</title>
+<defs>
+<linearGradient id="bbase" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="1600" y2="900">
+<stop offset="0" stop-color="#07060f"/><stop offset=".55" stop-color="#0e0b1e"/><stop offset="1" stop-color="#07060f"/></linearGradient>
+<radialGradient id="bbloom" gradientUnits="userSpaceOnUse" cx="1160" cy="420" r="700">
+<stop offset="0" stop-color="#a855f7" stop-opacity=".42"/>
+<stop offset=".45" stop-color="#6366f1" stop-opacity=".20"/>
+<stop offset="1" stop-color="#6366f1" stop-opacity="0"/></radialGradient>
+<radialGradient id="bcat" gradientUnits="userSpaceOnUse" cx="1312" cy="162" r="560">
+<stop offset="0" stop-color="#c084fc" stop-opacity=".22"/>
+<stop offset="1" stop-color="#c084fc" stop-opacity="0"/></radialGradient>
+<radialGradient id="bvig" gradientUnits="userSpaceOnUse" cx="800" cy="450" r="1152">
+<stop offset=".5" stop-color="#04030c" stop-opacity="0"/><stop offset="1" stop-color="#04030c" stop-opacity=".62"/></radialGradient>
+<radialGradient id="bfade" gradientUnits="userSpaceOnUse" cx="800" cy="378" r="992">
+<stop offset="0" stop-color="#fff" stop-opacity=".85"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+<mask id="bmfade"><rect width="1600" height="900" fill="url(#bfade)"/></mask>
+<pattern id="bgrid" width="160" height="160" patternUnits="userSpaceOnUse">
+<path d="M160 0V160M0 160H160" fill="none" stroke="#c7d2fe" stroke-width="1.1"/></pattern>
+<linearGradient id="bnum" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#cdc2f7"/></linearGradient>
+<linearGradient id="brim" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="1600" y2="0">
+<stop offset="0" stop-color="#6366f1"/><stop offset=".5" stop-color="#a855f7"/><stop offset="1" stop-color="#c084fc"/></linearGradient>
+<filter id="bhalo" x="-40%" y="-70%" width="180%" height="240%"><feGaussianBlur stdDeviation="40"/></filter>
+</defs>
+<rect width="1600" height="900" fill="url(#bbase)"/>
+<rect width="1600" height="900" fill="url(#bbloom)"/>
+<rect width="1600" height="900" fill="url(#bcat)"/>
+<rect width="1600" height="900" fill="url(#bgrid)" mask="url(#bmfade)" opacity=".11"/>
+<rect width="1600" height="900" fill="url(#bvig)"/>
+<g><rect x="96" y="74" width="76" height="76" rx="22" fill="url(#brim)"/><path transform="translate(101 73) scale(2.32)" opacity="1" fill="#ffffff" d="M9 6 L4.6 18.6 h5.1 l-2.2 8.4 L23.4 12.2 h-6.4 l2.2-6.2 z"/>
+<text x="192" y="130" font-family="Inter, system-ui, sans-serif" font-size="50" font-weight="800" letter-spacing="1" fill="#f5f3ff">ForgeMarket</text></g>
+<text x="96" y="300" font-family="Inter, system-ui, sans-serif" font-size="44" font-weight="700" letter-spacing="11" fill="#c084fc">GIFT CARD</text>
+<text x="96" y="500" font-family="Inter, system-ui, sans-serif" font-size="196" font-weight="800" letter-spacing="-4" fill="#a855f7" filter="url(#bhalo)" opacity=".6">€25</text>
+<text x="96" y="500" font-family="Inter, system-ui, sans-serif" font-size="196" font-weight="800" letter-spacing="-4" fill="url(#bnum)">€25</text>
+
+<text x="96" y="610" font-family="Inter, system-ui, sans-serif" font-size="56" font-weight="600" fill="#c3cbf0">Amazon Gift Card €25</text>
+<g><rect x="96" y="652" width="300" height="94" rx="26" fill="#140f2e" fill-opacity=".85" stroke="url(#brim)" stroke-width="3"/>
+<text x="126" y="714" font-family="Inter, system-ui, sans-serif" font-size="56" font-weight="800" fill="#f5f3ff">€25,99</text></g>
+<ellipse cx="1160" cy="640" rx="290" ry="34" fill="#c084fc" opacity=".18"/>
+<circle cx="1160" cy="450" r="228" fill="none" stroke="url(#brim)" stroke-width="7" opacity=".8"/>
+<svg x="1010" y="300" width="300" height="300" viewBox="0 0 512 512" preserveAspectRatio="xMidYMid meet" overflow="visible">
+
+  <defs><radialGradient id="amazon-sh1" cx="0.5" cy="0.5" r="0.5">
+    <stop offset="0" stop-color="#0b1220" stop-opacity="0.4"/>
+    <stop offset="0.6" stop-color="#0b1220" stop-opacity="0.16000000000000003"/>
+    <stop offset="1" stop-color="#0b1220" stop-opacity="0"/>
+  </radialGradient></defs>
+  <ellipse cx="256" cy="388" rx="118" ry="24" fill="url(#amazon-sh1)"/>
+  <defs>
+    <linearGradient id="amazon-g2" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#f6c084"/>
+      <stop offset="0.5" stop-color="#f0932b"/>
+      <stop offset="1" stop-color="#c07622"/>
+    </linearGradient>
+    <clipPath id="amazon-c3"><path d="M196 126H316A52 52 0 0 1 368 178V298A52 52 0 0 1 316 350H196A52 52 0 0 1 144 298V178A52 52 0 0 1 196 126Z"/></clipPath>
+    <radialGradient id="amazon-p4" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.72"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <defs><path id="amazon-s5" d="M196 126H316A52 52 0 0 1 368 178V298A52 52 0 0 1 316 350H196A52 52 0 0 1 144 298V178A52 52 0 0 1 196 126Z"/></defs><use href="#amazon-s5" y="26" fill="#6c4213"/><use href="#amazon-s5" y="25" fill="#6f4413"/><use href="#amazon-s5" y="24" fill="#714514"/><use href="#amazon-s5" y="23" fill="#744714"/><use href="#amazon-s5" y="22" fill="#764815"/><use href="#amazon-s5" y="21" fill="#794a15"/><use href="#amazon-s5" y="20" fill="#7b4b16"/><use href="#amazon-s5" y="19" fill="#7e4d16"/><use href="#amazon-s5" y="18" fill="#804e17"/><use href="#amazon-s5" y="17" fill="#835017"/><use href="#amazon-s5" y="16" fill="#855118"/><use href="#amazon-s5" y="15" fill="#885318"/><use href="#amazon-s5" y="14" fill="#8a5419"/><use href="#amazon-s5" y="13" fill="#8d5619"/><use href="#amazon-s5" y="12" fill="#8f5819"/><use href="#amazon-s5" y="11" fill="#92591a"/><use href="#amazon-s5" y="10" fill="#945b1a"/><use href="#amazon-s5" y="9" fill="#975c1b"/><use href="#amazon-s5" y="8" fill="#995e1b"/><use href="#amazon-s5" y="7" fill="#9c5f1c"/><use href="#amazon-s5" y="6" fill="#9e611c"/><use href="#amazon-s5" y="5" fill="#a1621d"/><use href="#amazon-s5" y="4" fill="#a3641d"/><use href="#amazon-s5" y="3" fill="#a6651e"/><use href="#amazon-s5" y="2" fill="#a8671e"/><use href="#amazon-s5" y="1" fill="#ab681f"/>
+  <path d="M196 126H316A52 52 0 0 1 368 178V298A52 52 0 0 1 316 350H196A52 52 0 0 1 144 298V178A52 52 0 0 1 196 126Z" fill="url(#amazon-g2)"/>
+  <path d="M196 126H316A52 52 0 0 1 368 178V298A52 52 0 0 1 316 350H196A52 52 0 0 1 144 298V178A52 52 0 0 1 196 126Z" fill="none" stroke="#f8cea0" stroke-opacity="0.75" stroke-width="3"/>
+  <g clip-path="url(#amazon-c3)"><ellipse cx="216" cy="172" rx="96" ry="54"
+      fill="url(#amazon-p4)" transform="rotate(-24 216 172)"/></g><g fill="none" stroke="#fff6e9" stroke-width="13" stroke-linecap="round" stroke-linejoin="round" opacity="0.95">
+    <path d="M200 194h22l16 74h58l18 -52h-84"/>
+  </g><g fill="#fff6e9" opacity="0.95">
+    <circle cx="252" cy="290" r="12"/><circle cx="298" cy="290" r="12"/></g>
+</svg>
+<text x="1504" y="846" text-anchor="end" font-family="Inter, system-ui, sans-serif" font-size="40" font-weight="600" letter-spacing="2" fill="#8e9bd9">forgemarket.nl</text>
+<rect x="0" y="893" width="1600" height="7" fill="url(#brim)"/>
+</svg>

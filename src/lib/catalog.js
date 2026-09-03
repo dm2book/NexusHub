@@ -93,16 +93,26 @@ export const isCustomImage = (src) => !!src && !String(src).startsWith('/product
  * own renders on the wrong side of that line, so the blending written for
  * exactly this art never applied to it.
  */
-export const carriesOwnBackground = (src) =>
-  isCustomImage(src)
-  || /\.(webp|png|jpe?g|avif)(\?|$)/i.test(String(src || ''))
-  /* The generated pack covers are SVG, and they are rectangles with colour to
-     the edge — the denomination card, not a badge. Extension alone put them on
-     the icon side of this line, so the product hero cropped them with
-     object-cover: "INSTANT TOP-UP" lost its first four letters and the coin lost
-     its left edge. The path is what separates the two kinds of generated SVG,
-     because that is what scripts/gen-pack-covers.mjs vs. the icon set decides. */
-  || /^\/products\/packs\//.test(String(src || ''));
+export const carriesOwnBackground = (src) => {
+  const s = String(src || '');
+  /* The built-in icon set is LOGOS, whatever container they happen to be in.
+     Ten of them ship as WebP because that was the smaller file at the time, and
+     the extension test below caught exactly those ten and called them
+     photographs — so xbox.webp and playstation.webp rendered edge to edge in
+     the gift-card grid while netflix.svg and amazon.svg beside them sat inset
+     on a plinth. Same kind of asset, same category, same row, two different
+     sizes, decided by nothing but a file extension.
+
+     The path is the honest question. /products/icons/ is a badge for a plinth,
+     /products/packs/ is a card with colour to the edge, and anything outside
+     /products/ is whatever the owner uploaded. */
+  if (/^\/products\/icons\//.test(s)) return false;
+  /* /products/art/ is the generated system: authored at 7:6, dark, colour to
+     the edge. It is the tile, so it must never be inset on a plinth. */
+  if (/^\/products\/(art|packs)\//.test(s)) return true;
+  return isCustomImage(s) || /\.(webp|png|jpe?g|avif)(\?|$)/i.test(s);
+};
+
 
 export { CreditCard };
 

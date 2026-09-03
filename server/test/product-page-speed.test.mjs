@@ -121,8 +121,16 @@ console.log('\n— Art the hero draws differently keeps the grey shell —');
   /* A transparent icon sits on a category GRADIENT in the real hero, not on the
      neutral panel. Painting it on the panel would change colour under the
      picture a second later, which is exactly what a shell must not do. */
+  /* The seeded catalogue no longer contains one: every product moved to the
+     generated /products/art/ system, which DOES carry its own background. The
+     behaviour still matters because an admin can point a product at a bare icon
+     by hand, so the rule is asserted directly and the end-to-end leg runs only
+     when the catalogue happens to have such a product. */
+  const { carriesOwnBackground: cob } = await import('../../src/lib/catalog.js');
+  ok('a bare icon is still the kind of art the shell leaves alone',
+    !cob('/products/icons/robux.svg'));
   const icon = products.find((p) => /\/products\/icons\/[a-z0-9-]+\.svg$/i.test(p.image || ''));
-  ok('the catalogue still has an icon-art product', !!icon, 'nothing to check');
+  if (!icon) console.log('  ⏭  no icon-art product in this catalogue — end-to-end leg skipped');
   if (icon && built) {
     const h = await fetch(`${base}/product/${icon.id}`).then((r) => r.text());
     ok('its shell is left as shapes', !h.includes('<div class="hero">'), 'the panel was painted anyway');
@@ -193,7 +201,17 @@ console.log('\n— The pack covers are not cropped —');
   const { carriesOwnBackground } = await import('../../src/lib/catalog.js');
   ok('a pack cover carries its own background', carriesOwnBackground('/products/packs/robux-1000.svg'));
   ok('a generated icon still does not', !carriesOwnBackground('/products/icons/robux.svg'));
-  ok('raster art still does', carriesOwnBackground('/products/icons/robux.webp'));
+  /* This used to assert the opposite, and the opposite was the bug: a WebP in
+     the ICON set is a logo, not a photograph, and treating it as one made
+     xbox.webp and playstation.webp paint edge-to-edge in a gift-card row while
+     netflix.svg beside them sat inset on a plinth. Measured: 100% of the card
+     versus 36-48%. The rule is the path now, not the extension. */
+  ok('a WebP in the icon set is still a logo, not a photograph',
+    !carriesOwnBackground('/products/icons/robux.webp'));
+  ok('a WebP the owner uploaded is still photo art',
+    carriesOwnBackground('/uploads/my-photo.webp'));
+  ok('generated ForgeMarket art carries its own background',
+    carriesOwnBackground('/products/art/robux-1000.svg'));
   ok('an owner upload still does', carriesOwnBackground('data:image/webp;base64,AAAA'));
 }
 

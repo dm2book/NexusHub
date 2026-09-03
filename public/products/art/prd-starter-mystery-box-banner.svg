@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" width="1600" height="900" role="img" aria-label="ForgeMarket — Forge Mystery Box">
+<title>ForgeMarket — Forge Mystery Box</title>
+<defs>
+<linearGradient id="bbase" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="1600" y2="900">
+<stop offset="0" stop-color="#07060f"/><stop offset=".55" stop-color="#0e0b1e"/><stop offset="1" stop-color="#07060f"/></linearGradient>
+<radialGradient id="bbloom" gradientUnits="userSpaceOnUse" cx="1160" cy="420" r="700">
+<stop offset="0" stop-color="#a855f7" stop-opacity=".42"/>
+<stop offset=".45" stop-color="#6366f1" stop-opacity=".20"/>
+<stop offset="1" stop-color="#6366f1" stop-opacity="0"/></radialGradient>
+<radialGradient id="bcat" gradientUnits="userSpaceOnUse" cx="1312" cy="162" r="560">
+<stop offset="0" stop-color="#a855f7" stop-opacity=".22"/>
+<stop offset="1" stop-color="#a855f7" stop-opacity="0"/></radialGradient>
+<radialGradient id="bvig" gradientUnits="userSpaceOnUse" cx="800" cy="450" r="1152">
+<stop offset=".5" stop-color="#04030c" stop-opacity="0"/><stop offset="1" stop-color="#04030c" stop-opacity=".62"/></radialGradient>
+<radialGradient id="bfade" gradientUnits="userSpaceOnUse" cx="800" cy="378" r="992">
+<stop offset="0" stop-color="#fff" stop-opacity=".85"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+<mask id="bmfade"><rect width="1600" height="900" fill="url(#bfade)"/></mask>
+<pattern id="bgrid" width="160" height="160" patternUnits="userSpaceOnUse">
+<path d="M160 0V160M0 160H160" fill="none" stroke="#c7d2fe" stroke-width="1.1"/></pattern>
+<linearGradient id="bnum" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#cdc2f7"/></linearGradient>
+<linearGradient id="brim" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="1600" y2="0">
+<stop offset="0" stop-color="#6366f1"/><stop offset=".5" stop-color="#a855f7"/><stop offset="1" stop-color="#a855f7"/></linearGradient>
+<filter id="bhalo" x="-40%" y="-70%" width="180%" height="240%"><feGaussianBlur stdDeviation="40"/></filter>
+</defs>
+<rect width="1600" height="900" fill="url(#bbase)"/>
+<rect width="1600" height="900" fill="url(#bbloom)"/>
+<rect width="1600" height="900" fill="url(#bcat)"/>
+<rect width="1600" height="900" fill="url(#bgrid)" mask="url(#bmfade)" opacity=".11"/>
+<rect width="1600" height="900" fill="url(#bvig)"/>
+<g><rect x="96" y="74" width="76" height="76" rx="22" fill="url(#brim)"/><path transform="translate(101 73) scale(2.32)" opacity="1" fill="#ffffff" d="M9 6 L4.6 18.6 h5.1 l-2.2 8.4 L23.4 12.2 h-6.4 l2.2-6.2 z"/>
+<text x="192" y="130" font-family="Inter, system-ui, sans-serif" font-size="50" font-weight="800" letter-spacing="1" fill="#f5f3ff">ForgeMarket</text></g>
+<text x="96" y="300" font-family="Inter, system-ui, sans-serif" font-size="44" font-weight="700" letter-spacing="11" fill="#a855f7">MYSTERY BOX</text>
+<text x="96" y="470" font-family="Inter, system-ui, sans-serif" font-size="80" font-weight="800" fill="url(#bnum)">Forge Mystery Box</text>
+<text x="96" y="610" font-family="Inter, system-ui, sans-serif" font-size="56" font-weight="600" fill="#c3cbf0">Forge Mystery Box</text>
+<g><rect x="96" y="652" width="300" height="94" rx="26" fill="#140f2e" fill-opacity=".85" stroke="url(#brim)" stroke-width="3"/>
+<text x="126" y="714" font-family="Inter, system-ui, sans-serif" font-size="56" font-weight="800" fill="#f5f3ff">€49,99</text></g>
+<ellipse cx="1160" cy="640" rx="290" ry="34" fill="#a855f7" opacity=".18"/>
+<circle cx="1160" cy="450" r="228" fill="none" stroke="url(#brim)" stroke-width="7" opacity=".8"/>
+<svg x="1010" y="300" width="300" height="300" viewBox="0 0 512 512" preserveAspectRatio="xMidYMid meet" overflow="visible">
+
+  <defs><radialGradient id="mystery-sh1" cx="0.5" cy="0.5" r="0.5">
+    <stop offset="0" stop-color="#0b1220" stop-opacity="0.4"/>
+    <stop offset="0.6" stop-color="#0b1220" stop-opacity="0.16000000000000003"/>
+    <stop offset="1" stop-color="#0b1220" stop-opacity="0"/>
+  </radialGradient></defs>
+  <ellipse cx="256" cy="388" rx="118" ry="24" fill="url(#mystery-sh1)"/>
+  <defs>
+    <linearGradient id="mystery-g2" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#d39c8d"/>
+      <stop offset="0.5" stop-color="#b3543a"/>
+      <stop offset="1" stop-color="#8f432e"/>
+    </linearGradient>
+    <clipPath id="mystery-c3"><path d="M165 220H347A16 16 0 0 1 363 236V336A16 16 0 0 1 347 352H165A16 16 0 0 1 149 336V236A16 16 0 0 1 165 220Z"/></clipPath>
+    <radialGradient id="mystery-p4" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.72"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <defs><path id="mystery-s5" d="M165 220H347A16 16 0 0 1 363 236V336A16 16 0 0 1 347 352H165A16 16 0 0 1 149 336V236A16 16 0 0 1 165 220Z"/></defs><use href="#mystery-s5" y="24" fill="#51261a"/><use href="#mystery-s5" y="23" fill="#53271b"/><use href="#mystery-s5" y="22" fill="#55281b"/><use href="#mystery-s5" y="21" fill="#57291c"/><use href="#mystery-s5" y="20" fill="#592a1d"/><use href="#mystery-s5" y="19" fill="#5b2b1d"/><use href="#mystery-s5" y="18" fill="#5d2c1e"/><use href="#mystery-s5" y="17" fill="#5f2c1f"/><use href="#mystery-s5" y="16" fill="#612d1f"/><use href="#mystery-s5" y="15" fill="#632e20"/><use href="#mystery-s5" y="14" fill="#652f21"/><use href="#mystery-s5" y="13" fill="#673021"/><use href="#mystery-s5" y="12" fill="#693122"/><use href="#mystery-s5" y="11" fill="#6b3223"/><use href="#mystery-s5" y="10" fill="#6d3323"/><use href="#mystery-s5" y="9" fill="#6f3424"/><use href="#mystery-s5" y="8" fill="#713525"/><use href="#mystery-s5" y="7" fill="#733625"/><use href="#mystery-s5" y="6" fill="#753726"/><use href="#mystery-s5" y="5" fill="#773727"/><use href="#mystery-s5" y="4" fill="#793827"/><use href="#mystery-s5" y="3" fill="#7b3928"/><use href="#mystery-s5" y="2" fill="#7d3a29"/><use href="#mystery-s5" y="1" fill="#7f3b29"/>
+  <path d="M165 220H347A16 16 0 0 1 363 236V336A16 16 0 0 1 347 352H165A16 16 0 0 1 149 336V236A16 16 0 0 1 165 220Z" fill="url(#mystery-g2)"/>
+  <path d="M165 220H347A16 16 0 0 1 363 236V336A16 16 0 0 1 347 352H165A16 16 0 0 1 149 336V236A16 16 0 0 1 165 220Z" fill="none" stroke="#ddb2a6" stroke-opacity="0.75" stroke-width="3"/>
+  <g clip-path="url(#mystery-c3)"><ellipse cx="216" cy="172" rx="96" ry="54"
+      fill="url(#mystery-p4)" transform="rotate(-24 216 172)"/></g>
+  <defs>
+    <linearGradient id="mystery-g6" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#f6cd83"/>
+      <stop offset="0.5" stop-color="#f0a92a"/>
+      <stop offset="1" stop-color="#c08722"/>
+    </linearGradient>
+    <clipPath id="mystery-c7"><path d="M149 220a107 107 0 0 1 214 0Z"/></clipPath>
+    <radialGradient id="mystery-p8" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.72"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <defs><path id="mystery-s9" d="M149 220a107 107 0 0 1 214 0Z"/></defs><use href="#mystery-s9" y="18" fill="#6c4c13"/><use href="#mystery-s9" y="17" fill="#704f14"/><use href="#mystery-s9" y="16" fill="#735114"/><use href="#mystery-s9" y="15" fill="#775415"/><use href="#mystery-s9" y="14" fill="#7a5615"/><use href="#mystery-s9" y="13" fill="#7e5916"/><use href="#mystery-s9" y="12" fill="#825b17"/><use href="#mystery-s9" y="11" fill="#855e17"/><use href="#mystery-s9" y="10" fill="#896018"/><use href="#mystery-s9" y="9" fill="#8d6319"/><use href="#mystery-s9" y="8" fill="#906619"/><use href="#mystery-s9" y="7" fill="#94681a"/><use href="#mystery-s9" y="6" fill="#976b1a"/><use href="#mystery-s9" y="5" fill="#9b6d1b"/><use href="#mystery-s9" y="4" fill="#9f701c"/><use href="#mystery-s9" y="3" fill="#a2721c"/><use href="#mystery-s9" y="2" fill="#a6751d"/><use href="#mystery-s9" y="1" fill="#a9771d"/>
+  <path d="M149 220a107 107 0 0 1 214 0Z" fill="url(#mystery-g6)"/>
+  <path d="M149 220a107 107 0 0 1 214 0Z" fill="none" stroke="#f8d89f" stroke-opacity="0.75" stroke-width="3"/>
+  <rect x="236" y="206" width="40" height="62" rx="10" fill="#f7d08a"/>
+    <circle cx="256" cy="236" r="10" fill="#5a2a1d"/>
+</svg>
+<text x="1504" y="846" text-anchor="end" font-family="Inter, system-ui, sans-serif" font-size="40" font-weight="600" letter-spacing="2" fill="#8e9bd9">forgemarket.nl</text>
+<rect x="0" y="893" width="1600" height="7" fill="url(#brim)"/>
+</svg>

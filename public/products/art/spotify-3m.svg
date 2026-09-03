@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 600" width="700" height="600" role="img" aria-label="Spotify Premium — 3 Months">
+<title>Spotify Premium — 3 Months</title>
+<defs>
+<linearGradient id="abase" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="700" y2="600">
+<stop offset="0" stop-color="#07060f"/><stop offset=".55" stop-color="#0e0b1e"/><stop offset="1" stop-color="#07060f"/></linearGradient>
+<radialGradient id="abloom" gradientUnits="userSpaceOnUse" cx="350" cy="236" r="400">
+<stop offset="0" stop-color="#a855f7" stop-opacity=".42"/>
+<stop offset=".45" stop-color="#6366f1" stop-opacity=".20"/>
+<stop offset="1" stop-color="#6366f1" stop-opacity="0"/></radialGradient>
+<radialGradient id="acat" gradientUnits="userSpaceOnUse" cx="574" cy="108" r="320">
+<stop offset="0" stop-color="#22c55e" stop-opacity=".22"/>
+<stop offset="1" stop-color="#22c55e" stop-opacity="0"/></radialGradient>
+<radialGradient id="avig" gradientUnits="userSpaceOnUse" cx="350" cy="300" r="504">
+<stop offset=".5" stop-color="#04030c" stop-opacity="0"/><stop offset="1" stop-color="#04030c" stop-opacity=".62"/></radialGradient>
+<radialGradient id="afade" gradientUnits="userSpaceOnUse" cx="350" cy="252" r="434">
+<stop offset="0" stop-color="#fff" stop-opacity=".85"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+<mask id="amfade"><rect width="700" height="600" fill="url(#afade)"/></mask>
+<pattern id="agrid" width="70" height="70" patternUnits="userSpaceOnUse">
+<path d="M70 0V70M0 70H70" fill="none" stroke="#c7d2fe" stroke-width="1.1"/></pattern>
+<linearGradient id="anum" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#cdc2f7"/></linearGradient>
+<linearGradient id="arim" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="700" y2="0">
+<stop offset="0" stop-color="#6366f1"/><stop offset=".5" stop-color="#a855f7"/><stop offset="1" stop-color="#22c55e"/></linearGradient>
+<filter id="ahalo" x="-40%" y="-70%" width="180%" height="240%"><feGaussianBlur stdDeviation="18"/></filter>
+</defs>
+<rect width="700" height="600" fill="url(#abase)"/>
+<rect width="700" height="600" fill="url(#abloom)"/>
+<rect width="700" height="600" fill="url(#acat)"/>
+<rect width="700" height="600" fill="url(#agrid)" mask="url(#amfade)" opacity=".11"/>
+<rect width="700" height="600" fill="url(#avig)"/>
+<path transform="translate(322 44) scale(1.7)" opacity="0.08" fill="#ddd6fe" d="M9 6 L4.6 18.6 h5.1 l-2.2 8.4 L23.4 12.2 h-6.4 l2.2-6.2 z"/>
+<ellipse cx="350" cy="344" rx="132" ry="17" fill="#22c55e" opacity=".16"/>
+<circle cx="350" cy="238" r="122" fill="none" stroke="url(#arim)" stroke-width="3" opacity=".6"/>
+<svg x="262" y="150" width="176" height="176" viewBox="0 0 512 512" preserveAspectRatio="xMidYMid meet" overflow="visible">
+
+  <defs><radialGradient id="spotify-sh1" cx="0.5" cy="0.5" r="0.5">
+    <stop offset="0" stop-color="#0b1220" stop-opacity="0.4"/>
+    <stop offset="0.6" stop-color="#0b1220" stop-opacity="0.16000000000000003"/>
+    <stop offset="1" stop-color="#0b1220" stop-opacity="0"/>
+  </radialGradient></defs>
+  <ellipse cx="256" cy="388" rx="118" ry="24" fill="url(#spotify-sh1)"/>
+  <defs>
+    <linearGradient id="spotify-g2" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#7fd29e"/>
+      <stop offset="0.5" stop-color="#22b258"/>
+      <stop offset="1" stop-color="#1b8e46"/>
+    </linearGradient>
+    <clipPath id="spotify-c3"><path d="M196 126H316A52 52 0 0 1 368 178V298A52 52 0 0 1 316 350H196A52 52 0 0 1 144 298V178A52 52 0 0 1 196 126Z"/></clipPath>
+    <radialGradient id="spotify-p4" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.72"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <defs><path id="spotify-s5" d="M196 126H316A52 52 0 0 1 368 178V298A52 52 0 0 1 316 350H196A52 52 0 0 1 144 298V178A52 52 0 0 1 196 126Z"/></defs><use href="#spotify-s5" y="26" fill="#0f5028"/><use href="#spotify-s5" y="25" fill="#0f5229"/><use href="#spotify-s5" y="24" fill="#10542a"/><use href="#spotify-s5" y="23" fill="#10562b"/><use href="#spotify-s5" y="22" fill="#10572c"/><use href="#spotify-s5" y="21" fill="#11592c"/><use href="#spotify-s5" y="20" fill="#115b2d"/><use href="#spotify-s5" y="19" fill="#115d2e"/><use href="#spotify-s5" y="18" fill="#125f2f"/><use href="#spotify-s5" y="17" fill="#126130"/><use href="#spotify-s5" y="16" fill="#126231"/><use href="#spotify-s5" y="15" fill="#136432"/><use href="#spotify-s5" y="14" fill="#136633"/><use href="#spotify-s5" y="13" fill="#146834"/><use href="#spotify-s5" y="12" fill="#146a34"/><use href="#spotify-s5" y="11" fill="#146c35"/><use href="#spotify-s5" y="10" fill="#156e36"/><use href="#spotify-s5" y="9" fill="#156f37"/><use href="#spotify-s5" y="8" fill="#157138"/><use href="#spotify-s5" y="7" fill="#167339"/><use href="#spotify-s5" y="6" fill="#16753a"/><use href="#spotify-s5" y="5" fill="#16773b"/><use href="#spotify-s5" y="4" fill="#17793b"/><use href="#spotify-s5" y="3" fill="#177a3c"/><use href="#spotify-s5" y="2" fill="#177c3d"/><use href="#spotify-s5" y="1" fill="#187e3e"/>
+  <path d="M196 126H316A52 52 0 0 1 368 178V298A52 52 0 0 1 316 350H196A52 52 0 0 1 144 298V178A52 52 0 0 1 196 126Z" fill="url(#spotify-g2)"/>
+  <path d="M196 126H316A52 52 0 0 1 368 178V298A52 52 0 0 1 316 350H196A52 52 0 0 1 144 298V178A52 52 0 0 1 196 126Z" fill="none" stroke="#9cdcb4" stroke-opacity="0.75" stroke-width="3"/>
+  <g clip-path="url(#spotify-c3)"><ellipse cx="216" cy="172" rx="96" ry="54"
+      fill="url(#spotify-p4)" transform="rotate(-24 216 172)"/></g><g fill="none" stroke="#f0fff6" stroke-width="13" stroke-linecap="round" opacity="0.95">
+    <path d="M208 216q48 -22 96 0"/>
+    <path d="M218 244q38 -18 76 0"/>
+    <path d="M229 272q27 -13 54 0"/>
+  </g>
+</svg>
+<text x="350" y="440" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="112" font-weight="800" letter-spacing="-1" fill="#a855f7" filter="url(#ahalo)" opacity=".55">3</text>
+<text x="350" y="440" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="112" font-weight="800" letter-spacing="-1" fill="url(#anum)">3</text>
+<text x="350" y="488" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="28" font-weight="700" letter-spacing="8" fill="#a9a3c9">MONTHS</text>
+<rect x="0" y="595" width="700" height="5" fill="url(#arim)" opacity=".75"/>
+</svg>

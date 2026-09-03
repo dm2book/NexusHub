@@ -12,6 +12,9 @@
  * Best-effort: a failure here never blocks boot.
  */
 import { get, all, run, nowIso } from './index.js';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { setRewards } from '../services/mysteryBoxService.js';
 import { createBundle } from '../services/bundleService.js';
 
@@ -19,6 +22,13 @@ import { createBundle } from '../services/bundleService.js';
 // (plain "check then create" raced when Vercel booted several instances at
 // once, which is exactly how two identical €49.99 boxes appeared).
 const BOX_ID = 'prd_starter_mystery_box';
+
+const boxArt = () => {
+  const file = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..',
+    'public', 'products', 'art', `${BOX_ID.replace(/_/g, '-')}.svg`);
+  try { return fs.existsSync(file) ? `/products/art/${BOX_ID.replace(/_/g, '-')}.svg`
+    : '/products/icons/mystery.svg'; } catch { return '/products/icons/mystery.svg'; }
+};
 
 export async function seedStarterContent() {
   await dedupeMysteryBoxes().catch((e) => console.error('[starter] dedupe:', e.message));
@@ -82,7 +92,10 @@ async function mysteryBox() {
       // generic gradient placeholder while all 71 others had real art — on the
       // highest-margin item in the shop. mystery.svg has been sitting in
       // public/products/icons the whole time.
-      meta: JSON.stringify({ featured: true, image: '/products/icons/mystery.svg' }),
+      /* The generated artboard when it exists, the plain icon otherwise. Same
+         rule as demoSeed's imageFor — without it this one product was the only
+         thing in a 72-product grid still on the old art. */
+      meta: JSON.stringify({ featured: true, image: boxArt() }),
       at,
     });
   if (!inserted.changes) return; // another instance just created it

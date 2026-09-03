@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 600" width="700" height="600" role="img" aria-label="Nintendo eShop €25">
+<title>Nintendo eShop €25</title>
+<defs>
+<linearGradient id="abase" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="700" y2="600">
+<stop offset="0" stop-color="#07060f"/><stop offset=".55" stop-color="#0e0b1e"/><stop offset="1" stop-color="#07060f"/></linearGradient>
+<radialGradient id="abloom" gradientUnits="userSpaceOnUse" cx="350" cy="236" r="400">
+<stop offset="0" stop-color="#a855f7" stop-opacity=".60"/>
+<stop offset=".45" stop-color="#6366f1" stop-opacity=".30"/>
+<stop offset="1" stop-color="#6366f1" stop-opacity="0"/></radialGradient>
+<radialGradient id="acat" gradientUnits="userSpaceOnUse" cx="574" cy="108" r="320">
+<stop offset="0" stop-color="#c084fc" stop-opacity=".34"/>
+<stop offset="1" stop-color="#c084fc" stop-opacity="0"/></radialGradient>
+<radialGradient id="avig" gradientUnits="userSpaceOnUse" cx="350" cy="300" r="504">
+<stop offset=".5" stop-color="#04030c" stop-opacity="0"/><stop offset="1" stop-color="#04030c" stop-opacity=".62"/></radialGradient>
+<radialGradient id="afade" gradientUnits="userSpaceOnUse" cx="350" cy="252" r="434">
+<stop offset="0" stop-color="#fff" stop-opacity=".85"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+<mask id="amfade"><rect width="700" height="600" fill="url(#afade)"/></mask>
+<pattern id="agrid" width="70" height="70" patternUnits="userSpaceOnUse">
+<path d="M70 0V70M0 70H70" fill="none" stroke="#c7d2fe" stroke-width="1.1"/></pattern>
+<linearGradient id="anum" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#cdc2f7"/></linearGradient>
+<linearGradient id="arim" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="700" y2="0">
+<stop offset="0" stop-color="#6366f1"/><stop offset=".5" stop-color="#a855f7"/><stop offset="1" stop-color="#c084fc"/></linearGradient>
+<filter id="ahalo" x="-40%" y="-70%" width="180%" height="240%"><feGaussianBlur stdDeviation="18"/></filter>
+</defs>
+<rect width="700" height="600" fill="url(#abase)"/>
+<rect width="700" height="600" fill="url(#abloom)"/>
+<rect width="700" height="600" fill="url(#acat)"/>
+<rect width="700" height="600" fill="url(#agrid)" mask="url(#amfade)" opacity=".16"/>
+<rect width="700" height="600" fill="url(#avig)"/>
+<path transform="translate(322 44) scale(1.7)" opacity="0.14" fill="#ddd6fe" d="M9 6 L4.6 18.6 h5.1 l-2.2 8.4 L23.4 12.2 h-6.4 l2.2-6.2 z"/>
+<ellipse cx="350" cy="344" rx="132" ry="17" fill="#c084fc" opacity=".28"/>
+<circle cx="350" cy="238" r="126" fill="none" stroke="url(#arim)" stroke-width="3" opacity=".95"/>
+<svg x="262" y="150" width="176" height="176" viewBox="0 0 512 512" preserveAspectRatio="xMidYMid meet" overflow="visible">
+  <defs><radialGradient id="nintendo-sh1" cx="0.5" cy="0.5" r="0.5">
+    <stop offset="0" stop-color="#0b1220" stop-opacity="0.4"/>
+    <stop offset="0.6" stop-color="#0b1220" stop-opacity="0.16"/>
+    <stop offset="1" stop-color="#0b1220" stop-opacity="0"/>
+  </radialGradient></defs>
+  <ellipse cx="256" cy="388" rx="118" ry="24" fill="url(#nintendo-sh1)"/>
+  <defs>
+    <linearGradient id="nintendo-g2" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#ff8a8a"/><stop offset="0.5" stop-color="#e60012"/><stop offset="1" stop-color="#a3000d"/>
+    </linearGradient>
+    <clipPath id="nintendo-c3"><path d="M196 126H316A52 52 0 0 1 368 178V298A52 52 0 0 1 316 350H196A52 52 0 0 1 144 298V178A52 52 0 0 1 196 126Z"/></clipPath>
+    <radialGradient id="nintendo-p4" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.72"/><stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <defs><path id="nintendo-s5" d="M196 126H316A52 52 0 0 1 368 178V298A52 52 0 0 1 316 350H196A52 52 0 0 1 144 298V178A52 52 0 0 1 196 126Z"/></defs>
+<use href="#nintendo-s5" y="26" fill="#5a0007"/>
+<use href="#nintendo-s5" y="25" fill="#5b0007"/>
+<use href="#nintendo-s5" y="24" fill="#5c0007"/>
+<use href="#nintendo-s5" y="23" fill="#5d0007"/>
+<use href="#nintendo-s5" y="22" fill="#5f0008"/>
+<use href="#nintendo-s5" y="21" fill="#600008"/>
+<use href="#nintendo-s5" y="20" fill="#610008"/>
+<use href="#nintendo-s5" y="19" fill="#620008"/>
+<use href="#nintendo-s5" y="18" fill="#640008"/>
+<use href="#nintendo-s5" y="17" fill="#650008"/>
+<use href="#nintendo-s5" y="16" fill="#660008"/>
+<use href="#nintendo-s5" y="15" fill="#670008"/>
+<use href="#nintendo-s5" y="14" fill="#690008"/>
+<use href="#nintendo-s5" y="13" fill="#6a0008"/>
+<use href="#nintendo-s5" y="12" fill="#6b0009"/>
+<use href="#nintendo-s5" y="11" fill="#6c0009"/>
+<use href="#nintendo-s5" y="10" fill="#6e0009"/>
+<use href="#nintendo-s5" y="9" fill="#6f0009"/>
+<use href="#nintendo-s5" y="8" fill="#700009"/>
+<use href="#nintendo-s5" y="7" fill="#710009"/>
+<use href="#nintendo-s5" y="6" fill="#730009"/>
+<use href="#nintendo-s5" y="5" fill="#740009"/>
+<use href="#nintendo-s5" y="4" fill="#750009"/>
+<use href="#nintendo-s5" y="3" fill="#760009"/>
+<use href="#nintendo-s5" y="2" fill="#78000a"/>
+<use href="#nintendo-s5" y="1" fill="#79000a"/>
+  <path d="M196 126H316A52 52 0 0 1 368 178V298A52 52 0 0 1 316 350H196A52 52 0 0 1 144 298V178A52 52 0 0 1 196 126Z" fill="url(#nintendo-g2)"/>
+  <path d="M196 126H316A52 52 0 0 1 368 178V298A52 52 0 0 1 316 350H196A52 52 0 0 1 144 298V178A52 52 0 0 1 196 126Z" fill="none" stroke="#ffb3b3" stroke-opacity="0.75" stroke-width="3"/>
+  <g clip-path="url(#nintendo-c3)"><ellipse cx="216" cy="172" rx="96" ry="54" fill="url(#nintendo-p4)" transform="rotate(-24 216 172)"/></g>
+  <path d="M172 216h168l-14 116a22 22 0 0 1-22 19H208a22 22 0 0 1-22-19Z" fill="#fff2f2"/>
+  <path d="M214 216v-16a42 42 0 0 1 84 0v16" fill="none" stroke="#fff2f2" stroke-width="14" stroke-linecap="round"/>
+  <path d="M206 250h100" stroke="#e60012" stroke-width="10" stroke-linecap="round" opacity="0.45"/>
+</svg>
+<text x="350" y="456" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="112" font-weight="800" letter-spacing="-1" fill="#a855f7" filter="url(#ahalo)" opacity=".85">€25</text>
+<text x="350" y="456" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="112" font-weight="800" letter-spacing="-1" fill="url(#anum)">€25</text>
+
+<rect x="0" y="595" width="700" height="5" fill="url(#arim)" opacity="1"/>
+</svg>
