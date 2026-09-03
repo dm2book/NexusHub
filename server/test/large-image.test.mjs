@@ -37,7 +37,14 @@ const bigImage = 'data:image/jpeg;base64,' + 'A'.repeat(1_400_000);
 const r1 = await fetch(`${base}/api/admin/products/${p.id}`, {
   method: 'PATCH', headers: auth, body: JSON.stringify({ metadata: { ...p.metadata, image: bigImage } }) });
 ok('1.4mb uploaded image saves (not 413)', r1.status === 200, `status=${r1.status}`);
-ok('image is persisted', (await getProduct(p.id)).image === bigImage);
+/* Persisted, but not in the product row: a 1.4 MB upload is exactly the case
+   that made GET /api/products 8.7 MB on the live shop. It is stored once in
+   product_images and the row keeps a URL. */
+const saved = (await getProduct(p.id)).image;
+ok('the 1.4mb upload is stored', /^\/api\/images\/[a-f0-9]{32}\./.test(saved), saved.slice(0, 48));
+ok('…and the product row no longer carries it',
+  saved.length < 100, `${saved.length} bytes in the row`);
+ok('…while the bytes are served from the URL', (await fetch(base + saved)).status === 200);
 
 // Over the cap → clean 400 (validation), never a crash / silent drop.
 const huge = 'data:image/jpeg;base64,' + 'A'.repeat(2_700_000);
