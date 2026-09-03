@@ -33,6 +33,7 @@ import paymentRoutes from './routes/payments.js';
 import mollieWebhook, { mollieApi } from './routes/mollie.js';
 import seoRoutes from './routes/seo.js';
 import socialRoutes from './routes/social.js';
+import imageRoutes from './routes/images.js';
 import adminRoutes from './routes/admin/index.js';
 
 let readyPromise = null;
@@ -230,6 +231,7 @@ export function createApp({ lazyReady = false } = {}) {
   app.use('/api/discord', discordRoutes);
   app.use('/api/payments', paymentRoutes);
   app.use('/api/social', socialRoutes);
+  app.use('/api/images', imageRoutes);
   app.use('/api', mollieApi);
   app.use('/api', catalogRoutes);
   app.use('/api/admin', adminRoutes);
