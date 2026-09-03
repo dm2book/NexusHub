@@ -147,6 +147,44 @@ console.log('\n— A NEW upload never lands in the product row —');
     /normalizeImageValue\(url/.test(route));
 }
 
+console.log('\n— The owner can do it without a terminal —');
+{
+  /* The scripts need a DATABASE_URL and a shell, which is exactly what the
+     person who needs them does not have. The half that only moves bytes runs
+     on the server; the half that composites runs in the admin's own browser,
+     because a Vercel function has no canvas. */
+  const route = (await import('node:fs')).readFileSync(
+    new URL('../src/routes/admin/products.js', import.meta.url), 'utf8');
+  ok('there is an endpoint to move embedded photos out of the rows',
+    /\/images\/migrate/.test(route));
+  ok('it can be asked what it would do before it does it', /dry/.test(route));
+  ok('it never keeps a base64 copy behind', /delete next\.imageLegacy/.test(route));
+  ok('and it is staff-only', /requirePermission\('suppliers\.manage'\)/.test(route));
+
+  const board = (await import('node:fs')).readFileSync(
+    new URL('../../src/lib/productArtboard.js', import.meta.url), 'utf8');
+  ok('the artboard is 7:6, matching the card', /const W = 1400/.test(board) && /const H = 1200/.test(board));
+  ok('the photo is scaled in both directions, not merely capped',
+    /Math\.min\(boxW \/ img\.naturalWidth/.test(board));
+  ok('nothing is cropped', !/drawImage\([^)]*sx/.test(board));
+
+  const upload = (await import('node:fs')).readFileSync(
+    new URL('../../src/lib/imageUpload.js', import.meta.url), 'utf8');
+  /* 600px was the cap while photos lived in the product row. The product hero
+     asks for 1490 device pixels, so it guaranteed softness. */
+  ok('uploads are no longer capped at 600px', /max = 1600/.test(upload));
+  ok('…and the reason the old cap existed is written down', /base64 inside the product/.test(upload));
+
+  const admin = (await import('node:fs')).readFileSync(
+    new URL('../../src/pages/admin/Products.jsx', import.meta.url), 'utf8');
+  ok('a new upload is put on the artboard as it is uploaded', /toArtboard\(data/.test(admin));
+  ok('an artboard failure keeps the photo rather than losing it',
+    /an artboard is an improvement, not a requirement/.test(admin));
+  ok('there is a one-pass button for the photos already there', /normalizeAll/.test(admin));
+  ok('…offered only when there is something to do',
+    /isOwnerUpload\(p\.image\) && !p\.imageNormalized/.test(admin));
+}
+
 console.log('\n— Normalising uploads onto one artboard —');
 {
   const src = (await import('node:fs')).readFileSync(

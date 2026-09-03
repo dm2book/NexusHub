@@ -30,6 +30,10 @@ const hydrate = (r) => {
       return x === null && y === null ? null : { x: x ?? 50, y: y ?? 50 };
     })(),
     imageFit: ['cover', 'contain'].includes(metadata.imageFit) ? metadata.imageFit : null,
+    /* Whether this photo has already been placed on the 7:6 artboard. The admin
+       needs it to know what is left to do, and to stop offering an action that
+       has nothing to act on. */
+    imageNormalized: metadata.imageNormalized === true,
     /* The grouped form, for owners who would rather write one object than three
        fields. Validated to the same values — an unknown fit or a position that
        is neither a CSS keyword nor a pair of numbers is dropped rather than

@@ -3,7 +3,20 @@
  * data-URI we can store straight on the product (the site has no blob store).
  * The image is downscaled and re-encoded so a phone photo doesn't bloat the DB.
  */
-export function fileToDataUrl(file, { max = 600, maxBytes = 700_000 } = {}) {
+/**
+ * `max` is the long edge in pixels.
+ *
+ * It was 600, and 600 is why the shop looked soft: the product page hero is
+ * 745 CSS pixels wide and a 2x display asks for 1490 device pixels, so every
+ * photo the owner had ever uploaded was being stretched two-and-a-half times.
+ * Measured on the live catalogue: 29 of 45 uploads were narrower than 400px.
+ *
+ * 600 was the right number while pictures lived as base64 inside the product
+ * row and every catalogue query dragged them along. They do not any more — they
+ * are stored once and served with an immutable cache header — so the reason for
+ * the cap is gone and the cost of it is not.
+ */
+export function fileToDataUrl(file, { max = 1600, maxBytes = 1_400_000 } = {}) {
   return new Promise((resolve, reject) => {
     if (!file) return reject(new Error('No file selected.'));
     if (!/^image\//.test(file.type)) return reject(new Error('Please choose an image file.'));

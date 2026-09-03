@@ -35,6 +35,45 @@ const storeUpload = async (metadata, productId = null) => {
   return value === metadata.image ? metadata : { ...metadata, image: value };
 };
 
+/**
+ * Move every embedded photo out of the product rows, from the admin.
+ *
+ * The same work scripts/migrate-product-images.mjs does, reachable without a
+ * terminal or a database URL — which matters because the person who needs it
+ * is the one who cannot run either. No browser needed: this only moves bytes
+ * between tables. Re-encoding to WebP still needs the script, because a Vercel
+ * function has no canvas.
+ *
+ * Idempotent: images are addressed by content hash, so a second run finds the
+ * rows the first one wrote and changes nothing.
+ */
+router.post('/images/migrate', requirePermission('suppliers.manage'), asyncHandler(async (req, res) => {
+  const dry = req.body?.dry === true;
+  const rows = await listProducts();
+  let moved = 0, freedBytes = 0;
+  const failed = [];
+
+  for (const p of rows) {
+    const image = p.metadata?.image;
+    if (typeof image !== 'string' || !image.startsWith('data:')) continue;
+    freedBytes += image.length;
+    if (dry) { moved += 1; continue; }
+    try {
+      const { value } = await normalizeImageValue(image, { productId: p.id, source: 'migrated' });
+      const next = { ...p.metadata, image: value };
+      delete next.imageLegacy;    // never keep a base64 copy — that is the problem
+      await updateProduct(p.id, { metadata: next });
+      moved += 1;
+    } catch (err) { failed.push({ name: p.name, error: err.message }); }
+  }
+
+  if (!dry && moved) {
+    await audit({ actor: req.user, action: 'product.images_migrated',
+      metadata: { moved, freedBytes }, req });
+  }
+  res.json({ moved, freedBytes, dry, failed, examined: rows.length });
+}));
+
 router.get('/', requirePermission('orders.read'), asyncHandler(async (_req, res) => {
   const products = await listProducts();
   const stock = await availableCounts(products.map((p) => p.id));
