@@ -147,6 +147,22 @@ console.log('\n— A NEW upload never lands in the product row —');
     /normalizeImageValue\(url/.test(route));
 }
 
+console.log('\n— Background removal knows when to decline —');
+{
+  const lib = (await import('node:fs')).readFileSync(
+    new URL('../../src/lib/imageUpload.js', import.meta.url), 'utf8');
+  ok('it declines when it barely removed anything', /cleared < w \* h \* 0\.02/.test(lib));
+  /* The guard that was missing: the flood fills from the edges inward, so a
+     subject the SAME colour as its background has nothing to stop it. A white
+     gift card photographed on white was eaten from the border through its own
+     body, leaving the logo floating with no card under it. Verified in a real
+     canvas: a white card on white is now declined, a red logo on white is
+     still stripped. */
+  ok('…and when it removed so much that the subject went with it',
+    /cleared > w \* h \* 0\.55/.test(lib));
+  ok('the reason is written down next to it', /same colour as its background/i.test(lib));
+}
+
 console.log('\n— The owner can do it without a terminal —');
 {
   /* The scripts need a DATABASE_URL and a shell, which is exactly what the
