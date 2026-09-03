@@ -8,6 +8,7 @@ import { addProductCodes, availableCounts, availableCount } from '../../services
 import { getRewards, setRewards } from '../../services/mysteryBoxService.js';
 import { audit } from '../../services/auditService.js';
 import { assertSafeImageValue, resolveImageUrl } from '../../utils/imageUrl.js';
+import { normalizeImageValue } from '../../services/imageStoreService.js';
 
 const router = Router();
 
@@ -15,6 +16,23 @@ const router = Router();
 const guardImage = (metadata) => {
   const img = metadata?.image;
   if (img != null && img !== '') assertSafeImageValue(img);
+};
+
+/**
+ * An upload never reaches products.metadata as base64.
+ *
+ * The store and the migration existed before this line did, and that was the
+ * hole: the 45 embedded photos on the live shop were cleaned up by a script
+ * while the upload form quietly put fresh ones back. A one-off migration that
+ * fixes a problem the write path keeps recreating is not a fix.
+ *
+ * Anything that is not a data: URI — a path, a link the owner pasted — comes
+ * back untouched, because it is already a URL and not ours to rewrite.
+ */
+const storeUpload = async (metadata, productId = null) => {
+  if (!metadata || typeof metadata.image !== 'string' || !metadata.image) return metadata;
+  const { value } = await normalizeImageValue(metadata.image, { productId, source: 'upload' });
+  return value === metadata.image ? metadata : { ...metadata, image: value };
 };
 
 router.get('/', requirePermission('orders.read'), asyncHandler(async (_req, res) => {
@@ -49,6 +67,7 @@ const productSchema = z.object({
 router.post('/', requirePermission('suppliers.manage'), asyncHandler(async (req, res) => {
   const body = productSchema.parse(req.body);
   guardImage(body.metadata);
+  if (body.metadata) body.metadata = await storeUpload(body.metadata);
   const product = await createProduct(body);
   await audit({ actor: req.user, action: 'product.create', targetType: 'product',
     targetId: product.id, req });
@@ -58,6 +77,7 @@ router.post('/', requirePermission('suppliers.manage'), asyncHandler(async (req,
 router.patch('/:id', requirePermission('suppliers.manage'), asyncHandler(async (req, res) => {
   const body = productSchema.partial().parse(req.body);
   guardImage(body.metadata);
+  if (body.metadata) body.metadata = await storeUpload(body.metadata, req.params.id);
   const product = await updateProduct(req.params.id, body);
   await audit({ actor: req.user, action: 'product.update', targetType: 'product',
     targetId: product.id, req });
@@ -85,8 +105,11 @@ router.post('/bulk', requirePermission('suppliers.manage'), asyncHandler(async (
   // Set (or clear) the same product image across a whole selection — e.g. one
   // logo for every Robux / V-Bucks variant at once. Accepts a link or upload.
   if (action === 'image') {
-    const url = String(value || '').trim();
+    let url = String(value || '').trim();
     if (url) assertSafeImageValue(url);
+    /* Stored once for the whole selection rather than per product: the same
+       picture across forty variants is one row, not forty. */
+    if (url) ({ value: url } = await normalizeImageValue(url, { source: 'upload' }));
     let updated = 0;
     for (const id of ids) {
       const p = await getProduct(id);

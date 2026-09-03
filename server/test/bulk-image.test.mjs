@@ -58,7 +58,13 @@ const dataUri = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1H
 const up = await fetch(`${base}/api/admin/products/bulk`, {
   method: 'POST', headers: auth, body: JSON.stringify({ ids: [c.id], action: 'image', value: dataUri }) });
 ok('uploaded data-URI image is accepted', up.status === 200, `status=${up.status}`);
-ok('product C stored the uploaded image', (await getProduct(c.id)).image === dataUri);
+/* The row no longer stores the picture. An upload is moved into
+   product_images and the product keeps a URL, so setting one image across a
+   whole selection costs one row rather than one copy per product — see
+   services/imageStoreService.js. This assertion used to require the opposite. */
+const stored = (await getProduct(c.id)).image;
+ok('product C stored a URL rather than the base64', /^\/api\/images\/[a-f0-9]{32}\./.test(stored), stored.slice(0, 48));
+ok('…and the picture is served from it', (await fetch(base + stored)).status === 200);
 
 srv.close();
 console.log(`\n${pass} passed, ${fail} failed`);

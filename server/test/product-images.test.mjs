@@ -116,6 +116,37 @@ console.log('\n— The generator does not overwrite the owner\'s own photographs
   ok('overwriting is possible but must be asked for', /--force/.test(gen));
 }
 
+console.log('\n— A NEW upload never lands in the product row —');
+{
+  /* The hole this closes: the store and the migration both existed while the
+     admin form still wrote base64 straight into products.metadata, so a one-off
+     cleanup would have been undone by the next upload. Driven through the real
+     service the route calls, with the real bytes. */
+  const id = newId('prd');
+  const photo = Buffer.concat(Array.from({ length: 60 }, () => PNG_1x1));
+  await run(`INSERT INTO products (id, sku, name, category, description, price, currency, kind, active, metadata, created_at, updated_at)
+             VALUES (@id,'UPLOADPATH','Upload path','giftcard','t',999,'EUR','digital',1,'{}',@at,@at)`,
+    { id, at: nowIso() });
+
+  const { value } = await store.normalizeImageValue(dataUri(photo), { productId: id, source: 'upload' });
+  await run(`UPDATE products SET metadata=@m WHERE id=@id`, { m: JSON.stringify({ image: value }), id });
+
+  const meta = (await get(`SELECT metadata FROM products WHERE id=@id`, { id })).metadata;
+  ok('what the row stores is a URL, not the picture',
+    /^\/api\/images\//.test(JSON.parse(meta).image), JSON.parse(meta).image.slice(0, 40));
+  ok('and the row is small', meta.length < 200, `${meta.length} bytes`);
+  ok('the picture is reachable at that URL',
+    (await fetch(base + JSON.parse(meta).image)).status === 200);
+
+  // The route itself must call it — a service nobody invokes is not a fix.
+  const route = (await import('node:fs')).readFileSync(
+    new URL('../src/routes/admin/products.js', import.meta.url), 'utf8');
+  ok('the create route stores uploads', /createProduct/.test(route) && /storeUpload\(body\.metadata\)/.test(route));
+  ok('the update route stores uploads', /storeUpload\(body\.metadata, req\.params\.id\)/.test(route));
+  ok('and so does setting one image across a bulk selection',
+    /normalizeImageValue\(url/.test(route));
+}
+
 console.log(`\n${fail === 0 ? '✅' : '❌'} product images: ${pass} passed, ${fail} failed`);
 srv.close();
 process.exit(fail ? 1 : 0);
