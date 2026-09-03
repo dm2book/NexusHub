@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Package, Plus, Pencil, Star, Eye, EyeOff, Search, Image as ImageIcon, Upload, Loader2, X, Scissors } from 'lucide-react';
+import { Package, Plus, Pencil, Star, Eye, EyeOff, Search, Image as ImageIcon, Upload, Loader2, X, Scissors, Wand2 } from 'lucide-react';
 import { api } from '../../lib/api.js';
 import { money, categoryVisual, normalizeSearch } from '../../lib/catalog.js';
 import { fileToDataUrl, removeSolidBackground, imageLabel } from '../../lib/imageUpload.js';
+import { toArtboard, isOwnerUpload } from '../../lib/productArtboard.js';
 import { PageLoader, EmptyState, Modal } from '../../components/ui.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
 
@@ -43,18 +44,73 @@ export default function AdminProducts() {
     } catch (err) { toast.error(err.message); } finally { setBusy(false); }
   };
 
-  // Upload an image straight from the owner's device → inline data URI. A flat
-  // (e.g. white) background is auto-removed so the artwork blends on the card.
-  const uploadImage = async (file, set) => {
+  /* Upload an image from the owner's device. A flat (e.g. white) background is
+     auto-removed so the artwork blends, and then the picture is placed on the
+     7:6 ForgeMarket artboard.
+
+     That last step is what makes a grid look chosen rather than collected: the
+     card's media box is 7:6, uploads arrive in whatever shape the source
+     happened to be — measured on the live catalogue, fourteen different ratios
+     — and art authored at the ratio of its container is the only thing that
+     fills the tile without letterboxing. Nothing is cropped; the board supplies
+     what the photo's proportions do not. */
+  const uploadImage = async (file, set, category) => {
     if (!file) return;
     setImgBusy(true);
     try {
       let data = await fileToDataUrl(file);
       try { const stripped = await removeSolidBackground(data); if (stripped) data = stripped; } catch { /* keep original */ }
+      try { data = await toArtboard(data, { category }); }
+      catch { /* an artboard is an improvement, not a requirement — keep the photo */ }
       set(data);
     }
     catch (err) { toast.error(err.message); }
     finally { setImgBusy(false); }
+  };
+
+  /* One pass over every product that already carries an uploaded photo.
+     Runs in this browser, one product at a time, because the compositing needs
+     a canvas and a Vercel function has no browser to give it. */
+  const [normBusy, setNormBusy] = useState(null);
+
+  /* The other half, and the one that has to run on the server: photos stored as
+     base64 inside the product row. Moving bytes between tables needs no canvas,
+     so this is a request rather than a loop in the browser. */
+  const migrateEmbedded = async () => {
+    setNormBusy('checking…');
+    try {
+      const dry = await api.post('/api/admin/products/images/migrate', { dry: true });
+      if (!dry.moved) { setNormBusy(null); return toast.success('No photos are stored inside product rows.'); }
+      const mb = (dry.freedBytes / 1048576).toFixed(1);
+      if (!window.confirm(`${dry.moved} photo(s) are stored inside the product rows, `
+        + `about ${mb} MB. Move them into the image store? The catalogue gets that much lighter `
+        + 'and the pictures start being cached properly.')) { setNormBusy(null); return; }
+      setNormBusy('moving…');
+      const out = await api.post('/api/admin/products/images/migrate', {});
+      load();
+      toast.success(`${out.moved} photo(s) moved, ${(out.freedBytes / 1048576).toFixed(1)} MB out of the catalogue.`);
+    } catch (err) { toast.error(err.message); }
+    finally { setNormBusy(null); }
+  };
+  const normalizeAll = async () => {
+    const targets = products.filter((p) => isOwnerUpload(p.image) && !p.imageNormalized);
+    if (!targets.length) return toast.success('Every uploaded photo is already on an artboard.');
+    if (!window.confirm(`${targets.length} product photo(s) will be placed on the ForgeMarket `
+      + 'artboard. The originals stay in the image store, so this can be undone. Continue?')) return;
+    let done = 0, failed = 0;
+    for (const p of targets) {
+      setNormBusy(`${done + failed + 1} / ${targets.length}`);
+      try {
+        const art = await toArtboard(p.image, { category: p.category });
+        await api.patch(`/api/admin/products/${p.id}`, {
+          metadata: { ...(p.metadata || {}), image: art, imageNormalized: true },
+        });
+        done += 1;
+      } catch { failed += 1; }
+    }
+    setNormBusy(null);
+    load();
+    toast.success(`${done} photo(s) placed on the artboard${failed ? `, ${failed} failed` : ''}.`);
   };
 
   // Manually strip a flat background off the image already on the product
@@ -179,7 +235,27 @@ export default function AdminProducts() {
     <div>
       <div className="flex items-center justify-between mb-2">
         <h1 className="text-2xl text-white">Products</h1>
-        <button onClick={openNew} className="btn-primary text-sm"><Plus size={16} /> New product</button>
+        <div className="flex items-center gap-2">
+          {/* Only offered when there is something to do, so it is not a button
+              that exists to do nothing on most visits. */}
+          {products.some((p) => String(p.image || '').startsWith('data:')) && (
+            <button onClick={migrateEmbedded} disabled={!!normBusy}
+              title="Move photos stored inside the product rows into the image store"
+              className="btn-ghost text-sm whitespace-nowrap">
+              <ImageIcon size={15} /> Move photos out of the catalogue
+            </button>
+          )}
+          {products.some((p) => isOwnerUpload(p.image) && !p.imageNormalized) && (
+            <button onClick={normalizeAll} disabled={!!normBusy}
+              title="Place every uploaded photo on the 7:6 ForgeMarket artboard so the grid is even"
+              className="btn-ghost text-sm whitespace-nowrap">
+              {normBusy
+                ? <><Loader2 size={15} className="animate-spin" /> {normBusy}</>
+                : <><Wand2 size={15} /> Fix product photos</>}
+            </button>
+          )}
+          <button onClick={openNew} className="btn-primary text-sm"><Plus size={16} /> New product</button>
+        </div>
       </div>
       <p className="text-slate-400 text-sm mb-4">Manage your catalog. Featured items get highlighted on the storefront.</p>
 
@@ -478,7 +554,7 @@ export default function AdminProducts() {
               <label className={`btn-ghost text-sm whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${imgBusy ? 'opacity-60 pointer-events-none' : ''}`}>
                 {imgBusy ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />} Upload
                 <input type="file" accept="image/*" className="hidden"
-                  onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; uploadImage(f, (v) => setForm((s) => ({ ...s, imageUrl: v }))); }} />
+                  onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; uploadImage(f, (v) => setForm((s) => ({ ...s, imageUrl: v })), form.category); }} />
               </label>
             </div>
             {form.imageUrl && (
