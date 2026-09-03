@@ -147,6 +147,26 @@ console.log('\n— A NEW upload never lands in the product row —');
     /normalizeImageValue\(url/.test(route));
 }
 
+console.log('\n— Normalising uploads onto one artboard —');
+{
+  const src = (await import('node:fs')).readFileSync(
+    new URL('../../scripts/art/normalize-uploads.mjs', import.meta.url), 'utf8');
+  ok('the artboard is 7:6, the ratio of the tile', /const W = 1400, H = 1200/.test(src));
+  /* The bug the first proof sheet caught: max-width/max-height cap a picture
+     but never scale a small one up, so a 232px upload stayed 232px inside a
+     1400px frame and came out a fifth of the tile — consistent, and smaller
+     than before. A sized box plus object-fit does scale up. */
+  ok('the photo is fitted to a box rather than merely capped',
+    /\.frame\{width:/.test(src) && /object-fit:contain/.test(src));
+  ok('…and nothing is cropped or stretched', !/object-fit:\s*cover/.test(src));
+  ok('the original is kept so the change can be undone',
+    /imageOriginal/.test(src) && /--revert/.test(src));
+  ok('it will not process its own output twice', /imageNormalized/.test(src));
+  ok('it leaves generated art and built-in icons alone', /isUpload/.test(src));
+  // Upscaling does not create detail; saying so is part of the job.
+  ok('it reports which uploads are too small to be sharp', /narrower than 400px/.test(src));
+}
+
 console.log(`\n${fail === 0 ? '✅' : '❌'} product images: ${pass} passed, ${fail} failed`);
 srv.close();
 process.exit(fail ? 1 : 0);
