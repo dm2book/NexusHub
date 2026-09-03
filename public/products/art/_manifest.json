@@ -1,28 +1,55 @@
 {
  "products": 72,
  "filesWritten": 216,
- "totalBytes": 2173529,
- "averageBytes": 10063,
+ "totalBytes": 2027752,
+ "averageBytes": 9388,
  "applied": true,
  "productsWithNoBrandMark": [],
+ "keptOwnerArtwork": [
+  {
+   "sku": "APEX-1000",
+   "name": "1,000 Apex Coins",
+   "image": "/api/images/f5acbc437130e504476a9b9f8f0ec08d.webp"
+  },
+  {
+   "sku": "FF-1080",
+   "name": "1,080 Diamonds — Free Fire",
+   "image": "/api/images/25e954632fd854835a950a25ed6045b5.webp"
+  },
+  {
+   "sku": "ROBUX-1000",
+   "name": "1,000 Robux",
+   "image": "/api/images/bac5a64ada046732db5b0fad017d5a8a.webp"
+  },
+  {
+   "sku": "VBUCKS-1000",
+   "name": "1,000 V-Bucks",
+   "image": "/api/images/dd6dc2a22c274a5fc685a63248f309e5.webp"
+  },
+  {
+   "sku": "VAL-1000",
+   "name": "1,000 VP — Valorant",
+   "image": "/api/images/25e954632fd854835a950a25ed6045b5.webp"
+  }
+ ],
  "rows": [
   {
-   "id": "prd_kXyzgsd9izAlvBvZ1-_HY",
+   "id": "prd_kw0JH407gLcisFzLLvGdM",
    "sku": "APEX-1000",
    "name": "1,000 Apex Coins",
    "category": "apex",
-   "was": "/products/art/apex-1000.svg",
+   "was": "/api/images/f5acbc437130e504476a9b9f8f0ec08d.webp",
    "main": "/products/art/apex-1000.svg",
    "hover": "/products/art/apex-1000-hover.svg",
    "banner": "/products/art/apex-1000-banner.svg",
    "sizes": {
-    "main": 4429,
-    "hover": 4428,
-    "banner": 5352
+    "main": 3378,
+    "hover": 3377,
+    "banner": 4302
    }
   },
   {
-   "id": "prd_sif1zFsPIRYoNTlE1HTWm",
+   "id": "prd_DEB_4QNP18Hn8OKNQL4uG",
    "sku": "APEX-11500",
    "name": "11,500 Apex Coins",
    "category": "apex",
@@ -37,7 +64,7 @@
    }
   },
   {
-   "id": "prd_KzZgIFQkGj8mUYJFUB-GT",
+   "id": "prd_W6fGGD0l_NAJhuWRmHkzV",
    "sku": "APEX-2150",
    "name": "2,150 Apex Coins",
    "category": "apex",
@@ -52,7 +79,7 @@
    }
   },
   {
-   "id": "prd_PrKfXRaAdbOq_af089nqF",
+   "id": "prd_0NSUPNurWp3vJiI5I5Hd5",
    "sku": "APEX-4350",
    "name": "4,350 Apex Coins",
    "category": "apex",
@@ -67,7 +94,7 @@
    }
   },
   {
-   "id": "prd_Oklzhq0keiQi-P4-edr0i",
+   "id": "prd_4Oo6RBIf70svOeRdeRVgj",
    "sku": "BRAWL-2000",
    "name": "2,000 Gems — Brawl Stars",
    "category": "brawl",
@@ -82,7 +109,7 @@
    }
   },
   {
-   "id": "prd_zYa1IvkymYNR6qJzHx2_d",
+   "id": "prd_Z2jEvExUOcxw4F7UOyW_R",
    "sku": "BRAWL-360",
    "name": "360 Gems — Brawl Stars",
    "category": "brawl",
@@ -97,7 +124,7 @@
    }
   },
   {
-   "id": "prd_oNZRSU1zfriMJgLJDSUkA",
+   "id": "prd_dPTXCGaUnV1EGwkKE9azX",
    "sku": "BRAWL-950",
    "name": "950 Gems — Brawl Stars",
    "category": "brawl",
@@ -112,7 +139,7 @@
    }
   },
   {
-   "id": "prd_E5AnmeB5VBhObTHNHI_9X",
+   "id": "prd_DAyxrYP4i1xELsV_OlPBv",
    "sku": "COC-1200",
    "name": "1,200 Gems — Clash of Clans",
    "category": "clash",
@@ -127,7 +154,7 @@
    }
   },
   {
-   "id": "prd_4QXSPVqjo0MAK5Ft0lAZn",
+   "id": "prd_92SDbijxppzy3Yxv2RGCf",
    "sku": "COC-2500",
    "name": "2,500 Gems — Clash of Clans",
    "category": "clash",
@@ -142,7 +169,7 @@
    }
   },
   {
-   "id": "prd_tZ1Wo_R8DPjKd5CKgVjx6",
+   "id": "prd_zsHuhIgGjZutXxA8scrk6",
    "sku": "COC-500",
    "name": "500 Gems — Clash of Clans",
    "category": "clash",
@@ -157,7 +184,7 @@
    }
   },
   {
-   "id": "prd_dpvYflNjnDSfX0fDNCqAe",
+   "id": "prd_t4UsyMJYtITtiPzSBC4rJ",
    "sku": "COC-6500",
    "name": "6,500 Gems — Clash of Clans",
    "category": "clash",
@@ -172,7 +199,7 @@
    }
   },
   {
-   "id": "prd_vl-7PpM_kkAXIuSEXEINP",
+   "id": "prd_x4SBaOv0wLhv-0RNWApwk",
    "sku": "CR-1200",
    "name": "1,200 Gems — Clash Royale",
    "category": "clashroyale",
@@ -187,7 +214,7 @@
    }
   },
   {
-   "id": "prd_RIEm5tokt19zUPSd5h4TR",
+   "id": "prd_ARNrgrOBeQhyQzsIcXrDz",
    "sku": "CR-2500",
    "name": "2,500 Gems — Clash Royale",
    "category": "clashroyale",
@@ -202,7 +229,7 @@
    }
   },
   {
-   "id": "prd_yIgWS6iTR9pLIrLxr71fp",
+   "id": "prd_vG8uyAMiLI6aubXtTcNhn",
    "sku": "CR-500",
    "name": "500 Gems — Clash Royale",
    "category": "clashroyale",
@@ -217,7 +244,7 @@
    }
   },
   {
-   "id": "prd_Ccj4i4ndSZrt9ufu8eHQa",
+   "id": "prd_-cmdyV6ubVfXIwty60LK4",
    "sku": "COD-2400",
    "name": "2,400 CP — Call of Duty",
    "category": "cod",
@@ -232,7 +259,7 @@
    }
   },
   {
-   "id": "prd_QfVnoFq0XMb8Dxjomj2_y",
+   "id": "prd_F_EVsPKa7-cuATmCVBatP",
    "sku": "COD-21000",
    "name": "21,000 CP — Call of Duty",
    "category": "cod",
@@ -247,7 +274,7 @@
    }
   },
   {
-   "id": "prd_yn4dMDrDc0sq_3NvFsWRq",
+   "id": "prd_RnbwnOSp2gAOCCBlCrDiy",
    "sku": "COD-5000",
    "name": "5,000 CP — Call of Duty",
    "category": "cod",
@@ -262,7 +289,7 @@
    }
   },
   {
-   "id": "prd_oxRRFHo-UfSSr4lAaByo4",
+   "id": "prd_Lh4PrtC4YkhkZxfGQeJJa",
    "sku": "COD-9500",
    "name": "9,500 CP — Call of Duty",
    "category": "cod",
@@ -277,7 +304,7 @@
    }
   },
   {
-   "id": "prd_reGr-grkFFbH-gd9d1SFr",
+   "id": "prd_IZ8A_g1eZreeliZKA3Qct",
    "sku": "NITRO-1M",
    "name": "Discord Nitro — 1 Month",
    "category": "discord-nitro",
@@ -292,7 +319,7 @@
    }
   },
   {
-   "id": "prd_QWptwKoCaGXcGN9LZv6WX",
+   "id": "prd_manNRUb8yxLh4FDJLdUHx",
    "sku": "NITRO-1Y",
    "name": "Discord Nitro — 1 Year",
    "category": "discord-nitro",
@@ -307,7 +334,7 @@
    }
   },
   {
-   "id": "prd_z02ER4CYZRMzqNZXlugYN",
+   "id": "prd_ZKKwUQWzLO0jCdxklX5yT",
    "sku": "EAFC-1600",
    "name": "1,600 FC Points — EA FC",
    "category": "eafc",
@@ -322,7 +349,7 @@
    }
   },
   {
-   "id": "prd_4qiH1LHeTWZI6ewaTeKtH",
+   "id": "prd_yoMfPx6sAzUMQzmZ4hAUq",
    "sku": "EAFC-12000",
    "name": "12,000 FC Points — EA FC",
    "category": "eafc",
@@ -337,7 +364,7 @@
    }
   },
   {
-   "id": "prd_D4HExYwOSzvC43-0LoJ1j",
+   "id": "prd_J7Y_HUsgl2qXggqFf1FEF",
    "sku": "EAFC-4600",
    "name": "4,600 FC Points — EA FC",
    "category": "eafc",
@@ -352,22 +379,22 @@
    }
   },
   {
-   "id": "prd_UeGCuUu05xLIvUCx29CfD",
+   "id": "prd_EF4mNpc4XJduup1uuYHpz",
    "sku": "FF-1080",
    "name": "1,080 Diamonds — Free Fire",
    "category": "freefire",
-   "was": "/products/art/ff-1080.svg",
+   "was": "/api/images/25e954632fd854835a950a25ed6045b5.webp",
    "main": "/products/art/ff-1080.svg",
    "hover": "/products/art/ff-1080-hover.svg",
    "banner": "/products/art/ff-1080-banner.svg",
    "sizes": {
-    "main": 4296,
-    "hover": 4295,
-    "banner": 5249
+    "main": 3237,
+    "hover": 3236,
+    "banner": 4191
    }
   },
   {
-   "id": "prd_BkGOd7ECEALshhxY-dXN8",
+   "id": "prd_wS_XUNMc3L1c7fPWEEXFK",
    "sku": "FF-2200",
    "name": "2,200 Diamonds — Free Fire",
    "category": "freefire",
@@ -382,7 +409,7 @@
    }
   },
   {
-   "id": "prd_9EXTG5k2fDgYGC7EA5oSK",
+   "id": "prd_GyJKDmS0D8m2I1dT-6kHq",
    "sku": "FF-530",
    "name": "530 Diamonds — Free Fire",
    "category": "freefire",
@@ -397,7 +424,7 @@
    }
   },
   {
-   "id": "prd_NqYmyYNNNbLfJciKwS8p0",
+   "id": "prd_aG63gn2YnjhqNL_1A3bKW",
    "sku": "GAMEPASS-3M",
    "name": "Xbox Game Pass Ultimate — 3 Months",
    "category": "gamepass",
@@ -412,7 +439,7 @@
    }
   },
   {
-   "id": "prd_V2xBsmlTaYS5nXVziM2yb",
+   "id": "prd_vjdZjsK5V2dt6VIrSGzCl",
    "sku": "GEN-1980",
    "name": "1,980 Genesis Crystals — Genshin",
    "category": "genshin",
@@ -427,7 +454,7 @@
    }
   },
   {
-   "id": "prd_I0Pok54u4gi8Uj8dNsDXM",
+   "id": "prd_ieC1U9gjD7poYJbNsB6fx",
    "sku": "GEN-3280",
    "name": "3,280 Genesis Crystals — Genshin",
    "category": "genshin",
@@ -442,7 +469,7 @@
    }
   },
   {
-   "id": "prd_uWdZzQU2WINIk3zttNtI8",
+   "id": "prd_OXs6Z58dZFP69butB9eBO",
    "sku": "GEN-6480",
    "name": "6,480 Genesis Crystals — Genshin",
    "category": "genshin",
@@ -457,7 +484,7 @@
    }
   },
   {
-   "id": "prd_UY1dowrW7oUDY03Iq-FuL",
+   "id": "prd_DPX9zWY8Gm4W9HrcYby0V",
    "sku": "GEN-980",
    "name": "980 Genesis Crystals — Genshin",
    "category": "genshin",
@@ -472,7 +499,7 @@
    }
   },
   {
-   "id": "prd_Q0Aiaq79cvGU7Le-Q8QHX",
+   "id": "prd_eyevuIR6sctnjABo-zy-x",
    "sku": "AMAZON-25",
    "name": "Amazon Gift Card €25",
    "category": "giftcard",
@@ -487,7 +514,7 @@
    }
   },
   {
-   "id": "prd_c9b_mDpkbVp_k1_DIOvrS",
+   "id": "prd_akotOAwdWYtg6SRjZlqez",
    "sku": "ITUNES-25",
    "name": "App Store & iTunes €25",
    "category": "giftcard",
@@ -502,7 +529,7 @@
    }
   },
   {
-   "id": "prd_Fu_Ho-B_MMZ_k2n1BSNzA",
+   "id": "prd_6wzNNvnxEjyJEzoUNhbMw",
    "sku": "GPLAY-25",
    "name": "Google Play €25",
    "category": "giftcard",
@@ -517,7 +544,7 @@
    }
   },
   {
-   "id": "prd_xOatIQxxa2vMmMPGQki9O",
+   "id": "prd_0swD0O_LTQTWq8ScBGhxn",
    "sku": "NETFLIX-25",
    "name": "Netflix Gift Card €25",
    "category": "giftcard",
@@ -532,7 +559,7 @@
    }
   },
   {
-   "id": "prd_LZQY5ZDvpwvHe5rltEl7_",
+   "id": "prd_t9NghVJ2_wpXgGnh_-mPi",
    "sku": "NINTENDO-25",
    "name": "Nintendo eShop €25",
    "category": "giftcard",
@@ -547,7 +574,7 @@
    }
   },
   {
-   "id": "prd_jtvS8-7lMr8HmkU7R3M57",
+   "id": "prd_szHJKru4fux3aHxuYPBcn",
    "sku": "PSN-25",
    "name": "PlayStation Store €25",
    "category": "giftcard",
@@ -562,7 +589,7 @@
    }
   },
   {
-   "id": "prd_RRuv-gLtVeqKYWvz5Malg",
+   "id": "prd_5dQU2zZ48iuvTBPGBXa-w",
    "sku": "STEAM-10",
    "name": "Steam Wallet €10",
    "category": "giftcard",
@@ -577,7 +604,7 @@
    }
   },
   {
-   "id": "prd_uXNBIwWExl3B9183CA1le",
+   "id": "prd_EO2naZrWl23Ckrn7TYbNn",
    "sku": "STEAM-25",
    "name": "Steam Wallet €25",
    "category": "giftcard",
@@ -592,7 +619,7 @@
    }
   },
   {
-   "id": "prd_sShfyPJvhtLtI1l7xTumX",
+   "id": "prd_3wYnW_R9zQ4SzQPOGzU2X",
    "sku": "STEAM-50",
    "name": "Steam Wallet €50",
    "category": "giftcard",
@@ -607,7 +634,7 @@
    }
   },
   {
-   "id": "prd_fy42tqK9_nxk4t4RpYdJT",
+   "id": "prd_UAX_f4dK_PBlHVv6UMrQU",
    "sku": "XBOX-25",
    "name": "Xbox Gift Card €25",
    "category": "giftcard",
@@ -622,7 +649,7 @@
    }
   },
   {
-   "id": "prd_tmYypmoZ4rUp_x6PYPtfi",
+   "id": "prd_Qp_4k3oWAV7Df_nF383qW",
    "sku": "GTA-GREAT",
    "name": "Great White Shark Card — GTA",
    "category": "gta",
@@ -637,7 +664,7 @@
    }
   },
   {
-   "id": "prd_dSuQhKOghioeN63BfQ0vw",
+   "id": "prd_wacXLfncKtkqHuR5Yujpy",
    "sku": "GTA-MEGALODON",
    "name": "Megalodon Shark Card — GTA",
    "category": "gta",
@@ -652,7 +679,7 @@
    }
   },
   {
-   "id": "prd_zIsn5HLLh9FhHb9QjfSXr",
+   "id": "prd_x1CjGQhLF3xRUIaJ4M1Sb",
    "sku": "GTA-WHALE",
    "name": "Whale Shark Card — GTA",
    "category": "gta",
@@ -667,7 +694,7 @@
    }
   },
   {
-   "id": "prd_nUFAnghnPLlW9ZOZLObuC",
+   "id": "prd_ox1WH-sN-CVps_WOFPww9",
    "sku": "LOL-1380",
    "name": "1,380 RP — League of Legends",
    "category": "league",
@@ -682,7 +709,7 @@
    }
   },
   {
-   "id": "prd_Nh1PjSWrfWUVNjN4XCWAb",
+   "id": "prd_ZOz-3l_5sB0kN5lJUcbT8",
    "sku": "LOL-3500",
    "name": "3,500 RP — League of Legends",
    "category": "league",
@@ -697,7 +724,7 @@
    }
   },
   {
-   "id": "prd_vY6sRsg-cAdRGTRBcnM32",
+   "id": "prd__veOyK6w6AyU5NOJN2v5n",
    "sku": "LOL-8000",
    "name": "8,000 RP — League of Legends",
    "category": "league",
@@ -712,7 +739,7 @@
    }
   },
   {
-   "id": "prd_wmpTTDJtpKKGhU0w_U4ZU",
+   "id": "prd_ot_0GFvecjTHOkq5wrJYr",
    "sku": "MC-1720",
    "name": "1,720 Minecoins — Minecraft",
    "category": "minecraft",
@@ -727,7 +754,7 @@
    }
   },
   {
-   "id": "prd_1CQvZDnPerGZytSJR6TLW",
+   "id": "prd_6GSEmRIpSgD3fZfEGCfRM",
    "sku": "MC-3500",
    "name": "3,500 Minecoins — Minecraft",
    "category": "minecraft",
@@ -742,7 +769,7 @@
    }
   },
   {
-   "id": "prd_z5e8lwJ14VQ_S0qGuOaxw",
+   "id": "prd_03xXO-EwTsN02qHpgGk8c",
    "sku": "MLBB-1155",
    "name": "1,155 Diamonds — Mobile Legends",
    "category": "mlbb",
@@ -757,7 +784,7 @@
    }
   },
   {
-   "id": "prd_3FHft8sFFeLE4BWem3Pas",
+   "id": "prd_o6gxO0APpiKCut_409dY1",
    "sku": "MLBB-275",
    "name": "275 Diamonds — Mobile Legends",
    "category": "mlbb",
@@ -772,7 +799,7 @@
    }
   },
   {
-   "id": "prd_VYYLupDpl4bkwEaS1jZXM",
+   "id": "prd_A-7Gi5Dmeji-chKiQhes0",
    "sku": "MLBB-565",
    "name": "565 Diamonds — Mobile Legends",
    "category": "mlbb",
@@ -802,7 +829,7 @@
    }
   },
   {
-   "id": "prd_Q-jNYgZywEIYrnpeSc4kQ",
+   "id": "prd_0o4h2KR0CrWIJEIRpd6_r",
    "sku": "PGO-1200",
    "name": "1,200 PokéCoins — Pokémon GO",
    "category": "pokemongo",
@@ -817,7 +844,7 @@
    }
   },
   {
-   "id": "prd_s2IVoNmwAM7zhO8yAv-6k",
+   "id": "prd_djYALDHqTScWm-B5It8T-",
    "sku": "PGO-550",
    "name": "550 PokéCoins — Pokémon GO",
    "category": "pokemongo",
@@ -832,7 +859,7 @@
    }
   },
   {
-   "id": "prd_9HfcMlLjR_NctWwuUEFFc",
+   "id": "prd_EJWVorpC2gmc04Iwmdq5o",
    "sku": "PUBG-1800",
    "name": "1,800 UC — PUBG Mobile",
    "category": "pubg",
@@ -847,7 +874,7 @@
    }
   },
   {
-   "id": "prd_gAaEDB5TxQZAs7Q3n21bf",
+   "id": "prd_a7h6Dq01mWdd4_brRteVk",
    "sku": "PUBG-3850",
    "name": "3,850 UC — PUBG Mobile",
    "category": "pubg",
@@ -862,7 +889,7 @@
    }
   },
   {
-   "id": "prd_8Dmec5F7iPaLTGmPel1Ua",
+   "id": "prd_XVoFq2PbrjaGJm88EUcP0",
    "sku": "PUBG-660",
    "name": "660 UC — PUBG Mobile",
    "category": "pubg",
@@ -877,22 +904,22 @@
    }
   },
   {
-   "id": "prd_jQvraMlJK5sJD8uKFvL9E",
+   "id": "prd_NQeGEmSjluqCK2AsdrvKH",
    "sku": "ROBUX-1000",
    "name": "1,000 Robux",
    "category": "robux",
-   "was": "/products/art/robux-1000.svg",
+   "was": "/api/images/bac5a64ada046732db5b0fad017d5a8a.webp",
    "main": "/products/art/robux-1000.svg",
    "hover": "/products/art/robux-1000-hover.svg",
    "banner": "/products/art/robux-1000-banner.svg",
    "sizes": {
-    "main": 17904,
-    "hover": 17903,
-    "banner": 18816
+    "main": 3368,
+    "hover": 3367,
+    "banner": 4281
    }
   },
   {
-   "id": "prd_pWOyZ34-gUqDVeTAFMiWn",
+   "id": "prd_N39nDS7JNSYf8wULNZFFn",
    "sku": "ROBUX-10000",
    "name": "10,000 Robux",
    "category": "robux",
@@ -907,7 +934,7 @@
    }
   },
   {
-   "id": "prd_GYqW1sqd31B-X5eyuKpr_",
+   "id": "prd_f4fFrDoDZvgmwMfJHSH7o",
    "sku": "ROBUX-2000",
    "name": "2,000 Robux",
    "category": "robux",
@@ -922,7 +949,7 @@
    }
   },
   {
-   "id": "prd_q1f_4p3JobcTuh7o-YWck",
+   "id": "prd_16uSiHbcUFcnBuPLKFegC",
    "sku": "ROBUX-22500",
    "name": "22,500 Robux",
    "category": "robux",
@@ -937,7 +964,7 @@
    }
   },
   {
-   "id": "prd_NSgnhqIkCOEzrB6pY0d7m",
+   "id": "prd_2oewaK_uWKarDHCnzr6R2",
    "sku": "ROBUX-4500",
    "name": "4,500 Robux",
    "category": "robux",
@@ -952,7 +979,7 @@
    }
   },
   {
-   "id": "prd_uXxtBeWlE_ezIhPJLn1s7",
+   "id": "prd_4JDQh9IlW5_8MTfdTH7dB",
    "sku": "SPOTIFY-3M",
    "name": "Spotify Premium — 3 Months",
    "category": "spotify",
@@ -967,22 +994,22 @@
    }
   },
   {
-   "id": "prd_Ro3T5F9gcP4lfnSSaVoac",
+   "id": "prd_zMrUfaqMjMgUpb7fuLGBZ",
    "sku": "VBUCKS-1000",
    "name": "1,000 V-Bucks",
    "category": "v-bucks",
-   "was": "/products/art/vbucks-1000.svg",
+   "was": "/api/images/dd6dc2a22c274a5fc685a63248f309e5.webp",
    "main": "/products/art/vbucks-1000.svg",
    "hover": "/products/art/vbucks-1000-hover.svg",
    "banner": "/products/art/vbucks-1000-banner.svg",
    "sizes": {
-    "main": 22190,
-    "hover": 22189,
-    "banner": 23106
+    "main": 3374,
+    "hover": 3373,
+    "banner": 4291
    }
   },
   {
-   "id": "prd_dns_ze0Km9tGbPPT8tPKN",
+   "id": "prd_h5SBIiHMCVAlWIkV7eocE",
    "sku": "VBUCKS-13500",
    "name": "13,500 V-Bucks",
    "category": "v-bucks",
@@ -997,7 +1024,7 @@
    }
   },
   {
-   "id": "prd_x1AuNFbxB2RzOmaeB8Iug",
+   "id": "prd_rUgV-5W9fKDFcj4XSzov8",
    "sku": "VBUCKS-2800",
    "name": "2,800 V-Bucks",
    "category": "v-bucks",
@@ -1012,7 +1039,7 @@
    }
   },
   {
-   "id": "prd_iSc4kDvvMrfyqteYg0NDB",
+   "id": "prd_uxoUhG2v5Lc2jHpRKBQBS",
    "sku": "VBUCKS-5000",
    "name": "5,000 V-Bucks",
    "category": "v-bucks",
@@ -1027,22 +1054,22 @@
    }
   },
   {
-   "id": "prd_qDxafTU9zcjR9P7NIq2sK",
+   "id": "prd_43uDdx_6ixBFt_fteJexc",
    "sku": "VAL-1000",
    "name": "1,000 VP — Valorant",
    "category": "valorant",
-   "was": "/products/art/val-1000.svg",
+   "was": "/api/images/25e954632fd854835a950a25ed6045b5.webp",
    "main": "/products/art/val-1000.svg",
    "hover": "/products/art/val-1000-hover.svg",
    "banner": "/products/art/val-1000-banner.svg",
    "sizes": {
-    "main": 16355,
-    "hover": 16354,
-    "banner": 17300
+    "main": 3223,
+    "hover": 3222,
+    "banner": 4169
    }
   },
   {
-   "id": "prd_DrBU3pUC-zAOXmh_JJ4eY",
+   "id": "prd_AGncMt89f-juAPx_7yQn8",
    "sku": "VAL-2050",
    "name": "2,050 VP — Valorant",
    "category": "valorant",
@@ -1057,7 +1084,7 @@
    }
   },
   {
-   "id": "prd_JgfUWEReMraVBY3H3H4OG",
+   "id": "prd_HHtjuMlDE8VxAsa2wMuIS",
    "sku": "VAL-3650",
    "name": "3,650 VP — Valorant",
    "category": "valorant",
@@ -1072,7 +1099,7 @@
    }
   },
   {
-   "id": "prd_NrGQYMAzQaO7wgmzutb0E",
+   "id": "prd_VewuzGdmpRC1IjSpWVOQ4",
    "sku": "VAL-5350",
    "name": "5,350 VP — Valorant",
    "category": "valorant",

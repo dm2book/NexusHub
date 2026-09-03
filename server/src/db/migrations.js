@@ -1423,4 +1423,39 @@ CREATE TABLE IF NOT EXISTS fx_rates (
 CREATE INDEX IF NOT EXISTS idx_fx_pair ON fx_rates (base, quote, as_of DESC);
 `,
   },
+  {
+    id: '034_product_images',
+    sql: `
+-- ── Uploaded product photos, out of the product row ────────────────────────
+--
+-- Measured on the live shop: 45 of 71 products carried their photo as a base64
+-- data: URI inside products.metadata. One GET /api/products was 8.7 MB, of
+-- which 4.3 MB was image bytes — pulled out of Postgres on every uncached call,
+-- decoded by every phone, and counted against the database's data-transfer
+-- allowance whether or not anybody looked at a picture.
+--
+-- The bytes move here. products.metadata keeps a URL, so the catalogue query
+-- reads a few hundred bytes per product instead of a few hundred kilobytes, and
+-- an image is fetched once per browser and then cached immutably at the edge.
+--
+-- BYTEA rather than base64 text: it is the encoding the file already is, and
+-- storing it as text costs a third more space and a decode on every read.
+CREATE TABLE IF NOT EXISTS product_images (
+  id          TEXT PRIMARY KEY,
+  product_id  TEXT REFERENCES products(id) ON DELETE CASCADE,
+  mime        TEXT NOT NULL,
+  bytes       BYTEA NOT NULL,
+  byte_size   INTEGER NOT NULL,
+  width       INTEGER,
+  height      INTEGER,
+  -- The content hash, so the same picture uploaded twice is stored once and a
+  -- migration can be re-run without duplicating anything.
+  sha256      TEXT NOT NULL,
+  source      TEXT NOT NULL DEFAULT 'upload',   -- upload | migrated | generated
+  created_at  TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_product_images_sha ON product_images (sha256);
+CREATE INDEX IF NOT EXISTS idx_product_images_product ON product_images (product_id);
+`,
+  },
 ];
