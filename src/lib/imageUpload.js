@@ -110,6 +110,17 @@ export function removeSolidBackground(src, { tolerance = 34 } = {}) {
       }
       if (cleared < w * h * 0.02) return resolve(null); // barely removed anything → leave as-is
 
+      /* And the guard that was missing at the other end. The flood fills from
+         the edges inward, so a subject the SAME colour as its background has
+         nothing to stop it: a white gift card photographed on white is eaten
+         from the border straight through its own body, and what comes back is
+         the logo floating with no card under it.
+         There is no tolerance that separates white from white, so the honest
+         answer is to decline. Over half the picture gone means the background
+         was not separable from the subject; the original is returned untouched
+         and the artboard gives it a ground to sit on instead. */
+      if (cleared > w * h * 0.55) return resolve(null);
+
       // Soften the fringe: pixels that survived but are still close to the old
       // background get partial transparency, killing the white halo.
       for (let p = 0; p < w * h; p++) {
