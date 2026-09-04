@@ -1,4 +1,4 @@
-import { Zap, Clock, PackageCheck, ShieldCheck, MessageCircle, BadgeCheck, User } from 'lucide-react';
+import { Zap, Clock, PackageCheck, ShieldCheck, MessageCircle, BadgeCheck, User, Wallet } from 'lucide-react';
 
 /**
  * Stock and delivery, stated in a way the shop can keep.
@@ -18,8 +18,24 @@ import { Zap, Clock, PackageCheck, ShieldCheck, MessageCircle, BadgeCheck, User 
  */
 
 /** @returns {{key, label, detail, tone}} — one stock signal, never two. */
-export function stockStatus(product, t) {
+export function stockStatus(product, t, orderingPaused = false) {
   const low = typeof product.stockLeft === 'number' && product.stockLeft > 0;
+
+  /* The shop cannot honour an order at all — no payment method configured, or
+     the launch gate is closed. /api/config has carried this flag all along, and
+     its own comment says the point is "so the storefront can say so up front
+     instead of letting someone fill a cart and hit a wall at the last step".
+     Only Checkout read it. So the product page showed "Available to order"
+     above a working Buy button, and the buyer found out three screens later.
+     It outranks every other stock signal, so it is checked first. */
+  if (orderingPaused) {
+    return {
+      key: 'paused',
+      label: t('pd.stockPaused', 'Not taking orders right now'),
+      detail: t('pd.stockPausedSub', 'You can still put this in your basket and read up on it — checkout will tell you the moment it reopens.'),
+      tone: 'amber',
+    };
+  }
 
   if (product.instant) {
     return {
@@ -79,8 +95,8 @@ const DOTS = { emerald: 'bg-emerald-500', amber: 'bg-amber-500', sky: 'bg-sky-50
  * The compact block that sits with the price and the buy button — the three
  * facts a buyer weighs at the moment of deciding, without scrolling.
  */
-export function DeliveryFacts({ product, t }) {
-  const stock = stockStatus(product, t);
+export function DeliveryFacts({ product, t, orderingPaused = false }) {
+  const stock = stockStatus(product, t, orderingPaused);
   const eta = deliveryEstimate(product, t);
   const Icon = eta.icon;
 
@@ -130,7 +146,13 @@ export function DeliveryFacts({ product, t }) {
  * empty statistic is worse than no statistic.
  */
 export function TrustRow({ t }) {
+  /* The row led with "money back if we cannot deliver" and never mentioned the
+     thing that actually removes the risk of pressing Buy: nothing is charged
+     until the buyer chooses to transfer it. On a shop that takes bank transfers
+     from strangers that is the strongest sentence available, and it was on the
+     homepage and not here — where the decision is made. */
   const items = [
+    { icon: Wallet, label: t('pd.tPayAfter', 'You pay after ordering — nothing is charged automatically') },
     { icon: ShieldCheck, label: t('pd.tMoneyBack', 'Money back if we cannot deliver') },
     { icon: PackageCheck, label: t('pd.tNoAccount', 'No account needed to order') },
     { icon: BadgeCheck, label: t('pd.tVerified', 'Reviews tied to real orders') },
@@ -138,8 +160,11 @@ export function TrustRow({ t }) {
   ];
   return (
     <ul className="grid grid-cols-2 gap-x-4 gap-y-2 mt-4">
-      {items.map(({ icon: Icon, label }) => (
-        <li key={label} className="flex items-start gap-2 text-[12.5px] text-slate-600">
+      {items.map(({ icon: Icon, label }, i) => (
+        // Five items in two columns leaves an orphan, so the first — the one
+        // that answers "what am I risking by pressing Buy" — takes the full row.
+        <li key={label} className={`flex items-start gap-2 text-[12.5px] ${
+          i === 0 ? 'col-span-2 font-semibold text-slate-800' : 'text-slate-600'}`}>
           <Icon size={14} className="text-emerald-600 shrink-0 mt-0.5" />
           <span className="leading-snug">{label}</span>
         </li>

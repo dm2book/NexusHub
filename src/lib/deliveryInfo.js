@@ -8,6 +8,14 @@
  */
 export const DELIVERY_INFO = {
   robux: {
+    /* The one detail the buyer has to hand over, named once here.
+       The product page asks "Do you need my account details?" only when it
+       knows what the answer is — and it was reading a `deliveryField` that is
+       set on 0 of the 72 products, so the question never appeared on any page.
+       For Robux the answer was already written three lines down, in the steps:
+       a username, never a password. That is the single most reassuring thing
+       this category can say and it was the one thing the FAQ left out. */
+    field: { en: 'Roblox username', nl: 'Roblox-gebruikersnaam' },
     en: {
       // "Roblox+" is a third-party browser extension, not a Roblox product, so
       // calling it official was simply false — and "fully account-safe" is an
@@ -99,4 +107,17 @@ export const DELIVERY_INFO = {
 export function deliveryInfo(category, lang = 'en') {
   const entry = DELIVERY_INFO[category] || DELIVERY_INFO.default;
   return entry[lang] || entry.en;
+}
+
+/**
+ * The one thing the buyer has to hand over for this category, or null.
+ *
+ * A product may state its own `deliveryField`; none of the 72 currently do, so
+ * without this the FAQ's "Do you need my account details?" never rendered on a
+ * single page — including the five Robux products, where the answer ("your
+ * username, never your password") is the most reassuring sentence available.
+ */
+export function deliveryField(category, lang = 'en') {
+  const f = DELIVERY_INFO[category]?.field;
+  return f ? (f[lang] || f.en) : null;
 }
