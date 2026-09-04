@@ -31,7 +31,7 @@ const force = process.argv.includes('--force');
 const { all, run, nowIso } = await import(path.join(ROOT, 'server/src/db/index.js'));
 
 const products = await all(
-  `SELECT id, sku, name, category, price, metadata FROM products WHERE active = 1 ORDER BY category, name`);
+  `SELECT id, sku, name, description, category, price, metadata FROM products WHERE active = 1 ORDER BY category, name`);
 
 /** A stable, readable filename from the SKU — never from the name, which changes. */
 const slug = (p) => String(p.sku || p.id).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');

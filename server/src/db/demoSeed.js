@@ -21,6 +21,7 @@ import { fileURLToPath } from 'node:url';
 import { run, get, nowIso } from './index.js';
 import { migrate } from './migrate.js';
 import { newId } from '../utils/ids.js';
+import { markPath } from '../../../src/lib/brandMarks.js';
 
 // price in minor units (cents). image = static asset shipped in /public.
 /* Exported so the pricing-sanity suite can check the shipped prices without a
@@ -194,18 +195,16 @@ const CATS_WITH_ICON = [
 // Categories whose art is the owner's own 3D renders rather than a generated
 // icon. These are raster (WEBP) and they carry their own background, which is
 // what the tile has to accommodate — see the raster branch in
-// LightProductCard.jsx. Keep in sync with RASTER_ICONS in src/lib/sampleCatalog.js.
-const RASTER_ICONS = [
-  'cod', 'discord-nitro', 'eafc', 'giftcard', 'playstation', 'robux', 'steam', 'v-bucks',
-  'valorant', 'xbox',
-];
+// LightProductCard.jsx. The list itself lives in src/lib/brandMarks.js, which
+// is also what the storefront and the art generator read — it used to be
+// written out here as well, with a comment asking the next reader to keep the
+// copies in step.
 // Raster brand art is WEBP, not PNG. The PNGs were converted during the
 // performance pass (481KB across ten files became 83KB) and this copy of the
 // rule was never updated — so every product in a raster category was pointed at
 // a file that has not existed since. There are zero .png files under
 // public/products/icons; the frontend's iconPath() has said .webp all along.
-export const iconFor = (cat) => (CATS_WITH_ICON.includes(cat)
-  ? `/products/icons/${cat}.${RASTER_ICONS.includes(cat) ? 'webp' : 'svg'}` : null);
+export const iconFor = (cat) => (CATS_WITH_ICON.includes(cat) ? markPath(cat) : null);
 
 /**
  * The generated ForgeMarket artboard, when one exists for this SKU.

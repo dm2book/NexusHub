@@ -450,7 +450,15 @@ export async function postDropEvent(kind, data = {}) {
     'drop-scheduled': 'deals',
   }[kind] || 'products';
   embed.image = { url: `${config.appUrl}/discord/banner-${banner}.png` };
-  embed.thumbnail = { url: (kind === 'product' && data.image) ? data.image : `${config.appUrl}/icon-512.png` };
+  /* Absolute, always. `data.image` is a site-relative path like
+     /products/art/robux-4500.svg, and Discord silently drops a thumbnail whose
+     url is not a full URL — so every product drop announced its artwork to
+     nobody. A data URI is skipped rather than absolutised: it is not a path,
+     and Discord will not fetch one. */
+  const thumb = kind === 'product' && data.image && !/^data:/.test(data.image)
+    ? (/^https?:\/\//.test(data.image) ? data.image : `${config.appUrl}${data.image}`)
+    : `${config.appUrl}/icon-512.png`;
+  embed.thumbnail = { url: thumb };
   embed.footer = { text: `${config.email.fromName} · drops & deals` };
   embed.timestamp = new Date().toISOString();
 

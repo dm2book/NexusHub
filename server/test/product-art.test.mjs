@@ -56,33 +56,47 @@ console.log('— Every product in the shop has art that exists —');
     broken.map((r) => `${r.name} -> ${r.image}`).join(' | '));
 }
 
-// ── 2. The two copies of the icon rule agree ────────────────────────────────
-console.log('\n— The browser and the seeder compose the same path —');
+// ── 2. One icon rule, not three ────────────────────────────────────────────
+console.log('\n— The browser, the seeder and the art generator read one list —');
 {
+  const brand = fs.readFileSync(new URL('../../src/lib/brandMarks.js', import.meta.url), 'utf8');
   const client = fs.readFileSync(new URL('../../src/lib/sampleCatalog.js', import.meta.url), 'utf8');
   const server = fs.readFileSync(new URL('../src/db/demoSeed.js', import.meta.url), 'utf8');
+  const gen = fs.readFileSync(new URL('../../scripts/art/render.mjs', import.meta.url), 'utf8');
 
-  const extOf = (src) => src.match(/RASTER_ICONS\.(?:has|includes)\(\w+\)\s*\?\s*'(\w+)'\s*:\s*'(\w+)'/);
-  const c = extOf(client);
-  const s = extOf(server);
-  ok('both files still build the icon path the same way', !!c && !!s, `client=${!!c} server=${!!s}`);
-  ok('…and pick the same extension for raster art', c?.[1] === s?.[1], `client=${c?.[1]} server=${s?.[1]}`);
-  ok('…and the same one for the generated icons', c?.[2] === s?.[2], `client=${c?.[2]} server=${s?.[2]}`);
+  /* This used to check that three hand-written copies of the list AGREED —
+     which is the weaker guarantee. They now import one, so the check is that
+     nobody has written a fourth copy. */
+  ok('the extension is chosen in exactly one place',
+    /RASTER_ICONS\.has\(\w+\)\s*\?\s*'webp'\s*:\s*'svg'/.test(brand), 'brandMarks.js');
+  for (const [name, src] of [['sampleCatalog', client], ['demoSeed', server], ['render.mjs', gen]]) {
+    ok(`${name} reads it rather than restating it`,
+      /brandMarks\.js'/.test(src) && !/(const|let)\s+RASTER_ICONS\s*=/.test(src));
+  }
 
-  // The rule is only right if the files agree with it.
-  const rasterList = server.match(/const RASTER_ICONS = \[([\s\S]*?)\];/)?.[1] || '';
-  const raster = [...rasterList.matchAll(/'([a-z0-9-]+)'/g)].map((m) => m[1]);
-  /* The owner's own art must stay the owner's own art.
-     These ten categories use 3D renders the shop owner made and supplied; the
-     rest use the generated icon set. Emptying this list swaps all ten for
-     generated icons in one line and the shop still builds, still passes, and
-     still looks fine — just not like the shop somebody designed. That is exactly
-     what happened once, so it is a test now rather than a comment. */
-  const OWNER_ART = ['cod', 'discord-nitro', 'eafc', 'giftcard', 'playstation',
-    'robux', 'steam', 'v-bucks', 'valorant', 'xbox'];
-  const dropped = OWNER_ART.filter((c) => !raster.includes(c));
-  ok('the owner-supplied art is still what those categories use',
-    dropped.length === 0, `silently swapped for generated icons: [${dropped}]`);
+  const raster = [...(brand.match(/RASTER_ICONS = new Set\(\[([\s\S]*?)\]\)/)?.[1] || '')
+    .matchAll(/'([a-z0-9-]+)'/g)].map((m) => m[1]);
+
+  /* The four marks that must stay raster.
+     The list was ten. Rendered side by side at 46 CSS px — the size a phone's
+     product grid actually gives a mark — six of them failed: cod is a wordmark
+     in a black box, eafc and v-bucks and giftcard are photographs, steam is the
+     right logo in navy on a near-black board, discord-nitro is an unreadable
+     grey blob. In each of those six the vector in the repo is a clean, legible
+     icon, so the raster was costing legibility, bytes and resolution
+     independence at once.
+     These four are different: the raster IS the rights-holder's mark and the
+     same-named SVG is a generic stand-in — xbox.svg is a circle with a cross,
+     not the Xbox sphere. Swapping one of these replaces a real trademark with
+     something a tool drew, which is worse than a soft edge. Emptying this list
+     still builds, still passes everything else, and still looks fine — just not
+     like the shop somebody designed. That is why it is a test. */
+  const TRUE_MARKS = ['playstation', 'robux', 'valorant', 'xbox'];
+  const dropped = TRUE_MARKS.filter((c) => !raster.includes(c));
+  ok('the four real trademarks are still served as the rights-holder published them',
+    dropped.length === 0, `silently swapped for stand-ins: [${dropped}]`);
+  ok('and every file the list names exists',
+    raster.every((c) => exists(`/products/icons/${c}.webp`)), raster.join(','));
 
   /* And nothing may point back at the flat banners under /products/.
      Six gradient rectangles with the brand name typeset in a corner, from before
@@ -94,8 +108,6 @@ console.log('\n— The browser and the seeder compose the same path —');
   const catalogueArt = [...(server + client).matchAll(/image:\s*'([^']+)'/g)].map((m) => m[1]);
   const revived = FLAT.filter((n) => catalogueArt.includes(`/products/${n}.svg`));
   ok('no catalogue entry points at the old flat banners', revived.length === 0, `[${revived}]`);
-  const wrongExt = raster.filter((cat) => !exists(`/products/icons/${cat}.${s?.[1]}`));
-  ok(`every raster category has a .${s?.[1]} file on disk`, wrongExt.length === 0, wrongExt.join(', '));
 
   // Nothing may point at PNG: there are none left.
   const pngs = fs.readdirSync(new URL('../../public/products/icons', import.meta.url))
