@@ -22,7 +22,7 @@ import MobileTabBar from '../components/store/MobileTabBar.jsx';
 import AnnouncementBar from '../components/store/AnnouncementBar.jsx';
 import StoreFooter from '../components/store/StoreFooter.jsx';
 import SellerIdentity from '../components/store/SellerIdentity.jsx';
-import { money } from '../lib/catalog.js';
+import { money, carriesOwnBackground } from '../lib/catalog.js';
 import { withFallback, SAMPLE_PRODUCTS, iconPath, CATALOG_UNAVAILABLE } from '../lib/sampleCatalog.js';
 import { useCategoryLogos } from '../lib/useCategoryLogos.js';
 import { useTrustpilot } from '../lib/useTrustpilot.js';
@@ -213,8 +213,27 @@ export default function HomeStore() {
       return { slug, label: labelFor(slug), cheapest,
                from: cheapest.price, currency: cheapest.currency || 'EUR', count: items.length };
     }).filter(Boolean);
-    return cats.length ? { ...pillar, cats } : null;
+    /* A pillar that collapses to ONE category shows that category's products
+       instead of a single tile for all of them. Gift cards were the case: the
+       shelf promised "Steam, PlayStation, Xbox, Netflix and more" and then
+       rendered one grey tile reading "Gift cards · 10 packs available", because
+       all ten share the `giftcard` category. Ten of the most recognisable brands
+       in the shop, collapsed into the least recognisable tile on the page. */
+    const solo = cats.length === 1 && cats[0].count >= 4
+      ? products.filter((p) => p.category === cats[0].slug && p.active !== false)
+        .sort((a, b) => a.price - b.price)
+      : null;
+    return cats.length ? { ...pillar, cats, solo } : null;
   }).filter(Boolean), [products]);
+  /* The cheapest thing in the shop, and how many there are. Nothing here is a
+     round number someone chose: both come out of the same catalogue the rails
+     are built from, and the whole line disappears if it is empty. */
+  const catalogueAnchor = useMemo(() => {
+    const live = products.filter((p) => p.active !== false && Number.isFinite(Number(p.price)));
+    if (live.length < 2) return null;
+    const cheapest = live.reduce((a, b) => (a.price <= b.price ? a : b));
+    return { count: live.length, from: cheapest.price, currency: cheapest.currency || 'EUR' };
+  }, [products]);
   const addToCart = (c) => add(c.cheapest);
 
   return (
@@ -510,10 +529,27 @@ export default function HomeStore() {
                     style={{ backgroundImage: 'linear-gradient(135deg,#7c5cff,#a855f7)' }}>
                     {tr('home.shopNowBig', 'Shop Now')} <ArrowRight size={18} />
                   </Link>
-                  <Link to="/shop" className="fm-press inline-flex items-center gap-2 font-semibold rounded-xl px-6 h-12 border border-white/25 text-white hover:bg-white/10 transition">
-                    {tr('home.viewAll', 'View All Products')}
+                  {/* This used to be a second "View All Products" pointing at
+                      /shop — the same destination as the button beside it. Two
+                      buttons, one outcome: the secondary took clicks off the
+                      primary and gave the visitor nothing they did not already
+                      have. The real second question a stranger has, on a shop
+                      with no reviews that asks for a bank transfer, is not
+                      "where are the products" but "how does paying work". */}
+                  <Link to="/how-it-works" className="fm-press inline-flex items-center gap-2 font-semibold rounded-xl px-6 h-12 border border-white/25 text-white hover:bg-white/10 transition">
+                    {tr('home.howPay', 'How paying works')}
                   </Link>
                 </div>
+                {/* A price to anchor against, and only when the catalogue really
+                    answered. Both numbers are read off the live catalogue — the
+                    cheapest active product and how many there are — so during an
+                    outage this line is absent rather than wrong. */}
+                {catalogueAnchor && (
+                  <p className="text-[13.5px] text-slate-300/90 mt-3">
+                    {tr('home.anchor', '{n} products · from {price}',
+                      { n: catalogueAnchor.count, price: money(catalogueAnchor.from, catalogueAnchor.currency) })}
+                  </p>
+                )}
                 {stats.reviews > 0 ? (
                   <div className="flex items-center gap-3 mt-7">
                     <div className="flex -space-x-2.5">
@@ -529,15 +565,25 @@ export default function HomeStore() {
                      the shop. These three answer the questions a stranger taking
                      a bank transfer actually gets asked, and all three are true
                      on day one, which is more than a review count can say. */
-                  <ul className="flex flex-col gap-2 mt-7 text-[13.5px] text-slate-200/95">
+                  /* These are the trust badges, and they used to be set as grey
+                     fine print under the buttons — the three strongest things
+                     this shop can say, at the visual weight of a disclaimer.
+                     Each now leads with the claim in white and carries the
+                     qualifier behind it, on a panel that reads as one block. */
+                  <ul className="flex flex-col gap-2.5 mt-7 rounded-2xl bg-white/[.06] border border-white/12 backdrop-blur px-4 py-3.5">
                     {[
-                      tr('home.trustWho', 'Run from the Netherlands by one person — name and contact on every page'),
-                      tr('home.trustPay', 'You pay after ordering, with your order number as reference. Nothing is charged automatically'),
-                      tr('home.trustBack', 'Money back in full if we cannot deliver'),
-                    ].map((line) => (
-                      <li key={line} className="flex items-start gap-2.5">
-                        <CheckCircle2 size={15} className="text-emerald-400 shrink-0 mt-0.5" />
-                        <span>{line}</span>
+                      { lead: tr('home.trustWhoLead', 'A named person, in the Netherlands'),
+                        rest: tr('home.trustWho2', 'not a faceless storefront — name and contact on every page') },
+                      { lead: tr('home.trustPayLead', 'You pay after ordering'),
+                        rest: tr('home.trustPay2', 'with your order number as the reference. Nothing is charged automatically and no card details are stored') },
+                      { lead: tr('home.trustBackLead', 'Money back in full if we cannot deliver'),
+                        rest: tr('home.trustBack2', 'in writing on the refund page, not a goodwill gesture') },
+                    ].map((b) => (
+                      <li key={b.lead} className="flex items-start gap-2.5 text-[13.5px] leading-snug">
+                        <CheckCircle2 size={16} className="text-emerald-400 shrink-0 mt-[1px]" />
+                        <span className="text-white font-semibold">{b.lead}
+                          <span className="text-slate-300/85 font-normal"> — {b.rest}</span>
+                        </span>
                       </li>
                     ))}
                   </ul>
@@ -611,15 +657,56 @@ export default function HomeStore() {
                 </Link>
               </div>
               <div className="fm-rail flex gap-4 overflow-x-auto pb-2 scroll-smooth snap-x">
-                {pillar.cats.map((c) => (
+                {pillar.solo ? pillar.solo.map((p) => (
+                  <div key={p.id} className="snap-start shrink-0 w-[212px] bg-white rounded-2xl border border-slate-200/70 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all p-4">
+                    <Link to={`/product/${p.id}`} className="block fm-logo-plinth rounded-xl h-[132px] grid place-items-center mb-3 overflow-hidden">
+                      <img src={p.image} alt="" aria-hidden="true" loading="lazy" decoding="async"
+                        className={carriesOwnBackground(p.image) ? 'w-full h-full object-contain' : 'fm-logo w-[84px] h-[84px]'} />
+                    </Link>
+                    <h3 className="font-bold text-[15px] text-slate-900 truncate" title={p.name}>{p.name}</h3>
+                    <div className="text-[12px] text-slate-500 mt-2">
+                      <span className="fm-num text-violet-700 text-[17px]">{money(p.price, p.currency)}</span>
+                    </div>
+                    <div className="flex items-center gap-2 mt-3">
+                      <Link to={`/product/${p.id}`}
+                        className="flex-1 text-center text-white text-sm font-semibold rounded-lg h-11 grid place-items-center hover:brightness-105 transition"
+                        style={{ backgroundImage: 'linear-gradient(135deg,#7c5cff,#a855f7)' }}>
+                        {tr('home.viewProduct', 'View')}
+                      </Link>
+                      <button aria-label={tr('home.addOne', 'Add {n} to your cart', { n: p.name })}
+                        onClick={(e) => { flyToCart(e.currentTarget.closest('.snap-start')?.querySelector('img')); add(p); }}
+                        className="w-11 h-11 shrink-0 rounded-lg border border-slate-200 grid place-items-center text-slate-600 hover:bg-slate-50 hover:text-violet-700 active:scale-90 transition-transform">
+                        <ShoppingCart size={16} />
+                      </button>
+                    </div>
+                  </div>
+                )) : pillar.cats.map((c) => (
                   <div key={c.slug} className="snap-start shrink-0 w-[212px] bg-white rounded-2xl border border-slate-200/70 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all p-4">
-                    <div className="fm-logo-plinth rounded-xl h-[132px] grid place-items-center mb-3">
-                      <img src={categoryLogos[c.slug] || ICON(c.slug)} alt="" aria-hidden="true"
-                        loading="lazy" decoding="async" className="fm-logo w-[84px] h-[84px]" />
+                    {/* The cheapest pack's own artboard, not a category badge.
+                        The gift-card shelf below shows real product art and the
+                        other two showed a logo on a pale tray, so one page was
+                        speaking in two visual languages. The artboard also does
+                        more work: it carries the denomination the "From" price
+                        underneath refers to. An owner-set category logo still
+                        wins where one exists — that is what Admin → Categories
+                        is for. */}
+                    <div className={`rounded-xl h-[132px] grid place-items-center mb-3 overflow-hidden ${
+                      categoryLogos[c.slug] || !carriesOwnBackground(c.cheapest?.image) ? 'fm-logo-plinth' : ''}`}>
+                      {!categoryLogos[c.slug] && carriesOwnBackground(c.cheapest?.image) ? (
+                        <img src={c.cheapest.image} alt="" aria-hidden="true" loading="lazy" decoding="async"
+                          className="w-full h-full object-contain" />
+                      ) : (
+                        <img src={categoryLogos[c.slug] || ICON(c.slug)} alt="" aria-hidden="true"
+                          loading="lazy" decoding="async" className="fm-logo w-[84px] h-[84px]" />
+                      )}
                     </div>
                     <h3 className="font-bold text-[15px] text-slate-900">{c.label}</h3>
+                    {/* "1 packs available" shipped on Xbox Game Pass and on
+                        Spotify — the two single-product categories. */}
                     <p className="text-[12.5px] text-slate-500 mt-0.5">
-                      {tr('home.packs', '{n} packs available', { n: c.count })}
+                      {c.count === 1
+                        ? tr('home.packs1', '1 pack available')
+                        : tr('home.packs', '{n} packs available', { n: c.count })}
                     </p>
                     <div className="text-[12px] text-slate-500 mt-2">
                       {tr('home.from', 'From')} <span className="fm-num text-violet-700 text-[17px]">{money(c.from, c.currency)}</span>
@@ -775,6 +862,40 @@ export default function HomeStore() {
                   <p className="px-5 pb-4 -mt-1 text-sm text-slate-600 leading-relaxed">{a}</p>
                 </details>
               ))}
+            </div>
+          </section>
+
+          {/* ── The last thing on the page ───────────────────────────────
+              The homepage used to end on an FAQ and then the footer, so a
+              visitor who read the whole thing — the one who did the most work
+              to get comfortable — arrived at the bottom with nowhere to go and
+              had to scroll back up to buy. This is the only new claim-free
+              block on the page: it repeats the price the catalogue really
+              starts at and offers the same two doors as the hero, one to the
+              shop and one to a person. */}
+          <section className="fm-reveal">
+            <div className="relative overflow-hidden rounded-3xl px-6 sm:px-10 py-9 sm:py-11 text-center"
+              style={{ backgroundImage: 'linear-gradient(135deg,#1a1140,#2b1a63 55%,#3b1f6b)' }}>
+              <div className="absolute inset-0 bg-grid opacity-[.14]" aria-hidden="true" />
+              <div className="relative">
+                <h2 className="fm-head text-white text-2xl sm:text-3xl">
+                  {tr('home.endTitle', 'Still deciding? Nothing is charged until you say so.')}
+                </h2>
+                <p className="text-slate-300/90 text-[15px] mt-2.5 max-w-xl mx-auto leading-relaxed">
+                  {tr('home.endSub', 'You place the order first, then transfer the exact amount shown. If we cannot deliver it, you get all of it back.')}
+                </p>
+                <div className="flex flex-wrap items-center justify-center gap-3 mt-6">
+                  <Link to="/shop" className="fm-press inline-flex items-center gap-2 text-white font-semibold rounded-xl px-6 h-12 shadow-lg shadow-violet-500/30 hover:brightness-105 transition"
+                    style={{ backgroundImage: 'linear-gradient(135deg,#7c5cff,#a855f7)' }}>
+                    {catalogueAnchor
+                      ? tr('home.endCta', 'Browse the shop · from {price}', { price: money(catalogueAnchor.from, catalogueAnchor.currency) })
+                      : tr('home.shopNowBig', 'Shop Now')} <ArrowRight size={18} />
+                  </Link>
+                  <Link to="/discord" className="fm-press inline-flex items-center gap-2 font-semibold rounded-xl px-6 h-12 border border-white/25 text-white hover:bg-white/10 transition">
+                    <MessageCircle size={17} /> {tr('home.askFirst', 'Ask a question first')}
+                  </Link>
+                </div>
+              </div>
             </div>
           </section>
         </main>
