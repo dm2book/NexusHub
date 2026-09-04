@@ -68,7 +68,13 @@ console.log('\n— It says what it sells —');
 console.log('\n— Nothing is invented —');
 {
   // A pillar renders only if the live catalogue has products in it.
-  ok('a pillar with no products is dropped', /cats\.length \? \{ \.\.\.pillar, cats \} : null/.test(home));
+  ok('a pillar with no products is dropped', /cats\.length \? \{ \.\.\.pillar, cats, solo \} : null/.test(home));
+  /* A pillar that collapses to one category shows that category's PRODUCTS.
+     Gift cards was the case: ten of the most recognisable brands in the shop
+     rendered as one grey tile reading "Gift cards · 10 packs available",
+     because all ten share the giftcard category. */
+  ok('a single-category pillar expands into its products',
+    /cats\.length === 1 && cats\[0\]\.count >= 4/.test(home) && /pillar\.solo \?/.test(home));
   ok('prices come from the real cheapest product',
     /items\.reduce\(\(a, b\) => \(a\.price <= b\.price \? a : b\)\)/.test(home));
   // Reviews: real ones or an honest empty state — never filler.
@@ -78,6 +84,54 @@ console.log('\n— Nothing is invented —');
     /home\.askBuyers/.test(home) && /footer\.trust/.test(home));
   // The stats grid that printed "0 / — / —" on launch day is gone for good.
   ok('no stats grid can render an empty figure', !/const statCards/.test(home));
+}
+
+console.log('\n— The page asks for the sale —');
+{
+  /* The hero had TWO buttons and both went to /shop. A secondary CTA that
+     repeats the primary takes clicks off it and gives the visitor nothing they
+     did not already have. */
+  /* Back up past the opening <Link> tag: the marker sits inside the primary
+     button, so its own `to` is behind it. The pillar chips just above use a
+     template literal, which the `to="` pattern below deliberately misses. */
+  const heroAt = code.indexOf('home.shopNowBig');
+  const hero = code.slice(Math.max(0, heroAt - 500), heroAt + 900);
+  const dests = [...hero.matchAll(/<Link to="([^"]+)"/g)].map((m) => m[1]);
+  ok('the hero has at least two calls to action', dests.length >= 2, dests.join(', '));
+  ok('and they do not go to the same place', new Set(dests).size === dests.length, dests.join(', '));
+
+  /* The page used to end on an FAQ and then the footer: the visitor who read
+     the whole thing had nowhere to go but back up. */
+  const faqAt = code.indexOf('home.faqTitle');
+  const footAt = code.indexOf('<StoreFooter />');
+  const tail = code.slice(faqAt, footAt);
+  ok('something asks for the sale after the FAQ',
+    /home\.endCta|home\.endTitle/.test(tail), 'no closing CTA between the FAQ and the footer');
+
+  /* A price to decide against. Read off the catalogue, never typed in. */
+  ok('the hero anchors on a real price', /catalogueAnchor/.test(code));
+  ok('and the anchor is computed from the live catalogue, not written down',
+    /live\.reduce\(\(a, b\) => \(a\.price <= b\.price \? a : b\)\)/.test(code));
+  ok('the anchor disappears rather than showing an empty shop',
+    /if \(live\.length < 2\) return null/.test(code));
+
+  // "1 packs available" shipped on the two single-product categories.
+  ok('a count of one is not pluralised', /home\.packs1/.test(code));
+}
+
+console.log('\n— No claim the shop cannot back —');
+{
+  /* SiteLayout printed "● All systems operational" as static text next to a
+     pulsing green dot, checking nothing. It was dead code, but during the
+     August outage that footer would have said the shop was fine. The live
+     version in StoreFooter asks /api/health and says so when it is not. */
+  const layouts = ['src/layouts/StoreLayout.jsx', 'src/components/store/StoreFooter.jsx', 'src/pages/HomeStore.jsx'];
+  for (const f of layouts) {
+    let src = '';
+    try { src = readFileSync(join(ROOT, f), 'utf8'); } catch { continue; }
+    const hard = /All systems operational/.test(src) && !/api\/health/.test(src);
+    ok(`${f} does not claim a status it never checked`, !hard);
+  }
 }
 
 console.log('\n— Works on a phone —');
