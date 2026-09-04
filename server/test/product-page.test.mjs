@@ -88,12 +88,15 @@ console.log('\n— Delivery information and the steps —');
 
 console.log('\n— A FAQ about THIS product —');
 {
-  ok('the questions are built per product', /const productFaq = \(product, t\)/.test(page));
+  ok('the questions are built per product', /const productFaq = \(product, t, lang/.test(page));
   ok('the speed answer differs by real stock', /pdq\.speedAInstant/.test(page) && /pdq\.speedAHand/.test(page));
   // Asking "do you need my account?" on a gift card raises a worry that does
   // not apply; asking it on a top-up answers the one people actually have.
+  /* `field` is the product's own deliveryField when it has one, and otherwise
+     what the category's delivery steps already say they need — the product
+     value was set on 0 of 72, so this question never rendered on any page. */
   ok('the account question appears only when a target is required',
-    /if \(product\.deliveryField\)/.test(page));
+    /if \(field\) \{/.test(page) && /const field = product\.deliveryField \|\|/.test(page));
   ok('the code-or-account choice gets its own answer', /pdq\.accountAChoice/.test(page));
   ok('the FAQ opens without JavaScript', /<details/.test(code) && /<summary/.test(code));
   ok('FAQ rows clear the 44px thumb target', /min-h-\[56px\]/.test(code));
@@ -116,6 +119,55 @@ console.log('\n— Dutch —');
   const used = [...(page + delivery).matchAll(/t\('((?:pd|pdq)\.[A-Za-z0-9]+)'/g)].map((m) => m[1]);
   const missing = [...new Set(used)].filter((k) => !nl.includes(`'${k}'`));
   ok('every new product-page key has Dutch', missing.length === 0, missing.join(', '));
+}
+
+console.log('\n— The page argues for the sale —');
+{
+  const cat = read('src', 'lib', 'catalog.js');
+  const dinfo = read('src', 'lib', 'deliveryInfo.js');
+
+  /* The hero pads its image by 32px and lays a blurred copy behind it, which is
+     right for a photograph and wrong for a board authored at the ratio of the
+     box. Measured: the hero painted the artwork at 59.1% of its box while the
+     card the visitor clicked to get there painted 97.7% — the biggest picture
+     on the page showed the product smaller than the thumbnail did. */
+  ok('there is a test for art the shop composed itself', /export const isForgeArtboard/.test(cat));
+  ok('and the artboard is not inset in the hero',
+    /isForgeArtboard\(product\.image\) \? '' : 'p-8'/.test(code));
+  ok('nor given a blurred backdrop it does not need',
+    /!isForgeArtboard\(product\.image\) && \(/.test(code));
+
+  /* A ladder is compared per unit before it is compared per pack. The shop knew
+     both numbers and made the buyer do the division. */
+  ok('every rung shows what it costs per 1,000', /const perThousand = /.test(code)
+    && (code.match(/perThousand\(p\) != null/g) || []).length >= 2);
+  ok('a pack priced in euros is not given a per-unit price', /if \(\/€\/\.test\(name\)\) return null/.test(code));
+  ok('the upsell says WHY it is an upgrade', /perUnitCheaper/.test(code));
+  ok('and stays quiet when the bigger pack is not actually cheaper',
+    /if \(a == null \|\| b == null \|\| b >= a\) return null/.test(code));
+
+  /* The flag /api/config has carried all along, whose own comment says the
+     storefront should "say so up front instead of letting someone fill a cart
+     and hit a wall at the last step". Only Checkout read it. */
+  ok('the product page knows when the shop cannot take an order',
+    /orderingPaused/.test(code) && /orderingPaused=\{!!cfg\.orderingPaused\}/.test(code));
+  ok('and the stock signal says so before the buy button',
+    /if \(orderingPaused\)/.test(delivery) && /pd\.stockPaused/.test(delivery));
+
+  /* The strongest sentence a bank-transfer shop has, and it was on the homepage
+     and not on the page where the decision is made. */
+  ok('the trust row leads with what pressing Buy actually risks', /pd\.tPayAfter/.test(delivery));
+
+  /* productFaq asked "Do you need my account details?" only when the product
+     carried a deliveryField — set on 0 of 72 products, so it never rendered.
+     For Robux the answer was already written in the delivery steps. */
+  ok('the delivery info names the field it asks for', /export function deliveryField/.test(dinfo));
+  ok('and the FAQ falls back to it', /product\.deliveryField \|\| deliveryField\(product\.category/.test(code));
+
+  // The empty state was a grey box on the page where the decision is made.
+  ok('the reviews empty state explains itself', /product\.noReviewsWhy/.test(code));
+  ok('and offers the two places a buyer can check instead',
+    /home\.askBuyers/.test(code) && /footer\.trust/.test(code));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

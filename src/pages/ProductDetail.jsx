@@ -2,13 +2,13 @@ import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Minus, Plus, ShoppingCart, Zap, ShieldCheck, Clock, BadgeCheck,
-  Star, RefreshCw, Headphones, ChevronDown, Heart, Truck, Info,
+  Star, RefreshCw, Headphones, ChevronDown, Heart, Truck, Info, MessageCircle,
 } from 'lucide-react';
-import { deliveryInfo } from '../lib/deliveryInfo.js';
+import { deliveryInfo, deliveryField } from '../lib/deliveryInfo.js';
 import { api } from '../lib/api.js';
 import { useCart } from '../context/CartContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
-import { categoryVisual, money, carriesOwnBackground, productDescription } from '../lib/catalog.js';
+import { categoryVisual, money, carriesOwnBackground, isForgeArtboard, productDescription } from '../lib/catalog.js';
 import { iconFor } from '../lib/sampleCatalog.js';
 import { SAMPLE_PRODUCTS } from '../lib/sampleCatalog.js';
 import { PageLoader } from '../components/ui.jsx';
@@ -18,6 +18,7 @@ import { useStats } from '../lib/useStats.js';
 import { useWishlist } from '../lib/wishlist.js';
 import { usePageMeta, useJsonLd } from '../lib/useMeta.js';
 import { useI18n } from '../lib/i18n.jsx';
+import { useConfig } from '../lib/useConfig.js';
 import { recordProductView, useRecentlyViewed } from '../lib/recentlyViewed.js';
 import { reportStep } from '../lib/attribution.js';
 import { flyToCart } from '../lib/flyToCart.js';
@@ -29,8 +30,29 @@ import { DeliveryFacts, TrustRow } from '../components/store/ProductDelivery.jsx
 // manual-payment shop can actually stand behind — the previous copy claimed
 // payment was confirmed "within minutes" around the clock and that delivery was
 // automatic for most orders, and neither is true while a person confirms by hand.
-const productFaq = (product, t) => {
+/**
+ * What a pack costs per 1,000 units, when the name carries a unit count.
+ *
+ * This is how the market compares — the first thing a buyer does with a ladder
+ * is divide price by units — and the shop was making them do it in their head.
+ * Nothing is invented: both numbers come off the product. Returns null for
+ * anything that is not a countable pack ("Xbox Game Pass Ultimate — 3 Months"
+ * is not three of anything comparable, and a €25 card is priced in euros).
+ */
+const perThousand = (p) => {
+  const name = String(p?.name || '');
+  if (/€/.test(name)) return null;
+  const m = /^([\d.,]+)\s+\S/.exec(name);
+  const units = m ? Number(m[1].replace(/[.,]/g, '')) : 0;
+  if (!units || units < 100) return null;
+  return (Number(p.price) / units) * 1000;
+};
+
+const productFaq = (product, t, lang = 'en') => {
   const out = [];
+  /* The product's own value first — an owner can always override — then what
+     the category's delivery steps already say it needs. */
+  const field = product.deliveryField || deliveryField(product.category, lang);
 
   out.push([
     t('pdq.speedQ', 'How fast will I get it?'),
@@ -46,12 +68,12 @@ const productFaq = (product, t) => {
 
   // Only asked when it applies. A gift-code product should not raise the
   // question of handing over an account at all.
-  if (product.deliveryField) {
+  if (field) {
     out.push([
       t('pdq.accountQ', 'Do you need my account details?'),
       product.deliveryChoice
-        ? t('pdq.accountAChoice', 'Only your {n} — and only if you choose the direct top-up. Pick a gift code at checkout instead and you give us nothing but an email address. We never ask for your password either way.', { n: product.deliveryField })
-        : t('pdq.accountA', 'Only your {n}, which you enter at checkout so we can top it up. We never ask for your password, and we never need to log in as you.', { n: product.deliveryField }),
+        ? t('pdq.accountAChoice', 'Only your {n} — and only if you choose the direct top-up. Pick a gift code at checkout instead and you give us nothing but an email address. We never ask for your password either way.', { n: field })
+        : t('pdq.accountA', 'Only your {n}, which you enter at checkout so we can top it up. We never ask for your password, and we never need to log in as you.', { n: field }),
     ]);
   }
 
@@ -101,6 +123,7 @@ export default function ProductDetail() {
   const reviews = useReviews();
   const stats = useStats();
   const { t, lang } = useI18n();
+  const cfg = useConfig();   // orderingPaused: the shop cannot honour an order at all
   const { has, toggle } = useWishlist();
   const [product, setProduct] = useState(() => bootProduct(id));
   const [qty, setQty] = useState(1);
@@ -280,7 +303,8 @@ export default function ProductDetail() {
         <Tilt max={6} className="h-80 lg:h-[420px]">
         <div style={{ viewTransitionName: 'product-hero' }}
           className={`shine-host group relative rounded-3xl h-full overflow-hidden animate-fade-in ${
-            carriesOwnBackground(product.image) && !heroBroken ? 'bg-slate-100' : `bg-gradient-to-br ${grad}`
+            isForgeArtboard(product.image) && !heroBroken ? 'bg-[#0b0918]'
+              : carriesOwnBackground(product.image) && !heroBroken ? 'bg-slate-100' : `bg-gradient-to-br ${grad}`
           } ${product.featured ? 'ring-featured' : ''}`}>
           {product.image && !heroBroken ? (
             carriesOwnBackground(product.image) ? (
@@ -296,11 +320,22 @@ export default function ProductDetail() {
                  dropped here too: two colour sources arguing under one picture
                  is what made it muddy. */
               <>
-                <img src={product.image} alt="" aria-hidden="true" decoding="async"
-                  className="absolute inset-0 w-full h-full object-cover scale-125 blur-3xl opacity-30" />
+                {/* The blurred backdrop and the 32px inset are for a PHOTOGRAPH:
+                    something with its own edges that would otherwise float on a
+                    flat panel. A ForgeMarket artboard is not that — it carries
+                    its ground to the edge and is authored at the ratio of the
+                    box. Padding it put the artwork at 59.1% of the hero while
+                    the card the visitor clicked to get here painted 97.7%: the
+                    biggest picture on the page showed the product smaller than
+                    the thumbnail did. */}
+                {!isForgeArtboard(product.image) && (
+                  <img src={product.image} alt="" aria-hidden="true" decoding="async"
+                    className="absolute inset-0 w-full h-full object-cover scale-125 blur-3xl opacity-30" />
+                )}
                 <img data-pd-media src={product.image} alt={product.name} onError={() => setHeroBroken(true)}
                   fetchpriority="high" decoding="async"
-                  className="absolute inset-0 w-full h-full object-contain p-8 drop-shadow-2xl transition-transform duration-700 group-hover:scale-105" />
+                  className={`absolute inset-0 w-full h-full object-contain drop-shadow-2xl transition-transform duration-700 group-hover:scale-105 ${
+                    isForgeArtboard(product.image) ? '' : 'p-8'}`} />
               </>
             ) : (
               /* A mark on a transparent canvas — carriesOwnBackground() just said
@@ -387,7 +422,7 @@ export default function ProductDetail() {
               Above the pack switcher on purpose: each pack is its own route, so
               this always describes the product on screen, and delivery is the
               question people have BEFORE they pick a size. */}
-          <DeliveryFacts product={product} t={t} />
+          <DeliveryFacts product={product} t={t} orderingPaused={!!cfg.orderingPaused} />
 
           {/* Pack switcher — jump between sizes of the same category in one tap */}
           {packSiblings.length > 0 && (
@@ -405,11 +440,21 @@ export default function ProductDetail() {
                         className="px-3.5 py-2 rounded-xl text-sm font-bold text-white shadow-lg shadow-violet-500/30"
                         style={{ backgroundImage: 'linear-gradient(135deg,#7c5cff,#a855f7)' }}>
                         {p.name} · {money(p.price, p.currency)}
+                        {perThousand(p) != null && (
+                          <span className="block text-[11px] font-semibold text-white/80 leading-tight">
+                            {money(Math.round(perThousand(p)), p.currency)} {t('product.per1k', 'per 1,000')}
+                          </span>
+                        )}
                       </span>
                     ) : (
                       <Link key={p.id} to={`/product/${p.id}`}
                         className="px-3.5 py-2 rounded-xl text-sm font-semibold glass text-slate-300 border border-white/10 hover:border-violet-400/60 hover:text-white transition">
                         {p.name} · {money(p.price, p.currency)}
+                        {perThousand(p) != null && (
+                          <span className="block text-[11px] font-medium text-slate-500 leading-tight">
+                            {money(Math.round(perThousand(p)), p.currency)} {t('product.per1k', 'per 1,000')}
+                          </span>
+                        )}
                       </Link>
                     );
                   })}
@@ -421,7 +466,25 @@ export default function ProductDetail() {
           {upsell && (
             <Link to={`/product/${upsell.id}`} className="group mt-4 flex items-center gap-3 rounded-xl border border-violet-200 bg-violet-50 px-3.5 py-2.5 hover:border-violet-300 transition">
               <span className="text-[11px] font-bold uppercase tracking-wide text-violet-600 bg-white rounded-md px-1.5 py-0.5">{t('product.upgrade', 'Upgrade')}</span>
-              <span className="text-sm text-slate-600 flex-1">{t('product.getMore', 'Get more with')} <b className="text-slate-900">{upsell.name}</b> — {money(upsell.price, upsell.currency)}</span>
+              <span className="text-sm text-slate-600 flex-1">
+                {t('product.getMore', 'Get more with')} <b className="text-slate-900">{upsell.name}</b> — {money(upsell.price, upsell.currency)}
+                {/* The reason, not just the offer. "Get more with 10,000 Robux"
+                    asks the buyer to work out for themselves whether it is a
+                    better deal; the shop already knows, from its own two
+                    prices. Rendered only when the bigger pack really is cheaper
+                    per unit — a ladder with an inversion says nothing here
+                    rather than talking a buyer into a worse rung. */}
+                {(() => {
+                  const a = perThousand(product); const b = perThousand(upsell);
+                  if (a == null || b == null || b >= a) return null;
+                  return (
+                    <b className="block text-[12.5px] text-violet-700">
+                      {t('product.perUnitCheaper', '{pct}% cheaper per 1,000',
+                        { pct: Math.round((1 - b / a) * 100) })}
+                    </b>
+                  );
+                })()}
+              </span>
               <ChevronDown size={16} className="-rotate-90 text-violet-500 fm-nudge" />
             </Link>
           )}
@@ -606,7 +669,30 @@ export default function ProductDetail() {
           )}
           <div className="space-y-3">
             {reviews.length === 0 && (
-              <div className="card p-4 text-slate-400 text-sm">{t('product.noReviews', 'No reviews yet — be the first after your purchase.')}</div>
+              /* The homepage's empty state says WHY there are none and offers
+                 the two places a buyer can check instead; this one was a grey
+                 box reading "be the first after your purchase", on the page
+                 where the decision is actually made. Same honesty, same two
+                 doors — and the reason is itself the strongest thing this shop
+                 can say about its reviews: they only come from delivered
+                 orders, which is more than a page of five stars proves. */
+              <div className="card p-4">
+                <div className="font-semibold text-slate-100 text-sm">
+                  {t('pd.noReviewsYet', 'No reviews yet — the shop is new')}
+                </div>
+                <p className="text-slate-400 text-[13px] mt-1.5 leading-relaxed">
+                  {t('product.noReviewsWhy', 'A review here can only be written from a delivered order, so this fills up at the pace the shop actually sells. Nothing is borrowed from anywhere else in the meantime.')}
+                </p>
+                <div className="flex flex-wrap gap-2 mt-3">
+                  <Link to="/discord" className="inline-flex items-center gap-1.5 text-[13px] font-semibold rounded-lg px-3 h-9 text-white"
+                    style={{ backgroundImage: 'linear-gradient(135deg,#5865F2,#7c5cff)' }}>
+                    <MessageCircle size={14} /> {t('home.askBuyers', 'Ask in Discord before you buy')}
+                  </Link>
+                  <Link to="/trust" className="inline-flex items-center gap-1.5 text-[13px] font-semibold rounded-lg px-3 h-9 border border-white/15 text-slate-200 hover:bg-white/5 transition">
+                    <ShieldCheck size={14} /> {t('footer.trust', 'Trust Center')}
+                  </Link>
+                </div>
+              </div>
             )}
             {reviews.slice(0, 3).map((r) => (
               <div key={r.id} className="card p-4 fm-lift">
@@ -624,7 +710,7 @@ export default function ProductDetail() {
         <section>
           <h2 className="text-2xl font-extrabold text-slate-900 mb-5">{t('product.faqTitle', 'Frequently asked')}</h2>
           <div className="bg-white rounded-2xl border border-slate-200/70 shadow-sm divide-y divide-slate-100 overflow-hidden">
-            {productFaq(product, t).map(([q, a]) => (
+            {productFaq(product, t, lang).map(([q, a]) => (
               <details key={q} className="group">
                 <summary className="flex items-center justify-between gap-3 cursor-pointer list-none px-4 py-3.5 min-h-[56px] hover:bg-slate-50 transition">
                   <span className="font-semibold text-slate-900 text-[14.5px]">{q}</span>

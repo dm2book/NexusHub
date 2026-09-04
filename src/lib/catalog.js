@@ -113,6 +113,27 @@ export const carriesOwnBackground = (src) => {
   return isCustomImage(s) || /\.(webp|png|jpe?g|avif)(\?|$)/i.test(s);
 };
 
+/**
+ * Art this shop composed itself, at the ratio of the box it goes in.
+ *
+ * Narrower than carriesOwnBackground(): that one answers "is this a photograph
+ * or a badge on a transparent canvas". This one answers "did we author it at
+ * 7:6", which is true of the generated artboards and of every owner upload,
+ * because productArtboard.js composites uploads onto the same 7:6 board before
+ * they reach the store.
+ *
+ * It matters on the product page. The hero pads its image by 32px and lays a
+ * blurred copy behind it — right for a photograph with its own edges, wrong for
+ * a board that already carries its ground to the edge. Measured before this
+ * existed: the hero painted the artwork at 59.1% of its box while the little
+ * card the visitor clicked to get there painted 97.7%. The most important
+ * picture on the page showed the product smaller than the thumbnail did.
+ */
+export const isForgeArtboard = (src) => {
+  const s = String(src || '');
+  return /^\/products\/art\//.test(s) || /^\/api\/images\//.test(s);
+};
+
 
 export { CreditCard };
 
