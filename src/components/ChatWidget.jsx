@@ -213,7 +213,10 @@ function Bubble({ m, L }) {
               <Link key={p.id} to={`/product/${p.id}`}
                     className="flex items-center gap-2.5 rounded-xl bg-black/30 border border-white/10 p-2 hover:border-primary/40 transition">
                 <div className="w-9 h-9 rounded-lg bg-white/5 overflow-hidden shrink-0 flex items-center justify-center">
-                  {p.image ? <img src={p.image} alt="" className="w-full h-full object-cover" /> : <Sparkles size={16} className="text-indigo-300" />}
+                  {/* contain, not cover: every artboard is 7:6 and this box is square, so
+                      cover cropped 14% off both sides of the artwork — the number the
+                      tile exists to show. The one cropping thumbnail in the shop. */}
+                  {p.image ? <img src={p.image} alt="" className="w-full h-full object-contain" /> : <Sparkles size={16} className="text-indigo-300" />}
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="text-white text-xs font-medium truncate">{p.name}</div>

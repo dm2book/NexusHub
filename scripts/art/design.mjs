@@ -89,11 +89,32 @@ export const esc = (s) => String(s ?? '')
  * "Xbox Game Pass Ultimate — 3 Months" -> "3 MONTHS". Returns null when the
  * name carries no quantity, and the layout then gives the whole stage to the
  * mark instead of printing a number nobody asked for.
+ *
+ * Three gaps found by running this against all 72 real product names and
+ * looking at the tiles it produced:
+ *
+ *   "Discord Nitro — 1 Year"        -> null. Only Month and Maand were matched,
+ *                                     so the shop's €84.99 product shipped a
+ *                                     tile with no number on it at all.
+ *   "1,000 VP — Valorant"           -> no unit. Four Valorant tiles printed a
+ *                                     bare number while every neighbour named
+ *                                     what it was selling.
+ *   "Whale Shark Card — GTA"        -> null, three times. The three GTA tiles
+ *                                     were visually identical in a grid, and a
+ *                                     shopper could not tell a €12.99 card from
+ *                                     a €54.99 one.
+ *
+ * The GTA amounts are not invented for this: the shop's own description field
+ * already says "$3,500,000 in-game cash for GTA Online". So the fallback reads
+ * the description, and only for an in-game $ amount — never €, which would put
+ * a price on a tile.
  */
-export function headline(name) {
+export function headline(name, description) {
   const s = String(name || '');
   const money = s.match(/€\s?(\d+(?:[.,]\d{1,2})?)/);
   if (money) return { big: `€${money[1]}`, small: null };
+  const years = s.match(/(\d+)\s*(Year|Jaar)/i);
+  if (years) return { big: years[1], small: years[1] === '1' ? 'YEAR' : 'YEARS' };
   const months = s.match(/(\d+)\s*(Month|Maand)/i);
   if (months) return { big: months[1], small: months[1] === '1' ? 'MONTH' : 'MONTHS' };
   const num = s.match(/\b(\d{1,3}(?:[.,]\d{3})+|\d{2,6})\b/);
@@ -101,10 +122,20 @@ export function headline(name) {
     const n = Number(num[1].replace(/[.,]/g, ''));
     const unit = /robux/i.test(s) ? 'ROBUX'
       : /v-?bucks/i.test(s) ? 'V-BUCKS'
-        : /gems?/i.test(s) ? 'GEMS'
-          : /coins?/i.test(s) ? 'COINS'
-            : /points?/i.test(s) ? 'POINTS' : null;
+        : /\bVP\b/.test(s) ? 'VP'
+          : /gems?/i.test(s) ? 'GEMS'
+            : /coins?/i.test(s) ? 'COINS'
+              : /diamonds?/i.test(s) ? 'DIAMONDS'
+                : /points?/i.test(s) ? 'POINTS' : null;
     return { big: n.toLocaleString('en-US'), small: unit };
+  }
+  /* Last resort: an in-game currency amount the owner already wrote down. Kept
+     to $ on purpose — a € in a description is a price, and a price does not
+     belong on the artwork. */
+  const inGame = String(description || '').match(/\$\s?(\d{1,3}(?:[.,]\d{3})+)/);
+  if (inGame) {
+    const n = Number(inGame[1].replace(/[.,]/g, ''));
+    return { big: `$${n.toLocaleString('en-US')}`, small: 'IN-GAME CASH' };
   }
   return null;
 }

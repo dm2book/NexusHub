@@ -16,12 +16,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { BRAND, accentFor, CATEGORY_LABEL, esc, headline, fitSize } from './design.mjs';
+/* Which marks are raster is decided once, in src/lib/brandMarks.js — the
+   storefront and the seed read the same list. */
+import { RASTER_ICONS as RASTER, markPath } from '../../src/lib/brandMarks.js';
 
 const PUBLIC = path.join(process.cwd(), 'public');
 
-/** The ten icons that exist only as WebP. Mirrors RASTER_ICONS in sampleCatalog. */
-const RASTER = new Set(['cod', 'discord-nitro', 'eafc', 'giftcard', 'playstation',
-  'robux', 'steam', 'v-bucks', 'valorant', 'xbox']);
 
 /** Gift cards share one category but keep their own brand mark. */
 const BRAND_BY_SKU = {
@@ -55,12 +55,36 @@ export function markFor(product) {
   if (img && !img.includes('/products/packs/') && !img.includes('/products/art/')) return img;
   const slug = BRAND_BY_SKU[product.sku] || product.category;
   if (!slug) return null;
-  const ext = RASTER.has(slug) ? 'webp' : 'svg';
-  const candidate = `/products/icons/${slug}.${ext}`;
+  const candidate = markPath(slug);
   if (fs.existsSync(path.join(PUBLIC, candidate.slice(1)))) return candidate;
   const svg = `/products/icons/${slug}.svg`;
   return fs.existsSync(path.join(PUBLIC, svg.slice(1))) ? svg : null;
 }
+
+/**
+ * How much of the circle the mark's INK should span.
+ *
+ * Measured before this existed: the 64 SVG marks painted 52-62% of the 176px
+ * stage while the 10 WebP marks painted 88.1% — because preserveAspectRatio
+ * fits the CANVAS, and the SVGs are drawn on a 512 square with generous
+ * padding while the WebPs are cropped tight. So 24 products showed a logo half
+ * again as large as the other 47, in the same grid, for no reason connected to
+ * the products. Exactly the unevenness the artboard system was built to remove,
+ * reintroduced one level down.
+ *
+ * Fitting by ink instead of by canvas makes the stage mean the same thing for
+ * every mark. 0.74 keeps a square logo clear of the ring it sits in: the stage
+ * is inscribed in a circle of the same diameter, so a square can reach 1/√2 =
+ * 70.7% of it before its corners cross the stroke, and the few marks that are
+ * round rather than square can afford the rest.
+ */
+const MARK_SPAN = 0.74;
+
+/** Ink boxes, measured by scripts/art/measure-marks.mjs. Absent → fit by canvas. */
+const INK = (() => {
+  try { return JSON.parse(fs.readFileSync(path.join(PUBLIC, 'products/icons/_ink.json'), 'utf8')); }
+  catch { return {}; }
+})();
 
 /**
  * Read an icon file and return something that can be dropped into an SVG at a
@@ -70,6 +94,7 @@ export function inlineMark(src, { x, y, w, h }) {
   if (!src) return null;
   const file = path.join(PUBLIC, String(src).replace(/^\/+/, ''));
   if (!fs.existsSync(file)) return null;
+  const ink = INK[path.basename(file)];
 
   if (file.endsWith('.svg')) {
     const raw = fs.readFileSync(file, 'utf8');
@@ -82,17 +107,45 @@ export function inlineMark(src, { x, y, w, h }) {
       .replace(/<\?xml[\s\S]*?\?>/gi, '');
     /* A nested <svg> gives the mark its own coordinate system, so the source
        file's ids and gradients keep working and nothing has to be rewritten.
-       preserveAspectRatio keeps the logo's proportions inside our box. */
-    return `<svg x="${x}" y="${y}" width="${w}" height="${h}" viewBox="${viewBox}" `
+       With an ink box we hand it the ink rather than the canvas, so the mark
+       fills the stage and preserveAspectRatio still keeps its proportions. */
+    const box = ink ? `${ink.x} ${ink.y} ${ink.w} ${ink.h}` : viewBox;
+    const [bx, by, bw, bh] = ink ? fitInk(ink, { x, y, w, h }) : [x, y, w, h];
+    return `<svg x="${bx}" y="${by}" width="${bw}" height="${bh}" viewBox="${box}" `
       + `preserveAspectRatio="xMidYMid meet" overflow="visible">${inner}</svg>`;
   }
 
   const b64 = fs.readFileSync(file).toString('base64');
   const mime = file.endsWith('.webp') ? 'image/webp'
     : file.endsWith('.png') ? 'image/png' : 'image/jpeg';
-  return `<image x="${x}" y="${y}" width="${w}" height="${h}" `
+  /* A raster cannot be re-cropped by a viewBox, so instead the whole image is
+     scaled and offset until its ink lands on the same stage every SVG mark
+     gets. Same result, arrived at from the other side. */
+  const [bx, by, bw, bh] = ink ? fitInkRaster(ink, { x, y, w, h }) : [x, y, w, h];
+  return `<image x="${bx}" y="${by}" width="${bw}" height="${bh}" `
     + `preserveAspectRatio="xMidYMid meet" href="data:${mime};base64,${b64}"/>`;
 }
+
+/** Place a nested <svg> whose viewBox is the ink box, centred, spanning MARK_SPAN. */
+function fitInk(ink, { x, y, w, h }) {
+  const target = Math.min(w, h) * MARK_SPAN;
+  const s = target / Math.max(ink.w, ink.h);
+  const bw = ink.w * s, bh = ink.h * s;
+  return [round(x + (w - bw) / 2), round(y + (h - bh) / 2), round(bw), round(bh)];
+}
+
+/** Same target, but reached by scaling the whole raster around its ink centre. */
+function fitInkRaster(ink, { x, y, w, h }) {
+  const [, , vbW, vbH] = ink.box;
+  const target = Math.min(w, h) * MARK_SPAN;
+  const s = target / Math.max(ink.w, ink.h);
+  const bw = vbW * s, bh = vbH * s;
+  // where the ink centre lands inside the scaled image, then align it to centre
+  const cx = (ink.x + ink.w / 2) * s, cy = (ink.y + ink.h / 2) * s;
+  return [round(x + w / 2 - cx), round(y + h / 2 - cy), round(bw), round(bh)];
+}
+
+const round = (n) => Math.round(n * 100) / 100;
 
 /** The ForgeMarket bolt, drawn rather than referenced so it never 404s. */
 const BOLT = (x, y, s, fill, op = 1) =>
@@ -153,12 +206,22 @@ function ground(id, w, h, lit) {
  * The bottom 18% is left empty for the same reason: the card floats "By hand"
  * and "High demand" there, and the unit line under the number ("MONTHS",
  * "COINS") was landing underneath them.
+ *
+ * "Left empty" was off by a hair. Measured in the real card: the pill's top edge
+ * sits at 81.4% of the media box and the unit line's baseline at 81.3% — 0.16
+ * CSS pixels apart on a phone, which is not a gap, it is a coincidence.
+ *
+ * The line now sits at 478, which puts real air under it, and it got BIGGER
+ * rather than smaller: at 28 it rendered 7.3 CSS px on a 182px phone tile, under
+ * anything anyone can read. At 34 it is 8.8. It also shrinks with its own length
+ * now, so "IN-GAME CASH" does not run the width of the tile the way a five-letter
+ * "COINS" comfortably does.
  */
 export function mainSvg(product, { lit = false } = {}) {
   const W = 700, H = 600, id = 'a';
   const accent = accentFor(product.category);
   const label = CATEGORY_LABEL[product.category] || String(product.category || '').toUpperCase();
-  const hl = headline(product.name);
+  const hl = headline(product.name, product.description);
   const mark = inlineMark(markFor(product), { x: 262, y: 150, w: 176, h: 176 });
 
   const bigSize = hl ? fitSize(hl.big, 7, 112, 62) : 0;
@@ -173,7 +236,7 @@ ${BOLT(322, 44, 1.7, '#ddd6fe', lit ? 0.14 : 0.08)}
 ${mark || `<circle cx="350" cy="238" r="88" fill="#1b1636" stroke="${accent}" stroke-width="3" opacity=".8"/>`}
 ${hl ? `<text x="350" y="${hl.small ? 440 : 456}" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="${bigSize}" font-weight="800" letter-spacing="-1" fill="${BRAND.purple}" filter="url(#${id}halo)" opacity="${lit ? '.85' : '.55'}">${esc(hl.big)}</text>
 <text x="350" y="${hl.small ? 440 : 456}" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="${bigSize}" font-weight="800" letter-spacing="-1" fill="url(#${id}num)">${esc(hl.big)}</text>` : ''}
-${hl && hl.small ? `<text x="350" y="488" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="28" font-weight="700" letter-spacing="8" fill="${BRAND.muted}">${esc(hl.small)}</text>` : ''}
+${hl && hl.small ? `<text x="350" y="478" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="${fitSize(hl.small, 8, 34, 22)}" font-weight="700" letter-spacing="6" fill="${BRAND.muted}">${esc(hl.small)}</text>` : ''}
 <rect x="0" y="${H - 5}" width="${W}" height="5" fill="url(#${id}rim)" opacity="${lit ? '1' : '.75'}"/>
 </svg>`;
 }
@@ -199,7 +262,7 @@ export function bannerSvg(product) {
   const W = 1600, H = 900, id = 'b';
   const accent = accentFor(product.category);
   const label = CATEGORY_LABEL[product.category] || String(product.category || '').toUpperCase();
-  const hl = headline(product.name);
+  const hl = headline(product.name, product.description);
   const mark = inlineMark(markFor(product), { x: 1010, y: 300, w: 300, h: 300 });
   const price = Number.isFinite(product.price) ? `€${(product.price / 100).toFixed(2).replace('.', ',')}` : null;
   const nameSize = fitSize(product.name, 30, 56, 34);

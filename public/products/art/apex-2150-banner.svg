@@ -39,7 +39,7 @@
 <text x="126" y="744" font-family="Inter, system-ui, sans-serif" font-size="56" font-weight="800" fill="#f5f3ff">€15,99</text></g>
 <ellipse cx="1160" cy="640" rx="290" ry="34" fill="#ef4444" opacity=".18"/>
 <circle cx="1160" cy="450" r="228" fill="none" stroke="url(#brim)" stroke-width="7" opacity=".8"/>
-<svg x="1010" y="300" width="300" height="300" viewBox="0 0 512 512" preserveAspectRatio="xMidYMid meet" overflow="visible">
+<svg x="1073.54" y="339" width="172.93" height="222" viewBox="145 118 222 285" preserveAspectRatio="xMidYMid meet" overflow="visible">
 
   <defs><radialGradient id="apex-sh1" cx="0.5" cy="0.5" r="0.5">
     <stop offset="0" stop-color="#0b1220" stop-opacity="0.4"/>

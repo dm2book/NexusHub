@@ -59,7 +59,8 @@ const SITE_URL = () => config.appUrl.replace(/\/+$/, '');
  * would leave two `og:title` tags and the scraper takes whichever it reads
  * first — a bug that only ever shows up in somebody else's chat window.
  */
-function withHead(html, { title, description, canonical, image, ld, ldProductId, preloadImage, boot }) {
+function withHead(html, { title, description, canonical, image, imageSize = { w: 1200, h: 630 },
+  ld, ldProductId, preloadImage, boot }) {
   const drop = [
     /\s*<title>[\s\S]*?<\/title>/,
     /\s*<meta name="description"[^>]*>/,
@@ -80,8 +81,8 @@ function withHead(html, { title, description, canonical, image, ld, ldProductId,
     `<meta property="og:title" content="${esc(title)}" />`,
     `<meta property="og:description" content="${esc(description)}" />`,
     `<meta property="og:image" content="${esc(image)}" />`,
-    '<meta property="og:image:width" content="1200" />',
-    '<meta property="og:image:height" content="630" />',
+    `<meta property="og:image:width" content="${imageSize.w}" />`,
+    `<meta property="og:image:height" content="${imageSize.h}" />`,
     '<meta property="og:locale" content="nl_NL" />',
     '<meta name="twitter:card" content="summary_large_image" />',
     `<meta name="twitter:title" content="${esc(title)}" />`,
@@ -270,9 +271,23 @@ router.get('/product/:id', asyncHandler(async (req, res, next) => {
   const inStock = product.deliveryMode === 'auto' && stock > 0;
   const payload = productPayload(product, stock);
   const canonical = `${SITE_URL()}/product/${product.id}`;
-  const image = product.image
-    ? (product.image.startsWith('http') ? product.image : SITE_URL() + product.image)
+  /* The share card, at the ratio a share card is actually cropped to.
+     og:image said 1200x630 while serving the 7:6 CARD artboard — 700x600, a
+     different shape and 0.58x the declared width, so every platform that
+     believes the declaration letterboxes or crops it. The 16:9 board was
+     authored for exactly this surface and was reaching no one: a repo-wide
+     grep found `-banner.svg` referenced only by its own test.
+     Caveat worth knowing: an SVG og:image is not rendered by every social
+     platform. Where it is not, the crawler falls back to the site-level
+     /og.png, which is a real 1200x630 raster — so a share card is never blank,
+     it is just less specific. */
+  const banner = /\/products\/art\/[^/]+\.svg$/.test(product.image || '')
+    ? product.image.replace(/\.svg$/, '-banner.svg') : null;
+  const share = banner || product.image;
+  const image = share
+    ? (share.startsWith('http') ? share : SITE_URL() + share)
     : `${SITE_URL()}/og.png`;
+  const imageSize = banner ? { w: 1600, h: 900 } : { w: 1200, h: 630 };
 
   // A rating is attached ONLY when real reviews exist. schema.org will happily
   // accept an aggregate with nothing behind it; Google treats that as spam, and
@@ -337,6 +352,7 @@ router.get('/product/:id', asyncHandler(async (req, res, next) => {
     description: describe(product, inStock),
     canonical,
     image,
+    imageSize,
     ld,
     ldProductId: product.id,
     /* Preload the picture the PAGE shows, not the social card. `image` above is

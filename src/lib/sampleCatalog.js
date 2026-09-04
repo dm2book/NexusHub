@@ -112,16 +112,13 @@ const CATS_WITH_ICON = [
   'ubisoft', 'v-bucks', 'valorant', 'voucher', 'wildrift', 'wow', 'xbox', 'youtube', 'zenless',
 ];
 export const CATEGORY_ICON = Object.fromEntries(CATS_WITH_ICON.map((c) => [c, c]));
-/**
- * Categories whose art is the owner's own 3D renders (raster) rather than a
- * generated icon. Keep in sync with the server list in db/demoSeed.js: the two
- * decide the same thing, and a disagreement means the storefront asks for a file
- * the catalogue was never pointed at.
- */
-export const RASTER_ICONS = new Set([
-  'cod', 'discord-nitro', 'eafc', 'giftcard', 'playstation', 'robux', 'steam', 'v-bucks',
-  'valorant', 'xbox',
-]);
+/* Which marks are raster, decided once in brandMarks.js and re-exported here so
+   existing importers keep working. It used to be spelled out in this file, in
+   db/demoSeed.js and in scripts/art/render.mjs, each telling the reader to keep
+   it in sync with the others. */
+import { RASTER_ICONS } from './brandMarks.js';
+
+export { RASTER_ICONS };
 /**
  * Path to the built-in icon for a category name (not the file's own slug).
  *

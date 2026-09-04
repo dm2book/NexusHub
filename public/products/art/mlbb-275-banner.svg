@@ -33,13 +33,13 @@
 <text x="96" y="300" font-family="Inter, system-ui, sans-serif" font-size="44" font-weight="700" letter-spacing="11" fill="#818cf8">MOBILE LEGENDS</text>
 <text x="96" y="500" font-family="Inter, system-ui, sans-serif" font-size="196" font-weight="800" letter-spacing="-4" fill="#a855f7" filter="url(#bhalo)" opacity=".6">275</text>
 <text x="96" y="500" font-family="Inter, system-ui, sans-serif" font-size="196" font-weight="800" letter-spacing="-4" fill="url(#bnum)">275</text>
-
-<text x="96" y="610" font-family="Inter, system-ui, sans-serif" font-size="56" font-weight="600" fill="#c3cbf0">275 Diamonds — Mobile Legends</text>
-<g><rect x="96" y="652" width="300" height="94" rx="26" fill="#140f2e" fill-opacity=".85" stroke="url(#brim)" stroke-width="3"/>
-<text x="126" y="714" font-family="Inter, system-ui, sans-serif" font-size="56" font-weight="800" fill="#f5f3ff">€4,49</text></g>
+<text x="96" y="566" font-family="Inter, system-ui, sans-serif" font-size="44" font-weight="700" letter-spacing="10" fill="#a9a3c9">DIAMONDS</text>
+<text x="96" y="640" font-family="Inter, system-ui, sans-serif" font-size="56" font-weight="600" fill="#c3cbf0">275 Diamonds — Mobile Legends</text>
+<g><rect x="96" y="682" width="300" height="94" rx="26" fill="#140f2e" fill-opacity=".85" stroke="url(#brim)" stroke-width="3"/>
+<text x="126" y="744" font-family="Inter, system-ui, sans-serif" font-size="56" font-weight="800" fill="#f5f3ff">€4,49</text></g>
 <ellipse cx="1160" cy="640" rx="290" ry="34" fill="#818cf8" opacity=".18"/>
 <circle cx="1160" cy="450" r="228" fill="none" stroke="url(#brim)" stroke-width="7" opacity=".8"/>
-<svg x="1010" y="300" width="300" height="300" viewBox="0 0 512 512" preserveAspectRatio="xMidYMid meet" overflow="visible">
+<svg x="1073.54" y="339" width="172.93" height="222" viewBox="145 118 222 285" preserveAspectRatio="xMidYMid meet" overflow="visible">
 
   <defs><radialGradient id="mlbb-sh1" cx="0.5" cy="0.5" r="0.5">
     <stop offset="0" stop-color="#0b1220" stop-opacity="0.4"/>

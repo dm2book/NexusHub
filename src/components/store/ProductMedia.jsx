@@ -89,9 +89,12 @@ export default function ProductMedia({
   className = '',
   /** First rows should not be lazy: they are the reason the page looks loaded. */
   priority = false,
-  /** Rendered box, so the browser can reserve it before any bytes arrive. */
-  width = 320,
-  height = 272,
+  /** Rendered box, so the browser can reserve it before any bytes arrive.
+      350x300 because that IS 7:6, the ratio the parent pins the box to. It was
+      320x272 = 1.1765, which reserves a box 0.8% the wrong shape — small, but
+      the whole point of this pair is to describe the box exactly. */
+  width = 350,
+  height = 300,
 }) {
   /* Two separate facts, and they must stay separate.
 

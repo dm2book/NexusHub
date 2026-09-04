@@ -33,13 +33,21 @@
 <text x="96" y="300" font-family="Inter, system-ui, sans-serif" font-size="44" font-weight="700" letter-spacing="11" fill="#f87171">FREE FIRE</text>
 <text x="96" y="500" font-family="Inter, system-ui, sans-serif" font-size="196" font-weight="800" letter-spacing="-4" fill="#a855f7" filter="url(#bhalo)" opacity=".6">1,080</text>
 <text x="96" y="500" font-family="Inter, system-ui, sans-serif" font-size="196" font-weight="800" letter-spacing="-4" fill="url(#bnum)">1,080</text>
-
-<text x="96" y="610" font-family="Inter, system-ui, sans-serif" font-size="56" font-weight="600" fill="#c3cbf0">1,080 Diamonds — Free Fire</text>
-<g><rect x="96" y="652" width="300" height="94" rx="26" fill="#140f2e" fill-opacity=".85" stroke="url(#brim)" stroke-width="3"/>
-<text x="126" y="714" font-family="Inter, system-ui, sans-serif" font-size="56" font-weight="800" fill="#f5f3ff">€8,49</text></g>
+<text x="96" y="566" font-family="Inter, system-ui, sans-serif" font-size="44" font-weight="700" letter-spacing="10" fill="#a9a3c9">DIAMONDS</text>
+<text x="96" y="640" font-family="Inter, system-ui, sans-serif" font-size="56" font-weight="600" fill="#c3cbf0">1,080 Diamonds — Free Fire</text>
+<g><rect x="96" y="682" width="300" height="94" rx="26" fill="#140f2e" fill-opacity=".85" stroke="url(#brim)" stroke-width="3"/>
+<text x="126" y="744" font-family="Inter, system-ui, sans-serif" font-size="56" font-weight="800" fill="#f5f3ff">€8,49</text></g>
 <ellipse cx="1160" cy="640" rx="290" ry="34" fill="#f87171" opacity=".18"/>
 <circle cx="1160" cy="450" r="228" fill="none" stroke="url(#brim)" stroke-width="7" opacity=".8"/>
-<circle cx="1160" cy="450" r="170" fill="#1b1636" stroke="#f87171" stroke-width="5" opacity=".8"/>
+<svg x="1073.54" y="339" width="172.93" height="222" viewBox="145 118 222 285" preserveAspectRatio="xMidYMid meet" overflow="visible">
+
+  <defs><radialGradient id="freefire-sh1" cx="0.5" cy="0.5" r="0.5">
+    <stop offset="0" stop-color="#0b1220" stop-opacity="0.4"/>
+    <stop offset="0.6" stop-color="#0b1220" stop-opacity="0.16000000000000003"/>
+    <stop offset="1" stop-color="#0b1220" stop-opacity="0"/>
+  </radialGradient></defs>
+  <ellipse cx="256" cy="386" rx="104" ry="20" fill="url(#freefire-sh1)"/><path d="M147 179L201.5 120L310.5 120L365 179L256 356Z" fill="#642e09" transform="translate(0 12)"/><path d="M147 179L201.5 120L201.5 179Z" fill="#fb9d5c"/><path d="M201.5 120L310.5 120L310.5 179L201.5 179Z" fill="#fcb98b"/><path d="M310.5 120L365 179L310.5 179Z" fill="#f9761b"/><path d="M147 179L201.5 179L256 356Z" fill="#ea6c15"/><path d="M201.5 179L310.5 179L256 356Z" fill="#fa8f45"/><path d="M310.5 179L365 179L256 356Z" fill="#a94e0f"/><path d="M147 179L201.5 120L310.5 120L365 179L256 356Z" fill="none" stroke="#fdc7a2" stroke-opacity="0.5" stroke-width="3"/><path d="M201.5 120L237.83 120L212.4 179L201.5 179Z" fill="#fff" opacity="0.22"/>
+</svg>
 <text x="1504" y="846" text-anchor="end" font-family="Inter, system-ui, sans-serif" font-size="40" font-weight="600" letter-spacing="2" fill="#8e9bd9">forgemarket.nl</text>
 <rect x="0" y="893" width="1600" height="7" fill="url(#brim)"/>
 </svg>

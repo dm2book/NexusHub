@@ -303,9 +303,23 @@ export default function ProductDetail() {
                   className="absolute inset-0 w-full h-full object-contain p-8 drop-shadow-2xl transition-transform duration-700 group-hover:scale-105" />
               </>
             ) : (
-              <img data-pd-media src={product.image} alt={product.name} onError={() => setHeroBroken(true)}
-                fetchpriority="high" decoding="async"
-                className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+              /* A mark on a transparent canvas — carriesOwnBackground() just said
+                 so. It gets the same treatment as the no-image branch below:
+                 centred on the gradient at a size it was drawn for.
+
+                 It used to get object-cover, the full-bleed photo treatment, and
+                 the result was a 256px square logo stretched across a 596x420
+                 hero and cropped by it — a Roblox hexagon blown up 2.3x into a
+                 wall of mint green on a page whose whole design is dark purple.
+                 Reachable today through the 404 fallback, where a stale product
+                 link renders the built-in showcase entry, and through any
+                 product whose image is a category icon. */
+              <>
+                <div className="absolute inset-0 bg-grid opacity-25" />
+                <img data-pd-media src={product.image} alt={product.name} onError={() => setHeroBroken(true)}
+                  fetchpriority="high" decoding="async"
+                  className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[46%] max-w-[220px] object-contain drop-shadow-2xl group-hover:scale-105 transition-transform duration-700" />
+              </>
             )
           ) : iconFor(product.category) ? (
             // Image missing/broken → show the category logo centred on the gradient
