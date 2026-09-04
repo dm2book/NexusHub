@@ -23,7 +23,9 @@ import { migrate } from './migrate.js';
 import { newId } from '../utils/ids.js';
 
 // price in minor units (cents). image = static asset shipped in /public.
-const CATALOG = [
+/* Exported so the pricing-sanity suite can check the shipped prices without a
+   database — the shape of a ladder is a property of this list, not of a row. */
+export const CATALOG = [
   // ── Robux (Eldorado top-up + €2) ─────────────────────────────────────────
   { sku: 'ROBUX-1000', name: '1,000 Robux', category: 'robux', price: 999, featured: true,
     image: '/products/packs/robux-1000.svg', description: 'Instant Robux top-up to your Roblox account.' },
@@ -41,7 +43,7 @@ const CATALOG = [
     image: '/products/packs/vbucks-1000.svg', description: 'Fortnite V-Bucks for skins and the Battle Pass.' },
   { sku: 'VBUCKS-2800', name: '2,800 V-Bucks', category: 'v-bucks', price: 1299, featured: true,
     image: '/products/packs/vbucks-2800.svg', description: 'Great-value V-Bucks bundle, instant delivery.' },
-  { sku: 'VBUCKS-5000', name: '5,000 V-Bucks', category: 'v-bucks', price: 2399,
+  { sku: 'VBUCKS-5000', name: '5,000 V-Bucks', category: 'v-bucks', price: 2299,
     image: '/products/packs/vbucks-5000.svg', description: '5,000 V-Bucks delivered to your account.' },
   { sku: 'VBUCKS-13500', name: '13,500 V-Bucks', category: 'v-bucks', price: 3999, featured: true,
     image: '/products/packs/vbucks-13500.svg', description: 'The biggest V-Bucks stack at the best rate.' },
@@ -111,11 +113,21 @@ const CATALOG = [
     image: '/products/packs/discord-nitro-1-year.svg', description: 'A full year of Discord Nitro.' },
 
   // ── Gift cards (face value + small margin; not on Eldorado) ──────────────
+  // The price floor here is arithmetic, not taste. A card is only worth selling
+  // if what the shop keeps after payment fees still beats the card's own face
+  // value by the configured minimum profit:
+  //
+  //     price − (price × feePct + feeFixed) ≥ face + minProfit
+  //
+  // At the shipped 2.9% + €0.29 and a €0.50 minimum that puts a €25 card at
+  // €26.56 and a €50 card at €52.31 — which is why these sit at €26.99 / €52.99
+  // and not a euro lower. catalog-pricing-sanity.test.mjs enforces it, so a
+  // future "let's undercut by a euro" cannot quietly sell at a loss.
   { sku: 'STEAM-10', name: 'Steam Wallet €10', category: 'giftcard', price: 1199,
     image: '/products/packs/steam-10.svg', description: 'Add €10 to your Steam Wallet via redeem code.' },
   { sku: 'STEAM-25', name: 'Steam Wallet €25', category: 'giftcard', price: 2699,
     image: '/products/packs/steam-25.svg', description: 'Add €25 to your Steam Wallet via redeem code.' },
-  { sku: 'STEAM-50', name: 'Steam Wallet €50', category: 'giftcard', price: 5199,
+  { sku: 'STEAM-50', name: 'Steam Wallet €50', category: 'giftcard', price: 5299,
     image: '/products/packs/steam-50.svg', description: 'Add €50 to your Steam Wallet via redeem code.' },
   { sku: 'PSN-25', name: 'PlayStation Store €25', category: 'giftcard', price: 2699,
     image: '/products/icons/playstation.webp', description: 'PSN gift card for games, DLC and PS Plus.' },
@@ -134,7 +146,7 @@ const CATALOG = [
   { sku: 'PUBG-3850', name: '3,850 UC — PUBG Mobile', category: 'pubg', price: 4199, image: '/products/packs/pubg-3850.svg', description: 'Large PUBG Mobile UC top-up.' },
   { sku: 'MLBB-275', name: '275 Diamonds — Mobile Legends', category: 'mlbb', price: 449, image: '/products/packs/mlbb-275.svg', description: 'MLBB Diamonds for heroes, skins and the Pass.' },
   { sku: 'MLBB-565', name: '565 Diamonds — Mobile Legends', category: 'mlbb', price: 799, featured: true, image: '/products/packs/mlbb-565.svg', description: 'Popular Mobile Legends diamond bundle.' },
-  { sku: 'MLBB-1155', name: '1,155 Diamonds — Mobile Legends', category: 'mlbb', price: 1699, image: '/products/packs/mlbb-1155.svg', description: 'Big Mobile Legends diamond stack.' },
+  { sku: 'MLBB-1155', name: '1,155 Diamonds — Mobile Legends', category: 'mlbb', price: 1599, image: '/products/packs/mlbb-1155.svg', description: 'Big Mobile Legends diamond stack.' },
   { sku: 'EAFC-1600', name: '1,600 FC Points — EA FC', category: 'eafc', price: 1299, image: '/products/packs/eafc-1600.svg', description: 'FC Points for Ultimate Team packs and drafts.' },
   { sku: 'EAFC-4600', name: '4,600 FC Points — EA FC', category: 'eafc', price: 3399, featured: true, image: '/products/packs/eafc-4600.svg', description: 'Best-value FC Points bundle.' },
   { sku: 'EAFC-12000', name: '12,000 FC Points — EA FC', category: 'eafc', price: 7999, image: '/products/packs/eafc-12000.svg', description: 'Maximum FC Points stack.' },
@@ -151,18 +163,18 @@ const CATALOG = [
 
   // ── Subscriptions ────────────────────────────────────────────────────────
   { sku: 'SPOTIFY-3M', name: 'Spotify Premium — 3 Months', category: 'spotify', price: 2499, description: 'Ad-free music, offline listening and better quality.' },
-  { sku: 'NETFLIX-25', name: 'Netflix Gift Card €25', category: 'giftcard', price: 2599, featured: true,
+  { sku: 'NETFLIX-25', name: 'Netflix Gift Card €25', category: 'giftcard', price: 2699, featured: true,
     image: '/products/icons/netflix.svg', description: 'Redeemable towards any Netflix plan.' },
   { sku: 'GAMEPASS-3M', name: 'Xbox Game Pass Ultimate — 3 Months', category: 'gamepass', price: 3499, featured: true, description: '100+ games, EA Play and online multiplayer.' },
 
   // ── More gift cards ──────────────────────────────────────────────────────
   { sku: 'NINTENDO-25', name: 'Nintendo eShop €25', category: 'giftcard', price: 2699,
     image: '/products/icons/nintendo.svg', description: 'Switch games, DLC and Nintendo Switch Online.' },
-  { sku: 'AMAZON-25', name: 'Amazon Gift Card €25', category: 'giftcard', price: 2599,
+  { sku: 'AMAZON-25', name: 'Amazon Gift Card €25', category: 'giftcard', price: 2699,
     image: '/products/icons/amazon.svg', description: 'Spend on millions of products on Amazon.' },
-  { sku: 'GPLAY-25', name: 'Google Play €25', category: 'giftcard', price: 2599,
+  { sku: 'GPLAY-25', name: 'Google Play €25', category: 'giftcard', price: 2699,
     image: '/products/icons/googleplay.svg', description: 'Apps, games and in-app purchases on Android.' },
-  { sku: 'ITUNES-25', name: 'App Store & iTunes €25', category: 'giftcard', price: 2599,
+  { sku: 'ITUNES-25', name: 'App Store & iTunes €25', category: 'giftcard', price: 2699,
     image: '/products/icons/itunes.svg', description: 'Apps, games, music and iCloud storage on Apple.' },
 ];
 

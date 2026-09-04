@@ -500,7 +500,10 @@ export const MESSAGES = {
 // anything else falls back to `default`.
 export const DELIVERY_INFO = {
   robux: {
-    method: 'Sent straight to your Roblox account via the official Roblox+ top-up method — no password or login needed, fully account-safe.',
+    // Kept in step with src/lib/deliveryInfo.js — same claim, said twice, so a
+    // correction to one that misses the other leaves the false version live in
+    // Discord. "Roblox+" is a third-party extension, not an official method.
+    method: 'Sent straight to your Roblox account — we only need your username, never your password, and you never log in anywhere.',
     steps: [
       'Turn on 2-Step Verification (2FA) on your Roblox account — required before we can deliver.',
       'Send us your Roblox username (in your order or a support ticket).',

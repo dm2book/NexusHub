@@ -9,7 +9,11 @@
 export const DELIVERY_INFO = {
   robux: {
     en: {
-      method: 'Sent straight to your Roblox account via the official Roblox+ top-up method — no password or login needed, and fully account-safe.',
+      // "Roblox+" is a third-party browser extension, not a Roblox product, so
+      // calling it official was simply false — and "fully account-safe" is an
+      // absolute guarantee no top-up service can honestly make. What is left is
+      // what the steps below actually describe and we can stand behind.
+      method: 'Sent straight to your Roblox account — we only need your username, never your password, and you never log in anywhere.',
       steps: [
         'Turn on 2-Step Verification (2FA) on your Roblox account — required before we can deliver.',
         'Send us your Roblox username (in your order or a support ticket).',
@@ -22,7 +26,7 @@ export const DELIVERY_INFO = {
       ],
     },
     nl: {
-      method: 'Rechtstreeks op je Roblox-account via de officiële Roblox+ top-up-methode — geen wachtwoord of inloggen nodig, en 100% account-veilig.',
+      method: 'Rechtstreeks op je Roblox-account — we hebben alleen je gebruikersnaam nodig, nooit je wachtwoord, en je logt nergens in.',
       steps: [
         'Zet 2-staps-verificatie (2FA) aan op je Roblox-account — verplicht voordat we kunnen leveren.',
         'Geef ons je Roblox-gebruikersnaam door (in je bestelling of via een ticket).',

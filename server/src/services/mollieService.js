@@ -22,8 +22,13 @@ import { config } from '../config/env.js';
 
 const API = 'https://api.mollie.com/v2';
 
-/** The methods this shop offers, in the order a Dutch buyer expects them. */
-export const SUPPORTED_METHODS = ['ideal', 'bancontact', 'applepay', 'creditcard', 'paypal'];
+/** The methods this shop offers, in the order a Dutch buyer expects them.
+ *  paysafecard is here because most of this catalogue is bought by people too
+ *  young to hold a bank card — the storefront already advertises a paysafecard
+ *  shelf. Listing it costs nothing if the owner has not enabled it at Mollie:
+ *  availableMethods() intersects this list with what Mollie actually returns
+ *  for the account, so an unenabled method never reaches a buyer. */
+export const SUPPORTED_METHODS = ['ideal', 'bancontact', 'paysafecard', 'applepay', 'creditcard', 'paypal'];
 
 export const isEnabled = () => !!config.payments.mollie.apiKey;
 
