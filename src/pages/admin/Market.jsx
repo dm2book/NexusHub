@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
   TrendingUp, Search, ShieldCheck, ShieldAlert, RefreshCw, Check, X, Upload,
-  AlertTriangle, Clock, ExternalLink, Copy, PackageX, HelpCircle, Loader2,
+  AlertTriangle, Clock, ExternalLink, Copy, PackageX, HelpCircle, Loader2, Plus, Package,
 } from 'lucide-react';
 import { api } from '../../lib/api.js';
 import { useToast } from '../../context/ToastContext.jsx';
@@ -75,6 +75,14 @@ const BUCKETS = [
     hint: 'Observed, but nobody has it in stock.' },
   { key: 'needsManualReview', label: 'Needs manual review', icon: HelpCircle,
     hint: 'The listing could not be read confidently enough to classify.' },
+  /* Approved candidates had nowhere to be seen: the five buckets are the five
+     the brief asks for, and an approved one left all of them. So the step that
+     actually writes to the catalogue was unreachable from here. */
+  { key: 'approved', label: 'Approved', icon: Plus,
+    hint: 'Approved and waiting to become a product. Created inactive and unpriced — '
+      + 'a price only arrives through an approved recommendation.' },
+  { key: 'productCreated', label: 'Product created', icon: Package,
+    hint: 'A real product exists, inactive, until you price and publish it.' },
 ];
 
 export default function AdminMarket() {
@@ -269,6 +277,20 @@ export default function AdminMarket() {
                       className="text-emerald-700 hover:bg-emerald-50 rounded-lg px-2 py-1 font-semibold">
                       <Check size={14} className="inline" /> Approve
                     </button>
+                    {/* The only button on this page that writes to the customer-facing
+                        catalogue, so it appears only once the candidate is approved and
+                        it says what it makes: a product nobody can buy yet. */}
+                    {c.status === 'approved' && (
+                      <button onClick={() => act(`cr-${c.id}`, async () => {
+                        const r = await api.post(`/api/admin/market/candidates/${c.id}/create-product`, {});
+                        toast.success(r?.created
+                          ? 'Created — inactive and unpriced until you price it.'
+                          : 'That candidate already has a product.');
+                      })} disabled={!!busy}
+                        className="text-violet-700 hover:bg-violet-50 rounded-lg px-2 py-1 font-semibold ml-1">
+                        <Plus size={14} className="inline" /> Create product
+                      </button>
+                    )}
                     <button onClick={() => act(`rj-${c.id}`, async () => {
                       await api.post(`/api/admin/market/candidates/${c.id}/rejected`, {});
                       toast.success('Rejected.');

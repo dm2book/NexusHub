@@ -437,6 +437,56 @@ console.log('\n━━ 13. Alerts are wired to real events ━━');
     ['market.new_product', 'market.margin_low', 'market.stale'].every((e) => EVENTS[e].priority < 1));
 }
 
+console.log('\n━━ 14. Approved → product created ━━');
+{
+  /* The one arrow in the workflow that had no implementation. A candidate could
+     be marked product_created, and "marked" meant a caller had made the product
+     itself and handed the id back — so the state was a promise the system could
+     not keep. */
+  const model = N.parseTitle('EA Sports FC 7500 Points PS5 Europe');
+  const mp = await OBS.upsertMarketProduct(model);
+  const at = nowIso();
+  const cid = newId('mcd');
+  await run(`INSERT INTO market_candidates (id, market_product_id, status, reason, created_at, updated_at)
+    VALUES (@id, @m, 'approved', 'test', @at, @at)`, { id: cid, m: mp.id, at });
+
+  const out = await D.createProductFromCandidate(cid, { actor: 'owner@x', category: 'eafc' });
+  ok('an approved candidate becomes a product', !!out.product?.id);
+  /* A product discovered on somebody else's shelf has no cost, no price this
+     shop chose and no image. Live on arrival is the exact failure the brief
+     warns about, and it would put a competitor's price on our shelf. */
+  ok('and it arrives INACTIVE', out.product.active === false || out.product.active === 0);
+  ok('with no price at all', Number(out.product.price) === 0);
+  ok('named from the canonical model, not from a listing title',
+    /7,?500/.test(out.product.name) && /PLAYSTATION/i.test(out.product.name));
+  ok('and traceable back to the observation it came from',
+    out.product.metadata?.canonicalKey === model.canonicalKey
+    && out.product.metadata?.marketProductId === mp.id);
+
+  const c = await get('SELECT status, forge_product_id FROM market_candidates WHERE id=@id', { id: cid });
+  ok('the candidate moves to product_created', c.status === 'product_created');
+  ok('and carries the link', c.forge_product_id === out.product.id);
+
+  const again = await D.createProductFromCandidate(cid, { actor: 'owner@x' });
+  ok('a second call makes no second product', again.created === false
+    && again.product.id === out.product.id);
+
+  const cid2 = newId('mcd');
+  const mp2 = await OBS.upsertMarketProduct(N.parseTitle('EA Sports FC 18500 Points PS5 Europe'));
+  await run(`INSERT INTO market_candidates (id, market_product_id, status, reason, created_at, updated_at)
+    VALUES (@id, @m, 'needs_review', 'test', @at, @at)`, { id: cid2, m: mp2.id, at });
+  ok('an unapproved candidate is refused',
+    await D.createProductFromCandidate(cid2, { actor: 'owner@x' }).then(() => false).catch(() => true));
+  ok('and so is one with no named actor',
+    await D.createProductFromCandidate(cid, {}).then(() => false).catch(() => true));
+
+  /* Publishing stays a separate decision: the product is inactive and unpriced,
+     so the only route to a live price is the recommendation path, which already
+     refuses anything unapproved. */
+  ok('publishing is still a decision of its own',
+    (await get('SELECT status FROM market_candidates WHERE id=@id', { id: cid })).status !== 'published');
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 if (failed.length) { console.log('FAILED:'); for (const f of failed) console.log(`  · ${f}`); }
 process.exit(fail ? 1 : 0);
