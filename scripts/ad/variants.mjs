@@ -40,6 +40,20 @@ export function tokensFor({ product, order, review, stock, mystery }) {
     reviewStars: review?.stars ? '★'.repeat(Math.round(review.stars)) : null,
     prize: mystery?.label || null,
     prizeValue: mystery?.credit ? money(mystery.credit) : null,
+    /* What this pack costs per 1,000 units, from the shop's own two numbers.
+       It is how this market compares before it buys, and it is the only
+       comparison this shop is entitled to make: market_observations is empty,
+       so nothing here may be measured against a competitor. Null for anything
+       that is not a countable pack — a €25 card is priced in euros, and "3
+       Months" is not three of something. */
+    perThousand: (() => {
+      const n = String(product?.name || '');
+      if (!product?.price || /€/.test(n)) return null;
+      const m = /^([\d.,]+)\s+\S/.exec(n);
+      const units = m ? Number(m[1].replace(/[.,]/g, '')) : 0;
+      if (!units || units < 100) return null;
+      return money(Math.round((product.price / units) * 1000), product.currency);
+    })(),
   };
 }
 
@@ -144,7 +158,12 @@ export const VARIANTS = [
     captions: [
       { at: 'open', text: 'No account. No waiting for a reply.', style: 'small' },
       { at: 'the product', text: '{price}', style: 'big' },
-      { at: 'checkout', text: 'Pay with iDEAL', style: 'small' },
+      /* This said "Pay with iDEAL". Whether iDEAL is offered depends on what
+         the owner has enabled at Mollie — availableMethods() intersects the
+         shop's list with what the account really returns — and with no provider
+         configured the shop pays by transfer. An advert is the last place to
+         name a method the checkout might not show. */
+      { at: 'checkout', text: 'You transfer the exact amount shown', style: 'small' },
       { at: 'delivered', text: '{delivery}', style: 'small' },
     ],
     cta: 'forgemarket.nl',

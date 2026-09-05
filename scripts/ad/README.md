@@ -96,6 +96,47 @@ payment clears" only when it auto-delivers *and* a code is on the shelf;
 otherwise "Bought in for you, delivered by hand". No advert ever says instant
 about a product that is not.
 
+### Twenty-five brand concepts
+
+`scripts/ad/concepts.mjs` holds twenty-five short-form briefs for TikTok and
+YouTube Shorts — five each for Roblox, FC Points, V-Bucks, PlayStation and Xbox.
+They use the same scene grammar and the same `needs` gate as the variants above,
+so a concept that cannot tell the truth about a product skips itself in exactly
+the same way.
+
+```bash
+DATABASE_URL=…  node scripts/ad/make-ad.mjs \
+  --base=https://forgemarket.nl --concept=R3 --email=ads@yourdomain
+```
+
+Each carries the five things a short needs, kept apart on purpose: `hook` (the
+first two seconds), `scenes` (the script), `captions` (the burnt-in lines),
+`onScreen` (what stays up the whole time — price chip, handle, `#ad`), `cta`
+(the end card) and `post` (the caption typed into the app, with tags).
+
+`{perThousand}` is the token this set leans on: what a pack costs per 1,000
+units, from the shop's own two numbers. It returns null for anything that is not
+a countable pack, so a concept built on it skips a €25 card rather than printing
+a per-unit price for one.
+
+`server/test/ad-concepts.test.mjs` checks all twenty-five against the shipped
+catalogue on every run — the SKU has to exist, the hook has to fill, and none of
+them may claim a rating, a countdown or a relationship with a rights-holder.
+
+### The static creatives are not covered by any of this
+
+`honest-copy.test.mjs` reads `.jsx` and `.html`. It cannot read a PNG, and that
+is where four claims the shop cannot back are still shipping: `og.png` says
+"delivered instantly", "4.9/5" and "24/7 support"; `banner-welcome.png` says
+"INSTANT DELIVERY" and "delivered in seconds"; `banner-support.png` says "24/7";
+`banner-vouches.png` shows five stars on a shop with no orders.
+
+`scripts/ad/static-creatives.mjs` writes the words on every shipped raster down
+in text, with a `sha` pinning the entry to the bytes it describes, so the test
+can read them. The four above are marked `retire` with the reason. **Replacing
+that artwork is the outstanding work** — until then the most distributed
+advertising this shop has is the least honest part of it.
+
 ### Adding a variant
 
 Add an entry to `scripts/ad/variants.mjs`. Nothing else changes:
