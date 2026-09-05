@@ -9,9 +9,17 @@ const KIND_HINT = {
   api: 'config: { baseUrl, auth:{type,token}, endpoints:{catalog,fulfill,status}, fieldMap }',
   csv: 'config: { source:{type:"url"|"inline",url,content}, columns:{sku,name,price,stock,status} }',
   manual: 'No connection — catalog curated in-app, fulfillment routed to the manual queue.',
-  eldorado: 'Eldorado.gg has no public BUYER API — you cannot auto-buy others’ listings. config: { apiKey, autoDeliver }',
+  /* One supplier row, two jobs. These credentials are also what Market →
+     Sources reads to turn competitor price discovery on: without a row here
+     that source reports UNAVAILABLE with the reason, which is deliberate — it
+     is the difference between "nobody sells this" and "we are not allowed to
+     ask". See server/src/services/market/sources.js. */
+  eldorado: 'Eldorado.gg has no public BUYER API — you cannot auto-buy others’ listings. '
+    + 'config: { apiKey, autoDeliver }. The same apiKey enables Eldorado as a price-discovery source under Market.',
   kinguin: 'Real auto-buy: config: { apiKey:"<kinguin key>", autoDeliver:true }. Map product → kinguinId; paid orders are purchased & keys delivered automatically.',
-  g2a: 'Real auto-buy: config: { apiHash, email, apiKey, currency:"EUR", autoDeliver:true }. Map product → G2A product_id; buy price is capped at your cost.',
+  g2a: 'Real auto-buy: config: { apiHash, email, apiKey, currency:"EUR", autoDeliver:true }. '
+    + 'Map product → G2A product_id; buy price is capped at your cost. '
+    + 'The same three credentials enable G2A as a price-discovery source under Market.',
 };
 
 const fmtSecs = (s) => (s == null ? '—' : s < 60 ? `${s}s` : s < 3600 ? `${Math.round(s / 60)}m` : `${Math.round(s / 3600)}h`);
