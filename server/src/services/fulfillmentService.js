@@ -269,7 +269,14 @@ export async function listManualQueue() {
 export async function ensureManualFulfillment(orderId, ctx = {}) {
   const order = await getOrder(orderId);
   if (!order || ['completed', 'refunded', 'cancelled'].includes(order.status)) return false;
-  const existing = await get('SELECT id FROM fulfillment_requests WHERE order_id=@o LIMIT 1', { o: orderId });
+  /* A FAILED request is not "already handled".
+     This guard asked whether any row existed, so an order whose automatic
+     fulfilment had failed looked handled to every caller — including the
+     maintenance sweep, whose whole job is to catch orders nothing is doing
+     anything about. The order stayed paid and undelivered with a dead row
+     standing in for a delivery. */
+  const existing = await get(
+    `SELECT id FROM fulfillment_requests WHERE order_id=@o AND status <> 'failed' LIMIT 1`, { o: orderId });
   if (existing) return false; // already handled (auto in-flight or manual queued)
   for (const item of order.items) {
     if (item.product_id && await resolveFulfillmentSupplier(item.product_id)) return false; // queue owns it
@@ -281,7 +288,9 @@ export async function ensureManualFulfillment(orderId, ctx = {}) {
  *  its status along the same path fulfillOrder walks so completing the request
  *  can legally complete the order. Idempotent via the existing-request check. */
 async function queueForHandDelivery(order, ctx = {}) {
-  const existing = await get('SELECT id FROM fulfillment_requests WHERE order_id=@o LIMIT 1', { o: order.id });
+  // Same reading as above: a failed row is not a delivery in progress.
+  const existing = await get(
+    `SELECT id FROM fulfillment_requests WHERE order_id=@o AND status <> 'failed' LIMIT 1`, { o: order.id });
   if (existing) return false;
   if (order.status === 'payment_received') {
     await transitionOrder(order.id, 'processing', { actorId: ctx.actorId || 'system', reason: 'Begin fulfillment' });
@@ -318,14 +327,32 @@ async function queueForHandDelivery(order, ctx = {}) {
  * is safe; it either completes it or leaves it exactly where it was.
  */
 export async function sweepUnfulfilledPaidOrders({ limit = 50 } = {}) {
+  /* Two shapes of stuck order, and only the first was ever picked up.
+     `NOT EXISTS (… fulfillment_requests …)` catches an order nothing has
+     touched. It also EXCLUDES an order whose automatic fulfilment ran and
+     FAILED — the row exists, so the net skips it forever. That order is paid,
+     the buyer has nothing, and the only thing that ever happened was one owner
+     alert at the moment of failure. If it was missed, nothing chases it: no
+     retry, no queue, no second alert. The customer's next move is a chargeback.
+     A failed request does not go back through autoDispenseFromStock — that is
+     the path that just failed — it goes straight to a person. */
   const rows = await all(
-    `SELECT o.id FROM orders o
+    `SELECT o.id, EXISTS (
+              SELECT 1 FROM fulfillment_requests fr
+               WHERE fr.order_id = o.id AND fr.status = 'failed') AS "hadFailure"
+       FROM orders o
       WHERE o.status IN ('payment_received','processing','awaiting_fulfillment')
-        AND NOT EXISTS (SELECT 1 FROM fulfillment_requests fr WHERE fr.order_id = o.id)
+        AND NOT EXISTS (
+              SELECT 1 FROM fulfillment_requests fr
+               WHERE fr.order_id = o.id AND fr.status <> 'failed')
       ORDER BY o.created_at ASC LIMIT @l`, { l: limit });
-  let queued = 0, dispensed = 0;
+  let queued = 0, dispensed = 0, recovered = 0;
   for (const r of rows) {
     try {
+      if (r.hadFailure) {
+        if (await ensureManualFulfillment(r.id, { actorId: 'system' })) { queued++; recovered++; }
+        continue;
+      }
       if (await autoDispenseFromStock(r.id, { actorId: 'system', reason: 'Recovered by maintenance sweep' })) {
         dispensed++;
         continue;
@@ -334,7 +361,8 @@ export async function sweepUnfulfilledPaidOrders({ limit = 50 } = {}) {
     } catch (e) { console.error('[fulfillment:sweep]', e.message); }
   }
   if (dispensed) console.log(`[fulfillment:sweep] auto-delivered ${dispensed} stuck order(s) from stock`);
-  return { queued, dispensed };
+  if (recovered) console.log(`[fulfillment:sweep] ${recovered} failed fulfilment(s) handed to the manual queue`);
+  return { queued, dispensed, recovered };
 }
 
 /**

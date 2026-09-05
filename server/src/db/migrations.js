@@ -1458,4 +1458,41 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_product_images_sha ON product_images (sha2
 CREATE INDEX IF NOT EXISTS idx_product_images_product ON product_images (product_id);
 `,
   },
+  {
+    id: '035_price_repair',
+    /*
+     * Seven prices that lose money or argue with the shelf they sit on.
+     *
+     * The commercial audit found these by arithmetic on the shop's own numbers,
+     * and the fix landed in demoSeed — which CREATES rows and never updates
+     * them, so a shop seeded before that ran still carries the old prices.
+     * catalog-pricing-sanity.test.mjs enforces the corrected values on the
+     * shipped catalogue and could not see the live one.
+     *
+     * TWO LADDER INVERSIONS — a bigger pack dearer per unit than a smaller one,
+     * which in a market where the first thing a buyer does is divide price by
+     * units is the shelf arguing against itself:
+     *   5,000 V-Bucks   €23.99 = €4.80/1,000 against €4.64 for the 2,800 pack
+     *   1,155 Diamonds  €16.99 = €14.71/1,000 against €14.14 for the 565 pack
+     *
+     * FIVE CARDS THAT CANNOT MAKE MONEY. After the configured 2.9% + €0.29, a
+     * €25.99 card keeps €24.95 — less than the €25 face value it has to buy.
+     * Every one of those sales loses money unless the card is sourced more than
+     * 2.2% under face, and nothing enforced that. €26.99 is the floor:
+     *   price − (price × feePct + feeFixed) ≥ face + minProfit
+     *
+     * PRICES ARE THE OWNER'S DECISION, so this only ever touches a row still
+     * sitting at the exact old value. A price changed since — deliberately, in
+     * the admin — is left alone, and re-running this does nothing.
+     */
+    sql: `
+UPDATE products SET price = 2299 WHERE sku = 'VBUCKS-5000'  AND price = 2399;
+UPDATE products SET price = 1599 WHERE sku = 'MLBB-1155'    AND price = 1699;
+UPDATE products SET price = 5299 WHERE sku = 'STEAM-50'     AND price = 5199;
+UPDATE products SET price = 2699 WHERE sku = 'NETFLIX-25'   AND price = 2599;
+UPDATE products SET price = 2699 WHERE sku = 'AMAZON-25'    AND price = 2599;
+UPDATE products SET price = 2699 WHERE sku = 'GPLAY-25'     AND price = 2599;
+UPDATE products SET price = 2699 WHERE sku = 'ITUNES-25'    AND price = 2599;
+`,
+  },
 ];
