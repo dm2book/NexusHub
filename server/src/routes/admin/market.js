@@ -19,7 +19,8 @@ import { badRequest } from '../../utils/errors.js';
 import { config } from '../../config/env.js';
 import { sourceStatuses } from '../../services/market/sources.js';
 import { recordObservation, observationsFor } from '../../services/market/observations.js';
-import { discoveryReport, decideCandidate, runDiscovery } from '../../services/market/discovery.js';
+import { discoveryReport, decideCandidate, runDiscovery, createProductFromCandidate }
+  from '../../services/market/discovery.js';
 import { validateFormula } from '../../services/market/formula.js';
 import { listRates, recordRate } from '../../services/market/fx.js';
 import {
@@ -105,6 +106,30 @@ router.post('/candidates/:id/:decision', requirePermission('products.write'), as
     res.json({ candidate: out });
   } catch (err) { throw badRequest(err.message); }
 }));
+
+/**
+ * Turn an approved candidate into a real product.
+ *
+ * Its own endpoint rather than a decision, because it is the only step in the
+ * workflow that WRITES to the customer-facing catalogue — and a route that
+ * creates products should not be reachable by passing a different word to a
+ * state-change endpoint. The product arrives inactive and unpriced; publishing
+ * it is a separate decision, and pricing it goes through the recommendation
+ * path that already refuses anything unapproved.
+ */
+router.post('/candidates/:id/create-product', requirePermission('products.write'),
+  asyncHandler(async (req, res) => {
+    try {
+      const out = await createProductFromCandidate(req.params.id, {
+        actor: actorOf(req),
+        category: req.body?.category ? String(req.body.category).slice(0, 40) : null,
+      });
+      await audit({ actor: req.user, action: 'market.candidate_product_created',
+        targetType: 'product', targetId: out.product.id,
+        metadata: { candidateId: req.params.id, created: out.created }, req });
+      res.json(out);
+    } catch (err) { throw badRequest(err.message); }
+  }));
 
 // ── Pricing ────────────────────────────────────────────────────────────────
 router.get('/pricing', requirePermission('products.read'), asyncHandler(async (_req, res) => {

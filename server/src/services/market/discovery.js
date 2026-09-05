@@ -28,6 +28,7 @@ import { all, get, run, nowIso } from '../../db/index.js';
 import { newId } from '../../utils/ids.js';
 import { parseTitle, nearMiss, canonicalKey } from './normalize.js';
 import { latestPerSource } from './observations.js';
+import { createProduct, getProduct } from '../productService.js';
 
 export const CANDIDATE_STATUS = {
   DISCOVERED: 'discovered',
@@ -186,6 +187,84 @@ const ALLOWED = {
   published: [],
   rejected: ['discovered'],
 };
+
+/**
+ * Turn an approved candidate into a real catalogue product.
+ *
+ * The one arrow in the workflow that had no implementation. Every other step
+ * existed — a candidate could be discovered, normalized, reviewed, approved,
+ * marked product_created and published — but "marked product_created" meant a
+ * caller had created the product themselves and handed the id back. Nothing
+ * actually made one, so the state was a promise the system could not keep.
+ *
+ * ── IT IS CREATED INACTIVE, AND THAT IS THE POINT ─────────────────────────
+ * A product discovered on somebody else's shelf arrives with no cost price, no
+ * price this shop chose, no image and no delivery arrangement. Creating it live
+ * would be the exact failure the brief warns about — thousands of
+ * customer-facing products nobody approved — and it would put a price on the
+ * shelf that came from a competitor rather than from this shop's own maths.
+ *
+ * So: active = 0, price = 0, and the only way to a live price is the
+ * recommendation path, which already refuses to publish anything unapproved.
+ * The candidate moves to product_created; PUBLISHED stays a separate decision.
+ *
+ * ── NOTHING IS INVENTED ───────────────────────────────────────────────────
+ * Name, category and denomination all come from the canonical model that
+ * normalization produced from observations that were actually recorded. The
+ * market product id and canonical key travel with it, so the product can always
+ * be traced back to the observation it came from.
+ *
+ * Idempotent: a candidate that already has a forge_product_id returns that
+ * product rather than making a second one.
+ */
+export async function createProductFromCandidate(candidateId, { actor, category = null } = {}) {
+  if (!actor) throw new Error('creating a product needs a named actor');
+  const c = await get(`SELECT * FROM market_candidates WHERE id=@id`, { id: candidateId });
+  if (!c) throw new Error('no such candidate');
+
+  if (c.forge_product_id) {
+    const existing = await getProduct(c.forge_product_id);
+    if (existing) return { product: existing, created: false, candidate: c };
+  }
+  if (c.status !== CANDIDATE_STATUS.APPROVED) {
+    throw new Error(`only an approved candidate becomes a product (this one is ${c.status})`);
+  }
+
+  const mp = await get(`SELECT * FROM market_products WHERE id=@id`, { id: c.market_product_id });
+  if (!mp) throw new Error('the candidate has no market product behind it');
+
+  const product = await createProduct({
+    name: mp.title,
+    category: category || mp.game,
+    // No price. A price arrives through the recommendation path or not at all.
+    price: 0,
+    currency: 'EUR',
+    active: false,
+    // Never announce a product nobody has priced yet.
+    announce: false,
+    metadata: {
+      source: 'market-discovery',
+      marketProductId: mp.id,
+      canonicalKey: mp.canonical_key,
+      productType: mp.product_type,
+      game: mp.game,
+      edition: mp.edition || null,
+      platform: mp.platform,
+      region: mp.region,
+      denomination: mp.denomination == null ? null : Number(mp.denomination),
+      denomUnit: mp.denom_unit || null,
+      discoveredBy: actor,
+      discoveredAt: nowIso(),
+    },
+  });
+
+  await decideCandidate(candidateId, CANDIDATE_STATUS.PRODUCT_CREATED, {
+    actor, forgeProductId: product.id,
+    reason: 'created inactive and unpriced — publish it after a price is approved',
+  });
+
+  return { product, created: true, candidate: await get(`SELECT * FROM market_candidates WHERE id=@id`, { id: candidateId }) };
+}
 
 export async function decideCandidate(candidateId, to, { actor, forgeProductId = null, reason = '' } = {}) {
   const c = await get(`SELECT * FROM market_candidates WHERE id=@id`, { id: candidateId });
