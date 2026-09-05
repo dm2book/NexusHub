@@ -10,7 +10,7 @@
  * These checks read the shipped source, so a claim reintroduced anywhere in the
  * storefront fails CI rather than reaching a buyer.
  */
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -42,18 +42,23 @@ const codeOf = (file) => readFileSync(file, 'utf8')
   .replace(/\{\s*\/\*[\s\S]*?\*\/\s*\}/g, ' ')
   .replace(/^\s*\/\/.*$/gm, ' ');
 
+/* Each pattern is a promise this shop cannot keep: one person confirms every
+   payment by hand, and most orders are delivered by hand too. Hoisted here
+   because the adverts are held to it as well as the pages. */
+const BANNED_LIST = [
+  [/24\s*\/\s*7/, '24/7 support'],
+  [/instant(ly)?\s+(automated\s+)?deliver/i, 'instant delivery'],
+  [/delivered\s+instantly/i, 'delivered instantly'],
+  [/delivered\s+in\s+seconds/i, 'delivered in seconds'],
+  [/automated\s+fulfil?lment/i, 'automated fulfilment'],
+  [/multi-supplier\s+engine/i, 'multi-supplier engine'],
+];
+
 console.log('— Claims we cannot back —');
 {
   // Each pattern is a promise this shop cannot keep: one person confirms every
   // payment by hand, and most orders are delivered by hand too.
-  const BANNED = [
-    [/24\s*\/\s*7/, '24/7 support'],
-    [/instant(ly)?\s+(automated\s+)?deliver/i, 'instant delivery'],
-    [/delivered\s+instantly/i, 'delivered instantly'],
-    [/delivered\s+in\s+seconds/i, 'delivered in seconds'],
-    [/automated\s+fulfil?lment/i, 'automated fulfilment'],
-    [/multi-supplier\s+engine/i, 'multi-supplier engine'],
-  ];
+  const BANNED = BANNED_LIST;
   const hits = [];
   for (const file of BUYER_FACING) {
     const code = codeOf(file);
@@ -62,6 +67,51 @@ console.log('— Claims we cannot back —');
     }
   }
   ok('no buyer-facing file promises what the shop cannot deliver', hits.length === 0, hits.join(' | '));
+}
+
+console.log('\n— The adverts —');
+{
+  /* The video toolkit refuses to lie by construction: a variant declares what
+     must be true before it may be made, and a caption token with no real value
+     drops its whole line. The words those adverts say still have to obey the
+     same list as every page. */
+  const AD_COPY = ['scripts/ad/variants.mjs', 'scripts/ad/concepts.mjs'];
+  for (const f of AD_COPY) {
+    const src = codeOf(join(ROOT, f));
+    const hits = BANNED_LIST.filter(([re]) => re.test(src)).map(([, l]) => l);
+    ok(`${f} promises nothing the shop cannot do`, hits.length === 0, hits.join(', '));
+    // No advert may claim a rating, a review count or a customer count. There
+    // are none, and the ones that quote a real review are token-gated instead.
+    ok(`${f} invents no social proof`,
+      !/\b\d(?:[.,]\d)?\s*\/\s*5\b/.test(src) && !/happy customers|trusted by|\bjoin \d/i.test(src));
+    // market_observations is empty, so the shop has observed no competitor price.
+    ok(`${f} makes no comparison it has not measured`,
+      !/cheapest|lowest price|beat any|better than any/i.test(src));
+    // Roblox, EA, Epic, Sony and Microsoft have not endorsed this shop.
+    ok(`${f} claims no relationship with a rights-holder`,
+      !/\b(official|authoris[ez]ed|partner(ed|ship)?)\b/i.test(src.replace(/an official code/gi, ' ')));
+  }
+
+  /* The claims that survived every one of those rules by being pixels.
+     static-creatives.mjs writes the words on each shipped raster down in text
+     so this test can read them; anything that trips the list must be marked
+     `retire` with a reason. The failure that matters is a creative that trips
+     the list and is NOT marked — a new claim, or an old one quietly unmarked. */
+  const creatives = readFileSync(join(ROOT, 'scripts/ad/static-creatives.mjs'), 'utf8');
+  const entries = [...creatives.matchAll(/\{\s*\n\s*file: '([^']+)'[\s\S]*?(?=\n  \},)/g)]
+    .map((m) => ({ file: m[1], body: m[0] }));
+  ok('every shipped raster creative has its copy written down', entries.length >= 9, `${entries.length}`);
+  const unmarked = entries.filter((e) => {
+    const copy = (e.body.match(/copy: \[([\s\S]*?)\]/) || [, ''])[1];
+    const bad = BANNED_LIST.some(([re]) => re.test(copy)) || /\d(?:[.,]\d)?\/5|★/.test(copy);
+    return bad && !/retire:/.test(e.body);
+  }).map((e) => e.file);
+  ok('a creative that carries a banned claim is marked for retirement',
+    unmarked.length === 0, unmarked.join(', '));
+
+  // The record has to describe the files that actually ship.
+  const missing = entries.filter((e) => !existsSync(join(ROOT, e.file))).map((e) => e.file);
+  ok('and every entry points at a file that exists', missing.length === 0, missing.join(', '));
 }
 
 console.log('\n— The file only crawlers read —');

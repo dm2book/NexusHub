@@ -28,6 +28,10 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { VARIANTS, variantById } from './variants.mjs';
+/* The twenty-five brand concepts are the same kind of thing as a variant —
+   same scene grammar, same needs gate — so --concept resolves through the
+   same lookup and everything downstream is unchanged. */
+import { CONCEPTS, conceptById } from './concepts.mjs';
 
 const arg = (k, d = null) => {
   const hit = process.argv.find((a) => a.startsWith(`--${k}=`));
@@ -46,7 +50,7 @@ const OUT = path.resolve(arg('out') || path.join('scripts', 'ad', 'out', slug));
    the pass-throughs instead would mean this file needing an edit every time
    record.mjs grows a flag. */
 const MINE = new Set(['sku', 'product', 'base', 'target', 'out', 'name', 'price', 'cta',
-  'tagline', 'variant', 'variants']);
+  'tagline', 'variant', 'variants', 'concept', 'concepts']);
 const passthrough = process.argv.slice(2)
   .filter((a) => a.startsWith('--') && !MINE.has(a.slice(2).split('=')[0]));
 
@@ -88,8 +92,13 @@ step('cards', 'cards.mjs', [
    that cannot honestly be made from this footage skips itself with a reason
    (exit code 2) and the run carries on — one product without a published
    review should not cost you the other seven adverts. */
-const want = arg('variants') === 'all' ? VARIANTS.map((v) => v.id)
-  : (arg('variants') || arg('variant') || '').split(',').map((x) => x.trim()).filter(Boolean);
+const conceptsWanted = arg('concepts') === 'all' ? CONCEPTS.map((c) => c.id)
+  : (arg('concepts') || arg('concept') || '').split(',').map((x) => x.trim()).filter(Boolean);
+const want = [
+  ...(arg('variants') === 'all' ? VARIANTS.map((v) => v.id)
+    : (arg('variants') || arg('variant') || '').split(',').map((x) => x.trim()).filter(Boolean)),
+  ...conceptsWanted,
+];
 
 const made = []; const skipped = [];
 if (!want.length) {
@@ -97,8 +106,8 @@ if (!want.length) {
   made.push({ id: '—', file: path.join(OUT, 'ad.mp4') });
 } else {
   for (const id of want) {
-    const v = variantById(id);
-    if (!v) { console.warn(`\n⚠ no variant "${id}"`); continue; }
+    const v = variantById(id) || conceptById(id);
+    if (!v) { console.warn(`\n⚠ no variant or concept "${id}"`); continue; }
     console.log(`\n━━ ${v.id} · ${v.name}`);
     const r = spawnSync(process.execPath,
       [path.join('scripts', 'ad', 'compose.mjs'),
