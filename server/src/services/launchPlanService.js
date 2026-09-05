@@ -126,6 +126,30 @@ export async function launchPlan() {
       : 'CTAs are live because the gate is open.');
 
   // ── Phase 2: what has to be true on the day ───────────────────────────────
+  /* The connection string, and specifically whether it goes through Neon's
+     pooler. Every serverless instance opens its own pg.Pool — small, five
+     connections — and launch traffic means many instances at once. Against a
+     DIRECT Neon endpoint that is instances × 5 real Postgres connections
+     against a plan that caps them, and the failure mode is not slowness, it is
+     the shop being down at exactly the moment it is busiest. The pooled
+     endpoint multiplexes them, and the only difference in the URL is
+     "-pooler" in the host. */
+  {
+    const url = config.db.url || '';
+    const neon = /\.neon\.tech/i.test(url);
+    const pooled = /-pooler\./i.test(url);
+    if (neon && !pooled) {
+      add(PHASE.DAY, 'dbpool', 'Database connections', 'fail',
+        'DATABASE_URL points at a Neon DIRECT endpoint. Every serverless instance opens its '
+        + 'own connections, so launch traffic can exhaust the plan\'s limit — which reads as '
+        + 'the shop being down, not as it being slow.',
+        'Use the pooled connection string (the host contains "-pooler").');
+    } else if (neon) {
+      add(PHASE.DAY, 'dbpool', 'Database connections', 'ok',
+        'Pooled Neon endpoint — connections are multiplexed across instances.');
+    }
+  }
+
   if (config.payments.demoMode) {
     add(PHASE.DAY, 'pay', 'Payment', 'fail',
       'DEMO_PAYMENTS is on: orders are marked paid without money arriving.',
