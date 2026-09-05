@@ -464,10 +464,21 @@ export const MESSAGES = {
       "<#open-a-ticket> and report them. We keep this community safe. 🛡️",
   },
   partnersIntro: {
-    title: '🤝 Partner with ForgeMarket',
+    title: '🤝 Earn from ForgeMarket',
     description:
-      "Content creator, community owner or reseller? Let's work together.\n\n" +
-      "**What you get:** revenue share, early access to drops and codes, a partner role, " +
+      /* This panel advertised an application-only partner programme and said
+         nothing about the referral programme every member already has. The
+         store has issued a code per account since it was built, pays 5% of
+         every order a referred customer places — not just their first — and
+         credits it as spendable store credit. Nobody was told, so nobody
+         shared. The open thing goes first because it applies to everyone
+         reading; the gated thing is the step up from it. */
+      "**Anyone can start today.** Type **/ref** for your own link. When someone " +
+      "orders through it you earn **5% of what they spend, on every order they " +
+      "ever place** — paid straight into your store credit, nothing to claim.\n\n" +
+      "— \n\n" +
+      "**Bigger audience?** Content creator, community owner or reseller — let's work together.\n\n" +
+      "**What you get:** a higher revenue share, early access to drops and codes, a partner role, " +
       "direct line to the owner and co-marketing.\n\n" +
       "**How to apply:** tap the button below (or open a ticket and pick **Partnership**) and tell us " +
       "who you are and where your audience is. We reply to every application.",

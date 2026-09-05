@@ -23,10 +23,10 @@ import { scoreOrder } from './fraudService.js';
 import { assertOrderLimits } from './orderLimitService.js';
 import { audit } from './auditService.js';
 import { getProduct } from './productService.js';
-import { postOrderEvent, postFraudHoldAlert, postDeliveryProof } from './discordService.js';
+import { postOrderEvent, postFraudHoldAlert, postDeliveryProof, postReviewRequest } from './discordService.js';
 import { alertOwner } from './notifyService.js';
 import { assertLaunched } from './launchGateService.js';
-import { syncMemberRoles, sendDeliveryDm } from './discordRolesService.js';
+import { syncMemberRoles, sendDeliveryDm, discordUidForUser } from './discordRolesService.js';
 import { availableCount, claimCodes, checkLowStock, releaseCodes } from './codeStockService.js';
 import { memberDiscountPercent } from './membershipService.js';
 import { recordOrderCommission } from './affiliateService.js';
@@ -735,6 +735,22 @@ export async function sendReviewRequests({ afterHours = 24, limit = 25 } = {}) {
           : '',
       },
     });
+
+    /* And in Discord, for a buyer who linked it.
+       This shop has zero reviews and its entire social-proof position rests on
+       getting the first ones — and the ask went out on exactly one channel, to
+       an inbox, for a customer who arrived through Discord, ordered through
+       Discord and was delivered through Discord. The email still goes; this is
+       the same ask where they already are. */
+    if (order.userId) {
+      const uid = await discordUidForUser(order.userId).catch(() => null);
+      if (uid) {
+        await postReviewRequest(uid, {
+          orderNumber: order.number,
+          productName: order.items?.length === 1 ? order.items[0].name : null,
+        }).catch(() => {});
+      }
+    }
     sent++;
   }
   return sent;

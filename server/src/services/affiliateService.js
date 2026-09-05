@@ -5,6 +5,8 @@
  */
 import { run, get, all, nowIso } from '../db/index.js';
 import { newId } from '../utils/ids.js';
+import { postReferralEarned } from './discordService.js';
+import { discordUidForUser } from './discordRolesService.js';
 import { credit } from './walletService.js';
 import { notify } from './notificationService.js';
 
@@ -79,11 +81,18 @@ export async function recordOrderCommission(order) {
       o: order.id, com: commission, at: nowIso() });
   await credit(referrerId, commission, 'referral', `Referral commission · order ${order.number || order.id}`, { orderId: order.id })
     .catch((e) => console.error('[affiliate] wallet credit', e.message));
+  /* "earned you 1.95 in store credit" — no currency. It reads as a coin count
+     next to a wallet that is denominated in euros. */
   await notify(referrerId, {
     type: 'system', title: 'You earned store credit',
-    body: `A referral order earned you ${(commission / 100).toFixed(2)} in store credit.`,
+    body: `A referral order earned you €${(commission / 100).toFixed(2)} in store credit.`,
     link: '/account/wallet',
   }).catch(() => {});
+
+  /* And in Discord, which is where the person who shared the link actually is.
+     A programme that pays silently is shared once and never again. */
+  const uid = await discordUidForUser(referrerId).catch(() => null);
+  if (uid) await postReferralEarned(uid, { commissionCents: commission }).catch(() => {});
 }
 
 /** Dashboard stats for a referrer. */

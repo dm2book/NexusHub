@@ -400,7 +400,12 @@ export async function postDropEvent(kind, data = {}) {
   if (kind === 'product') {
     embed = {
       title: `🆕 New drop: ${data.name}`,
-      description: `Fresh in the shop — **${money(data.price, data.currency)}**, instant delivery.\n[Grab it now](${config.appUrl}/product/${data.id})`,
+      /* Was "instant delivery". 0 of 72 products auto-deliver, every product
+         page says "delivered by hand, usually within a few hours", and the
+         phrase is on honest-copy's banned list — which never scanned this
+         directory, so the claim survived here after being removed everywhere
+         a person could see it on the site. */
+      description: `Fresh in the shop — **${money(data.price, data.currency)}**.\n[Grab it now](${config.appUrl}/product/${data.id})`,
       color: 0x6366f1,
     };
   } else if (kind === 'restock') {
@@ -512,6 +517,62 @@ export async function postReviewEvent({ author, stars, body, product, verified =
  * route per 5 minutes so an error storm can't flood the channel. Best-effort.
  */
 const errorAlertAt = new Map(); // route -> last alert ts
+/**
+ * Tell a referrer, in Discord, that their link just earned something.
+ *
+ * The commission has always been credited and an in-app notification written,
+ * and a member who lives in Discord — which is most of them, because that is
+ * where the shop's community is — heard nothing. A referral programme nobody is
+ * told about pays out once and is never shared again.
+ *
+ * Deliberately says WHAT was earned and nothing else — not who bought, not what
+ * they bought, not even the order number. The buyer did not agree to have their
+ * purchase reported to whoever shared a link, and the commission already tells
+ * the referrer everything they are entitled to know.
+ */
+export async function postReferralEarned(discordUserId, { commissionCents } = {}) {
+  if (!discordUserId || !(commissionCents > 0)) return;
+  await relayDm(discordUserId, {
+    embeds: [{
+      title: '🤝 Your referral link just earned',
+      description: `**${money(commissionCents, 'EUR')}** in store credit has been added to your account.\n`
+        + 'It spends like money at checkout — nothing to claim.\n\n'
+        + `[See your wallet](${config.appUrl}/account/wallet) · \`/ref\` for your link`,
+      color: 0xa855f7,
+      footer: { text: `${config.email.fromName} · referrals` },
+      timestamp: new Date().toISOString(),
+    }],
+  }).catch(() => {});
+}
+
+/**
+ * Ask a Discord-linked buyer for the review, where they already are.
+ *
+ * sendReviewRequests has run on the maintenance sweep since it was written and
+ * has only ever sent an email. This shop has zero reviews and its whole social
+ * proof problem hangs on that one channel — a buyer who arrived through Discord,
+ * ordered through Discord and was delivered through Discord was then asked for
+ * the review by email.
+ *
+ * One ask per order, because the sweep already only picks orders it has not
+ * asked about; a second prompt is a shop nagging someone who bought from it.
+ */
+export async function postReviewRequest(discordUserId, { orderNumber, productName } = {}) {
+  if (!discordUserId) return;
+  await relayDm(discordUserId, {
+    embeds: [{
+      title: '⭐ How did it go?',
+      description: (productName ? `Your **${productName}** landed a day ago.\n\n` : 'Your order landed a day ago.\n\n')
+        + 'A review here only counts if it came from a delivered order, so yours is worth '
+        + 'more than a page of five stars from nobody.\n\n'
+        + `Type \`/vouch\` in the server, or [write it on the site](${config.appUrl}/reviews).`,
+      color: 0xf59e0b,
+      footer: { text: `${config.email.fromName}${orderNumber ? ` · ${orderNumber}` : ''}` },
+      timestamp: new Date().toISOString(),
+    }],
+  }).catch(() => {});
+}
+
 export async function postErrorAlert(route, message) {
   const url = config.discord.stockWebhookUrl || config.discord.orderWebhookUrl;
   const now = Date.now();

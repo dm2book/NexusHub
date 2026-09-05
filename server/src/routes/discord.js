@@ -3,6 +3,7 @@ import { Router } from 'express';
 import { asyncHandler } from '../middleware/error.js';
 import { getServerInfo, claimOutbox, ackOutbox, stampBotSeen, setLiveInviteUrl } from '../services/discordService.js';
 import { verifyIngest } from '../middleware/ingestSignature.js';
+import { affiliateStats } from '../services/affiliateService.js';
 import { config } from '../config/env.js';
 import { overview, topProducts } from '../services/analyticsService.js';
 import { all, get } from '../db/index.js';
@@ -134,6 +135,44 @@ router.post('/balance',
     res.json({
       linked: true, coins, creditCents: credit,
       tier: loyalty?.tierName || null, spentCents: loyalty?.xp ?? null,
+    });
+  }));
+
+/**
+ * A member's referral code, link and earnings, for /ref in Discord.
+ *
+ * The affiliate program has existed server-side the whole time — one code per
+ * user, ?ref= attribution on arrival, a commission recorded on every paid order
+ * the referred customer places — and Discord, which is where this shop's
+ * community actually is, had no idea. There was no way to find your own code
+ * without opening the site, and nothing ever told you when a referral paid.
+ *
+ * Same shape as /balance: HMAC-signed with the uid bound into the signature, so
+ * a member cannot ask for someone else's earnings. An unlinked member gets
+ * {linked:false} rather than an error, because "link your account first" is a
+ * useful answer and a 404 is not.
+ */
+export const canonicalReferral = (b = {}) => `referral:${b.uid || ''}`;
+router.post('/referral',
+  verifyIngest(canonicalReferral)(config.discord.reviewIngestSecret),
+  asyncHandler(async (req, res) => {
+    const uid = String(req.body?.uid || '').trim();
+    const acct = uid
+      ? await get(`SELECT user_id FROM oauth_accounts WHERE provider='discord' AND provider_uid=@uid LIMIT 1`, { uid })
+      : null;
+    if (!acct) return res.json({ linked: false });
+    const u = await get('SELECT email FROM users WHERE id=@id', { id: acct.user_id });
+    const stats = await affiliateStats(acct.user_id, u?.email || '');
+    res.json({
+      linked: true,
+      code: stats.code,
+      url: `${config.appUrl}/?ref=${encodeURIComponent(stats.code)}`,
+      commissionPercent: stats.commissionPercent,
+      referrals: stats.referrals,
+      orders: stats.orders,
+      pendingCents: stats.pendingCommission,
+      paidCents: stats.paidCommission,
+      totalCents: stats.totalCommission,
     });
   }));
 
