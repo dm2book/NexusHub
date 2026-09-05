@@ -292,10 +292,31 @@ export const config = {
   },
 
   payments: {
-    // Demo mode lets the storefront mark an order paid without a real PSP, so
-    // the full order → fulfillment loop is usable in a demo. Defaults ON outside
-    // production; set DEMO_PAYMENTS=true to enable it on a live deploy.
-    demoMode: bool(env.DEMO_PAYMENTS, !isProd),
+    /* Demo mode marks an order paid without any money arriving, so the whole
+       order → fulfilment → delivery loop can be walked without a PSP. It
+       defaults ON outside production, which is right on a laptop and wrong the
+       moment that same build answers on a public domain: a shop that hands out
+       codes for free is one missing environment variable away.
+       So it is refused on a public origin regardless of what is asked for.
+       NODE_ENV is the usual guard and it is the one that goes missing — a
+       preview deployment, a container that inherits nothing, a host that sets
+       it late. The URL people actually reach the shop on does not go missing.
+       The launch checker already refuses to open the gate with demo payments
+       on; this makes the dangerous half impossible rather than reported. */
+    demoMode: (() => {
+      const wanted = bool(env.DEMO_PAYMENTS, !isProd);
+      if (!wanted) return false;
+      const origin = env.APP_URL || (isProd ? 'https://forgemarket.nl' : '');
+      const publicOrigin = /^https:\/\//i.test(origin)
+        && !/localhost|127\.0\.0\.1|\.local(host)?(:|$)/i.test(origin);
+      if (publicOrigin) {
+        console.warn('[config] DEMO_PAYMENTS refused: '
+          + `${origin} is a public origin, and demo payments mark orders paid `
+          + 'without money arriving. Use a real payment provider or a local URL.');
+        return false;
+      }
+      return true;
+    })(),
     stripe: {
       secretKey: env.STRIPE_SECRET_KEY || '',
       webhookSecret: env.STRIPE_WEBHOOK_SECRET || '',
