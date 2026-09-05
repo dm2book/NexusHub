@@ -11,7 +11,7 @@ import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CONCEPTS, BRANDS, conceptsForBrand } from '../../scripts/ad/concepts.mjs';
-import { tokensFor, fill, blockedReason } from '../../scripts/ad/variants.mjs';
+import { VARIANTS, tokensFor, fill, blockedReason } from '../../scripts/ad/variants.mjs';
 import { CATALOG } from '../src/db/demoSeed.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -107,6 +107,61 @@ console.log('\n— No advert outruns the shop —');
     !/in seconds|within minutes|in under a minute/i.test(src));
   ok('no advert quotes a review that is not token-gated',
     !/★★|5 stars|five stars/i.test(src));
+}
+
+console.log('\n— The workflow cut —');
+{
+  const compose = readFileSync(join(ROOT, 'scripts', 'ad', 'compose.mjs'), 'utf8');
+  const captions = readFileSync(join(ROOT, 'scripts', 'ad', 'captions.mjs'), 'utf8');
+  const timing = readFileSync(join(ROOT, 'scripts', 'ad', 'timing.mjs'), 'utf8');
+
+  const W = VARIANTS.find((v) => v.id === 'W');
+  ok('there is a workflow variant', !!W);
+  /* Product → Checkout → Payment → Email delivery → Success, and nothing else:
+     no shop front and no browsing, so every second is spent on the five steps
+     between wanting the thing and having it. */
+  const labels = (W?.scenes || []).map((s) => s.label);
+  ok('it runs product → buy → checkout → payment → confirmed → email → code',
+    labels.join(' → ') === 'the product → buy → checkout → payment → confirmed → the email → the code',
+    labels.join(' → '));
+  ok('it claims a delivery, so it needs one', (W?.needs || []).includes('order'));
+
+  /* The grammar went straight from checkout to confirmed, so the beat between
+     placing an order and it existing was not a scene anything could pin to. */
+  const pay = W?.scenes?.find((s) => s.label === 'payment');
+  ok('the payment scene bridges order-placed and confirmed',
+    pay?.from === 'order-placed' && pay?.to === 'confirmed');
+
+  /* On the shared speeds this cut opened on a four-second product shot and did
+     not reach its first flash until then. */
+  ok('it carries its own pacing rather than the shared defaults',
+    W?.scenes?.every((s) => typeof s.speed === 'number' && typeof s.weight === 'number'));
+  const emailScene = W?.scenes?.find((s) => s.label === 'the email');
+  ok('and the email arrival is the one scene played at real time',
+    emailScene?.speed === 1.0 && emailScene.weight === Math.max(...W.scenes.map((x) => x.weight)));
+
+  // The four effects the brief asks for, each in the code rather than in a note.
+  ok('fast zooms: every scene declares one', W?.scenes?.every((s) => ['in', 'punch', 'drift'].includes(s.zoom)));
+  ok('flash transitions: a white frame on every cut', /color=white@0\.55/.test(compose));
+  ok('motion blur: frames averaged after the speed ramp', /Motion blur/.test(compose) && /tmix|tblend/.test(compose));
+  ok('cursor tracking: painted from the real click coordinates',
+    /A visible cursor/.test(readFileSync(join(ROOT, 'scripts', 'ad', 'record.mjs'), 'utf8')));
+
+  /* The email arrival. Every other caption fades; this one has to move, because
+     a notification that dissolves into view is not an arrival. */
+  ok('the arrival card has a style of its own', /notify: `/.test(captions));
+  ok('it is pinned to the top so it can slide in from off-frame',
+    /align-items:flex-start/.test(captions.slice(captions.indexOf('notify: `'))));
+  ok('compose slides it rather than fading it',
+    /const arrival = c\.style === 'notify'/.test(compose) && /const SLIDE/.test(compose));
+  ok('it overshoots and settles', /OVERSHOOT/.test(compose));
+  ok('and the frame underneath lifts as it lands', /eq=brightness=0\.06/.test(compose));
+
+  /* Two copies of the timing maths is how an edit and its storyboard drift
+     apart — the same shape as every other drift in this codebase. */
+  ok('the timing resolver lives in one file', /export function resolveTiming/.test(timing));
+  ok('and compose calls it rather than restating it',
+    /resolveTiming\(cuts/.test(compose) && !/const share = room \* /.test(compose));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

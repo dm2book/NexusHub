@@ -57,6 +57,24 @@ const STYLES = {
     .t{font-family:'Inter',system-ui,sans-serif;font-weight:600;font-size:52px;line-height:1.3;
        color:#fff;text-align:center;font-style:italic;
        text-shadow:0 4px 26px rgba(0,0,0,.8)}`,
+  /* The email arrival card. Pinned to the TOP of the frame with nothing above
+     it, because compose.mjs slides this one down into place from off-frame
+     instead of fading it — the arrival is the effect, and a notification that
+     dissolves into view is not one anybody recognises. Everything below the
+     card is transparent, so the slide reveals the recording underneath. */
+  notify: `
+    .wrap{align-items:flex-start;padding:150px 54px 0}
+    .t{font-family:'Inter',system-ui,sans-serif;font-weight:700;font-size:44px;line-height:1.2;
+       color:#fff;text-align:left;width:100%;
+       display:flex;align-items:center;gap:26px;
+       padding:30px 36px;border-radius:34px;
+       background:linear-gradient(180deg,rgba(18,16,34,.96),rgba(12,10,26,.94));
+       box-shadow:0 26px 70px rgba(0,0,0,.55),0 0 0 1px rgba(255,255,255,.10) inset,
+                  0 0 0 3px rgba(124,92,255,.35)}
+    .t .ic{flex:0 0 auto;width:74px;height:74px;border-radius:22px;display:grid;place-items:center;
+       background:linear-gradient(135deg,#7c5cff,#a855f7);font-size:40px}
+    .t .tx{min-width:0}
+    .t .sub{display:block;font-size:30px;font-weight:600;color:#a9a3c9;padding-top:4px}`,
 };
 
 /* A slab behind the words. Screen recordings are mostly light UI, and white
@@ -84,7 +102,12 @@ export async function renderCaptions({ lines, out, base, chrome }) {
       html,body{width:${W}px;height:${H}px;background:transparent;overflow:hidden}
       .wrap{height:100%;display:flex;justify-content:center}
       ${style}${SLAB}
-    </style></head><body><div class="wrap"><div class="t">${esc(line.text)}</div></div></body></html>`;
+    </style></head><body><div class="wrap"><div class="t">${
+      line.style === 'notify'
+        ? `<span class="ic">\u2709</span><span class="tx">${esc(line.text)}`
+          + (line.sub ? `<span class="sub">${esc(line.sub)}</span>` : '') + '</span>'
+        : esc(line.text)
+    }</div></div></body></html>`;
 
     /* Same-origin so the webfonts load — see cards.mjs; a caption in the
        fallback face is the most visible place for the brand to slip. */

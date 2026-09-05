@@ -24,7 +24,9 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
+import { planCuts, resolveTiming } from './timing.mjs';
 import { variantById, tokensFor, fill, blockedReason } from './variants.mjs';
+import { conceptById } from './concepts.mjs';
 import { renderCaptions } from './captions.mjs';
 
 const require = createRequire(import.meta.url);
@@ -41,7 +43,7 @@ const IN = path.resolve(arg('in') || path.join('scripts', 'ad', 'out'));
 const SFX = path.resolve(arg('sfx') || path.join('scripts', 'ad', 'sfx'));
 const RAW = path.join(IN, 'raw.webm');
 const VARIANT = arg('variant', null);
-const variant = VARIANT ? variantById(VARIANT) : null;
+const variant = VARIANT ? (variantById(VARIANT) || conceptById(VARIANT)) : null;
 if (VARIANT && !variant) { console.error(`No variant "${VARIANT}".`); process.exit(1); }
 const TARGET = Number(arg('target', String(variant?.target || 20)));
 // Named after the variant so eight of them can live side by side.
@@ -144,70 +146,15 @@ if (variant) {
 
 const PLAN = variant ? variant.scenes : SCENES;
 
-/* Resolve each scene against the beats that actually exist. A recording that
-   skipped a step (a product with no cart step, say) simply has fewer scenes
-   rather than an edit full of frozen frames. */
-const cuts = [];
-for (const s of PLAN) {
-  let a = at(s.from); let b = at(s.to);
-  /* A run without DATABASE_URL has no email beats, and the scene that bridges
-     to them would vanish with them — so the last scene falls back to `end`.
-     The advert then finishes on the order page, which is still a real
-     delivery, rather than losing its final shot. */
-  if (s.from === 'delivered-detail' && b === null) b = at('end');
-  if (a === null || b === null || b <= a) continue;
-  const rawLen = (b - a) / 1000;
-  if (rawLen < 0.12) continue;                       // nothing happened here
-  cuts.push({ ...s, start: a / 1000, srcLen: rawLen });
-}
+/* Resolve each scene against the beats that actually exist, and give each one
+   its length. Both live in timing.mjs so storyboard.mjs gets the same answer —
+   two copies of this maths is how an edit and its storyboard drift apart. */
+const cuts = planCuts(PLAN, at);
 if (!cuts.length) { console.error('No usable scenes in beats.json.'); process.exit(1); }
+const resolved = resolveTiming(cuts, { target: TARGET, card: 2.6, min: 15 });
+let CARD = resolved.card;
+const total = resolved.total;
 
-/* Fill the target rather than shrink towards it.
-   The first version capped every scene and then scaled down, which on a fast
-   recording produced a seven-second advert with the product shot missing — it
-   had been on screen for 236ms, below the floor, so the one frame the whole
-   thing exists to show was the frame that got dropped. Now the budget is
-   DISTRIBUTED: each scene gets a share of the target by weight, and a scene
-   with little footage is slowed rather than cut. */
-let CARD = 2.6;
-const MIN = 15;                                       // the floor the brief allows
-const room = Math.max(MIN - CARD, TARGET - CARD);
-const totalWeight = cuts.reduce((n, c) => n + (c.weight || 1), 0);
-
-/* Nothing is ever played slower than real time.
-   The first attempt distributed the whole budget by weight, which on a
-   seventeen-second recording meant every scene ran at 0.5–0.8× — a "fast-paced"
-   advert entirely in slow motion. Real time is the floor: a scene gets its
-   share of the target, but never more seconds than it has frames for. If that
-   leaves the advert short, the advert is short — fifteen seconds is inside the
-   brief and a padded twenty is not. */
-for (const c of cuts) {
-  const share = room * ((c.weight || 1) / totalWeight);
-  const fastest = c.srcLen / (c.speed || 1);          // the ramp this scene wants
-  c.played = Math.min(Math.max(fastest, share), c.srcLen);
-  c.speed = c.srcLen / c.played;
-}
-
-/* Still over? Take it back from the fastest-ramping scenes first — the ones
-   already carrying the least information per second. */
-let used = cuts.reduce((n, c) => n + c.played, 0);
-if (used > room) {
-  const k = room / used;
-  for (const c of cuts) {
-    c.played = Math.max(c.srcLen / 6, c.played * k);
-    c.speed = c.srcLen / c.played;
-  }
-  used = cuts.reduce((n, c) => n + c.played, 0);
-}
-
-/* A variant with little footage — a showcase has no checkout to film — would
-   otherwise come in under the fifteen seconds the brief asks for. The end card
-   takes up the slack rather than the footage being stretched: brand time is
-   honest time, and half a second of slow motion on a screen recording is not. */
-const footageTotal = cuts.reduce((n, c) => n + c.played, 0);
-if (footageTotal + CARD < MIN) CARD = Math.min(4.5, MIN - footageTotal);
-
-const total = cuts.reduce((n, c) => n + c.played, 0) + CARD;
 console.log(`\n🎬 ${cuts.length} scenes · ${total.toFixed(1)}s (target ${TARGET}s)`);
 for (const c of cuts) console.log(`   ${c.played.toFixed(2)}s  ${c.label} (${c.speed.toFixed(1)}×)`);
 
@@ -225,7 +172,7 @@ if (variant) {
     if (!text) continue;                          // a token had no real value
     const scene = cuts.findIndex((x) => x.label === c.at);
     if (scene < 0) continue;                      // that beat is not in this cut
-    capLines.push({ text, style: c.style || 'small', scene, late: !!c.late });
+    capLines.push({ text, style: c.style || 'small', scene, late: !!c.late, sub: fill(c.sub, tokens) || null });
   }
 }
 
@@ -318,13 +265,51 @@ if (hasPrice && wantsPriceCard) {
    flash competes with it, and both lose. `late` holds the line back so two
    captions on one scene read one after the other instead of on top of each
    other. */
+/* The email arrival.
+   Every other caption fades. This one SLIDES — a notification that dissolves
+   into view is not an arrival, and the arrival is the whole beat. The card is
+   rendered pinned to the top of a full-height transparent frame, so moving the
+   overlay's y from -H to 0 walks it down from off-screen into place; a short
+   overshoot past the rest position and back is what makes it read as landing
+   rather than as being placed. The notify sound already fires 0.12s into this
+   scene (see the audio pass below), so SLIDE is timed to meet it.
+   The frame underneath lifts for two tenths at the same moment — the phone-lit
+   flash you get when something actually arrives. */
+const SLIDE = 0.34;
+const OVERSHOOT = 26;
+
 caps.forEach((c, ci) => {
   const i = c.scene;
   if (i < 0 || i >= cuts.length) return;
   const d = cuts[i].played;
-  const start = c.late ? Math.min(d * 0.55, Math.max(0.2, d - 0.9)) : (c.hook ? 0.06 : 0.18);
-  const hold = Math.max(0.45, d - start - 0.16);
+  const arrival = c.style === 'notify';
+  const start = arrival ? 0.10
+    : c.late ? Math.min(d * 0.55, Math.max(0.2, d - 0.9)) : (c.hook ? 0.06 : 0.18);
+  const hold = Math.max(0.45, d - start - (arrival ? 0.04 : 0.16));
   const nm = `cap${ci}`;
+
+  if (arrival) {
+    // Held at full alpha; the movement does the work the fade normally does.
+    parts.push(`[${capIdx[ci]}:v]scale=${W}:${H},format=rgba,`
+      + `trim=duration=${hold.toFixed(3)},setpts=PTS-STARTPTS+${start.toFixed(3)}/TB[${nm}]`);
+    /* y walks -H → +OVERSHOOT → 0 across SLIDE, then sits. `min(...)` clamps the
+       ramp so the expression stays put for the rest of the scene rather than
+       running the card off the bottom of the frame. */
+    const t0 = start.toFixed(3);
+    const y = `if(lt(t,${t0}+${SLIDE}),`
+      + `-h+(h+${OVERSHOOT})*((t-${t0})/${SLIDE}),`
+      + `if(lt(t,${t0}+${(SLIDE + 0.10).toFixed(3)}),`
+      + `${OVERSHOOT}-${OVERSHOOT}*((t-${t0}-${SLIDE})/0.10),0))`;
+    const lit = `${names[i]}lit`;
+    // The lift, on the recording rather than on the card.
+    parts.push(`[${names[i]}]eq=brightness=0.06:enable='between(t,${t0},${(start + 0.20).toFixed(3)})'[${lit}]`);
+    const dst = `${names[i]}c${ci}`;
+    parts.push(`[${lit}][${nm}]overlay=0:'${y}':enable='between(t,${t0},${(start + hold).toFixed(3)})':`
+      + `format=auto,format=yuv420p[${dst}]`);
+    names[i] = dst;
+    return;
+  }
+
   parts.push(`[${capIdx[ci]}:v]scale=${W}:${H},format=rgba,`
     + `fade=t=in:st=0:d=0.18:alpha=1,fade=t=out:st=${Math.max(0.2, hold - 0.20).toFixed(2)}:d=0.20:alpha=1,`
     + `trim=duration=${hold.toFixed(3)},setpts=PTS-STARTPTS+${start.toFixed(3)}/TB[${nm}]`);
