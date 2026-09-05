@@ -328,7 +328,7 @@ export const LEGACY_TEMPLATE_BODIES = {
       in your cart at {{brand.name}}. They're still here — grab them before they're gone.</p>
       {{cart.itemsHtml}}
       <p style="text-align:center"><a class="btn" href="{{cart.url}}">Complete your order</a></p>
-      <p style="text-align:center;color:#8b93a7;font-size:13px">Instant delivery, buyer-protected. Questions? Just reply
+      <p style="text-align:center;color:#8b93a7;font-size:13px">Money back if we cannot deliver. Questions? Just reply
       to this email or open a ticket in our Discord.</p>`],
   login_otp: [`
       <h1>Your login code</h1>

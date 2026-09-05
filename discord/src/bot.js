@@ -1351,6 +1351,7 @@ async function handleCommand(i) {
   if (i.commandName === 'reroll') return rerollGiveaway(i);
   if (i.commandName === 'rank') return rankCmd(i);
   if (i.commandName === 'balance') return balanceCmd(i);
+  if (i.commandName === 'ref' || i.commandName === 'referral') return refCmd(i);
   if (i.commandName === 'leaderboard') return leaderboardCmd(i);
   if (i.commandName === 'suggest') return postSuggestion(i);
   if (i.commandName === 'digest') return digestCmd(i);
@@ -2205,6 +2206,65 @@ function maybePostWeeklyDigest(guild) {
     saveMeta();
     ch.send({ embeds: [digestEmbed(d)] }).catch(() => {});
   });
+}
+
+/**
+ * /ref — your referral code, your link and what it has earned.
+ *
+ * The affiliate program has run server-side since it was built: one code per
+ * account, ?ref= attribution on arrival, a commission on every paid order the
+ * referred customer places. None of it was reachable from Discord — the place
+ * this shop's customers actually are — so the only way to find your own code
+ * was to know the account page existed.
+ *
+ * Ephemeral, because a referral link in a public channel is one someone else
+ * can take, and because the earnings are nobody else's business.
+ */
+async function refCmd(i) {
+  await i.deferReply({ ephemeral: true });
+  if (!FORGEMARKET_API_URL || !REVIEW_INGEST_SECRET) {
+    return i.editReply('The store link isn’t configured yet — ask staff to set REVIEW_INGEST_SECRET.');
+  }
+  let d = null;
+  try {
+    const ts = String(Date.now());
+    const signature = createHmac('sha256', REVIEW_INGEST_SECRET)
+      .update(`${ts}.referral:${i.user.id}`).digest('hex');
+    const res = await fetch(`${FORGEMARKET_API_URL.replace(/\/$/, '')}/api/discord/referral`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-timestamp': ts, 'x-signature': signature },
+      body: JSON.stringify({ uid: i.user.id }),
+    });
+    if (res.ok) d = await res.json();
+  } catch (e) { console.error('[ref]', e.message); }
+  if (!d) return i.editReply('Couldn’t reach the store right now — try again in a minute.');
+  if (!d.linked) {
+    return i.editReply({ embeds: [new EmbedBuilder().setColor(0xf59e0b)
+      .setTitle('🔗 Link your Discord first')
+      .setDescription(`Sign in on the store with **Discord** and your referral link shows up here.\n\n👉 ${STORE_URL}/login`)
+      .setFooter({ text: 'ForgeMarket · account link' })] });
+  }
+  /* What it has earned, and only when it has earned something. A row of zeros
+     is the shop telling a member their link does not work — the same reason the
+     storefront hides an empty review count rather than printing 0.0. */
+  const earned = (d.totalCents || 0) > 0;
+  const e = new EmbedBuilder().setColor(0xa855f7)
+    .setTitle('🤝 Your referral link')
+    .setThumbnail(BRAND_ICON)
+    .setDescription(
+      `Share this and you earn **${d.commissionPercent}%** of what they spend, on every order they place — not just the first.\n\n`
+      + `\`\`\`${d.url}\`\`\``)
+    .addFields({ name: 'Your code', value: `\`${d.code}\``, inline: true });
+  if (earned) {
+    e.addFields(
+      { name: 'Referrals', value: String(d.referrals || 0), inline: true },
+      { name: 'Their orders', value: String(d.orders || 0), inline: true },
+      { name: '⏳ Pending', value: money(d.pendingCents || 0), inline: true },
+      { name: '✅ Paid out', value: money(d.paidCents || 0), inline: true });
+  } else {
+    e.addFields({ name: 'Earned so far', value: 'Nothing yet — nobody has ordered through it.', inline: false });
+  }
+  return i.editReply({ embeds: [e.setFooter({ text: 'ForgeMarket · referrals' })] });
 }
 
 // /balance — member self-service: Forge Coins + store credit + loyalty tier,

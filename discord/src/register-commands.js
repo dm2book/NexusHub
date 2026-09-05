@@ -39,6 +39,7 @@ const commands = [
     .addStringOption((o) => o.setName('message_id').setDescription('The giveaway message ID').setRequired(true)),
   new SlashCommandBuilder().setName('rank').setDescription('Show your level & XP'),
   new SlashCommandBuilder().setName('balance').setDescription('Check your Forge Coins, store credit & loyalty tier'),
+  new SlashCommandBuilder().setName('ref').setDescription('Your referral link — earn a cut of every order you send'),
   new SlashCommandBuilder().setName('leaderboard').setDescription('Show the top members by XP'),
   new SlashCommandBuilder().setName('suggest').setDescription('Suggest an idea for ForgeMarket')
     .addStringOption((o) => o.setName('idea').setDescription('Your suggestion').setRequired(true)),
