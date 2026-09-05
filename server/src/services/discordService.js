@@ -546,6 +546,34 @@ export async function postReferralEarned(discordUserId, { commissionCents } = {}
 }
 
 /**
+ * Chase an unpaid order in Discord.
+ *
+ * This is revenue the shop has ALREADY won: an order placed, priced and
+ * reserved, waiting on a transfer. It was chased on exactly one channel — an
+ * inbox — for a customer who found the shop in a Discord server, and then went
+ * quiet until the fourteen-day auto-cancel took it away.
+ *
+ * Says what is owed and where to pay it, and nothing that pressures: the
+ * order is not going anywhere for two weeks and saying otherwise would be a
+ * countdown that is not counting anything.
+ */
+export async function postPaymentReminder(discordUserId, { orderNumber, amount } = {}) {
+  if (!discordUserId || !orderNumber) return;
+  await relayDm(discordUserId, {
+    embeds: [{
+      title: '💳 Your order is waiting for payment',
+      description: `**${orderNumber}**${amount ? ` · ${amount}` : ''}\n\n`
+        + 'Transfer the exact amount shown with your order number as the reference, '
+        + 'and it goes out as soon as the payment is matched.\n\n'
+        + `[Open your order](${config.appUrl}/track?number=${encodeURIComponent(orderNumber)})`,
+      color: 0x6366f1,
+      footer: { text: `${config.email.fromName} · nothing is charged automatically` },
+      timestamp: new Date().toISOString(),
+    }],
+  }).catch(() => {});
+}
+
+/**
  * Ask a Discord-linked buyer for the review, where they already are.
  *
  * sendReviewRequests has run on the maintenance sweep since it was written and

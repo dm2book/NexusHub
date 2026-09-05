@@ -11,6 +11,7 @@
  * it is the record you need when the PSP asks for evidence.
  */
 import { run, get, all, nowIso } from '../db/index.js';
+import { reverseOrderCommission } from './affiliateService.js';
 import { newId } from '../utils/ids.js';
 import { audit } from './auditService.js';
 import { alertOwner } from './notifyService.js';
@@ -72,6 +73,16 @@ export async function recordChargeback({
     // chargeback through two routes is still one chargeback.
     key: id,
   }).catch(() => {});
+
+  /* And take the referral commission back.
+     A chargeback is the money leaving weeks after the sale; the 5% left on the
+     day it arrived and is spendable store credit by now. Best-effort and after
+     the alert, because a failure here must not stop the owner being told there
+     is a deadline to answer. */
+  if (order?.id) {
+    await reverseOrderCommission(order.id, 'charged back')
+      .catch((e) => console.error('[chargeback] commission reversal', e.message));
+  }
 
   return { id, duplicate: false };
 }

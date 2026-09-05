@@ -346,6 +346,14 @@ export const config = {
     maxCompetitorUndercutPercent: num(env.MAX_COMPETITOR_UNDERCUT_PERCENT, 5),
     targetMarketPosition: num(env.TARGET_MARKET_POSITION, 0.98),
     promotionMargin: num(env.PROMOTION_MARGIN, 0.08),
+    /* The ceiling on EVERY discount an order can carry, added together.
+       A coupon caps at 90%, a bundle caps at 90% and Forge+ adds 5% — each
+       one sane on its own, and the checkout summed them and capped the total
+       at the subtotal. So 90 + 5 + 20 was a 100%-off order: the buyer paid
+       nothing and the shop still handed over a code it had bought. There is
+       no cost price on any product, so a margin floor cannot be computed —
+       this is the one bound that can be. */
+    maxTotalDiscountPercent: num(env.MAX_TOTAL_DISCOUNT_PERCENT, 40),
     paymentFeePercent: num(env.PAYMENT_FEE_PERCENT, 2.9),
     paymentFixedFee: num(env.PAYMENT_FIXED_FEE, 0.29),
     fulfillmentCostEur: num(env.FULFILLMENT_COST_EUR, 0),

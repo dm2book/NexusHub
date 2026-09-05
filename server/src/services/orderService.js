@@ -23,13 +23,14 @@ import { scoreOrder } from './fraudService.js';
 import { assertOrderLimits } from './orderLimitService.js';
 import { audit } from './auditService.js';
 import { getProduct } from './productService.js';
-import { postOrderEvent, postFraudHoldAlert, postDeliveryProof, postReviewRequest } from './discordService.js';
+import { postOrderEvent, postFraudHoldAlert, postDeliveryProof, postReviewRequest,
+  postPaymentReminder } from './discordService.js';
 import { alertOwner } from './notifyService.js';
 import { assertLaunched } from './launchGateService.js';
 import { syncMemberRoles, sendDeliveryDm, discordUidForUser } from './discordRolesService.js';
 import { availableCount, claimCodes, checkLowStock, releaseCodes } from './codeStockService.js';
 import { memberDiscountPercent } from './membershipService.js';
-import { recordOrderCommission } from './affiliateService.js';
+import { recordOrderCommission, reverseOrderCommission } from './affiliateService.js';
 import { recordPurchaseEvent } from './socialProofService.js';
 import { bustSocialCaches } from '../routes/social.js';
 import { balanceOf, debit, credit, hasOrderEntry } from './walletService.js';
@@ -147,7 +148,21 @@ export async function createOrder(input, ctx = {}) {
   // Bundle discount: best single bundle whose products are all in the order.
   const bundle = await bestBundleDiscount(lineItems);
   const bundleDiscount = bundle.discount;
-  const discount = Math.min(subtotal, couponDiscount + memberDiscount + bundleDiscount);
+  /* One ceiling over the whole stack.
+     These were summed and capped at the subtotal, which is not a cap: a 90%
+     coupon, a 20% bundle and the 5% Forge+ discount is 115%, so the order came
+     to €0 and the shop delivered a code it had paid for. Each source is
+     individually sane; nothing was looking at the total.
+     Clamped rather than refused — a buyer who found a legitimate stack should
+     still get the best discount the shop is willing to give, not an error. */
+  const stacked = couponDiscount + memberDiscount + bundleDiscount;
+  const discountCeiling = Math.round(subtotal * Math.max(0, Math.min(100,
+    config.market.maxTotalDiscountPercent)) / 100);
+  const discount = Math.min(subtotal, stacked, discountCeiling);
+  if (stacked > discount) {
+    console.warn(`[order] discount stack ${stacked} clamped to ${discount} `
+      + `(${config.market.maxTotalDiscountPercent}% of ${subtotal})`);
+  }
   const afterDiscount = Math.max(0, subtotal - discount);
   // Optionally pay part of the order with the customer's store credit.
   let creditApplied = 0;
@@ -281,6 +296,21 @@ export async function createOrder(input, ctx = {}) {
   const fresh = await getOrder(orderId);
   await sendEmailAsync('order_received', email, emailContext(fresh));
   await postOrderEvent(fresh, 'received').catch(() => {});
+  /* And on the owner's phone. postOrderEvent goes to a Discord CHANNEL, which
+     is only seen by somebody who happens to be looking at Discord; alertOwner is
+     the path that reaches Telegram and Pushover. This shop is paid by manual
+     transfer, so the minutes between an order being placed and the owner
+     watching for the money are the minutes the delivery promise is spending. */
+  await alertOwner('order.placed', {
+    title: `${fresh.number} · ${fresh.totalFormatted || formatMoney(fresh.total, fresh.currency)}`,
+    lines: [
+      (fresh.items || []).map((i) => `${i.quantity > 1 ? `${i.quantity}× ` : ''}${i.name}`).join(', ') || 'no items',
+      `Customer: ${fresh.email}`,
+      'Waiting for the transfer — nothing has been paid yet.',
+    ],
+    url: `${config.appUrl}/admin/orders/${fresh.id}`,
+    key: `placed:${fresh.id}`,
+  }).catch(() => {});
   if (input.userId) {
     await notify(input.userId, {
       type: 'order_update', title: `Order ${number} received`,
@@ -471,6 +501,15 @@ export async function transitionOrder(orderId, to, ctx = {}) {
     await sendDeliveryDm(updated).catch(() => {});
   }
   // If the order is cancelled/refunded, return any store credit that was spent on it.
+  /* An order that stops being a sale takes its referral commission with it.
+     The commission is paid the moment money arrives, as spendable credit, and
+     nothing reversed it — so a refunded referred order left the 5% out of the
+     door with the goods and the money both gone. */
+  if (to === 'refunded' || to === 'cancelled' || to === 'failed') {
+    await reverseOrderCommission(updated.id, to).catch((e) =>
+      console.error('[order] commission reversal', e.message));
+  }
+
   if ((to === 'refunded' || to === 'cancelled') && updated.userId && updated.billing?.creditApplied > 0) {
     if (!(await hasOrderEntry(orderId, 'refund').catch(() => true))) {
       await credit(updated.userId, updated.billing.creditApplied, 'refund',
@@ -683,6 +722,17 @@ export async function sendPaymentReminders({ afterMinutes = 60, maxAgeHours = 72
         body: 'Complete your payment to receive your items — they are still reserved for you.',
         link: `/account/orders/${order.id}`,
       }).catch(() => {});
+      /* And in Discord. This is revenue the shop has ALREADY won — an order
+         placed and not yet paid — and it was chased on one channel, an inbox,
+         for a customer who ordered from a Discord server. One reminder at sixty
+         minutes and then silence until the fourteen-day auto-cancel. */
+      const uid = await discordUidForUser(order.userId).catch(() => null);
+      if (uid) {
+        await postPaymentReminder(uid, {
+          orderNumber: order.number,
+          amount: order.totalFormatted || formatMoney(order.total, order.currency),
+        }).catch(() => {});
+      }
     }
     sent++;
   }

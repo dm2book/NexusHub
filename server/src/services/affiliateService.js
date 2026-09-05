@@ -7,7 +7,7 @@ import { run, get, all, nowIso } from '../db/index.js';
 import { newId } from '../utils/ids.js';
 import { postReferralEarned } from './discordService.js';
 import { discordUidForUser } from './discordRolesService.js';
-import { credit } from './walletService.js';
+import { credit, debit } from './walletService.js';
 import { notify } from './notificationService.js';
 
 export const COMMISSION_PERCENT = 5;
@@ -93,6 +93,51 @@ export async function recordOrderCommission(order) {
      A programme that pays silently is shared once and never again. */
   const uid = await discordUidForUser(referrerId).catch(() => null);
   if (uid) await postReferralEarned(uid, { commissionCents: commission }).catch(() => {});
+}
+
+/**
+ * Take a commission back when the order it was paid on stops being a sale.
+ *
+ * The commission is credited the moment money arrives — before delivery, and
+ * weeks before a chargeback window closes — and lands as SPENDABLE store credit.
+ * Nothing reversed it. Measured against a real database: a €174.99 order paid
+ * €8.75, the order was refunded, and the €8.75 stayed in the wallet with the
+ * referral_event still reading `paid`. That is money out of the door on every
+ * refunded referred order, and an open door for the oldest referral fraud there
+ * is — refer, buy with a stolen card, spend the commission, charge back.
+ *
+ * The debit is allowed to take the wallet NEGATIVE. A referrer who has already
+ * spent it owes it; hiding that by clamping at zero would mean the shop eats
+ * the difference and the ledger stops describing what happened.
+ *
+ * Idempotent: the event is flipped to `reversed` in the same statement that
+ * decides whether to act, so two calls — a refund and then a chargeback on the
+ * same order — reverse it once.
+ */
+export async function reverseOrderCommission(orderId, reason = 'order reversed') {
+  if (!orderId) return null;
+  const ev = await get(
+    `SELECT id, referrer_id AS "referrerId", commission FROM referral_events
+      WHERE order_id=@o AND kind='order' AND status <> 'reversed'`, { o: orderId });
+  if (!ev || !(ev.commission > 0)) return null;
+
+  const claimed = await run(
+    `UPDATE referral_events SET status='reversed'
+      WHERE id=@id AND status <> 'reversed'`, { id: ev.id });
+  if (!claimed?.changes) return null;                 // somebody else got here first
+
+  await debit(ev.referrerId, ev.commission, 'referral_reversal',
+    `Referral commission reversed · ${reason}`, { orderId, allowNegative: true })
+    .catch((e) => console.error('[affiliate] reversal debit', e.message));
+
+  await notify(ev.referrerId, {
+    type: 'system', title: 'A referral commission was reversed',
+    body: `An order you referred was ${reason}, so €${(ev.commission / 100).toFixed(2)} `
+      + 'has been taken back off your store credit.',
+    link: '/account/wallet',
+  }).catch(() => {});
+
+  return { reversed: ev.commission };
 }
 
 /** Dashboard stats for a referrer. */

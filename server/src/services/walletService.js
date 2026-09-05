@@ -9,7 +9,8 @@ import { run, get, all, nowIso, tx } from '../db/index.js';
 import { newId } from '../utils/ids.js';
 import { badRequest } from '../utils/errors.js';
 
-export const TX_TYPES = ['referral', 'refund', 'grant', 'spend', 'adjustment', 'mystery_prize'];
+export const TX_TYPES = ['referral', 'referral_reversal', 'refund', 'grant', 'spend',
+  'adjustment', 'mystery_prize'];
 
 /** Current balance in cents (0 if no entries). */
 export async function balanceOf(userId) {
@@ -21,7 +22,8 @@ export async function balanceOf(userId) {
  * Append a ledger entry. `amount` is signed (positive = credit, negative =
  * debit). Debits cannot take the balance below zero. Returns the entry.
  */
-export async function addEntry({ userId, amount, type, description, orderId = null, createdBy = null, tag = null }) {
+export async function addEntry({ userId, amount, type, description, orderId = null,
+  createdBy = null, tag = null, allowNegative = false }) {
   const amt = Math.round(Number(amount));
   if (!userId || !amt) throw badRequest('A wallet entry needs a user and a non-zero amount');
   if (!TX_TYPES.includes(type)) throw badRequest(`Unknown wallet transaction type: ${type}`);
@@ -37,7 +39,12 @@ export async function addEntry({ userId, amount, type, description, orderId = nu
     const cur = await get(
       'SELECT COALESCE(SUM(amount),0) AS bal FROM credit_transactions WHERE user_id=@u', { u: userId });
     const balance = Number(cur?.bal || 0);
-    if (amt < 0 && balance + amt < 0) throw badRequest('Insufficient store credit');
+    /* A spend cannot exceed the balance. A REVERSAL can: the commission was
+       credited on a sale that stopped being one, and if the referrer has
+       already spent it they owe it. Clamping at zero would mean the shop
+       silently eats the difference and the ledger stops describing what
+       happened — which is the whole reason there is a ledger. */
+    if (amt < 0 && balance + amt < 0 && !allowNegative) throw badRequest('Insufficient store credit');
     const after = balance + amt;
     const id = newId('ctx');
     const at = nowIso();

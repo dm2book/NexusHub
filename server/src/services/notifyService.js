@@ -52,6 +52,14 @@ const BUDGET_MS = 7_000;
  * owner silences the channel and then misses the one that mattered.
  */
 export const EVENTS = {
+  /* An order PLACED, not yet paid. On a shop where the buyer transfers by
+     hand and a person matches it, this is the moment the clock starts on the
+     'usually within a few hours' the product page promises — and it was the
+     one order event that never reached the owner. order.paid arrives after
+     the owner has already found the payment themselves.
+     Priority -1: it is a heads-up, not an emergency. A phone that rings for
+     every order is a phone that gets silenced before the chargeback lands. */
+  'order.placed':    { emoji: '🛒', color: 0x6366f1, priority: -1, label: 'New order' },
   'order.paid':      { emoji: '💰', color: 0x10b981, priority: 0,  label: 'Paid order' },
   'payment.failed':  { emoji: '⚠️', color: 0xf59e0b, priority: 0,  label: 'Payment failed' },
   'order.refunded':  { emoji: '↩️', color: 0xec4899, priority: 0,  label: 'Refund' },
@@ -116,6 +124,7 @@ export const EVENTS = {
 export const STORM = {
   windowMs: 5 * 60_000,
   perEvent: {
+    'order.placed': 20,
     'order.paid': 20,
     'payment.failed': 5,
     'order.refunded': 10,
