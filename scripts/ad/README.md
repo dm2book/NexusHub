@@ -96,6 +96,56 @@ payment clears" only when it auto-delivers *and* a code is on the shelf;
 otherwise "Bought in for you, delivered by hand". No advert ever says instant
 about a product that is not.
 
+### W — the workflow cut
+
+Product → Checkout → Payment → Email delivery → Success, and nothing else. No
+shop front, no browsing: every second goes on the five steps between wanting the
+thing and having it.
+
+```bash
+node scripts/ad/storyboard.mjs --variant=W          # the exact timing
+DATABASE_URL=…  node scripts/ad/make-ad.mjs \
+  --base=https://forgemarket.nl --sku=ROBUX-4500 \
+  --email=ads@yourdomain --variant=W
+```
+
+It carries its own pacing rather than the shared speeds. On the defaults it
+opened on a four-second product shot and did not reach its first flash until
+then — a "fast" advert whose first four seconds hold still. The mechanics now
+run at 2.4–3.4× and land at roughly two seconds each; the email is the only
+scene played at real time, because the arrival is the payoff.
+
+| effect | where it lives |
+|---|---|
+| fast zooms | `zoom: 'in' \| 'punch' \| 'drift'` per scene → `zoompan` |
+| flash transitions | one white frame pair on every cut, with the whoosh on it |
+| motion blur | frames averaged after the speed ramp, in `compose.mjs` |
+| cursor tracking | a painted cursor following the real click coordinates, `record.mjs` |
+| **email arrival** | the `notify` caption style — see below |
+
+**The email arrival** is the only caption in the toolkit that moves. Every other
+one fades; a notification that dissolves into view is not an arrival. The card is
+rendered pinned to the top of a transparent full-height frame, and `compose.mjs`
+walks the overlay's `y` from off-frame down into place over 0.34s, overshooting
+26px and settling back — while the recording underneath lifts 6% brightness for
+two tenths, which is the phone-lit flash you get when something really lands. The
+notify sound was already timed to that frame.
+
+### The storyboard is generated, never written down
+
+`storyboard.mjs` runs the same resolver `compose.mjs` runs, so its numbers are
+the numbers. Scene lengths are not chosen: each is a span between two beats the
+recorder marked, given a share of the target by weight and floored at real time —
+so the same variant is a different edit on a fast recording than on a slow one,
+and any timing typed into a document is wrong the moment the site changes.
+
+With `--in=scripts/ad/out/<slug>` it reads a real `beats.json`. Without one it
+uses a reference recording and prints that it is a model rather than a
+measurement.
+
+The maths itself lives in `timing.mjs`, called by both. Two copies of a rule is
+how this codebase has repeatedly shipped a rule that disagreed with itself.
+
 ### Twenty-five brand concepts
 
 `scripts/ad/concepts.mjs` holds twenty-five short-form briefs for TikTok and

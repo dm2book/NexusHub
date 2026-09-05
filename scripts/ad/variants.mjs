@@ -88,6 +88,10 @@ const S = {
   goods: { from: 'delivered-detail', to: 'email-open', speed: 1.4, weight: 0.9, zoom: 'in', label: 'the goods' },
   email: { from: 'email-open', to: 'email-detail', speed: 1.2, weight: 1.8, zoom: 'punch', label: 'the email', notify: true },
   code: { from: 'email-detail', to: 'end', speed: 1.2, weight: 1.4, zoom: 'in', label: 'the code' },
+  /* The money moving. The grammar went straight from checkout to confirmed, so
+     the one beat between placing an order and it existing — the payment — was
+     never a scene anything could be pinned to. */
+  pay: { from: 'order-placed', to: 'confirmed', speed: 1.8, weight: 1.1, zoom: 'punch', label: 'payment' },
 };
 
 /**
@@ -241,6 +245,56 @@ export const VARIANTS = [
     cta: 'forgemarket.nl',
     // A real box, really opened, with the prize it really rolled.
     needs: ['mystery', 'order'],
+  },
+  {
+    id: 'W',
+    slug: 'workflow',
+    name: 'The workflow',
+    target: 20,
+    /* Product → Checkout → Payment → Email delivery → Success, and nothing
+       else. No shop front, no browsing: this cut starts on the thing being
+       bought and spends every second it has on the five steps between wanting
+       it and having it.
+       Weights are the argument. The product and the email arrival carry the
+       most because they are the two frames that decide anything — one is what
+       you get, the other is proof you got it — and the three steps between them
+       are the mechanics, which have to be legible but not lingered on. */
+    /* Its own pacing, not the shared defaults.
+       On the shared speeds this cut opened on a 4.2-second product shot and did
+       not reach its first flash until then — a "fast" advert whose first four
+       seconds hold still. Each scene here carries the ramp it needs to compress
+       into the share the weights give it: the mechanics run at 2.4–3.4× and land
+       at roughly two seconds each, and the email is the only scene played at
+       real time, because the arrival is the payoff and speeding it up throws
+       away the thing the other fifteen seconds were spent earning. */
+    scenes: [
+      { ...S.product, speed: 1.9, weight: 1.0 },
+      { ...S.buy, speed: 2.4, weight: 0.5 },
+      { ...S.checkout, speed: 3.4, weight: 0.85 },
+      { ...S.pay, speed: 2.6, weight: 0.95 },
+      { ...S.confirmed, speed: 3.2, weight: 0.7 },
+      { ...S.email, speed: 1.0, weight: 2.3 },
+      { ...S.code, speed: 1.35, weight: 1.2 },
+    ],
+    hook: '{name}. Ordered and delivered.',
+    captions: [
+      { at: 'the product', text: '{price}', style: 'big' },
+      { at: 'buy', text: 'Add to cart', style: 'small' },
+      { at: 'checkout', text: 'Checkout — no account needed', style: 'small' },
+      { at: 'payment', text: 'You transfer the exact amount shown', style: 'small' },
+      { at: 'confirmed', text: 'Order {orderNumber}', style: 'small' },
+      /* The one caption in the whole toolkit that slides instead of fading.
+         compose.mjs walks it in from off-frame and lifts the recording under it
+         for two tenths at the same moment — the arrival IS the beat, and the
+         notify sound is already timed to land on it. */
+      { at: 'the email', text: 'Your order from ForgeMarket', sub: 'to your inbox', style: 'notify' },
+      { at: 'the code', text: '{delivery}', style: 'small' },
+    ],
+    cta: 'forgemarket.nl',
+    /* It claims a delivery, so a delivery has to have happened. Without a
+       completed order this variant does not get made — which is the whole
+       point of it existing in this file rather than in a brief. */
+    needs: ['price', 'order', 'delivery'],
   },
 ];
 
