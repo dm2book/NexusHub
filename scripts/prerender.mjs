@@ -28,7 +28,8 @@ import { fileURLToPath } from 'node:url';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const DIST = join(ROOT, 'dist');
 
-const { PAGES, LANDING, ALIASES, NOINDEX, SITE, metaFor, canonicalFor, organizationLd, websiteLd, breadcrumbLd } =
+const { PAGES, LANDING, ALIASES, NOINDEX, SITE, metaFor, canonicalFor, organizationLd, websiteLd, breadcrumbLd,
+  collectionLd } =
   await import(join(ROOT, 'src/content/seo.js'));
 
 const template = readFileSync(join(DIST, 'index.html'), 'utf8');
@@ -191,11 +192,12 @@ for (const [route, def] of Object.entries(LANDING)) {
     title: `${m.title} · ${SITE.name}`,
     description: m.description,
     canonical: canonicalFor(route),
-    ld: [org, site, breadcrumbLd([
-      { name: 'Home', path: '/' },
-      { name: 'Shop', path: '/shop' },
-      { name: m.h1, path: route },
-    ])],
+    ld: [org, site, collectionLd(route, { name: m.h1, description: m.description }),
+      breadcrumbLd([
+        { name: 'Home', path: '/' },
+        { name: 'Shop', path: '/shop' },
+        { name: m.h1, path: route },
+      ])],
   }));
   count++;
 }

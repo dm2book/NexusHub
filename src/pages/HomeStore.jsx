@@ -6,6 +6,11 @@ import { Search, ShoppingCart, Zap, ShieldCheck, Headphones, Tag, Star, ArrowRig
 import { useCart } from '../context/CartContext.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { usePageMeta, useJsonLd } from '../lib/useMeta.js';
+/* Category links go to the category's own page where it has one.
+   `/shop?category=x` renders the same shelf but points its canonical at
+   /shop, so every one of these links used to hand the homepage's authority to
+   a single destination instead of to the page about that game. */
+import { landingPathFor } from '../content/seo.js';
 import { useI18n } from '../lib/i18n.jsx';
 import { LangSwitch } from '../components/store/StoreNav.jsx';
 import { flyToCart } from '../lib/flyToCart.js';
@@ -361,7 +366,7 @@ export default function HomeStore() {
               </p>
               <div className="grid grid-cols-2 gap-1">
                 {CATEGORIES.filter((c) => c.slug).map((c) => (
-                  <Link key={c.slug} to={`/shop?category=${c.slug}`} onClick={() => setMenuOpen(false)}
+                  <Link key={c.slug} to={landingPathFor(c.slug)} onClick={() => setMenuOpen(false)}
                     className="flex items-center gap-2.5 px-2.5 py-2.5 rounded-xl text-[14px] font-medium text-slate-600 hover:bg-slate-50">
                     <img src={categoryLogos[c.slug] || ICON(c.img)} alt="" className="w-6 h-6 object-contain shrink-0" />
                     <span className="truncate">{c.label}</span>
@@ -388,7 +393,7 @@ export default function HomeStore() {
             <p className="text-[11px] font-bold tracking-wider text-slate-400 px-2 py-2">{tr('shop.browseCategories', 'BROWSE CATEGORIES')}</p>
             <nav className="space-y-0.5">
               {CATEGORIES.map((c, i) => (
-                <Link key={c.label} to={`/shop${c.slug ? `?category=${c.slug}` : ''}`}
+                <Link key={c.label} to={c.slug ? landingPathFor(c.slug) : '/shop'}
                   className={`flex items-center gap-3 px-2.5 py-2 rounded-xl text-[14.5px] font-medium transition
                     ${i === 0 ? 'bg-violet-50 text-violet-700' : 'text-slate-600 hover:bg-slate-50'}`}>
                   <span className="w-7 h-7 grid place-items-center shrink-0">
@@ -518,7 +523,7 @@ export default function HomeStore() {
                     one deep-links into the shop already filtered. */}
                 <div className="flex flex-wrap gap-2 mt-4">
                   {pillars.map((p) => (
-                    <Link key={p.key} to={`/shop?category=${p.cats[0].slug}`}
+                    <Link key={p.key} to={landingPathFor(p.cats[0].slug)}
                       className="fm-press text-[13px] font-semibold text-white/95 bg-white/10 hover:bg-white/[.16] border border-white/15 rounded-full px-3.5 py-2 transition">
                       {tr(`home.pillar.${p.key}`, p.title)}
                     </Link>
@@ -651,7 +656,7 @@ export default function HomeStore() {
                     {tr(`home.pillar.${pillar.key}Sub`, pillar.sub)}
                   </p>
                 </div>
-                <Link to={`/shop?category=${pillar.cats[0].slug}`}
+                <Link to={landingPathFor(pillar.cats[0].slug)}
                   className="shrink-0 self-start sm:self-auto text-violet-700 font-semibold text-sm inline-flex items-center gap-1 hover:gap-2 transition-all">
                   {tr('home.viewAll', 'View All Products')} <ArrowRight size={15} />
                 </Link>
@@ -712,7 +717,7 @@ export default function HomeStore() {
                       {tr('home.from', 'From')} <span className="fm-num text-violet-700 text-[17px]">{money(c.from, c.currency)}</span>
                     </div>
                     <div className="flex items-center gap-2 mt-3">
-                      <Link to={`/shop?category=${c.slug}`}
+                      <Link to={landingPathFor(c.slug)}
                         className="flex-1 text-center text-white text-sm font-semibold rounded-lg h-11 grid place-items-center hover:brightness-105 transition"
                         style={{ backgroundImage: 'linear-gradient(135deg,#7c5cff,#a855f7)' }}>
                         {tr('home.browseCat', 'Browse')}

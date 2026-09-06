@@ -1,5 +1,11 @@
 <!DOCTYPE html>
-<html lang="en">
+<!-- Dutch, because every page this build writes is Dutch: scripts/prerender.mjs
+     renders `metaFor(route, 'nl')` and server/src/routes/seo.js writes a Dutch
+     product description. The document declared English while carrying Dutch
+     copy on every URL. The app overwrites this per visitor on mount (see
+     src/lib/i18n.jsx), so an English reader still gets lang="en" — but the HTML
+     a crawler is served now says what it actually contains. -->
+<html lang="nl">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />

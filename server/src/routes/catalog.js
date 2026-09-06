@@ -19,6 +19,9 @@ import { createOrder, getOrderByNumber, getOrder, markPaymentReceived, getPspPay
 import { requestRefund, getRefundRequestForOrder } from '../services/supportService.js';
 import { answer } from '../services/assistantService.js';
 import { withCopy } from '../services/productCopy.js';
+/* The landing pages, from the one place that declares them. Shared with the
+   prerender and the router rather than retyped — see the sitemap handler. */
+import { LANDING } from '../../../src/content/seo.js';
 import { productPayload, stockLeftFor, instantFor } from '../services/productPayload.js';
 import { submitProof, getOrderProof } from '../services/paymentProofService.js';
 import { listEnabledProviders } from '../services/oauthService.js';
@@ -591,14 +594,6 @@ router.get('/sitemap.xml', asyncHandler(async (_req, res) => {
   const staticPages = [
     ['', '1.0', 'daily'],
     ['/shop', '0.9', 'daily'],
-    // The keyword landing pages — the ones this shop is actually searched for.
-    // Ranked just under the shop itself: each is a real page with its own copy,
-    // not a filtered view.
-    ['/robux', '0.9', 'daily'],
-    ['/v-bucks', '0.9', 'daily'],
-    ['/valorant-points', '0.9', 'daily'],
-    ['/giftcards', '0.9', 'daily'],
-    ['/game-currency', '0.8', 'weekly'],
     ['/how-it-works', '0.7', 'monthly'],
     ['/payment-methods', '0.7', 'monthly'],
     ['/reviews', '0.7', 'weekly'],
@@ -618,8 +613,31 @@ router.get('/sitemap.xml', asyncHandler(async (_req, res) => {
     ['/cookies', '0.4', 'yearly'],
   ];
   const products = await listProducts({ activeOnly: true });
+
+  /* The keyword landing pages — the ones this shop is actually searched for —
+     come from the same LANDING object that declares their routes and writes
+     their HTML. They used to be typed out here as well, which is how the list
+     here and the list in src/content/seo.js were free to disagree: five pages
+     existed, five were listed, and the other sixteen categories the shop
+     stocks had neither.
+
+     Listed only when the catalogue genuinely holds at least two ACTIVE
+     products in that category. A page asking to be crawled for "CoD Points
+     kopen" that then shows an empty shelf is worse than no page, and a page
+     holding one product is not a category — it is the product page again under
+     a second URL. `/game-currency` pins no category (it is the whole shelf) so
+     it is always listed. */
+  const perCategory = products.reduce((acc, p) => {
+    const key = String(p.category || '').toLowerCase();
+    if (key) acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+  const landingPages = Object.entries(LANDING)
+    .filter(([, def]) => !def.category || (perCategory[String(def.category).toLowerCase()] || 0) >= 2)
+    .map(([path, def]) => [path, def.category ? '0.9' : '0.8', 'daily']);
+
   const urls = [
-    ...staticPages.map(([p, prio, freq]) => ({ loc: `${base}${p}`, prio, freq })),
+    ...[...staticPages, ...landingPages].map(([p, prio, freq]) => ({ loc: `${base}${p}`, prio, freq })),
     // Products carry a real lastmod so a price change is re-crawled rather than
     // waiting for the whole site to be revisited.
     ...products.map((p) => ({

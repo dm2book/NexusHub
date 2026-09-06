@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Search, SlidersHorizontal, PackageX, LayoutGrid, CloudOff } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { withEarly } from '../lib/earlyFetch.js';
@@ -13,6 +13,7 @@ import { SkeletonCard } from '../components/ui.jsx';
 import BundlesShowcase from '../components/store/BundlesShowcase.jsx';
 import { usePageMeta } from '../lib/useMeta.js';
 import { useI18n } from '../lib/i18n.jsx';
+import { LANDING, landingPathFor } from '../content/seo.js';
 import { useTrending } from '../lib/useTrending.js';
 import { Flame } from 'lucide-react';
 
@@ -23,11 +24,11 @@ const SORTS = {
   name: { key: 'shop.sortName', label: 'Name A–Z', fn: (a, b) => a.name.localeCompare(b.name) },
 };
 
-export default function Shop({ landingCategory = null, landingTitle = null, landingSub = null } = {}) {
+export default function Shop({ landingCategory = null, landingPath = null } = {}) {
   const { add } = useCart();
   const toast = useToast();
-  const { t } = useI18n();
-  const [params, setParams] = useSearchParams();
+  const { t, lang } = useI18n();
+  const [params] = useSearchParams();
   const [products, setProducts] = useState(null);
   const [search, setSearch] = useState(() => new URLSearchParams(window.location.search).get('search') || '');
   const [sort, setSort] = useState('popular');
@@ -45,6 +46,13 @@ export default function Shop({ landingCategory = null, landingTitle = null, land
   // rail still work, they just start from here. One component, one catalogue —
   // a second copy of the shop per keyword is how those pages go stale.
   const category = landingCategory ?? (params.get('category') || '');
+  /* The landing page's own heading and its one line of prose, read from the
+     same object that wrote its <title> and its prerendered HTML. They used to
+     be JSX attributes in App.jsx, which meant the heading a visitor read and
+     the title a crawler read lived in two files and could drift apart —
+     exactly the failure the rest of this module exists to prevent. */
+  const landing = landingPath ? LANDING[landingPath] : null;
+  const landingCopy = landing ? (lang === 'nl' ? landing.nl : landing.en) : null;
   // No arguments: usePageMeta falls back to this route's own copy in
   // content/seo.js — the same copy the prerendered HTML already carries, for
   // /shop and for every landing route alike. Passing a hardcoded "Shop" here
@@ -83,11 +91,18 @@ export default function Shop({ landingCategory = null, landingTitle = null, land
     return list.sort(SORTS[sort].fn);
   }, [products, category, search, sort]);
 
-  const setCategory = (c) => {
-    const next = new URLSearchParams(params);
-    if (c) next.set('category', c); else next.delete('category');
-    setParams(next);
-  };
+  /* Choosing a category is a NAVIGATION, not a filter.
+
+     It used to be `setCategory`, which rewrote `?category=` in place. Two
+     things were wrong with that. A crawler cannot press a button, so the whole
+     category navigation — twenty-one entries, on the catalogue page — was
+     invisible to a search engine: no page linked to a category page except the
+     footer's five. And on a landing route it did not work at all for a
+     visitor either, because `category` reads `landingCategory` first, so on
+     /robux the URL changed, the shelf did not, and the highlight stayed put.
+
+     They are <Link>s now, to the category's own page. Same click for a person,
+     a followable link for a crawler, and correct on every route. */
 
   const trending = useTrending();
   /* Stable identity, so the memoised cards below are not all invalidated by
@@ -106,22 +121,22 @@ export default function Shop({ landingCategory = null, landingTitle = null, land
         <div className="bg-white rounded-2xl border border-slate-200/70 p-3 shadow-sm">
           <p className="text-[11px] font-bold tracking-wider text-slate-400 px-2 py-2">{t('shop.browseCategories', 'BROWSE CATEGORIES')}</p>
           <nav className="space-y-0.5 max-h-[70vh] overflow-y-auto">
-            <button onClick={() => setCategory('')}
+            <Link to="/shop"
               className={`w-full flex items-center gap-3 px-2.5 py-2 rounded-xl text-[14.5px] font-medium transition ${!category ? 'bg-violet-50 text-violet-700' : 'text-slate-600 hover:bg-slate-50'}`}>
               <span className="w-7 h-7 grid place-items-center"><LayoutGrid size={18} className="text-violet-600" /></span>
               {t('shop.all', 'All Products')}
-            </button>
+            </Link>
             {categories.map((c) => {
               const v = categoryVisual(c); const img = logoFor(categoryLogos, c); const Icon = v.icon;
               return (
-                <button key={c} onClick={() => setCategory(c)}
+                <Link key={c} to={landingPathFor(c)}
                   className={`w-full flex items-center gap-3 px-2.5 py-2 rounded-xl text-[14.5px] font-medium transition ${category === c ? 'bg-violet-50 text-violet-700' : 'text-slate-600 hover:bg-slate-50'}`}>
                   <span className="w-7 h-7 grid place-items-center shrink-0">
                     {img ? <img src={img} alt="" className="w-7 h-7 object-contain" />
                       : <span className={`w-7 h-7 rounded-lg bg-gradient-to-br ${v.grad} grid place-items-center`}><Icon size={15} className="text-white" /></span>}
                   </span>
                   <span className="truncate">{v.label}</span>
-                </button>
+                </Link>
               );
             })}
           </nav>
@@ -149,13 +164,13 @@ export default function Shop({ landingCategory = null, landingTitle = null, land
                 than the category label — because that heading is the page's
                 single strongest on-page signal and the one a visitor reads
                 first to know they are in the right place. */}
-            {landingTitle || (category ? categoryVisual(category).label : t('shop.all', 'All Products'))}
+            {landingCopy?.h1 || (category ? categoryVisual(category).label : t('shop.all', 'All Products'))}
           </h1>
           {/* A landing page says what IT is about. The generic shop line under
               a "Robux kopen" heading is the on-page equivalent of a title tag
               that does not match its content. */}
           <p className="text-white/85 mt-1.5">
-            {landingSub || t('shop.tagline', 'Digital goods, delivered to your inbox & dashboard.')}
+            {landingCopy?.sub || t('shop.tagline', 'Digital goods, delivered to your inbox & dashboard.')}
           </p>
           <div className="flex flex-wrap items-center gap-2 mt-4">
             <span className="text-[11.5px] font-semibold bg-white/15 border border-white/25 rounded-full px-2.5 py-1">🛡 {t('shop.badgeProtected', 'Money back if undelivered')}</span>
@@ -172,29 +187,30 @@ export default function Shop({ landingCategory = null, landingTitle = null, land
 
         {/* Category filter, phones only — the sidebar above is `hidden lg:block`,
             so until now a phone had no way to filter the catalogue at all. Same
-            state and same setCategory as the sidebar, so the two cannot drift.
+            state and the same destinations as the sidebar, so the two cannot
+            drift.
             A horizontal rail rather than a dropdown: the icons are the point,
             and it keeps the current choice visible while you browse. */}
         <div className="lg:hidden -mx-4 px-4 mb-6">
           <div className="fm-rail flex gap-2 overflow-x-auto pb-1 snap-x">
-            <button onClick={() => setCategory('')}
+            <Link to="/shop"
               className={`snap-start shrink-0 inline-flex items-center gap-2 h-11 px-3.5 rounded-xl border text-[14px] font-semibold transition fm-press ${
                 !category ? 'chip-active' : 'bg-white text-slate-600 border-slate-200'}`}>
               <LayoutGrid size={16} className={category ? 'text-violet-600' : ''}
                 style={category ? undefined : { color: '#fff' }} />
               {t('shop.all', 'All Products')}
-            </button>
+            </Link>
             {categories.map((c) => {
               const v = categoryVisual(c); const img = logoFor(categoryLogos, c); const Icon = v.icon;
               const on = category === c;
               return (
-                <button key={c} onClick={() => setCategory(c)}
+                <Link key={c} to={landingPathFor(c)}
                   className={`snap-start shrink-0 inline-flex items-center gap-2 h-11 pl-2 pr-3.5 rounded-xl border text-[14px] font-semibold transition fm-press ${
                     on ? 'chip-active' : 'bg-white text-slate-600 border-slate-200'}`}>
                   {img ? <img src={img} alt="" className="w-7 h-7 object-contain" />
                     : <span className={`w-7 h-7 rounded-lg bg-gradient-to-br ${v.grad} grid place-items-center`}><Icon size={14} className="text-white" /></span>}
                   <span className="whitespace-nowrap">{v.label}</span>
-                </button>
+                </Link>
               );
             })}
           </div>

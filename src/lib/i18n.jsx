@@ -611,6 +611,7 @@ const NL = {
   'product.steps': 'Stappen',
   'product.goodToKnow': 'Goed om te weten',
   'product.back': 'Terug naar shop',
+  'product.breadcrumb': 'Kruimelpad',
   'product.addToCart': 'In winkelwagen',
   'product.buyNow': 'Direct kopen',
   'product.off': 'KORTING',
