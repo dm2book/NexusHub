@@ -160,7 +160,15 @@ export default function AdminProducts() {
     setForm({
       name: p.name, sku: p.sku || '', category: p.category || '', description: p.description || '',
       priceEuro: (p.price / 100).toFixed(2),
-      costEuro: p.metadata?.cost != null ? (p.metadata.cost / 100).toFixed(2) : '',
+      costEuro: (() => {
+        /* The purchase price has been written under three names over time.
+           Showing a blank field for a product that has one is how an owner
+           concludes it was never saved and types it in again. */
+        const m = p.metadata || {};
+        const cents = [m.cost, m.costCents].find((v) => Number.isFinite(Number(v)))
+          ?? (Number.isFinite(Number(m.buyPrice)) ? Number(m.buyPrice) * 100 : undefined);
+        return cents == null ? '' : (Number(cents) / 100).toFixed(2);
+      })(),
       compareAtEuro: p.metadata?.compareAt != null ? (p.metadata.compareAt / 100).toFixed(2) : '',
       deliveryMode: p.metadata?.deliveryMode === 'manual' ? 'manual' : 'auto',
       deliveryField: p.metadata?.deliveryField || '',
@@ -200,9 +208,20 @@ export default function AdminProducts() {
         kind: form.kind, active: form.active,
         stock: form.stock === '' ? null : Number(form.stock),
         metadata: {
+          /* updateProduct REPLACES metadata, it does not merge. Without this
+             spread, saving a price change also drops every key the form does
+             not know about — the image framing the normalizer wrote, a cost
+             stored under an older name, anything a later feature adds. Keys
+             the form does control still clear correctly, because an explicit
+             `undefined` below wins over the spread and JSON drops it. */
+          ...(editing !== 'new' && editing?.metadata ? editing.metadata : {}),
           featured: form.featured,
           image: form.imageUrl || undefined,
           cost: form.costEuro === '' ? undefined : Math.round(parseFloat(form.costEuro || '0') * 100),
+          /* One name after any save. The field above shows whichever of the
+             three was stored, so leaving the older ones behind would mean
+             clearing the field here and the engine still reading a cost. */
+          costCents: undefined, buyPrice: undefined,
           compareAt: form.compareAtEuro === '' ? undefined : Math.round(parseFloat(form.compareAtEuro || '0') * 100),
           deliveryMode: form.deliveryMode === 'manual' ? 'manual' : undefined,
           deliveryField: form.deliveryField?.trim() || undefined,

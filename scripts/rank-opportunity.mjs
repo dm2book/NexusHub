@@ -40,6 +40,7 @@ const asJson = process.argv.includes('--json');
 const { all, get } = await import(path.join(ROOT, 'server/src/db/index.js'));
 const { config } = await import(path.join(ROOT, 'server/src/config/env.js'));
 const { DELIVERY_INFO } = await import(path.join(ROOT, 'src/lib/deliveryInfo.js'));
+const { countWithCost } = await import(path.join(ROOT, 'server/src/services/costService.js'));
 
 const FEE_PCT = config.market.paymentFeePercent / 100;
 const FEE_FIX = config.market.paymentFixedFee;
@@ -54,7 +55,7 @@ const ACCOUNT_BASED = new Set(Object.entries(DELIVERY_INFO)
   .map(([k]) => k));
 
 const rows = await all(
-  `SELECT id, sku, name, category, kind, price FROM products WHERE active = 1`);
+  `SELECT id, sku, name, category, kind, price, metadata FROM products WHERE active = 1`);
 
 // The three things that would make this a real ranking, counted rather than assumed.
 const sold = Number((await get(
@@ -66,11 +67,8 @@ const observations = Number((await get('SELECT COUNT(*) AS n FROM market_observa
   .catch(() => ({ n: 0 })))?.n || 0);
 const adEvents = Number((await get('SELECT COUNT(*) AS n FROM ad_events')
   .catch(() => ({ n: 0 })))?.n || 0);
-let withCost = 0;
-for (const r of rows) {
-  try { const m = JSON.parse(r.metadata || '{}'); if (m.costCents != null || m.cost != null) withCost++; }
-  catch { /* none */ }
-}
+// One reader, so this number means the same thing here as in the pricing engine.
+const withCost = countWithCost(rows);
 
 const byCategory = {};
 for (const r of rows) (byCategory[r.category] = byCategory[r.category] || []).push(r);

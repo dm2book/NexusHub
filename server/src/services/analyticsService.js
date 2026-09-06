@@ -3,6 +3,7 @@
  * Revenue counts only paid, non-refunded orders.
  */
 import { get, all } from '../db/index.js';
+import { costCentsFor } from './costService.js';
 import { formatMoney } from '../utils/money.js';
 import { visitorStats } from './trackingService.js';
 
@@ -67,10 +68,13 @@ async function supplierCost(since) {
        FROM order_items oi JOIN orders o ON o.id = oi.order_id
       WHERE ${PAID} AND o.created_at > @since`, { since });
   if (!items.length) return 0;
+  /* Through costService, so this agrees with the pricing engine. It read
+     metadata.cost while the engine read metadata.costCents, which meant gross
+     margin could show a healthy number on this page while every pricing
+     recommendation was blocked for want of the same figure. */
   const costMap = {};
   for (const id of [...new Set(items.map((i) => i.pid).filter(Boolean))]) {
-    const p = await get(`SELECT metadata FROM products WHERE id=@id`, { id });
-    try { costMap[id] = Number(JSON.parse(p?.metadata || '{}').cost) || 0; } catch { costMap[id] = 0; }
+    costMap[id] = (await costCentsFor(id)) ?? 0;
   }
   return items.reduce((s, i) => s + (costMap[i.pid] || 0) * (i.qty || 1), 0);
 }

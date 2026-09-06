@@ -22,17 +22,22 @@ const ok = (name, cond, extra = '') => {
 
 console.log('— It names what it cannot rank on —');
 {
-  for (const [axis, token] of [['margin', 'costCents'], ['demand', 'order_items'],
+  for (const [axis, token] of [['margin', 'countWithCost'], ['demand', 'order_items'],
     ['competition', 'market_observations'], ['advertising', 'ad_events']]) {
     ok(`${axis} is counted, not assumed`, src.includes(token), token);
   }
+  /* The margin axis used to read `metadata.costCents` here while the admin form
+     wrote `metadata.cost`, so it reported 0 of 72 for a shop whose costs were
+     all filled in. It goes through the one reader now. */
+  ok('and margin is counted by the same reader the pricing engine uses',
+    /costService\.js/.test(src));
   ok('and the refusal is printed, not buried', /Cannot be ranked on, and not estimated/.test(src));
   /* The failure mode this guards against is a ranking that looks authoritative
      because it has four columns, three of which are made up. Each of the four
      reports a COUNT of what exists; none of them is derived from anything. */
   const code = src.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^\s*\/\/.*$/gm, ' ');
   ok('each unrankable axis reports a count of what exists',
-    /withCost = 0/.test(code) && /COALESCE\(SUM\(oi\.quantity\),0\)/.test(code)
+    /withCost = countWithCost\(rows\)/.test(code) && /COALESCE\(SUM\(oi\.quantity\),0\)/.test(code)
     && /COUNT\(\*\) AS n FROM market_observations/.test(code)
     && /COUNT\(\*\) AS n FROM ad_events/.test(code));
   ok('and none of them feeds the score',
