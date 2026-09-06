@@ -28,7 +28,7 @@ if (!existsSync(join(DIST, 'index.html'))) {
   process.exit(0);
 }
 
-const { PAGES, LANDING, ALIASES, NOINDEX, SITE, metaFor, canonicalFor, productLd, faqLd } =
+const { PAGES, LANDING, ALIASES, NOINDEX, SITE, metaFor, canonicalFor, productLd, faqLd, landingPathFor } =
   await import(join(ROOT, 'src/content/seo.js'));
 
 const htmlFor = (route) => {
@@ -168,6 +168,10 @@ console.log('— What should and should not be indexed —');
   }
   // Filters and referral links mint endless crawlable duplicates.
   ok('…and keeps crawlers off the query-string duplicates', /Disallow: \/\*\?ref=/.test(robots));
+  /* ?category= joined them once every category the shop stocks in depth got a
+     path of its own. It is the shop's own filter now, not an address. */
+  ok('…including the category filter, now that categories have real paths',
+    /Disallow: \/\*\?category=/.test(robots));
   // robots.txt asks a crawler not to LOOK; noindex tells it not to LIST. Both
   // are needed, and the file says why so nobody "tidies" one away.
   ok('…and explains why both robots.txt and noindex exist', /noindex/.test(robots));
@@ -176,15 +180,35 @@ console.log('— What should and should not be indexed —');
 // ── The focus keywords ──────────────────────────────────────────────────────
 console.log('— Landing pages for what this shop sells —');
 {
+  /* The original five. Kept named here because they are the URLs that have
+     been live and linked, and a rename would throw away whatever they have
+     earned. */
   const want = ['/robux', '/v-bucks', '/valorant-points', '/giftcards', '/game-currency'];
-  for (const r of want) {
+  for (const r of want) ok(`${r} is still a real page at the same URL`, !!htmlFor(r));
+
+  /* Every landing page, not just those five. There were five of these against
+     twenty-one categories the shop stocks — sixteen categories, forty-six of
+     the seventy-one products, had no address of their own and no way to rank
+     for the thing they are. */
+  ok('every category the shop stocks in depth has a page of its own',
+    Object.keys(LANDING).length >= 20, String(Object.keys(LANDING).length));
+
+  const untitled = Object.keys(LANDING).filter((r) => {
     const h = htmlFor(r);
-    ok(`${r} is a real page`, !!h);
-    if (!h) continue;
-    const term = r.slice(1).replace(/-/g, ' ');
-    ok(`…and its title is about ${term}`,
-      new RegExp(term.split(' ')[0], 'i').test(title(h) || ''), title(h));
-  }
+    if (!h) return true;
+    // The first word of the path has to appear in the title, or the page is
+    // reachable at a URL that is not about what it says it is about.
+    const first = r.slice(1).replace(/-/g, ' ').split(' ')[0];
+    return !new RegExp(first, 'i').test(title(h) || '');
+  });
+  ok('…and each one is a real page whose title is about its own subject',
+    untitled.length === 0, untitled.join(', '));
+
+  // Distinct copy, or twenty pages compete with each other for one result.
+  const titles = Object.keys(LANDING).map((r) => title(htmlFor(r)));
+  ok('no two landing pages share a title', new Set(titles).size === titles.length);
+  const descs = Object.keys(LANDING).map((r) => tag(htmlFor(r), /<meta name="description" content="([^"]*)"/));
+  ok('nor a description', new Set(descs).size === descs.length);
 
   // A landing route must pin a category the products genuinely carry, or the
   // page ranks for a term and then shows an empty shelf.
@@ -194,9 +218,55 @@ console.log('— Landing pages for what this shop sells —');
   ok('every landing category exists in the catalogue', bad.length === 0,
     bad.map(([r, d]) => `${r}→${d.category}`).join(', '));
 
+  /* …and holds enough of it. One product is not a category; it is the product
+     page again at a second URL, which is what a doorway page is. */
+  const counts = {};
+  for (const m of catalog.matchAll(/', '([a-z-]+)', \d/g)) counts[m[1]] = (counts[m[1]] || 0) + 1;
+  const thin = Object.entries(LANDING)
+    .filter(([, def]) => def.category && (counts[def.category] || 0) < 2);
+  ok('…with at least two products behind it', thin.length === 0,
+    thin.map(([r, d]) => `${r}→${d.category}:${counts[d.category] || 0}`).join(', '));
+
+  // Every entry needs the heading and the sentence the page renders, or the
+  // page a visitor reads and the title a crawler reads drift apart.
+  const incomplete = Object.entries(LANDING)
+    .filter(([, d]) => !d.nl?.h1 || !d.nl?.sub || !d.en?.h1 || !d.en?.sub);
+  ok('every landing page carries its own heading and its own line of prose',
+    incomplete.length === 0, incomplete.map(([r]) => r).join(', '));
+
   // A page nothing links to is a page a crawler has to be told about twice.
   const footer = readFileSync(join(ROOT, 'src/components/store/StoreFooter.jsx'), 'utf8');
-  ok('they are linked from the footer', want.every((r) => footer.includes(`'${r}'`)));
+  ok('the five original ones are linked from the footer', want.every((r) => footer.includes(`'${r}'`)));
+
+  /* The rest are linked from the homepage's category tiles. Those tiles used to
+     point at `/shop?category=x` — a URL whose canonical is `/shop`, so the
+     strongest page on the site spent all of its category link equity on one
+     destination and the category pages received none of it. */
+  const home = readFileSync(join(ROOT, 'src/pages/HomeStore.jsx'), 'utf8');
+  ok('the homepage links categories to their own page, not to a query string',
+    /landingPathFor\(/.test(home) && !/to=\{`\/shop\?category=/.test(home));
+
+  /* And from every product page, which is where the depth is: seventy-one
+     pages that all linked only to /shop. */
+  const pdp = readFileSync(join(ROOT, 'src/pages/ProductDetail.jsx'), 'utf8');
+  ok('a product page links up to its own category', /landingPathFor\(product\.category\)/.test(pdp));
+
+  /* The catalogue page's own category navigation. It was twenty-one <button>s
+     calling setCategory — a crawler cannot press a button, so the deepest
+     navigation on the site was invisible to one. It was also broken for a
+     visitor on a landing route: `category` reads landingCategory first, so on
+     /robux the URL changed and the shelf did not. */
+  const shop = readFileSync(join(ROOT, 'src/pages/Shop.jsx'), 'utf8');
+  ok('the shop\u2019s category navigation is links a crawler can follow',
+    /<Link key=\{c\} to=\{landingPathFor\(c\)\}/.test(shop));
+  ok('\u2026and no longer a button that only rewrites a query string',
+    !/setCategory\(c\)/.test(shop));
+
+  // The helper must never hand out a link to a shelf that does not exist.
+  ok('a category with no page of its own still gets a working link',
+    landingPathFor('spotify') === '/shop?category=spotify');
+  ok('and one with a page gets the page', landingPathFor('eafc') === '/fc-points');
+  ok('and no category at all is the whole shop', landingPathFor('') === '/shop');
 }
 
 // ── Structured data ─────────────────────────────────────────────────────────
@@ -276,8 +346,15 @@ console.log('— Sitemap —');
 {
   const src = readFileSync(join(ROOT, 'server/src/routes/catalog.js'), 'utf8');
   const listed = [...src.matchAll(/\['(\/[a-z-]*)', '[\d.]+', '\w+'\]/g)].map((m) => m[1]);
-  const shouldList = [...Object.keys(PAGES), ...Object.keys(LANDING)]
-    .filter((r) => !NOINDEX.has(r) && r !== '/');
+  /* The landing pages are no longer typed out here. They were, in parallel with
+     the list in src/content/seo.js — which is how five pages could exist, five
+     be listed, and sixteen categories have neither. The sitemap now maps over
+     the same object, filtered to categories the catalogue genuinely stocks. */
+  ok('the sitemap reads the landing pages rather than repeating them',
+    /Object\.entries\(LANDING\)/.test(src));
+  ok('…and only lists a category page the catalogue can actually fill',
+    /perCategory\[String\(def\.category\)\.toLowerCase\(\)\] \|\| 0\) >= 2/.test(src));
+  const shouldList = Object.keys(PAGES).filter((r) => !NOINDEX.has(r) && r !== '/');
   const absent = shouldList.filter((r) => !listed.includes(r));
   ok('every indexable page is in the sitemap', absent.length === 0, absent.join(', '));
   ok('nothing noindexed is in the sitemap',

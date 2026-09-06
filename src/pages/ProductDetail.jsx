@@ -17,6 +17,7 @@ import { useReviews } from '../lib/useReviews.js';
 import { useStats } from '../lib/useStats.js';
 import { useWishlist } from '../lib/wishlist.js';
 import { usePageMeta, useJsonLd } from '../lib/useMeta.js';
+import { landingPathFor, SITE } from '../content/seo.js';
 import { useI18n } from '../lib/i18n.jsx';
 import { useConfig } from '../lib/useConfig.js';
 import { recordProductView, useRecentlyViewed } from '../lib/recentlyViewed.js';
@@ -134,6 +135,30 @@ export default function ProductDetail() {
   const [priceHist, setPriceHist] = useState([]);
   const [heroBroken, setHeroBroken] = useState(false); // product image failed to load
   usePageMeta(product?.name || 'Product', product?.description || 'Digital top-ups and gift cards, delivered with your order number as the reference.');
+  /* The page this product belongs to, where its category has one. Used for the
+     breadcrumb the visitor reads and for the BreadcrumbList a crawler reads —
+     one value, so the two cannot describe different trails. */
+  const categoryPath = product?.category ? landingPathFor(product.category) : null;
+
+  /* Where this page sits. The server writes a BreadcrumbList into the HTML too
+     (Home → Shop → product); this is the client half, for an in-app navigation,
+     and it names the category page the server's version predates. */
+  useJsonLd('breadcrumb', product && {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: `${SITE.url}/` },
+      { '@type': 'ListItem', position: 2, name: 'Shop', item: `${SITE.url}/shop` },
+      ...(categoryPath && categoryPath !== '/shop' && !categoryPath.includes('?')
+        ? [{ '@type': 'ListItem', position: 3, name: categoryVisual(product.category).label,
+          item: SITE.url + categoryPath }]
+        : []),
+      { '@type': 'ListItem',
+        position: categoryPath && categoryPath !== '/shop' && !categoryPath.includes('?') ? 4 : 3,
+        name: product.name, item: `${SITE.url}/product/${product.id}` },
+    ],
+  });
+
   // Product structured data → rich results (price, rating) in Google.
   useJsonLd('product', product && {
     '@context': 'https://schema.org',
@@ -294,9 +319,31 @@ export default function ProductDetail() {
 
   return (
     <div className="section pt-10 pb-28 lg:pb-10">
-      <Link to="/shop" className="inline-flex items-center gap-2 text-slate-400 hover:text-white text-sm mb-6">
-        <ArrowLeft size={16} /> {t('product.back', 'Back to shop')}
-      </Link>
+      {/* A breadcrumb, not a back button.
+
+          This was a single "← Back to shop" link, which meant seventy-one
+          product pages — the deepest and most numerous pages on the site — sent
+          every drop of their internal link equity to exactly one destination,
+          and the category pages received none of it at all. A crawler arriving
+          on a Robux product had no path to the other Robux products except
+          through the whole catalogue.
+
+          It reads as a trail rather than a button because that is what it is,
+          and because the JSON-LD below says the same thing to a machine. */}
+      <nav aria-label={t('product.breadcrumb', 'Breadcrumb')}
+        className="flex items-center gap-1.5 text-sm text-slate-400 mb-6 flex-wrap">
+        <Link to="/shop" className="inline-flex items-center gap-2 hover:text-white transition">
+          <ArrowLeft size={16} /> {t('product.back', 'Back to shop')}
+        </Link>
+        {categoryPath && categoryPath !== '/shop' && (
+          <>
+            <span aria-hidden className="text-slate-600">/</span>
+            <Link to={categoryPath} className="hover:text-white transition">
+              {categoryVisual(product.category).label}
+            </Link>
+          </>
+        )}
+      </nav>
 
       <div className="grid lg:grid-cols-2 gap-10">
         {/* visual — shared-element morph target, with pointer-driven 3D tilt */}

@@ -27,6 +27,11 @@ Disallow: /wishlist
 Disallow: /*?ref=
 Disallow: /*?search=
 Disallow: /*?sort=
+# Every category the shop stocks in depth now has a real path of its own
+# (/robux, /fc-points, /cod-points…), and that is where the links point. What
+# is left on ?category= is the shop's own filter for the two categories too
+# small to deserve a page — a view of /shop, which is what its canonical says.
+Disallow: /*?category=
 
 # The API returns JSON. There is nothing here for a search engine to index, and
 # some of it is rate-limited.

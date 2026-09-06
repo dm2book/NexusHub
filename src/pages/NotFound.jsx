@@ -2,13 +2,19 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { Home, ShoppingBag, Search, LifeBuoy } from 'lucide-react';
 import { usePageMeta } from '../lib/useMeta.js';
+import { landingPathFor } from '../content/seo.js';
 import { useI18n } from '../lib/i18n.jsx';
 
-// Product names stay as they are in every language; only the last entry is copy.
+/* Product names stay as they are in every language; only the last entry is copy.
+
+   Every one of these used to be a `?category=` link, and one of them —
+   "Steam Wallet" → `?category=steam` — pointed at a shelf with nothing on it:
+   the Steam cards this shop sells all carry the category `giftcard`. A 404 page
+   whose recovery links lead to a second empty page is a 404 twice. */
 const popular = (t) => [
-  ['Robux', '/shop?category=robux'], ['V-Bucks', '/shop?category=v-bucks'],
-  ['Valorant', '/shop?category=valorant'], ['Discord Nitro', '/shop?category=discord-nitro'],
-  ['Steam Wallet', '/shop?category=steam'], [t('footer.track', 'Track order'), '/track'],
+  ['Robux', landingPathFor('robux')], ['V-Bucks', landingPathFor('v-bucks')],
+  ['Valorant', landingPathFor('valorant')], ['Discord Nitro', landingPathFor('discord-nitro')],
+  ['Giftcards', landingPathFor('giftcard')], [t('footer.track', 'Track order'), '/track'],
 ];
 
 export default function NotFound() {

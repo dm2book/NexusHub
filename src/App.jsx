@@ -1,6 +1,7 @@
 import { Routes, Route } from 'react-router-dom';
 import { lazy, Suspense } from 'react';
 import StoreLayout from './layouts/StoreLayout.jsx';
+import { LANDING } from './content/seo.js';
 // Split out of the main bundle. Every visitor who came to buy Robux was
 // downloading the admin console's shell and the account dashboard's shell
 // before the shop could render — neither of which they will ever open.
@@ -114,17 +115,17 @@ export default function App() {
               renders the same Shop already filtered, with its own heading,
               title, description and canonical — see src/content/seo.js. A
               query string (?category=robux) is crawlable but reads as a
-              filtered view of one page rather than a page about Robux. */}
-          <Route path="/robux" element={<Shop landingCategory="robux" landingTitle="Robux"
-            landingSub="Robux voor je Roblox-account. Op voorraad gaat automatisch de deur uit; de rest zetten we met de hand voor je klaar." />} />
-          <Route path="/v-bucks" element={<Shop landingCategory="v-bucks" landingTitle="V-Bucks"
-            landingSub="V-Bucks voor Fortnite, betaald met iDEAL. Automatisch geleverd wanneer we voorraad hebben." />} />
-          <Route path="/valorant-points" element={<Shop landingCategory="valorant" landingTitle="Valorant Points"
-            landingSub="Valorant Points (VP) met iDEAL. Automatisch als het op voorraad staat, anders met de hand binnen een paar uur." />} />
-          <Route path="/giftcards" element={<Shop landingCategory="giftcard" landingTitle="Giftcards"
-            landingSub="Digitale giftcards voor Steam, PlayStation, Xbox en meer. De code komt per e-mail." />} />
-          <Route path="/game-currency" element={<Shop landingCategory="" landingTitle="Game currency"
-            landingSub="Alle game currency op één plek: Robux, V-Bucks, Valorant Points en meer." />} />
+              filtered view of one page rather than a page about Robux.
+
+              Generated from LANDING rather than written out here. There were
+              five of these against twenty-one categories the shop stocks, and
+              the five were hardcoded in four places — this file, the prerender,
+              the sitemap and the footer — which is why the other sixteen never
+              got one. Adding a category is now one entry in seo.js. */}
+          {Object.entries(LANDING).map(([path, def]) => (
+            <Route key={path} path={path} element={
+              <Shop landingCategory={def.category} landingPath={path} />} />
+          ))}
           <Route path="/wishlist" element={<Wishlist />} />
           <Route path="/product/:id" element={<ProductDetail />} />
           <Route path="/cart" element={<Cart />} />

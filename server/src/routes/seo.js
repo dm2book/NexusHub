@@ -23,6 +23,7 @@ import { getProduct } from '../services/productService.js';
 import { availableCount } from '../services/codeStockService.js';
 import { reviewStats } from '../services/reviewsService.js';
 import { productPayload } from '../services/productPayload.js';
+import { LANDING, landingPathFor } from '../../../src/content/seo.js';
 
 const router = Router();
 
@@ -243,8 +244,13 @@ function describe(product, inStock) {
   const tail = `${price} · ${delivery} · Betaal met iDEAL.`;
   // 155 characters is where Google starts truncating; the part that gets cut is
   // always the part you cared about, so the facts go first.
-  const room = 155 - tail.length - 3;
-  return base && base.length > 20 ? `${base.slice(0, room).trim()}… ${tail}` : tail;
+  /* Math.max, because slice() with a negative argument counts from the END:
+     a long tail would have turned the description into the last few characters
+     of the product copy followed by the price. It cannot happen with today's
+     two tails (77 and 62 characters against a 155 budget), which is exactly why
+     it would go unnoticed if a third were ever added. */
+  const room = Math.max(0, 155 - tail.length - 3);
+  return base && base.length > 20 && room >= 20 ? `${base.slice(0, room).trim()}… ${tail}` : tail;
 }
 
 router.get('/product/:id', asyncHandler(async (req, res, next) => {
@@ -296,6 +302,14 @@ router.get('/product/:id', asyncHandler(async (req, res, next) => {
     ? { reviewCount: stats.count, ratingValue: stats.average }
     : {};
 
+  /* The category's own page, where it has one. `landingPathFor` returns a
+     `?category=` fallback for categories too small to deserve a page; that is
+     fine for a visitor's link and wrong for a breadcrumb, so anything with a
+     query string is dropped rather than published as a step. */
+  const candidate = product.category ? landingPathFor(product.category) : null;
+  const landingPath = candidate && candidate !== '/shop' && !candidate.includes('?') ? candidate : null;
+  const landingName = landingPath ? (LANDING[landingPath]?.nl?.h1 || product.category) : null;
+
   const ld = [{
     '@context': 'https://schema.org',
     '@type': 'Product',
@@ -336,10 +350,20 @@ router.get('/product/:id', asyncHandler(async (req, res, next) => {
   }, {
     '@context': 'https://schema.org',
     '@type': 'BreadcrumbList',
+    /* Home → Shop → Category → product. The category step used to be missing,
+       which was honest at the time: five categories out of twenty-one had a
+       page to point at. Now that every category the shop stocks has one, the
+       trail a crawler reads matches the trail the page renders — and each
+       product page passes a link to its own category rather than all seventy-one
+       of them pointing only at /shop. A category with no page of its own falls
+       back to the three-step trail rather than linking to a query string. */
     itemListElement: [
       { '@type': 'ListItem', position: 1, name: 'Home', item: SITE_URL() },
       { '@type': 'ListItem', position: 2, name: 'Shop', item: `${SITE_URL()}/shop` },
-      { '@type': 'ListItem', position: 3, name: product.name, item: canonical },
+      ...(landingPath
+        ? [{ '@type': 'ListItem', position: 3, name: landingName, item: SITE_URL() + landingPath }]
+        : []),
+      { '@type': 'ListItem', position: landingPath ? 4 : 3, name: product.name, item: canonical },
     ],
   }];
 

@@ -209,6 +209,28 @@ export const PAGES = {
  * duplicate catalogue to keep in sync — but with its own title, description,
  * heading and canonical. The `category` is the value the products genuinely
  * carry, so a landing page can never point at an empty shelf by typo.
+ *
+ * There used to be five of these, against twenty-one categories the shop
+ * genuinely stocks. Sixteen categories — forty-six of the seventy-one products
+ * — had no address of their own at all: their only URL was `/shop?category=x`,
+ * whose canonical points at `/shop`. Every one of those queries ("FC Points
+ * kopen", "CoD Points kopen", "Genesis Crystals kopen") had nothing to land on.
+ *
+ * This object is now the ONE source for them. It is read by
+ * scripts/prerender.mjs (which writes the HTML), by src/App.jsx (which
+ * declares the routes), by the sitemap in server/src/routes/catalog.js, and by
+ * the internal links on the homepage and on every product page — so a category
+ * cannot have a page that nothing links to, or a link to a page that does not
+ * exist.
+ *
+ * `sub` is the sentence under the heading. It lives here rather than in
+ * App.jsx because it is the page's only prose, and prose that describes the
+ * page belongs with the rest of the page's copy.
+ *
+ * A category earns a page when the shop stocks at least two products in it.
+ * One product is not a category — it is the product page again under another
+ * URL, which is the definition of a doorway. `spotify` and `gamepass` hold one
+ * each and are deliberately absent until they have depth.
  */
 export const LANDING = {
   '/robux': {
@@ -217,11 +239,13 @@ export const LANDING = {
       title: 'Robux kopen — direct op je Roblox-account',
       description: 'Robux kopen met iDEAL. Wat op voorraad staat gaat automatisch de deur uit; de rest zetten we met de hand op je Roblox-account, meestal binnen een paar uur.',
       h1: 'Robux kopen',
+      sub: 'Robux voor je Roblox-account. Op voorraad gaat automatisch de deur uit; de rest zetten we met de hand voor je klaar.',
     },
     en: {
       title: 'Buy Robux — straight to your Roblox account',
       description: 'Buy Robux with iDEAL. What is in stock goes out automatically; the rest we add to your Roblox account by hand, usually within a few hours.',
       h1: 'Buy Robux',
+      sub: 'Robux for your Roblox account. In stock goes out automatically; the rest we prepare by hand.',
     },
   },
   '/v-bucks': {
@@ -230,11 +254,13 @@ export const LANDING = {
       title: 'V-Bucks kopen voor Fortnite — snel geleverd',
       description: 'V-Bucks kopen met iDEAL, Bancontact of PayPal. Op voorraad wordt automatisch geleverd, de rest met de hand binnen een paar uur.',
       h1: 'V-Bucks kopen',
+      sub: 'V-Bucks voor Fortnite, betaald met iDEAL. Automatisch geleverd wanneer we voorraad hebben.',
     },
     en: {
       title: 'Buy V-Bucks for Fortnite — delivered fast',
       description: 'Buy V-Bucks with iDEAL, Bancontact or PayPal. In stock is delivered automatically, the rest by hand within a few hours.',
       h1: 'Buy V-Bucks',
+      sub: 'V-Bucks for Fortnite, paid with iDEAL. Delivered automatically when we have stock.',
     },
   },
   '/valorant-points': {
@@ -243,11 +269,13 @@ export const LANDING = {
       title: 'Valorant Points kopen — VP met iDEAL',
       description: 'Valorant Points kopen bij een Nederlandse shop. Betaal met iDEAL en krijg je VP automatisch of met de hand geleverd, meestal binnen een paar uur.',
       h1: 'Valorant Points kopen',
+      sub: 'Valorant Points (VP) met iDEAL. Automatisch als het op voorraad staat, anders met de hand binnen een paar uur.',
     },
     en: {
       title: 'Buy Valorant Points — VP with iDEAL',
       description: 'Buy Valorant Points from a Dutch shop. Pay with iDEAL and get your VP automatically or delivered by hand, usually within a few hours.',
       h1: 'Buy Valorant Points',
+      sub: 'Valorant Points (VP) with iDEAL. Automatic when in stock, otherwise by hand within a few hours.',
     },
   },
   '/giftcards': {
@@ -256,11 +284,238 @@ export const LANDING = {
       title: 'Giftcards kopen — Steam, PlayStation, Xbox',
       description: 'Digitale giftcards voor Steam, PlayStation, Xbox, Netflix en meer. Code per e-mail, betalen met iDEAL, geld terug als we niet kunnen leveren.',
       h1: 'Giftcards kopen',
+      sub: 'Digitale giftcards voor Steam, PlayStation, Xbox en meer. De code komt per e-mail.',
     },
     en: {
       title: 'Buy gift cards — Steam, PlayStation, Xbox',
       description: 'Digital gift cards for Steam, PlayStation, Xbox, Netflix and more. Code by email, pay with iDEAL, money back if we cannot deliver.',
       h1: 'Buy gift cards',
+      sub: 'Digital gift cards for Steam, PlayStation, Xbox and more. The code arrives by email.',
+    },
+  },
+  '/fc-points': {
+    category: 'eafc',
+    nl: {
+      title: 'FC Points kopen voor EA FC — direct geleverd',
+      description: 'FC Points kopen met iDEAL voor EA SPORTS FC. Op voorraad gaat automatisch de deur uit, de rest zetten we met de hand voor je klaar.',
+      h1: 'FC Points kopen',
+      sub: 'FC Points voor EA SPORTS FC, voor packs en Ultimate Team. Betalen met iDEAL, levering automatisch of met de hand.',
+    },
+    en: {
+      title: 'Buy FC Points for EA FC — delivered fast',
+      description: 'Buy FC Points for EA SPORTS FC with iDEAL. In stock goes out automatically, the rest we prepare by hand.',
+      h1: 'Buy FC Points',
+      sub: 'FC Points for EA SPORTS FC, for packs and Ultimate Team. Pay with iDEAL, delivered automatically or by hand.',
+    },
+  },
+  '/cod-points': {
+    category: 'cod',
+    nl: {
+      title: 'CoD Points kopen — Call of Duty CP met iDEAL',
+      description: 'CoD Points (CP) kopen voor Call of Duty en Warzone. Betaal met iDEAL; wat op voorraad staat gaat automatisch de deur uit.',
+      h1: 'CoD Points kopen',
+      sub: 'CP voor Call of Duty en Warzone — voor bundles, skins en de Battle Pass.',
+    },
+    en: {
+      title: 'Buy CoD Points — Call of Duty CP with iDEAL',
+      description: 'Buy CoD Points (CP) for Call of Duty and Warzone. Pay with iDEAL; what is in stock goes out automatically.',
+      h1: 'Buy CoD Points',
+      sub: 'CP for Call of Duty and Warzone — for bundles, skins and the Battle Pass.',
+    },
+  },
+  '/apex-coins': {
+    category: 'apex',
+    nl: {
+      title: 'Apex Coins kopen — Apex Legends met iDEAL',
+      description: 'Apex Coins kopen voor Apex Legends. Betaal met iDEAL of Bancontact; op voorraad wordt automatisch geleverd, de rest met de hand.',
+      h1: 'Apex Coins kopen',
+      sub: 'Apex Coins voor Apex Legends — voor legends, skins en de Battle Pass.',
+    },
+    en: {
+      title: 'Buy Apex Coins — Apex Legends with iDEAL',
+      description: 'Buy Apex Coins for Apex Legends. Pay with iDEAL or Bancontact; in stock is delivered automatically, the rest by hand.',
+      h1: 'Buy Apex Coins',
+      sub: 'Apex Coins for Apex Legends — for legends, skins and the Battle Pass.',
+    },
+  },
+  '/genshin-crystals': {
+    category: 'genshin',
+    nl: {
+      title: 'Genesis Crystals kopen — Genshin Impact top-up',
+      description: 'Genesis Crystals kopen voor Genshin Impact, betaald met iDEAL. Automatisch geleverd wanneer we voorraad hebben, anders met de hand.',
+      h1: 'Genesis Crystals kopen',
+      sub: 'Genesis Crystals voor Genshin Impact — voor wishes, de Battle Pass en Welkin.',
+    },
+    en: {
+      title: 'Buy Genesis Crystals — Genshin Impact top-up',
+      description: 'Buy Genesis Crystals for Genshin Impact, paid with iDEAL. Delivered automatically when in stock, otherwise by hand.',
+      h1: 'Buy Genesis Crystals',
+      sub: 'Genesis Crystals for Genshin Impact — for wishes, the Battle Pass and Welkin.',
+    },
+  },
+  '/clash-of-clans-gems': {
+    category: 'clash',
+    nl: {
+      title: 'Clash of Clans Gems kopen — met iDEAL',
+      description: 'Gems kopen voor Clash of Clans. Betaal met iDEAL; wat op voorraad staat gaat automatisch de deur uit, de rest binnen een paar uur.',
+      h1: 'Clash of Clans Gems kopen',
+      sub: 'Gems voor Clash of Clans — voor builders, boosts en de Gold Pass.',
+    },
+    en: {
+      title: 'Buy Clash of Clans Gems — with iDEAL',
+      description: 'Buy Gems for Clash of Clans. Pay with iDEAL; what is in stock goes out automatically, the rest within a few hours.',
+      h1: 'Buy Clash of Clans Gems',
+      sub: 'Gems for Clash of Clans — for builders, boosts and the Gold Pass.',
+    },
+  },
+  '/clash-royale-gems': {
+    category: 'clashroyale',
+    nl: {
+      title: 'Clash Royale Gems kopen — direct geleverd',
+      description: 'Gems kopen voor Clash Royale met iDEAL. Op voorraad wordt automatisch geleverd, de rest zetten we met de hand voor je klaar.',
+      h1: 'Clash Royale Gems kopen',
+      sub: 'Gems voor Clash Royale — voor chests, kaarten en de Pass Royale.',
+    },
+    en: {
+      title: 'Buy Clash Royale Gems — delivered fast',
+      description: 'Buy Gems for Clash Royale with iDEAL. In stock is delivered automatically, the rest we prepare by hand.',
+      h1: 'Buy Clash Royale Gems',
+      sub: 'Gems for Clash Royale — for chests, cards and the Pass Royale.',
+    },
+  },
+  '/brawl-stars-gems': {
+    category: 'brawl',
+    nl: {
+      title: 'Brawl Stars Gems kopen — met iDEAL',
+      description: 'Gems kopen voor Brawl Stars. Betaal met iDEAL, Bancontact of PayPal; automatisch geleverd zodra er voorraad is.',
+      h1: 'Brawl Stars Gems kopen',
+      sub: 'Gems voor Brawl Stars — voor brawlers, skins en de Brawl Pass.',
+    },
+    en: {
+      title: 'Buy Brawl Stars Gems — with iDEAL',
+      description: 'Buy Gems for Brawl Stars. Pay with iDEAL, Bancontact or PayPal; delivered automatically as soon as stock is there.',
+      h1: 'Buy Brawl Stars Gems',
+      sub: 'Gems for Brawl Stars — for brawlers, skins and the Brawl Pass.',
+    },
+  },
+  '/free-fire-diamonds': {
+    category: 'freefire',
+    nl: {
+      title: 'Free Fire Diamonds kopen — snel geleverd',
+      description: 'Diamonds kopen voor Free Fire met iDEAL. Wat op voorraad staat gaat automatisch de deur uit, de rest met de hand binnen een paar uur.',
+      h1: 'Free Fire Diamonds kopen',
+      sub: 'Diamonds voor Free Fire — voor skins, karakters en de Elite Pass.',
+    },
+    en: {
+      title: 'Buy Free Fire Diamonds — delivered fast',
+      description: 'Buy Diamonds for Free Fire with iDEAL. What is in stock goes out automatically, the rest by hand within a few hours.',
+      h1: 'Buy Free Fire Diamonds',
+      sub: 'Diamonds for Free Fire — for skins, characters and the Elite Pass.',
+    },
+  },
+  '/riot-points': {
+    category: 'league',
+    nl: {
+      title: 'Riot Points kopen — RP voor League of Legends',
+      description: 'Riot Points (RP) kopen voor League of Legends, betaald met iDEAL. Automatisch geleverd wanneer we voorraad hebben.',
+      h1: 'Riot Points kopen',
+      sub: 'RP voor League of Legends — voor champions, skins en de Battle Pass.',
+    },
+    en: {
+      title: 'Buy Riot Points — RP for League of Legends',
+      description: 'Buy Riot Points (RP) for League of Legends, paid with iDEAL. Delivered automatically when in stock.',
+      h1: 'Buy Riot Points',
+      sub: 'RP for League of Legends — for champions, skins and the Battle Pass.',
+    },
+  },
+  '/gta-shark-cards': {
+    category: 'gta',
+    nl: {
+      title: 'GTA Shark Cards kopen — cash voor GTA Online',
+      description: 'Shark Cards kopen voor GTA Online. Betaal met iDEAL en krijg je in-game cash automatisch of met de hand geleverd.',
+      h1: 'GTA Shark Cards kopen',
+      sub: 'Shark Cards voor GTA Online — in-game cash voor auto\u2019s, wapens en bedrijven.',
+    },
+    en: {
+      title: 'Buy GTA Shark Cards — cash for GTA Online',
+      description: 'Buy Shark Cards for GTA Online. Pay with iDEAL and get your in-game cash automatically or delivered by hand.',
+      h1: 'Buy GTA Shark Cards',
+      sub: 'Shark Cards for GTA Online — in-game cash for cars, weapons and businesses.',
+    },
+  },
+  '/minecoins': {
+    category: 'minecraft',
+    nl: {
+      title: 'Minecoins kopen — Minecraft met iDEAL',
+      description: 'Minecoins kopen voor Minecraft. Betaal met iDEAL; op voorraad gaat automatisch de deur uit, de rest met de hand.',
+      h1: 'Minecoins kopen',
+      sub: 'Minecoins voor Minecraft — voor skins, werelden en texture packs.',
+    },
+    en: {
+      title: 'Buy Minecoins — Minecraft with iDEAL',
+      description: 'Buy Minecoins for Minecraft. Pay with iDEAL; in stock goes out automatically, the rest by hand.',
+      h1: 'Buy Minecoins',
+      sub: 'Minecoins for Minecraft — for skins, worlds and texture packs.',
+    },
+  },
+  '/pubg-uc': {
+    category: 'pubg',
+    nl: {
+      title: 'PUBG UC kopen — Unknown Cash met iDEAL',
+      description: 'UC kopen voor PUBG Mobile, betaald met iDEAL. Wat op voorraad staat wordt automatisch geleverd, de rest binnen een paar uur.',
+      h1: 'PUBG UC kopen',
+      sub: 'Unknown Cash voor PUBG Mobile — voor crates, skins en de Royale Pass.',
+    },
+    en: {
+      title: 'Buy PUBG UC — Unknown Cash with iDEAL',
+      description: 'Buy UC for PUBG Mobile, paid with iDEAL. What is in stock is delivered automatically, the rest within a few hours.',
+      h1: 'Buy PUBG UC',
+      sub: 'Unknown Cash for PUBG Mobile — for crates, skins and the Royale Pass.',
+    },
+  },
+  '/mobile-legends-diamonds': {
+    category: 'mlbb',
+    nl: {
+      title: 'Mobile Legends Diamonds kopen — MLBB top-up',
+      description: 'Diamonds kopen voor Mobile Legends: Bang Bang met iDEAL. Automatisch geleverd zodra er voorraad is, anders met de hand.',
+      h1: 'Mobile Legends Diamonds kopen',
+      sub: 'Diamonds voor Mobile Legends: Bang Bang — voor helden, skins en de Pass.',
+    },
+    en: {
+      title: 'Buy Mobile Legends Diamonds — MLBB top-up',
+      description: 'Buy Diamonds for Mobile Legends: Bang Bang with iDEAL. Delivered automatically as soon as stock is there, otherwise by hand.',
+      h1: 'Buy Mobile Legends Diamonds',
+      sub: 'Diamonds for Mobile Legends: Bang Bang — for heroes, skins and the Pass.',
+    },
+  },
+  '/pokemon-go': {
+    category: 'pokemongo',
+    nl: {
+      title: 'Pokemon GO munten kopen — PokéCoins met iDEAL',
+      description: 'PokéCoins kopen voor Pokemon GO. Betaal met iDEAL; op voorraad wordt automatisch geleverd, de rest met de hand.',
+      h1: 'PokéCoins kopen',
+      sub: 'PokéCoins voor Pokemon GO — voor items, opslag en raids.',
+    },
+    en: {
+      title: 'Buy Pokemon GO coins — PokéCoins with iDEAL',
+      description: 'Buy PokéCoins for Pokemon GO. Pay with iDEAL; in stock is delivered automatically, the rest by hand.',
+      h1: 'Buy PokéCoins',
+      sub: 'PokéCoins for Pokemon GO — for items, storage and raids.',
+    },
+  },
+  '/discord-nitro': {
+    category: 'discord-nitro',
+    nl: {
+      title: 'Discord Nitro kopen — 1 maand of 1 jaar',
+      description: 'Discord Nitro kopen met iDEAL. De code komt per e-mail; op voorraad gaat automatisch de deur uit, de rest met de hand.',
+      h1: 'Discord Nitro kopen',
+      sub: 'Nitro voor Discord — emoji overal, grotere uploads en een betere stream.',
+    },
+    en: {
+      title: 'Buy Discord Nitro — 1 month or 1 year',
+      description: 'Buy Discord Nitro with iDEAL. The code arrives by email; in stock goes out automatically, the rest by hand.',
+      h1: 'Buy Discord Nitro',
+      sub: 'Nitro for Discord — emoji everywhere, bigger uploads and a better stream.',
     },
   },
   '/game-currency': {
@@ -269,14 +524,35 @@ export const LANDING = {
       title: 'Game currency kopen — Robux, V-Bucks, VP',
       description: 'Game currency voor Roblox, Fortnite, Valorant en meer, bij één Nederlandse shop. Betalen met iDEAL, levering automatisch of met de hand.',
       h1: 'Game currency kopen',
+      sub: 'Alle game currency op één plek: Robux, V-Bucks, Valorant Points en meer.',
     },
     en: {
       title: 'Buy game currency — Robux, V-Bucks, VP',
       description: 'Game currency for Roblox, Fortnite, Valorant and more, from one Dutch shop. Pay with iDEAL, delivered automatically or by hand.',
       h1: 'Buy game currency',
+      sub: 'All game currency in one place: Robux, V-Bucks, Valorant Points and more.',
     },
   },
 };
+
+/**
+ * The landing page for a category, if it has one.
+ *
+ * Used by every internal link that would otherwise point at
+ * `/shop?category=x`. That URL works for a visitor and is worth nothing to a
+ * search engine: useMeta points its canonical at `/shop`, so the homepage — the
+ * strongest page on the site — was spending all of its category link equity on
+ * one destination. A link to `/robux` spends it on the page about Robux.
+ *
+ * Falls back to the query string, because a category with too few products to
+ * deserve a page of its own still has to be browsable.
+ */
+export function landingPathFor(category) {
+  const key = String(category || '').toLowerCase();
+  if (!key) return '/shop';
+  const hit = Object.entries(LANDING).find(([, def]) => def.category === key);
+  return hit ? hit[0] : `/shop?category=${encodeURIComponent(key)}`;
+}
 
 /**
  * Pages that must not be indexed.
@@ -372,6 +648,32 @@ export const websiteLd = () => ({
     'query-input': 'required name=search_term_string',
   },
 });
+
+/**
+ * A category page, as a page about a category.
+ *
+ * Without it a landing page carried Organization, WebSite and a breadcrumb —
+ * three blocks about the SITE and none about the page. This says what the URL
+ * is: a collection, part of this website, published by this shop.
+ *
+ * Deliberately not an ItemList of the products on it. The products come from
+ * the database at request time and this HTML is written at build time, so any
+ * list here would be a guess — and structured data that does not match the page
+ * is the one kind of markup that costs more than it earns.
+ */
+export function collectionLd(path, { name, description } = {}) {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'CollectionPage',
+    '@id': `${SITE.url}${path}#page`,
+    url: SITE.url + path,
+    name,
+    description,
+    isPartOf: { '@id': `${SITE.url}/#website` },
+    about: { '@id': `${SITE.url}/#organization` },
+    inLanguage: 'nl-NL',
+  };
+}
 
 /** Where a page sits, so search results can show a path rather than a bare URL. */
 export function breadcrumbLd(trail) {
