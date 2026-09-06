@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Rocket, Check, Loader2 } from 'lucide-react';
 import { useLaunch } from '../../lib/useLaunch.js';
-import { useI18n } from '../../lib/i18n.jsx';
+import { useI18n, localeOf } from '../../lib/i18n.jsx';
 import { api } from '../../lib/api.js';
 
 /**
@@ -30,12 +30,14 @@ export default function LaunchBanner() {
   // Read off the same hook call above, not a second one: this sits after an
   // early return, and a hook called conditionally is a hook that will explode
   // the first time the shop is open.
-  const when = new Date(launchAt).toLocaleDateString(lang === 'nl' ? 'nl-NL' : 'en-GB',
+  /* The reader's real locale rather than "Dutch or English": a German visitor
+     was shown "24 September" formatted for en-GB. */
+  const when = new Date(launchAt).toLocaleDateString(localeOf(lang),
     { day: 'numeric', month: 'long', timeZone: 'UTC' });
 
-  const consentText = lang === 'nl'
-    ? 'Ik wil een e-mail als ForgeMarket opengaat.'
-    : 'Email me when ForgeMarket opens.';
+  /* Stored against the subscription as proof of what was agreed to, so it has
+     to be the sentence this visitor actually read. */
+  const consentText = t('launch.consent', 'Email me when ForgeMarket opens.');
 
   const submit = async (e) => {
     e.preventDefault();

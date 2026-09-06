@@ -1,16 +1,31 @@
 /* eslint-disable react-refresh/only-export-components */
 /**
- * Lightweight storefront i18n (EN default, NL translation) — no dependencies.
+ * Lightweight storefront i18n — no dependencies.
  *
  * Usage: const { t, lang, setLang } = useI18n();
  *        t('cart.title', 'Your cart')   ← key + English default inline
  *
- * English lives at the call site (always readable, nothing can "miss"); the NL
- * dictionary below only maps keys → Dutch. Unknown keys fall back to English,
- * so a missing translation can never break the UI. The choice persists in
+ * English lives at the call site (always readable, nothing can "miss"); every
+ * other language is a key → string map. An unknown key falls back to English,
+ * so a missing translation can never break the UI — which is what makes it safe
+ * to add a language before its dictionary is finished. The choice persists in
  * localStorage and defaults to the browser language on first visit.
+ *
+ * This used to be a hardcoded pair: `lang === 'nl' ? NL[key] : en`, an EN⇄NL
+ * toggle, and a stored value validated against exactly two strings. The
+ * languages now come from one registry (src/lib/i18n/registry.js) and the
+ * dictionaries from one map, so adding a fifth is a file and a line rather than
+ * a rewrite of every place that asked "is this Dutch?".
+ *
+ * Dutch is bundled because it is the shop's own language and most visitors read
+ * it. German and French are loaded on demand — together they are about as much
+ * text again as the whole entry chunk, and a Dutch buyer must not pay for them.
+ * Until that chunk lands the page renders English rather than blanks.
  */
 import { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
+import { LANG_CODES, localeOf } from './i18n/registry.js';
+
+export { LANGUAGES, localeOf } from './i18n/registry.js';
 
 const NL = {
   // Navigation
@@ -331,6 +346,7 @@ const NL = {
   'launch.minutes': 'min',
   'launch.seconds': 'sec',
   'launch.remaining': 'Nog {days} dagen tot ForgeMarket opent',
+  'launch.consent': 'Ik wil een e-mail als ForgeMarket opengaat.',
   'launch.subscribed': 'We mailen je op de dag zelf.',
   'launch.emailLabel': 'Je e-mailadres',
   'launch.placeholder': 'jij@voorbeeld.nl',
@@ -347,6 +363,7 @@ const NL = {
   'shop.sortBy': 'Sorteer producten op',
   'shop.loadMore': 'Meer producten tonen',
   'shop.showing': '{n} van {total}',
+  'legal.langNote': 'Dit document is alleen in het Nederlands en Engels gepubliceerd. Die twee versies zijn de bindende.',
   'legal.whoH': 'Met wie je zakendoet',
   'legal.whoEmail': 'E-mail',
   'legal.whoKvk': 'KvK-nummer',
@@ -997,31 +1014,88 @@ const LanguageContext = createContext({
   t: (_key, en) => en,
 });
 
-function initialLang() {
+/**
+ * The loaded dictionaries, by language code.
+ *
+ * Dutch is here from the start; German and French arrive when someone picks
+ * them. Module-level rather than React state because `translate()` below runs
+ * outside the provider — api.js writes the sentence a buyer reads when a
+ * request fails, and it has no React above it.
+ */
+const DICTS = { nl: NL };
+/** Bumped whenever a dictionary lands, so the provider re-renders with it. */
+let dictVersion = 0;
+const listeners = new Set();
+
+const LOADERS = {
+  de: () => import('./i18n/de.js'),
+  fr: () => import('./i18n/fr.js'),
+};
+
+/** Load a language's dictionary once. Resolves immediately if it is already in. */
+export function loadDictionary(code) {
+  if (DICTS[code] || !LOADERS[code]) return Promise.resolve();
+  return LOADERS[code]()
+    .then((m) => {
+      DICTS[code] = m.default || m.DICT || {};
+      dictVersion += 1;
+      listeners.forEach((fn) => fn());
+    })
+    /* A failed chunk is an English page, not a broken one. Worth saying out
+       loud though: silently serving the wrong language is the kind of thing
+       nobody reports and everybody notices. */
+    .catch(() => { console.warn(`[i18n] could not load the ${code} dictionary — falling back to English`); });
+}
+
+const lookup = (lang, key, en) => DICTS[lang]?.[key] ?? en;
+
+function readStoredLang() {
   try {
     const stored = localStorage.getItem('fm_lang');
-    if (stored === 'nl' || stored === 'en') return stored;
-    return (navigator.language || '').toLowerCase().startsWith('nl') ? 'nl' : 'en';
+    if (LANG_CODES.includes(stored)) return stored;
+    /* navigator.language is a tag like "de-AT" or "fr-BE", so match the prefix
+       rather than the whole thing — a Belgian French speaker got English out of
+       an exact comparison. */
+    const nav = (navigator.language || '').toLowerCase().split('-')[0];
+    return LANG_CODES.includes(nav) ? nav : 'en';
   } catch { return 'en'; }
 }
 
+function initialLang() { return readStoredLang(); }
+
 export function LanguageProvider({ children }) {
   const [lang, setLangState] = useState(initialLang);
+  /* Re-render when a lazily-loaded dictionary arrives. Without this a visitor
+     whose language is German would read English until they touched something. */
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const fn = () => setTick((n) => n + 1);
+    listeners.add(fn);
+    return () => listeners.delete(fn);
+  }, []);
+
   useEffect(() => { document.documentElement.lang = lang; }, [lang]);
+  // Fetch the dictionary for whatever language we start in, and for each switch.
+  useEffect(() => { loadDictionary(lang); }, [lang]);
 
   const setLang = useCallback((l) => {
+    if (!LANG_CODES.includes(l)) return;
     try { localStorage.setItem('fm_lang', l); } catch { /* private mode */ }
+    // Start the fetch before the re-render so the gap is as short as possible.
+    loadDictionary(l);
     setLangState(l);
   }, []);
 
   // {n}-style tokens are substituted from vars: t('x', 'Only {n} left', {n: 3}).
   const t = useCallback((key, en, vars) => {
-    let s = lang === 'nl' ? (NL[key] ?? en) : en;
+    let s = lookup(lang, key, en);
     if (vars) for (const [k, v] of Object.entries(vars)) s = s.replaceAll(`{${k}}`, String(v));
     return s;
-  }, [lang]);
+  // dictVersion is read so this memo is rebuilt when a dictionary lands.
+  }, [lang, dictVersion]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const value = useMemo(() => ({ lang, setLang, t }), [lang, setLang, t]);
+  const value = useMemo(() => ({ lang, setLang, t, locale: localeOf(lang) }),
+    [lang, setLang, t]);
   return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;
 }
 
@@ -1041,8 +1115,7 @@ export function useI18n() {
  * starts from, so the two cannot disagree about which language this is.
  */
 export function translate(key, en, vars) {
-  const lang = initialLang();
-  let s = lang === 'nl' ? (NL[key] ?? en) : en;
+  let s = lookup(initialLang(), key, en);
   if (vars) for (const [k, v] of Object.entries(vars)) s = s.replaceAll(`{${k}}`, String(v));
   return s;
 }
