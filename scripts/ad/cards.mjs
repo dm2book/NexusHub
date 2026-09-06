@@ -110,6 +110,32 @@ if (PRICE) {
   `), 'price.png');
 }
 
+/* ── The corner tag ─────────────────────────────────────────────────────────
+ *
+ * The address, small, bottom-left, from the second scene until the end card.
+ *
+ * The advert this pipeline was measured against shows its call to action at
+ * 15.0s of 20.7 — seventy-three per cent in — so everyone who left earlier
+ * watched twenty seconds of a shop whose name they could not then type. This
+ * costs a corner and means the address has been readable since the third
+ * second, however early the viewer goes.
+ *
+ * Deliberately quiet: it sits under the captions in the visual hierarchy,
+ * because the moment it competes with the hook it becomes the splash screen
+ * this whole approach exists to avoid.
+ */
+await shoot(page(`
+  <div class="wrap"><div class="tag"><span class="dot"></span>${esc(CTA)}</div></div>`, `
+  .wrap{height:100%;display:flex;align-items:flex-end;justify-content:flex-start;padding:0 0 210px 46px}
+  .tag{display:flex;align-items:center;gap:14px;padding:16px 30px 17px;border-radius:999px;
+    font-family:'Bricolage Grotesque','Inter',sans-serif;font-weight:700;font-size:34px;
+    color:rgba(255,255,255,.94);background:rgba(10,10,22,.58);
+    box-shadow:0 0 0 1.5px rgba(255,255,255,.16) inset,0 10px 34px rgba(0,0,0,.34);
+    backdrop-filter:blur(8px)}
+  .dot{width:16px;height:16px;border-radius:999px;background:linear-gradient(135deg,#7c5cff,#d946ef);
+    box-shadow:0 0 16px rgba(168,85,247,.9)}
+`), 'cta-tag.png');
+
 // ── The end card ────────────────────────────────────────────────────────────
 // One mark, one line, one address. An advert that ends on three competing
 // messages ends on none of them.
