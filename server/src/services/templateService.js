@@ -47,20 +47,20 @@ export function renderTokens(str, ctx, { where = 'template' } = {}) {
  * of [] renders no strip at all — a security code is not a place for marketing.
  */
 export const EMAIL_THEMES = {
-  account_created:   { accent: '#7c5cff', accent2: '#a855f7', eyebrow: 'Account created',   pills: ['🔐 No password to remember', '💬 Support on Discord'] },
-  order_received:    { accent: '#f5b324', accent2: '#fb923c', eyebrow: 'Order received',    pills: ['🧾 Reference = your order number', '🛡 Money back if undelivered'] },
-  payment_reminder:  { accent: '#f5b324', accent2: '#f97316', eyebrow: 'Waiting for payment', pills: ['⏳ Still reserved for you', '🛡 Money back if undelivered'] },
-  payment_confirmed: { accent: '#34d399', accent2: '#10b981', eyebrow: 'Payment confirmed', pills: ['✅ Payment received', '📦 Preparing your order'] },
-  order_processing:  { accent: '#38bdf8', accent2: '#6366f1', eyebrow: 'Order in progress', pills: ['📦 Being prepared', '💬 Support on Discord'] },
-  order_completed:   { accent: '#34d399', accent2: '#10b981', eyebrow: 'Delivered',         pills: ['🛡 Money back if undelivered', '💬 Something wrong? Reply'] },
-  refund_issued:     { accent: '#a855f7', accent2: '#d946ef', eyebrow: 'Refund issued',     pills: ['↩️ Refund on its way'] },
-  custom_message:    { accent: '#7c5cff', accent2: '#a855f7', eyebrow: 'Message from support', pills: ['💬 Just reply to reach a human'] },
-  support_reply:     { accent: '#7c5cff', accent2: '#a855f7', eyebrow: 'Support reply',      pills: ['💬 Just reply to reach a human'] },
-  cart_reminder:     { accent: '#7c5cff', accent2: '#d946ef', eyebrow: 'Still in your cart', pills: ['🛒 No account needed', '💸 No hidden fees'] },
-  review_request:    { accent: '#f59e0b', accent2: '#f97316', eyebrow: 'How did we do?',    pills: ['⭐ Takes 20 seconds'] },
-  gift_card:         { accent: '#d946ef', accent2: '#a855f7', eyebrow: 'Gift card',         pills: ['🎁 Never expires unused'] },
+  account_created:   { accent: '#7c5cff', accent2: '#a855f7', eyebrow: 'Account aangemaakt', pills: ['🔐 Geen wachtwoord om te onthouden', '💬 Hulp via Discord'] },
+  order_received:    { accent: '#f5b324', accent2: '#fb923c', eyebrow: 'Bestelling ontvangen', pills: ['🧾 Kenmerk = je bestelnummer', '🛡 Geld terug als we niet leveren'] },
+  payment_reminder:  { accent: '#f5b324', accent2: '#f97316', eyebrow: 'Wacht op betaling', pills: ['⏳ Nog voor je gereserveerd', '🛡 Geld terug als we niet leveren'] },
+  payment_confirmed: { accent: '#34d399', accent2: '#10b981', eyebrow: 'Betaling bevestigd', pills: ['✅ Betaling ontvangen', '📦 We maken je bestelling klaar'] },
+  order_processing:  { accent: '#38bdf8', accent2: '#6366f1', eyebrow: 'Bestelling in behandeling', pills: ['📦 Wordt klaargemaakt', '💬 Hulp via Discord'] },
+  order_completed:   { accent: '#34d399', accent2: '#10b981', eyebrow: 'Geleverd',          pills: ['🛡 Geld terug als we niet leveren', '💬 Klopt er iets niet? Antwoord even'] },
+  refund_issued:     { accent: '#a855f7', accent2: '#d946ef', eyebrow: 'Terugbetaald',      pills: ['↩️ Je geld is onderweg'] },
+  custom_message:    { accent: '#7c5cff', accent2: '#a855f7', eyebrow: 'Bericht van support', pills: ['💬 Antwoord gewoon — er zit een mens achter'] },
+  support_reply:     { accent: '#7c5cff', accent2: '#a855f7', eyebrow: 'Antwoord op je ticket', pills: ['💬 Antwoord gewoon — er zit een mens achter'] },
+  cart_reminder:     { accent: '#7c5cff', accent2: '#d946ef', eyebrow: 'Staat nog in je winkelwagen', pills: ['🛒 Geen account nodig', '💸 Geen verborgen kosten'] },
+  review_request:    { accent: '#f59e0b', accent2: '#f97316', eyebrow: 'Hoe deden we het?', pills: ['⭐ Kost 20 seconden'] },
+  gift_card:         { accent: '#d946ef', accent2: '#a855f7', eyebrow: 'Cadeaubon',         pills: ['🎁 Vervalt niet zolang hij niet gebruikt is'] },
   // Security mail: no marketing, no distractions, nothing to click by mistake.
-  login_otp:         { accent: '#64748b', accent2: '#475569', eyebrow: 'Security code',     pills: [] },
+  login_otp:         { accent: '#64748b', accent2: '#475569', eyebrow: 'Beveiligingscode',  pills: [] },
 };
 
 const DEFAULT_THEME = { accent: null, eyebrow: 'Digital goods for gamers', pills: [] };
@@ -144,10 +144,10 @@ export function wrapBranded(contentHtml, { preheader = '', theme = DEFAULT_THEME
       <div class="divider"></div>
     </div>` : `<div style="padding:0 30px"><div class="divider"></div></div>`}
     <div class="foot">
-      You're receiving this because you have a ${brand} account or placed an order.<br><br>
-      <a href="${config.appUrl}/track">Track order</a> &nbsp;·&nbsp;
-      <a href="${config.appUrl}/discord">Discord support</a> &nbsp;·&nbsp;
-      <a href="${config.appUrl}/account/settings">Email settings</a><br><br>
+      Je krijgt deze mail omdat je een ${brand}-account hebt of een bestelling hebt geplaatst.<br><br>
+      <a href="${config.appUrl}/track">Bestelling volgen</a> &nbsp;·&nbsp;
+      <a href="${config.appUrl}/discord">Hulp via Discord</a> &nbsp;·&nbsp;
+      <a href="${config.appUrl}/account/settings">E-mailinstellingen</a><br><br>
       © ${year} ${brand} — <a href="${config.appUrl}">${config.appUrl.replace(/^https?:\/\//, '')}</a>
     </div>
   </div>

@@ -79,8 +79,8 @@ console.log('\n— Order summary breakdown (price-bug fix) —');
   ok('order total reflects the €3 coupon (999 → 699)', o.total === 699, `total=${o.total}`);
   const email = await renderOrderEmail(o.id, 'order_received');
   const html = email.html;
-  ok('email summary shows a Subtotal line', /Subtotal/i.test(html), '');
-  ok('email summary shows the coupon discount line', /Coupon/i.test(html) && html.includes(coup.code), '');
+  ok('email summary shows a Subtotal line', /Subtotaal/i.test(html), '');
+  ok('email summary shows the coupon discount line', /Kortingscode/i.test(html) && html.includes(coup.code), '');
   ok('email summary shows the correct total (€6.99)', /6[.,]99/.test(html), '');
   ok('email summary still shows the list price (€9.99)', /9[.,]99/.test(html), '');
 }

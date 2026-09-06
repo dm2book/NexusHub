@@ -251,6 +251,12 @@ router.get('/config', asyncHandler(async (_req, res) => {
     // the last step. The reasons themselves name env vars and stay server-side.
     orderingPaused: commerceBlockers().length > 0,
     demoPayments: config.payments.demoMode,
+    /* The ceiling the order actually applies over the whole discount stack.
+       The checkout summed coupon + Forge+ + bundle and clamped only at the
+       subtotal, while createOrder clamps at this percentage — so a coupon above
+       it quoted one total and charged another: a 50% code on €9.99 showed
+       €4.99 in the cart and took €5.99. Sent so both sides use one number. */
+    maxDiscountPercent: Math.max(0, Math.min(100, config.market.maxTotalDiscountPercent)),
     paymentMethods: manual,                 // [{id,label,target,kind}]
     // What the buyer may end up seeing on Mollie's page. Which of these is
     // actually offered depends on the amount and the country, so the checkout
@@ -738,6 +744,13 @@ router.get('/track/:number', asyncHandler(async (req, res) => {
     // prepared at all. The buyer is owed the truth about why their code has not
     // arrived; what they are NOT told is which signal caught them, because that
     // is a free tuning loop for the next attempt.
+    /* What the order is still waiting on from the buyer — "Roblox-gebruikersnaam"
+       and the like. Without this the page said "we're preparing it" for an
+       order that could not move until somebody asked for an account name, and
+       the buyer had no way to know they were the blocker. Cleared once the
+       order is settled. */
+    needsFromBuyer: ['completed', 'refunded', 'cancelled'].includes(order.status)
+      ? null : (order.billing?.needsFromBuyer || null),
     onHold: !!order.fraudHold,
     onHoldMessage: order.fraudHold ? holdMessage() : null,
     updatedAt: order.updatedAt,
