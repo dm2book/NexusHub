@@ -38,6 +38,7 @@ const ROOT = process.cwd();
 const asJson = process.argv.includes('--json');
 const { all, get } = await import(path.join(ROOT, 'server/src/db/index.js'));
 const { config } = await import(path.join(ROOT, 'server/src/config/env.js'));
+const { costCentsFromMetadata } = await import(path.join(ROOT, 'server/src/services/costService.js'));
 
 const FEE_PCT = config.market.paymentFeePercent / 100;
 const FEE_FIX = config.market.paymentFixedFee;
@@ -55,7 +56,9 @@ const parsed = products.map((p) => {
   const units = m ? Number(m[1].replace(/[.,]/g, '')) : null;
   const face = (/€\s?(\d+)/.exec(p.name) || [])[1];
   return { ...p, meta, units, faceEur: face ? Number(face) : null, priceEur: p.price / 100,
-    costEur: Number.isFinite(Number(meta.costCents)) ? Number(meta.costCents) / 100 : null };
+    /* Through costService, so this counts the same costs the pricing engine
+       uses. It read only `costCents` while the admin form writes `cost`. */
+    costEur: (() => { const c = costCentsFromMetadata(meta); return c === null ? null : c / 100; })() };
 });
 
 /** What the shop keeps after the payment provider takes its cut. */

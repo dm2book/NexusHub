@@ -19,6 +19,7 @@ import { config } from '../../config/env.js';
 import { all, get, run, nowIso } from '../../db/index.js';
 import { newId } from '../../utils/ids.js';
 import { alertOwner } from '../notifyService.js';
+import { costEurFor } from '../costService.js';
 import { sourceStatuses, persistSourceStatuses, fetchFromSource, SourceUnavailable, SOURCES } from './sources.js';
 import { recordObservation, latestPerSource } from './observations.js';
 import { runDiscovery, CANDIDATE_STATUS } from './discovery.js';
@@ -133,19 +134,18 @@ export async function runProductDiscovery({ force = false, fetchImpl = fetch } =
  * neither exists there is no cost, and a recommendation without a cost cannot
  * assert a margin — so it is blocked rather than assumed to be free.
  */
+/**
+ * What this product costs us, in euros, or null.
+ *
+ * This used to read `supplier_products.cost_cents` — a column that does not
+ * exist, inside a `.catch(() => null)`, so a supplier mapping silently reached
+ * nobody — and then `metadata.costCents`, which is not the key the admin form
+ * writes. An owner could fill in the purchase price of every product and this
+ * function would still answer null for all of them, blocking every
+ * recommendation with NO_COST. costService is the one reader now.
+ */
 export async function costFor(forgeProductId) {
-  if (!forgeProductId) return null;
-  const mapped = await get(
-    `SELECT cost_cents FROM supplier_products WHERE product_id=@p AND cost_cents IS NOT NULL
-      ORDER BY updated_at DESC LIMIT 1`, { p: forgeProductId }).catch(() => null);
-  if (mapped?.cost_cents != null) return Number(mapped.cost_cents) / 100;
-  const p = await get(`SELECT metadata FROM products WHERE id=@p`, { p: forgeProductId }).catch(() => null);
-  try {
-    const meta = JSON.parse(p?.metadata || '{}');
-    if (Number.isFinite(Number(meta.costCents))) return Number(meta.costCents) / 100;
-    if (Number.isFinite(Number(meta.buyPrice))) return Number(meta.buyPrice);
-  } catch { /* no metadata cost */ }
-  return null;
+  return costEurFor(forgeProductId);
 }
 
 export async function recommendFor(marketProductId, { promotional = false } = {}) {
