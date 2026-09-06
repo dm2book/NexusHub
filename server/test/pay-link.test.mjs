@@ -125,7 +125,7 @@ console.log('\n— The buyer sees it —');
 
   const mail = await renderOrderEmail(order.id, 'payment_reminder');
   ok('the reminder email carries the exact-amount link', mail.html.includes('https://tikkie.me/pay/in-the-email'));
-  ok('the email says the amount is already filled in', /already filled in/i.test(mail.html));
+  ok('the email says the amount is already filled in', /bedrag staat er al in/i.test(mail.html));
   // With no generic method configured there is nothing to fall back to, and the
   // mail must not invent one. "as the reference" only appears in the generic
   // block — matching on "Tikkie" would hit the link's own hostname.

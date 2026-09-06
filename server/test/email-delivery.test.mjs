@@ -134,14 +134,18 @@ console.log('\n— The headers that actually left the building —');
 
 console.log('\n— The delivery email carries the code in BOTH parts —');
 {
-  const raw = inbox.find((m) => /is ready/.test(m));
+  /* Found by the code it carries rather than by a phrase in the subject: the
+     subject is Dutch now, and a subject line is quoted-printable-encoded the
+     moment it contains anything but ASCII, so matching words in it is brittle
+     in a way that has nothing to do with what this test is checking. */
+  const raw = inbox.find((m) => m.includes('ROBUX-TEST-CODE-9876'));
   ok('the delivery email was sent', !!raw);
   ok('…the HTML has the code', raw.includes('ROBUX-TEST-CODE-9876'));
   const text = plainPart(raw) || '';
   ok('…and so does the plain-text part', text.includes('ROBUX-TEST-CODE-9876'),
     text.slice(0, 120));
   ok('…the plain text is not just stripped tags',
-    /order/i.test(text) && !/<[a-z]/i.test(text), text.slice(0, 120));
+    /bestelling/i.test(text) && !/<[a-z]/i.test(text), text.slice(0, 120));
 }
 
 console.log('\n— Nothing in an email that should not leave the server —');

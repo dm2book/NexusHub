@@ -60,10 +60,10 @@ console.log('— Per-mail identity —');
 
   const otp = await render('login_otp');
   ok('security mail carries no marketing pills', !/Money back|No hidden fees|Support on Discord/.test(otp.html));
-  ok('security mail says what it is', /SECURITY CODE|Security code/i.test(otp.html));
+  ok('security mail says what it is', /Beveiligingscode/i.test(otp.html));
 
   const delivered = await render('order_completed');
-  ok('delivery mail uses the delivered eyebrow', /Delivered/.test(delivered.html));
+  ok('delivery mail uses the delivered eyebrow', /Geleverd/.test(delivered.html));
   ok('delivery mail is green, not the default purple', /#34d399/.test(delivered.html), 'accent missing');
 
   const waiting = await render('payment_reminder');
@@ -92,17 +92,17 @@ console.log('\n— Redeem steps per category —');
   ok('Robux order does NOT show gift-card steps', !/PlayStation, Xbox/.test(rbxMail));
 
   const cardMail = await deliver([{ productId: card.id, quantity: 1 }], [[card.id, `STEAM-${tag}`]]);
-  ok('gift card explains the store redeem flow', /Add funds/.test(cardMail));
+  ok('gift card explains the store redeem flow', /Tegoed toevoegen/.test(cardMail));
   ok('gift card does NOT show Roblox steps', !/roblox\.com\/redeem/.test(cardMail));
 
   const mixed = await deliver(
     [{ productId: robux.id, quantity: 1 }, { productId: card.id, quantity: 1 }],
     [[robux.id, `RBX2-${tag}`], [card.id, `STEAM2-${tag}`]]);
-  ok('a mixed order explains BOTH', /roblox\.com\/redeem/.test(mixed) && /Add funds/.test(mixed));
+  ok('a mixed order explains BOTH', /roblox\.com\/redeem/.test(mixed) && /Tegoed toevoegen/.test(mixed));
 
   const fallback = await deliver([{ productId: odd.id, quantity: 1 }], [[odd.id, `FF-${tag}`]]);
-  ok('a category with no recipe still gets usable guidance', /How to use your code/.test(fallback));
-  ok('the fallback offers a human, not a dead end', /reply to this email/i.test(fallback));
+  ok('a category with no recipe still gets usable guidance', /Zo gebruik je je code/.test(fallback));
+  ok('the fallback offers a human, not a dead end', /beantwoord deze mail/i.test(fallback));
 }
 
 // ── 3. Account top-ups have nothing to redeem ───────────────────────────────
@@ -127,7 +127,7 @@ console.log('\n— Template upgrades —');
     { b: LEGACY_TEMPLATE_BODIES.payment_confirmed[0], i: 'payment_confirmed' });
   await syncEmailTemplates();
   const upgraded = await get("SELECT body_html FROM email_templates WHERE id='payment_confirmed'");
-  ok('an untouched old default is upgraded', /What happens next/.test(upgraded.body_html));
+  ok('an untouched old default is upgraded', /Wat er nu gebeurt/.test(upgraded.body_html));
 
   const mine = '<h1>Eigen tekst</h1><p>{{order.number}}</p>';
   await run('UPDATE email_templates SET body_html=@b WHERE id=@i', { b: mine, i: 'payment_confirmed' });

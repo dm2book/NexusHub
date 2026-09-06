@@ -254,8 +254,29 @@ export default function Track() {
             </div>
           )}
 
+          {/* The buyer is the blocker, and until now nothing said so.
+
+              A Robux order is delivered onto an account, so without a username
+              it cannot move — and this page told the buyer "we're on it" while
+              it sat in the queue waiting for them. Shown above the reassurance
+              panel, because it is the one thing on this page they can act on. */}
+          {result.needsFromBuyer && !failed && (
+            <div className="rounded-2xl border border-amber-400/40 bg-amber-400/10 p-5 mb-6">
+              <div className="text-amber-200 font-semibold">
+                ⚠️ {t('track.needsTitle', 'We still need one thing from you')}
+              </div>
+              <p className="text-slate-300 text-sm mt-1">
+                {t('track.needsSub', 'This order is delivered straight to your account, so we need your {field}. Reply to your order email with just that, and it goes out right away — we never ask for your password.',
+                  { field: result.needsFromBuyer })}
+              </p>
+              <Link to="/contact" className="text-amber-200 text-sm hover:underline mt-2 inline-block">
+                {t('track.needsCta', 'Send it to us →')}
+              </Link>
+            </div>
+          )}
+
           {/* In-flight reassurance */}
-          {!result.onHold && ['payment_received', 'processing', 'awaiting_fulfillment'].includes(result.status) && (
+          {!result.onHold && !result.needsFromBuyer && ['payment_received', 'processing', 'awaiting_fulfillment'].includes(result.status) && (
             <div className="rounded-2xl border border-indigo-500/30 bg-indigo-500/10 p-5 mb-6">
               <div className="text-indigo-200 font-semibold">{t('track.confirmed', '✅ Payment confirmed — we’re on it')}</div>
               <p className="text-slate-300 text-sm mt-1">

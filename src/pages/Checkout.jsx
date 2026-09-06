@@ -13,6 +13,7 @@ import { useToast } from '../context/ToastContext.jsx';
 import { money } from '../lib/catalog.js';
 import { EmptyState } from '../components/ui.jsx';
 import { usePageMeta } from '../lib/useMeta.js';
+import { deliveryField } from '../lib/deliveryInfo.js';
 import { matchBundle } from '../lib/bundles.js';
 import { useStickyBarLift } from '../lib/useStickyBarLift.js';
 import { rememberOrder, recallOrder, forgetOrder } from '../lib/lastOrder.js';
@@ -76,19 +77,41 @@ export default function Checkout() {
   const [deliveryChoices, setDeliveryChoices] = useState({}); // productId → offers a code/account choice
   const [deliveryDetail, setDeliveryDetail] = useState('');
   const [deliveryMethod, setDeliveryMethod] = useState('code'); // 'code' | 'account' (buyer's pick)
+  // Server-owned; 100 until /api/config answers, so a slow config never invents
+  // a cap the order does not apply.
+  const [maxDiscountPercent, setMaxDiscountPercent] = useState(100);
 
   // Same rule as the cart, from one place — they used to disagree.
   const matchedBundle = matchBundle(items, bundles);
   const bundleDiscount = matchedBundle?.discount || 0;
 
+  /* The server already told us what this coupon is worth on this subtotal —
+     /api/coupons/:code?subtotal= returns `discount` — and recomputing it here
+     is how the two came to disagree. Kept as a fallback for a cached coupon
+     object from before this field was read. */
   const couponDiscount = coupon
-    ? (coupon.percent ? Math.round(subtotal * coupon.percent / 100) : Math.min(subtotal, coupon.value || 0))
+    ? (Number.isFinite(coupon.discount) ? coupon.discount
+      : (coupon.percent ? Math.round(subtotal * coupon.percent / 100) : Math.min(subtotal, coupon.value || 0)))
     : 0;
   /* Forge+ takes a standing percentage off every order server-side. Leaving it
      out here meant the summary quoted more than the buyer was charged. */
   const memberPercent = user?.memberPercent || 0;
   const memberDiscount = memberPercent ? Math.round(subtotal * memberPercent / 100) : 0;
-  const discount = Math.min(subtotal, couponDiscount + memberDiscount + bundleDiscount);
+  /* One ceiling over the whole stack, the same one createOrder applies.
+
+     This clamped at the subtotal only, which is not the rule the order uses:
+     createOrder caps the total discount at MAX_TOTAL_DISCOUNT_PERCENT (40).
+     Measured — a 50% coupon on a €9.99 product showed −€5.00 and a €4.99 total
+     here, and the order charged €5.99. The buyer read one price and paid
+     another, which is a dispute and a support ticket per order. */
+  const discountCeiling = Math.round(subtotal * maxDiscountPercent / 100);
+  const stacked = couponDiscount + memberDiscount + bundleDiscount;
+  const discount = Math.min(subtotal, stacked, discountCeiling);
+  /* When the ceiling bites, the lines below must still add up to the total the
+     buyer is charged — three lines summing to more than the discount shown is
+     the same broken arithmetic in a different place. The coupon is the line
+     that gives way, because it is the one the buyer chose to add. */
+  const couponShown = stacked > discount ? Math.max(0, couponDiscount - (stacked - discount)) : couponDiscount;
   const afterDiscount = Math.max(0, subtotal - discount);
   const creditToApply = useCredit ? Math.min(creditBalance, afterDiscount) : 0;
   const grandTotal = Math.max(0, afterDiscount - creditToApply);
@@ -141,12 +164,24 @@ export default function Checkout() {
     }).catch(() => {});
   }, []);
 
-  // Delivery target labels for cart items (e.g. a Robux top-up asks for the
-  // buyer's Roblox username).
-  const deliveryLabels = [...new Set(items.map((i) => deliveryFields[i.id]).filter(Boolean))];
+  /* Delivery target labels for cart items (e.g. a Robux top-up asks for the
+     buyer's Roblox username).
+
+     This read ONLY `metadata.deliveryField`, which is set on 0 of the 72
+     products — so the field never rendered for anything, and a Robux order
+     arrived with no username on it. The product page meanwhile tells the buyer
+     "geef ons je Roblox-gebruikersnaam door (in je bestelling…)", pointing at a
+     field that was not there. Every Robux sale therefore had to become a
+     conversation before it could be delivered.
+
+     deliveryField() is the same source that sentence comes from, keyed by
+     category, and the cart item already carries its category — so this needs no
+     network call and cannot be silenced by the products fetch below failing. */
+  const fieldFor = (i) => deliveryFields[i.id] || deliveryField(i.category, lang);
+  const deliveryLabels = [...new Set(items.map(fieldFor).filter(Boolean))];
   // A product offers a CHOICE (code vs account) or REQUIRES account delivery.
   const offersChoice = items.some((i) => deliveryChoices[i.id]);
-  const requiresAccount = items.some((i) => deliveryFields[i.id] && !deliveryChoices[i.id]);
+  const requiresAccount = items.some((i) => fieldFor(i) && !deliveryChoices[i.id]);
   // Effective method: forced to account for pure top-up products, otherwise the
   // buyer's pick (defaults to a gift code).
   const method = requiresAccount ? 'account' : (offersChoice ? deliveryMethod : 'code');
@@ -161,6 +196,7 @@ export default function Checkout() {
       // payments still on, a Mollie test key). Say it here rather than letting
       // someone fill in their details and meet a 503 at the last step.
       setPaused(!!c.orderingPaused);
+      if (Number.isFinite(c.maxDiscountPercent)) setMaxDiscountPercent(c.maxDiscountPercent);
       if ((c.paymentMethods || []).length) setMethodId(c.paymentMethods[0].id);
     }).catch(() => {});
   }, []);
@@ -472,7 +508,7 @@ export default function Checkout() {
             <div className="flex justify-between text-sm text-slate-400"><span>{t('cart.subtotal', 'Subtotal')}</span><span>{money(subtotal, currency)}</span></div>
             {matchedBundle && <div className="flex justify-between text-sm text-amber-300"><span>Bundle ({matchedBundle.name} · {matchedBundle.percent}%)</span><span>−{money(bundleDiscount, currency)}</span></div>}
             {memberDiscount > 0 && <div className="flex justify-between text-sm text-violet-300"><span>{t('checkout.memberOff', 'Forge+ member — {n}% off', { n: memberPercent })}</span><span>−{money(memberDiscount, currency)}</span></div>}
-            {coupon && <div className="flex justify-between text-sm text-emerald-300"><span>{t('checkout.coupon', 'Coupon')} ({coupon.code}{coupon.percent ? ` · ${coupon.percent}%` : ''})</span><span>−{money(couponDiscount, currency)}</span></div>}
+            {coupon && <div className="flex justify-between text-sm text-emerald-300"><span>{t('checkout.coupon', 'Coupon')} ({coupon.code}{coupon.percent ? ` · ${coupon.percent}%` : ''})</span><span>−{money(couponShown, currency)}</span></div>}
             {creditToApply > 0 && <div className="flex justify-between text-sm text-indigo-300"><span>{t('checkout.credit', 'Store credit')}</span><span>−{money(creditToApply, currency)}</span></div>}
             <div className="flex justify-between text-lg pt-1"><span className="text-slate-300">{t('cart.total', 'Total')}</span><span className="text-white font-semibold">{money(grandTotal, currency)}</span></div>
           </div>

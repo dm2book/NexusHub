@@ -38,6 +38,9 @@ import { grantTierRewards } from './loyaltyService.js';
 import { awardCoinsForOrder } from './forgeCoinService.js';
 import { settleMysteryForOrder } from './mysteryBoxService.js';
 import { evaluateCoupon, recordCouponRedemption } from './couponService.js';
+/* The one detail a category needs from the buyer, from the same module the
+   product page and the checkout read. */
+import { deliveryField as deliveryFieldFor } from '../../../src/lib/deliveryInfo.js';
 import { bestBundleDiscount } from './bundleService.js';
 
 export const STATUSES = [
@@ -106,6 +109,10 @@ export async function createOrder(input, ctx = {}) {
   let subtotal = 0;
   const currency = input.currency || 'EUR';
   const lineItems = [];
+  /* What this order still needs from the buyer before it can be delivered —
+     "Roblox-gebruikersnaam" and the like. Collected while walking the items so
+     a mixed order names each thing once. */
+  const missingTargets = new Set();
 
   for (const li of input.items) {
     const product = await getProduct(li.productId);
@@ -124,6 +131,24 @@ export async function createOrder(input, ctx = {}) {
     if (product.kind === 'mystery' && !input.userId) {
       throw badRequest(
         `${product.name} pays out as store credit, so it needs an account — please sign in or create one first.`);
+    }
+    /* A top-up we cannot address stalls until somebody asks for the address.
+
+       Robux goes onto an account, not into a code, and the product page says
+       so: "geef ons je Roblox-gebruikersnaam door (in je bestelling of via een
+       ticket)". The checkout was reading only `metadata.deliveryField`, which
+       is set on none of the seventy-two products, so that field never rendered
+       and every Robux order arrived with nothing to deliver it to.
+
+       Not refused here. The page offers a ticket as an equally valid way to
+       hand it over, so an order without it is incomplete rather than invalid —
+       and refusing a payment over a field the shop says you may supply later
+       would lose the sale outright. It is RECORDED instead, so the buyer is
+       asked for it in the confirmation mail and on the track page, and the
+       fulfilment queue shows what it is waiting for. */
+    const needsTarget = deliveryFieldFor(product.category, 'nl');
+    if (needsTarget && !String(input.billing?.deliveryDetails || '').trim()) {
+      missingTargets.add(needsTarget);
     }
     const qty = Math.max(1, Number(li.quantity || 1));
     const unit = product.price;
@@ -190,6 +215,12 @@ export async function createOrder(input, ctx = {}) {
   // A plain gift-code order carries no account target — drop any stray value so
   // the fulfillment queue never shows a phantom "deliver to" on a code order.
   if (billing.deliveryMethod !== 'account') { delete billing.deliveryDetails; delete billing.deliveryLabel; }
+  /* What we still have to ask the buyer for. Recorded on the order so the
+     confirmation mail, the track page and the fulfilment queue all name the
+     same thing — and only when the buyer did not already supply it. */
+  if (missingTargets.size && !suppliedTarget) {
+    billing.needsFromBuyer = [...missingTargets].join(' / ');
+  }
   if (couponCode) { billing.coupon = couponCode; billing.discount = couponDiscount; }
   if (memberDiscount) { billing.memberDiscount = memberDiscount; billing.memberPercent = memberPercent; }
   if (bundleDiscount) { billing.bundle = bundle.bundle?.name; billing.bundleDiscount = bundleDiscount; }
@@ -1180,9 +1211,35 @@ function consentHtml(order) {
   const escaped = sentence
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   return `<p style="color:#8b93a7;font-size:12px;line-height:1.6;margin-top:18px;padding-top:14px;border-top:1px solid rgba(255,255,255,.08)">
-    <strong style="color:#b6c1d1">Right of withdrawal</strong><br>
-    ${escaped ? `On ${stamp} you confirmed: “${escaped}”<br>` : `On ${stamp} you asked for immediate delivery and acknowledged that the 14-day right of withdrawal lapses once the order has been delivered.<br>`}
-    Until delivery you can still cancel — just reply to this email.</p>`;
+    <strong style="color:#b6c1d1">Herroepingsrecht</strong><br>
+    ${escaped ? `Op ${stamp} bevestigde je: “${escaped}”<br>` : `Op ${stamp} vroeg je om directe levering en erkende je dat het herroepingsrecht van 14 dagen vervalt zodra de bestelling geleverd is.<br>`}
+    Tot de levering kun je nog annuleren — beantwoord daarvoor gewoon deze mail.</p>`;
+}
+
+/**
+ * The one thing we still need from the buyer, asked where they will read it.
+ *
+ * A Robux order goes onto an account, and until we know which account it can
+ * only sit in the queue. The product page says to send the username "in je
+ * bestelling of via een ticket"; when the order carries neither, this asks for
+ * it in the confirmation mail — which is the message every buyer opens — so the
+ * order resolves itself instead of waiting for somebody to notice it.
+ */
+function needsFromBuyerHtml(order) {
+  const need = String(order.billing?.needsFromBuyer || '').trim();
+  if (!need) return '';
+  const settled = ['completed', 'refunded', 'cancelled'].includes(order.status);
+  if (settled) return '';
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:18px 0 4px">
+    <tr><td style="background-color:#241d09;border:1px solid #6b5115;border-radius:14px;padding:16px 18px">
+      <div style="font:700 14px/1.35 'Segoe UI',Arial,sans-serif;color:#fbbf24">⚠️ We hebben nog één ding van je nodig</div>
+      <div style="font:400 13.5px/1.6 'Segoe UI',Arial,sans-serif;color:#d8c9a3;padding-top:6px">
+        Deze bestelling leveren we rechtstreeks op je account, dus we hebben je
+        <strong style="color:#fff">${escapeHtml(need)}</strong> nodig.
+        Beantwoord deze mail met alleen dat gegeven — daarna gaat je bestelling meteen de deur uit.
+        We vragen <strong style="color:#fff">nooit</strong> om je wachtwoord.
+      </div>
+    </td></tr></table>`;
 }
 
 /** Manual-payment instructions block for the order-received email (Tikkie/Revolut/PayPal). */
@@ -1200,25 +1257,25 @@ function paymentInstructionsHtml(order) {
   // and needs no reference — so it goes first, and the generic methods below
   // become the fallback rather than the instruction.
   const exact = order.payLink
-    ? `<div class="quote"><strong>Pay ${amt} — the amount is already filled in</strong><br>` +
+    ? `<div class="quote"><strong>Betaal ${amt} — het bedrag staat er al in</strong><br>` +
       `<a href="${escapeHtml(order.payLink)}">${escapeHtml(String(order.payLink).replace(/^https?:\/\//, '').slice(0, 60))}</a>` +
       `</div>`
     : '';
   const rows = payMethodsFor(methods, order).map((m) => {
     if (m.kind === 'email') {
-      return `<tr><td><strong>${m.label}</strong></td><td class="r">Send ${amt} to ${escapeHtml(m.target)}</td></tr>`;
+      return `<tr><td><strong>${m.label}</strong></td><td class="r">Maak ${amt} over naar ${escapeHtml(m.target)}</td></tr>`;
     }
     // Saying which links already carry the amount is the difference between a
     // buyer tapping once and a buyer typing a number wrong.
-    const note = m.prefilled ? ' <span style="color:#34d399">· amount filled in</span>' : '';
+    const note = m.prefilled ? ' <span style="color:#34d399">· bedrag staat er al in</span>' : '';
     return `<tr><td><strong>${m.label}</strong>${note}</td><td class="r">` +
       `<a href="${m.url}">${escapeHtml(String(m.url).replace(/^https?:\/\//, ''))}</a></td></tr>`;
   }).join('');
   if (!methods.length) return exact;   // only the exact-amount link to show
   return exact +
-    `<div class="quote"><strong>${exact ? 'Or pay it yourself' : 'Complete your payment'} — ${amt}</strong><br>` +
-    `Pay using one of the methods below and put your order number <strong>${order.number}</strong> as the reference. ` +
-    `Your order is confirmed as soon as we receive it.</div>` +
+    `<div class="quote"><strong>${exact ? 'Of maak het zelf over' : 'Rond je betaling af'} — ${amt}</strong><br>` +
+    `Betaal via een van de methoden hieronder en zet je bestelnummer <strong>${order.number}</strong> erbij als kenmerk. ` +
+    `Je bestelling is bevestigd zodra we hem binnen hebben.</div>` +
     `<table class="summary"><tbody>${rows}</tbody></table>`;
 }
 
@@ -1235,27 +1292,27 @@ function paymentInstructionsHtml(order) {
  * this sits under the code, it is not a manual.
  */
 const REDEEM_STEPS = {
-  robux: { icon: '🎮', title: 'How to redeem your Robux code', where: 'roblox.com/redeem',
-    steps: ['Sign in to Roblox and open <strong>roblox.com/redeem</strong>.', 'Paste the code above and press <strong>Redeem</strong>.', 'The Robux land in the account you are signed in to — double-check it is the right one.'] },
-  'v-bucks': { icon: '🪂', title: 'How to redeem your V-Bucks code', where: 'fortnite.com/vbuckscard',
-    steps: ['Open <strong>fortnite.com/vbuckscard</strong> and sign in to your Epic account.', 'Enter the code above and confirm.', 'V-Bucks are shared across every platform on that Epic account.'] },
-  valorant: { icon: '🎯', title: 'How to redeem your Valorant code', where: 'the in-game store',
-    steps: ['Open Valorant and go to the <strong>Store</strong>.', 'Choose <strong>Redeem code</strong> (or redeem on the Riot website).', 'Points appear in your wallet straight away.'] },
-  'discord-nitro': { icon: '💜', title: 'How to redeem your Nitro code', where: 'discord.com/billing/promotions',
-    steps: ['Open <strong>discord.com/billing/promotions</strong> while signed in.', 'Paste the code and confirm.', 'Nitro activates on that Discord account immediately.'] },
-  giftcard: { icon: '🎁', title: 'How to redeem your gift card', where: 'the store it belongs to',
-    steps: ['Open the store the card is for (Steam, PlayStation, Xbox, …) and sign in.', 'Find <strong>Redeem code</strong> / <strong>Add funds</strong> and paste the code above.', 'The balance is added to that account — it cannot be moved afterwards.'] },
-  gamepass: { icon: '🕹', title: 'How to redeem your Game Pass code', where: 'redeem.microsoft.com',
-    steps: ['Open <strong>redeem.microsoft.com</strong> and sign in with your Microsoft account.', 'Enter the code and confirm.', 'Game Pass activates on that account — check it is the one you play on.'] },
-  spotify: { icon: '🎧', title: 'How to redeem your Spotify code', where: 'spotify.com/redeem',
-    steps: ['Open <strong>spotify.com/redeem</strong> and sign in.', 'Paste the code and confirm.', 'Premium is applied to that Spotify account.'] },
-  minecraft: { icon: '⛏', title: 'How to redeem your Minecraft code', where: 'minecraft.net/redeem',
-    steps: ['Open <strong>minecraft.net/redeem</strong> and sign in.', 'Enter the code and confirm.', 'The purchase is tied to that Microsoft account.'] },
+  robux: { icon: '🎮', title: 'Zo wissel je je Robux-code in', where: 'roblox.com/redeem',
+    steps: ['Log in bij Roblox en open <strong>roblox.com/redeem</strong>.', 'Plak de code hierboven en klik op <strong>Redeem</strong>.', 'De Robux komen op het account waarop je bent ingelogd — controleer even of dat de juiste is.'] },
+  'v-bucks': { icon: '🪂', title: 'Zo wissel je je V-Bucks-code in', where: 'fortnite.com/vbuckscard',
+    steps: ['Open <strong>fortnite.com/vbuckscard</strong> en log in op je Epic-account.', 'Vul de code hierboven in en bevestig.', 'V-Bucks gelden op elk platform van dat Epic-account.'] },
+  valorant: { icon: '🎯', title: 'Zo wissel je je Valorant-code in', where: 'de winkel in de game',
+    steps: ['Open Valorant en ga naar de <strong>Store</strong>.', 'Kies <strong>Redeem code</strong> (of wissel hem in op de site van Riot).', 'De Points staan meteen in je wallet.'] },
+  'discord-nitro': { icon: '💜', title: 'Zo wissel je je Nitro-code in', where: 'discord.com/billing/promotions',
+    steps: ['Open <strong>discord.com/billing/promotions</strong> terwijl je ingelogd bent.', 'Plak de code en bevestig.', 'Nitro is meteen actief op dat Discord-account.'] },
+  giftcard: { icon: '🎁', title: 'Zo wissel je je giftcard in', where: 'de winkel waar hij bij hoort',
+    steps: ['Open de winkel waar de kaart voor is (Steam, PlayStation, Xbox, …) en log in.', 'Zoek <strong>Code inwisselen</strong> / <strong>Tegoed toevoegen</strong> en plak de code hierboven.', 'Het saldo komt op dat account te staan — daarna kun je het niet meer verplaatsen.'] },
+  gamepass: { icon: '🕹', title: 'Zo wissel je je Game Pass-code in', where: 'redeem.microsoft.com',
+    steps: ['Open <strong>redeem.microsoft.com</strong> en log in met je Microsoft-account.', 'Vul de code in en bevestig.', 'Game Pass wordt actief op dat account — controleer of het het account is waarop je speelt.'] },
+  spotify: { icon: '🎧', title: 'Zo wissel je je Spotify-code in', where: 'spotify.com/redeem',
+    steps: ['Open <strong>spotify.com/redeem</strong> en log in.', 'Plak de code en bevestig.', 'Premium wordt toegevoegd aan dat Spotify-account.'] },
+  minecraft: { icon: '⛏', title: 'Zo wissel je je Minecraft-code in', where: 'minecraft.net/redeem',
+    steps: ['Open <strong>minecraft.net/redeem</strong> en log in.', 'Vul de code in en bevestig.', 'De aankoop is gekoppeld aan dat Microsoft-account.'] },
 };
 
 /** Generic fallback for categories with no dedicated recipe (mobile games etc.). */
-const REDEEM_FALLBACK = { icon: '📩', title: 'How to use your code', where: 'the game or store it belongs to',
-  steps: ['Open the game or store this top-up is for and sign in.', 'Find <strong>Redeem code</strong> in the shop or account settings and paste the code above.', 'Stuck? Reply to this email with a screenshot and we will walk you through it.'] };
+const REDEEM_FALLBACK = { icon: '📩', title: 'Zo gebruik je je code', where: 'de game of winkel waar hij bij hoort',
+  steps: ['Open de game of winkel waar deze top-up voor is en log in.', 'Zoek <strong>Code inwisselen</strong> in de shop of je accountinstellingen en plak de code hierboven.', 'Kom je er niet uit? Beantwoord deze mail met een screenshot, dan helpen we je erdoorheen.'] };
 
 function redeemHtml(order) {
   // Account top-ups have nothing to redeem — we already did it for them.
@@ -1272,7 +1329,7 @@ function redeemHtml(order) {
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:14px 0 0">
       <tr><td style="background-color:#141426;border:1px solid #2c2c48;border-radius:14px;padding:16px 18px">
         <div style="font:700 14px/1.3 'Segoe UI',Arial,sans-serif;color:#ffffff">${r.icon} ${escapeHtml(r.title)}</div>
-        <div style="font:400 12.5px/1.6 'Segoe UI',Arial,sans-serif;color:#8b8fa3;padding-top:3px">Redeem at ${escapeHtml(r.where)}</div>
+        <div style="font:400 12.5px/1.6 'Segoe UI',Arial,sans-serif;color:#8b8fa3;padding-top:3px">Inwisselen op ${escapeHtml(r.where)}</div>
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:11px">
           ${r.steps.map((s, n) => `<tr>
             <td valign="top" style="padding:3px 9px 3px 0"><span style="display:inline-block;width:19px;height:19px;background-color:#26264a;border-radius:999px;color:#c7d2fe;font:700 11px/19px Arial,sans-serif;text-align:center">${n + 1}</span></td>
@@ -1289,12 +1346,12 @@ function redeemHtml(order) {
 function deliveryHtml(order) {
   // Direct account top-up → reassuring confirmation, no code to show.
   if (order.billing?.deliveryMethod === 'account' && order.billing?.deliveryDetails) {
-    const label = escapeHtml(order.billing.deliveryLabel || 'Your account');
+    const label = escapeHtml(order.billing.deliveryLabel || 'Je account');
     const target = escapeHtml(order.billing.deliveryDetails);
     return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 8px">
       <tr><td style="background:#0e1f19;border:1px solid #1f5140;border-radius:16px;padding:20px 22px">
-        <div style="font:800 15px/1.3 'Segoe UI',Arial,sans-serif;color:#34d399">⚡ Delivered straight to your account</div>
-        <div style="font:400 13.5px/1.6 'Segoe UI',Arial,sans-serif;color:#9fb8ad;margin:6px 0 12px">Topped up and ready to play — no code to redeem.</div>
+        <div style="font:800 15px/1.3 'Segoe UI',Arial,sans-serif;color:#34d399">⚡ Rechtstreeks op je account geleverd</div>
+        <div style="font:400 13.5px/1.6 'Segoe UI',Arial,sans-serif;color:#9fb8ad;margin:6px 0 12px">Opgewaardeerd en klaar om te spelen — geen code om in te wisselen.</div>
         <div style="font:600 11px/1 Arial,sans-serif;color:#6f8f83;text-transform:uppercase;letter-spacing:1.2px;margin:0 0 5px">${label}</div>
         <div style="font:700 18px/1.3 'Courier New',monospace;color:#eafff6;background:#0a1712;border:1px solid #1f5140;border-radius:10px;padding:12px 16px;word-break:break-all">${target}</div>
       </td></tr></table>`;
@@ -1333,15 +1390,15 @@ function summaryHtml(order) {
   const credit = Number(b.creditApplied || 0);
   const extras = [];
   if (order.subtotal != null && (couponDiscount || memberDiscount || bundleDiscount || credit)) {
-    extras.push(line('Subtotal', order.subtotal));
-    if (couponDiscount) extras.push(line(`Coupon${b.coupon ? ` (${escapeHtml(b.coupon)})` : ''}`, couponDiscount, true));
-    if (memberDiscount) extras.push(line(`Forge+ discount${b.memberPercent ? ` (${b.memberPercent}%)` : ''}`, memberDiscount, true));
-    if (bundleDiscount) extras.push(line(`Bundle${b.bundle ? ` (${escapeHtml(b.bundle)})` : ''}`, bundleDiscount, true));
-    if (credit) extras.push(line('Store credit', credit, true));
+    extras.push(line('Subtotaal', order.subtotal));
+    if (couponDiscount) extras.push(line(`Kortingscode${b.coupon ? ` (${escapeHtml(b.coupon)})` : ''}`, couponDiscount, true));
+    if (memberDiscount) extras.push(line(`Forge+-korting${b.memberPercent ? ` (${b.memberPercent}%)` : ''}`, memberDiscount, true));
+    if (bundleDiscount) extras.push(line(`Bundel${b.bundle ? ` (${escapeHtml(b.bundle)})` : ''}`, bundleDiscount, true));
+    if (credit) extras.push(line('Tegoed', credit, true));
   }
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:2px 0 20px">` +
     `<tbody>${rows.join('')}${extras.join('')}` +
-    `<tr><td style="padding:13px 0 0;border-top:2px solid #34345a;color:#fff;font-weight:800;font-size:15px">Total</td>` +
+    `<tr><td style="padding:13px 0 0;border-top:2px solid #34345a;color:#fff;font-weight:800;font-size:15px">Totaal</td>` +
     `<td style="padding:13px 0 0;border-top:2px solid #34345a;color:#fff;font-weight:800;font-size:15px;text-align:right;white-space:nowrap">${money(order.total)}</td></tr>` +
     `</tbody></table>`;
 }
@@ -1382,6 +1439,7 @@ function emailContext(order, ctx = {}) {
       redeemHtml: redeemHtml(order),
       paymentHtml: paymentInstructionsHtml(order),
       consentHtml: consentHtml(order),
+      needsFromBuyerHtml: needsFromBuyerHtml(order),
       url: orderUrlFor(order),
     },
     refund: ctx.refundAmount != null

@@ -78,7 +78,7 @@ console.log('— Withdrawal consent —');
   const { renderOrderEmail } = await import('../src/services/orderService.js');
   const mail = await renderOrderEmail(order.id, 'order_received');
   ok('the confirmation email states the withdrawal right',
-    /Right of withdrawal/i.test(mail.html), mail.html.slice(0, 120));
+    /Herroepingsrecht/i.test(mail.html), mail.html.slice(0, 120));
   ok('it quotes the buyer back their own sentence',
     mail.html.includes('Ik wil mijn bestelling meteen geleverd krijgen.'));
 
