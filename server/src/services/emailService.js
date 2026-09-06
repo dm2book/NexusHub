@@ -101,8 +101,44 @@ export function htmlToText(html) {
     .join('\n').replace(/\n{3,}/g, '\n\n').trim();
 }
 
-function loadTemplate(eventKey) {
-  return get('SELECT * FROM email_templates WHERE id = @id', { id: eventKey });
+/** The languages that have their own templates; anything else falls back. */
+const TEMPLATE_LANGS = new Set(['nl', 'en', 'de', 'fr']);
+const FALLBACK_LANG = 'nl';
+
+/**
+ * The template for this event in the reader's language.
+ *
+ * Falls back to Dutch — the shop's own language and the one every template is
+ * guaranteed to have — rather than returning nothing. A missing translation
+ * must never mean a missing email: a buyer who does not get their code because
+ * their language was unseeded is a refund, and an untranslated confirmation is
+ * merely a worse one.
+ *
+ * A disabled row is a decision about that language, so a disabled German
+ * template does NOT quietly fall through to Dutch. It is skipped like any other
+ * disabled template.
+ */
+async function loadTemplate(eventKey, lang) {
+  const want = TEMPLATE_LANGS.has(lang) ? lang : FALLBACK_LANG;
+  const own = await get('SELECT * FROM email_templates WHERE id = @id AND lang = @lang',
+    { id: eventKey, lang: want });
+  if (own) return own;
+  if (want === FALLBACK_LANG) return null;
+  return get('SELECT * FROM email_templates WHERE id = @id AND lang = @lang',
+    { id: eventKey, lang: FALLBACK_LANG });
+}
+
+/**
+ * Which language this email should be written in.
+ *
+ * The context carries it: an order email gets it from the order's own
+ * `billing.lang` (recorded at checkout, in the language the buyer read the shop
+ * in), and everything else from the user row. Neither is guaranteed, so the
+ * shop's own language is the floor.
+ */
+export function langFor(context = {}) {
+  const candidate = context.lang || context.order?.lang || context.user?.lang;
+  return TEMPLATE_LANGS.has(candidate) ? candidate : FALLBACK_LANG;
 }
 
 /**
@@ -112,7 +148,8 @@ function loadTemplate(eventKey) {
 export async function sendEmail(eventKey, to, context = {}) {
   const id = newId('eml');
   const at = nowIso();
-  const tpl = await loadTemplate(eventKey);
+  const lang = langFor(context);
+  const tpl = await loadTemplate(eventKey, lang);
 
   if (!tpl || !tpl.enabled) {
     await run(`INSERT INTO email_log (id, template_id, to_email, status, error, context, created_at)

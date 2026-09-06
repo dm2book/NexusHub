@@ -61,12 +61,18 @@ export async function replyTicket(ticketId, { authorId, authorKind = 'staff', bo
  */
 async function ticketRecipient(t) {
   if (t.user_id) {
-    const u = await get('SELECT email, display_name FROM users WHERE id=@id', { id: t.user_id });
-    if (u?.email) return { email: u.email, name: u.display_name || u.email.split('@')[0] };
+    const u = await get('SELECT email, display_name, lang FROM users WHERE id=@id', { id: t.user_id });
+    if (u?.email) return { email: u.email, name: u.display_name || u.email.split('@')[0], lang: u.lang };
   }
   if (t.order_id) {
-    const o = await get('SELECT email FROM orders WHERE id=@id', { id: t.order_id });
-    if (o?.email) return { email: o.email, name: o.email.split('@')[0] };
+    /* A guest ticket has no user row, so the language comes off the order the
+       ticket is about — which is the one this person is writing in. */
+    const o = await get('SELECT email, billing FROM orders WHERE id=@id', { id: t.order_id });
+    if (o?.email) {
+      let lang;
+      try { lang = JSON.parse(o.billing || '{}').lang; } catch { /* not JSON — no language */ }
+      return { email: o.email, name: o.email.split('@')[0], lang };
+    }
   }
   return null;
 }
@@ -77,6 +83,7 @@ async function emailTicketReply(t, body) {
   const order = t.order_id
     ? await get('SELECT number FROM orders WHERE id=@id', { id: t.order_id }) : null;
   await sendEmailAsync('support_reply', to.email, {
+    lang: to.lang || undefined,
     user: { name: to.name },
     reply: body,
     ticket: {

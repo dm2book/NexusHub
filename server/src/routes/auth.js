@@ -38,10 +38,16 @@ const isEmail = (s) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(s || ''));
 
 const router = Router();
 
+const LANGS = new Set(['nl', 'en', 'de', 'fr']);
 const ctxOf = (req) => ({
   ip: req.ip,
   userAgent: req.get('user-agent'),
   fingerprint: req.get('x-device-id') || null,
+  /* Which language the page asking for the code was rendered in. Sent by the
+     client as a header rather than read from Accept-Language: the visitor may
+     have chosen a language that is not their browser's, and the code has to
+     arrive in the one they are looking at. */
+  lang: LANGS.has(req.get('x-lang')) ? req.get('x-lang') : null,
   req,
 });
 

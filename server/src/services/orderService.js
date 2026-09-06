@@ -41,6 +41,7 @@ import { evaluateCoupon, recordCouponRedemption } from './couponService.js';
 /* The one detail a category needs from the buyer, from the same module the
    product page and the checkout read. */
 import { deliveryField as deliveryFieldFor } from '../../../src/lib/deliveryInfo.js';
+import { emailCopy, redeemSteps, redeemFallback } from './emailCopy.js';
 import { bestBundleDiscount } from './bundleService.js';
 
 export const STATUSES = [
@@ -259,6 +260,16 @@ export async function createOrder(input, ctx = {}) {
     }
     await appendHistory(orderId, null, 'pending', ctx.actorId || 'system', 'Order created');
   });
+
+  /* Remember which language this person reads in.
+     The order carries it, but a login code and a cart reminder do not have an
+     order behind them — so it lands on the user too, and every later mail
+     follows the language they last bought in. Best-effort: a shop that cannot
+     write a preference must still take the order. */
+  if (input.userId && billing.lang) {
+    await run('UPDATE users SET lang = @l WHERE id = @id', { l: billing.lang, id: input.userId })
+      .catch((e) => console.warn('[order] could not store buyer language:', e.message));
+  }
 
   // Record the coupon redemption (per-user limits + usage counter). Best-effort.
   if (couponCode) {
@@ -1207,7 +1218,8 @@ function statusBlurb(status) {
  * Quoted back verbatim, with the timestamp, so what the buyer keeps and what the
  * shop can produce are the same sentence.
  */
-function consentHtml(order) {
+function consentHtml(order, lang) {
+  const c = emailCopy(lang);
   if (!order.consentAt) return '';
   const when = new Date(order.consentAt);
   const stamp = Number.isNaN(when.getTime()) ? '' : when.toISOString().replace('T', ' ').slice(0, 16) + ' UTC';
@@ -1215,9 +1227,9 @@ function consentHtml(order) {
   const escaped = sentence
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   return `<p style="color:#8b93a7;font-size:12px;line-height:1.6;margin-top:18px;padding-top:14px;border-top:1px solid rgba(255,255,255,.08)">
-    <strong style="color:#b6c1d1">Herroepingsrecht</strong><br>
-    ${escaped ? `Op ${stamp} bevestigde je: “${escaped}”<br>` : `Op ${stamp} vroeg je om directe levering en erkende je dat het herroepingsrecht van 14 dagen vervalt zodra de bestelling geleverd is.<br>`}
-    Tot de levering kun je nog annuleren — beantwoord daarvoor gewoon deze mail.</p>`;
+    <strong style="color:#b6c1d1">${escapeHtml(c.withdrawalTitle)}</strong><br>
+    ${escaped ? `${c.withdrawalConfirmed(stamp, escaped)}<br>` : `${c.withdrawalDefault(stamp)}<br>`}
+    ${escapeHtml(c.withdrawalCancel)}</p>`;
 }
 
 /**
@@ -1229,25 +1241,24 @@ function consentHtml(order) {
  * it in the confirmation mail — which is the message every buyer opens — so the
  * order resolves itself instead of waiting for somebody to notice it.
  */
-function needsFromBuyerHtml(order) {
+function needsFromBuyerHtml(order, lang) {
+  const c = emailCopy(lang);
   const need = String(order.billing?.needsFromBuyer || '').trim();
   if (!need) return '';
   const settled = ['completed', 'refunded', 'cancelled'].includes(order.status);
   if (settled) return '';
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:18px 0 4px">
     <tr><td style="background-color:#241d09;border:1px solid #6b5115;border-radius:14px;padding:16px 18px">
-      <div style="font:700 14px/1.35 'Segoe UI',Arial,sans-serif;color:#fbbf24">⚠️ We hebben nog één ding van je nodig</div>
+      <div style="font:700 14px/1.35 'Segoe UI',Arial,sans-serif;color:#fbbf24">${escapeHtml(c.needTitle)}</div>
       <div style="font:400 13.5px/1.6 'Segoe UI',Arial,sans-serif;color:#d8c9a3;padding-top:6px">
-        Deze bestelling leveren we rechtstreeks op je account, dus we hebben je
-        <strong style="color:#fff">${escapeHtml(need)}</strong> nodig.
-        Beantwoord deze mail met alleen dat gegeven — daarna gaat je bestelling meteen de deur uit.
-        We vragen <strong style="color:#fff">nooit</strong> om je wachtwoord.
+        ${c.needBody(escapeHtml(need))}
       </div>
     </td></tr></table>`;
 }
 
 /** Manual-payment instructions block for the order-received email (Tikkie/Revolut/PayPal). */
-function paymentInstructionsHtml(order) {
+function paymentInstructionsHtml(order, lang) {
+  const c = emailCopy(lang);
   const methods = manualPayMethods();
   const settled = ['completed', 'refunded', 'cancelled', 'payment_received'].includes(order.status);
   if (settled) return '';
@@ -1261,64 +1272,34 @@ function paymentInstructionsHtml(order) {
   // and needs no reference — so it goes first, and the generic methods below
   // become the fallback rather than the instruction.
   const exact = order.payLink
-    ? `<div class="quote"><strong>Betaal ${amt} — het bedrag staat er al in</strong><br>` +
+    ? `<div class="quote"><strong>${escapeHtml(c.payExact(amt))}</strong><br>` +
       `<a href="${escapeHtml(order.payLink)}">${escapeHtml(String(order.payLink).replace(/^https?:\/\//, '').slice(0, 60))}</a>` +
       `</div>`
     : '';
   const rows = payMethodsFor(methods, order).map((m) => {
     if (m.kind === 'email') {
-      return `<tr><td><strong>${m.label}</strong></td><td class="r">Maak ${amt} over naar ${escapeHtml(m.target)}</td></tr>`;
+      return `<tr><td><strong>${m.label}</strong></td><td class="r">${escapeHtml(c.paySendTo(amt, m.target))}</td></tr>`;
     }
     // Saying which links already carry the amount is the difference between a
     // buyer tapping once and a buyer typing a number wrong.
-    const note = m.prefilled ? ' <span style="color:#34d399">· bedrag staat er al in</span>' : '';
+    const note = m.prefilled ? ` <span style="color:#34d399">· ${escapeHtml(c.payPrefilled)}</span>` : '';
     return `<tr><td><strong>${m.label}</strong>${note}</td><td class="r">` +
       `<a href="${m.url}">${escapeHtml(String(m.url).replace(/^https?:\/\//, ''))}</a></td></tr>`;
   }).join('');
   if (!methods.length) return exact;   // only the exact-amount link to show
   return exact +
-    `<div class="quote"><strong>${exact ? 'Of maak het zelf over' : 'Rond je betaling af'} — ${amt}</strong><br>` +
-    `Betaal via een van de methoden hieronder en zet je bestelnummer <strong>${order.number}</strong> erbij als kenmerk. ` +
-    `Je bestelling is bevestigd zodra we hem binnen hebben.</div>` +
+    `<div class="quote"><strong>${escapeHtml(exact ? c.payOr : c.payComplete)} — ${amt}</strong><br>` +
+    `${c.payHow(escapeHtml(order.number))}</div>` +
     `<table class="summary"><tbody>${rows}</tbody></table>`;
 }
 
-/**
- * How to actually use what we just delivered — per product category.
- *
- * A delivered code with no instructions is a support ticket waiting to happen:
- * Robux, V-Bucks, Valorant Points, Nitro and a Steam gift card are each redeemed
- * somewhere completely different, and a 14-year-old buying their first top-up
- * does not know where. Keyed by the product's own category, so the steps a buyer
- * gets always match what they bought.
- *
- * `where` is the screen to go to; `steps` are the clicks. Deliberately short —
- * this sits under the code, it is not a manual.
- */
-const REDEEM_STEPS = {
-  robux: { icon: '🎮', title: 'Zo wissel je je Robux-code in', where: 'roblox.com/redeem',
-    steps: ['Log in bij Roblox en open <strong>roblox.com/redeem</strong>.', 'Plak de code hierboven en klik op <strong>Redeem</strong>.', 'De Robux komen op het account waarop je bent ingelogd — controleer even of dat de juiste is.'] },
-  'v-bucks': { icon: '🪂', title: 'Zo wissel je je V-Bucks-code in', where: 'fortnite.com/vbuckscard',
-    steps: ['Open <strong>fortnite.com/vbuckscard</strong> en log in op je Epic-account.', 'Vul de code hierboven in en bevestig.', 'V-Bucks gelden op elk platform van dat Epic-account.'] },
-  valorant: { icon: '🎯', title: 'Zo wissel je je Valorant-code in', where: 'de winkel in de game',
-    steps: ['Open Valorant en ga naar de <strong>Store</strong>.', 'Kies <strong>Redeem code</strong> (of wissel hem in op de site van Riot).', 'De Points staan meteen in je wallet.'] },
-  'discord-nitro': { icon: '💜', title: 'Zo wissel je je Nitro-code in', where: 'discord.com/billing/promotions',
-    steps: ['Open <strong>discord.com/billing/promotions</strong> terwijl je ingelogd bent.', 'Plak de code en bevestig.', 'Nitro is meteen actief op dat Discord-account.'] },
-  giftcard: { icon: '🎁', title: 'Zo wissel je je giftcard in', where: 'de winkel waar hij bij hoort',
-    steps: ['Open de winkel waar de kaart voor is (Steam, PlayStation, Xbox, …) en log in.', 'Zoek <strong>Code inwisselen</strong> / <strong>Tegoed toevoegen</strong> en plak de code hierboven.', 'Het saldo komt op dat account te staan — daarna kun je het niet meer verplaatsen.'] },
-  gamepass: { icon: '🕹', title: 'Zo wissel je je Game Pass-code in', where: 'redeem.microsoft.com',
-    steps: ['Open <strong>redeem.microsoft.com</strong> en log in met je Microsoft-account.', 'Vul de code in en bevestig.', 'Game Pass wordt actief op dat account — controleer of het het account is waarop je speelt.'] },
-  spotify: { icon: '🎧', title: 'Zo wissel je je Spotify-code in', where: 'spotify.com/redeem',
-    steps: ['Open <strong>spotify.com/redeem</strong> en log in.', 'Plak de code en bevestig.', 'Premium wordt toegevoegd aan dat Spotify-account.'] },
-  minecraft: { icon: '⛏', title: 'Zo wissel je je Minecraft-code in', where: 'minecraft.net/redeem',
-    steps: ['Open <strong>minecraft.net/redeem</strong> en log in.', 'Vul de code in en bevestig.', 'De aankoop is gekoppeld aan dat Microsoft-account.'] },
-};
+/* The redeem instructions and every other phrase these blocks need moved to
+   emailCopy.js when the emails became multilingual. They lived here as one
+   hardcoded Dutch table, which would have put Dutch redeem steps inside a
+   German email — the templates translated and the generated half not. */
 
-/** Generic fallback for categories with no dedicated recipe (mobile games etc.). */
-const REDEEM_FALLBACK = { icon: '📩', title: 'Zo gebruik je je code', where: 'de game of winkel waar hij bij hoort',
-  steps: ['Open de game of winkel waar deze top-up voor is en log in.', 'Zoek <strong>Code inwisselen</strong> in de shop of je accountinstellingen en plak de code hierboven.', 'Kom je er niet uit? Beantwoord deze mail met een screenshot, dan helpen we je erdoorheen.'] };
-
-function redeemHtml(order) {
+function redeemHtml(order, lang) {
+  const c = emailCopy(lang);
   // Account top-ups have nothing to redeem — we already did it for them.
   if (order.billing?.deliveryMethod === 'account' && order.billing?.deliveryDetails) return '';
   if (!order.deliveries?.length) return '';
@@ -1326,14 +1307,14 @@ function redeemHtml(order) {
   // One block per distinct category in the order, so a mixed order (Robux +
   // a Steam card) explains both instead of guessing at one.
   const cats = [...new Set((order.items || []).map((i) => String(i.metadata?.category || i.category || '').toLowerCase()).filter(Boolean))];
-  const recipes = cats.map((c) => REDEEM_STEPS[c]).filter(Boolean);
-  const list = recipes.length ? recipes : [REDEEM_FALLBACK];
+  const recipes = cats.map((cat) => redeemSteps(lang, cat)).filter(Boolean);
+  const list = recipes.length ? recipes : [redeemFallback(lang)];
 
   return list.map((r) => `
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:14px 0 0">
       <tr><td style="background-color:#141426;border:1px solid #2c2c48;border-radius:14px;padding:16px 18px">
         <div style="font:700 14px/1.3 'Segoe UI',Arial,sans-serif;color:#ffffff">${r.icon} ${escapeHtml(r.title)}</div>
-        <div style="font:400 12.5px/1.6 'Segoe UI',Arial,sans-serif;color:#8b8fa3;padding-top:3px">Inwisselen op ${escapeHtml(r.where)}</div>
+        <div style="font:400 12.5px/1.6 'Segoe UI',Arial,sans-serif;color:#8b8fa3;padding-top:3px">${escapeHtml(c.redeemAt)} ${escapeHtml(r.where)}</div>
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:11px">
           ${r.steps.map((s, n) => `<tr>
             <td valign="top" style="padding:3px 9px 3px 0"><span style="display:inline-block;width:19px;height:19px;background-color:#26264a;border-radius:999px;color:#c7d2fe;font:700 11px/19px Arial,sans-serif;text-align:center">${n + 1}</span></td>
@@ -1347,15 +1328,16 @@ function redeemHtml(order) {
 /** The hero block of the completion email: a green "delivered to your account"
  *  confirmation for direct top-ups, otherwise premium copyable code cards. All
  *  styles are inline so it renders intact even where a client strips <style>. */
-function deliveryHtml(order) {
+function deliveryHtml(order, lang) {
+  const c = emailCopy(lang);
   // Direct account top-up → reassuring confirmation, no code to show.
   if (order.billing?.deliveryMethod === 'account' && order.billing?.deliveryDetails) {
-    const label = escapeHtml(order.billing.deliveryLabel || 'Je account');
+    const label = escapeHtml(order.billing.deliveryLabel || c.yourAccount);
     const target = escapeHtml(order.billing.deliveryDetails);
     return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 8px">
       <tr><td style="background:#0e1f19;border:1px solid #1f5140;border-radius:16px;padding:20px 22px">
-        <div style="font:800 15px/1.3 'Segoe UI',Arial,sans-serif;color:#34d399">⚡ Rechtstreeks op je account geleverd</div>
-        <div style="font:400 13.5px/1.6 'Segoe UI',Arial,sans-serif;color:#9fb8ad;margin:6px 0 12px">Opgewaardeerd en klaar om te spelen — geen code om in te wisselen.</div>
+        <div style="font:800 15px/1.3 'Segoe UI',Arial,sans-serif;color:#34d399">${escapeHtml(c.deliveredTitle)}</div>
+        <div style="font:400 13.5px/1.6 'Segoe UI',Arial,sans-serif;color:#9fb8ad;margin:6px 0 12px">${escapeHtml(c.deliveredSub)}</div>
         <div style="font:600 11px/1 Arial,sans-serif;color:#6f8f83;text-transform:uppercase;letter-spacing:1.2px;margin:0 0 5px">${label}</div>
         <div style="font:700 18px/1.3 'Courier New',monospace;color:#eafff6;background:#0a1712;border:1px solid #1f5140;border-radius:10px;padding:12px 16px;word-break:break-all">${target}</div>
       </td></tr></table>`;
@@ -1377,7 +1359,8 @@ function deliveryHtml(order) {
 /** Order breakdown for the emails: subtotal, each discount, store credit, total.
  *  Without this the line-item (list price) and the final total look mismatched
  *  whenever a coupon/member/bundle discount or store credit was applied. */
-function summaryHtml(order) {
+function summaryHtml(order, lang) {
+  const c = emailCopy(lang);
   const cur = order.currency;
   const b = order.billing || {};
   const money = (c) => escapeHtml(formatMoney(c, cur));
@@ -1394,15 +1377,15 @@ function summaryHtml(order) {
   const credit = Number(b.creditApplied || 0);
   const extras = [];
   if (order.subtotal != null && (couponDiscount || memberDiscount || bundleDiscount || credit)) {
-    extras.push(line('Subtotaal', order.subtotal));
-    if (couponDiscount) extras.push(line(`Kortingscode${b.coupon ? ` (${escapeHtml(b.coupon)})` : ''}`, couponDiscount, true));
-    if (memberDiscount) extras.push(line(`Forge+-korting${b.memberPercent ? ` (${b.memberPercent}%)` : ''}`, memberDiscount, true));
-    if (bundleDiscount) extras.push(line(`Bundel${b.bundle ? ` (${escapeHtml(b.bundle)})` : ''}`, bundleDiscount, true));
-    if (credit) extras.push(line('Tegoed', credit, true));
+    extras.push(line(c.subtotal, order.subtotal));
+    if (couponDiscount) extras.push(line(`${c.coupon}${b.coupon ? ` (${escapeHtml(b.coupon)})` : ''}`, couponDiscount, true));
+    if (memberDiscount) extras.push(line(`${c.memberOff}${b.memberPercent ? ` (${b.memberPercent}%)` : ''}`, memberDiscount, true));
+    if (bundleDiscount) extras.push(line(`${c.bundle}${b.bundle ? ` (${escapeHtml(b.bundle)})` : ''}`, bundleDiscount, true));
+    if (credit) extras.push(line(c.credit, credit, true));
   }
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:2px 0 20px">` +
     `<tbody>${rows.join('')}${extras.join('')}` +
-    `<tr><td style="padding:13px 0 0;border-top:2px solid #34345a;color:#fff;font-weight:800;font-size:15px">Totaal</td>` +
+    `<tr><td style="padding:13px 0 0;border-top:2px solid #34345a;color:#fff;font-weight:800;font-size:15px">${escapeHtml(c.total)}</td>` +
     `<td style="padding:13px 0 0;border-top:2px solid #34345a;color:#fff;font-weight:800;font-size:15px;text-align:right;white-space:nowrap">${money(order.total)}</td></tr>` +
     `</tbody></table>`;
 }
@@ -1428,22 +1411,30 @@ export function orderUrlFor(order) {
 }
 
 function emailContext(order, ctx = {}) {
+  /* The language this buyer read the shop in, recorded at checkout. Resolved
+     once here and handed to every generated block, so the prose in a German
+     email and the order summary inside it cannot end up in different
+     languages — which is what would have happened if each generator asked
+     separately and one of them forgot. */
+  const lang = order.billing?.lang || 'nl';
   return {
+    lang,
     user: { name: order.billing?.full_name || order.email.split('@')[0] },
     order: {
+      lang,
       number: order.number,
       total: order.totalFormatted,
       status: order.statusLabel,
       // `itemsHtml` now renders the FULL breakdown (subtotal, discounts, credit,
       // total) so the line-item price and the final total never look mismatched.
-      itemsHtml: summaryHtml(order),
-      summaryHtml: summaryHtml(order),
-      deliveryHtml: deliveryHtml(order),
-      deliveriesHtml: deliveryHtml(order), // back-compat alias for older templates
-      redeemHtml: redeemHtml(order),
-      paymentHtml: paymentInstructionsHtml(order),
-      consentHtml: consentHtml(order),
-      needsFromBuyerHtml: needsFromBuyerHtml(order),
+      itemsHtml: summaryHtml(order, lang),
+      summaryHtml: summaryHtml(order, lang),
+      deliveryHtml: deliveryHtml(order, lang),
+      deliveriesHtml: deliveryHtml(order, lang), // back-compat alias for older templates
+      redeemHtml: redeemHtml(order, lang),
+      paymentHtml: paymentInstructionsHtml(order, lang),
+      consentHtml: consentHtml(order, lang),
+      needsFromBuyerHtml: needsFromBuyerHtml(order, lang),
       url: orderUrlFor(order),
     },
     refund: ctx.refundAmount != null
@@ -1456,7 +1447,17 @@ function emailContext(order, ctx = {}) {
  *  and tests to verify the real rendered output without sending anything. */
 export async function renderOrderEmail(orderId, eventKey = 'order_completed', ctx = {}) {
   const order = await getOrder(orderId);
-  const tpl = await get('SELECT * FROM email_templates WHERE id = @id', { id: eventKey });
-  if (!order || !tpl) return null;
+  if (!order) return null;
+  /* The buyer's own language, same resolution the send path uses.
+     This selected on `id` alone, which after templates became per-language
+     meant it picked whichever row Postgres returned first — so a preview, and
+     the admin's own "what did this buyer get?" view, could show a different
+     language from the mail that was actually sent. */
+  const lang = order.billing?.lang || 'nl';
+  const tpl = await get('SELECT * FROM email_templates WHERE id = @id AND lang = @lang',
+    { id: eventKey, lang })
+    || await get('SELECT * FROM email_templates WHERE id = @id AND lang = @nl',
+      { id: eventKey, nl: 'nl' });
+  if (!tpl) return null;
   return renderTemplate(tpl, baseContext(emailContext(order, ctx)));
 }

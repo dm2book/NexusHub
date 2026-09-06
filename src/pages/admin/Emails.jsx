@@ -10,26 +10,39 @@ export default function Emails() {
   const [templates, setTemplates] = useState(null);
   const [selected, setSelected] = useState(null);
   const [preview, setPreview] = useState('');
+  /* Every template now exists once per language. The row you edit is the one
+     for the language selected here — without this the page silently showed the
+     Dutch copy for all four and a German buyer's mail could never be changed. */
+  const [lang, setLang] = useState('nl');
+  const LANGS = [['nl', 'Nederlands'], ['en', 'English'], ['de', 'Deutsch'], ['fr', 'Français']];
+  const q = `?lang=${lang}`;
 
-  const load = () => api.get('/api/admin/emails').then((r) => { setTemplates(r.templates); }).catch(() => setTemplates([]));
-  useEffect(() => { load(); }, []);
-  useEffect(() => { if (templates && !selected) setSelected(templates[0]); }, [templates]);
+  const load = () => api.get(`/api/admin/emails${q}`)
+    .then((r) => { setTemplates(r.templates); }).catch(() => setTemplates([]));
+  useEffect(() => { load(); }, [lang]); // eslint-disable-line react-hooks/exhaustive-deps
+  /* Keep the same template selected when the language changes, so switching
+     language is a translation view rather than a jump back to the first one. */
+  useEffect(() => {
+    if (!templates) return;
+    const keep = selected && templates.find((t) => t.id === selected.id);
+    setSelected(keep || templates[0] || null);
+  }, [templates]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!templates) return <PageLoader />;
 
   const save = async () => {
     try {
-      await api.put(`/api/admin/emails/${selected.id}`, {
+      await api.put(`/api/admin/emails/${selected.id}${q}`, {
         subject: selected.subject, bodyHtml: selected.body_html, enabled: !!selected.enabled,
       });
-      toast.success('Template saved.'); load();
+      toast.success(`Template saved (${lang.toUpperCase()}).`); load();
     } catch (err) { toast.error(err.message); }
   };
   const doPreview = async () => {
-    try { const r = await api.post(`/api/admin/emails/${selected.id}/preview`); setPreview(r.html); }
+    try { const r = await api.post(`/api/admin/emails/${selected.id}/preview${q}`); setPreview(r.html); }
     catch (err) { toast.error(err.message); }
   };
   const sendTest = async () => {
-    try { const r = await api.post(`/api/admin/emails/${selected.id}/test`); toast.success(`Test sent to ${r.sentTo}`); }
+    try { const r = await api.post(`/api/admin/emails/${selected.id}/test${q}`); toast.success(`Test sent to ${r.sentTo} (${r.lang?.toUpperCase() || lang.toUpperCase()})`); }
     catch (err) { toast.error(err.message); }
   };
 
@@ -37,6 +50,21 @@ export default function Emails() {
     <div>
       <h1 className="text-2xl text-white mb-2">Emails</h1>
       <p className="text-slate-400 text-sm mb-5">Branded transactional templates, plus a broadcast to message all your customers.</p>
+
+      {tab === 'templates' && (
+        <div className="flex flex-wrap items-center gap-2 mb-4">
+          <span className="text-[11px] font-bold tracking-wider text-slate-500 uppercase">Language</span>
+          {LANGS.map(([code, label]) => (
+            <button key={code} onClick={() => setLang(code)}
+              className={`text-sm px-3 py-1.5 rounded-lg ${lang === code ? 'bg-primary/20 text-white font-semibold' : 'text-slate-400 hover:bg-white/5'}`}>
+              {label}
+            </button>
+          ))}
+          <span className="text-slate-500 text-xs">
+            Editing the {LANGS.find(([c]) => c === lang)?.[1]} version. Dutch is what a buyer gets when their own language has no template.
+          </span>
+        </div>
+      )}
 
       <div className="flex gap-2 mb-6">
         <button onClick={() => setTab('templates')}

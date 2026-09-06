@@ -91,7 +91,15 @@ export async function requestEmailOtp(email, ctx = {}) {
 
   // Deliver the code, but never let a mail failure break login: the code is
   // already stored, and the failure is recorded in email_log for diagnosis.
+  /* The language this person reads the shop in.
+     A login code has no order behind it, so it comes from the user row — set
+     the first time they order or sign in — and falls back to whatever the
+     browser sent with the request. Without it a German buyer who has already
+     received a German confirmation gets a Dutch login code, which is the one
+     mail where "is this really from them?" costs a sign-in. */
+  const known = await get('SELECT lang FROM users WHERE email = @e', { e }).catch(() => null);
   await sendEmailAsync('login_otp', e, {
+    lang: known?.lang || ctx.lang || undefined,
     otp: { code, ttl: config.auth.otpTtlMinutes, codeHtml: otpDigitsHtml(code) },
     user: { name: e.split('@')[0] },
   });

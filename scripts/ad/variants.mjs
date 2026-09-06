@@ -16,8 +16,29 @@
  * drops the whole line rather than rendering a gap or a guess.
  */
 
+/**
+ * The two sentences the shop is entitled to say about delivery, per language.
+ *
+ * These are the only claim in the whole toolkit that is not a number lifted
+ * straight off the page, so they live here once. A Dutch placement gets Dutch:
+ * the advert that prompted this one ran on a Dutch feed with English burnt into
+ * the frame and dollar prices in the product grid, and both are the kind of
+ * mismatch a viewer reads as "not for me" before they read anything else.
+ */
+const DELIVERY_COPY = {
+  en: { instant: 'Sent the moment your payment clears', hand: 'Bought in for you, delivered by hand',
+    instantShort: 'Instant', handShort: 'By hand' },
+  nl: { instant: 'Verstuurd zodra je betaling binnen is', hand: 'Voor je ingekocht, met de hand geleverd',
+    instantShort: 'Direct', handShort: 'Met de hand' },
+  de: { instant: 'Verschickt, sobald deine Zahlung da ist', hand: 'Für dich eingekauft, von Hand geliefert',
+    instantShort: 'Sofort', handShort: 'Von Hand' },
+  fr: { instant: 'Envoyé dès que ton paiement arrive', hand: 'Acheté pour toi, livré à la main',
+    instantShort: 'Immédiat', handShort: 'À la main' },
+};
+
 /** Tokens available to every caption, resolved from real data only. */
-export function tokensFor({ product, order, review, stock, mystery }) {
+export function tokensFor({ product, order, review, stock, mystery, lang = 'en' }) {
+  const d = DELIVERY_COPY[lang] || DELIVERY_COPY.en;
   /* Formatted the way the storefront formats it — the caption sits beside a
      page showing that exact number, and "€ 9,99" next to "€9.99" reads as a
      different price. This is the same locale the site's money() uses. */
@@ -28,9 +49,10 @@ export function tokensFor({ product, order, review, stock, mystery }) {
     price: product?.price ? money(product.price, product.currency) : null,
     // Only what the shop itself promises for THIS product. `instant` is true
     // only when it auto-delivers and a code is on the shelf right now.
-    delivery: product?.instant === true ? 'Sent the moment your payment clears'
-      : product?.instant === false ? 'Bought in for you, delivered by hand' : null,
-    deliveryShort: product?.instant === true ? 'Instant' : product?.instant === false ? 'By hand' : null,
+    delivery: product?.instant === true ? d.instant
+      : product?.instant === false ? d.hand : null,
+    deliveryShort: product?.instant === true ? d.instantShort
+      : product?.instant === false ? d.handShort : null,
     orderNumber: order?.number || null,
     // 1–6 only: the server hides anything higher, so a bigger number here would
     // be one this shop never publishes.
@@ -295,6 +317,72 @@ export const VARIANTS = [
        completed order this variant does not get made — which is the whole
        point of it existing in this file rather than in a brief. */
     needs: ['price', 'order', 'delivery'],
+  },
+  {
+    id: 'J',
+    slug: 'klik-tot-code',
+    name: 'Van klik tot code (NL)',
+    lang: 'nl',
+    target: 18,
+    /*
+     * Written against a competitor's advert, frame by frame, because the gap
+     * between the two is the whole argument.
+     *
+     * Theirs: 20.7 seconds, vertical, served on a Dutch feed. The first two
+     * seconds are a logo splash. Then 3D renders of a gaming desk, then a
+     * tilted, blurred, moving grid of product cards — the prices are on screen
+     * for nine seconds and not one of them is readable, and the ones you can
+     * half-make-out are in dollars. Nothing is ever delivered: no code, no
+     * inbox, no order. "Cheaper" is asserted and never shown against anything.
+     * The call to action lands at 15.0s of 20.7 — seventy-three per cent in,
+     * past where most of the audience has gone — and five of the last seconds
+     * are logo animation.
+     *
+     * So it spends twenty seconds asserting and none proving. This toolkit
+     * films a real purchase on the real site, which means this cut can do the
+     * exact opposite: spend its whole runtime proving and none asserting.
+     *
+     * Four deliberate inversions:
+     *
+     *   1. NO SPLASH. Frame one is the product and its price, readable, in
+     *      euros, held still long enough to read. The brand arrives at the end,
+     *      once it has been earned.
+     *   2. THE DELIVERY IS THE CLIMAX. Their advert never shows anything
+     *      arriving; for a top-up shop that is the single biggest thing a buyer
+     *      is anxious about. Here the last third is the email landing with the
+     *      code in it — the one shot a competitor using stock renders cannot
+     *      make.
+     *   3. THE CTA IS EARLY AND LATE. compose.mjs paints the domain as a
+     *      corner tag from the second scene onward, so someone who leaves at
+     *      six seconds has still read it. It is repeated on the end card.
+     *   4. DUTCH, AND EVERY NUMBER REAL. Their frame was English over dollar
+     *      prices on a Dutch placement. Every number in this one is lifted off
+     *      the page the camera is pointing at.
+     *
+     * What it does NOT do: claim to be cheaper than anyone. market_observations
+     * is empty, so there is no observed competitor price this shop is entitled
+     * to put on screen. The comparison it makes instead is the one it can
+     * stand behind — the price you were shown against the price you paid.
+     */
+    scenes: [S.product, S.buy, S.checkout, S.pay, S.confirmed, S.delivered, S.email, S.code],
+    // Frame one: a real price on a real product. No logo, no swoosh, no promise.
+    hook: '{price}. Meer wordt het niet.',
+    captions: [
+      { at: 'the product', text: '{price}', style: 'big' },
+      { at: 'the product', text: '{delivery}', style: 'small', late: true },
+      { at: 'buy', text: 'Geen account nodig', style: 'small' },
+      { at: 'checkout', text: 'Betalen met iDEAL', style: 'small' },
+      { at: 'payment', text: 'Betaald — {price}', style: 'big' },
+      { at: 'confirmed', text: 'Bestelling {orderNumber}', style: 'small' },
+      /* The shot the other advert does not have. Timed to the notify sound,
+         which compose.mjs already lands on this beat. */
+      { at: 'the email', text: 'Je bestelling van ForgeMarket', sub: 'in je inbox', style: 'notify' },
+      { at: 'the code', text: 'Je code. Klaar.', style: 'big' },
+    ],
+    cta: 'forgemarket.nl',
+    /* Every one of those captions is a thing that happened on camera, so the
+       whole cut is refused rather than faked if the purchase did not complete. */
+    needs: ['price', 'order', 'delivery', 'orderNumber'],
   },
 ];
 

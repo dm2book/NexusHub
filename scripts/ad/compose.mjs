@@ -49,6 +49,9 @@ const TARGET = Number(arg('target', String(variant?.target || 20)));
 // Named after the variant so eight of them can live side by side.
 const OUT = path.join(IN, arg('name', variant ? `ad-${variant.id}-${variant.slug}.mp4` : 'ad.mp4'));
 const W = 1080; const H = 1920;
+/* The domain painted in the corner for most of the advert. A variant may set
+   its own; this is the fallback for a plain run. */
+const CTA_TEXT = arg('cta', 'forgemarket.nl');
 
 for (const f of [RAW, path.join(IN, 'beats.json')]) {
   if (!fs.existsSync(f)) { console.error(`Missing ${f} — run record.mjs first.`); process.exit(1); }
@@ -134,6 +137,10 @@ const extras = readJson('extras.json', {});
 const tokens = tokensFor({
   product: { ...manifest.product, instant: extras.instant },
   order, review: extras.review, stock: extras.stockLeft, mystery: extras.mystery,
+  /* A variant may be written for a specific placement. The Dutch cut needs the
+     Dutch delivery sentence, or its captions and its tokens end up in two
+     languages in the same frame. */
+  lang: variant?.lang || arg('lang', 'en'),
 });
 
 if (variant) {
@@ -339,9 +346,35 @@ for (let i = 0; i < cuts.length; i++) {
 const flashExpr = flashes
   .map((t) => `between(t,${(t - 0.045).toFixed(3)},${(t + 0.045).toFixed(3)})`)
   .join('+');
+/* The domain, in the corner, from the second scene until the end card.
+ *
+ * The advert this was written against puts its call to action at 15.0s of 20.7
+ * — seventy-three per cent in — and everyone who left before that saw twenty
+ * seconds of a shop whose name they now cannot type. A corner tag costs a
+ * hundred and something pixels and means the address has been on screen since
+ * the third second for every viewer, however early they go.
+ *
+ * It starts AFTER the first scene on purpose: the first two seconds are the
+ * hook's, and a brand mark competing with it is the mistake being corrected,
+ * not repeated. It ends when the end card starts, which says the same thing
+ * bigger.
+ */
+const ctaText = variant?.cta || CTA_TEXT;
+const bodyEnd = cuts.reduce((a, c) => a + c.played, 0);
+const tagFrom = Math.min(cuts[0]?.played ?? 1.5, 2.2);
+const tagFile = path.join(IN, 'cta-tag.png');
+let ctaChain = '';
+if (ctaText && fs.existsSync(tagFile) && bodyEnd - tagFrom > 1.5) {
+  const tagIdx = addInput('-loop', '1', '-i', tagFile);
+  parts.push(`[${tagIdx}:v]scale=${W}:${H},format=rgba,`
+    + `fade=t=in:st=0:d=0.30:alpha=1,fade=t=out:st=${(bodyEnd - tagFrom - 0.35).toFixed(2)}:d=0.30:alpha=1,`
+    + `trim=duration=${(bodyEnd - tagFrom).toFixed(3)},setpts=PTS-STARTPTS+${tagFrom.toFixed(3)}/TB[ctatag]`);
+  ctaChain = '[ctatag]overlay=0:0:format=auto:eof_action=pass,';
+}
+
 parts.push(`[cat]${flashes.length
   ? `drawbox=x=0:y=0:w=iw:h=ih:color=white@0.55:t=fill:enable='${flashExpr}',`
-  : ''}format=yuv420p[vout]`);
+  : ''}${ctaChain ? 'null[preCta];[preCta]' + ctaChain : ''}format=yuv420p[vout]`);
 
 // ── Audio graph ─────────────────────────────────────────────────────────────
 const sfx = (n) => path.join(SFX, `${n}.wav`);
