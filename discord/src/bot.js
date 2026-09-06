@@ -312,7 +312,39 @@ const shopIsOpen = async () => {
  * about — sending someone who typed `/price robux` to a grid of seventy-two
  * products is a step they should never have had to take.
  */
-async function shopCta(productUrl = null) {
+/**
+ * Tag a shop link with where in the server the click came from.
+ *
+ * ── WHY THIS EXISTS ───────────────────────────────────────────────────────
+ * The site has carried a full attribution system since it was built: it reads
+ * utm_*, source, campaign and content off the landing URL, follows the visit to
+ * an order, and the admin has a view showing which creative produced purchases.
+ * Every link this bot handed out went in BARE — the join DM, the verify success
+ * message, /shop, /price, /recommend, every panel button, every drop
+ * announcement. So the largest owned traffic source this shop has was the one
+ * source it could never measure, and "does Discord bring paying customers" —
+ * the whole reason the server exists — had no answer in the data.
+ *
+ * `content` is the SURFACE, not the campaign: join-dm, verify, price, drop.
+ * That is the useful cut. Knowing Discord converts is worth something; knowing
+ * the join DM converts and the drop announcements do not is worth acting on.
+ *
+ * Never appended to a link that already carries a ref or utm — a referral link
+ * a member shared is theirs, and overwriting its attribution would take the
+ * credit for their sale.
+ */
+function tagged(url, surface) {
+  try {
+    const u = new URL(url);
+    if ([...u.searchParams.keys()].some((k) => /^(utm_|ref$|source$|src$)/i.test(k))) return url;
+    u.searchParams.set('utm_source', 'discord');
+    u.searchParams.set('utm_medium', 'community');
+    if (surface) u.searchParams.set('utm_content', surface);
+    return u.toString();
+  } catch { return url; }
+}
+
+async function shopCta(productUrl = null, surface = 'bot') {
   const open = await shopIsOpen();
   const at = await shopOpensAt();
   const when = at
@@ -320,7 +352,7 @@ async function shopCta(productUrl = null) {
     : null;
   return {
     open,
-    url: productUrl || `${STORE_URL}/shop`,
+    url: tagged(productUrl || `${STORE_URL}/shop`, surface),
     // Before launch the label describes what the page actually does.
     label: open ? (productUrl ? 'Buy now' : 'Open the shop')
       : (productUrl ? 'See it on the site' : 'Browse the catalogue'),
@@ -329,15 +361,15 @@ async function shopCta(productUrl = null) {
 }
 
 /** The shop button, labelled for whether the shop is actually open. */
-async function shopButton(productUrl = null) {
-  const cta = await shopCta(productUrl);
+async function shopButton(productUrl = null, surface = 'bot') {
+  const cta = await shopCta(productUrl, surface);
   return new ButtonBuilder().setLabel(`\u{1F6CD}\uFE0F ${cta.label}`)
     .setStyle(ButtonStyle.Link).setURL(cta.url);
 }
 
 /** A markdown link that tells the truth about what happens when it is clicked. */
-async function shopLink(productUrl = null) {
-  const cta = await shopCta(productUrl);
+async function shopLink(productUrl = null, surface = 'bot') {
+  const cta = await shopCta(productUrl, surface);
   return `[${cta.label}](${cta.url})${cta.note ? `\n${cta.note}` : ''}`;
 }
 
@@ -505,8 +537,8 @@ function ruleBasedAnswer(q, products) {
   const hit = FAQ.find((f) => f.q.toLowerCase().split(' ').some((w) => w.length > 4 && t.includes(w)));
   if (hit) return `**${hit.q}**\n${hit.a}`;
   const match = products.find((p) => t.includes(p.category) || t.includes(p.name.toLowerCase().split(' ')[0]));
-  if (match) return `Check out **${match.name}** — ${money(match.price, match.currency)}. Browse more at ${STORE_URL}/shop 🎮`;
-  return `I can help with top-ups, prices, delivery and orders! Tell me the game and amount, browse ${STORE_URL}/shop, or open a ticket in #open-a-ticket for order help.`;
+  if (match) return `Check out **${match.name}** — ${money(match.price, match.currency)}. Browse more at ${tagged(`${STORE_URL}/shop`, 'ask')} 🎮`;
+  return `I can help with top-ups, prices, delivery and orders! Tell me the game and amount, browse ${tagged(`${STORE_URL}/shop`, 'ask')}, or open a ticket in #open-a-ticket for order help.`;
 }
 
 const BUY_INTENT = /\b(buy|price|cheap|how much|robux|v-?bucks|vp|cp|gems|crystals|apex|order|top.?up)\b/i;
@@ -823,9 +855,18 @@ client.on(Events.GuildMemberAdd, async (member) => {
       "Money back if it never arrives · a real person on support · no account needed to buy.")
     .setFooter({ text: 'ForgeMarket · game top-ups & gift cards' });
   const dmButtons = new ActionRowBuilder().addComponents(
-    await shopButton(),
-    new ButtonBuilder().setLabel('📦 Track an order').setStyle(ButtonStyle.Link).setURL(`${STORE_URL}/track`));
-  member.send({ embeds: [dm], components: [dmButtons] }).catch(() => {});
+    await shopButton(null, 'join-dm'),
+    new ButtonBuilder().setLabel('📦 Track an order').setStyle(ButtonStyle.Link)
+      .setURL(tagged(`${STORE_URL}/track`, 'join-dm')));
+  /* A DM that never arrives is the most expensive silence in the funnel.
+     Most Discord accounts have DMs from server members switched off, and this
+     was `.catch(() => {})` — so the one message that tells a new member how to
+     verify and where the shop is went nowhere, and the only thing left was a
+     public greeting that deletes itself after ten minutes. Somebody who joined
+     a shop's server is the highest-intent visitor it will ever get. */
+  const dmDelivered = await member.send({ embeds: [dm], components: [dmButtons] })
+    .then(() => true).catch(() => false);
+  if (!dmDelivered) leadLog(member.guild, `✉️ DMs closed for <@${member.id}> — greeted in #welcome instead.`);
   leadLog(member.guild, `🟢 New member joined: <@${member.id}> (${member.guild.memberCount} total)`);
   checkImpersonation(member); // scam guard: flag staff-lookalike names on join
   trackJoinForRaid(member.guild); // raid guard: alert staff on join spikes
@@ -836,9 +877,25 @@ client.on(Events.GuildMemberAdd, async (member) => {
     // one message meant to greet them was posted where they could never read it.
     const ch = findChannel(member.guild, 'welcome') || findChannel(member.guild, 'general');
     const verifyCh = findChannel(member.guild, 'verify');
-    ch?.send(`👋 Welcome <@${member.id}>! Verify in ${verifyCh ? `<#${verifyCh.id}>` : '#verify'} to unlock everything, and say hi 💜`)
-      .then((m) => setTimeout(() => m.delete().catch(() => {}), 10 * 60_000))
-      .catch(() => {});
+    const hello = `👋 Welcome <@${member.id}>! Verify in ${verifyCh ? `<#${verifyCh.id}>` : '#verify'} to unlock everything, and say hi 💜`;
+    if (dmDelivered) {
+      // They already have the full version in their DMs; this is just a wave.
+      ch?.send(hello)
+        .then((m) => setTimeout(() => m.delete().catch(() => {}), 10 * 60_000))
+        .catch(() => {});
+    } else {
+      /* The DM bounced, so this message is now the ONLY thing they get — it
+         carries the shop button and it does not self-destruct. */
+      ch?.send({
+        content: `${hello}\n\nYour DMs are closed, so here is the short version: `
+          + 'verify above, then everything unlocks. Money back if an order never arrives, '
+          + 'a real person answers support, and no account is needed to buy.',
+        components: [new ActionRowBuilder().addComponents(
+          await shopButton(null, 'welcome-public'),
+          new ButtonBuilder().setLabel('📦 Track an order').setStyle(ButtonStyle.Link)
+            .setURL(tagged(`${STORE_URL}/track`, 'welcome-public')))],
+      }).catch(() => {});
+    }
   }
 });
 
@@ -921,7 +978,7 @@ async function handleButton(i) {
        reading list; the route to the thing they came for was a search away. The
        buttons are the same ones the rest of the server uses, and they say what
        the site will actually do today. */
-    const cta = await shopCta();
+    const cta = await shopCta(null, 'verify');
     return i.update({
       content: `\u2705 **Verified!** Welcome in \u2014 the full server is now unlocked.\n`
         + `${cta.note ? `${cta.note}\n` : ''}`
@@ -930,9 +987,9 @@ async function handleButton(i) {
         + 'so you hear about restocks first. \u{1F3AE}',
       embeds: [],
       components: [new ActionRowBuilder().addComponents(
-        await shopButton(),
+        await shopButton(null, 'verify'),
         new ButtonBuilder().setLabel('\u{1F4E6} Track an order')
-          .setStyle(ButtonStyle.Link).setURL(`${STORE_URL}/track`))],
+          .setStyle(ButtonStyle.Link).setURL(tagged(`${STORE_URL}/track`, 'verify')))],
     }).catch(() => {});
   }
 
@@ -1314,7 +1371,12 @@ async function handleCommand(i) {
         { name: '🛒 Shopping',
           value: '`/ask` — ask me anything about products or prices\n' +
                  '`/shop` — open the store\n' +
-                 '`/drops` — upcoming drops & restocks' },
+                 '`/drops` — upcoming drops & restocks\n' +
+                 /* The one command that turns a member into a salesperson, and it
+                    was in no list of what the bot can do — mentioned once, in one
+                    panel, in one channel. A referral programme nobody knows the
+                    command for pays out nothing. */
+                 '`/ref` — your referral link: 5% of every order it brings, as store credit' },
         { name: '💬 Community',
           value: '`/vouch` — leave a vouch after a purchase\n' +
                  '`/suggest` — suggest an idea (the server votes)\n' +
@@ -1871,9 +1933,23 @@ async function postVouch(i) {
   // Someone who just wrote something nice is the only person who will ever
   // bother writing it twice. Asking here — and only here — is why this line is
   // in the vouch reply rather than pinned somewhere nobody reads.
+  /* Staff have to be told, or nothing happens.
+     A vouch arrives on the site as PENDING and waits for a person to publish
+     it. Nothing anywhere said one was waiting, so they accumulate in an admin
+     list nobody opens while the storefront keeps saying "no reviews yet" — on a
+     shop whose single biggest conversion problem is having none. */
+  leadLog(i.guild, `⭐ New vouch from <@${i.user.id}> (${stars}/5) — waiting to be published: `
+    + `${tagged(`${STORE_URL}/admin/social`, 'vouch')}`);
+
+  /* And tell the member what actually happened.
+     This said "posted in #vouchers AND on the website". It is posted in
+     #vouchers; on the website it is pending review. Somebody who just wrote
+     something nice and then went to look for it would have found nothing, which
+     is the worst possible thing to do to the one person willing to advocate. */
   return i.reply({
     ephemeral: true,
-    content: 'Thanks for the vouch! 💚 Posted in #vouchers **and** on the website.'
+    content: 'Thanks for the vouch! 💚 It is up in #vouchers now, and it goes on the website '
+      + 'once a person has read it — reviews there only ever come from real people, so each one is checked.'
       + (TRUSTPILOT_REVIEW_URL ? `\n\n⭐ Would you put it on Trustpilot too? It helps more than you'd think: ${TRUSTPILOT_REVIEW_URL}` : ''),
   });
 }
@@ -1883,7 +1959,7 @@ async function priceCmd(i) {
   await i.deferReply({ ephemeral: true });
   const q = i.options.getString('product').toLowerCase().trim();
   const products = await getProducts();
-  if (!products.length) return i.editReply(`I can’t reach the catalog right now — browse ${STORE_URL}/shop 🛍️`);
+  if (!products.length) return i.editReply(`I can’t reach the catalog right now — browse ${tagged(`${STORE_URL}/shop`, 'price')} 🛍️`);
   const scored = products
     .map((p) => {
       const name = p.name.toLowerCase();
@@ -1897,7 +1973,7 @@ async function priceCmd(i) {
     .filter((x) => x.score > 0)
     .sort((a, b) => b.score - a.score);
   if (!scored.length) {
-    return i.editReply(`No product matching **${q}** — see the full list in #price-list or at ${STORE_URL}/shop`);
+    return i.editReply(`No product matching **${q}** — see the full list in #price-list or at ${tagged(`${STORE_URL}/shop`, 'price')}`);
   }
   const top = scored.slice(0, 5);
   const best = top[0].p;
