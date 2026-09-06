@@ -75,7 +75,7 @@ console.log('\n— The adverts —');
      must be true before it may be made, and a caption token with no real value
      drops its whole line. The words those adverts say still have to obey the
      same list as every page. */
-  const AD_COPY = ['scripts/ad/variants.mjs', 'scripts/ad/concepts.mjs'];
+  const AD_COPY = ['scripts/ad/variants.mjs', 'scripts/ad/concepts.mjs', 'scripts/ad/concepts-50.mjs'];
   for (const f of AD_COPY) {
     const src = codeOf(join(ROOT, f));
     const hits = BANNED_LIST.filter(([re]) => re.test(src)).map(([, l]) => l);
