@@ -119,5 +119,58 @@ console.log('\n— No revenue surface promises what the shop cannot do —');
   }
 }
 
+console.log('\n— Every click out of Discord is measurable —');
+{
+  /* The site has read utm_* off the landing URL since it was built, follows the
+     visit to an order, and the admin has a view of which creative produced
+     purchases. Every link this bot handed out went in BARE — so the largest
+     owned traffic source was the one source that could never be measured, and
+     "does Discord bring paying customers" had no answer in the data. */
+  ok('the bot tags the links it hands out', /function tagged\(url, surface\)/.test(bot));
+  ok('as discord/community', /utm_source', 'discord'/.test(bot) && /utm_medium', 'community'/.test(bot));
+  /* The surface, not the campaign. Knowing Discord converts is worth something;
+     knowing the join DM converts and the drop posts do not is worth acting on. */
+  for (const surface of ['join-dm', 'verify', 'price', 'ask']) {
+    ok(`${surface} is tagged as its own surface`, new RegExp(`'${surface}'`).test(bot), surface);
+  }
+  /* A referral link a member shared is theirs. Overwriting its attribution
+     would take the credit for their sale. */
+  ok('a link that already carries a ref or utm is left alone',
+    /\^\(utm_\|ref\$\|source\$\|src\$\)/.test(bot));
+}
+
+console.log('\n— The member whose DMs are closed is not lost —');
+{
+  /* Most Discord accounts have DMs from server members off, and the welcome DM
+     was `.catch(() => {})`. The only thing left was a public greeting that
+     deletes itself after ten minutes — for the highest-intent visitor the
+     server will ever get. */
+  ok('the join DM reports whether it landed', /const dmDelivered = await member\.send/.test(bot));
+  ok('and a bounced DM gets the shop in public instead',
+    /if \(dmDelivered\)/.test(bot) && /welcome-public/.test(bot));
+  ok('that message does not delete itself', /Your DMs are closed/.test(bot)
+    && !/Your DMs are closed[\s\S]{0,400}setTimeout\(\(\) => m\.delete/.test(bot));
+}
+
+console.log('\n— A vouch says what actually happened —');
+{
+  /* addReview inserts `pending`: it is NOT on the site until a person publishes
+     it. The reply said "posted in #vouchers AND on the website", so somebody who
+     wrote something nice and went to look for it found nothing. */
+  ok('the reply no longer claims it is already live',
+    !/Posted in #vouchers \*\*and\*\* on the website/.test(bot));
+  ok('and says it is read first', /once a person has read it/.test(bot));
+  /* Nothing told anyone a vouch was waiting, so they accumulated in an admin
+     list nobody opens while the storefront kept saying "no reviews yet". */
+  ok('staff are told one is waiting', /waiting to be published/.test(bot));
+}
+
+console.log('\n— The referral command is findable —');
+{
+  // It was mentioned once, in one panel, in one channel.
+  ok('/ref is in the help list', /`\/ref` — your referral link/.test(bot));
+  ok('and says what it pays', /5% of every order it brings/.test(bot));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
