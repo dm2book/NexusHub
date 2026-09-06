@@ -85,6 +85,7 @@ const AdminSupport = lazy(() => import('./pages/admin/Support.jsx'));
 const AdminSecurity = lazy(() => import('./pages/admin/Security.jsx'));
 const AdminSocialProof = lazy(() => import('./pages/admin/SocialProof.jsx'));
 const AdminOperations = lazy(() => import('./pages/admin/Operations.jsx'));
+const AdminMoney = lazy(() => import('./pages/admin/Money.jsx'));
 const AdminMonetization = lazy(() => import('./pages/admin/Monetization.jsx'));
 const AdminCategories = lazy(() => import('./pages/admin/Categories.jsx'));
 
@@ -175,6 +176,7 @@ export default function App() {
         <Route element={<ProtectedRoute staff><AdminLayout /></ProtectedRoute>}>
           <Route path="/admin" element={<AdminAnalytics />} />
           <Route path="/admin/operations" element={<AdminOperations />} />
+          <Route path="/admin/money" element={<AdminMoney />} />
           <Route path="/admin/orders" element={<AdminOrders />} />
           <Route path="/admin/orders/:id" element={<AdminOrderDetail />} />
           <Route path="/admin/payments" element={<AdminPayments />} />
