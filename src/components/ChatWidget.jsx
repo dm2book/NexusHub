@@ -67,7 +67,10 @@ export { openForgeChat } from '../lib/forgeChat.js';
 
 export default function ChatWidget() {
   const { lang } = useI18n();
-  const L = COPY[lang === 'nl' ? 'nl' : 'en'];
+  /* COPY carries nl and en. Any other language falls back to English rather
+     than to Dutch — the assistant's answers are written prose, and half-Dutch
+     for a French reader is worse than plain English. */
+  const L = COPY[lang] || COPY.en;
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
@@ -154,7 +157,7 @@ export default function ChatWidget() {
             )}
             {messages.length <= 1 && !typing && (
               <div className="flex flex-wrap gap-2 pt-1">
-                {(QUICK[lang === 'nl' ? 'nl' : 'en']).map((q) => (
+                {(QUICK[lang] || QUICK.en).map((q) => (
                   <button key={q} onClick={() => send(q)} className="chip text-xs hover:border-primary/40 hover:text-white">{q}</button>
                 ))}
               </div>

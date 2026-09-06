@@ -239,6 +239,13 @@ export default function Checkout() {
         email,
         items: items.map((i) => ({ productId: i.id, quantity: i.qty })),
         billing: { full_name: fullName, city, email,
+          /* The language this buyer read the shop in.
+             The order emails are Dutch — one set of templates, one language —
+             so a French buyer gets a Dutch mail and then writes a ticket in
+             French. Recording it does not translate anything; it tells the
+             person answering which language to answer in, which is the part a
+             human can actually act on today. */
+          lang,
           deliveryMethod: method,
           ...(needsTarget ? { deliveryDetails: deliveryDetail, deliveryLabel: deliveryLabels.join(' / ') } : {}) },
         currency,

@@ -200,6 +200,10 @@ export async function createOrder(input, ctx = {}) {
   // Bound the free-text billing fields (they flow into emails and admin views).
   if (billing.full_name) billing.full_name = String(billing.full_name).trim().slice(0, 80);
   if (billing.city) billing.city = String(billing.city).trim().slice(0, 80);
+  /* Which language the buyer read the shop in — kept so the person answering a
+     ticket knows which one to answer in. Bounded to the codes the storefront
+     actually offers; anything else is dropped rather than stored. */
+  billing.lang = ['nl', 'en', 'de', 'fr'].includes(billing.lang) ? billing.lang : undefined;
   // How the buyer wants this order delivered: 'code' = emailed gift code, 'account'
   // = we top up their account directly (needs a target). A supplied target implies
   // account delivery unless the buyer explicitly chose a code (backward compatible

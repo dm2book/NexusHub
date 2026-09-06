@@ -116,15 +116,27 @@ export const formatUpdated = (iso, nl) =>
     { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
 
 export default function LegalDoc({ doc, children }) {
-  const { lang } = useI18n();
+  const { lang, t } = useI18n();
   const nl = lang === 'nl';
   const d = nl ? doc.nl : doc.en;
+  /* The terms, the privacy policy and the cookie policy exist in Dutch and
+     English and in no other language, on purpose. These are the documents a
+     dispute is decided on; a translation of them is a legal claim, not a
+     convenience, and one nobody here can verify. So a German or French reader
+     gets the English text and is told why — rather than a machine translation
+     presented as if it were binding. */
+  const translated = lang === 'nl' || lang === 'en';
 
   return (
     <InfoShell eyebrow={d.eyebrow} title={d.title} subtitle={d.subtitle}>
       <p className="text-slate-500 text-sm mb-8">
         {nl ? 'Laatst bijgewerkt' : 'Last updated'}: {formatUpdated(doc.updated, nl)}
       </p>
+      {!translated && (
+        <p className="text-slate-500 text-sm mb-8 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+          {t('legal.langNote', 'This document is published in Dutch and English only. Those two versions are the binding ones; we would rather show you the English text than a translation nobody can stand behind.')}
+        </p>
+      )}
       <div className="space-y-4">
         {d.sections.map((s, i) => (
           <section key={i} className="space-y-4">

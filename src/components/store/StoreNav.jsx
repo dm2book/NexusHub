@@ -1,19 +1,63 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Search, ShoppingCart, Zap, ArrowRight, Shield, Menu, X, User } from 'lucide-react';
 import { useCart } from '../../context/CartContext.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
-import { useI18n } from '../../lib/i18n.jsx';
+import { useI18n, LANGUAGES } from '../../lib/i18n.jsx';
 
-/** EN ⇄ NL toggle — a compact pill that shows the language you can switch TO. */
+/**
+ * Language chooser.
+ *
+ * This was a two-way pill: press it and you went from Dutch to English and
+ * back. That is the right control for exactly two languages and the wrong one
+ * for four — with a toggle there is no way to reach the third. A menu also says
+ * what is on offer, which a pill showing only the other option never did.
+ *
+ * Each language is named in its own language, because someone looking for
+ * French does not read "Frans".
+ */
 export function LangSwitch({ className = '' }) {
   const { lang, setLang } = useI18n();
+  const [open, setOpen] = useState(false);
+  const box = useRef(null);
+  const current = LANGUAGES.find((l) => l.code === lang) || LANGUAGES[0];
+
+  // Click outside and Escape both close it — a menu that traps you is worse
+  // than no menu.
+  useEffect(() => {
+    if (!open) return undefined;
+    const onDown = (e) => { if (box.current && !box.current.contains(e.target)) setOpen(false); };
+    const onKey = (e) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('pointerdown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => { document.removeEventListener('pointerdown', onDown); document.removeEventListener('keydown', onKey); };
+  }, [open]);
+
   return (
-    <button onClick={() => setLang(lang === 'nl' ? 'en' : 'nl')}
-      title={lang === 'nl' ? 'Switch to English' : 'Schakel naar Nederlands'}
-      className={`inline-flex items-center gap-1 h-10 px-2.5 rounded-xl text-[13px] font-bold tracking-wide text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition ${className}`}>
-      🌐 {lang === 'nl' ? 'EN' : 'NL'}
-    </button>
+    <div ref={box} className={`relative ${className}`}>
+      <button onClick={() => setOpen((v) => !v)}
+        aria-haspopup="listbox" aria-expanded={open}
+        aria-label={`Language: ${current.label}`}
+        className="inline-flex items-center gap-1 h-10 px-2.5 rounded-xl text-[13px] font-bold tracking-wide text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition">
+        🌐 {current.short}
+      </button>
+      {open && (
+        <ul role="listbox" aria-label="Language"
+          className="absolute right-0 top-11 z-50 min-w-[164px] rounded-xl border border-slate-200 bg-white shadow-lg py-1">
+          {LANGUAGES.map((l) => (
+            <li key={l.code}>
+              <button role="option" aria-selected={l.code === lang} lang={l.code}
+                onClick={() => { setLang(l.code); setOpen(false); }}
+                className={`w-full text-left px-3 py-2 text-[14px] transition ${
+                  l.code === lang ? 'font-bold text-violet-700 bg-violet-50' : 'text-slate-700 hover:bg-slate-50'}`}>
+                <span className="inline-block w-7 text-[11px] font-bold tracking-wide text-slate-400">{l.short}</span>
+                {l.label}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 
