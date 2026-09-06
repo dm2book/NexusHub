@@ -60,7 +60,7 @@ export async function sendCartReminders({ afterHours = 4, maxDays = 14, limit = 
   const staleBefore = new Date(Date.now() - afterHours * 3_600_000).toISOString();
   const tooOld = new Date(Date.now() - maxDays * 86_400_000).toISOString();
   const rows = await all(
-    `SELECT sc.user_id, sc.items, sc.updated_at, u.email, u.display_name
+    `SELECT sc.user_id, sc.items, sc.updated_at, u.email, u.display_name, u.lang
        FROM saved_carts sc JOIN users u ON u.id = sc.user_id
       WHERE sc.items <> '[]' AND u.email IS NOT NULL
         AND sc.updated_at < @staleBefore AND sc.updated_at > @tooOld
@@ -80,6 +80,7 @@ export async function sendCartReminders({ afterHours = 4, maxDays = 14, limit = 
       { at: nowIso(), u: row.user_id });
     if (!claim?.changes) continue;
     await sendEmailAsync('cart_reminder', row.email, {
+      lang: row.lang || undefined,
       user: { name: row.display_name || row.email.split('@')[0] },
       cart: { itemsHtml: itemsHtml(items), url: `${config.appUrl}/cart` },
     });

@@ -1495,4 +1495,34 @@ UPDATE products SET price = 2699 WHERE sku = 'GPLAY-25'     AND price = 2599;
 UPDATE products SET price = 2699 WHERE sku = 'ITUNES-25'    AND price = 2599;
 `,
   },
+  {
+    id: '036_email_templates_per_language',
+    /*
+     * A buyer reads the shop in one of four languages and gets their email in
+     * Dutch.
+     *
+     * The storefront speaks nl, en, de and fr; email_templates held exactly one
+     * row per template id, so there was one language for everyone. A German
+     * buyer paid in German and received a Dutch confirmation — which is both
+     * useless to them and, coming from a shop they have never bought from
+     * before, indistinguishable from a phishing mail.
+     *
+     * The id stops being the key and (id, lang) becomes it. Every existing row
+     * is stamped `nl`, which is what it already was: the defaults were made
+     * Dutch in the launch-audit round. Nothing is rewritten and nothing an
+     * owner has edited by hand is touched — their Dutch copy stays the Dutch
+     * copy, and the other three languages are seeded alongside it.
+     *
+     * users.lang is the same question for mail that has no order behind it: a
+     * login code, a welcome, a cart reminder. Orders carry billing.lang
+     * already; this is where it lands for the person rather than the purchase.
+     */
+    sql: `
+ALTER TABLE email_templates ADD COLUMN IF NOT EXISTS lang TEXT NOT NULL DEFAULT 'nl';
+ALTER TABLE email_templates DROP CONSTRAINT IF EXISTS email_templates_pkey;
+ALTER TABLE email_templates ADD PRIMARY KEY (id, lang);
+
+ALTER TABLE users ADD COLUMN IF NOT EXISTS lang TEXT;
+`,
+  },
 ];

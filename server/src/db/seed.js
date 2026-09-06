@@ -6,6 +6,7 @@
 import { run, get, nowIso } from './index.js';
 import { migrate } from './migrate.js';
 import { DEFAULT_TEMPLATES, LEGACY_TEMPLATE_BODIES } from '../services/defaultTemplates.js';
+import { TEMPLATE_TRANSLATIONS } from '../services/templateTranslations.js';
 
 // Permission catalog. Granular so roles can be composed precisely.
 const PERMISSIONS = {
@@ -96,17 +97,34 @@ export async function seed() {
  */
 export async function syncEmailTemplates(at = nowIso()) {
   const normalize = (s) => String(s || '').replace(/\s+/g, ' ').trim();
-  for (const t of DEFAULT_TEMPLATES) {
-    const exists = await get('SELECT id, body_html FROM email_templates WHERE id = @id', { id: t.id });
+
+  /* One row per (template, language).
+     The Dutch set is the shop's own; the other three come from
+     templateTranslations.js. An owner who has edited a template by hand keeps
+     that edit — the upgrade path only ever replaces a body that still matches a
+     known previous default, and it is now scoped per language, so editing the
+     Dutch order mail does not freeze the German one. */
+  const variants = [
+    ...DEFAULT_TEMPLATES.map((t) => ({ lang: 'nl', id: t.id, name: t.name, subject: t.subject, body: t.body_html })),
+    ...Object.entries(TEMPLATE_TRANSLATIONS).flatMap(([lang, byId]) =>
+      DEFAULT_TEMPLATES
+        .filter((t) => byId[t.id])
+        .map((t) => ({ lang, id: t.id, name: t.name, subject: byId[t.id].subject, body: byId[t.id].body_html }))),
+  ];
+
+  for (const v of variants) {
+    const exists = await get('SELECT id, body_html FROM email_templates WHERE id = @id AND lang = @lang',
+      { id: v.id, lang: v.lang });
     if (!exists) {
-      await run(`INSERT INTO email_templates (id, name, subject, body_html, enabled, updated_at)
-                 VALUES (@id, @name, @subject, @body, 1, @at)`,
-                { id: t.id, name: t.name, subject: t.subject, body: t.body_html, at });
-    } else if ((LEGACY_TEMPLATE_BODIES[t.id] || []).some((old) => normalize(old) === normalize(exists.body_html))) {
+      await run(`INSERT INTO email_templates (id, lang, name, subject, body_html, enabled, updated_at)
+                 VALUES (@id, @lang, @name, @subject, @body, 1, @at)`,
+                { id: v.id, lang: v.lang, name: v.name, subject: v.subject, body: v.body, at });
+    } else if (v.lang === 'nl'
+      && (LEGACY_TEMPLATE_BODIES[v.id] || []).some((old) => normalize(old) === normalize(exists.body_html))) {
       await run(`UPDATE email_templates SET name = @name, subject = @subject, body_html = @body, updated_at = @at
-                 WHERE id = @id`,
-                { id: t.id, name: t.name, subject: t.subject, body: t.body_html, at });
-      console.log(`  · email template "${t.id}" upgraded to the new default`);
+                 WHERE id = @id AND lang = @lang`,
+                { id: v.id, lang: v.lang, name: v.name, subject: v.subject, body: v.body, at });
+      console.log(`  · email template "${v.id}" (${v.lang}) upgraded to the new default`);
     }
   }
 }

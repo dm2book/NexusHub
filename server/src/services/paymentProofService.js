@@ -137,6 +137,7 @@ export async function rejectProof(proofId, reason = '', ctx = {}) {
   const order = await getOrder(proof.order_id);
   if (order) {
     sendEmailAsync('custom_message', order.email, {
+      lang: order.billing?.lang || undefined,
       subject: `Payment not verified for ${order.number}`,
       message: `We couldn't verify your payment yet${reason ? `: ${reason}` : ''}. Please double-check the amount and reference and resubmit your proof.`,
       // Pre-filled track link: a rejected proof is exactly the moment the buyer

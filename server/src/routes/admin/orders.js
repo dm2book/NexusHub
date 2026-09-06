@@ -245,6 +245,8 @@ router.post('/:id/contact', requirePermission('orders.contact'),
     if (!order) throw notFound('Order not found');
 
     await sendEmail('custom_message', order.email, {
+      // Answer the buyer in the language they bought in.
+      lang: order.billing?.lang || undefined,
       user: { name: order.billing?.full_name || order.email.split('@')[0] },
       subject,
       message,

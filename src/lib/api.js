@@ -51,6 +51,15 @@ async function request(path, { method = 'GET', body, raw = false, retry = true, 
   const token = getAccessToken();
   if (token) headers.authorization = `Bearer ${token}`;
   if (body !== undefined) headers['content-type'] = 'application/json';
+  /* The language the page is being read in, on every request.
+     The server uses it for the one email that has no order behind it — the
+     login code — so it arrives in the language of the page that asked for it,
+     not the language of the browser. Read from localStorage rather than a React
+     hook because api.js runs outside the provider. */
+  try {
+    const l = localStorage.getItem('fm_lang');
+    if (l && ['nl', 'en', 'de', 'fr'].includes(l)) headers['x-lang'] = l;
+  } catch { /* private mode — the server falls back to the shop's own language */ }
 
   // Abort hung requests so the UI never spins forever (e.g. API/DB unreachable).
   const ctrl = new AbortController();
