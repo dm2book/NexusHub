@@ -363,18 +363,34 @@ const ctaText = variant?.cta || CTA_TEXT;
 const bodyEnd = cuts.reduce((a, c) => a + c.played, 0);
 const tagFrom = Math.min(cuts[0]?.played ?? 1.5, 2.2);
 const tagFile = path.join(IN, 'cta-tag.png');
-let ctaChain = '';
+let ctaChain = false;
 if (ctaText && fs.existsSync(tagFile) && bodyEnd - tagFrom > 1.5) {
-  const tagIdx = addInput('-loop', '1', '-i', tagFile);
-  parts.push(`[${tagIdx}:v]scale=${W}:${H},format=rgba,`
-    + `fade=t=in:st=0:d=0.30:alpha=1,fade=t=out:st=${(bodyEnd - tagFrom - 0.35).toFixed(2)}:d=0.30:alpha=1,`
-    + `trim=duration=${(bodyEnd - tagFrom).toFixed(3)},setpts=PTS-STARTPTS+${tagFrom.toFixed(3)}/TB[ctatag]`);
-  ctaChain = '[ctatag]overlay=0:0:format=auto:eof_action=pass,';
+  /* The tag runs from the first frame and is simply INVISIBLE until it fades
+     in. The obvious version — a stream that starts at `tagFrom` via setpts —
+     leaves overlay with no second input for the first two seconds, and it
+     stalls there rather than passing the first input through: the whole advert
+     rendered black under the overlays, which is a filtergraph that runs, exits
+     zero, and produces a file nobody would ship. */
+  /* Bounded at the INPUT with -t and -framerate, the way the end card is, rather
+     than trimmed inside the graph. A `-loop 1` still with no bound is an endless
+     25fps stream, and overlaying that onto the concatenated 30fps body produced
+     eighteen seconds of black under the overlays — a filtergraph that runs,
+     exits zero, and writes a file nobody would ship. */
+  const tagIdx = addInput('-loop', '1', '-framerate', String(FPS),
+    '-t', bodyEnd.toFixed(3), '-i', tagFile);
+  parts.push(`[${tagIdx}:v]scale=${W}:${H},fps=${FPS},format=rgba,setpts=PTS-STARTPTS,`
+    + `fade=t=in:st=${tagFrom.toFixed(2)}:d=0.30:alpha=1,`
+    + `fade=t=out:st=${Math.max(tagFrom + 0.5, bodyEnd - 0.35).toFixed(2)}:d=0.30:alpha=1[ctatag]`);
+  ctaChain = true;
 }
 
+/* Two statements rather than one long chain: the tag is overlaid onto the
+   finished body exactly the way the price badge is overlaid onto its scene,
+   which is the pattern already known to work here. */
 parts.push(`[cat]${flashes.length
   ? `drawbox=x=0:y=0:w=iw:h=ih:color=white@0.55:t=fill:enable='${flashExpr}',`
-  : ''}${ctaChain ? 'null[preCta];[preCta]' + ctaChain : ''}format=yuv420p[vout]`);
+  : ''}format=yuv420p${ctaChain ? '[body]' : '[vout]'}`);
+if (ctaChain) parts.push('[body][ctatag]overlay=0:0:format=auto,format=yuv420p[vout]');
 
 // ── Audio graph ─────────────────────────────────────────────────────────────
 const sfx = (n) => path.join(SFX, `${n}.wav`);

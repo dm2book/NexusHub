@@ -87,7 +87,15 @@ const SLAB = `
 
 export async function renderCaptions({ lines, out, base, chrome }) {
   fs.mkdirSync(out, { recursive: true });
-  const browser = await chromium.launch({ executablePath: chrome });
+  /* --default-background-color=00000000 is what actually makes
+     `omitBackground: true` produce a transparent PNG. Without it this Chromium
+     writes an OPAQUE image: the overlay then covers the footage instead of
+     sitting on it, and the whole advert renders as black rectangles with the
+     captions floating on them. It fails silently — the screenshot is written,
+     ffmpeg overlays it happily, and the only way to notice is to watch the
+     result. */
+  const browser = await chromium.launch({ executablePath: chrome,
+    args: ['--default-background-color=00000000'] });
   const ctx = await browser.newContext({ viewport: { width: W, height: H }, deviceScaleFactor: 1 });
   const p = await ctx.newPage();
   const written = [];
@@ -112,7 +120,15 @@ export async function renderCaptions({ lines, out, base, chrome }) {
     /* Same-origin so the webfonts load — see cards.mjs; a caption in the
        fallback face is the most visible place for the brand to slip. */
     await p.goto(`${base}/`, { waitUntil: 'domcontentloaded' }).catch(() => {});
-    await p.evaluate((h) => { document.open(); document.write(h); document.close(); }, html);
+    await p.evaluate((h) => {
+      document.open(); document.write(h); document.close();
+      /* Same reason as cards.mjs: the root keeps the navigated site's dark
+         background through document.write, so `omitBackground` has nothing to
+         omit and the caption is written as an opaque frame that hides the
+         footage underneath it. */
+      document.documentElement.style.setProperty('background', 'transparent', 'important');
+      document.body.style.setProperty('background', 'transparent', 'important');
+    }, html);
     await p.evaluate(async () => {
       await Promise.all([
         document.fonts.load('800 96px "Bricolage Grotesque"'),
