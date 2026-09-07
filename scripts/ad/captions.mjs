@@ -35,7 +35,13 @@ const esc = (s) => String(s)
 
 /* Positions keep out of the platforms' own furniture: TikTok's right rail and
    caption area eat the bottom ~420px and the right ~180px, Reels a little less.
-   Everything sits inside that, and the hook sits high where nothing overlaps. */
+   Everything sits inside that, and the hook sits high where nothing overlaps.
+
+   Measured against the first finished cut, they did not: the bottom-anchored
+   styles sat at 430–470px, which is INSIDE that zone, so TikTok drew its own
+   caption, handle and buttons straight over them. They clear it at 580–620px
+   now, and the type went up with them — a line that has to survive a six-inch
+   screen at arm's length is not a 46px line. */
 const STYLES = {
   hook: `
     .wrap{align-items:flex-start;padding:300px 90px 0}
@@ -43,18 +49,18 @@ const STYLES = {
        line-height:1.04;letter-spacing:-.02em;color:#fff;text-align:left;
        text-shadow:0 8px 40px rgba(0,0,0,.75),0 2px 10px rgba(0,0,0,.6)}`,
   big: `
-    .wrap{align-items:flex-end;padding:0 80px 470px}
-    .t{font-family:'Bricolage Grotesque','Inter',sans-serif;font-weight:800;font-size:82px;
+    .wrap{align-items:flex-end;padding:0 80px 620px}
+    .t{font-family:'Bricolage Grotesque','Inter',sans-serif;font-weight:800;font-size:88px;
        line-height:1.08;letter-spacing:-.02em;color:#fff;text-align:center;
        text-shadow:0 6px 34px rgba(0,0,0,.75),0 2px 8px rgba(0,0,0,.6)}`,
   small: `
-    .wrap{align-items:flex-end;padding:0 80px 430px}
-    .t{font-family:'Inter',system-ui,sans-serif;font-weight:700;font-size:46px;line-height:1.25;
+    .wrap{align-items:flex-end;padding:0 80px 580px}
+    .t{font-family:'Inter',system-ui,sans-serif;font-weight:700;font-size:54px;line-height:1.25;
        color:#fff;text-align:center;
        text-shadow:0 4px 24px rgba(0,0,0,.8),0 1px 6px rgba(0,0,0,.7)}`,
   quote: `
-    .wrap{align-items:flex-end;padding:0 80px 450px}
-    .t{font-family:'Inter',system-ui,sans-serif;font-weight:600;font-size:52px;line-height:1.3;
+    .wrap{align-items:flex-end;padding:0 80px 600px}
+    .t{font-family:'Inter',system-ui,sans-serif;font-weight:600;font-size:58px;line-height:1.3;
        color:#fff;text-align:center;font-style:italic;
        text-shadow:0 4px 26px rgba(0,0,0,.8)}`,
   /* The email arrival card. Pinned to the TOP of the frame with nothing above
@@ -64,7 +70,10 @@ const STYLES = {
      card is transparent, so the slide reveals the recording underneath. */
   notify: `
     .wrap{align-items:flex-start;padding:150px 54px 0}
-    .t{font-family:'Inter',system-ui,sans-serif;font-weight:700;font-size:44px;line-height:1.2;
+    /* A notification mimics a real one, so it stays small relative to the copy
+       styles — but 44px on a 1920 frame is about nine points on a phone, which
+       is below what a viewer reads at a glance while scrolling. */
+    .t{font-family:'Inter',system-ui,sans-serif;font-weight:700;font-size:52px;line-height:1.2;
        color:#fff;text-align:left;width:100%;
        display:flex;align-items:center;gap:26px;
        padding:30px 36px;border-radius:34px;
@@ -72,9 +81,9 @@ const STYLES = {
        box-shadow:0 26px 70px rgba(0,0,0,.55),0 0 0 1px rgba(255,255,255,.10) inset,
                   0 0 0 3px rgba(124,92,255,.35)}
     .t .ic{flex:0 0 auto;width:74px;height:74px;border-radius:22px;display:grid;place-items:center;
-       background:linear-gradient(135deg,#7c5cff,#a855f7);font-size:40px}
+       background:linear-gradient(135deg,#7c5cff,#a855f7);font-size:46px}
     .t .tx{min-width:0}
-    .t .sub{display:block;font-size:30px;font-weight:600;color:#a9a3c9;padding-top:4px}`,
+    .t .sub{display:block;font-size:34px;font-weight:600;color:#a9a3c9;padding-top:4px}`,
 };
 
 /* A slab behind the words. Screen recordings are mostly light UI, and white

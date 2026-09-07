@@ -116,7 +116,7 @@ if (PRICE) {
         <div class="price">${esc(PRICE)}</div>
       </div>
     </div>`, `
-    .wrap{height:100%;display:flex;align-items:flex-end;justify-content:center;padding-bottom:430px}
+    .wrap{height:100%;display:flex;align-items:flex-end;justify-content:center;padding-bottom:640px}
     .badge{position:relative;padding:26px 54px 30px;border-radius:34px;
       background:linear-gradient(135deg,rgba(124,92,255,.96),rgba(168,85,247,.96));
       box-shadow:0 26px 70px rgba(124,92,255,.5),0 0 0 3px rgba(255,255,255,.14) inset;
@@ -145,7 +145,13 @@ if (PRICE) {
  */
 await shoot(page(`
   <div class="wrap"><div class="tag"><span class="dot"></span>${esc(CTA)}</div></div>`, `
-  .wrap{height:100%;display:flex;align-items:flex-end;justify-content:flex-start;padding:0 0 210px 46px}
+  /* Top-left, clear of everything.
+     At the bottom it was hidden by TikTok's own caption and buttons; lifted to
+     470px it merely joined the queue of captions stacked in the lower third and
+     read as clutter. The top-left corner is empty in all three formats, the eye
+     passes it on the way to the hook, and it never competes with a line of
+     copy. */
+  .wrap{height:100%;display:flex;align-items:flex-start;justify-content:flex-start;padding:150px 0 0 46px}
   .tag{display:flex;align-items:center;gap:14px;padding:16px 30px 17px;border-radius:999px;
     font-family:'Bricolage Grotesque','Inter',sans-serif;font-weight:700;font-size:34px;
     color:rgba(255,255,255,.94);background:rgba(10,10,22,.58);

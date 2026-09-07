@@ -47,7 +47,22 @@ const variant = VARIANT ? (variantById(VARIANT) || conceptById(VARIANT)) : null;
 if (VARIANT && !variant) { console.error(`No variant "${VARIANT}".`); process.exit(1); }
 const TARGET = Number(arg('target', String(variant?.target || 20)));
 // Named after the variant so eight of them can live side by side.
-const OUT = path.join(IN, arg('name', variant ? `ad-${variant.id}-${variant.slug}.mp4` : 'ad.mp4'));
+/* The filename says what the footage is.
+ *
+ * Two things put text on screen that must never reach a feed: footage filmed
+ * against anything but the live shop bakes that host into the delivery email's
+ * footer (`© 2026 ForgeMarket — localhost:3000`, legible for a second and a
+ * half) and a demo payment makes the checkout say so, in Dutch, on camera.
+ * Both used to be console warnings — a note to whoever ran the command, and
+ * nothing at all to whoever uploads the file a week later. A `preview-` prefix
+ * and a burnt-in marker travel with the file. */
+const provenance = (() => {
+  try { return JSON.parse(fs.readFileSync(path.join(IN, 'beats.json'), 'utf8')).provenance || {}; }
+  catch { return {}; }
+})();
+const PUBLISHABLE = provenance.live === true && provenance.realPayment === true;
+const baseName = variant ? `ad-${variant.id}-${variant.slug}.mp4` : 'ad.mp4';
+const OUT = path.join(IN, arg('name', PUBLISHABLE ? baseName : `preview-${baseName}`));
 const W = 1080; const H = 1920;
 /* The domain painted in the corner for most of the advert. A variant may set
    its own; this is the fallback for a plain run. */
@@ -158,7 +173,14 @@ const PLAN = variant ? variant.scenes : SCENES;
    two copies of this maths is how an edit and its storyboard drift apart. */
 const cuts = planCuts(PLAN, at);
 if (!cuts.length) { console.error('No usable scenes in beats.json.'); process.exit(1); }
-const resolved = resolveTiming(cuts, { target: TARGET, card: 2.6, min: 15 });
+/* The floor follows the target rather than sitting at a hardcoded fifteen.
+   A variant asking for twelve seconds was being padded back up to fifteen, and
+   the padding came out of the slowest footage — so shortening the advert made
+   it MORE static, which is the opposite of the point. */
+const CARD_LEN = Number(arg('card', String(variant?.card ?? 2.6)));
+const resolved = resolveTiming(cuts, {
+  target: TARGET, card: CARD_LEN, min: Math.min(15, TARGET - 1),
+});
 let CARD = resolved.card;
 const total = resolved.total;
 
@@ -234,6 +256,16 @@ cuts.forEach((c, i) => {
     punch: `zoompan=z='max(1.09-0.09*on/${frames},1.0)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=${W}x${H}:fps=${FPS}`,
     // Barely moves; for scrolling, where the content is already moving.
     drift: `zoompan=z='1.03':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)+${Math.round(20)}*on/${frames}':d=1:s=${W}x${H}:fps=${FPS}`,
+    /* A real push, into the TOP of the frame.
+       The other three move 3–9%, which is texture rather than emphasis — and
+       the shot this advert exists for, the code arriving, was one of them: the
+       code sat small and unmagnified near the top of a dense email while the
+       caption talked about it at the bottom. This goes to 1.55× and tracks
+       upward, so the thing being talked about is the thing filling the screen. */
+    focus: `zoompan=z='min(1.06+0.49*on/${frames},1.55)'`
+      + `:x='iw/2-(iw/zoom/2)'`
+      + `:y='max(0, ih*0.20 - (ih/zoom/2) + ih*0.10*(1-on/${frames}))'`
+      + `:d=1:s=${W}x${H}:fps=${FPS}`,
   }[c.zoom] || '';
 
   parts.push(
@@ -387,9 +419,19 @@ if (ctaText && fs.existsSync(tagFile) && bodyEnd - tagFrom > 1.5) {
 /* Two statements rather than one long chain: the tag is overlaid onto the
    finished body exactly the way the price badge is overlaid onto its scene,
    which is the pattern already known to work here. */
+/* Preview footage carries a marker across the whole running time. Deliberately
+   impossible to crop out of a 9:16 upload without cropping the advert, because
+   the thing it is warning about (a dev host, a demo-mode notice) is legible in
+   the picture and the person uploading it will not be the person who filmed
+   it. drawtext needs a TTF and this shop's faces are woff2, so it is a box and
+   a label rendered the only way ffmpeg can do it alone. */
+const mark = PUBLISHABLE ? '' :
+  `drawbox=x=0:y=${Math.round(H * 0.02)}:w=iw:h=64:color=black@0.55:t=fill,`
+  + `drawbox=x=0:y=${Math.round(H * 0.02)}:w=8:h=64:color=0xd946ef@0.95:t=fill,`;
+
 parts.push(`[cat]${flashes.length
   ? `drawbox=x=0:y=0:w=iw:h=ih:color=white@0.55:t=fill:enable='${flashExpr}',`
-  : ''}format=yuv420p${ctaChain ? '[body]' : '[vout]'}`);
+  : ''}${mark}format=yuv420p${ctaChain ? '[body]' : '[vout]'}`);
 if (ctaChain) parts.push('[body][ctatag]overlay=0:0:format=auto,format=yuv420p[vout]');
 
 // ── Audio graph ─────────────────────────────────────────────────────────────
@@ -438,7 +480,13 @@ cuts.forEach((c, i) => {
 place(sfx('impact'), cursor - 0.05, 0.7);
 
 aParts.push(`[bed]${aNames.join('')}amix=inputs=${aNames.length + 1}:duration=first:dropout_transition=0,`
-  + `alimiter=limit=0.92,aresample=48000[aout]`);
+  /* Normalised to the loudness the platforms play at.
+     Measured on the first finished cut: −33,6 LUFS integrated, about twenty
+     decibels under the ~−14 LUFS TikTok, Reels and Shorts normalise to. In a
+     feed that is either silent next to everything around it, or the platform
+     lifts it and brings the noise floor up with it. The limiter stays: loudnorm
+     sets the level, it does not stop a transient. */
+  + `loudnorm=I=-14:TP=-1.5:LRA=11,alimiter=limit=0.95,aresample=48000[aout]`);
 
 // ── Render ──────────────────────────────────────────────────────────────────
 const filter = [...parts, ...aParts].join(';');

@@ -130,6 +130,86 @@ console.log('\n— The recording is filmed in the language of the advert —');
   ok('a product that needs a delivery target gets one', /#co-target/.test(rec));
 }
 
+console.log('\n— The performance edit, measured against the first cut —');
+{
+  /* Every number here was read off the finished 18s file before it changed:
+     six of eighteen seconds under 1.5 on frame-to-frame motion, one cut per
+     2.25s, −33.6 LUFS, and the price on screen three times at once. */
+  const compose = read('scripts/ad/compose.mjs');
+
+  ok('the advert is cut to twelve seconds, not eighteen', V.target === 12, String(V.target));
+  ok('…and the end card comes down with it', V.card !== undefined && V.card < 2.6, String(V.card));
+  ok('…without a hardcoded floor padding it back up',
+    /min: Math\.min\(15, TARGET - 1\)/.test(compose));
+
+  /* The waiting shots are the ones with nothing in them: `confirmed → delivery`
+     is the shop polling, and the track page is a status list that does not
+     move. Left at 1.2–1.4× they were the dead stretch. */
+  const byLabel = Object.fromEntries(V.scenes.map((sc) => [sc.label, sc]));
+  ok('the polling wait is compressed hard', byLabel.confirmed.speed >= 4);
+  ok('…and so is the status page', byLabel.delivered.speed >= 2);
+
+  ok('the audio is normalised to what the platforms play at',
+    /loudnorm=I=-14:TP=-1\.5:LRA=11/.test(compose));
+
+  /* The shot the advert is built to reach was a 1.2× drift with the code small
+     and unmagnified near the top of a dense email. */
+  ok('the code reveal is a real push, not a drift', byLabel['the code'].zoom === 'focus');
+  ok('…and the focus zoom actually magnifies', /min\(1\.06\+0\.49\*on/.test(compose));
+
+  ok('the price is not on screen three times at once', V.priceCard === false
+    && V.captions.filter((c) => /\{price\}/.test(c.text)).length <= 1);
+
+  /* A beat fires when the navigation resolves, not when the page has painted:
+     frame one was 200ms of the catalogue the product page was still leaving. */
+  ok('the opening scene waits for the page to paint', V.scenes[0].settle > 0);
+  ok('…and the resolver honours that', /if \(s\.settle\)/.test(read('scripts/ad/timing.mjs')));
+}
+
+console.log('\n— Nothing sits under the platform’s own furniture —');
+{
+  const caps = read('scripts/ad/captions.mjs');
+  const cards = read('scripts/ad/cards.mjs');
+  /* TikTok's caption and buttons cover roughly the bottom 420px. The
+     bottom-anchored styles were at 430–470px — inside it — and the permanent
+     call to action was at 210px, which is as hidden as a CTA can be. */
+  const pads = [...caps.matchAll(/padding:0 80px (\d+)px/g)].map((m) => Number(m[1]));
+  ok('every bottom-anchored caption clears the chrome zone',
+    pads.length > 0 && pads.every((n) => n >= 560), pads.join(','));
+  /* The copy styles, not the notification mimic — a notification that is set
+     like a headline stops reading as a notification. */
+  const copySizes = [...caps.matchAll(/font-weight:[678]00;font-size:(\d+)px;line-height/g)]
+    .map((m) => Number(m[1]));
+  ok('…and every line of copy is big enough to survive a phone',
+    copySizes.length > 0 && copySizes.every((n) => n >= 52), copySizes.join(','));
+  ok('the call to action is out of the lower third entirely',
+    /align-items:flex-start;justify-content:flex-start;padding:150px/.test(cards));
+}
+
+console.log('\n— A preview cannot be mistaken for a finished advert —');
+{
+  const rec = read('scripts/ad/record.mjs');
+  const compose = read('scripts/ad/compose.mjs');
+  /* Footage filmed against anything but the live shop bakes that host into the
+     delivery email's footer — `© 2026 ForgeMarket — localhost:3000` was legible
+     for a second and a half — and a demo payment puts a demo-mode notice on the
+     checkout, in Dutch, on camera. Both were console warnings: a note to
+     whoever ran the command, nothing to whoever uploads the file later. */
+  ok('the recording records what it is', /const provenance = \{/.test(rec)
+    && /realPayment: PAY === 'manual'/.test(rec));
+  ok('…and whether the shop it filmed was the live one', /provenance\.live/.test(rec)
+    || /live: \/\^https/.test(rec));
+  ok('compose reads it', /PUBLISHABLE = provenance\.live === true/.test(compose));
+  ok('…names the file preview- when it is not publishable',
+    /`preview-\$\{baseName\}`/.test(compose));
+  ok('…and burns a marker into every frame of it',
+    /const mark = PUBLISHABLE \? '' :/.test(compose));
+
+  /* A visible pointer. It was a 26px radial gradient fading to nothing, which
+     on a light storefront page is a lens flare rather than a cursor. */
+  ok('the cursor is opaque and ringed', /border:2\.5px solid rgba\(255,255,255/.test(rec));
+}
+
 console.log('\n— It cannot be built out of things that did not happen —');
 {
   /* The whole argument against the other advert is that it asserts. This one is
