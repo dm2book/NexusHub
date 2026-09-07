@@ -56,7 +56,15 @@ if (!log) {
   process.exit(1);
 }
 
-const tpl = await get(`SELECT * FROM email_templates WHERE id = @id`, { id: log.template_id });
+/* Templates are per (id, language) now. Selecting on the id alone returned
+   whichever row Postgres felt like, so the advert could show a German template
+   for a Dutch order. The language the buyer actually got is in the context the
+   send path stored. */
+let sentLang = 'nl';
+try { sentLang = JSON.parse(log.context || '{}').lang || 'nl'; } catch { /* keep nl */ }
+const tpl = await get(`SELECT * FROM email_templates WHERE id = @id AND lang = @lang`,
+  { id: log.template_id, lang: sentLang })
+  || await get(`SELECT * FROM email_templates WHERE id = @id AND lang = 'nl'`, { id: log.template_id });
 if (!tpl) { console.error(`Template ${log.template_id} is missing.`); process.exit(1); }
 
 let ctx = {};

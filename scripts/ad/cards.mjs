@@ -54,7 +54,15 @@ const page = (body, extraCss = '') => `<!doctype html><html><head><meta charset=
   ${extraCss}
 </style></head><body>${body}</body></html>`;
 
-const browser = await chromium.launch({ executablePath: CHROME });
+/* --default-background-color=00000000 is what actually makes
+   `omitBackground: true` produce a transparent PNG. Without it this Chromium
+   writes an OPAQUE image: the overlay then covers the footage instead of
+   sitting on it, and the whole advert renders as black rectangles with the
+   captions floating on them. It fails silently — the screenshot is written,
+   ffmpeg overlays it happily, and the only way to notice is to watch the
+   result. */
+const browser = await chromium.launch({ executablePath: CHROME,
+  args: ['--default-background-color=00000000'] });
 const ctx = await browser.newContext({
   viewport: { width: 1080, height: 1920 },
   deviceScaleFactor: 1,
@@ -69,7 +77,18 @@ async function shoot(html, file) {
      advert look like somebody else's. Navigating to the site first means the
      fonts are same-origin, and then the markup is written into that document. */
   await p.goto(`${BASE}/`, { waitUntil: 'domcontentloaded' }).catch(() => {});
-  await p.evaluate((h) => { document.open(); document.write(h); document.close(); }, html);
+  await p.evaluate((h) => {
+    document.open(); document.write(h); document.close();
+      /* The root keeps the navigated site's background through document.write:
+         computed style says rgb(7,7,16), not transparent. `omitBackground` then
+         has nothing to omit, Chromium writes an OPAQUE RGB png, and the overlay
+         covers the footage instead of sitting on it — the whole advert renders
+         as black rectangles with the captions floating on them. It fails
+         silently: the screenshot is written, ffmpeg overlays it happily, and
+         the only way to notice is to watch the result. */
+      document.documentElement.style.setProperty('background', 'transparent', 'important');
+      document.body.style.setProperty('background', 'transparent', 'important');
+  }, html);
   await p.evaluate(async () => {
     // Ask for each face by name so the browser actually fetches it before the
     // screenshot, rather than lazily on first paint of a glyph.

@@ -109,13 +109,31 @@ const browser = await chromium.launch({ executablePath: CHROME, args: ['--force-
    540x960 is the widest that still gets the PHONE layout (Tailwind's sm
    breakpoint is 640), so the frame is filled here and compose.mjs takes it up
    to 1080x1920 with a proper scaler. */
+/* The language the purchase is filmed in.
+ *
+ * The shop picks a language from the browser, and headless Chromium says
+ * en-US — so a Dutch advert was filmed against an English shop, and the
+ * delivery email in the last third of it arrived in English. Nothing was
+ * broken: the shop served an English buyer an English mail, exactly as it
+ * should. The recording simply has to browse the way the advert's audience
+ * does, which means both the browser locale AND the shop's own stored choice.
+ */
+const LANG = arg('lang', 'nl');
+const LOCALE = { nl: 'nl-NL', en: 'en-GB', de: 'de-DE', fr: 'fr-FR' }[LANG] || 'en-GB';
+
 const context = await browser.newContext({
   viewport: { width: 540, height: 960 },
   deviceScaleFactor: 1,
   isMobile: true,
   hasTouch: true,
+  locale: LOCALE,
   recordVideo: { dir: OUT, size: { width: 540, height: 960 } },
 });
+/* Set before the first navigation: the shop reads `fm_lang` on its very first
+   render, so setting it afterwards would film one language and email another. */
+await context.addInitScript((l) => {
+  try { localStorage.setItem('fm_lang', l); } catch { /* private mode */ }
+}, LANG);
 const page = await context.newPage();
 
 /* A visible cursor. Playwright moves a real mouse but paints nothing, and an
@@ -179,7 +197,8 @@ try {
   await page.goto(`${BASE}/`, { waitUntil: 'networkidle', timeout: TIMEOUT });
   t0 = Date.now();
   beat('open');
-  await page.getByRole('button', { name: /Accept/i }).click({ timeout: 3000 }).catch(() => {});
+  await page.getByRole('button', { name: /Accept|Accepteren|Akzeptieren|Accepter/i })
+    .click({ timeout: 3000 }).catch(() => {});
   await page.waitForTimeout(600);
 
   // ── 2. Browse ───────────────────────────────────────────────────────────
@@ -223,7 +242,13 @@ try {
   if (priceBox) beat('price-onscreen', { box: priceBox });
 
   // ── 5. Buy ──────────────────────────────────────────────────────────────
-  const buy = page.getByRole('button', { name: /Buy Now|Koop|Pay .* securely|Place order/i }).first();
+  /* Every language the shop speaks, because the shop is filmed in the language
+     of the advert now. These were English-only, so a Dutch recording waited
+     thirty seconds for a "Buy Now" on a page whose button says "Direct kopen"
+     and then failed with a timeout that named a selector rather than a cause. */
+  const buy = page.getByRole('button', {
+    name: /Buy Now|Direct kopen|Koop|Sofort kaufen|Acheter maintenant|Pay .* securely|Place order/i,
+  }).first();
   await tap(buy, 'buy');
   await page.waitForTimeout(900);
 
@@ -235,6 +260,20 @@ try {
     await emailField.fill(EMAIL);
     await page.waitForTimeout(200);
   }
+  /* The delivery target, where the product needs one.
+     An account top-up asks for the buyer's in-game username, and that field is
+     `required` — so leaving it empty means the browser silently refuses to
+     submit and the recording dies at "no order number in the URL" with nothing
+     in the server log to explain it, because no request was ever made. Filmed
+     with an obviously fictional name: this frame ends up on screen, and a real
+     username on a real account is somebody's. */
+  const target = page.locator('#co-target');
+  if (await target.count()) {
+    await target.fill(arg('target-name', 'ForgeDemo_NL'));
+    beat('delivery-target');
+    await page.waitForTimeout(SLOW);
+  }
+
   /* Consent is a legal checkbox, not decoration, and the submit stays disabled
      until it is ticked. Clicking it can miss — the real input often sits under a
      styled label — so `check()` is used, which asserts the resulting state
@@ -278,7 +317,9 @@ try {
     console.warn(`  checkout refused (${r.status()}): ${why.slice(0, 200)}`);
   });
 
-  const candidates = await page.getByRole('button', { name: /Pay|Place order|Bestellen|Buy/i }).all();
+  const candidates = await page.getByRole('button', {
+    name: /Pay|Place order|Bestellen|Bestelling plaatsen|Betalen|Buy|Bezahlen|Bestellung|Payer|Passer la commande/i,
+  }).all();
   let clicked = false;
   for (const c of candidates) {
     if (!(await c.isVisible().catch(() => false))) continue;
@@ -389,11 +430,19 @@ try {
 await context.close();          // flushes the video file
 await browser.close();
 
-// Playwright names the video after the page; give it the name the editor wants.
-const vids = fs.readdirSync(OUT).filter((f) => f.endsWith('.webm'));
+/* Playwright names the video after the page; give it the name the editor wants.
+ *
+ * `raw.webm` is excluded from the candidates on purpose. It used to be in the
+ * list, and re-recording into a directory that already held one destroyed the
+ * take: sorted, `page@….webm` comes before `raw.webm`, so the new file was
+ * renamed over the old one correctly — and then the "extras" sweep deleted
+ * `raw.webm`, which was by then the recording that had just been made. The
+ * whole purchase, filmed and thrown away, and compose.mjs then reporting a
+ * missing file for a run that had just printed a success. */
+const vids = fs.readdirSync(OUT).filter((f) => f.endsWith('.webm') && f !== 'raw.webm');
 if (!vids.length) { console.error('No video was written.'); process.exit(1); }
-fs.renameSync(path.join(OUT, vids[0]), path.join(OUT, 'raw.webm'));
 for (const extra of vids.slice(1)) fs.unlinkSync(path.join(OUT, extra));
+fs.renameSync(path.join(OUT, vids[0]), path.join(OUT, 'raw.webm'));
 
 fs.writeFileSync(path.join(OUT, 'beats.json'), JSON.stringify({
   base: BASE, recordedAt: new Date().toISOString(),
