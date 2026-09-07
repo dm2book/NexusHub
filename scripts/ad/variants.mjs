@@ -114,6 +114,23 @@ const S = {
      the one beat between placing an order and it existing — the payment — was
      never a scene anything could be pinned to. */
   pay: { from: 'order-placed', to: 'confirmed', speed: 1.8, weight: 1.1, zoom: 'punch', label: 'payment' },
+
+  /* Waiting, compressed.
+     `confirmed → delivery` is the shop polling for the order to complete: seven
+     or eight seconds of a page that does not change. At speed 1.4 and weight
+     1.2 it took 4.83 of an eighteen-second advert — twenty-seven per cent of
+     the running time on the least eventful footage in the recording. Measured
+     frame-to-frame, seconds seven through eleven scored 0.5–1.3 against a 19.8
+     peak elsewhere: four seconds of near-stillness at exactly the point a
+     viewer decides whether to stay. Same beat, a third of the time. */
+  confirmedFast: { from: 'confirmed', to: 'delivery', speed: 4.0, weight: 0.5, zoom: 'punch', label: 'confirmed' },
+
+  /* The shot the whole advert is built to reach.
+     It used to be `S.code` — a 1.2× drift over a scrolling email, with the
+     masked code small and unmagnified near the top of the frame while the
+     caption talked about it at the bottom. `focus` pushes to 1.55× into the top
+     of the frame, so the thing being named is the thing filling the screen. */
+  codeReveal: { from: 'email-detail', to: 'end', speed: 1.0, weight: 2.0, zoom: 'focus', label: 'the code' },
 };
 
 /**
@@ -323,7 +340,17 @@ export const VARIANTS = [
     slug: 'klik-tot-code',
     name: 'Van klik tot code (NL)',
     lang: 'nl',
-    target: 18,
+    /* Twelve, not eighteen.
+       Measured on the eighteen-second cut: six of those seconds scored under
+       1.5 on frame-to-frame motion, and shortening the SCENES alone made it
+       worse — with less to compress, everything fell back to real time and
+       eight of sixteen seconds went static. A screen recording of a shop simply
+       does not contain eighteen seconds of event. Twelve does, and every one of
+       them then has something happening in it.
+       The end card comes down with it: 2.6s of a still logo is a fifth of a
+       twelve-second advert. */
+    target: 12,
+    card: 1.8,
     /*
      * Written against a competitor's advert, frame by frame, because the gap
      * between the two is the whole argument.
@@ -364,11 +391,26 @@ export const VARIANTS = [
      * to put on screen. The comparison it makes instead is the one it can
      * stand behind — the price you were shown against the price you paid.
      */
-    scenes: [S.product, S.buy, S.checkout, S.pay, S.confirmed, S.delivered, S.email, S.code],
+    /* The opening scene starts a third of a second after the product beat, so
+       frame one is the product page rather than the catalogue it was still
+       navigating away from. */
+    scenes: [{ ...S.product, settle: 0.35 }, S.buy, S.checkout, S.pay,
+      S.confirmedFast,
+      /* The track page is another wait: a status list that does not move.
+         Left at 1.2× it was the last remaining slow stretch of the cut. */
+      { ...S.delivered, speed: 2.4, weight: 1.0 },
+      S.email, S.codeReveal],
+    /* The price is in the hook, in the badge AND on the page — three instances
+       of one number on screen together at half a second, which is not emphasis,
+       it is noise. The hook says it; the page proves it; the badge goes. */
+    priceCard: false,
     // Frame one: a real price on a real product. No logo, no swoosh, no promise.
     hook: '{price}. Meer wordt het niet.',
     captions: [
-      { at: 'the product', text: '{price}', style: 'big' },
+      /* No second price caption. The hook already says {price}, the page behind
+         it shows {price}, and a third instance in the lower third made the same
+         number appear three times at once half a second in. That is not
+         emphasis. */
       { at: 'the product', text: '{delivery}', style: 'small', late: true },
       { at: 'buy', text: 'Geen account nodig', style: 'small' },
       { at: 'checkout', text: 'Betalen met iDEAL', style: 'small' },

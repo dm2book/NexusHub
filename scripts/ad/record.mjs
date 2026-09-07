@@ -145,15 +145,24 @@ await page.addInitScript(() => {
     if (document.getElementById('__adcur')) return;
     const c = document.createElement('div');
     c.id = '__adcur';
-    c.style.cssText = 'position:fixed;left:0;top:0;width:26px;height:26px;border-radius:50%;'
-      + 'background:radial-gradient(circle at 30% 30%,rgba(255,255,255,.95),rgba(160,140,255,.55) 60%,rgba(124,92,255,0) 70%);'
-      + 'box-shadow:0 0 18px 6px rgba(124,92,255,.45);pointer-events:none;z-index:2147483647;'
-      + 'transform:translate(-50%,-50%);transition:transform .08s ease-out;will-change:transform';
+    /* Opaque, ringed and large enough to read at a thumb's distance.
+       It used to be a 26px radial gradient fading to nothing — on a light
+       storefront page that is not a cursor, it is a lens flare, and a reviewer
+       watching the finished advert could not find it at all. A screen recording
+       with no visible pointer reads as a slideshow of pages rather than
+       somebody buying something. */
+    c.style.cssText = 'position:fixed;left:0;top:0;width:34px;height:34px;border-radius:50%;'
+      + 'background:radial-gradient(circle at 32% 30%,#ffffff,#cdbcff 42%,#7c5cff 100%);'
+      + 'border:2.5px solid rgba(255,255,255,.95);'
+      + 'box-shadow:0 3px 14px rgba(0,0,0,.45),0 0 26px 8px rgba(124,92,255,.55);'
+      + 'pointer-events:none;z-index:2147483647;'
+      + 'transform:translate(-50%,-50%);transition:transform .09s cubic-bezier(.22,.61,.36,1);'
+      + 'will-change:transform';
     document.documentElement.appendChild(c);
     const ring = document.createElement('div');
     ring.id = '__adring';
-    ring.style.cssText = 'position:fixed;left:0;top:0;width:26px;height:26px;border-radius:50%;'
-      + 'border:2px solid rgba(255,255,255,.9);pointer-events:none;z-index:2147483647;opacity:0;'
+    ring.style.cssText = 'position:fixed;left:0;top:0;width:34px;height:34px;border-radius:50%;'
+      + 'border:3px solid rgba(124,92,255,.95);pointer-events:none;z-index:2147483647;opacity:0;'
       + 'transform:translate(-50%,-50%) scale(1)';
     document.documentElement.appendChild(ring);
     let x = innerWidth / 2, y = innerHeight / 2;
@@ -444,7 +453,30 @@ if (!vids.length) { console.error('No video was written.'); process.exit(1); }
 for (const extra of vids.slice(1)) fs.unlinkSync(path.join(OUT, extra));
 fs.renameSync(path.join(OUT, vids[0]), path.join(OUT, 'raw.webm'));
 
+/* What this footage IS, recorded with it.
+ *
+ * Two things put text on screen that must never reach a feed: filming against
+ * anything but the live shop bakes that host into the delivery email's footer
+ * (`© 2026 ForgeMarket — localhost:3000`, legible for a second and a half), and
+ * a demo payment makes the checkout say so in Dutch, on camera. Both were
+ * console warnings, which is a note to whoever ran the command and nothing at
+ * all to whoever uploads the file a week later.
+ *
+ * So it travels with the recording, and compose.mjs refuses to write a
+ * shippable filename without it. */
+const provenance = {
+  live: /^https:\/\//i.test(BASE) && !/localhost|127\.0\.0\.1|:\d{4,5}$/.test(BASE),
+  realPayment: PAY === 'manual',
+};
+if (!provenance.live || !provenance.realPayment) {
+  console.warn(`\n  ⚠ PREVIEW footage — ${!provenance.live ? `filmed against ${BASE}` : ''}`
+    + `${!provenance.live && !provenance.realPayment ? ' and ' : ''}`
+    + `${!provenance.realPayment ? `paid with --pay=${PAY}` : ''}.`);
+  console.warn('    The frame will carry a dev host and/or a demo-mode notice. Not publishable.\n');
+}
+
 fs.writeFileSync(path.join(OUT, 'beats.json'), JSON.stringify({
+  provenance,
   base: BASE, recordedAt: new Date().toISOString(),
   payment: PAY,
   realPayment: PAY === 'manual',

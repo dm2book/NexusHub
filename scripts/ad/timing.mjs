@@ -34,6 +34,12 @@ export function planCuts(plan, at) {
        to them would vanish with them — so the last scene falls back to `end`. */
     if (s.from === 'delivered-detail' && b === null) b = at('end');
     if (a === null || b === null || b <= a) continue;
+    /* `settle` skips the first moments after a beat.
+       A beat fires when the navigation resolves, not when the page has painted
+       — so the opening scene of the finished cut began on 200ms of the CATALOGUE
+       while the product page was still arriving. That is the one frame an advert
+       cannot afford to get wrong, and it was showing the previous screen. */
+    if (s.settle) a = Math.min(a + s.settle * 1000, b - 200);
     const rawLen = (b - a) / 1000;
     if (rawLen < 0.12) continue;                     // nothing happened here
     cuts.push({ ...s, start: a / 1000, srcLen: rawLen });
