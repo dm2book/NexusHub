@@ -208,6 +208,19 @@ console.log('\n— A preview cannot be mistaken for a finished advert —');
   /* A visible pointer. It was a 26px radial gradient fading to nothing, which
      on a light storefront page is a lens flare rather than a cursor. */
   ok('the cursor is opaque and ringed', /border:2\.5px solid rgba\(255,255,255/.test(rec));
+
+  /* And the route OUT of preview, written down — because the obvious reading of
+     "not publishable" is "wait for the card provider", and that is not what
+     blocks it. A manual payment method needs no provider at all: verified
+     against a running shop with PAY_TIKKIE set and DEMO_PAYMENTS off, the
+     checkout offered a real method, orderingPaused was false and nothing on the
+     page said demo. */
+  const doc = read('scripts/ad/README.md');
+  ok('the README says what makes a cut publishable', /What makes a cut publishable/.test(doc));
+  ok('…and that it does not need the card provider',
+    /It does not need Mollie/.test(doc) && /PAY_TIKKIE/.test(doc));
+  ok('…and that a manual method is what the shop already has',
+    /--pay=manual/.test(doc) && /commerceBlockers/.test(doc));
 }
 
 console.log('\n— It cannot be built out of things that did not happen —');

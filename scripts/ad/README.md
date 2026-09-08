@@ -228,6 +228,42 @@ that did not happen.
 `beats.json` records which was used, and the tooling prints a warning on the
 test paths. **Do not caption a test purchase as a live sale.**
 
+## What makes a cut publishable
+
+Two things put text on screen that must never reach a feed, and neither is a
+matter of care:
+
+- **Filming against anything but the live shop** bakes that host into the
+  delivery email's footer — `© 2026 ForgeMarket — localhost:3000`, legible for
+  a second and a half in the finished cut.
+- **`--pay=demo`** makes the checkout say `Demomodus: je bestelling wordt direct
+  gemarkeerd als betaald`, in Dutch, on camera.
+
+So `record.mjs` writes what the footage IS into `beats.json`, and `compose.mjs`
+reads it: anything that is not a live host AND a real payment is named
+`preview-…mp4` and carries a marker across every frame. There is no flag to
+override it. The person who uploads the file a week later is not the person who
+ran the command, and a console warning does not reach them.
+
+### It does not need Mollie
+
+The blocker is a payment path that does not print "demo" — and the shop already
+has one that needs no card provider at all. `PAY_TIKKIE`, `PAY_REVOLUT` or
+`PAY_PAYPAL` puts a real manual method on the checkout; `commerceBlockers` then
+asks for one more thing, a way to email the buyer their code.
+
+    RESEND_API_KEY=…            # or SMTP_URL — needed before launch anyway
+    PAY_TIKKIE=https://tikkie.me/pay/…
+    DEMO_PAYMENTS=false
+
+    node scripts/ad/make-ad.mjs --base=https://forgemarket.nl \
+      --sku=PGO-550 --email=ads@yourdomain --pay=manual --lang=nl \
+      --variant=klik-tot-code
+
+`--pay=manual` pauses while you pay the amount yourself, so the purchase in the
+advert is a real one — buy the cheapest thing on the shelf and it costs €4.49,
+paid to your own account.
+
 ## Privacy
 
 Non-negotiable, and handled before anything is written to disk:
