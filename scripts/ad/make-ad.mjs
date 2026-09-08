@@ -27,7 +27,8 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { VARIANTS, variantById } from './variants.mjs';
+import { VARIANTS, variantById, tokensFor, fill } from './variants.mjs';
+import { HOOKS, hookById, eligibleHooks, hookBlockedReason } from './hooks.mjs';
 /* The twenty-five brand concepts are the same kind of thing as a variant —
    same scene grammar, same needs gate — so --concept resolves through the
    same lookup and everything downstream is unchanged. */
@@ -69,9 +70,31 @@ if (!fs.existsSync(path.join('scripts', 'ad', 'sfx', 'notify.wav'))) {
   step('sound pack', 'sfx.mjs', []);
 }
 
-// 2. The purchase.
-step('recording a real purchase', 'record.mjs',
-  [`--base=${BASE}`, `--sku=${SKU}`, `--out=${OUT}`, ...passthrough]);
+/* 2. The purchase.
+ *
+ * Reused when this directory already holds one. Buying something and filming it
+ * is the expensive half of this pipeline — it costs money, it consumes a code,
+ * and it trips the shop's own order limiter if you do it repeatedly — while
+ * changing the first two seconds costs nothing. `--reuse` (implied by any
+ * `--hooks=` run) cuts again from the footage that is already there.
+ *
+ * Refused rather than assumed when the directory is empty: an advert built on
+ * a recording that does not exist is the one failure this toolkit must never
+ * produce quietly. */
+const alreadyRecorded = fs.existsSync(path.join(OUT, 'beats.json'))
+  && fs.existsSync(path.join(OUT, 'raw.webm'));
+const REUSE = process.argv.includes('--reuse') || !!(arg('hooks') || arg('hook'));
+
+if (REUSE && alreadyRecorded) {
+  console.log(`\n♻  reusing the recording in ${OUT} — nothing is bought or filmed again`);
+} else {
+  if (REUSE) {
+    console.error(`\n✖ nothing to reuse in ${OUT} — no recording there yet.\n`);
+    process.exit(1);
+  }
+  step('recording a real purchase', 'record.mjs',
+    [`--base=${BASE}`, `--sku=${SKU}`, `--out=${OUT}`, ...passthrough]);
+}
 
 // 3. Cards, named from the product the recorder actually bought.
 const manifest = JSON.parse(fs.readFileSync(path.join(OUT, 'beats.json'), 'utf8'));
@@ -79,7 +102,7 @@ const p = manifest.product;
 // Same formatting as the storefront and the captions — see variants.mjs.
 const money = new Intl.NumberFormat('en-IE',
   { style: 'currency', currency: p.currency || 'EUR' }).format((p.price || 0) / 100);
-step('cards', 'cards.mjs', [
+if (!(REUSE && fs.existsSync(path.join(OUT, 'endcard.png')))) step('cards', 'cards.mjs', [
   `--out=${OUT}`, `--base=${BASE}`,
   `--name=${arg('name') || p.name}`,
   `--price=${arg('price') || money}`,
@@ -100,8 +123,65 @@ const want = [
   ...conceptsWanted,
 ];
 
+/* 4b. The openings.
+   `--hooks=all` emits one advert per hook the footage can honestly support,
+   from the SAME recording — the expensive half of this pipeline is buying
+   something and filming it, and swapping the first two seconds does not need
+   either done again. `--hooks=list` says which are possible and stops.
+
+   A hook the footage cannot support exits 2 and the batch carries on, exactly
+   like a variant that cannot be made: a product with no published review should
+   not cost you the eight other openings. */
+const hooksArg = arg('hooks') || arg('hook') || '';
+/* The same two side files compose reads, so a hook is judged against exactly
+   the facts the advert would be built from. */
+const readSide = (f, d) => {
+  try { return JSON.parse(fs.readFileSync(path.join(OUT, f), 'utf8')); } catch { return d; }
+};
+const order = readSide('order.json', null);
+const extras = readSide('extras.json', {});
+const hookTokens = tokensFor({
+  product: { ...manifest.product, instant: extras.instant },
+  order, review: extras.review, stock: extras.stockLeft, mystery: extras.mystery,
+  lang: arg('lang', 'nl'), provenance: manifest.provenance,
+});
+const eligible = eligibleHooks(hookTokens, fill);
+
+if (hooksArg === 'list') {
+  console.log(`\n🪝 ${eligible.length} of ${HOOKS.length} hooks are possible for ${p.name}\n`);
+  for (const h of HOOKS) {
+    const why = hookBlockedReason(h, hookTokens);
+    const line = fill(h.text, hookTokens);
+    console.log(why
+      ? `   ✗ ${h.id.padEnd(15)} ${h.type.padEnd(18)} ${why}`
+      : `   ✓ ${h.id.padEnd(15)} ${h.type.padEnd(18)} ${line}`);
+  }
+  console.log('');
+  process.exit(0);
+}
+const wantHooks = hooksArg === 'all' ? eligible.map((h) => h.id)
+  : hooksArg.split(',').map((x) => x.trim()).filter(Boolean);
+
 const made = []; const skipped = [];
-if (!want.length) {
+if (wantHooks.length) {
+  /* One variant, many openings. Everything after the first two seconds is
+     identical by construction — same recording, same cuts, same sound. */
+  const v = variantById(arg('variant') || 'K') || VARIANTS[0];
+  console.log(`\n🪝 ${wantHooks.length} opening(s) · ${v.id} ${v.name}`);
+  for (const id of wantHooks) {
+    const h = hookById(id);
+    if (!h) { console.warn(`\n⚠ no hook "${id}"`); continue; }
+    console.log(`\n━━ hook ${h.id} · ${h.type}`);
+    const r = spawnSync(process.execPath,
+      [path.join('scripts', 'ad', 'compose.mjs'),
+        `--in=${OUT}`, `--variant=${v.id}`, `--hook=${h.id}`, `--base=${BASE}`,
+        ...(arg('target') ? [`--target=${TARGET}`] : [])],
+      { stdio: 'inherit' });
+    if (r.status === 0) made.push({ id: h.id, name: h.type, file: path.join(OUT, `ad-${v.id}-${v.slug}-${h.id}.mp4`) });
+    else if (r.status === 2) skipped.push({ id: h.id, name: h.type });
+    else { console.error(`\n✖ hook ${h.id} failed to render.\n`); process.exit(1); }
+  }
+} else if (!want.length) {
   step('composing', 'compose.mjs', [`--in=${OUT}`, `--target=${TARGET}`, `--base=${BASE}`]);
   made.push({ id: '—', file: path.join(OUT, 'ad.mp4') });
 } else {

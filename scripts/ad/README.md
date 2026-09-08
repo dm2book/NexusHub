@@ -267,6 +267,84 @@ payment beat has no footage of its own — the caption ends up over a page that
 already says delivered. With `--pay=manual` there is a real gap and a real
 payment screen in it. It is one more reason the demo path is a preview.
 
+## The first two seconds, per product
+
+The opening line used to belong to the variant, so every advert cut from K
+opened with the same sentence whatever it was selling. `scripts/ad/hooks.mjs` is
+a catalogue of fifteen openings across the seven kinds instead, and the
+generator emits one advert per opening **from a single recording**:
+
+    node scripts/ad/make-ad.mjs --sku=STEAM-10 --out=… --hooks=all
+
+Buying something and filming it is the expensive half of this pipeline — it
+costs money, it consumes a code and it trips the shop's own order limiter.
+Changing the first two seconds costs nothing, so any `--hooks=` run implies
+`--reuse`: the recording, the price badge and the end card in that directory are
+used again, and only the opening is re-rendered. Everything after the hook is
+identical by construction — a frame sampled at the same timestamp out of five
+hooks of one recording has the same checksum in all five.
+
+    --hooks=list          say which openings this footage supports, render nothing
+    --hooks=price,speed   render those two
+    --hooks=all           render every one that is possible
+    --reuse               cut again from the take that is already there
+
+| kind | hooks | leads on |
+|---|---|---|
+| product-first | `product`, `product-price` | what it is |
+| price-first | `price`, `per-thousand` | the number, and the rate per 1.000 |
+| speed-first | `speed`, `in-stock` | the shop's own delivery promise for that row |
+| problem → solution | `no-account`, `money-back`, `last-few` | the objection first |
+| testimonial | `review-stars`, `review-quote` | a published review |
+| watch me buy this | `watch-me`, `click-to-code` | the purchase itself |
+| countdown / stopwatch | `stopwatch`, `countdown` | the measured gap between money and code |
+
+### A hook may only say what the recording can prove
+
+Each hook declares the tokens it `needs` and a `proves` line naming where the
+claim comes from. `fill()` returns null the moment a token has no real value,
+and a hook whose line or sub-line comes back null is **dropped** — not softened,
+not filled with a plausible number. `--hooks=list` prints the reason:
+
+    🪝 10 of 15 hooks are possible for Steam Wallet €10
+       ✓ product         product-first    Steam Wallet €10
+       ✓ price           price-first      €11.99
+       ✗ per-thousand    price-first      no real value for {perThousand}
+       ✗ review-stars    testimonial      no real value for {reviewStars}, …
+       ✗ stopwatch       stopwatch        no real value for {deliverySeconds}
+
+That is not caution, it is the state of the data. This shop has no published
+reviews, so `review-*` cannot be made; `market_observations` is empty, so no
+hook compares a price to anyone else's; `per-thousand` is a rate computed from
+the product's own two numbers and is null for anything that is not a countable
+pack. Asking for a blocked hook by name fails loudly rather than quietly
+handing back a different advert wearing that name (`compose.mjs` exits 2, and a
+batch treats that as a skip and carries on).
+
+`deliverySeconds` is the strictest of them. It is measured from the order's own
+`payment_received → completed` transitions and is null unless the payment was
+**real** and the gap is between one second and ten minutes — a `--pay=demo`
+order is marked paid the instant it is placed, so nothing timed against it means
+anything, and a sub-second figure reads as a lie even when it is not. The two
+stopwatch hooks therefore need a `--pay=manual` recording.
+
+### Adding a hook
+
+Add an entry to `scripts/ad/hooks.mjs`. Nothing else changes — the id names the
+output file (`ad-K-performance-<id>.mp4`), and `needs` is the whole gate:
+
+```js
+{
+  id: 'bundle', type: 'product-first',
+  text: '{name} — {price}', sub: 'Code in je mail.',
+  needs: ['name', 'price'],
+  proves: 'both come off the product row the recording bought',
+}
+```
+
+Every token the lines render must appear in `needs`; `server/test/ad-hooks.test.mjs`
+fails otherwise, and also fails any hook carrying a hard-coded figure.
+
 ## What makes a cut publishable
 
 Two things put text on screen that must never reach a feed, and neither is a
@@ -358,6 +436,8 @@ overwrites that one only.
 | flag | default | |
 |---|---|---|
 | `--target=20` | 20 | seconds to aim for; the result lands 15–25 |
+| `--hooks=` | — | `all`, `list`, or ids — one advert per opening, from one take |
+| `--reuse` | off | cut again from the recording already in `--out` |
 | `--slow=120` | 120 | ms between actions — higher reads calmer |
 | `--name=` `--price=` | from the product | override the badge text |
 | `--cta=` `--tagline=` | forgemarket.nl | end-card copy |
