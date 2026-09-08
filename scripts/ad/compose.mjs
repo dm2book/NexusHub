@@ -26,6 +26,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { planCuts, resolveTiming } from './timing.mjs';
 import { variantById, tokensFor, fill, blockedReason } from './variants.mjs';
+import { HOOKS, hookById, hookBlockedReason } from './hooks.mjs';
 import { conceptById } from './concepts.mjs';
 import { renderCaptions } from './captions.mjs';
 
@@ -47,6 +48,10 @@ const variant = VARIANT ? (variantById(VARIANT) || conceptById(VARIANT)) : null;
 if (VARIANT && !variant) { console.error(`No variant "${VARIANT}".`); process.exit(1); }
 const TARGET = Number(arg('target', String(variant?.target || 20)));
 // Named after the variant so eight of them can live side by side.
+/* Which opening line to use. Empty means the variant's own. Declared here
+   because the output filename carries it. */
+const HOOK_ID = arg('hook', '');
+
 /* The filename says what the footage is.
  *
  * Two things put text on screen that must never reach a feed: footage filmed
@@ -61,7 +66,10 @@ const provenance = (() => {
   catch { return {}; }
 })();
 const PUBLISHABLE = provenance.live === true && provenance.realPayment === true;
-const baseName = variant ? `ad-${variant.id}-${variant.slug}.mp4` : 'ad.mp4';
+/* The hook is in the filename: a batch writes one file per opening line, and
+   which one you are looking at has to survive being dragged into a folder. */
+const hookTag = HOOK_ID ? `-${HOOK_ID}` : '';
+const baseName = variant ? `ad-${variant.id}-${variant.slug}${hookTag}.mp4` : `ad${hookTag}.mp4`;
 const OUT = path.join(IN, arg('name', PUBLISHABLE ? baseName : `preview-${baseName}`));
 const W = 1080; const H = 1920;
 /* The domain painted in the corner for most of the advert. A variant may set
@@ -162,6 +170,8 @@ const tokens = tokensFor({
      Dutch delivery sentence, or its captions and its tokens end up in two
      languages in the same frame. */
   lang: variant?.lang || arg('lang', 'en'),
+  /* So a hook that times the delivery can refuse to exist on a demo purchase. */
+  provenance,
 });
 
 if (variant) {
@@ -199,12 +209,32 @@ for (const c of cuts) console.log(`   ${c.played.toFixed(2)}s  ${c.label} (${c.s
    a scene's length changes — which it does on every recording. */
 const capLines = [];
 if (variant) {
-  const hook = fill(variant.hook, tokens);
-  /* The first two seconds, over whatever the variant opens on.
-     `hookSub` is the second line — what the shop is, under what it costs — for
-     a viewer who has never heard of it. A variant that does not set one keeps
-     the single-line style it had. */
-  const hookSub = fill(variant.hookSub, tokens);
+  /* The first two seconds.
+   *
+   * `--hook=<id>` picks one out of the catalogue (scripts/ad/hooks.mjs), which
+   * is how one recording produces a set of adverts that differ only in their
+   * opening line. Without it the variant's own hook is used, so every cut that
+   * existed before this behaves exactly as it did.
+   *
+   * A named hook that this footage cannot support is refused rather than
+   * quietly falling back — asking for the review hook on a shop with no reviews
+   * should fail loudly, not hand back a different advert wearing that name. */
+  let hookText = variant.hook; let hookSubText = variant.hookSub;
+  if (HOOK_ID) {
+    const chosen = hookById(HOOK_ID);
+    if (!chosen) {
+      console.error(`\n✖ no hook "${HOOK_ID}". Known: ${HOOKS.map((h) => h.id).join(', ')}\n`);
+      process.exit(1);
+    }
+    const why = hookBlockedReason(chosen, tokens);
+    if (why) {
+      console.error(`\n⏭  hook ${chosen.id}: skipped — ${why}.\n`);
+      process.exit(2);                 // 2 = honestly skipped, not broken
+    }
+    hookText = chosen.text; hookSubText = chosen.sub;
+  }
+  const hook = fill(hookText, tokens);
+  const hookSub = fill(hookSubText, tokens);
   if (hook) {
     capLines.push({
       text: hook, style: variant.hookStyle || (hookSub ? 'lede' : 'hook'),

@@ -36,8 +36,34 @@ const DELIVERY_COPY = {
     instantShort: 'Immédiat', handShort: 'À la main' },
 };
 
+/**
+ * How long the shop actually took, from the order's own history.
+ *
+ * `payment_received → completed` is the only span the shop controls: money
+ * confirmed at one end, code delivered at the other. Read off the transitions
+ * the order recorded, so it is a measurement rather than a promise.
+ *
+ * Returns null unless it is a number worth putting on screen. Under a second is
+ * true and unusable — it reads as a lie even when it is not — and a demo
+ * payment never waited for money at all, so nothing timed against it means
+ * anything. A hook that needs this simply does not get made.
+ */
+function measuredDeliverySeconds(order, { realPayment } = {}) {
+  if (!realPayment) return null;
+  const at = (to) => {
+    const h = (order?.history || []).find((x) => x.to === to);
+    const t = h ? Date.parse(h.at) : NaN;
+    return Number.isFinite(t) ? t : null;
+  };
+  const paid = at('payment_received');
+  const done = at('completed');
+  if (paid === null || done === null || done <= paid) return null;
+  const secs = Math.round((done - paid) / 1000);
+  return secs >= 1 && secs <= 600 ? secs : null;
+}
+
 /** Tokens available to every caption, resolved from real data only. */
-export function tokensFor({ product, order, review, stock, mystery, lang = 'en' }) {
+export function tokensFor({ product, order, review, stock, mystery, lang = 'en', provenance }) {
   const d = DELIVERY_COPY[lang] || DELIVERY_COPY.en;
   /* Formatted the way the storefront formats it — the caption sits beside a
      page showing that exact number, and "€ 9,99" next to "€9.99" reads as a
@@ -68,6 +94,12 @@ export function tokensFor({ product, order, review, stock, mystery, lang = 'en' 
        so nothing here may be measured against a competitor. Null for anything
        that is not a countable pack — a €25 card is priced in euros, and "3
        Months" is not three of something. */
+    /* The measured gap between money and code, in seconds. Null on any
+       recording that cannot honestly produce one — see above. */
+    deliverySeconds: (() => {
+      const n = measuredDeliverySeconds(order, provenance);
+      return n === null ? null : String(n);
+    })(),
     perThousand: (() => {
       const n = String(product?.name || '');
       if (!product?.price || /€/.test(n)) return null;
