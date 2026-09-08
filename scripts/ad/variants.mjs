@@ -131,6 +131,27 @@ const S = {
      caption talked about it at the bottom. `focus` pushes to 1.55× into the top
      of the frame, so the thing being named is the thing filling the screen. */
   codeReveal: { from: 'email-detail', to: 'end', speed: 1.0, weight: 2.0, zoom: 'focus', label: 'the code' },
+
+  /* ── The performance grammar ──────────────────────────────────────────────
+     Same beats, cut for a feed rather than for a demonstration.
+
+     What separates these from the ones above is that every scene declares the
+     speed it WANTS to reach, not the fastest it may go. The resolver treats
+     `speed` as a ceiling, so a scene that could be compressed sits at real time
+     whenever the budget allows — which is how an eighteen-second cut ended up
+     with eight static seconds. Here the weights are small and the ceilings are
+     high, so the budget runs out first and everything is moving.
+
+     `blur: true` forces frame averaging on the scenes that carry a hard cut
+     regardless of the speed they land on. Motion blur was in this toolkit from
+     the start and had never once been applied. */
+  pHook: { from: 'product', to: 'buy', speed: 2.2, weight: 1.5, zoom: 'punch', label: 'the product', settle: 0.35, price: true },
+  pBuy: { from: 'buy', to: 'checkout', speed: 3.0, weight: 0.5, zoom: 'in', label: 'buy', blur: true },
+  pCheckout: { from: 'checkout', to: 'order-placed', speed: 3.4, weight: 0.7, zoom: 'in', label: 'checkout', blur: true },
+  pPay: { from: 'order-placed', to: 'delivery', speed: 5.5, weight: 0.8, zoom: 'punch', label: 'payment', confirm: true, blur: true },
+  pMail: { from: 'delivery', to: 'email-open', speed: 2.6, weight: 0.7, zoom: 'in', label: 'delivered', blur: true },
+  pArrive: { from: 'email-open', to: 'email-detail', speed: 1.4, weight: 1.3, zoom: 'punch', label: 'the email', notify: true },
+  pReveal: { from: 'email-detail', to: 'end', speed: 1.1, weight: 1.8, zoom: 'focus', label: 'the code' },
 };
 
 /**
@@ -425,6 +446,59 @@ export const VARIANTS = [
     /* Every one of those captions is a thing that happened on camera, so the
        whole cut is refused rather than faked if the purchase did not complete. */
     needs: ['price', 'order', 'delivery', 'orderNumber'],
+  },
+  {
+    id: 'K',
+    slug: 'performance',
+    name: 'Performance (NL)',
+    lang: 'nl',
+    /*
+     * The seven-beat performance cut: hook → product → checkout → payment →
+     * email arrival → code → call to action, in about ten seconds.
+     *
+     * Written against the measurements taken off the earlier cuts of this same
+     * footage rather than against a brief. What those measurements said:
+     *
+     *   0 applications of motion blur   nothing reached the 2.0× threshold
+     *   6% / 9% zooms                   invisible at phone size
+     *   one cut per 2.25s               then 1.50s, still slow for a feed
+     *   one flash on every cut          so no cut reads as punctuation
+     *   a hook that gave only a price   to a viewer who does not know the shop
+     *   6 of 18 seconds under 1.5       on frame-to-frame motion
+     *
+     * Each of those has a knob here. `zoomScale` triples the pushes, `blurAt`
+     * drops the motion-blur threshold and four scenes force it outright,
+     * `whipAt` names the three cuts that are thrown rather than flashed, and
+     * the hook has a second line that says what is being sold before it says
+     * what it costs.
+     *
+     * Ten seconds because that is what the footage contains. An eighteen-second
+     * version of these beats was measured at a third dead; twelve at a quarter.
+     * The events are the same, so the shorter it is, the more of it is event.
+     */
+    target: 10,
+    card: 1.6,
+    zoomScale: 3,
+    blurAt: 1.6,
+    // Buy, payment and the mail landing — the three moments worth throwing to.
+    whipAt: [1, 3, 4],
+    priceCard: false,
+    scenes: [S.pHook, S.pBuy, S.pCheckout, S.pPay, S.pMail, S.pArrive, S.pReveal],
+    /* What is being sold, then what it costs, then why to stay — in that order,
+       because the third only means anything after the first two. */
+    hook: '{name} — {price}',
+    hookSub: 'Game-tegoed en giftcards. Code in je mail.',
+    captions: [
+      { at: 'buy', text: 'Geen account nodig', style: 'small' },
+      { at: 'checkout', text: 'Betalen met iDEAL', style: 'small' },
+      { at: 'payment', text: 'Betaald', style: 'big' },
+      { at: 'the email', text: 'Je bestelling van ForgeMarket', sub: 'in je inbox', style: 'notify' },
+      { at: 'the code', text: 'Je code. Klaar.', style: 'big' },
+    ],
+    cta: 'forgemarket.nl',
+    /* Every caption above is a thing that happened on camera, so the whole cut
+       is refused rather than faked when the purchase did not complete. */
+    needs: ['name', 'price', 'order', 'delivery'],
   },
 ];
 

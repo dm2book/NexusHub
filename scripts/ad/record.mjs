@@ -156,7 +156,7 @@ await page.addInitScript(() => {
       + 'border:2.5px solid rgba(255,255,255,.95);'
       + 'box-shadow:0 3px 14px rgba(0,0,0,.45),0 0 26px 8px rgba(124,92,255,.55);'
       + 'pointer-events:none;z-index:2147483647;'
-      + 'transform:translate(-50%,-50%);transition:transform .09s cubic-bezier(.22,.61,.36,1);'
+      + 'transform:translate(-50%,-50%);transition:transform .06s linear;'
       + 'will-change:transform';
     document.documentElement.appendChild(c);
     const ring = document.createElement('div');
@@ -173,6 +173,29 @@ await page.addInitScript(() => {
     };
     move(x, y);
     window.__adMove = move;
+
+    /* Smooth tracking, not teleporting.
+       `move` sets a transform and lets a 90ms CSS transition cover the gap,
+       which is fine for a nudge and wrong for the width of a phone screen: the
+       cursor arrived before the eye could follow it, so the finished advert
+       showed a pointer that was simply in a different place each cut. This
+       animates along the path on a cubic ease-out at 60fps, so the recording
+       actually contains the movement — which is the whole reason a viewer reads
+       it as somebody doing something rather than pages appearing. */
+    window.__adGlide = (nx, ny, ms) => new Promise((done) => {
+      const sx = x, sy = y;
+      const dist = Math.hypot(nx - sx, ny - sy);
+      const dur = ms || Math.min(620, Math.max(180, dist * 1.15));
+      const t0 = performance.now();
+      const ease = (p) => 1 - Math.pow(1 - p, 3);
+      const step = (now) => {
+        const p = Math.min(1, (now - t0) / dur);
+        const e = ease(p);
+        move(sx + (nx - sx) * e, sy + (ny - sy) * e);
+        if (p < 1) requestAnimationFrame(step); else done();
+      };
+      requestAnimationFrame(step);
+    });
     window.__adTap = () => {
       ring.animate(
         [{ opacity: .9, transform: ring.style.transform + ' scale(1)' },
@@ -191,9 +214,11 @@ async function tap(locator, label) {
   const box = await locator.boundingBox();
   if (box) {
     const x = box.x + box.width / 2, y = box.y + box.height / 2;
-    await page.evaluate(([px, py]) => window.__adMove?.(px, py), [x, y]).catch(() => {});
-    await page.waitForTimeout(SLOW);
+    /* Awaited, so the recording contains the travel rather than the arrival. */
+    await page.evaluate(([px, py]) => window.__adGlide?.(px, py), [x, y]).catch(() => {});
+    await page.waitForTimeout(Math.max(80, SLOW / 2));
     await page.evaluate(() => window.__adTap?.()).catch(() => {});
+    await page.waitForTimeout(120);
   }
   if (label) beat(label, { click: true });
   await locator.click();
@@ -291,7 +316,7 @@ try {
   if (await consent.count()) {
     const box = await consent.boundingBox().catch(() => null);
     if (box) {
-      await page.evaluate(([x, y]) => window.__adMove?.(x, y),
+      await page.evaluate(([x, y]) => window.__adGlide?.(x, y),
         [box.x + box.width / 2, box.y + box.height / 2]).catch(() => {});
       await page.evaluate(() => window.__adTap?.()).catch(() => {});
     }

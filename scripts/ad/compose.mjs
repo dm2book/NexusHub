@@ -67,6 +67,12 @@ const W = 1080; const H = 1920;
 /* The domain painted in the corner for most of the advert. A variant may set
    its own; this is the fallback for a plain run. */
 const CTA_TEXT = arg('cta', 'forgemarket.nl');
+/* How hard this cut moves.
+   ZOOM scales every push; BLUR_AT is the speed a scene has to reach before its
+   frames are averaged. Both default to what the older variants were tuned
+   against, so nothing that existed before this changes. */
+const ZOOM = Number(arg('zoom', String(variant?.zoomScale ?? 1)));
+const BLUR_AT = Number(arg('blurAt', String(variant?.blurAt ?? 2)));
 
 for (const f of [RAW, path.join(IN, 'beats.json')]) {
   if (!fs.existsSync(f)) { console.error(`Missing ${f} — run record.mjs first.`); process.exit(1); }
@@ -194,8 +200,17 @@ for (const c of cuts) console.log(`   ${c.played.toFixed(2)}s  ${c.label} (${c.s
 const capLines = [];
 if (variant) {
   const hook = fill(variant.hook, tokens);
-  // The first two seconds, over whatever the variant opens on.
-  if (hook) capLines.push({ text: hook, style: 'hook', scene: 0, hook: true });
+  /* The first two seconds, over whatever the variant opens on.
+     `hookSub` is the second line — what the shop is, under what it costs — for
+     a viewer who has never heard of it. A variant that does not set one keeps
+     the single-line style it had. */
+  const hookSub = fill(variant.hookSub, tokens);
+  if (hook) {
+    capLines.push({
+      text: hook, style: variant.hookStyle || (hookSub ? 'lede' : 'hook'),
+      scene: 0, hook: true, sub: hookSub || null,
+    });
+  }
   for (const c of variant.captions || []) {
     const text = fill(c.text, tokens);
     if (!text) continue;                          // a token had no real value
@@ -250,10 +265,14 @@ cuts.forEach((c, i) => {
      the end of the clip. */
   const frames = Math.max(2, Math.round(c.played * FPS));
   const zoom = {
-    // A slow push in. `on` is the output frame number.
-    in: `zoompan=z='min(1.0+0.055*on/${frames},1.06)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=${W}x${H}:fps=${FPS}`,
+    /* A push in. `on` is the output frame number.
+       6% was texture, not a move — on a phone it is invisible, and a screen
+       recording has no parallax of its own to carry a scene. `PUSH` scales the
+       whole set so a variant can ask for cinema without every other cut being
+       rewritten. */
+    in: `zoompan=z='min(1.0+${(0.055 * ZOOM).toFixed(3)}*on/${frames},${(1 + 0.06 * ZOOM).toFixed(3)})':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=${W}x${H}:fps=${FPS}`,
     // Starts pushed in and settles — reads as landing on something.
-    punch: `zoompan=z='max(1.09-0.09*on/${frames},1.0)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=${W}x${H}:fps=${FPS}`,
+    punch: `zoompan=z='max(${(1 + 0.09 * ZOOM).toFixed(3)}-${(0.09 * ZOOM).toFixed(3)}*on/${frames},1.0)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=${W}x${H}:fps=${FPS}`,
     // Barely moves; for scrolling, where the content is already moving.
     drift: `zoompan=z='1.03':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)+${Math.round(20)}*on/${frames}':d=1:s=${W}x${H}:fps=${FPS}`,
     /* A real push, into the TOP of the frame.
@@ -275,7 +294,12 @@ cuts.forEach((c, i) => {
     /* Motion blur. Averaging frames after a speed ramp is what stops a 3×
        section reading as a slideshow — the smear is the point. Only on the
        fast scenes; on a slow one it just softens the type. */
-    + (c.speed >= 2 ? 'tmix=frames=3:weights=1 2 1,' : '')
+    /* Motion blur. Averaging frames after a speed ramp is what stops a fast
+       section reading as a slideshow. The threshold was a hard `>= 2`, and on
+       the first finished cut NOTHING reached it — the effect was in the file and
+       had never once been applied. A variant can lower it, and a scene can ask
+       for it outright. */
+    + (c.blur || c.speed >= BLUR_AT ? `tmix=frames=${c.speed >= 3 ? 5 : 3}:weights=${c.speed >= 3 ? '1 2 3 2 1' : '1 2 1'},` : '')
     + (zoom ? `${zoom},` : '')
     + `trim=duration=${c.played.toFixed(3)},setpts=PTS-STARTPTS,format=yuv420p[${n}]`);
   names.push(n);
@@ -378,6 +402,29 @@ for (let i = 0; i < cuts.length; i++) {
 const flashExpr = flashes
   .map((t) => `between(t,${(t - 0.045).toFixed(3)},${(t + 0.045).toFixed(3)})`)
   .join('+');
+
+/* Whips.
+ *
+ * A single white flash on every cut means every cut has the same weight, which
+ * is the opposite of pacing: the eye stops reading them as punctuation after
+ * the third one. A whip is a directional throw — a hard horizontal blur that
+ * peaks on the cut frame and is gone in a sixth of a second — and it belongs on
+ * the cuts that are meant to feel like the camera being thrown rather than the
+ * scene politely changing.
+ *
+ * `whipAt` on a variant names the cut indices; alternating direction matters,
+ * because two throws the same way in a row read as one long stumble.
+ *
+ * Built with `boxblur` rather than a real motion blur because it has to run in
+ * the same filtergraph as everything else — a horizontal-only box blur with a
+ * vertical radius of zero is directional smear, which is the part the eye reads.
+ */
+const WHIP = 0.16;
+const whipCuts = new Set(variant?.whipAt || []);
+const whipExpr = flashes
+  .map((t, i) => (whipCuts.has(i) ? `between(t,${(t - WHIP / 2).toFixed(3)},${(t + WHIP / 2).toFixed(3)})` : null))
+  .filter(Boolean)
+  .join('+');
 /* The domain, in the corner, from the second scene until the end card.
  *
  * The advert this was written against puts its call to action at 15.0s of 20.7
@@ -429,14 +476,16 @@ const mark = PUBLISHABLE ? '' :
   `drawbox=x=0:y=${Math.round(H * 0.02)}:w=iw:h=64:color=black@0.55:t=fill,`
   + `drawbox=x=0:y=${Math.round(H * 0.02)}:w=8:h=64:color=0xd946ef@0.95:t=fill,`;
 
-parts.push(`[cat]${flashes.length
+parts.push(`[cat]${whipExpr
+  ? `boxblur=luma_radius=42:luma_power=2:chroma_radius=42:chroma_power=1:enable='${whipExpr}',`
+  : ''}${flashes.length
   ? `drawbox=x=0:y=0:w=iw:h=ih:color=white@0.55:t=fill:enable='${flashExpr}',`
   : ''}${mark}format=yuv420p${ctaChain ? '[body]' : '[vout]'}`);
 if (ctaChain) parts.push('[body][ctatag]overlay=0:0:format=auto,format=yuv420p[vout]');
 
 // ── Audio graph ─────────────────────────────────────────────────────────────
 const sfx = (n) => path.join(SFX, `${n}.wav`);
-const need = ['click', 'whoosh', 'notify', 'impact', 'bed'];
+const need = ['click', 'whoosh', 'notify', 'impact', 'confirm', 'whip', 'bed'];
 const missing = need.filter((n) => !fs.existsSync(sfx(n)));
 if (missing.length) {
   console.error(`Missing sounds: ${missing.join(', ')} — run: node scripts/ad/sfx.mjs`);
@@ -463,10 +512,23 @@ const place = (file, tSec, vol) => {
   aNames.push(`[${nm}]`);
 };
 
-// A whoosh on every cut, a click where the recording says a click happened.
+/* The sound follows the picture, beat for beat.
+ *
+ * Every cut used to get the same whoosh, which is the audio version of every cut
+ * getting the same white flash: after three of them the ear stops hearing them
+ * as punctuation. A cut the edit throws (see `whipAt`) gets the whip instead,
+ * and it lands ON the cut rather than 120ms early, because a throw and its sound
+ * arriving apart is what makes a transition feel cheap.
+ *
+ * Two beats get a sound of their own because they are the two the viewer is
+ * waiting for: the money clearing, and the mail landing.
+ */
 let cursor = 0;
 cuts.forEach((c, i) => {
-  if (i > 0) place(sfx('whoosh'), cursor - 0.12, 0.5);
+  if (i > 0) {
+    const thrown = whipCuts.has(i - 1);
+    place(sfx(thrown ? 'whip' : 'whoosh'), cursor - (thrown ? 0.06 : 0.12), thrown ? 0.62 : 0.5);
+  }
   // Clicks inside this scene, mapped from real time into edited time.
   for (const b of beats) {
     if (!b.click) continue;
@@ -474,6 +536,10 @@ cuts.forEach((c, i) => {
     if (rel < 0 || rel > c.srcLen) continue;
     place(sfx('click'), cursor + rel / c.speed, 0.62);
   }
+  /* The payment clearing. Placed a beat INTO the scene rather than on its first
+     frame: the cut is already carrying a whip or a whoosh, and two sounds on one
+     frame is one muddy sound. */
+  if (c.confirm) place(sfx('confirm'), cursor + 0.14, 0.8);
   if (c.notify) place(sfx('notify'), cursor + 0.12, 0.85);
   cursor += c.played;
 });

@@ -76,6 +76,27 @@ const SOUNDS = {
     dur: 0.9,
     expr: "0.7*exp(-t*9)*sin(2*PI*70*t) + 0.35*exp(-t*26)*sin(2*PI*150*t) + 0.2*random(0)*exp(-t*40)",
   },
+  /* The payment clearing.
+     A rising major third resolving up a fourth — the shape a terminal makes when
+     a card is accepted, which is the association being borrowed. It is the one
+     beat in the whole advert where the viewer needs to feel something settle,
+     and `whoosh` (a cut) and `notify` (an arrival) were both saying something
+     else. Short, because a long chime over a fast cut is a smear. */
+  confirm: {
+    dur: 0.55,
+    expr: "0.40*exp(-t*9)*sin(2*PI*784*t)"
+      + " + 0.40*exp(-max(t-0.08,0)*9)*sin(2*PI*988*max(t-0.08,0))*gt(t,0.08)"
+      + " + 0.34*exp(-max(t-0.17,0)*7)*sin(2*PI*1318*max(t-0.17,0))*gt(t,0.17)",
+  },
+  /* A whip: a fast downward pitch sweep with noise, for a hard directional cut.
+     Sharper and shorter than `whoosh` — a whoosh is a scene changing, a whip is
+     the camera being thrown. Using the same sound for both makes every cut feel
+     the same weight, which is the opposite of pacing. */
+  whip: {
+    dur: 0.26,
+    expr: "0.52*sin(2*PI*(1500-4200*t)*t)*exp(-pow((t-0.07)/0.06,2))"
+      + " + 0.34*random(0)*exp(-pow((t-0.09)/0.05,2))",
+  },
 };
 
 /**
