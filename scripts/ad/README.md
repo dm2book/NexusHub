@@ -228,6 +228,45 @@ that did not happen.
 `beats.json` records which was used, and the tooling prints a warning on the
 test paths. **Do not caption a test purchase as a live sale.**
 
+## The performance cut
+
+`--variant=performance` (K) is the one written for a feed rather than for a
+demonstration: hook → product → checkout → payment → email arrival → code → call
+to action, in about ten seconds.
+
+    node scripts/ad/make-ad.mjs --base=https://www.forgemarket.nl \
+      --sku=STEAM-10 --email=ads@yourdomain --pay=manual --lang=nl \
+      --variant=performance
+
+What separates it from the other variants is that its numbers came out of
+measuring earlier renders of the same footage, not out of a brief:
+
+| measured on the older cut | what the variant does |
+|---|---|
+| 0 applications of motion blur — nothing reached the 2.0× threshold | `blurAt: 1.6`, and four scenes force it outright |
+| 6% / 9% zooms, invisible at phone size | `zoomScale: 3` — a 27% punch and an 18% push |
+| one white flash on every cut, so none read as punctuation | `whipAt: [1, 3, 4]` throws three of them instead |
+| a hook that gave only a price | `hookSub` says what the shop sells, above the price |
+| −33.6 LUFS | the mix is normalised to −14 |
+| 6 of 18 seconds under 1.5 on frame-to-frame motion | 10s target, small weights, high ceilings |
+
+Three knobs are variant-level so the older cuts are untouched: `zoomScale`
+scales every push, `blurAt` sets the speed at which frames start being averaged,
+and `whipAt` names the cut indices that get a directional smear and the whip
+sound instead of a whoosh.
+
+Two beats have a sound of their own, because they are the two the viewer is
+waiting for: `confirm: true` on the payment scene and `notify: true` on the
+email arrival.
+
+### One thing a demo purchase cannot show
+
+With `--pay=demo` the order is marked paid the instant it is placed, so
+`order-placed` and `confirmed` land about twenty milliseconds apart and the
+payment beat has no footage of its own — the caption ends up over a page that
+already says delivered. With `--pay=manual` there is a real gap and a real
+payment screen in it. It is one more reason the demo path is a preview.
+
 ## What makes a cut publishable
 
 Two things put text on screen that must never reach a feed, and neither is a

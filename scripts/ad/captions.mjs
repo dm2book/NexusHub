@@ -47,7 +47,30 @@ const STYLES = {
     .wrap{align-items:flex-start;padding:300px 90px 0}
     .t{font-family:'Bricolage Grotesque','Inter',sans-serif;font-weight:800;font-size:96px;
        line-height:1.04;letter-spacing:-.02em;color:#fff;text-align:left;
-       text-shadow:0 8px 40px rgba(0,0,0,.75),0 2px 10px rgba(0,0,0,.6)}`,
+       text-shadow:0 8px 40px rgba(0,0,0,.75),0 2px 10px rgba(0,0,0,.6)}
+    .t .sub{display:block;font-family:'Inter',system-ui,sans-serif;font-weight:600;
+       font-size:52px;line-height:1.2;letter-spacing:0;color:#d9d3ff;padding-top:18px;
+       text-shadow:0 4px 22px rgba(0,0,0,.8)}`,
+  /* The opening claim, with a second line under it.
+   *
+   * A hook that says only a price answers "how much" for somebody who does not
+   * yet know WHAT. Measured on the first cut: the first two seconds said
+   * "€11.99. Meer wordt het niet." over a product page — correct, honest, and no
+   * use at all to a viewer who has never heard of the shop and is deciding in
+   * about 800 milliseconds whether this is for them.
+   *
+   * Two lines: what it is, then why to stay. Set on a dark plate because the
+   * storefront behind it is light and white type on a light page is not a hook,
+   * it is a rumour. */
+  lede: `
+    .wrap{align-items:flex-start;padding:250px 74px 0}
+    .t{font-family:'Bricolage Grotesque','Inter',sans-serif;font-weight:800;font-size:92px;
+       line-height:1.02;letter-spacing:-.025em;color:#fff;text-align:left;
+       padding:34px 40px 38px;border-radius:34px;
+       background:linear-gradient(160deg,rgba(12,10,26,.93),rgba(20,16,44,.86));
+       box-shadow:0 0 0 2px rgba(168,85,247,.35) inset,0 26px 70px rgba(0,0,0,.5)}
+    .t .sub{display:block;font-family:'Inter',system-ui,sans-serif;font-weight:600;
+       font-size:50px;line-height:1.22;letter-spacing:0;color:#c9bfff;padding-top:16px}`,
   big: `
     .wrap{align-items:flex-end;padding:0 80px 620px}
     .t{font-family:'Bricolage Grotesque','Inter',sans-serif;font-weight:800;font-size:88px;
@@ -118,12 +141,20 @@ export async function renderCaptions({ lines, out, base, chrome }) {
       *{margin:0;padding:0;box-sizing:border-box}
       html,body{width:${W}px;height:${H}px;background:transparent;overflow:hidden}
       .wrap{height:100%;display:flex;justify-content:center}
-      ${style}${SLAB}
+      /* SLAB first, so a style that draws its own plate WINS. It used to come
+         last and overrode every background a style set: notify lost the card
+         that makes it read as a notification, and the two-line hook lost its
+         own plate. */
+      ${SLAB}${style}
     </style></head><body><div class="wrap"><div class="t">${
       line.style === 'notify'
         ? `<span class="ic">\u2709</span><span class="tx">${esc(line.text)}`
           + (line.sub ? `<span class="sub">${esc(line.sub)}</span>` : '') + '</span>'
-        : esc(line.text)
+        /* A second line on ANY style that has one. This was inside the notify
+           branch, so a hook with a sub rendered its first line and silently
+           dropped the second — which was the line that said what the shop
+           sells. */
+        : esc(line.text) + (line.sub ? `<span class="sub">${esc(line.sub)}</span>` : '')
     }</div></div></body></html>`;
 
     /* Same-origin so the webfonts load — see cards.mjs; a caption in the
