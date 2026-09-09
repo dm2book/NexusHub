@@ -47,10 +47,10 @@ on those marks — so a slow page makes a slower cut, not a cut in the wrong pla
 5. buy · 6. checkout · 7. the purchase completes · 8. order confirmation ·
 9-11. the delivery email, opened, with the order in it · 12. end card
 
-## Eight creative variants from one recording
+## Twelve creative variants from one recording
 
-One real purchase, cut eight ways — not eight purchases (which would also trip
-the shop's order limiter).
+One real purchase, cut twelve ways — not twelve purchases (which would also
+trip the shop's order limiter).
 
 ```bash
 DATABASE_URL=…  node scripts/ad/make-ad.mjs \
@@ -68,6 +68,10 @@ DATABASE_URL=…  node scripts/ad/make-ad.mjs \
 | **F** | Customer proof | a real published review | a verified review |
 | **G** | Restock / limited | a real low-stock count | `stockLeft` ≤ 6 |
 | **H** | Mystery box reveal | the box, then the prize | a real rolled prize |
+| **J** | Klik tot code | the walk from click to code | a completed order |
+| **K** | Performance (NL) | cut for a feed, ten seconds | a completed order |
+| **L** | Real purchase test (NL) | a clock, running | a delivery in the footage |
+| **W** | Workflow | the workflow, beat by beat | a completed order |
 
 `--variant=A` builds one; `--variants=A,B,E` builds a few; `--variants=all`
 walks the set.
@@ -267,6 +271,85 @@ payment beat has no footage of its own — the caption ends up over a page that
 already says delivered. With `--pay=manual` there is a real gap and a real
 payment screen in it. It is one more reason the demo path is a preview.
 
+## The real-purchase test
+
+`--variant=stopwatch` (L) is the timed cut: *"Ik ga kijken hoe snel ForgeMarket
+dit levert."* A clock starts on the first frame and runs until the shop
+delivers, and the storyboard is written in seconds rather than in weights:
+
+| | scene | beats |
+|---|---|---|
+| 0.0–1.5 | hook + product + clock | `product → buy` |
+| 1.5–3.5 | selecting | `buy → checkout` |
+| 3.5–5.5 | checkout | `checkout → order-placed` |
+| 5.5–7.0 | payment confirmation | `order-placed → confirmed` |
+| 7.0–9.5 | the mailbox | `confirmed → email-open` |
+| 9.5–11.0 | the code | `email-open → end` |
+| 11.0–12.0 | the CTA | end card |
+
+The weights **are** those seconds. `resolveTiming` gives each scene
+`room × weight / totalWeight`, and with an eleven-second body and weights
+summing to eleven that is the brief, scene for scene — so nobody has to
+reverse-engineer a timing out of a ratio. The ceilings are set high on purpose:
+a ceiling that binds first is a scene sitting at real time while the clock over
+it is compressing, and those two disagreeing on screen is the one thing this
+variant cannot have.
+
+    node scripts/ad/make-ad.mjs --base=https://www.forgemarket.nl \
+      --sku=STEAM-10 --email=ads@yourdomain --pay=manual --lang=nl \
+      --variant=stopwatch
+
+### The clock shows the recording's seconds, never the video's
+
+The cut is ramped 2–8× through the parts nobody needs to watch, so twelve
+seconds of video can cover most of a minute of a real purchase. Every frame is
+therefore mapped back through its own scene's ramp to the moment in the session
+it came from, and the badge shows the distance from the first frame to that
+moment. A clock counting screen time would claim a thirty-eight-second purchase
+took eleven, which is the whole thing this variant exists not to do.
+
+The number jumps as the ramp speeds up. That is the honest artefact of a
+compressed recording and it is left visible rather than smoothed away.
+
+### No delivery in the footage, no number on the badge
+
+Three separate refusals, because there are three ways to end up with a figure
+that was not measured:
+
+- **No `delivery` beat at all** — the cut is refused before a frame is rendered
+  (`compose.mjs` exits 2, and a batch treats that as a skip).
+- **The beat exists but this cut skipped over it** — the clock keeps running,
+  never freezes, and no total is ever shown. That is not hypothetical: on a
+  `--pay=demo` recording the order is marked paid eighteen milliseconds after it
+  is placed, the payment scene falls under the floor and is dropped, and a
+  delivery inside that hole is in the recording but not in the video.
+- **The purchase never completed** — `needs: ['order', 'delivery']` refuses it
+  the same way every other variant is refused.
+
+The measured total reaches the captions as the `{measured}` token, which is null
+when nothing was measured — so the line that states it removes itself, exactly
+like every other fact in this toolkit.
+
+### What the number includes
+
+The badge's own label reads **productpagina → code**, because that is the span
+being timed and it is *longer* than the part the shop controls. It can only
+understate how fast delivery is, never flatter it. Zero on the clock is the
+advert's first frame rather than the `product` beat: the opening scene settles
+past the first 350ms (a beat fires when a navigation resolves, not when the page
+has painted), and timing from the beat would open the advert on "0,4".
+
+One caveat that no code can fix: `record.mjs` fills the checkout form faster
+than a person does. The figure is the real elapsed time of that session, not a
+promise about yours — which is why the label names the span and the copy says
+"gemeten", never "altijd".
+
+### It wants `--pay=manual`
+
+On a demo purchase there is no payment to time: the order is marked paid the
+instant it is placed. The payment scene drops out, and the cut is a preview
+anyway (see below). `PAY_TIKKIE` is enough — no card provider needed.
+
 ## The first two seconds, per product
 
 The opening line used to belong to the variant, so every advert cut from K
@@ -437,6 +520,7 @@ overwrites that one only.
 |---|---|---|
 | `--target=20` | 20 | seconds to aim for; the result lands 15–25 |
 | `--hooks=` | — | `all`, `list`, or ids — one advert per opening, from one take |
+| `--variant=stopwatch` | — | the timed cut; needs a delivery in the footage |
 | `--reuse` | off | cut again from the recording already in `--out` |
 | `--slow=120` | 120 | ms between actions — higher reads calmer |
 | `--name=` `--price=` | from the product | override the badge text |

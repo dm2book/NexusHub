@@ -24,7 +24,10 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
-import { planCuts, resolveTiming } from './timing.mjs';
+import { planCuts, resolveTiming, timeline } from './timing.mjs';
+import {
+  SW_W, stopwatchFrames, stopwatchBlockedReason, clockZero, renderStopwatch, formatClock,
+} from './stopwatch.mjs';
 import { variantById, tokensFor, fill, blockedReason } from './variants.mjs';
 import { HOOKS, hookById, hookBlockedReason } from './hooks.mjs';
 import { conceptById } from './concepts.mjs';
@@ -175,7 +178,11 @@ const tokens = tokensFor({
 });
 
 if (variant) {
-  const why = blockedReason(variant, { tokens, order, review: extras.review, mystery: extras.mystery });
+  const why = blockedReason(variant, { tokens, order, review: extras.review, mystery: extras.mystery })
+    /* A variant whose whole premise is a timed delivery, cut from a recording
+       where nothing was delivered, is not a weaker version of the idea — it is
+       a different claim. Refused before a frame is rendered. */
+    || stopwatchBlockedReason(variant.stopwatch, at);
   if (why) {
     console.error(`\n⏭  ${variant.id} ${variant.name}: skipped — ${why}.\n`);
     process.exit(2);                    // 2 = honestly skipped, not broken
@@ -202,6 +209,42 @@ const total = resolved.total;
 
 console.log(`\n🎬 ${cuts.length} scenes · ${total.toFixed(1)}s (target ${TARGET}s)`);
 for (const c of cuts) console.log(`   ${c.played.toFixed(2)}s  ${c.label} (${c.speed.toFixed(1)}×)`);
+
+/* ── The clock ──────────────────────────────────────────────────────────────
+   Planned here, before the captions, because the measured total is a caption
+   token: a variant can say how long the delivery took and the line disappears
+   by itself when nothing was measured.
+
+   `timeline()` is asked for the rows rather than the accumulation being written
+   out a second time. Two copies of where a scene starts is precisely how the
+   clock and the picture would end up disagreeing about the same frame. */
+const swSpec = variant?.stopwatch || null;
+const swRows = swSpec ? timeline(cuts, CARD).rows : [];
+const swBody = cuts.reduce((a, c) => a + c.played, 0);
+const swZero = swSpec ? clockZero(swSpec, swRows) : null;
+if (swZero?.error) { console.error(`\n✖ ${swZero.error}\n`); process.exit(1); }
+const sw = swSpec ? stopwatchFrames({
+  rows: swRows,
+  t0: swZero.t0,
+  /* The instant the shop delivered. `outputAt` returns null when this cut
+     skipped over that instant, and the clock then simply never stops — no
+     total, no claim. */
+  freezeSrc: at(swSpec.freeze) / 1000,
+  fps: 30, until: swBody, lang: variant?.lang || arg('lang', 'nl'),
+}) : null;
+if (sw) {
+  console.log(sw.freezeAt === null
+    ? '   ⏱  running — the delivery is not inside this cut, so no total is shown'
+    : `   ⏱  ${formatClock(sw.total, variant?.lang || 'nl')}s measured, frozen at ${sw.freezeAt.toFixed(2)}s`);
+  /* The measured figure, offered to the captions the same way every other fact
+     is: as a token that is null when it does not exist. */
+  const swLang = variant?.lang || 'nl';
+  const UNIT = { nl: 'seconden', en: 'seconds', de: 'Sekunden', fr: 'secondes' };
+  /* The unit belongs to the token, not to the caption: past a minute the clock
+     reads 1:12,4 and "1:12,4 seconden" is not a thing anybody says. */
+  tokens.measured = sw.total === null ? null
+    : `${formatClock(sw.total, swLang)}${sw.total < 60 ? ` ${UNIT[swLang] || UNIT.en}` : ''}`;
+}
 
 /* ── Captions ───────────────────────────────────────────────────────────────
    Most of these are watched with the sound off, so the captions carry the copy.
@@ -260,6 +303,22 @@ const caps = capLines.length
   })
   : [];
 if (caps.length) console.log(`   ${caps.length} caption(s)`);
+
+/* Drawn in the browser for the same reason the captions are — and one PNG per
+   frame, because the number changes on nearly every one of them. Frames that
+   would draw an identical badge are rendered once and copied, which is most of
+   the tail: the clock stops moving the moment it freezes. */
+const swDir = path.join(IN, 'stopwatch');
+if (sw) {
+  const r = await renderStopwatch({
+    frames: sw.frames, out: swDir,
+    base: (arg('base') || manifest.base || 'http://localhost:5000').replace(/\/+$/, ''),
+    chrome: arg('chrome') || process.env.AD_CHROME
+      || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+    lang: variant?.lang || arg('lang', 'nl'),
+  });
+  console.log(`   ${r.frames} clock frames (${r.drawn} drawn)`);
+}
 
 // ── Video graph ─────────────────────────────────────────────────────────────
 const priceCard = path.join(IN, 'price.png');
@@ -506,12 +565,47 @@ const mark = PUBLISHABLE ? '' :
   `drawbox=x=0:y=${Math.round(H * 0.02)}:w=iw:h=64:color=black@0.55:t=fill,`
   + `drawbox=x=0:y=${Math.round(H * 0.02)}:w=8:h=64:color=0xd946ef@0.95:t=fill,`;
 
+/* The clock, over the finished body.
+ *
+ * A PNG sequence rather than a still: the number changes on nearly every frame,
+ * and this is the one overlay in the toolkit that has to. It is bounded by the
+ * files that exist, and `eof_action=pass` lets the end card through untouched
+ * rather than freezing the badge on top of the brand card.
+ *
+ * Top-centre, under the strip the preview marker occupies and well clear of
+ * the bottom 420px the platforms fill with their own furniture. */
+let swChain = false;
+if (sw && fs.existsSync(path.join(swDir, '00000.png'))) {
+  const swIdx = addInput('-framerate', String(FPS), '-start_number', '0',
+    '-i', path.join(swDir, '%05d.png'));
+  parts.push(`[${swIdx}:v]format=rgba,setpts=PTS-STARTPTS[sw]`);
+  swChain = true;
+}
+const SW_X = Math.round((W - SW_W) / 2);
+/* Under the corner tag, not on it. cards.mjs pins that tag at 150px from the
+   top and it is about 67px tall, so anything above ~220 collides with it — the
+   first cut of this variant had "forgemarket.nl" printed across the clock's own
+   label. Still in the top fifth, still clear of the bottom 420px the platforms
+   fill with their own furniture. */
+const SW_Y = 252;
+
+/* Everything that sits over the whole body, in order. Written as a chain so a
+   second full-frame overlay does not mean rewriting the first: the corner tag
+   used to be spliced in by hand, and the clock would have been the third copy
+   of the same three lines. */
+const post = [];
+if (swChain) post.push(['sw', `${SW_X}:${SW_Y}:eof_action=pass`]);
+if (ctaChain) post.push(['ctatag', '0:0']);
+
 parts.push(`[cat]${whipExpr
   ? `boxblur=luma_radius=42:luma_power=2:chroma_radius=42:chroma_power=1:enable='${whipExpr}',`
   : ''}${flashes.length
   ? `drawbox=x=0:y=0:w=iw:h=ih:color=white@0.55:t=fill:enable='${flashExpr}',`
-  : ''}${mark}format=yuv420p${ctaChain ? '[body]' : '[vout]'}`);
-if (ctaChain) parts.push('[body][ctatag]overlay=0:0:format=auto,format=yuv420p[vout]');
+  : ''}${mark}format=yuv420p${post.length ? '[body0]' : '[vout]'}`);
+post.forEach(([label, xy], i) => {
+  const dst = i === post.length - 1 ? 'vout' : `body${i + 1}`;
+  parts.push(`[body${i}][${label}]overlay=${xy}:format=auto,format=yuv420p[${dst}]`);
+});
 
 // ── Audio graph ─────────────────────────────────────────────────────────────
 const sfx = (n) => path.join(SFX, `${n}.wav`);

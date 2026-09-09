@@ -67,8 +67,13 @@ console.log('\n— The address is on screen early, not at 73% —');
   ok('a corner tag is rendered', /cta-tag\.png/.test(cards));
   ok('…in the shop’s own type, like the other cards',
     /Bricolage Grotesque/.test(cards.slice(cards.indexOf('cta-tag') - 1200, cards.indexOf('cta-tag'))));
+  /* Overlaid onto the finished body at the origin. It used to be one hand-
+     written statement; it is now the last link of the chain that also carries
+     the stopwatch, so this asks for the tag and the position rather than for
+     the exact string that used to spell them. */
   ok('…and compose holds it over the body of the advert',
-    /\[body\]\[ctatag\]overlay=0:0:format=auto/.test(compose));
+    /post\.push\(\['ctatag', '0:0'\]\)/.test(compose)
+    && /\[body\$\{i\}\]\[\$\{label\}\]overlay=\$\{xy\}:format=auto/.test(compose));
   ok('…starting after the hook rather than competing with it',
     /const tagFrom = Math\.min/.test(compose));
   /* Bounded at the input, like the end card. An unbounded `-loop 1` still
