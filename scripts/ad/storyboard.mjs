@@ -61,7 +61,14 @@ const at = (name) => (beats[name] === undefined ? null : beats[name]);
 
 const cuts = planCuts(v.scenes, at);
 if (!cuts.length) { console.error('None of this variant\'s beats are in the recording.'); process.exit(1); }
-const { card } = resolveTiming(cuts, { target: v.target || 20, card: 2.6, min: 15 });
+/* The same three arguments compose.mjs passes. They used to be hardcoded here
+   — target 20, card 2.6, floor 15 — so the storyboard for a variant that asks
+   for ten or twelve seconds described a fifteen-second edit that nothing would
+   ever render. A storyboard that disagrees with the cut is worse than none. */
+const TARGET = Number(arg('target', String(v.target || 20)));
+const { card } = resolveTiming(cuts, {
+  target: TARGET, card: v.card ?? 2.6, min: Math.min(15, TARGET - 1),
+});
 const tl = timeline(cuts, card);
 
 /* Captions resolve against a product so the storyboard shows the words that
@@ -118,5 +125,12 @@ for (const [i, r] of tl.rows.entries()) {
 console.log(`${String(tl.rows.length + 1).padStart(2)}. END CARD`);
 console.log(`    ${sec(tl.card.in)} → ${sec(tl.card.out)}   (${sec(card)})`);
 console.log(`    fades in over 0.25s · “${v.cta}”\n`);
+if (v.stopwatch) {
+  /* The clock is not a caption and not a card, so it would otherwise be the one
+     thing on screen the storyboard does not mention. */
+  console.log(`stopwatch: starts on the first frame (${v.stopwatch.from}), counts REAL recording`);
+  console.log(`           seconds through every ramp, and freezes on ${v.stopwatch.freeze}.`);
+  console.log(`           No ${v.stopwatch.freeze} in the footage → no total is ever shown.`);
+}
 console.log(`cursor: painted throughout, following the real click coordinates (record.mjs)`);
 console.log(`flashes at: ${tl.flashes.map(sec).join(', ')}`);

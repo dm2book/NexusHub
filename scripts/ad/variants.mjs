@@ -184,6 +184,27 @@ const S = {
   pMail: { from: 'delivery', to: 'email-open', speed: 2.6, weight: 0.7, zoom: 'in', label: 'delivered', blur: true },
   pArrive: { from: 'email-open', to: 'email-detail', speed: 1.4, weight: 1.3, zoom: 'punch', label: 'the email', notify: true },
   pReveal: { from: 'email-detail', to: 'end', speed: 1.1, weight: 1.8, zoom: 'focus', label: 'the code' },
+
+  /* ── The timed grammar ────────────────────────────────────────────────────
+     Six beats cut to a brief that is written in seconds rather than in weights:
+     1.5s on the product, 2.0 selecting, 2.0 through checkout, 1.5 on the
+     payment clearing, 2.5 to the mailbox, 1.5 on the code.
+
+     The weights ARE those seconds. The resolver hands each scene
+     `room × weight / totalWeight`, and with an eleven-second body and weights
+     summing to eleven that is the brief, scene for scene — so the timings a
+     storyboard asks for do not have to be reverse-engineered out of a ratio.
+     The ceilings are deliberately high: a ceiling that binds first is a scene
+     sitting at real time while the clock over it is compressing, and those two
+     disagreeing on screen is the one thing this variant cannot have. */
+  tProduct: { from: 'product', to: 'buy', speed: 4.0, weight: 1.5, zoom: 'punch', label: 'the product', settle: 0.35 },
+  tSelect: { from: 'buy', to: 'checkout', speed: 5.0, weight: 2.0, zoom: 'in', label: 'select', blur: true },
+  tCheckout: { from: 'checkout', to: 'order-placed', speed: 6.0, weight: 2.0, zoom: 'in', label: 'checkout', blur: true },
+  tPay: { from: 'order-placed', to: 'confirmed', speed: 6.0, weight: 1.5, zoom: 'punch', label: 'payment', confirm: true, blur: true },
+  /* The wait and the mailbox in one shot. This is where the delivery beat sits,
+     so it is the scene the clock stops on. */
+  tMail: { from: 'confirmed', to: 'email-open', speed: 8.0, weight: 2.5, zoom: 'in', label: 'the mailbox', blur: true },
+  tReveal: { from: 'email-open', to: 'end', speed: 2.0, weight: 1.5, zoom: 'focus', label: 'the code', notify: true },
 };
 
 /**
@@ -530,6 +551,69 @@ export const VARIANTS = [
     cta: 'forgemarket.nl',
     /* Every caption above is a thing that happened on camera, so the whole cut
        is refused rather than faked when the purchase did not complete. */
+    needs: ['name', 'price', 'order', 'delivery'],
+  },
+  {
+    id: 'L',
+    slug: 'stopwatch',
+    name: 'Real purchase test (NL)',
+    lang: 'nl',
+    /*
+     * "Ik ga kijken hoe snel ForgeMarket dit levert." A clock starts on the
+     * first frame and runs until the shop delivers.
+     *
+     * Which makes the clock the advert, and a clock is the easiest thing in a
+     * video to fake — so the whole design of this variant is about what it
+     * refuses to show. See stopwatch.mjs for the two rules; the short version:
+     * the clock counts REAL seconds out of the recording rather than seconds of
+     * video, and it never reaches a total unless the delivery is actually in
+     * the footage.
+     *
+     * Two consequences worth knowing before filming one:
+     *
+     *   · The number jumps. The cut is ramped 4–8× through the parts nobody
+     *     needs to watch, so real time moves faster than screen time and the
+     *     tenths skip. That is what a compressed recording honestly looks like.
+     *   · It wants `--pay=manual`. On a demo purchase the order is marked paid
+     *     the instant it is placed, so the payment scene is under the floor and
+     *     drops out — and the timed span would not contain a payment at all.
+     *
+     * The span the clock measures is printed on the badge itself rather than
+     * left to the viewer: product page → code. That is LONGER than the part the
+     * shop controls, so it can only understate how fast delivery is, never
+     * flatter it.
+     */
+    target: 12,
+    card: 1.0,
+    zoomScale: 3,
+    blurAt: 1.6,
+    // Selecting, the payment clearing, and the mail landing.
+    whipAt: [1, 3, 4],
+    // The clock owns the top of the frame; a price badge there fights it.
+    priceCard: false,
+    scenes: [S.tProduct, S.tSelect, S.tCheckout, S.tPay, S.tMail, S.tReveal],
+    /* Starts on the first frame of the cut and stops on the beat where the shop
+       delivered. `from` is a beat rather than "zero" so the clock and the
+       footage are reading off the same recording. */
+    stopwatch: { from: 'product', freeze: 'delivery' },
+    hook: 'Ik ga kijken hoe snel ForgeMarket dit levert.',
+    hookStyle: 'big',
+    captions: [
+      { at: 'select', text: '{name} — {price}', style: 'small' },
+      { at: 'checkout', text: 'Geen account nodig', style: 'small' },
+      { at: 'payment', text: 'Betaald', style: 'small' },
+      /* Not "wachten op de mail": the clock freezes partway through this scene,
+         so for its last second the badge says GELEVERD while the caption would
+         still say the delivery had not happened. */
+      { at: 'the mailbox', text: 'Naar de inbox', style: 'small' },
+      /* Only renders when the clock actually stopped: compose sets
+         {measured} from the freeze, and fill() drops the line when it is null.
+         So a recording that never delivered says nothing about speed. */
+      { at: 'the code', text: 'Van productpagina tot code: {measured}', style: 'big' },
+    ],
+    cta: 'forgemarket.nl',
+    /* The delivery is the claim, so the cut is refused outright when the
+       purchase did not complete — before a single frame is rendered. */
     needs: ['name', 'price', 'order', 'delivery'],
   },
 ];
