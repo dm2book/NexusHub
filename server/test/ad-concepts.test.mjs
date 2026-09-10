@@ -142,7 +142,12 @@ console.log('\n— The workflow cut —');
 
   // The four effects the brief asks for, each in the code rather than in a note.
   ok('fast zooms: every scene declares one', W?.scenes?.every((s) => ['in', 'punch', 'drift'].includes(s.zoom)));
-  ok('flash transitions: a white frame on every cut', /color=white@0\.55/.test(compose));
+  /* Still a white frame on every cut, and still at 0.55 for anything that does
+     not ask otherwise — it is a variant-level knob now, because an eight-second
+     cut wants it harder and a cinematic one wants it barely there. */
+  ok('flash transitions: a white frame on every cut', /color=white@\$\{FLASH\.toFixed\(2\)\}/.test(compose));
+  ok('…at the same weight as before for every cut that does not ask otherwise',
+    /variant\?\.flash \?\? 0\.55/.test(compose));
   ok('motion blur: frames averaged after the speed ramp', /Motion blur/.test(compose) && /tmix|tblend/.test(compose));
   ok('cursor tracking: painted from the real click coordinates',
     /A visible cursor/.test(readFileSync(join(ROOT, 'scripts', 'ad', 'record.mjs'), 'utf8')));

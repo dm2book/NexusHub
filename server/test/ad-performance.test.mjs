@@ -128,8 +128,14 @@ console.log('\n— Whip transitions, and a flash that still means something —'
   ok('…and compose smears those and only those',
     /const whipCuts = new Set\(variant\?\.whipAt \|\| \[\]\)/.test(compose)
     && /boxblur=luma_radius=42/.test(compose));
+  /* Still fires on every cut this variant does not throw, and still at 0.55:
+     the weight is a variant-level knob now (an eight-second cut wants it
+     harder, a cinematic one barely at all), and K does not ask, so K gets what
+     it always got. */
   ok('the flash is still there for the ordinary cuts',
-    /color=white@0\.55:t=fill:enable='\$\{flashExpr\}'/.test(compose));
+    /color=white@\$\{FLASH\.toFixed\(2\)\}:t=fill:enable='\$\{flashExpr\}'/.test(compose));
+  ok('…at the weight this variant was measured into', (V.flash ?? 0.55) === 0.55
+    && /variant\?\.flash \?\? 0\.55/.test(compose));
 }
 
 console.log('\n— Smooth cursor tracking —');

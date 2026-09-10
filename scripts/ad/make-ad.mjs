@@ -27,12 +27,14 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { VARIANTS, variantById, tokensFor, fill } from './variants.mjs';
+import { VARIANTS, variantById, tokensFor, fill, blockedReason } from './variants.mjs';
 import { HOOKS, hookById, eligibleHooks, hookBlockedReason } from './hooks.mjs';
 /* The twenty-five brand concepts are the same kind of thing as a variant —
    same scene grammar, same needs gate — so --concept resolves through the
    same lookup and everything downstream is unchanged. */
 import { CONCEPTS, conceptById } from './concepts.mjs';
+/* Ten cuts of one purchase, composed from a pace and a focus — see cuts.mjs. */
+import { CUTS, cutById } from './cuts.mjs';
 
 const arg = (k, d = null) => {
   const hit = process.argv.find((a) => a.startsWith(`--${k}=`));
@@ -51,7 +53,7 @@ const OUT = path.resolve(arg('out') || path.join('scripts', 'ad', 'out', slug));
    the pass-throughs instead would mean this file needing an edit every time
    record.mjs grows a flag. */
 const MINE = new Set(['sku', 'product', 'base', 'target', 'out', 'name', 'price', 'cta',
-  'tagline', 'variant', 'variants', 'concept', 'concepts']);
+  'tagline', 'variant', 'variants', 'concept', 'concepts', 'cut', 'cuts']);
 const passthrough = process.argv.slice(2)
   .filter((a) => a.startsWith('--') && !MINE.has(a.slice(2).split('=')[0]));
 
@@ -83,7 +85,8 @@ if (!fs.existsSync(path.join('scripts', 'ad', 'sfx', 'notify.wav'))) {
  * produce quietly. */
 const alreadyRecorded = fs.existsSync(path.join(OUT, 'beats.json'))
   && fs.existsSync(path.join(OUT, 'raw.webm'));
-const REUSE = process.argv.includes('--reuse') || !!(arg('hooks') || arg('hook'));
+const REUSE = process.argv.includes('--reuse')
+  || !!(arg('hooks') || arg('hook') || arg('cuts') || arg('cut'));
 
 if (REUSE && alreadyRecorded) {
   console.log(`\n♻  reusing the recording in ${OUT} — nothing is bought or filmed again`);
@@ -163,7 +166,41 @@ const wantHooks = hooksArg === 'all' ? eligible.map((h) => h.id)
   : hooksArg.split(',').map((x) => x.trim()).filter(Boolean);
 
 const made = []; const skipped = [];
-if (wantHooks.length) {
+
+/* 4c. The ten cuts.
+   Same recording, same beats, same order — only the montage, the opening, the
+   timing, the zooms, the transitions, the captions and the closing line differ.
+   `--cuts=all` walks the set; one that cannot honestly be made from this
+   footage skips itself with a reason and the run carries on. */
+const cutsArg = arg('cuts') || arg('cut') || '';
+if (cutsArg === 'list') {
+  console.log(`\n🎞  ${CUTS.length} cuts of one recording\n`);
+  for (const c of CUTS) {
+    const why = blockedReason(c, { tokens: hookTokens, order, review: extras.review, mystery: extras.mystery });
+    console.log(`   ${why ? '✗' : '✓'} ${c.id}  ${c.slug.padEnd(14)} ${String(c.target).padStart(2)}s  `
+      + `${c.pace.padEnd(9)} ${c.focus.padEnd(9)} ${why || fill(c.hook, hookTokens) || ''}`);
+  }
+  console.log('');
+  process.exit(0);
+}
+const wantCuts = cutsArg === 'all' ? CUTS.map((c) => c.id)
+  : cutsArg.split(',').map((x) => x.trim()).filter(Boolean);
+
+if (wantCuts.length) {
+  console.log(`\n🎞  ${wantCuts.length} cut(s) of one purchase`);
+  for (const id of wantCuts) {
+    const c = cutById(id);
+    if (!c) { console.warn(`\n⚠ no cut "${id}"`); continue; }
+    console.log(`\n━━ ${c.id} · ${c.name} — ${c.pace}, on ${c.focus}`);
+    const r = spawnSync(process.execPath,
+      [path.join('scripts', 'ad', 'compose.mjs'),
+        `--in=${OUT}`, `--cut=${c.id}`, `--base=${BASE}`],
+      { stdio: 'inherit' });
+    if (r.status === 0) made.push({ id: c.id, name: c.name, file: path.join(OUT, `ad-cut-${c.id}-${c.slug}.mp4`) });
+    else if (r.status === 2) skipped.push({ id: c.id, name: c.name });
+    else { console.error(`\n✖ cut ${c.id} failed to render.\n`); process.exit(1); }
+  }
+} else if (wantHooks.length) {
   /* One variant, many openings. Everything after the first two seconds is
      identical by construction — same recording, same cuts, same sound. */
   const v = variantById(arg('variant') || 'K') || VARIANTS[0];

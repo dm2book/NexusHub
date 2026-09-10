@@ -51,21 +51,14 @@
  * variants.mjs and enforced by blockedReason().
  */
 
-/* Scene grammar, re-used verbatim from variants.mjs so a concept and a variant
-   are the same kind of thing to compose.mjs. */
-export const S = {
-  open: { from: 'open', to: 'shop', speed: 3.4, weight: 0.7, zoom: 'in', label: 'open' },
-  browse: { from: 'shop', to: 'select', speed: 3.2, weight: 1.1, zoom: 'drift', label: 'browse' },
-  toProduct: { from: 'select', to: 'product', speed: 1.6, weight: 0.7, zoom: 'punch', label: 'open product' },
-  product: { from: 'product', to: 'buy', speed: 1.2, weight: 2.0, zoom: 'in', label: 'the product', price: true },
-  buy: { from: 'buy', to: 'checkout', speed: 2.0, weight: 0.7, zoom: 'punch', label: 'buy' },
-  checkout: { from: 'checkout', to: 'order-placed', speed: 2.8, weight: 1.0, zoom: 'in', label: 'checkout' },
-  confirmed: { from: 'confirmed', to: 'delivery', speed: 1.4, weight: 1.2, zoom: 'punch', label: 'confirmed' },
-  delivered: { from: 'delivery', to: 'delivered-detail', speed: 1.2, weight: 1.4, zoom: 'in', label: 'delivered' },
-  goods: { from: 'delivered-detail', to: 'email-open', speed: 1.4, weight: 0.9, zoom: 'in', label: 'the goods' },
-  email: { from: 'email-open', to: 'email-detail', speed: 1.2, weight: 1.8, zoom: 'punch', label: 'the email', notify: true },
-  code: { from: 'email-detail', to: 'end', speed: 1.2, weight: 1.4, zoom: 'in', label: 'the code' },
-};
+/* Scene grammar, from variants.mjs rather than copied out of it.
+   These eleven entries were a verbatim duplicate — byte for byte — which is the
+   bug this codebase keeps shipping: one rule in two files, then the two drift.
+   Re-exported because a concept and a variant are the same kind of thing to
+   compose.mjs, and callers of this module should not have to know which file
+   the grammar happens to live in. */
+export { S } from './variants.mjs';
+import { S } from './variants.mjs';
 
 /* Two overlays every concept carries, so neither is a per-concept decision.
    The handle is the CTA a viewer can act on without leaving the app; the
