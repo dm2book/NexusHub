@@ -130,7 +130,7 @@ export function fill(template, tokens) {
  * share of the running time; `speed` is the fastest it may be played. compose.mjs
  * resolves these against the beats the recorder actually marked.
  */
-const S = {
+export const S = {
   open: { from: 'open', to: 'shop', speed: 3.4, weight: 0.7, zoom: 'in', label: 'open' },
   browse: { from: 'shop', to: 'select', speed: 3.2, weight: 1.1, zoom: 'drift', label: 'browse' },
   toProduct: { from: 'select', to: 'product', speed: 1.6, weight: 0.7, zoom: 'punch', label: 'open product' },

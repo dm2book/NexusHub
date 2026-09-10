@@ -31,6 +31,7 @@ import {
 import { variantById, tokensFor, fill, blockedReason } from './variants.mjs';
 import { HOOKS, hookById, hookBlockedReason } from './hooks.mjs';
 import { conceptById } from './concepts.mjs';
+import { CUTS, cutById } from './cuts.mjs';
 import { renderCaptions } from './captions.mjs';
 
 const require = createRequire(import.meta.url);
@@ -47,8 +48,18 @@ const IN = path.resolve(arg('in') || path.join('scripts', 'ad', 'out'));
 const SFX = path.resolve(arg('sfx') || path.join('scripts', 'ad', 'sfx'));
 const RAW = path.join(IN, 'raw.webm');
 const VARIANT = arg('variant', null);
-const variant = VARIANT ? (variantById(VARIANT) || conceptById(VARIANT)) : null;
-if (VARIANT && !variant) { console.error(`No variant "${VARIANT}".`); process.exit(1); }
+/* `--cut=` addresses cuts.mjs, `--variant=` addresses variants.mjs and
+   concepts.mjs. Kept apart because A–H and J exist in both tables, and a run
+   that asks for the 8-second cut and silently gets the 16-second price-hook
+   variant is the kind of quiet wrong answer this toolkit exists to avoid. */
+const CUT = arg('cut', null);
+const variant = CUT ? cutById(CUT)
+  : (VARIANT ? (variantById(VARIANT) || conceptById(VARIANT)) : null);
+if (CUT && !variant) {
+  console.error(`No cut "${CUT}". Known: ${CUTS.map((c) => c.id).join(', ')}`);
+  process.exit(1);
+}
+if (!CUT && VARIANT && !variant) { console.error(`No variant "${VARIANT}".`); process.exit(1); }
 const TARGET = Number(arg('target', String(variant?.target || 20)));
 // Named after the variant so eight of them can live side by side.
 /* Which opening line to use. Empty means the variant's own. Declared here
@@ -72,7 +83,8 @@ const PUBLISHABLE = provenance.live === true && provenance.realPayment === true;
 /* The hook is in the filename: a batch writes one file per opening line, and
    which one you are looking at has to survive being dragged into a folder. */
 const hookTag = HOOK_ID ? `-${HOOK_ID}` : '';
-const baseName = variant ? `ad-${variant.id}-${variant.slug}${hookTag}.mp4` : `ad${hookTag}.mp4`;
+const family = variant?.family ? `${variant.family}-` : '';
+const baseName = variant ? `ad-${family}${variant.id}-${variant.slug}${hookTag}.mp4` : `ad${hookTag}.mp4`;
 const OUT = path.join(IN, arg('name', PUBLISHABLE ? baseName : `preview-${baseName}`));
 const W = 1080; const H = 1920;
 /* The domain painted in the corner for most of the advert. A variant may set
@@ -84,6 +96,11 @@ const CTA_TEXT = arg('cta', 'forgemarket.nl');
    against, so nothing that existed before this changes. */
 const ZOOM = Number(arg('zoom', String(variant?.zoomScale ?? 1)));
 const BLUR_AT = Number(arg('blurAt', String(variant?.blurAt ?? 2)));
+/* How hard a cut lands. The white frame pair was fixed at 0.55 for every edit,
+   which is fine at ten seconds and wrong at both ends: an eight-second cut
+   wants it harder, and a cinematic one wants it barely there or not at all.
+   Zero switches the flashes off entirely. */
+const FLASH = Math.max(0, Math.min(1, Number(arg('flash', String(variant?.flash ?? 0.55)))));
 
 for (const f of [RAW, path.join(IN, 'beats.json')]) {
   if (!fs.existsSync(f)) { console.error(`Missing ${f} — run record.mjs first.`); process.exit(1); }
@@ -599,8 +616,8 @@ if (ctaChain) post.push(['ctatag', '0:0']);
 
 parts.push(`[cat]${whipExpr
   ? `boxblur=luma_radius=42:luma_power=2:chroma_radius=42:chroma_power=1:enable='${whipExpr}',`
-  : ''}${flashes.length
-  ? `drawbox=x=0:y=0:w=iw:h=ih:color=white@0.55:t=fill:enable='${flashExpr}',`
+  : ''}${flashes.length && FLASH > 0
+  ? `drawbox=x=0:y=0:w=iw:h=ih:color=white@${FLASH.toFixed(2)}:t=fill:enable='${flashExpr}',`
   : ''}${mark}format=yuv420p${post.length ? '[body0]' : '[vout]'}`);
 post.forEach(([label, xy], i) => {
   const dst = i === post.length - 1 ? 'vout' : `body${i + 1}`;

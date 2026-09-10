@@ -271,6 +271,111 @@ payment beat has no footage of its own — the caption ends up over a page that
 already says delivered. With `--pay=manual` there is a real gap and a real
 payment screen in it. It is one more reason the demo path is a preview.
 
+## Ten cuts of one purchase
+
+`--cuts=all` builds ten adverts from a single recording. Three that differ only
+in pace, seven that differ in what they lean on:
+
+    node scripts/ad/make-ad.mjs --sku=STEAM-10 --out=… --cuts=all
+
+| | cut | pace | leans on | ends on |
+|---|---|---|---|---|
+| **A** | ultra-fast | 8s | the whole flow | "Klaar." |
+| **B** | balanced | 10s | the whole flow | "Je code. Klaar." |
+| **C** | cinematic | 12s | the whole flow | "Van klik tot code." |
+| **D** | price | 10s | the price | "{price}. Meer wordt het niet." |
+| **E** | speed | 10s | the delivery | "{deliveryShort}" |
+| **F** | product | 10s | the product | "{name}" |
+| **G** | checkout | 10s | the checkout | "Geen account. Gewoon je code." |
+| **H** | email | 10s | the mail arriving | "In je mail. Klaar." |
+| **I** | watch-me-buy | 10s | the buying itself | "Zo koop je het." |
+| **J** | clean-premium | 12s | restraint | "Geleverd." |
+
+    --cuts=list       which of the ten this footage supports, render nothing
+    --cuts=A,C,J      render those three
+    --cuts=all        render all ten
+
+Like `--hooks=`, any `--cuts=` run implies `--reuse`: the recording, the price
+badge and the end card are used again and only the edit is redone. Buying
+something and filming it costs money and consumes a code; re-cutting costs
+nothing.
+
+### They are composed, not written
+
+Ten cuts written out longhand is ten more variant literals, each one a place for
+the flow to drift out of step with the other nine. So `scripts/ad/cuts.mjs`
+holds two tables and the ten are pairs of them:
+
+```js
+{ id: 'G', slug: 'checkout', name: 'Checkout-focused',
+  pace: 'balanced', focus: 'checkout', close: 'Geen account. Gewoon je code.' }
+```
+
+**PACE** is how fast the edit moves — running time, end-card hold, how hard the
+zooms push, when frames are averaged, which cuts are thrown, how hard the flash
+lands. The one number that matters is `ceiling`, which scales every scene's
+speed *limit*: raising it lets a scene be squeezed, lowering it forces the scene
+closer to real time. That single number is the whole difference between
+ultra-fast and cinematic; the rest is polish.
+
+**FOCUS** is what the cut leans on — which beats get the weight, which opening
+it uses, and which beats speak.
+
+Change how a payment beat should be cut and all ten change together, because
+there is one of it.
+
+### Leaning on a beat buys it slack, not just budget
+
+The first version of `focus` only redistributed weight, and on real footage that
+moved almost nothing: most scenes already sit at their speed ceiling, because
+the ceiling is what stops a six-second wait becoming the whole advert. Measured
+on the real recording, the speed cut and the balanced cut both spent 1.6s on the
+delivery — doubling the weight of a ceiling-pinned scene changes nothing at all.
+
+A focused scene now gets its ceiling divided by the root of its lean as well, so
+it can run closer to real time. Same recording, after:
+
+| beat | balanced | the cut that leans on it |
+|---|---|---|
+| the product | 1.55s | 2.58s (F) |
+| the checkout | 0.72s | 1.43s (G) |
+| the delivery | 1.64s | 2.10s (E) |
+| the mail arriving | 1.55s | 2.04s (H) |
+| the buying | 0.52s | 0.83s (I) |
+
+### What is identical across all ten, on purpose
+
+- **The recording.** One real purchase, filmed once.
+- **The beats.** `product → buy → checkout → payment → delivered → email → code`,
+  in that order, every time. The skeleton is the shared scene grammar spread,
+  not a restatement of it.
+- **The honesty gate.** The opening comes out of `hooks.mjs` and every caption
+  goes through `fill()`, so a line whose token has no real value removes itself
+  here exactly as it does everywhere else. `needs` is *derived* from the opening
+  and the captions rather than typed out — a hand-maintained list goes stale the
+  first time a line changes, and the failure mode is an advert making a claim
+  nothing checked.
+
+Only montage, hook, timing, zooms, transitions, captions and the closing line
+differ — which is also the only part of an advert that may differ when the thing
+being advertised is one real purchase.
+
+### `--cut=` and `--variant=` are different flags on purpose
+
+A–H and J exist in **both** tables: `variantById('A')` is the 16-second price
+hook, `cutById('A')` is the 8-second ultra-fast cut. Merging the lookups would
+mean a run asking for one and silently getting the other, which is the quiet
+wrong answer this toolkit is built around avoiding. The output filename carries
+the family too — `ad-cut-A-ultra-fast.mp4` next to `ad-A-price-hook.mp4`.
+
+### The end card is shared
+
+Each cut brings its own closing caption and its own end-card *hold* (0.9s on the
+eight-second cut, 2.0s on the cinematic one), but the card art itself is
+rendered once per recording by `cards.mjs`. Ten cuts of one purchase point at
+one shop; if you want a different tagline per cut, re-run `cards.mjs` with
+`--tagline=` between renders.
+
 ## The real-purchase test
 
 `--variant=stopwatch` (L) is the timed cut: *"Ik ga kijken hoe snel ForgeMarket
@@ -519,6 +624,7 @@ overwrites that one only.
 | flag | default | |
 |---|---|---|
 | `--target=20` | 20 | seconds to aim for; the result lands 15–25 |
+| `--cuts=` | — | `all`, `list`, or ids — ten cuts of one purchase |
 | `--hooks=` | — | `all`, `list`, or ids — one advert per opening, from one take |
 | `--variant=stopwatch` | — | the timed cut; needs a delivery in the footage |
 | `--reuse` | off | cut again from the recording already in `--out` |
