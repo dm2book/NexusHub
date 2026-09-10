@@ -75,7 +75,7 @@ console.log('\n— The address is on screen early, not at 73% —');
     /post\.push\(\['ctatag', '0:0'\]\)/.test(compose)
     && /\[body\$\{i\}\]\[\$\{label\}\]overlay=\$\{xy\}:format=auto/.test(compose));
   ok('…starting after the hook rather than competing with it',
-    /const tagFrom = Math\.min/.test(compose));
+    /const tagFrom = HERO \+ Math\.min/.test(compose));
   /* Bounded at the input, like the end card. An unbounded `-loop 1` still
      overlaid onto the concatenated body rendered eighteen seconds of black
      under the overlays — a filtergraph that runs, exits zero, and writes a file
@@ -145,7 +145,7 @@ console.log('\n— The performance edit, measured against the first cut —');
   ok('the advert is cut to twelve seconds, not eighteen', V.target === 12, String(V.target));
   ok('…and the end card comes down with it', V.card !== undefined && V.card < 2.6, String(V.card));
   ok('…without a hardcoded floor padding it back up',
-    /min: Math\.min\(15, TARGET - 1\)/.test(compose));
+    /min: Math\.min\(15, TARGET - HERO - 1\)/.test(compose));
 
   /* The waiting shots are the ones with nothing in them: `confirmed → delivery`
      is the shop polling, and the track page is a status list that does not

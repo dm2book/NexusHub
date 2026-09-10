@@ -219,11 +219,33 @@ if (!cuts.length) { console.error('No usable scenes in beats.json.'); process.ex
    the padding came out of the slowest footage — so shortening the advert made
    it MORE static, which is the opposite of the point. */
 const CARD_LEN = Number(arg('card', String(variant?.card ?? 2.6)));
+
+/* ── The product, in the first second ───────────────────────────────────────
+ *
+ * Every cut opened on a SCREEN RECORDING of a product page — a browser, a
+ * header, a breadcrumb, and somewhere inside all of that, small, the thing
+ * being sold. In a feed that is a second spent working out what you are looking
+ * at, and the second is the entire budget.
+ *
+ * `hero` puts the shop's own product artwork, name and price full-frame at t=0,
+ * then hands off to the footage. It is a still rather than a scene because
+ * there is no footage of it: cards.mjs draws it from the product row.
+ *
+ * It comes out of the FOOTAGE budget, not on top of the running time, so a cut
+ * asking for ten seconds still gets ten. */
+const heroCard = path.join(IN, 'hero.png');
+const HERO = Number(arg('hero', String(variant?.hero ?? 0))) > 0 && fs.existsSync(heroCard)
+  ? Number(arg('hero', String(variant?.hero ?? 0)))
+  : 0;
+if ((variant?.hero ?? 0) > 0 && !HERO) {
+  console.warn(`\n⚠ no hero.png in ${IN} — this product has no artwork, so the cut opens on the footage.`);
+}
+
 const resolved = resolveTiming(cuts, {
-  target: TARGET, card: CARD_LEN, min: Math.min(15, TARGET - 1),
+  target: TARGET - HERO, card: CARD_LEN, min: Math.min(15, TARGET - HERO - 1),
 });
 let CARD = resolved.card;
-const total = resolved.total;
+const total = HERO + resolved.total;
 
 console.log(`\n🎬 ${cuts.length} scenes · ${total.toFixed(1)}s (target ${TARGET}s)`);
 for (const c of cuts) console.log(`   ${c.played.toFixed(2)}s  ${c.label} (${c.speed.toFixed(1)}×)`);
@@ -237,8 +259,12 @@ for (const c of cuts) console.log(`   ${c.played.toFixed(2)}s  ${c.label} (${c.s
    out a second time. Two copies of where a scene starts is precisely how the
    clock and the picture would end up disagreeing about the same frame. */
 const swSpec = variant?.stopwatch || null;
-const swRows = swSpec ? timeline(cuts, CARD).rows : [];
-const swBody = cuts.reduce((a, c) => a + c.played, 0);
+/* Offset by the hero: the clock is overlaid on the finished body, and the
+   footage does not start at zero when a still is in front of it. Before the
+   offset the clock read the footage a hero's length early — and a clock that is
+   wrong is the one thing that file exists to prevent. */
+const swRows = swSpec ? timeline(cuts, CARD).rows.map((r) => ({ ...r, in: r.in + HERO, out: r.out + HERO })) : [];
+const swBody = HERO + cuts.reduce((a, c) => a + c.played, 0);
 const swZero = swSpec ? clockZero(swSpec, swRows) : null;
 if (swZero?.error) { console.error(`\n✖ ${swZero.error}\n`); process.exit(1); }
 const sw = swSpec ? stopwatchFrames({
@@ -472,6 +498,53 @@ if (hasPrice && wantsPriceCard) {
   }
 }
 
+/* ── The product card, revealed on the beat it belongs to ───────────────────
+ *
+ * Two overlays drawn from the product row by cards.mjs, each pinned to the
+ * scene that earns it:
+ *
+ *   productcard.png  the reveal — art, name and price over the product page
+ *   productchip.png  the last beat, so the closing frame is a code that belongs
+ *                    to something rather than an anonymous string
+ *
+ * Both RISE into place as they fade, which is what makes a card read as being
+ * placed rather than as having always been there. Absent when the product has
+ * no artwork: nothing stands in for it.
+ *
+ * The movement is an overlay offset rather than a scale-up. The obvious version
+ * — `scale=w='iw*min(0.92+…*t,1)':eval=frame` followed by a `pad` back to the
+ * frame — does not run: pad fixes its geometry at init, so a per-frame size
+ * feeding it is an invalid argument and ffmpeg refuses the whole graph. An
+ * overlay's x/y ARE evaluated per frame, which is why the email card already
+ * animates that way. */
+const RISE = 54;
+const reveal = (file, sceneLabel, { at = 0.12, rise = RISE } = {}) => {
+  const f = path.join(IN, file);
+  const idx = cuts.findIndex((c) => c.label === sceneLabel);
+  if (!fs.existsSync(f) || idx < 0) return;
+  const d = cuts[idx].played;
+  const hold = Math.max(0.5, d - at - 0.10);
+  const i = addInput('-loop', '1', '-framerate', String(FPS), '-t', hold.toFixed(3), '-i', f);
+  const nm = `pc${idx}`;
+  parts.push(`[${i}:v]scale=${W}:${H},format=rgba,fps=${FPS},`
+    + `fade=t=in:st=0:d=0.16:alpha=1,fade=t=out:st=${Math.max(0.3, hold - 0.22).toFixed(2)}:d=0.22:alpha=1,`
+    + `trim=duration=${hold.toFixed(3)},setpts=PTS-STARTPTS+${at.toFixed(3)}/TB[${nm}]`);
+  const t0 = at.toFixed(3);
+  const y = `if(lt(t,${t0}+0.26),${rise}-${rise}*((t-${t0})/0.26),0)`;
+  const src = names[idx]; const dst = `${src}${nm}`;
+  parts.push(`[${src}][${nm}]overlay=0:'${y}':enable='between(t,${t0},${(at + hold).toFixed(3)})':`
+    + `format=auto,format=yuv420p[${dst}]`);
+  names[idx] = dst;
+};
+/* Opt-in. These files exist for every recording of a product that has artwork,
+   and switching them on by default would have quietly redressed twelve
+   variants, ten cuts and seventy-five concepts that were composed without
+   them. */
+if (variant?.productCard === true) {
+  reveal('productcard.png', variant?.productCardAt || 'the product', { rise: 40 });
+  reveal('productchip.png', variant?.productChipAt || 'the code', { at: 0.30, rise: 40 });
+}
+
 /* Captions, laid over the scene each belongs to.
    Faded rather than cut in: a caption that appears on the same frame as the
    flash competes with it, and both lose. `late` holds the line back so two
@@ -532,6 +605,21 @@ caps.forEach((c, ci) => {
   names[i] = dst;
 });
 
+/* The hero, in front of everything.
+   A push-in on a still, so the first frame is already the product and the
+   second frame is already moving. It ends on a hard cut into the footage,
+   which shows the same artwork on the real page — the two read as one move. */
+if (HERO) {
+  const hf = Math.max(2, Math.round(HERO * FPS));
+  const hIdx = addInput('-loop', '1', '-framerate', String(FPS), '-t', HERO.toFixed(3), '-i', heroCard);
+  parts.push(`[${hIdx}:v]scale=${W}:${H}:force_original_aspect_ratio=increase:flags=lanczos,`
+    + `crop=${W}:${H},fps=${FPS},`
+    + `zoompan=z='min(1.0+${(0.10 * ZOOM).toFixed(3)}*on/${hf},${(1 + 0.11 * ZOOM).toFixed(3)})'`
+    + `:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=${W}x${H}:fps=${FPS},`
+    + `trim=duration=${HERO.toFixed(3)},setpts=PTS-STARTPTS,format=yuv420p[vhero]`);
+  names.unshift('vhero');
+}
+
 // The end card, held and faded in.
 parts.push(`[${endIdx}:v]scale=${W}:${H},fps=${FPS},trim=duration=${CARD},setpts=PTS-STARTPTS,`
   + `fade=t=in:st=0:d=0.25,format=yuv420p[vend]`);
@@ -542,11 +630,15 @@ names.push('vend');
    lands on the same frame. */
 parts.push(`${names.map((n) => `[${n}]`).join('')}concat=n=${names.length}:v=1:a=0[cat]`);
 
-let acc = 0;
+/* The hero is the first thing in `names`, so every cut boundary — and every
+   flash, whip and sound placed on one — is a hero later than the footage's own
+   accumulation says. */
+let acc = HERO;
 const flashes = [];
+if (HERO) flashes.push(HERO);          // the cut out of the hero is a cut too
 for (let i = 0; i < cuts.length; i++) {
   acc += cuts[i].played;
-  if (i < names.length - 1) flashes.push(acc);
+  if (i < cuts.length - 1) flashes.push(acc);
 }
 const flashExpr = flashes
   .map((t) => `between(t,${(t - 0.045).toFixed(3)},${(t + 0.045).toFixed(3)})`)
@@ -588,8 +680,8 @@ const whipExpr = flashes
  * bigger.
  */
 const ctaText = ctaChecked.text;      // checked, not as typed — see the claim gate
-const bodyEnd = cuts.reduce((a, c) => a + c.played, 0);
-const tagFrom = Math.min(cuts[0]?.played ?? 1.5, 2.2);
+const bodyEnd = HERO + cuts.reduce((a, c) => a + c.played, 0);
+const tagFrom = HERO + Math.min(cuts[0]?.played ?? 1.5, 2.2);
 const tagFile = path.join(IN, 'cta-tag.png');
 let ctaChain = false;
 if (ctaText && fs.existsSync(tagFile) && bodyEnd - tagFrom > 1.5) {
@@ -707,9 +799,9 @@ const place = (file, tSec, vol) => {
  * Two beats get a sound of their own because they are the two the viewer is
  * waiting for: the money clearing, and the mail landing.
  */
-let cursor = 0;
+let cursor = HERO;
 cuts.forEach((c, i) => {
-  if (i > 0) {
+  if (i > 0 || HERO) {
     const thrown = whipCuts.has(i - 1);
     place(sfx(thrown ? 'whip' : 'whoosh'), cursor - (thrown ? 0.06 : 0.12), thrown ? 0.62 : 0.5);
   }

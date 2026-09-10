@@ -205,6 +205,15 @@ export const S = {
      so it is the scene the clock stops on. */
   tMail: { from: 'confirmed', to: 'email-open', speed: 8.0, weight: 2.5, zoom: 'in', label: 'the mailbox', blur: true },
   tReveal: { from: 'email-open', to: 'end', speed: 2.0, weight: 1.5, zoom: 'focus', label: 'the code', notify: true },
+
+  /* ── The product-first grammar ────────────────────────────────────────────
+     The same beats, but the PRICE BADGE moves off the product scene and onto
+     the buy click. On the product scene it now shares the frame with the
+     product card, which already carries the price — two of the same number in
+     one frame is not emphasis, it is a mistake. Moved, the two become the two
+     reveals the brief asks for: the card, then the price. */
+  mProduct: { from: 'product', to: 'buy', speed: 2.0, weight: 2.0, zoom: 'in', label: 'the product', settle: 0.35 },
+  mPrice: { from: 'buy', to: 'checkout', speed: 2.4, weight: 1.0, zoom: 'punch', label: 'buy', price: true, blur: true },
 };
 
 /**
@@ -614,6 +623,68 @@ export const VARIANTS = [
     cta: 'forgemarket.nl',
     /* The delivery is the claim, so the cut is refused outright when the
        purchase did not complete — before a single frame is rendered. */
+    needs: ['name', 'price', 'order', 'delivery'],
+  },
+  {
+    id: 'M',
+    slug: 'product-first',
+    name: 'Product-first (NL)',
+    lang: 'nl',
+    /*
+     * The product, visually central, from the first frame.
+     *
+     * Every other cut opens on a SCREEN RECORDING of a product page: a browser,
+     * a header, a breadcrumb, and somewhere inside all of that, small, the
+     * thing being sold. In a feed that is a second spent working out what you
+     * are looking at, and the second is the entire budget.
+     *
+     * Six moments, each drawn from the product row rather than from a brief:
+     *
+     *   1. product zoom-in     the shop's own artwork full-frame, pushing in
+     *   2. product card reveal art, name and price over the real page
+     *   3. price reveal        the badge, on the buy click rather than on the
+     *                          product shot, so it is its own moment
+     *   4. checkout transition a thrown cut into the checkout
+     *   5. email transition    a thrown cut into the mail landing
+     *   6. code reveal         the code, with a chip saying what it is FOR
+     *
+     * The hero comes out of the footage budget rather than on top of it, so
+     * this is still a twelve-second advert. And it is a still, not a scene:
+     * there is no footage of a product card, cards.mjs draws it. A product with
+     * no artwork gets no hero and the cut opens on the footage — nothing is
+     * drawn to stand in for a picture the shop does not have.
+     */
+    target: 12,
+    card: 1.4,
+    hero: 1.0,
+    productCard: true,
+    zoomScale: 3,
+    blurAt: 1.6,
+    /* The cut indices, counted over the whole body — and the hero is the first
+       thing in it, so 0 is the cut OUT of the hero and every footage cut is one
+       later than the scene list suggests. 2 is the throw into the checkout and
+       5 the throw into the mail landing: the two transitions the brief names.
+       [0, 2, 4] threw into "delivered" instead, which is a page nobody is
+       waiting for. */
+    whipAt: [0, 2, 5],
+    scenes: [S.mProduct, S.mPrice, S.pCheckout, S.pPay, S.pMail, S.pArrive, S.pReveal],
+    /* NOT the name and the price. The hero has just shown both full-frame and
+       the product card is showing them again over the page — a caption saying
+       them a third time in the same second is not emphasis, it is clutter. The
+       pictures say what and how much; the line says what is about to happen. */
+    hook: 'Van klik tot code.',
+    /* Bottom-anchored. The two-line hook plate sits at 250px from the top and
+       so does the product card, so the default style printed the line straight
+       across the artwork — in a cut whose whole point is that the product is
+       visually central. The card owns the top of the frame here; the line owns
+       the bottom. */
+    hookStyle: 'big',
+    captions: [
+      { at: 'checkout', text: 'Geen account nodig', style: 'small' },
+      { at: 'payment', text: 'Betaald', style: 'small' },
+      { at: 'the email', text: 'Je bestelling van ForgeMarket', sub: 'in je inbox', style: 'notify' },
+    ],
+    cta: 'forgemarket.nl',
     needs: ['name', 'price', 'order', 'delivery'],
   },
 ];

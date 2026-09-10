@@ -109,6 +109,9 @@ if (!(REUSE && fs.existsSync(path.join(OUT, 'endcard.png')))) step('cards', 'car
   `--out=${OUT}`, `--base=${BASE}`,
   `--name=${arg('name') || p.name}`,
   `--price=${arg('price') || money}`,
+  /* The product's own artwork, straight off the row the recorder bought. A
+     product without one simply gets no hero — nothing is drawn to stand in. */
+  ...(p.image ? [`--image=${p.image}`] : []),
   ...(arg('cta') ? [`--cta=${arg('cta')}`] : []),
   ...(arg('tagline') ? [`--tagline=${arg('tagline')}`] : []),
 ]);
