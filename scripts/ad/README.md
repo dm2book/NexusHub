@@ -271,6 +271,80 @@ payment beat has no footage of its own — the caption ends up over a page that
 already says delivered. With `--pay=manual` there is a real gap and a real
 payment screen in it. It is one more reason the demo path is a preview.
 
+## Product-first
+
+`--variant=product-first` (M) is the cut where the product is visually central
+from the first frame. Every other cut opens on a **screen recording of a product
+page** — a browser, a header, a breadcrumb, a chat bubble, and somewhere inside
+all of that, small, the thing being sold. In a feed that is a second spent
+working out what you are looking at, and the second is the entire budget.
+
+    node scripts/ad/make-ad.mjs --base=https://www.forgemarket.nl \
+      --sku=STEAM-10 --email=ads@yourdomain --pay=manual --lang=nl \
+      --variant=product-first
+
+Six moments, each drawn from the product row rather than from a brief:
+
+| | moment | how |
+|---|---|---|
+| 1 | product zoom-in | the shop's own artwork full-frame, pushing in — the first 1.0s |
+| 2 | product card reveal | art and name rising into place over the real page |
+| 3 | price reveal | the badge, on the buy click, so it is its own beat |
+| 4 | checkout transition | a thrown cut into the checkout |
+| 5 | email transition | a thrown cut into the mail landing |
+| 6 | code reveal | the code, with a chip saying what the code is **for** |
+
+### The artwork is the shop's
+
+`cards.mjs --image=` takes the path off the product row — the same picture the
+buyer sees on the product page. `record.mjs` already writes `product.image` into
+`beats.json` and `make-ad.mjs` hands it on, so nothing has to be pointed at it.
+
+A product with no artwork gets **no hero**: the cards are simply not rendered,
+compose says so, and the cut opens on the footage instead. Nothing is drawn to
+stand in for a picture the shop does not have.
+
+### The hero comes out of the footage budget
+
+It is a still, not a scene — there is no recording of a product card. It is
+prepended to the concatenated body and paid for out of the footage, so a
+twelve-second cut is still twelve seconds.
+
+Everything timed against the body — the flashes, the whips, the corner tag, the
+sound, the stopwatch — accumulates from the footage, and the footage no longer
+starts at zero. Each of those was wrong by exactly one hero before it was right,
+and the stopwatch mattered most: a clock reading the recording a second early is
+the one thing `stopwatch.mjs` exists to prevent.
+
+### Readable on a phone
+
+The hero sets the name at 104px and the price at 128px on a 1080-wide frame —
+roughly 6mm and 8mm of glass on a six-inch screen. The measured mistake they
+correct is the old price badge at 60px: legible on a laptop, a smudge on a
+phone.
+
+Two collisions found by **measuring the rendered overlays** rather than by
+reasoning about the CSS:
+
+- the product card ran `y 233 → 1400` while the hook caption sat at `1160`, so
+  the card printed straight across the line — in the one cut whose whole point
+  is that the product is central. The card carries art and **name** only now
+  (the price is the next reveal), which keeps the name on one line and ends the
+  card around `990`.
+- the hook is bottom-anchored here (`hookStyle: 'big'`), because the two-line
+  hook plate sits at 250px from the top and so does the card.
+
+`node scripts/ad/rows.mjs <overlay.png>` prints the first and last row an
+overlay actually covers. It is how both were found, and it is the answer to any
+overlay that looks wrong: measure it, do not reason about the CSS.
+
+### The opt-in
+
+`hero` and `productCard` are off unless a variant asks. The cards exist for
+every recording of a product that has artwork, and switching the overlays on by
+default would have quietly redressed twelve variants, ten cuts and seventy-five
+concepts that were composed without them.
+
 ## Ten cuts of one purchase
 
 `--cuts=all` builds ten adverts from a single recording. Three that differ only
@@ -720,6 +794,7 @@ overwrites that one only.
 |---|---|---|
 | `--target=20` | 20 | seconds to aim for; the result lands 15–25 |
 | `--cuts=` | — | `all`, `list`, or ids — ten cuts of one purchase |
+| `--image=` | from the product | the artwork the hero and cards are drawn from |
 | `--hooks=` | — | `all`, `list`, or ids — one advert per opening, from one take |
 | `--variant=stopwatch` | — | the timed cut; needs a delivery in the footage |
 | `--reuse` | off | cut again from the recording already in `--out` |

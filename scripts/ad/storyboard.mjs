@@ -66,8 +66,13 @@ if (!cuts.length) { console.error('None of this variant\'s beats are in the reco
    for ten or twelve seconds described a fifteen-second edit that nothing would
    ever render. A storyboard that disagrees with the cut is worse than none. */
 const TARGET = Number(arg('target', String(v.target || 20)));
+/* A hero still is paid for out of the footage budget, so the scenes get the
+   target MINUS the hero — the same subtraction compose makes. Without it this
+   would describe a twelve-second edit of footage that compose only gives eleven
+   seconds to, which is the drift this file was fixed for once already. */
+const HERO = v.hero ?? 0;
 const { card } = resolveTiming(cuts, {
-  target: TARGET, card: v.card ?? 2.6, min: Math.min(15, TARGET - 1),
+  target: TARGET - HERO, card: v.card ?? 2.6, min: Math.min(15, TARGET - HERO - 1),
 });
 const tl = timeline(cuts, card);
 
@@ -82,7 +87,10 @@ const tokens = {
 const sec = (n) => `${n.toFixed(2)}s`;
 const frame = (n) => `f${Math.round(n * FPS)}`;
 
-console.log(`\n${v.id} · ${v.name} — ${sec(tl.total)} at ${FPS}fps (${Math.round(tl.total * FPS)} frames)`);
+/* The hero is not in `tl` — it is a still, prepended by compose — so the
+   running time it reports is the footage's, not the advert's. */
+const RUNTIME = HERO + tl.total;
+console.log(`\n${v.id} · ${v.name} — ${sec(RUNTIME)} at ${FPS}fps (${Math.round(RUNTIME * FPS)} frames)`);
 console.log(`timing from: ${source}`);
 console.log(`captions shown with sample product "${sample.name} · ${sample.price}"\n`);
 
@@ -121,6 +129,12 @@ for (const [i, r] of tl.rows.entries()) {
     console.log(`    ── cut at ${sec(r.out)}: white flash (1 frame pair) + whoosh at ${sec(r.out - 0.12)}`);
   }
   console.log('');
+}
+if (HERO) {
+  console.log(` 0. PRODUCT (still)`);
+  console.log(`    0.00s → ${sec(HERO)}   (${sec(HERO)})`);
+  console.log(`    the shop's own artwork, name and price, pushing in`);
+  console.log(`    everything below is ${sec(HERO)} later in the finished cut\n`);
 }
 console.log(`${String(tl.rows.length + 1).padStart(2)}. END CARD`);
 console.log(`    ${sec(tl.card.in)} → ${sec(tl.card.out)}   (${sec(card)})`);

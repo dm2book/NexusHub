@@ -60,7 +60,8 @@ console.log('\n— Eight to twelve seconds —');
 {
   ok('the target is inside the brief', V.target >= 8 && V.target <= 12, String(V.target));
   ok('…and the floor follows it rather than padding back to fifteen',
-    /min: Math\.min\(15, TARGET - 1\)/.test(compose));
+    /min: Math\.min\(15, TARGET - HERO - 1\)/.test(compose)
+    && (V.hero ?? 0) === 0);
 }
 
 console.log('\n— The first two seconds say what is being sold —');
