@@ -53,9 +53,15 @@ const OUT = path.resolve(arg('out') || path.join('scripts', 'ad', 'out', slug));
    the pass-throughs instead would mean this file needing an edit every time
    record.mjs grows a flag. */
 const MINE = new Set(['sku', 'product', 'base', 'target', 'out', 'name', 'price', 'cta',
-  'tagline', 'variant', 'variants', 'concept', 'concepts', 'cut', 'cuts']);
+  'tagline', 'variant', 'variants', 'concept', 'concepts', 'cut', 'cuts',
+  'sound', 'sounds']);
 const passthrough = process.argv.slice(2)
   .filter((a) => a.startsWith('--') && !MINE.has(a.slice(2).split('=')[0]));
+
+/* Which mix. Passed to every compose call rather than to the recorder — the
+   sound is an edit decision, and `--sounds=all` gives four mixes of one video. */
+const SOUND = arg('sounds') ? [`--sounds=${arg('sounds')}`]
+  : arg('sound') ? [`--sound=${arg('sound')}`] : [];
 
 const step = (label, file, args) => {
   console.log(`\n━━ ${label}`);
@@ -197,7 +203,7 @@ if (wantCuts.length) {
     console.log(`\n━━ ${c.id} · ${c.name} — ${c.pace}, on ${c.focus}`);
     const r = spawnSync(process.execPath,
       [path.join('scripts', 'ad', 'compose.mjs'),
-        `--in=${OUT}`, `--cut=${c.id}`, `--base=${BASE}`],
+        `--in=${OUT}`, `--cut=${c.id}`, `--base=${BASE}`, ...SOUND],
       { stdio: 'inherit' });
     if (r.status === 0) made.push({ id: c.id, name: c.name, file: path.join(OUT, `ad-cut-${c.id}-${c.slug}.mp4`) });
     else if (r.status === 2) skipped.push({ id: c.id, name: c.name });
@@ -214,7 +220,7 @@ if (wantCuts.length) {
     console.log(`\n━━ hook ${h.id} · ${h.type}`);
     const r = spawnSync(process.execPath,
       [path.join('scripts', 'ad', 'compose.mjs'),
-        `--in=${OUT}`, `--variant=${v.id}`, `--hook=${h.id}`, `--base=${BASE}`,
+        `--in=${OUT}`, `--variant=${v.id}`, `--hook=${h.id}`, `--base=${BASE}`, ...SOUND,
         ...(arg('target') ? [`--target=${TARGET}`] : [])],
       { stdio: 'inherit' });
     if (r.status === 0) made.push({ id: h.id, name: h.type, file: path.join(OUT, `ad-${v.id}-${v.slug}-${h.id}.mp4`) });
@@ -222,7 +228,7 @@ if (wantCuts.length) {
     else { console.error(`\n✖ hook ${h.id} failed to render.\n`); process.exit(1); }
   }
 } else if (!want.length) {
-  step('composing', 'compose.mjs', [`--in=${OUT}`, `--target=${TARGET}`, `--base=${BASE}`]);
+  step('composing', 'compose.mjs', [`--in=${OUT}`, `--target=${TARGET}`, `--base=${BASE}`, ...SOUND]);
   made.push({ id: '—', file: path.join(OUT, 'ad.mp4') });
 } else {
   for (const id of want) {
@@ -231,7 +237,7 @@ if (wantCuts.length) {
     console.log(`\n━━ ${v.id} · ${v.name}`);
     const r = spawnSync(process.execPath,
       [path.join('scripts', 'ad', 'compose.mjs'),
-        `--in=${OUT}`, `--variant=${v.id}`, `--base=${BASE}`,
+        `--in=${OUT}`, `--variant=${v.id}`, `--base=${BASE}`, ...SOUND,
         ...(arg('target') ? [`--target=${TARGET}`] : [])],
       { stdio: 'inherit' });
     if (r.status === 0) made.push({ id: v.id, name: v.name, file: path.join(OUT, `ad-${v.id}-${v.slug}.mp4`) });

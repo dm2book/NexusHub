@@ -160,8 +160,11 @@ console.log('— The hero does not shift anything underneath it —');
   ok('…and the cut out of the hero is one of them', /if \(HERO\) flashes\.push\(HERO\)/.test(compose));
   ok('the corner tag waits for it', /const tagFrom = HERO \+/.test(compose));
   ok('…and ends where the body ends', /const bodyEnd = HERO \+/.test(compose));
-  ok('the sound follows the picture', /let cursor = HERO;/.test(compose));
-  ok('…including the whoosh out of the hero', /if \(i > 0 \|\| HERO\)/.test(compose));
+  /* The cue plan takes the hero as its own argument now, so the sound starts
+     where the footage starts rather than at zero. */
+  ok('the sound follows the picture', /hero: HERO,/.test(compose));
+  ok('…including the cut out of the hero, which is a cut like any other',
+    /if \(HERO\) flashes\.push\(HERO\)/.test(compose));
   /* The stopwatch reads the recording's own clock off these rows. Wrong by a
      hero, it would have read the footage a second early — and a clock that is
      wrong is the one thing that file exists to prevent. */

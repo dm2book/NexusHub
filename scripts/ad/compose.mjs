@@ -33,6 +33,9 @@ import { HOOKS, hookById, hookBlockedReason } from './hooks.mjs';
 import { conceptById } from './concepts.mjs';
 import { CUTS, cutById } from './cuts.mjs';
 import { renderCaptions } from './captions.mjs';
+import {
+  CUES, PROFILE_IDS, profileById, planCues, schedule, report as soundReport,
+} from './sound.mjs';
 import { gatherEvidence, validateLines, validateText, report } from './claims.mjs';
 
 const require = createRequire(import.meta.url);
@@ -85,7 +88,8 @@ const PUBLISHABLE = provenance.live === true && provenance.realPayment === true;
    which one you are looking at has to survive being dragged into a folder. */
 const hookTag = HOOK_ID ? `-${HOOK_ID}` : '';
 const family = variant?.family ? `${variant.family}-` : '';
-const baseName = variant ? `ad-${family}${variant.id}-${variant.slug}${hookTag}.mp4` : `ad${hookTag}.mp4`;
+const stem = variant ? `ad-${family}${variant.id}-${variant.slug}${hookTag}` : `ad${hookTag}`;
+const baseName = `${stem}.mp4`;
 const OUT = path.join(IN, arg('name', PUBLISHABLE ? baseName : `preview-${baseName}`));
 const W = 1080; const H = 1920;
 /* The domain painted in the corner for most of the advert. A variant may set
@@ -760,75 +764,135 @@ post.forEach(([label, xy], i) => {
 });
 
 // ── Audio graph ─────────────────────────────────────────────────────────────
+/* The sound follows the picture, and now it is PLANNED rather than triggered.
+ *
+ * sound.mjs names the seven moments once, times them against the resolved edit,
+ * and then schedules them: a cue landing within a profile's minimum gap of a
+ * louder-meaning one is dropped, and clicks are rate-limited. Both rules exist
+ * because of what this recording actually does — the checkout fires three
+ * clicks inside a second, and a click 40ms before a whoosh is not two sounds,
+ * it is one muddy one.
+ *
+ * A profile is a set of gains, pitches and gaps over that same plan, so the
+ * same edit can be mixed four ways without any of them moving a beat. */
 const sfx = (n) => path.join(SFX, `${n}.wav`);
-const need = ['click', 'whoosh', 'notify', 'impact', 'confirm', 'whip', 'bed'];
+const need = [...new Set(Object.values(CUES).map((c) => c.sound)), 'bed'];
 const missing = need.filter((n) => !fs.existsSync(sfx(n)));
 if (missing.length) {
   console.error(`Missing sounds: ${missing.join(', ')} — run: node scripts/ad/sfx.mjs`);
   process.exit(1);
 }
 
-const aInputs = [];
-const aParts = [];
-const aNames = [];
-/* Audio inputs are appended after every video input, so they continue the same
-   count rather than guessing where the video ones stopped. */
-const addAudio = (file) => { aInputs.push('-i', file); return nInputs++; };
+const SOUNDS_WANTED = (arg('sounds') === 'all' ? PROFILE_IDS
+  : (arg('sounds') || arg('sound') || variant?.sound || 'gaming')
+    .split(',').map((x) => x.trim()).filter(Boolean));
+for (const id of SOUNDS_WANTED) {
+  if (!profileById(id)) {
+    console.error(`No sound profile "${id}". Known: ${PROFILE_IDS.join(', ')}`);
+    process.exit(1);
+  }
+}
 
-const bedIdx = addAudio(sfx('bed'));
-aParts.push(`[${bedIdx}:a]atrim=duration=${total.toFixed(3)},asetpts=PTS-STARTPTS,`
-  + `volume=0.34,afade=t=out:st=${(total - 0.6).toFixed(2)}:d=0.6[bed]`);
+/* Planned once. Every profile mixes the SAME moments — that is what makes them
+   profiles rather than four different adverts. */
+const cuePlan = planCues({
+  cuts, beats, flashes, whipAt: variant?.whipAt || [], hero: HERO,
+  bodyEnd, cardAt: bodyEnd,
+});
 
-/** Put one sound at one moment. */
-const place = (file, tSec, vol) => {
-  const idx = addAudio(file);
-  const nm = `s${idx}`;
-  aParts.push(`[${idx}:a]adelay=${Math.max(0, Math.round(tSec * 1000))}|${Math.max(0, Math.round(tSec * 1000))},`
-    + `volume=${vol}[${nm}]`);
-  aNames.push(`[${nm}]`);
+/** The whole audio graph for one profile, ready to hand to ffmpeg. */
+const audioFor = (profileId, startIndex, norm = NORM_ONE_PASS) => {
+  const profile = profileById(profileId);
+  const planned = schedule(cuePlan, profile);
+  const inputs = []; const parts = []; const names = [];
+  let n = startIndex;
+  const add = (file) => { inputs.push('-i', file); return n++; };
+
+  if (profile.bed > 0) {
+    const b = add(sfx('bed'));
+    parts.push(`[${b}:a]atrim=duration=${total.toFixed(3)},asetpts=PTS-STARTPTS,`
+      + `volume=${profile.bed},afade=t=out:st=${(total - 0.6).toFixed(2)}:d=0.6[bed]`);
+    names.push('[bed]');
+  }
+  for (const c of planned.cues) {
+    const idx = add(sfx(c.sound));
+    const nm = `s${idx}`;
+    const ms = Math.max(0, Math.round(c.at * 1000));
+    /* Pitch by playback rate — the cheap shift, and the right one for sounds
+       this short: it moves the transient with the tone instead of smearing it.
+       Resampled straight back, or every later filter sees the wrong rate. */
+    const shift = c.pitch && c.pitch !== 1
+      ? `asetrate=48000*${c.pitch},aresample=48000,`
+      : '';
+    parts.push(`[${idx}:a]${shift}adelay=${ms}|${ms},volume=${c.gain}[${nm}]`);
+    names.push(`[${nm}]`);
+  }
+  if (!names.length) {                     // a profile can legitimately be silent
+    const q = add(sfx('tail'));
+    parts.push(`[${q}:a]volume=0,atrim=duration=${total.toFixed(3)}[silent]`);
+    names.push('[silent]');
+  }
+  parts.push(`${names.join('')}amix=inputs=${names.length}:duration=first:dropout_transition=0,`
+    /* A safety limiter, not a second normaliser.
+       `level` defaults to ENABLED, which auto-levels the output up to the limit
+       — so alimiter had been quietly undoing loudnorm's work and delivering
+       whatever the limit was. Measured: dropping the limit from 0.95 to 0.85
+       made the files LOUDER (−13.0 → −12.2 LUFS) and the true peaks worse, which
+       is the opposite of what a limiter is for.
+       Disabled, it only ever reduces. 0.85 is −1.4 dBFS of sample ceiling, and
+       the headroom matters because alimiter limits the SAMPLE peak while every
+       platform re-encodes to a lossy codec, which adds inter-sample overshoot
+       on top of it. */
+    + `${norm},alimiter=limit=0.85:level=disabled,aresample=48000[aout]`);
+  return { inputs, parts, planned, profile, next: n };
 };
 
-/* The sound follows the picture, beat for beat.
+/**
+ * Two passes, because one is measurably wrong on this material.
  *
- * Every cut used to get the same whoosh, which is the audio version of every cut
- * getting the same white flash: after three of them the ear stops hearing them
- * as punctuation. A cut the edit throws (see `whipAt`) gets the whip instead,
- * and it lands ON the cut rather than 120ms early, because a throw and its sound
- * arriving apart is what makes a transition feel cheap.
+ * loudnorm in single-pass mode estimates as it goes, and a twelve-second mix
+ * that is mostly silence between transients is exactly where the estimate
+ * fails. Measured on the four profiles it produced:
  *
- * Two beats get a sound of their own because they are the two the viewer is
- * waiting for: the money clearing, and the mail landing.
+ *   minimal      −33.0 LUFS, peak −24.1 dBFS   twenty under the platforms —
+ *                                              the same fault this toolkit
+ *                                              already fixed once
+ *   premium      peak +0.2 dBFS                clipping, with TP set to −1.5
+ *
+ * The documented fix is to measure first and hand the numbers back. It costs
+ * one extra pass over twelve seconds of audio, and it is the difference between
+ * a target and a hope.
  */
-let cursor = HERO;
-cuts.forEach((c, i) => {
-  if (i > 0 || HERO) {
-    const thrown = whipCuts.has(i - 1);
-    place(sfx(thrown ? 'whip' : 'whoosh'), cursor - (thrown ? 0.06 : 0.12), thrown ? 0.62 : 0.5);
-  }
-  // Clicks inside this scene, mapped from real time into edited time.
-  for (const b of beats) {
-    if (!b.click) continue;
-    const rel = b.atMs / 1000 - c.start;
-    if (rel < 0 || rel > c.srcLen) continue;
-    place(sfx('click'), cursor + rel / c.speed, 0.62);
-  }
-  /* The payment clearing. Placed a beat INTO the scene rather than on its first
-     frame: the cut is already carrying a whip or a whoosh, and two sounds on one
-     frame is one muddy sound. */
-  if (c.confirm) place(sfx('confirm'), cursor + 0.14, 0.8);
-  if (c.notify) place(sfx('notify'), cursor + 0.12, 0.85);
-  cursor += c.played;
-});
-place(sfx('impact'), cursor - 0.05, 0.7);
+const measured = (profileId) => {
+  const a = audioFor(profileId, 0, `${NORM_ONE_PASS}:print_format=json`);
+  const r = spawnSync(FFMPEG, ['-hide_banner', '-y', ...a.inputs,
+    '-filter_complex', a.parts.join(';'), '-map', '[aout]', '-f', 'null', '-'],
+  { encoding: 'utf8', maxBuffer: 1 << 26 });
+  const j = /\{[\s\S]*?\}/.exec(r.stderr || '');
+  if (!j) return NORM_ONE_PASS;
+  try {
+    const m = JSON.parse(j[0]);
+    /* linear=true applies a single gain rather than compressing, which is what
+       keeps a sparse mix sounding sparse instead of pumped up out of its own
+       silence. ffmpeg falls back to dynamic on its own if it cannot. */
+    return `${NORM_ONE_PASS}:measured_I=${m.input_i}:measured_TP=${m.input_tp}`
+      + `:measured_LRA=${m.input_lra}:measured_thresh=${m.input_thresh}`
+      + `:offset=${m.target_offset}:linear=true`;
+  } catch { return NORM_ONE_PASS; }
+};
 
-aParts.push(`[bed]${aNames.join('')}amix=inputs=${aNames.length + 1}:duration=first:dropout_transition=0,`
-  /* Normalised to the loudness the platforms play at.
-     Measured on the first finished cut: −33,6 LUFS integrated, about twenty
-     decibels under the ~−14 LUFS TikTok, Reels and Shorts normalise to. In a
-     feed that is either silent next to everything around it, or the platform
-     lifts it and brings the noise floor up with it. The limiter stays: loudnorm
-     sets the level, it does not stop a transient. */
-  + `loudnorm=I=-14:TP=-1.5:LRA=11,alimiter=limit=0.95,aresample=48000[aout]`);
+/* The level the platforms play at. TikTok, Reels and Shorts all normalise to
+   about −14 LUFS; under it the advert is silent next to everything around it,
+   over it they pull it back down. The limiter stays either way — loudnorm sets
+   the level, it does not stop a transient. */
+const NORM_ONE_PASS = 'loudnorm=I=-14:TP=-1.5:LRA=11';
+
+const primary = audioFor(SOUNDS_WANTED[0], nInputs, measured(SOUNDS_WANTED[0]));
+nInputs = primary.next;
+const aInputs = primary.inputs;
+const aParts = primary.parts;
+console.log(`\n🔊 sound`);
+for (const l of soundReport(primary.planned, primary.profile)) console.log(l);
 
 // ── Render ──────────────────────────────────────────────────────────────────
 const filter = [...parts, ...aParts].join(';');
@@ -847,8 +911,31 @@ ff([...inputs, ...aInputs,
   '-t', total.toFixed(3),
   OUT], 'render');
 
+/* The other profiles.
+ *
+ * The VIDEO is copied, not re-encoded: "the same video with a different sound
+ * profile" has to mean the same video, and re-rendering it four times would
+ * give four files that differ in the encoder's noise as well as in the mix.
+ * Only the audio graph is rebuilt, and `-c:v copy` puts the identical stream
+ * beside it. */
+const extras2 = [];
+for (const id of SOUNDS_WANTED.slice(1)) {
+  const a = audioFor(id, 0, measured(id));
+  const file = path.join(IN, `${PUBLISHABLE ? '' : 'preview-'}${stem}-${id}.mp4`);
+  console.log(`\n🔊 ${a.profile.name}`);
+  for (const l of soundReport(a.planned, a.profile)) console.log(l);
+  ff([...a.inputs.map((x, k) => (k % 2 ? x : x)), '-i', OUT,
+    '-filter_complex', a.parts.join(';'),
+    '-map', `${a.next}:v`, '-map', '[aout]',
+    '-c:v', 'copy', '-movflags', '+faststart',
+    '-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '-ac', '2',
+    '-t', total.toFixed(3), file], `remux ${id}`);
+  extras2.push(file);
+}
+
 const size = fs.statSync(OUT).size;
 console.log(`\n✅ ${OUT}`);
+for (const f of extras2) console.log(`   ${path.basename(f)}`);
 console.log(`   ${total.toFixed(1)}s · ${W}×${H} · ${(size / 1048576).toFixed(1)} MB`);
 console.log(`   source recording: ${duration ? `${duration.toFixed(1)}s` : 'unknown'} of a real purchase`);
 console.log(`   payment: ${manifest.payment}${manifest.realPayment ? '' : ' (TEST — do not caption this as a live sale)'}\n`);
