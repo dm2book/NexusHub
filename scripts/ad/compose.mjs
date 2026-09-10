@@ -33,6 +33,7 @@ import { HOOKS, hookById, hookBlockedReason } from './hooks.mjs';
 import { conceptById } from './concepts.mjs';
 import { CUTS, cutById } from './cuts.mjs';
 import { renderCaptions } from './captions.mjs';
+import { gatherEvidence, validateLines, validateText, report } from './claims.mjs';
 
 const require = createRequire(import.meta.url);
 let FFMPEG; let FFPROBE;
@@ -310,6 +311,48 @@ if (variant) {
   }
 }
 
+/* ── The claim gate ─────────────────────────────────────────────────────────
+ * Everything above resolves TOKENS. This checks what the words actually say.
+ *
+ * A caption with no tokens in it — "4.9/5, 24/7 support, instant delivery" —
+ * passes fill() untouched, because there is nothing in it to resolve. Until
+ * this gate the only thing that ever caught a line like that was a test
+ * grepping a hardcoded list of source files, which never saw `--cta=`,
+ * `--tagline=` or `--name=` at all.
+ *
+ * Unproven claims are rewritten to a form the evidence supports, or the line
+ * goes. Both are printed: a layer that silently edits an advert is one nobody
+ * knows is there. */
+const evidence = gatherEvidence({
+  product: { ...manifest.product, instant: extras.instant, deliveryLine: tokens.delivery },
+  extras,
+  /* The one review this cut may quote, so its stars are judged against the row
+     they came from rather than against a shop average that does not exist. */
+  review: extras.review,
+  // The shop's own figures, read off the site that was filmed — see record.mjs.
+  stats: extras.stats,
+  /* This recording's own payment → code gap, already refused by variants.mjs on
+     anything but a real payment. */
+  measuredSeconds: tokens.deliverySeconds === null ? null : Number(tokens.deliverySeconds),
+  observations: extras.observations, suppliers: extras.suppliers, support: extras.support,
+  lang: variant?.lang || arg('lang', 'en'),
+});
+{
+  const checked = validateLines(capLines, evidence);
+  const lines = report(checked);
+  if (lines.length) {
+    console.log(`\n⚖  claims: ${checked.rewritten.length} rewritten, ${checked.dropped.length} dropped`);
+    for (const l of lines) console.log(l);
+  }
+  capLines.length = 0;
+  capLines.push(...checked.lines);
+}
+/* The corner tag is command-line text and had never been checked by anything. */
+const ctaChecked = validateText(variant?.cta || CTA_TEXT, evidence);
+if (ctaChecked.changed) {
+  console.log(`\n⚖  call to action: ${ctaChecked.dropped ? 'dropped' : `"${ctaChecked.text}"`}`);
+}
+
 const caps = capLines.length
   ? await renderCaptions({
     lines: capLines,
@@ -544,7 +587,7 @@ const whipExpr = flashes
  * not repeated. It ends when the end card starts, which says the same thing
  * bigger.
  */
-const ctaText = variant?.cta || CTA_TEXT;
+const ctaText = ctaChecked.text;      // checked, not as typed — see the claim gate
 const bodyEnd = cuts.reduce((a, c) => a + c.played, 0);
 const tagFrom = Math.min(cuts[0]?.played ?? 1.5, 2.2);
 const tagFile = path.join(IN, 'cta-tag.png');
