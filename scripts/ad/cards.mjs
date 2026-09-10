@@ -18,6 +18,7 @@
 import { chromium } from 'playwright-core';
 import fs from 'node:fs';
 import path from 'node:path';
+import { gatherEvidence, validateText } from './claims.mjs';
 
 const arg = (k, d = null) => {
   const hit = process.argv.find((a) => a.startsWith(`--${k}=`));
@@ -25,10 +26,32 @@ const arg = (k, d = null) => {
 };
 
 const OUT = path.resolve(arg('out') || path.join('scripts', 'ad', 'out', 'cards'));
-const NAME = arg('name', 'Game top-ups');
+
+/* ── The claim gate ─────────────────────────────────────────────────────────
+ * The end card and the corner tag are the most-seen text this toolkit
+ * produces, and they were the least checked: they arrive on the command line
+ * as `--tagline=` and `--cta=` and go straight onto a PNG. Nothing between
+ * a typed "Instant delivery, 24/7 support" and a burnt-in frame.
+ *
+ * Card copy is AUTHORED rather than generated, so an unproven claim is not
+ * quietly dropped here — the run stops and says which words and what would
+ * have proved them. Somebody typed it; somebody can fix it. */
+const said = (label, text, { required = false } = {}) => {
+  const r = validateText(text, gatherEvidence({ lang: arg('lang', 'en') }));
+  if (!r.changed) return text;
+  console.error(`\n✖ ${label}: ${r.findings.filter((f) => !f.proven)
+    .map((f) => `${f.label} — ${f.proof}`).join('; ')}`);
+  if (r.dropped || required) {
+    console.error(`   "${text}"\n   Nothing this shop can show proves it. Change the copy.\n`);
+    process.exit(1);
+  }
+  console.error(`   "${text}" → "${r.text}"\n`);
+  return r.text;
+};
+const NAME = said('--name', arg('name', 'Game top-ups'));
 const PRICE = arg('price', '');
-const CTA = arg('cta', 'forgemarket.nl');
-const TAGLINE = arg('tagline', 'Game top-ups & gift cards');
+const CTA = said('--cta', arg('cta', 'forgemarket.nl'), { required: true });
+const TAGLINE = said('--tagline', arg('tagline', 'Game top-ups & gift cards'));
 const BASE = (arg('base') || 'http://localhost:5000').replace(/\/+$/, '');
 const CHROME = arg('chrome') || process.env.AD_CHROME
   || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';

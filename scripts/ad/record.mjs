@@ -539,6 +539,17 @@ if (product.kind === 'mystery') {
     if (won?.label) extras.mystery = { label: won.label, credit: won.credit ?? won.credit_cents ?? null };
   } catch { /* no prize read: variant H skips itself */ }
 }
+/* The shop's own figures, so a claim that IS provable can be proven.
+   /api/social/stats is computed from the orders table and the published
+   reviews and returns nulls until there are some — which is the honest state
+   today, and exactly what the claim gate needs to refuse a rating. Absent
+   means not proven, so a shop that does not serve this endpoint simply gets a
+   quieter advert. */
+try {
+  const stats = await api('/api/social/stats');
+  if (stats && typeof stats === 'object') extras.stats = stats;
+} catch { /* no stats: every statistical claim stays unproven, which is right */ }
+
 fs.writeFileSync(path.join(OUT, 'extras.json'), JSON.stringify(extras, null, 2));
 
 console.log(`\n✅ ${path.join(OUT, 'raw.webm')}`);

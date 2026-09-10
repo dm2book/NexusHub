@@ -533,6 +533,101 @@ output file (`ad-K-performance-<id>.mp4`), and `needs` is the whole gate:
 Every token the lines render must appear in `needs`; `server/test/ad-hooks.test.mjs`
 fails otherwise, and also fails any hook carrying a hard-coded figure.
 
+## The claim gate
+
+Every line of text goes through `scripts/ad/claims.mjs` before it reaches a
+frame. A claim is allowed only when the evidence proves it; when the data is
+missing it is rewritten to a form that IS provable, or the line is dropped.
+
+    node scripts/ad/claims.mjs                       # what may be claimed, and what proves it
+    node scripts/ad/claims.mjs "4.9/5 — 24/7 support"
+
+| claim | proven by |
+|---|---|
+| a star rating (`4.9/5`, `★★★★★`) | the average of the shop's published reviews — or, for a run of stars, the one review being quoted |
+| support around the clock (`24/7`) | a staffed rota, off unless configured |
+| instant delivery | the product's own instant flag: auto-delivery **and** a code on the shelf |
+| a delivery time (`under 60 seconds`) | a measured delivery — this recording's own gap, or the shop's average |
+| a price comparison (`cheapest`, `lowest price`) | `market_observations` — a competitor price actually observed |
+| how many people have bought (`thousands of customers`) | the orders table |
+| a supplier network | an active supplier the shop actually buys from |
+
+### Why a layer and not another banned-word list
+
+The toolkit already refused to lie in two ways and both share one blind spot.
+`fill()` drops a caption whose **token** has no real value, and `blockedReason()`
+refuses a variant whose **needs** are unmet — so a line saying `{price}` is safe.
+Neither looks at a line containing no tokens at all:
+
+```js
+{ at: 'buy', text: '4.9/5 — 24/7 support, instant delivery' }
+```
+
+passes both untouched, because there is nothing in it to resolve. The only thing
+that ever caught a string like that was `honest-copy.test.mjs` grepping a
+**hardcoded list of files** — so a new file was invisible until somebody
+remembered it (`cuts.mjs` was, for exactly one round), and `--cta=`,
+`--tagline=` and `--name=` were never seen at all, because those arrive on the
+command line and go straight onto a card.
+
+This is a gate on the **rendered text**, after the tokens are filled and after
+the command line has had its say.
+
+### Neutral, or nothing
+
+Which one it is belongs to the claim, not to a preference:
+
+| written | rendered |
+|---|---|
+| `24/7 support` | `support` — the hours come off, the sentence stands |
+| `Vragen? 24/7 support via Discord.` | `Vragen? support via Discord.` |
+| `Instant delivery on every order` | the shop's own delivery sentence for that product |
+| `Geleverd in 20 seconden` | the same |
+| `4.9/5 from real buyers` | *dropped* — a rating you do not have has no quieter form |
+| `The cheapest Robux anywhere` | *dropped* — a comparison with nothing to compare against |
+| `Thousands of customers` | *dropped* |
+
+A replacement is checked again before it is used, so the layer cannot swap one
+unproven claim for another and call it progress. And nothing is softened into a
+vaguer version of the same promise: "instant delivery" does not become "fast
+delivery", it becomes the sentence the shop already shows on that product page.
+
+Both are printed. A layer that silently edits an advert is one nobody knows is
+there:
+
+    ⚖  claims: 2 rewritten, 1 dropped
+       ↻ "24/7 support" → "support"  (support around the clock — not proven)
+       ↻ "Geleverd in 20 seconden" → "Verstuurd zodra je betaling binnen is"
+       ✗ "De goedkoopste Robux" dropped — a price comparison: market_observations
+
+Card copy is treated differently: `--cta=`, `--tagline=` and `--name=` are
+**authored**, so `cards.mjs` stops the run and names what would have proved the
+claim, rather than quietly editing something a person typed.
+
+### Absent means not proven
+
+Every default is "not proven", so every bug in this layer fails towards a
+quieter advert rather than a bolder one. That is not a slogan — it is the thing
+that went wrong first:
+
+> `Number(null)` is `0`, and `0` is not "missing", it is the strongest possible
+> evidence. A recording with no measured delivery arrived as "0 seconds" and
+> **proved** *"in under 60 seconds"*, because zero is under sixty.
+
+It was found by rendering an advert, not by testing `gatherEvidence()` — the
+no-argument case was fine (`Number(undefined)` is `NaN`), which is exactly why a
+unit test on the gatherer alone did not see it. There is now a test for every
+spelling of absent.
+
+### Where the evidence comes from
+
+`record.mjs` reads `/api/social/stats` off the shop it is filming — computed
+from the orders table and the published reviews, and returning nulls until there
+are some. A shop that does not serve it simply gets a quieter advert. Today that
+endpoint says: 0 completed orders, 0 published reviews, nobody on a rota; and
+`market_observations` is empty. Which is why, right now, five of the seven
+claims above cannot be made at all.
+
 ## What makes a cut publishable
 
 Two things put text on screen that must never reach a feed, and neither is a
