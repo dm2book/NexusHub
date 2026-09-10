@@ -156,16 +156,20 @@ console.log('\n— The sound follows the beats —');
   for (const s of ['click', 'whoosh', 'notify', 'confirm', 'whip', 'impact', 'bed']) {
     ok(`${s} is generated`, new RegExp(`\\b${s}:`).test(sfxSrc) || s === 'bed');
   }
+  /* The placement moved out of compose into sound.mjs, which names the seven
+     moments once and schedules them. These ask the catalogue rather than the
+     loop that used to do it inline. */
+  const { CUES } = await import(join(ROOT, 'scripts/ad/sound.mjs'));
   ok('a thrown cut gets the whip, an ordinary one the whoosh',
-    /sfx\(thrown \? 'whip' : 'whoosh'\)/.test(compose));
-  ok('the payment beat has a confirmation sound', /if \(c\.confirm\) place\(sfx\('confirm'\)/.test(compose));
+    CUES.throw.sound === 'whip' && CUES.transition.sound === 'whoosh');
+  ok('the payment beat has a confirmation sound', CUES.payment.sound === 'confirm'
+    && /if \(c\.confirm\) add\('payment'/.test(read('scripts/ad/sound.mjs')));
   ok('…and the variant marks which scene that is',
     V.scenes.some((s) => s.confirm));
   ok('the email arrival keeps its notification sound',
-    /if \(c\.notify\) place\(sfx\('notify'\)/.test(compose)
-    && V.scenes.some((s) => s.notify));
-  ok('every sound the graph asks for is on the required list',
-    /const need = \['click', 'whoosh', 'notify', 'impact', 'confirm', 'whip', 'bed'\]/.test(compose));
+    CUES.email.sound === 'notify' && V.scenes.some((s) => s.notify));
+  ok('every sound the graph asks for is generated',
+    /const need = \[\.\.\.new Set\(Object\.values\(CUES\)\.map\(\(c\) => c\.sound\)\), 'bed'\]/.test(compose));
   ok('the mix is normalised to what the platforms play at',
     /loudnorm=I=-14:TP=-1\.5:LRA=11/.test(compose));
 }

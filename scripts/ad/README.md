@@ -702,6 +702,84 @@ endpoint says: 0 completed orders, 0 published reviews, nobody on a rota; and
 `market_observations` is empty. Which is why, right now, five of the seven
 claims above cannot be made at all.
 
+## Sound design
+
+Seven moments, planned against the resolved edit and then scheduled — so the
+sound is timed to the picture by construction rather than by two files agreeing
+about seconds.
+
+| moment | sound |
+|---|---|
+| cursor click | `click` |
+| product selection | `select` — a soft note, the answer to the click |
+| transition | `whoosh`, or `whip` on a cut the edit throws |
+| payment success | `confirm` |
+| email arrival | `notify` |
+| code reveal | `impact` |
+| the call to action | `tail` — half the weight, a full stop rather than a second climax |
+
+    node scripts/ad/sound.mjs                    # the profiles and the moments
+    node scripts/ad/make-ad.mjs … --sound=premium
+    node scripts/ad/make-ad.mjs … --sounds=all   # four mixes of one video
+
+### Supporting, not irritating, is a rule the code enforces
+
+Two things, both because of what this recording actually does:
+
+- **Nothing may land on top of anything.** A cue within a profile's `minGap` of
+  a louder-meaning one is **dropped** — not ducked, because ducked it is still
+  smearing the transient it sits on.
+- **Clicks are rate-limited.** The checkout fires three inside one second and
+  all three is a rattle.
+
+Priority decides who survives, and it is not loudness. A click is the loudest
+thing in the checkout and the first to go, because it is texture. Transitions
+and throws outrank it — the picture visibly cuts and smears there, and a thrown
+cut whose whip got evicted by a chime is a visible throw with no sound. The
+three the viewer is waiting for — money clearing, mail landing, code arriving —
+never lose one.
+
+### Four mixes of the same seven moments
+
+| profile | | |
+|---|---|---|
+| `gaming` | bright and punchy, every beat marked | bed 0.34, gap 0.12s, 4 clicks/s |
+| `premium` | restrained and low; the interface stops narrating itself | bed 0.22, gap 0.24s, 1 click/s |
+| `minimal` | the four moments that carry meaning, silence between them | no bed, gap 0.35s, no clicks |
+| `high-energy` | everything, loud, close together | bed 0.42, gap 0.08s, 6 clicks/s |
+
+They are *profiles*, not four adverts: the cue plan is built once and each
+profile only decides what survives it, how loud, and at what pitch. None of them
+moves a beat.
+
+`--sounds=all` renders the video **once** and copies the stream for the other
+three — "the same video with a different sound profile" has to mean the same
+video, and re-rendering would give four files differing in the encoder's noise
+as well as in the mix. Verified: one video MD5, four audio MD5s.
+
+### The mix is measured, not hoped at
+
+Three defects found by metering the finished files rather than by reading the
+filtergraph:
+
+| | measured | after |
+|---|---|---|
+| `minimal` | **−33.0 LUFS**, peak −24.1 dBFS | −13.5 LUFS, −4.5 dBFS |
+| `premium` | peak **+0.2 dBFS** — clipping, with TP set to −1.5 | −0.5 dBFS |
+| all four | got *louder* when the limiter was lowered | −13.4 to −13.8 LUFS |
+
+- **loudnorm runs in two passes.** Single-pass estimates as it goes, and a
+  twelve-second mix that is mostly silence between transients is exactly where
+  the estimate fails. `linear=true` applies one gain, which keeps a sparse mix
+  sparse instead of pumping it up out of its own silence.
+- **`alimiter` gets `level=disabled`.** It auto-levels its output *up* to the
+  limit by default, so it had been quietly undoing loudnorm and delivering
+  whatever the limit was — which is why lowering the limit made the files
+  louder. Disabled, it only ever reduces.
+- **The ceiling is 0.85, not 0.95.** alimiter limits the *sample* peak; every
+  platform re-encodes to a lossy codec and that adds inter-sample overshoot on
+  top.
+
 ## What makes a cut publishable
 
 Two things put text on screen that must never reach a feed, and neither is a
@@ -794,6 +872,7 @@ overwrites that one only.
 |---|---|---|
 | `--target=20` | 20 | seconds to aim for; the result lands 15–25 |
 | `--cuts=` | — | `all`, `list`, or ids — ten cuts of one purchase |
+| `--sound=` `--sounds=` | gaming | a mix, or `all` for four of one video |
 | `--image=` | from the product | the artwork the hero and cards are drawn from |
 | `--hooks=` | — | `all`, `list`, or ids — one advert per opening, from one take |
 | `--variant=stopwatch` | — | the timed cut; needs a delivery in the footage |

@@ -88,6 +88,25 @@ const SOUNDS = {
       + " + 0.40*exp(-max(t-0.08,0)*9)*sin(2*PI*988*max(t-0.08,0))*gt(t,0.08)"
       + " + 0.34*exp(-max(t-0.17,0)*7)*sin(2*PI*1318*max(t-0.17,0))*gt(t,0.17)",
   },
+  /* The product landing.
+     A single soft note, a fifth above the click that preceded it — the sound a
+     good interface makes when a choice REGISTERS, as opposed to `confirm`,
+     which is the sound money makes. Deliberately quiet and short: this is the
+     one cue that fires while the viewer is still reading the screen, and a cue
+     that competes with reading is the definition of irritating. */
+  select: {
+    dur: 0.30,
+    expr: "0.30*exp(-t*13)*sin(2*PI*660*t) + 0.16*exp(-t*18)*sin(2*PI*1320*t)",
+  },
+  /* The last hit, under the end card.
+     `impact` moved to the code reveal, which is the beat the whole advert is
+     built to reach — and using the same big low hit again a second later made
+     the brand card feel like a second climax rather than a full stop. This is
+     half its weight and a third of its length: a period, not an exclamation. */
+  tail: {
+    dur: 0.45,
+    expr: "0.34*exp(-t*14)*sin(2*PI*98*t) + 0.16*exp(-t*22)*sin(2*PI*196*t)",
+  },
   /* A whip: a fast downward pitch sweep with noise, for a hard directional cut.
      Sharper and shorter than `whoosh` — a whoosh is a scene changing, a whip is
      the camera being thrown. Using the same sound for both makes every cut feel
