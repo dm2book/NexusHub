@@ -339,6 +339,7 @@ const NL = {
   'checkout.consentFirstShort': 'Nog één vinkje: de wet vraagt je akkoord voordat we direct mogen leveren.',
   'checkout.reviewFirst': 'Bevestig de levering om door te gaan',
   'nav.cart': 'Winkelwagen',
+  'launch.eyebrow': 'Opent',
   'launch.headline': 'ForgeMarket opent {when}',
   'launch.sub': 'Bekijk nu alles — de winkel gaat op die dag open voor bestellingen.',
   'launch.days': 'dagen',
