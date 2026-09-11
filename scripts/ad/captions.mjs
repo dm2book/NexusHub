@@ -117,6 +117,48 @@ const SLAB = `
      box-shadow:0 20px 60px rgba(0,0,0,.45),0 0 0 1px rgba(255,255,255,.08) inset;
      backdrop-filter:blur(2px)}`;
 
+/* The styles, and their geometry, as data.
+ *
+ * scoring a cut needs to know how big a caption is and where it sits — and the
+ * answer has to be the one that will actually be rendered, not a second copy of
+ * it in another file. So it is READ OUT of the CSS above rather than restated
+ * beside it: there is one place a caption's size is decided, and both the
+ * renderer and the scorer use it.
+ */
+export { STYLES };
+
+const px = (css, re) => { const m = re.exec(css || ''); return m ? Number(m[1]) : null; };
+
+/** Size and position of one caption style, in frame pixels. */
+export function styleMetrics(style) {
+  const css = STYLES[style];
+  if (!css) return null;
+  const wrap = /\.wrap\{([^}]*)\}/.exec(css)?.[1] || '';
+  const pad = /padding:\s*([^;}]+)/.exec(wrap)?.[1]?.trim().split(/\s+/) || [];
+  const n = (v) => Number(String(v || '').replace('px', '')) || 0;
+  /* CSS padding shorthand, properly: 1 value is all four, 2 is [tb lr], 3 is
+     [t lr b], 4 is [t r b l]. Read as "the fourth one, or the second" it made
+     `big` — padding:0 80px 620px — an 80px bottom offset instead of 620, which
+     would have scored every bottom caption as sitting in the platform's own
+     furniture. */
+  const bottom = pad.length >= 3 ? n(pad[2]) : pad.length === 2 ? n(pad[0]) : n(pad[0]);
+  const top = /align-items:\s*flex-start/.test(wrap);
+  return {
+    style,
+    anchor: top ? 'top' : 'bottom',
+    offset: top ? n(pad[0]) : bottom,
+    fontSize: px(css, /\.t\{[^}]*font-size:(\d+)px/),
+    subSize: px(css, /\.sub\{[^}]*font-size:(\d+)px/),
+    /* Whether the style draws its OWN plate. Every style also gets SLAB
+       prepended by the renderer, so "is there a plate" is always yes — this is
+       the narrower question of which ones did not need it. */
+    ownPlate: /\.t\{[^}]*background:/.test(css),
+  };
+}
+
+/** Every style, measured. */
+export const allStyleMetrics = () => Object.keys(STYLES).map(styleMetrics);
+
 export async function renderCaptions({ lines, out, base, chrome }) {
   fs.mkdirSync(out, { recursive: true });
   /* --default-background-color=00000000 is what actually makes

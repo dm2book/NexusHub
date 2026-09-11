@@ -683,6 +683,11 @@ export const VARIANTS = [
       { at: 'checkout', text: 'Geen account nodig', style: 'small' },
       { at: 'payment', text: 'Betaald', style: 'small' },
       { at: 'the email', text: 'Je bestelling van ForgeMarket', sub: 'in je inbox', style: 'notify' },
+      /* The closing line. Its absence was found by scoring this variant against
+         its own toolkit: the cut ended on the code with nothing said, which
+         costs three of eight on the call to action and leaves the last thing a
+         viewer reads three seconds behind the last thing they see. */
+      { at: 'the code', text: '{name}. Geleverd.', style: 'big' },
     ],
     cta: 'forgemarket.nl',
     needs: ['name', 'price', 'order', 'delivery'],

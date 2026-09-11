@@ -702,6 +702,83 @@ endpoint says: 0 completed orders, 0 published reviews, nobody on a rota; and
 `market_observations` is empty. Which is why, right now, five of the seven
 claims above cannot be made at all.
 
+## Scoring
+
+Every cut is scored out of 100 on nine dimensions, from its **plan** — no
+rendering needed. That is what makes "the best three for this product" cheap:
+score twenty-three, render three.
+
+    node scripts/ad/make-ad.mjs --sku=STEAM-10 --out=… --score      # rank them all
+    node scripts/ad/make-ad.mjs --sku=STEAM-10 --out=… --score=M    # one, in full
+    node scripts/ad/make-ad.mjs --sku=STEAM-10 --out=… --best=3     # render the top three
+
+| dimension | weight | measured from |
+|---|---|---|
+| hook strength | 16 | when the first line lands, whether the product is **shown** or only named |
+| product clarity | 14 | the name on screen, how early, at what type size, whether the shop's artwork is used |
+| pacing | 14 | the resolved edit: total length, cuts per second, longest shot, share of scenes moving |
+| factual accuracy | 12 | the claim gate — **pass or rejected** |
+| price clarity | 10 | on screen, given a moment of its own, not sharing the beat it is first said on |
+| visual hierarchy | 10 | caption anchors and sizes: two lines on one edge of one scene is a collision |
+| trust | 10 | address on screen, an end card, the money clearing, no promise kept by hand |
+| CTA | 8 | a closing line, an end card held long enough to read, the address last |
+| mobile readability | 6 | caption sizes and the platforms' bottom 420px, read out of the styles themselves |
+
+### Every point is a measurement; the weights are the judgement
+
+A score is the easiest thing in this repository to fake — nine dimensions and a
+number out of a hundred looks like rigour whether or not anything was counted.
+So every point comes from something the toolkit already computes: the resolved
+edit from `timing.mjs`, the caption geometry from `captions.mjs`, the claim gate
+from `claims.mjs`. The **weights** are the one judgement, they are in a single
+table, and every dimension reports what it measured beside what it scored — so a
+disagreement is about the weighting, not about the facts.
+
+### An unproven claim is rejected, not marked down
+
+```
+var ZZ  careless  REJECTED - unproven: a price comparison, a star rating,
+                             how many people have bought, support around the clock
+```
+
+Rejected scores **zero**, carries no dimensions, and can never be picked however
+good the other eight are. The claim layer rewrites what it can before this;
+anything reaching the scorer unproven is something no neutral wording existed
+for. `unbuildable` is a different answer — a variant quoting a review this shop
+has not got is not dishonest, it is impossible.
+
+### It has to actually rank
+
+The first version scored **eight different cuts at 98/100**, which is a ranking
+that ranks nothing. The fault was scoring *named* and *shown* the same: a caption
+naming the product over a screen recording of a browser is a sentence to read;
+the artwork full-frame is a thing to recognise. That one point is now the
+heaviest in the scorer, and the spread went from 2 points to 39.
+
+On the Steam Wallet €10 recording:
+
+```
+var M   product-first       98/100  12s
+cut F   product             85/100  10.1s
+cut A   ultra-fast          82/100  8.3s
+
+7 more tied at 82: balanced, cinematic, price, checkout, email, watch-me-buy, performance
+Not broken by a coin toss — they prove the same things and differ only in pace.
+```
+
+**Ties are reported, not broken.** Eight cuts walk the same beats, prove the same
+things and differ only in pace. That they score the same is the true answer, and
+inventing a preference between them is the one thing this file must not do.
+
+### It scores its own toolkit
+
+Running it on the existing variants found two real faults in the one that won:
+the product-first cut ended on the code with **nothing said** — three of eight
+on the call to action, and the last thing a viewer reads three seconds behind
+the last thing they see — and the hook test only asked whether the *caption*
+named the product, scoring the one cut that puts the name and price full-frame
+as though it said neither. Both fixed.
+
 ## Sound design
 
 Seven moments, planned against the resolved edit and then scheduled — so the
@@ -873,6 +950,8 @@ overwrites that one only.
 | `--target=20` | 20 | seconds to aim for; the result lands 15–25 |
 | `--cuts=` | — | `all`, `list`, or ids — ten cuts of one purchase |
 | `--sound=` `--sounds=` | gaming | a mix, or `all` for four of one video |
+| `--score` `--score=<id>` | — | rank every cut against this recording |
+| `--best=3` | — | render the best N that can honestly be made |
 | `--image=` | from the product | the artwork the hero and cards are drawn from |
 | `--hooks=` | — | `all`, `list`, or ids — one advert per opening, from one take |
 | `--variant=stopwatch` | — | the timed cut; needs a delivery in the footage |

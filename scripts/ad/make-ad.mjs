@@ -35,6 +35,9 @@ import { HOOKS, hookById, eligibleHooks, hookBlockedReason } from './hooks.mjs';
 import { CONCEPTS, conceptById } from './concepts.mjs';
 /* Ten cuts of one purchase, composed from a pace and a focus — see cuts.mjs. */
 import { CUTS, cutById } from './cuts.mjs';
+/* Score every cut against this recording and render only the ones worth it. */
+import { rank, best, scorecard } from './score.mjs';
+import { gatherEvidence } from './claims.mjs';
 
 const arg = (k, d = null) => {
   const hit = process.argv.find((a) => a.startsWith(`--${k}=`));
@@ -54,7 +57,7 @@ const OUT = path.resolve(arg('out') || path.join('scripts', 'ad', 'out', slug));
    record.mjs grows a flag. */
 const MINE = new Set(['sku', 'product', 'base', 'target', 'out', 'name', 'price', 'cta',
   'tagline', 'variant', 'variants', 'concept', 'concepts', 'cut', 'cuts',
-  'sound', 'sounds']);
+  'sound', 'sounds', 'score', 'best']);
 const passthrough = process.argv.slice(2)
   .filter((a) => a.startsWith('--') && !MINE.has(a.slice(2).split('=')[0]));
 
@@ -91,8 +94,11 @@ if (!fs.existsSync(path.join('scripts', 'ad', 'sfx', 'notify.wav'))) {
  * produce quietly. */
 const alreadyRecorded = fs.existsSync(path.join(OUT, 'beats.json'))
   && fs.existsSync(path.join(OUT, 'raw.webm'));
-const REUSE = process.argv.includes('--reuse')
-  || !!(arg('hooks') || arg('hook') || arg('cuts') || arg('cut'));
+/* Scoring and picking the best both work off a recording that already exists —
+   that is the entire point of scoring from the plan. Neither should ever buy
+   something to answer a question about the edit. */
+const REUSE = process.argv.includes('--reuse') || process.argv.includes('--score')
+  || !!(arg('hooks') || arg('hook') || arg('cuts') || arg('cut') || arg('score') || arg('best'));
 
 if (REUSE && alreadyRecorded) {
   console.log(`\n♻  reusing the recording in ${OUT} — nothing is bought or filmed again`);
@@ -174,7 +180,62 @@ if (hooksArg === 'list') {
 const wantHooks = hooksArg === 'all' ? eligible.map((h) => h.id)
   : hooksArg.split(',').map((x) => x.trim()).filter(Boolean);
 
+/* 4d. Scoring.
+   Every cut is scored from its PLAN — no rendering needed — which is what makes
+   "the best three for this product" cheap: score twenty-three, render three.
+   An advert carrying a claim the shop cannot prove is rejected outright and
+   never reaches a file. */
+const at = (label) => manifest.beats.find((b) => b.label === label)?.atMs ?? null;
+const evidence = gatherEvidence({
+  product: { ...manifest.product, instant: extras.instant, deliveryLine: hookTokens.delivery },
+  extras, review: extras.review, stats: extras.stats, lang: arg('lang', 'nl'),
+});
+const ALL = [...VARIANTS, ...CUTS];
+const scoreCtx = { at, tokens: hookTokens, evidence };
+
+if (process.argv.includes('--score') || arg('score')) {
+  const rows = rank(ALL, scoreCtx);
+  const one = arg('score');
+  console.log(`\n📊 ${p.name} — ${rows.filter((r) => r.verdict === 'ok').length} of ${rows.length} can be made\n`);
+  for (const r of rows) {
+    if (one && one !== 'all' && r.id !== one && r.slug !== one) continue;
+    for (const l of scorecard(r, { detail: !!one })) console.log(l);
+  }
+  console.log('');
+  process.exit(0);
+}
+
+const BEST = Number(arg('best', '0')) || 0;
 const made = []; const skipped = [];
+
+if (BEST) {
+  const { picked, alsoTied, rejected } = best(ALL, scoreCtx, BEST);
+  console.log(`\n📊 best ${picked.length} of ${ALL.length} for ${p.name}\n`);
+  for (const r of picked) for (const l of scorecard(r, { detail: false })) console.log(l);
+  if (alsoTied.length) {
+    console.log(`\n   ${alsoTied.length} more tied at ${picked.at(-1).total}: `
+      + `${alsoTied.map((r) => r.slug).join(', ')}`);
+    console.log('   Not broken by a coin toss — they prove the same things and differ only in pace.');
+  }
+  const refused = rejected.filter((r) => r.verdict === 'rejected');
+  if (refused.length) {
+    console.log(`\n   ${refused.length} rejected for claims this shop cannot prove:`);
+    for (const r of refused) console.log(`   ✗ ${r.slug} — ${r.why}`);
+  }
+  for (const r of picked) {
+    console.log(`\n━━ ${r.id} · ${r.name} — ${r.total}/100`);
+    const flag = r.family === 'cut' ? `--cut=${r.id}` : `--variant=${r.id}`;
+    const res = spawnSync(process.execPath,
+      [path.join('scripts', 'ad', 'compose.mjs'), `--in=${OUT}`, flag, `--base=${BASE}`, ...SOUND],
+      { stdio: 'inherit' });
+    if (res.status === 0) {
+      made.push({ id: r.id, name: `${r.name} (${r.total}/100)`,
+        file: path.join(OUT, `ad-${r.family === 'cut' ? 'cut-' : ''}${r.id}-${r.slug}.mp4`) });
+    } else if (res.status === 2) skipped.push({ id: r.id, name: r.name });
+    else { console.error(`\n✖ ${r.id} failed to render.\n`); process.exit(1); }
+  }
+}
+
 
 /* 4c. The ten cuts.
    Same recording, same beats, same order — only the montage, the opening, the
@@ -195,7 +256,8 @@ if (cutsArg === 'list') {
 const wantCuts = cutsArg === 'all' ? CUTS.map((c) => c.id)
   : cutsArg.split(',').map((x) => x.trim()).filter(Boolean);
 
-if (wantCuts.length) {
+if (BEST) { /* already rendered above */ }
+else if (wantCuts.length) {
   console.log(`\n🎞  ${wantCuts.length} cut(s) of one purchase`);
   for (const id of wantCuts) {
     const c = cutById(id);
