@@ -57,7 +57,7 @@ const OUT = path.resolve(arg('out') || path.join('scripts', 'ad', 'out', slug));
    record.mjs grows a flag. */
 const MINE = new Set(['sku', 'product', 'base', 'target', 'out', 'name', 'price', 'cta',
   'tagline', 'variant', 'variants', 'concept', 'concepts', 'cut', 'cuts',
-  'sound', 'sounds', 'score', 'best']);
+  'sound', 'sounds', 'score', 'best', 'flagship']);
 const passthrough = process.argv.slice(2)
   .filter((a) => a.startsWith('--') && !MINE.has(a.slice(2).split('=')[0]));
 
@@ -98,6 +98,7 @@ const alreadyRecorded = fs.existsSync(path.join(OUT, 'beats.json'))
    that is the entire point of scoring from the plan. Neither should ever buy
    something to answer a question about the edit. */
 const REUSE = process.argv.includes('--reuse') || process.argv.includes('--score')
+  || process.argv.includes('--flagship')
   || !!(arg('hooks') || arg('hook') || arg('cuts') || arg('cut') || arg('score') || arg('best'));
 
 if (REUSE && alreadyRecorded) {
@@ -150,7 +151,12 @@ const want = [
    A hook the footage cannot support exits 2 and the batch carries on, exactly
    like a variant that cannot be made: a product with no published review should
    not cost you the eight other openings. */
-const hooksArg = arg('hooks') || arg('hook') || '';
+/* One command for the thing you actually want.
+   `--flagship` is the N template with every opening the recording can honestly
+   support: one purchase, ten adverts that share every frame after the first
+   second and none of the first. */
+const FLAGSHIP = process.argv.includes('--flagship');
+const hooksArg = FLAGSHIP ? 'all' : (arg('hooks') || arg('hook') || '');
 /* The same two side files compose reads, so a hook is judged against exactly
    the facts the advert would be built from. */
 const readSide = (f, d) => {
@@ -274,7 +280,11 @@ else if (wantCuts.length) {
 } else if (wantHooks.length) {
   /* One variant, many openings. Everything after the first two seconds is
      identical by construction — same recording, same cuts, same sound. */
-  const v = variantById(arg('variant') || 'K') || VARIANTS[0];
+  /* The variant that was asked for — cut, variant, or the flagship. It was
+     hardcoded to K, so `--variant=N --hooks=all` quietly rendered eight
+     openings of a different advert. */
+  const v = FLAGSHIP ? variantById('N')
+    : (cutById(arg('cut') || '') || variantById(arg('variant') || 'N') || VARIANTS[0]);
   console.log(`\n🪝 ${wantHooks.length} opening(s) · ${v.id} ${v.name}`);
   for (const id of wantHooks) {
     const h = hookById(id);
@@ -282,10 +292,14 @@ else if (wantCuts.length) {
     console.log(`\n━━ hook ${h.id} · ${h.type}`);
     const r = spawnSync(process.execPath,
       [path.join('scripts', 'ad', 'compose.mjs'),
-        `--in=${OUT}`, `--variant=${v.id}`, `--hook=${h.id}`, `--base=${BASE}`, ...SOUND,
+        `--in=${OUT}`, `--${v.family === 'cut' ? 'cut' : 'variant'}=${v.id}`,
+        `--hook=${h.id}`, `--base=${BASE}`, ...SOUND,
         ...(arg('target') ? [`--target=${TARGET}`] : [])],
       { stdio: 'inherit' });
-    if (r.status === 0) made.push({ id: h.id, name: h.type, file: path.join(OUT, `ad-${v.id}-${v.slug}-${h.id}.mp4`) });
+    if (r.status === 0) {
+      made.push({ id: h.id, name: h.type,
+        file: path.join(OUT, `ad-${v.family === 'cut' ? 'cut-' : ''}${v.id}-${v.slug}-${h.id}.mp4`) });
+    }
     else if (r.status === 2) skipped.push({ id: h.id, name: h.type });
     else { console.error(`\n✖ hook ${h.id} failed to render.\n`); process.exit(1); }
   }

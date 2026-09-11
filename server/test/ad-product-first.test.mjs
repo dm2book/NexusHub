@@ -194,12 +194,16 @@ console.log('— Nothing that already worked was disturbed —');
      Switching the overlays on by default would have quietly redressed twelve
      variants, ten cuts and seventy-five concepts composed without them. */
   ok('the product overlays are opt-in', /if \(variant\?\.productCard === true\)/.test(compose));
-  ok('…and no other variant opted in',
-    VARIANTS.filter((v) => v.productCard === true).length === 1);
+  /* Two now — this one and the flagship it became. Still two of fourteen,
+     which is the property: the overlays are opt-in, not a default that quietly
+     redressed everything composed without them. */
+  ok('…and only the flagship opted in as well',
+    VARIANTS.filter((v) => v.productCard === true).map((v) => v.id).join(',') === 'M,N'),
   ok('…nor any cut', CUTS.every((c) => c.productCard !== true));
   ok('the hero is off unless a variant asks',
-    VARIANTS.filter((v) => (v.hero ?? 0) > 0).length === 1 && CUTS.every((c) => !c.hero));
-  ok('every earlier variant still resolves', VARIANTS.length === 13 && !!variantById('K') && !!variantById('L'));
+    VARIANTS.filter((v) => (v.hero ?? 0) > 0).map((v) => v.id).join(',') === 'M,N'
+    && CUTS.every((c) => !c.hero));
+  ok('every earlier variant still resolves', VARIANTS.length === 14 && !!variantById('K') && !!variantById('L'));
   ok('and the price badge still lands on whichever scene asks for it',
     /const idx = cuts\.findIndex\(\(c\) => c\.price\)/.test(compose));
 }

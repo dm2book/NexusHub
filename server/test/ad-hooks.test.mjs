@@ -251,8 +251,13 @@ console.log('\n— One recording, many openings —');
 
 console.log('\n— Nothing that already worked was disturbed —');
 {
-  ok('the performance variant is still the default for a hook batch',
-    /variantById\(arg\('variant'\) \|\| 'K'\)/.test(makeAd));
+  /* The default moved from K to the flagship, which is what a hook batch is
+     for. Hardcoded to K, `--variant=N --hooks=all` quietly rendered eight
+     openings of a different advert. */
+  ok('a hook batch defaults to the flagship',
+    /variantById\(arg\('variant'\) \|\| 'N'\)/.test(makeAd));
+  ok('…and honours whatever was actually asked for',
+    /cutById\(arg\('cut'\) \|\| ''\) \|\| variantById\(arg\('variant'\)/.test(makeAd));
   ok('the variants still resolve', !!variantById('performance') && !!variantById('A'));
   ok('their own hooks are untouched', variantById('performance').hook.includes('{name}'));
   ok('and --variants= still builds variants, not hooks',
