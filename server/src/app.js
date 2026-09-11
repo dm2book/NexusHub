@@ -35,6 +35,7 @@ import seoRoutes from './routes/seo.js';
 import socialRoutes from './routes/social.js';
 import imageRoutes from './routes/images.js';
 import adminRoutes from './routes/admin/index.js';
+import { noteServedHost } from './services/servedHostService.js';
 
 let readyPromise = null;
 /**
@@ -143,6 +144,18 @@ export function createApp({ lazyReady = false } = {}) {
   // (isSafeImageValue) still caps the actual data URI below this.
   app.use(express.json({ limit: '3mb' }));
   app.use(cookieParser());
+
+  /* Record the hostname this request came in on.
+     `config.appUrl` is what every canonical, the sitemap, the CORS origin and
+     every email link is built from, and nothing verified it was the host buyers
+     actually arrive on. The server is the only thing that can know — it is the
+     only thing that sees the Host header — so it writes it down and the launch
+     check compares. Debounced to once per host per six hours, and never allowed
+     to fail a request. See servedHostService for how little it is trusted. */
+  app.use((req, _res, next) => {
+    noteServedHost(req.hostname || req.headers.host);
+    next();
+  });
 
   /* On serverless, make sure the schema exists before handling API traffic —
      with one exception, which the outage of 26 August is the argument for.
