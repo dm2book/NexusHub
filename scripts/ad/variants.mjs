@@ -214,6 +214,24 @@ export const S = {
      reveals the brief asks for: the card, then the price. */
   mProduct: { from: 'product', to: 'buy', speed: 2.0, weight: 2.0, zoom: 'in', label: 'the product', settle: 0.35 },
   mPrice: { from: 'buy', to: 'checkout', speed: 2.4, weight: 1.0, zoom: 'punch', label: 'buy', price: true, blur: true },
+
+  /* ── The flagship grammar ─────────────────────────────────────────────────
+     The same seven beats, weighted for ten seconds rather than twelve, with
+     every scene forced to average its frames. Ten is where a performance cut
+     lives: long enough that the payment and the code are both legible, short
+     enough that the whole thing plays twice before a thumb moves.
+
+     Every ceiling is high and every weight small, which is what makes the
+     BUDGET run out before the ceilings do — the difference between a cut that
+     is moving throughout and one that spends a third of itself on a page that
+     is not changing. */
+  fProduct: { from: 'product', to: 'buy', speed: 2.6, weight: 1.4, zoom: 'in', label: 'the product', settle: 0.35, blur: true },
+  fBuy: { from: 'buy', to: 'checkout', speed: 3.0, weight: 0.9, zoom: 'punch', label: 'buy', price: true, blur: true },
+  fCheckout: { from: 'checkout', to: 'order-placed', speed: 3.6, weight: 0.9, zoom: 'in', label: 'checkout', blur: true },
+  fPay: { from: 'order-placed', to: 'delivery', speed: 5.5, weight: 0.9, zoom: 'punch', label: 'payment', confirm: true, blur: true },
+  fMail: { from: 'delivery', to: 'email-open', speed: 3.0, weight: 0.8, zoom: 'in', label: 'delivered', blur: true },
+  fArrive: { from: 'email-open', to: 'email-detail', speed: 1.5, weight: 1.3, zoom: 'punch', label: 'the email', notify: true },
+  fReveal: { from: 'email-detail', to: 'end', speed: 1.2, weight: 1.8, zoom: 'focus', label: 'the code' },
 };
 
 /**
@@ -687,6 +705,72 @@ export const VARIANTS = [
          its own toolkit: the cut ended on the code with nothing said, which
          costs three of eight on the call to action and leaves the last thing a
          viewer reads three seconds behind the last thing they see. */
+      { at: 'the code', text: '{name}. Geleverd.', style: 'big' },
+    ],
+    cta: 'forgemarket.nl',
+    needs: ['name', 'price', 'order', 'delivery'],
+  },
+  {
+    id: 'N',
+    slug: 'flagship',
+    name: 'Flagship (NL)',
+    lang: 'nl',
+    /*
+     * THE flagship. One template, for TikTok, Reels and Shorts.
+     *
+     * Not a fourteenth idea — the assembly of everything the previous six
+     * rounds measured, in the shape a performance team would ship:
+     *
+     *   9:16, ten seconds     inside the 8–12 the brief asks for, and where a
+     *                         cut plays twice before a thumb moves
+     *   the first second      the shop's own artwork, name and price
+     *                         full-frame, pushing in (round: product-first)
+     *   real everything       the product row, the real price, the real
+     *                         checkout, the real payment, the real mail and
+     *                         the real code — it is one recorded purchase
+     *   motion blur           blurAt 1.6 and every scene forcing it, after a
+     *                         cut was measured applying it zero times
+     *   transitions           three thrown cuts, the rest flashed; the throw
+     *                         lands ON the cut and the whoosh leads it
+     *   cursor tracking       record.mjs glides the pointer along its path
+     *   sound design          the gaming profile by default, and the same
+     *                         video remixes four ways without moving a beat
+     *   a real CTA            the address from the second scene, a closing
+     *                         line on the code, and an end card held to read
+     *
+     * And it is the one built to be RE-OPENED. Its hook is swapped from the
+     * catalogue (`--hooks=all`), so one purchase recording becomes ten adverts
+     * that share every frame after the first second and none of the first.
+     *
+     * Ten rather than twelve: the product-first cut proved the structure at
+     * twelve, and the same beats at ten spend a fifth less time on the parts
+     * nobody is waiting for without losing one of them.
+     */
+    target: 10,
+    card: 1.2,
+    hero: 1.0,
+    productCard: true,
+    zoomScale: 3,
+    blurAt: 1.6,
+    /* 0 is the cut out of the hero, 2 the throw into the checkout, 5 the throw
+       into the mail landing. Counted over the whole body, and the hero is the
+       first thing in it. */
+    whipAt: [0, 2, 5],
+    sound: 'gaming',
+    /* The three platforms this is cut for. Their furniture differs — TikTok
+       eats the bottom ~420px, Reels rather less, Shorts less again — so the
+       geometry everywhere in this toolkit is TikTok's, which clears all three. */
+    platforms: ['tiktok', 'reels', 'shorts'],
+    scenes: [S.fProduct, S.fBuy, S.fCheckout, S.fPay, S.fMail, S.fArrive, S.fReveal],
+    /* The default opening. Replaced by any of the catalogue's — that is what
+       this template is for — and deliberately NOT the name or the price,
+       because the hero has just shown both at 104 and 128px. */
+    hook: 'Van klik tot code.',
+    hookStyle: 'big',
+    captions: [
+      { at: 'checkout', text: 'Geen account nodig', style: 'small' },
+      { at: 'payment', text: 'Betaald', style: 'small' },
+      { at: 'the email', text: 'Je bestelling van ForgeMarket', sub: 'in je inbox', style: 'notify' },
       { at: 'the code', text: '{name}. Geleverd.', style: 'big' },
     ],
     cta: 'forgemarket.nl',

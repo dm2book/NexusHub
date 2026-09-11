@@ -275,14 +275,22 @@ if (ART) {
         <div class="ctext"><div class="cname">${esc(NAME)}</div></div>
       </div>
     </div>`, `
-    .cwrap{height:100%;display:flex;align-items:flex-start;justify-content:center;padding:220px 170px 0}
+    /* 120 from the top and 200 in from each side, not 220/170.
+       The catalogue hooks carry a second line, and the tallest of them — a
+       two-line headline over a two-line sub — runs y 937 to 1344. Measured with
+       rows.mjs, the card at its old size ended at 1076 and printed straight
+       through it, which is exactly the collision this same tool caught once
+       before. Ending around 790 clears the worst hook by 150px — enough that
+       the 40px the card RISES through on its way in does not eat the gap,
+       which a 22px clearance would have. */
+    .cwrap{height:100%;display:flex;align-items:flex-start;justify-content:center;padding:110px 220px 0}
     .ccard{width:100%;border-radius:44px;overflow:hidden;
       background:linear-gradient(165deg,rgba(12,10,26,.96),rgba(20,16,44,.92));
       box-shadow:0 0 0 2px rgba(168,85,247,.4) inset,0 40px 110px rgba(0,0,0,.6)}
     .cart img{display:block;width:100%;height:auto}
     .ctext{display:flex;align-items:center;justify-content:center;padding:26px 36px 34px}
     .cname{font-family:'Bricolage Grotesque','Inter',sans-serif;font-weight:800;
-      font-size:72px;line-height:1.04;letter-spacing:-.03em;color:#fff;text-align:center;
+      font-size:66px;line-height:1.04;letter-spacing:-.03em;color:#fff;text-align:center;
       white-space:nowrap;overflow:hidden;text-overflow:ellipsis}`), 'productcard.png');
 
   /* The last beat. The code is in the footage underneath; this says what the

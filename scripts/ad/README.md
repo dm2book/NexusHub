@@ -47,6 +47,69 @@ on those marks — so a slow page makes a slower cut, not a cut in the wrong pla
 5. buy · 6. checkout · 7. the purchase completes · 8. order confirmation ·
 9-11. the delivery email, opened, with the order in it · 12. end card
 
+## The flagship
+
+One template, for TikTok, Reels and Shorts. If you are shipping one advert,
+ship this one.
+
+    node scripts/ad/make-ad.mjs --base=https://www.forgemarket.nl \
+      --sku=STEAM-10 --email=ads@yourdomain --pay=manual --lang=nl --flagship
+
+That single command scores every template against the recording, cuts the
+flagship, and renders **one advert per opening the recording can honestly
+support** — ten, on the Steam Wallet €10 take. They share every frame after the
+first second and none of the first.
+
+| the brief | how |
+|---|---|
+| 9:16 | 1080×1920 |
+| 8–12 seconds | 10.1s measured on the real recording |
+| a strong first second | the shop's own artwork, name and price full-frame, pushing in |
+| real product information, real price | the product row, through the token gate |
+| real checkout, payment, email, code | one recorded purchase, seven windows into it |
+| no invented claims | the claim gate, and the scorer rejects outright |
+| fast but comprehensible | 0.69 cuts/s, nothing under 0.45s, nothing over 3.0s |
+| professional transitions | three thrown cuts, the rest flashed |
+| motion blur | `blurAt 1.6`, six of seven scenes forcing it |
+| cursor tracking | the pointer glides its real path, eased, at frame rate |
+| sound design | the gaming profile; the same video remixes four ways |
+| a strong CTA | the address from the second scene, a closing line, an end card |
+
+It scores **100/100** on the toolkit's own scorer, with every dimension full.
+
+### Not a fourteenth idea
+
+It is the assembly of what the previous rounds measured: the product-first
+opening, the hook catalogue, the claim gate, the composed pace, the planned
+sound, and the scorer that ranks it. Ten seconds rather than twelve — the same
+beats, a fifth less time on the parts nobody is waiting for, and none of them
+lost.
+
+### Built to be re-opened
+
+Its hook is a placeholder. `--flagship` replaces it with every opening in the
+catalogue the product can prove, which on this recording is ten across six
+kinds — product-first, price-first, speed-first, problem → solution,
+watch-me-buy — and refuses the five it cannot: no published reviews, no
+measured delivery time, no per-unit rate for a currency-denominated card.
+
+Verified on one take: a frame sampled at 6.0s has the **same MD5 in all ten**
+files, and the ten opening frames are all different.
+
+### Two things that had to be fixed to make it work
+
+- **`--hooks=` was hardcoded to variant K.** `--variant=N --hooks=all` quietly
+  rendered eight openings of a different advert.
+- **`big` could not carry a second line.** Every catalogue hook has one, so a
+  catalogue hook on a bottom-anchored cut rendered its sub as unstyled inline
+  text at the headline size.
+
+And one collision, found by measuring rather than by reading the CSS: the
+tallest hook — a two-line headline over a two-line sub — runs `y 937 → 1344`,
+and the product card ended at `1076`. The card moved up and in; it now ends at
+`869`, which clears the worst hook by enough that the 40px it rises through on
+its way in does not eat the gap.
+
 ## Twelve creative variants from one recording
 
 One real purchase, cut twelve ways — not twelve purchases (which would also
@@ -948,6 +1011,7 @@ overwrites that one only.
 | flag | default | |
 |---|---|---|
 | `--target=20` | 20 | seconds to aim for; the result lands 15–25 |
+| `--flagship` | — | the flagship template, one advert per honest opening |
 | `--cuts=` | — | `all`, `list`, or ids — ten cuts of one purchase |
 | `--sound=` `--sounds=` | gaming | a mix, or `all` for four of one video |
 | `--score` `--score=<id>` | — | rank every cut against this recording |

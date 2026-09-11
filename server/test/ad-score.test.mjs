@@ -202,7 +202,22 @@ console.log('\n— It ranks —');
      that ranks nothing. A spread is the property being tested. */
   const spread = okRows[0].total - okRows[okRows.length - 1].total;
   ok('the scores actually spread out', spread >= 25, `${spread} points`);
-  ok('…and a hundred is not free', okRows[0].total < 100, String(okRows[0].total));
+  /* A hundred is reachable — the flagship is built to reach it — but it has to
+     be rare, or the scorer is a rubber stamp again. Written as "nothing scores
+     100" this failed the moment something deliberately satisfied all nine. */
+  const perfect = okRows.filter((r) => r.total === 100);
+  ok('…and a hundred is rare', perfect.length <= 2, `${perfect.length} of ${okRows.length}`);
+  const median = okRows[Math.floor(okRows.length / 2)].total;
+  ok('…with the middle of the field well below it', median <= 85, String(median));
+
+  /* Same score, less of the viewer's time. A cost claim, not a taste one — and
+     the only tiebreak in the file. */
+  for (let i = 1; i < okRows.length; i++) {
+    if (okRows[i].total !== okRows[i - 1].total) continue;
+    ok(`a tie at ${okRows[i].total} puts the shorter cut first`,
+      okRows[i - 1].seconds <= okRows[i].seconds,
+      `${okRows[i - 1].seconds}s then ${okRows[i].seconds}s`);
+  }
 
   /* A–H and J exist in both tables, so the id alone names two adverts. */
   ok('a result says which table it came from',
@@ -217,17 +232,24 @@ console.log('\n— The best three, and the ties it refuses to break —');
   ok('three are picked', b.picked.length === 3);
   ok('…all of them buildable and proven', b.picked.every((r) => r.verdict === 'ok'));
   ok('…in order', b.picked[0].total >= b.picked[1].total && b.picked[1].total >= b.picked[2].total);
-  ok('…and the product-first cut wins on this recording',
-    b.picked[0].id === 'M', `${b.picked[0].id}/${b.picked[0].slug}`);
+  ok('…and the flagship wins on this recording',
+    b.picked[0].id === 'N', `${b.picked[0].id}/${b.picked[0].slug}`);
 
-  /* Eight cuts walk the same beats, prove the same things and differ only in
-     pace. That they score the same is the true answer, and inventing a
-     preference between them is the one thing this file must not do. */
-  ok('a tie at the cut-off is reported, not broken', b.alsoTied.length > 0);
+  /* Constructed rather than borrowed from whatever the board happens to look
+     like: four copies of one cut score identically by construction, so the
+     reporting is tested rather than the day's data. Written against the real
+     board, this assertion broke the moment a new template changed where the
+     cut-off fell. */
+  const clones = ['P', 'Q', 'R', 'S'].map((id) => ({ ...M, id, slug: `clone-${id}` }));
+  const t = best(clones, ctx, 2);
+  ok('a tie at the cut-off is reported, not broken', t.alsoTied.length === 2,
+    `${t.alsoTied.length}`);
   ok('…and everything reported is genuinely tied',
-    b.alsoTied.every((r) => r.total === b.picked[b.picked.length - 1].total));
+    t.alsoTied.every((r) => r.total === t.picked[t.picked.length - 1].total));
   ok('…and none of them is silently in the picks',
-    b.alsoTied.every((r) => !b.picked.some((p) => p.id === r.id && p.family === r.family)));
+    t.alsoTied.every((r) => !t.picked.some((p) => p.id === r.id)));
+  ok('…while a clear win reports no tie',
+    best([M, variantById('B')], ctx, 1).alsoTied.length === 0);
   ok('asking for one gives one', best([...VARIANTS, ...CUTS], ctx, 1).picked.length === 1);
   ok('asking for more than exist gives what exists',
     best([...VARIANTS, ...CUTS], ctx, 99).picked.length

@@ -266,7 +266,7 @@ console.log('\n— One recording, ten files —');
 
 console.log('\n— Nothing that already worked was disturbed —');
 {
-  ok('every variant still resolves', VARIANTS.length === 13 && !!variantById('K') && !!variantById('L'));
+  ok('every variant still resolves', VARIANTS.length === 14 && !!variantById('K') && !!variantById('L'));
   ok('no variant grew a pace or a focus', VARIANTS.every((v) => !v.pace && !v.focus));
   ok('the flash is unchanged for anything that does not ask',
     /variant\?\.flash \?\? 0\.55/.test(compose));

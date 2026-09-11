@@ -75,7 +75,13 @@ const STYLES = {
     .wrap{align-items:flex-end;padding:0 80px 620px}
     .t{font-family:'Bricolage Grotesque','Inter',sans-serif;font-weight:800;font-size:88px;
        line-height:1.08;letter-spacing:-.02em;color:#fff;text-align:center;
-       text-shadow:0 6px 34px rgba(0,0,0,.75),0 2px 8px rgba(0,0,0,.6)}`,
+       text-shadow:0 6px 34px rgba(0,0,0,.75),0 2px 8px rgba(0,0,0,.6)}
+    /* A second line. Every hook in the catalogue carries one, and until this
+       existed a catalogue hook on a bottom-anchored cut rendered its sub as
+       unstyled inline text at the headline size. */
+    .t .sub{display:block;font-family:'Inter',system-ui,sans-serif;font-weight:600;
+       font-size:46px;line-height:1.2;letter-spacing:0;color:#d9d3ff;padding-top:14px;
+       text-shadow:0 4px 22px rgba(0,0,0,.8)}`,
   small: `
     .wrap{align-items:flex-end;padding:0 80px 580px}
     .t{font-family:'Inter',system-ui,sans-serif;font-weight:700;font-size:54px;line-height:1.25;
