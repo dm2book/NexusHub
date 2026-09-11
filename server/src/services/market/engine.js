@@ -183,10 +183,11 @@ async function persistRecommendation(mp, forgeProductId, stats, rec, extra = {})
   const id = newId('mkr');
   await run(
     `INSERT INTO market_price_recommendations (id, market_product_id, forge_product_id, low_cents,
-       median_cents, high_cents, official_cents, competitor_count, freshest_at, confidence,
+       median_cents, mean_cents, high_cents, official_cents, competitor_count, freshest_at, confidence,
        recommended_cents, margin_pct, profit_cents, status, blockers, inputs, created_at)
-     VALUES (@id,@mp,@fp,@low,@med,@high,@off,@n,@fresh,@conf,@rec,@margin,@profit,@status,@blockers,@inputs,@at)`,
-    { id, mp: mp.id, fp: forgeProductId, low: stats.lowCents, med: stats.medianCents, high: stats.highCents,
+     VALUES (@id,@mp,@fp,@low,@med,@mean,@high,@off,@n,@fresh,@conf,@rec,@margin,@profit,@status,@blockers,@inputs,@at)`,
+    { id, mp: mp.id, fp: forgeProductId, low: stats.lowCents, med: stats.medianCents,
+      mean: stats.meanCents, high: stats.highCents,
       off: stats.officialCents, n: stats.competitorCount, fresh: stats.freshestAt, conf: rec.confidence,
       rec: rec.recommendedEur == null ? null : Math.round(rec.recommendedEur * 100),
       margin: rec.marginPct, profit: rec.profitEur == null ? null : Math.round(rec.profitEur * 100),

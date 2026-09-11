@@ -147,6 +147,92 @@ export const SOURCES = [
     },
   },
 
+  {
+    key: 'kinguin',
+    label: 'Kinguin (Integration API)',
+    kind: 'api',
+    requiresCredentials: true,
+    legalBasis:
+      'Kinguin publishes a documented Integration API issued against an account '
+      + 'API key. That key is the permission. The public storefront is not, and '
+      + 'its terms forbid automated collection.',
+    termsUrl: 'https://www.kinguin.net/page/terms-and-conditions',
+    robotsUrl: 'https://www.kinguin.net/robots.txt',
+    available: (creds) => (creds?.apiKey
+      ? { ok: true, reason: 'Integration API key configured' }
+      : { ok: false, reason: 'no Kinguin Integration API key (KINGUIN_API_KEY). Public pages are NOT a fallback.' }),
+    /**
+     * Kinguin's catalogue endpoint returns a product with a `price` and a
+     * `cheapestOfferId`. The price is the number a buyer sees, which is the only
+     * one worth comparing against — a wholesale figure from an integration
+     * account is not what the market charges.
+     */
+    fetchOffers: async ({ creds, query, fetchImpl = fetch }) => {
+      const base = (creds.baseUrl || 'https://gateway.kinguin.net/esa/api').replace(/\/$/, '');
+      const url = `${base}/v1/products?name=${encodeURIComponent(query)}&limit=100`;
+      const res = await fetchImpl(url, {
+        headers: { 'X-Api-Key': creds.apiKey, Accept: 'application/json',
+          'User-Agent': config.market.userAgent },
+      });
+      if (!res.ok) throw new Error(`Kinguin API HTTP ${res.status}`);
+      const data = await res.json();
+      return (data?.results || data?.items || []).map((p) => ({
+        sourceProductId: String(p.productId ?? p.kinguinId ?? p.id ?? ''),
+        title: String(p.name ?? p.originalName ?? ''),
+        priceCents: Math.round(Number(p.price ?? 0) * 100),
+        currency: String(p.currency || 'EUR').toUpperCase(),
+        availability: Number(p.qty ?? p.textQty ?? 0) > 0 ? 'in_stock' : 'out_of_stock',
+        url: p.productId ? `https://www.kinguin.net/category/${p.productId}` : 'https://www.kinguin.net/',
+        hints: { platformRaw: p.platform || '', region: (p.regionalLimitations || p.region || '').toLowerCase() || undefined },
+      }));
+    },
+  },
+
+  {
+    key: 'eneba',
+    label: 'Eneba (partner API)',
+    kind: 'api',
+    requiresCredentials: true,
+    /* Eneba does not publish an open catalogue API. Access is granted per
+       partner, and the endpoint differs per agreement — which is why this one
+       takes its base URL from configuration rather than hardcoding a guess. A
+       hardcoded URL nobody has been granted would be a source that looks
+       configured and quietly returns nothing, which is worse than absent. */
+    legalBasis:
+      'Eneba grants catalogue access per partner agreement. That agreement is the '
+      + 'permission, and it names the endpoint — so both the base URL and the key '
+      + 'come from configuration. Scraping eneba.com is forbidden by its terms.',
+    termsUrl: 'https://www.eneba.com/terms-and-conditions',
+    robotsUrl: 'https://www.eneba.com/robots.txt',
+    available: (creds) => ((creds?.apiKey && creds?.baseUrl)
+      ? { ok: true, reason: 'partner API key and endpoint configured' }
+      : {
+        ok: false,
+        reason: creds?.apiKey
+          ? 'Eneba partner key set but no ENEBA_BASE_URL — the endpoint is named in your agreement, not guessable.'
+          : 'no Eneba partner credentials (ENEBA_API_KEY + ENEBA_BASE_URL). Public pages are NOT a fallback.',
+      }),
+    fetchOffers: async ({ creds, query, fetchImpl = fetch }) => {
+      const base = String(creds.baseUrl).replace(/\/$/, '');
+      const url = `${base}/products?search=${encodeURIComponent(query)}&limit=100`;
+      const res = await fetchImpl(url, {
+        headers: { Authorization: `Bearer ${creds.apiKey}`, Accept: 'application/json',
+          'User-Agent': config.market.userAgent },
+      });
+      if (!res.ok) throw new Error(`Eneba API HTTP ${res.status}`);
+      const data = await res.json();
+      return (data?.results || data?.items || data?.data || []).map((p) => ({
+        sourceProductId: String(p.id ?? p.slug ?? ''),
+        title: String(p.name ?? p.title ?? ''),
+        priceCents: Math.round(Number(p.price?.amount ?? p.priceFrom ?? p.price ?? 0) * 100),
+        currency: String(p.price?.currency ?? p.currency ?? 'EUR').toUpperCase(),
+        availability: p.available === false ? 'out_of_stock' : (p.available === true ? 'in_stock' : 'unknown'),
+        url: p.url || (p.slug ? `https://www.eneba.com/${p.slug}` : 'https://www.eneba.com/'),
+        hints: { platformRaw: p.platform || '', region: (p.region || '').toLowerCase() || undefined },
+      }));
+    },
+  },
+
   /* ── Publisher reference prices ──────────────────────────────────────────
      Defined so an official RRP has a home in the data model, and marked as
      never-automated so nobody later mistakes the absence of a fetcher for an
@@ -176,11 +262,19 @@ export const bySourceKey = (key) => SOURCES.find((s) => s.key === key) || null;
  * configured where one exists — so an Eldorado key is entered once, not twice.
  */
 export async function credentialsFor(key) {
+  /* Environment first, because three of the four marketplaces issue a single
+     key and an operator should not have to create a supplier row to use one.
+     A supplier row still wins where it exists — that is where a key rotated by
+     the person who owns the account belongs. */
+  const fromEnv = config.market.credentials?.[key];
+  if (key === 'kinguin' || key === 'eneba') {
+    return fromEnv && Object.values(fromEnv).some(Boolean) ? fromEnv : null;
+  }
   if (key === 'eldorado' || key === 'g2a') {
     const row = await get(
       `SELECT config FROM suppliers WHERE connector_kind=@k AND status='active' ORDER BY created_at LIMIT 1`,
       { k: key }).catch(() => null);
-    if (!row) return null;
+    if (!row) return fromEnv && Object.values(fromEnv).some(Boolean) ? fromEnv : null;
     try { return JSON.parse(row.config || '{}'); } catch { return null; }
   }
   return null;

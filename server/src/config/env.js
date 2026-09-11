@@ -364,6 +364,12 @@ export const config = {
       || 'max(minimum_profitable_price, competitive_market_price * target_position)',
     targetMargin: num(env.TARGET_MARGIN, 0.18),                 // 18% gross
     minimumProfitEur: num(env.MINIMUM_PROFIT_EUR, 0.50),
+    /* The other floor. A minimum profit in EUROS protects a cheap product and
+       does nothing for an expensive one: 50 cents on a €4.49 top-up is 11%, and
+       on a €174.99 subscription it is 0.3%. A minimum PERCENTAGE is the one
+       that scales, and until now the engine only refused a NEGATIVE margin —
+       which means it would happily recommend selling at 0.4% and call it fine. */
+    minimumMarginPercent: num(env.MINIMUM_MARGIN_PERCENT, 6),
     maxCompetitorUndercutPercent: num(env.MAX_COMPETITOR_UNDERCUT_PERCENT, 5),
     targetMarketPosition: num(env.TARGET_MARKET_POSITION, 0.98),
     promotionMargin: num(env.PROMOTION_MARGIN, 0.08),
@@ -381,6 +387,24 @@ export const config = {
     sourceCostPercent: num(env.SOURCE_COST_PERCENT, 0),
     // Which competitor statistic "the market price" means. low | median | high.
     marketBasis: (env.MARKET_PRICE_BASIS || 'median').toLowerCase(),
+    /* Marketplace credentials, per source.
+       Every one of these is access-gated by an agreement the account holder
+       signs; none of these marketplaces permits collecting prices off its
+       public pages. A source with no credentials reports UNAVAILABLE and is
+       skipped — it is never quietly replaced by fetching the storefront. */
+    credentials: {
+      kinguin: { apiKey: env.KINGUIN_API_KEY || '', baseUrl: env.KINGUIN_BASE_URL || '' },
+      /* Eneba names the endpoint in the partner agreement rather than
+         publishing one, so the base URL is configuration too. Hardcoding a
+         guess would produce a source that looks configured and returns
+         nothing. */
+      eneba: { apiKey: env.ENEBA_API_KEY || '', baseUrl: env.ENEBA_BASE_URL || '' },
+      eldorado: { apiKey: env.ELDORADO_API_KEY || '', baseUrl: env.ELDORADO_BASE_URL || '' },
+      g2a: {
+        apiHash: env.G2A_API_HASH || '', apiKey: env.G2A_API_KEY || '',
+        email: env.G2A_EMAIL || '', baseUrl: env.G2A_BASE_URL || '',
+      },
+    },
 
     // ── VAT ─────────────────────────────────────────────────────────────────
     // Off by default and it stays off: this shop publishes no VAT number, and a
