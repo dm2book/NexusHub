@@ -26,6 +26,7 @@ import { launchState, launchAtIso, launchDayLabel } from './launchGateService.js
 import { configuredChannels, EVENTS as ALERT_EVENTS } from './notifyService.js';
 import { isEnabled as mollieEnabled } from './mollieService.js';
 import { get } from '../db/index.js';
+import { appUrlVerdict } from './servedHostService.js';
 
 /** BEFORE = must be true today. DAY = must be true on the 24th. */
 export const PHASE = { BEFORE: 'before', DAY: 'day' };
@@ -117,6 +118,16 @@ export async function launchPlan() {
     'ok',
     'The catalogue, product pages, Discord page and legal pages are public and ungated. '
     + 'Only buying and signing up wait for the day.');
+
+  /* The address the shop believes it lives at.
+     Everything public is built from APP_URL — every canonical, the sitemap, the
+     OG urls, the CORS allow-list and every link in every email — and nothing
+     checked it against the host buyers actually arrive on. It has no symptom on
+     the shop's own pages, which render fine either way, which is exactly why it
+     needs a check rather than an eye. BEFORE rather than DAY: a canonical
+     pointing at the wrong host is worth nothing once Google has crawled it. */
+  const url = await appUrlVerdict();
+  add(PHASE.BEFORE, 'site.url', 'Public address', url.status, url.detail, url.fix || null);
 
   add(PHASE.BEFORE, 'site.cta', 'Purchase CTAs',
     state.prelaunch ? 'ok' : 'warn',

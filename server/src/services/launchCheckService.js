@@ -16,6 +16,7 @@ import { isEnabled as mollieEnabled, isTestKey as mollieTestKey, SUPPORTED_METHO
 import { LEGAL, legalComplete } from '../../../src/lib/legalIdentity.js';
 import { artStatus } from '../../../src/lib/shippedArt.js';
 import { auditCatalog } from './catalogAuditService.js';
+import { appUrlVerdict } from './servedHostService.js';
 
 export async function launchChecks() {
   const checks = [];
@@ -52,6 +53,14 @@ export async function launchChecks() {
     add('payments', 'Payment methods', 'fail',
       'No way to pay: set MOLLIE_API_KEY (iDEAL, Bancontact, card, PayPal) in Vercel → orders currently dead-end as pending.');
   }
+
+  /* 1b. The address everything public is built from.
+     Same verdict function the launch plan uses — two copies of this rule would
+     be two answers to "is the domain right", and the whole point is that there
+     is one. */
+  const url = await appUrlVerdict();
+  add('appurl', 'Public address', url.status,
+    url.fix ? `${url.detail} ${url.fix}` : url.detail);
 
   // 2. Email — login codes + receipts must actually deliver.
   if (config.email.resendApiKey || config.email.smtpUrl) {
