@@ -1525,4 +1525,26 @@ ALTER TABLE email_templates ADD PRIMARY KEY (id, lang);
 ALTER TABLE users ADD COLUMN IF NOT EXISTS lang TEXT;
 `,
   },
+  {
+    id: '037_market_mean_price',
+    /*
+     * "Average competitor price" had nowhere to live.
+     *
+     * market_price_recommendations stored the low, the median and the high, and
+     * the engine positions against the MEDIAN on purpose — one seller with no
+     * stock and a typo drags a mean and cannot move a median. But the number a
+     * person asks for when they look at a pricing table is the average, and
+     * refusing to show it because it is the worse statistic helps nobody. Both
+     * are stored now; only the median is used to decide anything.
+     *
+     * Nullable and unbackfilled: the mean of observations that are no longer
+     * summarised cannot be recovered, and inventing one from the low and high
+     * would be a fabricated statistic in a table whose entire purpose is to
+     * record what was actually seen. Existing rows read NULL until their next
+     * refresh, which the dashboard already renders as "—".
+     */
+    sql: `
+      ALTER TABLE market_price_recommendations ADD COLUMN IF NOT EXISTS mean_cents INTEGER;
+    `,
+  },
 ];

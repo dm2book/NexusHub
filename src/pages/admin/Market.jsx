@@ -324,11 +324,20 @@ export default function AdminMarket() {
             <thead className="text-slate-400 text-left">
               <tr>
                 <th className="py-2 font-semibold">Product</th>
-                <th className="font-semibold">Low</th><th className="font-semibold">Median</th>
-                <th className="font-semibold">High</th><th className="font-semibold">Official</th>
-                <th className="font-semibold">Sellers</th><th className="font-semibold">Ours</th>
-                <th className="font-semibold">Recommended</th><th className="font-semibold">Margin</th>
-                <th className="font-semibold">Profit</th><th className="font-semibold">Data</th>
+                {/* Named for what they are rather than in engine shorthand: the
+                    three competitor statistics belong together and under one
+                    heading, and "Low / Median / High" beside "Ours" reads as
+                    four unrelated numbers. */}
+                <th className="font-semibold">Lowest<span className="block font-normal text-[11px] text-slate-400">competitor</span></th>
+                <th className="font-semibold">Average<span className="block font-normal text-[11px] text-slate-400">competitor</span></th>
+                <th className="font-semibold">Median<span className="block font-normal text-[11px] text-slate-400">positions on this</span></th>
+                <th className="font-semibold">Highest<span className="block font-normal text-[11px] text-slate-400">competitor</span></th>
+                <th className="font-semibold">Official</th>
+                <th className="font-semibold">Sources</th>
+                <th className="font-semibold">Current<span className="block font-normal text-[11px] text-slate-400">price</span></th>
+                <th className="font-semibold">Suggested<span className="block font-normal text-[11px] text-slate-400">price</span></th>
+                <th className="font-semibold">Margin</th>
+                <th className="font-semibold">Profit</th><th className="font-semibold">Last seen</th>
                 <th className="font-semibold text-right">Actions</th>
               </tr>
             </thead>
@@ -348,10 +357,19 @@ export default function AdminMarket() {
                     )}
                   </td>
                   <td className="pr-3">{fmt(r.low_cents)}</td>
+                  {/* NULL on any row written before mean_cents existed, and left
+                      as "—" rather than reconstructed from the low and the high:
+                      a fabricated statistic in a table whose purpose is to
+                      record what was actually observed. */}
+                  <td className="pr-3">{fmt(r.mean_cents)}</td>
                   <td className="pr-3 font-semibold">{fmt(r.median_cents)}</td>
                   <td className="pr-3">{fmt(r.high_cents)}</td>
                   <td className="pr-3 text-slate-500">{fmt(r.official_cents)}</td>
-                  <td className="pr-3">{r.competitor_count}</td>
+                  <td className="pr-3">
+                    {r.competitor_count}
+                    {r.source_count != null && r.source_count !== r.competitor_count
+                      && <span className="text-slate-400"> / {r.source_count}</span>}
+                  </td>
                   <td className="pr-3">{fmt(r.forge_price_cents)}</td>
                   <td className="pr-3 font-bold text-slate-900">{fmt(r.recommended_cents)}</td>
                   <td className="pr-3">{pct(r.margin_pct)}</td>

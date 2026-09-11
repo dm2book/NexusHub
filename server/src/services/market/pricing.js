@@ -76,6 +76,13 @@ export function summarise(observations, { now = Date.now() } = {}) {
   return {
     lowCents: prices.length ? Math.min(...prices) : null,
     medianCents: median(prices),
+    /* The mean, beside the median rather than instead of it. The median is what
+       the engine positions against — one seller with no stock and a typo drags
+       a mean and cannot move a median — but "average competitor price" is what
+       a person asks for when they look at a table, and refusing to show it
+       because it is the worse statistic helps nobody. */
+    meanCents: prices.length
+      ? Math.round(prices.reduce((a, b) => a + b, 0) / prices.length) : null,
     highCents: prices.length ? Math.max(...prices) : null,
     officialCents: official.length ? Math.min(...official.map((o) => Number(o.price_eur_cents))) : null,
     competitorCount: prices.length,
@@ -97,11 +104,27 @@ export function minimumProfitablePrice(costEur, cfg = config.market) {
   const srcPct = cfg.sourceCostPercent / 100;
   const denom = 1 - feePct - srcPct;
   if (denom <= 0) throw new Error('payment + source fees consume the whole price — check PAYMENT_FEE_PERCENT / SOURCE_COST_PERCENT');
-  const net = Number(costEur) + cfg.fulfillmentCostEur + cfg.paymentFixedFee + cfg.minimumProfitEur;
-  const exVat = net / denom;
-  // VAT is added only when the shop is actually configured to charge it.
   const vat = cfg.vatPercent > 0 && cfg.pricesIncludeVat ? 1 + cfg.vatPercent / 100 : 1;
-  return round2(exVat * vat);
+
+  // The euro floor: cost, costs and the minimum profit, grossed back up.
+  const byAmount = ((Number(costEur) + cfg.fulfillmentCostEur + cfg.paymentFixedFee
+    + cfg.minimumProfitEur) / denom) * vat;
+
+  /* The percentage floor, which is the one that scales.
+   *
+   * profit = exVat − cost − fulfilment − fees, and we want profit ≥ m·exVat.
+   * Solving for exVat:  exVat · (1 − feePct − srcPct − m) ≥ cost + fulfilment
+   *                                                        + fixed fee
+   * A minimum profit in EUROS protects a €4.49 top-up and does nothing for a
+   * €174.99 subscription — 50 cents is 11% of one and 0.3% of the other. */
+  const m = Math.max(0, Number(cfg.minimumMarginPercent ?? 0)) / 100;
+  const marginDenom = denom - m;
+  const byMargin = marginDenom > 0
+    ? ((Number(costEur) + cfg.fulfillmentCostEur + cfg.paymentFixedFee) / marginDenom) * vat
+    : Infinity;
+
+  // Whichever floor binds. Both are floors; neither is a preference.
+  return round2(Math.max(byAmount, byMargin));
 }
 
 /** The margin and profit a given price actually yields, after every deduction. */
@@ -162,6 +185,36 @@ export function recommend({ stats, costEur, currentPriceEur = null, identityConf
 
   const market = basisPrice(stats, cfg);
   const floor = minimumProfitablePrice(costEur, cfg);
+
+  /* THE MARKET SELLS BELOW WHAT THIS COSTS US.
+   *
+   * The floor already stops the engine recommending a loss — it simply raises
+   * the price to the floor and carries on. What it cannot say is that the price
+   * it produced will not sell, because everyone else is under it.
+   *
+   * That is a different decision and it belongs to a person: either the cost is
+   * wrong, or the supplier is, or this product should not be on the shelf. A
+   * recommendation of "price it at €12.40 in a market trading at €9.80" is
+   * arithmetically correct and commercially useless, so it is flagged rather
+   * than quietly published.
+   *
+   * Compared against the LOWEST observed, not the median: one seller under our
+   * cost is a margin problem worth knowing about; the median under our cost is
+   * the same problem with the volume turned up. */
+  if (stats.lowCents != null && Number(costEur) > 0) {
+    const low = eur(stats.lowCents);
+    if (low < Number(costEur)) {
+      blockers.push({
+        code: 'MARKET_BELOW_COST',
+        detail: `the cheapest observed price €${low} is below what this costs us `
+          + `(€${round2(Number(costEur))}). Nothing priced profitably will win on price — `
+          + 'check the cost, check the supplier, or stop stocking it.',
+      });
+    } else if (low < floor) {
+      notes.push(`the cheapest observed price €${low} is below our profitable floor €${floor} — `
+        + 'any profitable price is above the cheapest seller');
+    }
+  }
 
   let recommended = null;
   let formulaError = null;
@@ -228,8 +281,16 @@ export function recommend({ stats, costEur, currentPriceEur = null, identityConf
   }
 
   const m = recommended == null ? { profitEur: null, marginPct: null } : marginAt(recommended, costEur, cfg);
-  if (m.marginPct != null && m.marginPct < 0) {
-    blockers.push({ code: 'BELOW_MINIMUM_MARGIN', detail: `margin ${m.marginPct}% is negative` });
+  /* Under the MINIMUM, not merely under zero. The guard used to read `< 0`,
+     which let a 0.4% margin through as though it were fine — and the whole
+     point of a floor is that it is not zero. */
+  if (m.marginPct != null && m.marginPct < Number(cfg.minimumMarginPercent ?? 0)) {
+    blockers.push({
+      code: 'BELOW_MINIMUM_MARGIN',
+      detail: m.marginPct == null ? 'margin cannot be computed'
+        : m.marginPct < 0 ? `margin ${m.marginPct}% is negative — this sells at a loss`
+          : `margin ${m.marginPct}% is under the ${cfg.minimumMarginPercent}% minimum`,
+    });
   } else if (m.profitEur != null && m.profitEur + 1e-9 < cfg.minimumProfitEur) {
     blockers.push({ code: 'BELOW_MINIMUM_PROFIT',
       detail: `profit €${m.profitEur} is under MINIMUM_PROFIT_EUR €${cfg.minimumProfitEur}` });

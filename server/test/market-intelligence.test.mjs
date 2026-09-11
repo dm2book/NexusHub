@@ -169,12 +169,25 @@ console.log('\n━━ 4. Margin calculation ━━');
   ok('margin is that profit over the price',
     Math.abs(m.marginPct - (3.4 / 12.24) * 100) < 0.2, JSON.stringify(m));
 
-  // The floor solves for price on both sides; check it round-trips.
+  /* The floor solves for price on both sides; check it round-trips.
+   *
+   * There are TWO floors now — a minimum profit in euros and a minimum margin
+   * in percent — and the price is whichever is higher. So the invariant is "at
+   * least the minimum", not "exactly": on this product the margin floor binds
+   * and the profit lands above €0.50. Asserted as exactly-equal, this passed
+   * only while the euro floor was the sole floor, and it described a shop that
+   * would price a €100 product at a 0.48% margin. */
   const floor = P.minimumProfitablePrice(8.2);
   const atFloor = P.marginAt(floor, 8.2);
-  ok('the minimum profitable price yields exactly the minimum profit',
-    Math.abs(atFloor.profitEur - config.market.minimumProfitEur) < 0.02,
+  ok('the minimum profitable price clears the minimum profit',
+    atFloor.profitEur >= config.market.minimumProfitEur - 0.01,
     `floor ${floor} → profit ${atFloor.profitEur}`);
+  ok('…and the minimum margin',
+    atFloor.marginPct >= config.market.minimumMarginPercent - 0.01,
+    `floor ${floor} → margin ${atFloor.marginPct}%`);
+  ok('…and is exactly the euro floor when that is the binding one',
+    Math.abs(P.marginAt(P.minimumProfitablePrice(8.2, { ...config.market, minimumMarginPercent: 0 }), 8.2)
+      .profitEur - config.market.minimumProfitEur) < 0.02);
   ok('a naive "cost + fee-on-cost" floor would have been too low',
     floor > 8.2 + 0.5 + 0.29 + 8.2 * 0.029, String(floor));
 
