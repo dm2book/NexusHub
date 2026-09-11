@@ -34,6 +34,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { config, manualPayMethods } from '../config/env.js';
 import { isEnabled as mollieEnabled } from '../services/mollieService.js';
+import { isEnabled as stripeEnabled, hasWebhookSecret as stripeWebhook } from './stripeService.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const read = (p) => {
@@ -322,7 +323,21 @@ export async function auditCompliance() {
     add('payments', 'payments.demo', 'FAIL', 'Demo payments are on',
       'Orders are marked paid without money arriving.', 'Set DEMO_PAYMENTS=false.');
   }
-  if (mollieEnabled()) {
+  if (stripeEnabled()) {
+    /* The silent one: without a webhook secret constructEvent refuses, which is
+       the safe direction and the invisible one — the buyer pays, the money
+       arrives, and no order is ever marked paid. */
+    if (!stripeWebhook()) {
+      add('payments', 'payments.stripe-webhook', 'FAIL', 'Stripe cannot confirm a payment',
+        'STRIPE_SECRET_KEY is set and STRIPE_WEBHOOK_SECRET is not. Buyers can pay and the money '
+        + 'arrives, and no order is ever marked paid because the webhook is rejected unverified.',
+        'Add the webhook in the Stripe dashboard and put its signing secret in STRIPE_WEBHOOK_SECRET.');
+    }
+    const test = /^sk_test_/.test(config.payments.stripe.secretKey || '');
+    add('payments', 'payments.stripe', test ? 'FAIL' : 'PASS', 'Stripe',
+      test ? 'STRIPE_SECRET_KEY is a test key — buyers reach test mode and no money moves.'
+        : 'Live key configured.');
+  } else if (mollieEnabled()) {
     const test = /^test_/.test(config.payments.mollie.apiKey || '');
     add('payments', 'payments.mollie', test ? 'FAIL' : 'PASS', 'Mollie',
       test ? 'MOLLIE_API_KEY is a test key — buyers reach the sandbox and no money moves.'
@@ -333,9 +348,17 @@ export async function auditCompliance() {
   } else {
     add('payments', 'payments.none', 'FAIL', 'No way to pay', 'Orders dead-end as pending.');
   }
-  add('payments', 'payments.terms-match', 'OWNER', 'Does your Mollie account allow what you sell?',
-    'Payment providers restrict digital goods and top-ups, and an account closed mid-launch takes '
-    + 'the shop with it.', 'Confirm your product categories with Mollie in writing before opening.');
+  /* The single largest business risk in this category, and it is not a code
+     problem. Every major processor restricts prepaid codes, game currency and
+     top-ups somewhere in its acceptable-use policy; an account frozen with
+     money in it takes the shop and the float with it. Named after whichever
+     processor is actually configured, because "ask Mollie" is useless advice to
+     a shop running Stripe. */
+  const processor = stripeEnabled() ? 'Stripe' : mollieEnabled() ? 'Mollie' : 'your payment provider';
+  add('payments', 'payments.terms-match', 'OWNER', `Does your ${processor} account allow what you sell?`,
+    'Payment providers restrict digital goods, prepaid codes and top-ups, and an account closed '
+    + 'mid-launch takes the shop with it.',
+    `Confirm your product categories with ${processor} in writing before opening, and keep the reply.`);
 
   const level = (l) => out.filter((c) => c.level === l).length;
   return {

@@ -33,6 +33,44 @@ async function stripe() {
 
 export const isEnabled = () => !!config.payments.stripe.secretKey;
 
+/** A live key, not a test one. Test keys take fake cards and move no money. */
+export const isTestKey = () => /^sk_test_/.test(config.payments.stripe.secretKey || '');
+
+/** Whether the webhook can be verified at all. Without it nothing is ever paid. */
+export const hasWebhookSecret = () => !!config.payments.stripe.webhookSecret;
+
+/**
+ * Which payment methods a Dutch buyer will actually be offered.
+ *
+ * Checkout does not hardcode a list — it uses whatever is enabled on the Stripe
+ * account, which is the right default (hardcoding `ideal` throws at session
+ * creation if the account has not enabled it, taking the checkout down rather
+ * than degrading). The cost of that default is that it is SILENT: a Dutch shop
+ * whose account has only cards switched on serves cards to a country where
+ * iDEAL is most of online payment, and nothing says so.
+ *
+ * So the launch check asks Stripe instead of assuming. Returns null when the
+ * question cannot be answered — an unreachable API is not evidence of anything.
+ */
+export async function enabledMethods() {
+  const s = await stripe();
+  if (!s) return null;
+  try {
+    const list = await s.paymentMethodConfigurations.list({ limit: 10 });
+    const active = (list?.data || []).filter((c) => c.active !== false);
+    if (!active.length) return null;
+    const names = new Set();
+    for (const cfg of active) {
+      for (const [name, v] of Object.entries(cfg)) {
+        if (v && typeof v === 'object' && v.display_preference?.value === 'on') names.add(name);
+      }
+    }
+    return [...names].sort();
+  } catch {
+    return null;                       // no permission, old API version, offline
+  }
+}
+
 /** Create a Checkout Session for an order. Returns { id, url }. */
 export async function createCheckoutSession(order) {
   const s = await stripe();

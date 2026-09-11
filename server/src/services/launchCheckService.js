@@ -9,6 +9,10 @@ import { iconFor } from '../db/demoSeed.js';
 import { botSeenRecently } from './discordService.js';
 import { configuredChannels, EVENTS as NOTIFY_EVENTS } from './notifyService.js';
 import { isEnabled as mollieEnabled, isTestKey as mollieTestKey, SUPPORTED_METHODS as MOLLIE_METHODS } from './mollieService.js';
+import {
+  isEnabled as stripeEnabled, isTestKey as stripeTestKey,
+  hasWebhookSecret as stripeWebhook, enabledMethods as stripeMethods,
+} from './stripeService.js';
 // The only place the server reaches into the SPA tree. legalIdentity.js is a
 // dependency-free constants module that both sides must agree on: the storefront
 // renders it on every legal page, and this check is the owner's warning that it
@@ -30,8 +34,47 @@ export async function launchChecks() {
   // pay", and a shop with a Tikkie link but no Mollie key was told it was fine.
   // A readiness dashboard that disagrees with the checkout is worse than none.
   const manual = manualPayMethods();
-  const stripe = !!config.payments.stripe.secretKey;
-  if (mollieEnabled()) {
+  const stripe = stripeEnabled();
+  if (stripe) {
+    /* Stripe first, because a shop with both configured sends buyers to
+       whichever the checkout picks, and this check exists to agree with the
+       checkout rather than with whichever provider was added first.
+     *
+     * THE SILENT ONE. constructEvent refuses without a webhook secret, which is
+     * the safe direction and also the invisible one: with STRIPE_SECRET_KEY set
+     * and STRIPE_WEBHOOK_SECRET missing, the buyer pays, Stripe takes the money,
+     * and no order is ever marked paid. Nothing in the shop notices — the
+     * payment simply never comes back. */
+    if (!stripeWebhook()) {
+      add('payments', 'Payment methods', 'fail',
+        'STRIPE_SECRET_KEY is set but STRIPE_WEBHOOK_SECRET is not. Buyers can pay and the money '
+        + 'arrives — and no order is ever marked paid, because the webhook cannot be verified and '
+        + 'is rejected. Add the endpoint at dashboard.stripe.com → Developers → Webhooks, pointing '
+        + `at ${config.appUrl}/api/payments/stripe/webhook for checkout.session.completed, and put `
+        + 'its signing secret in Vercel as STRIPE_WEBHOOK_SECRET.');
+    } else if (stripeTestKey()) {
+      // The expensive one: everything works and no money ever moves.
+      add('payments', 'Payment methods', 'fail',
+        'STRIPE_SECRET_KEY is a sk_test_ key — buyers reach Stripe’s test mode, orders are marked '
+        + 'paid and NO money arrives. Swap it for the live key in Vercel.');
+    } else {
+      /* Which methods a Dutch buyer is actually offered, asked of Stripe rather
+         than assumed. Checkout uses the account's enabled methods; a Dutch shop
+         with only cards switched on is serving cards to a country that pays by
+         iDEAL, and nothing else would say so. */
+      const methods = await stripeMethods();
+      const hasIdeal = methods ? methods.includes('ideal') : null;
+      add('payments', 'Payment methods', hasIdeal === false ? 'warn' : 'ok',
+        hasIdeal === false
+          ? `Stripe live, but iDEAL is not enabled on the account — buyers are offered ${
+            methods.join(', ') || 'card only'}. Most Dutch online payment is iDEAL. `
+            + 'Turn it on at dashboard.stripe.com → Settings → Payment methods.'
+          : methods
+            ? `Stripe live — ${methods.join(', ')}${manual.length ? ` (manual fallback: ${manual.map((m) => m.label).join(', ')})` : ''}`
+            : 'Stripe live. Could not read which payment methods are enabled — check '
+              + 'dashboard.stripe.com → Settings → Payment methods shows iDEAL for a Dutch shop.');
+    }
+  } else if (mollieEnabled()) {
     // A test_ key is the expensive one. Checkout works, Mollie's sandbox marks
     // the payment paid, the order delivers — and no money ever moves. It only
     // surfaces when the bank statement does not match the orders.
@@ -39,19 +82,21 @@ export async function launchChecks() {
       mollieTestKey()
         ? 'MOLLIE_API_KEY is a test_ key — buyers reach Mollie’s sandbox, orders are marked paid and NO money arrives. Swap it for the live key in Vercel.'
         : `Mollie live — ${MOLLIE_METHODS.join(', ')}${manual.length ? ` (manual fallback: ${manual.map((m) => m.label).join(', ')})` : ''}`);
-  } else if (manual.length || stripe) {
+  } else if (manual.length) {
     // Not a failure — it sells — but every order now waits for a person to read
     // a bank app, so say that rather than a flat green.
     add('payments', 'Payment methods', 'warn',
-      stripe
-        ? 'Stripe active — no MOLLIE_API_KEY, so no iDEAL. Most Dutch buyers pay with iDEAL.'
-        : `Manual only: ${manual.map((m) => m.label).join(', ')} — every payment needs confirming by hand. Set MOLLIE_API_KEY for automatic iDEAL.`);
+      `Manual only: ${manual.map((m) => m.label).join(', ')} — every payment needs confirming by `
+      + 'hand. Set STRIPE_SECRET_KEY (+ STRIPE_WEBHOOK_SECRET) or MOLLIE_API_KEY for automatic iDEAL.');
   } else if (config.payments.demoMode) {
     add('payments', 'Payment methods', 'warn',
-      'DEMO mode only — orders are auto-marked paid without real money. Set MOLLIE_API_KEY in Vercel before selling. (In production the checkout refuses orders while this is on, so nothing is given away.)');
+      'DEMO mode only — orders are auto-marked paid without real money. Set STRIPE_SECRET_KEY '
+      + '+ STRIPE_WEBHOOK_SECRET (or MOLLIE_API_KEY) in Vercel before selling. (In production the '
+      + 'checkout refuses orders while this is on, so nothing is given away.)');
   } else {
     add('payments', 'Payment methods', 'fail',
-      'No way to pay: set MOLLIE_API_KEY (iDEAL, Bancontact, card, PayPal) in Vercel → orders currently dead-end as pending.');
+      'No way to pay: set STRIPE_SECRET_KEY + STRIPE_WEBHOOK_SECRET, or MOLLIE_API_KEY, in Vercel '
+      + '→ orders currently dead-end as pending.');
   }
 
   /* 1b. The address everything public is built from.
