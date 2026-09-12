@@ -32,6 +32,12 @@ export const config = {
   // Public origin of the storefront SPA, used for CORS + email links + OAuth
   // redirects. In production we fall back to the live URL so emails/links work
   // with zero extra config (override with APP_URL if you use another domain).
+  /* The shop's own clock.
+     "Today" for a Dutch shop is not today in UTC: between local midnight and
+     02:00 in summer, UTC is still yesterday, so a late sale lands on the wrong
+     day in every by-day figure. Amsterdam is UTC+1 or +2 depending on the
+     season, which is why this is a zone name and not an offset. */
+  timezone: env.SHOP_TIMEZONE || 'Europe/Amsterdam',
   appUrl: env.APP_URL
     || (isProd ? 'https://forgemarket.nl' : 'http://localhost:3000'),
   apiUrl: env.API_URL

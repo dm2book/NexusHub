@@ -32,11 +32,21 @@ export async function overview({ days = 30 } = {}) {
   const conversionRate = conversionDenom ? Math.round((revenue.orders / conversionDenom) * 1000) / 10 : 0;
   const aov = revenue.orders ? Math.round(revenue.cents / revenue.orders) : 0;
 
-  // Gross profit = paid revenue − supplier cost. Each product's unit cost is
-  // stored in metadata.cost (cents); items without a cost contribute 0.
-  const cost = await supplierCost(since);
-  const profit = Math.max(0, revenue.cents - cost);
-  const margin = revenue.cents ? Math.round((profit / revenue.cents) * 1000) / 10 : 0;
+  /* Gross profit, over the units whose cost we actually know.
+   *
+   * Two things were wrong here and both were wrong in the same direction:
+   * an item with no cost entered contributed ZERO cost, so a shop that has
+   * entered none reported a 100% margin; and the profit was clamped with
+   * Math.max(0, …), so a loss displayed as break-even. Both produced a
+   * confident number from an absence.
+   *
+   * Cost and profit now cover the costed portion only, the margin is taken
+   * over the revenue it was computed from, and a loss is a loss. The same
+   * rule, and the same numbers, as the profit dashboard — two pages
+   * disagreeing about profit is worse than one. */
+  const { cost, costedRevenue, costedUnits, totalUnits } = await supplierCost(since);
+  const profit = costedRevenue - cost;
+  const margin = costedRevenue ? Math.round((profit / costedRevenue) * 1000) / 10 : null;
 
   return {
     rangeDays: days,
@@ -47,6 +57,14 @@ export async function overview({ days = 30 } = {}) {
     profit,
     profitFormatted: formatMoney(profit),
     margin,
+    /* What the margin was computed over. A margin over 3 of 200 units is a real
+       number about 3 units and a fantasy about the shop, and publishing the
+       denominator is the only way to tell them apart. */
+    costCoverage: {
+      units: costedUnits, unitsTotal: totalUnits,
+      revenue: costedRevenue, revenueTotal: revenue.cents,
+      complete: totalUnits > 0 && costedUnits === totalUnits,
+    },
     paidOrders: revenue.orders,
     totalOrders: allOrders,
     completedOrders: completed,
@@ -64,19 +82,30 @@ export async function overview({ days = 30 } = {}) {
 /** Total supplier cost of paid order items since `since` (from product metadata.cost). */
 async function supplierCost(since) {
   const items = await all(
-    `SELECT oi.product_id AS pid, oi.quantity AS qty
+    `SELECT oi.product_id AS pid, oi.quantity AS qty, oi.unit_price AS unit_price
        FROM order_items oi JOIN orders o ON o.id = oi.order_id
       WHERE ${PAID} AND o.created_at > @since`, { since });
-  if (!items.length) return 0;
+  if (!items.length) return { cost: 0, costedRevenue: 0, costedUnits: 0, totalUnits: 0 };
   /* Through costService, so this agrees with the pricing engine. It read
      metadata.cost while the engine read metadata.costCents, which meant gross
      margin could show a healthy number on this page while every pricing
      recommendation was blocked for want of the same figure. */
   const costMap = {};
   for (const id of [...new Set(items.map((i) => i.pid).filter(Boolean))]) {
-    costMap[id] = (await costCentsFor(id)) ?? 0;
+    // null stays null. An unknown cost is unknown; only zero is zero.
+    costMap[id] = await costCentsFor(id);
   }
-  return items.reduce((s, i) => s + (costMap[i.pid] || 0) * (i.qty || 1), 0);
+  let cost = 0; let costedRevenue = 0; let costedUnits = 0; let totalUnits = 0;
+  for (const i of items) {
+    const qty = Number(i.qty) || 1;
+    totalUnits += qty;
+    const unit = costMap[i.pid];
+    if (unit == null) continue;
+    cost += unit * qty;
+    costedRevenue += (Number(i.unit_price) || 0) * qty;
+    costedUnits += qty;
+  }
+  return { cost, costedRevenue, costedUnits, totalUnits };
 }
 
 export async function revenueSeries({ days = 30 } = {}) {

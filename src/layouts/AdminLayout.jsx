@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Outlet, NavLink, Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   Zap, BarChart3, ShoppingCart, Truck, PackageCheck, Package,
-  Mail, ShieldAlert, LogOut, Store, LifeBuoy, Menu, X, Users, ShieldCheck, Activity, Gauge, Tag, LayoutGrid, TrendingUp, Euro } from 'lucide-react';
+  Mail, ShieldAlert, LogOut, Store, LifeBuoy, Menu, X, Users, ShieldCheck, Activity, Gauge, Tag, LayoutGrid, TrendingUp, Euro, Percent } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { api } from '../lib/api.js';
 
@@ -21,6 +21,7 @@ const NAV = [
   { to: '/admin/fulfillment', icon: PackageCheck, label: 'Fulfillment', perm: 'fulfillment.manage', badge: 'fulfillment' },
   { to: '/admin/suppliers', icon: Truck, label: 'Suppliers', perm: 'suppliers.read' },
   { to: '/admin/market', icon: TrendingUp, label: 'Market', perm: 'orders.read' },
+  { to: '/admin/profit', icon: Percent, label: 'Profit', perm: 'analytics.read' },
   { to: '/admin/support', icon: LifeBuoy, label: 'Support', perm: 'tickets.read', badge: 'tickets' },
   { to: '/admin/social', icon: Activity, label: 'Social proof', perm: 'social.moderate' },
   { to: '/admin/monetization', icon: Tag, label: 'Monetization', perm: 'monetization.manage' },
