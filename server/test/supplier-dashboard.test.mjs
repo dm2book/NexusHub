@@ -379,7 +379,7 @@ console.log('\n— Wiring —');
   const panel = codeOf('src/components/admin/SupplyDashboard.jsx');
   ok('the admin panel loads it', /\/api\/admin\/suppliers\/dashboard/.test(panel));
   ok('…and renders the grouped warnings, not one row per product',
-    /warningGroups\.map/.test(panel) && !/d\.warnings\.slice/.test(panel));
+    /warningGroups/.test(panel) && /groups\.map/.test(panel) && !/d\.warnings\.map/.test(panel));
   ok('…and the supplier page renders the panel',
     /import SupplyDashboard/.test(page) && /<SupplyDashboard \/>/.test(page));
   /* The admin shell is DARK — `theme-light` is applied by StoreLayout, not here.
