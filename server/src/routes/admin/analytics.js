@@ -3,10 +3,21 @@ import { Router } from 'express';
 import { asyncHandler } from '../../middleware/error.js';
 import { requirePermission } from '../../middleware/rbac.js';
 import * as analytics from '../../services/analyticsService.js';
+import * as profit from '../../services/profitService.js';
 import * as attribution from '../../services/attributionService.js';
 
 const router = Router();
 router.use(requirePermission('analytics.read'));
+
+/* Profit, which is a different question from revenue.
+   Its own endpoint rather than more fields on /overview: it carries three
+   periods, every product, three leaderboards and the coverage each figure was
+   computed over, and folding that into the revenue summary would make the one
+   number people read depend on a payload they did not ask for. */
+router.get('/profit', asyncHandler(async (req, res) => {
+  const limit = Math.min(Math.max(Number(req.query.limit) || 10, 1), 50);
+  res.json(await profit.profitDashboard({ limit }));
+}));
 
 router.get('/overview', asyncHandler(async (req, res) => {
   const days = Math.min(Number(req.query.days) || 30, 365);
