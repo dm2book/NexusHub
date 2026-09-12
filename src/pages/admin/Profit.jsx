@@ -26,10 +26,10 @@ const eur = (c) => (c == null ? '—' : money(c));
 function Coverage({ c }) {
   if (!c || c.unitsTotal === 0) return null;
   if (c.complete) {
-    return <p className="text-[11.5px] text-emerald-700 mt-1">every unit costed</p>;
+    return <p className="text-[11.5px] text-emerald-300 mt-1">every unit costed</p>;
   }
   return (
-    <p className="text-[11.5px] text-amber-700 mt-1 flex items-start gap-1">
+    <p className="text-[11.5px] text-amber-300 mt-1 flex items-start gap-1">
       <HelpCircle size={11} className="mt-0.5 shrink-0" />
       {c.units} of {c.unitsTotal} units costed{c.pct != null && ` · ${c.pct}% of revenue`}
     </p>
@@ -41,14 +41,14 @@ function Period({ title, p }) {
   return (
     <div className="card p-4">
       <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">{title}</p>
-      <p className="mt-2 text-2xl font-bold text-slate-900">{money(p.revenue)}</p>
-      <p className="text-[12px] text-slate-500">{p.orders} order(s) · {p.units} unit(s)</p>
-      <div className="mt-3 pt-3 border-t border-slate-100">
-        <p className={`text-xl font-bold ${loss ? 'text-rose-600' : 'text-slate-900'}`}>
+      <p className="mt-2 text-2xl font-bold text-white">{money(p.revenue)}</p>
+      <p className="text-[12px] text-slate-400">{p.orders} order(s) · {p.units} unit(s)</p>
+      <div className="mt-3 pt-3 border-t border-white/5">
+        <p className={`text-xl font-bold ${loss ? 'text-red-300' : 'text-white'}`}>
           {p.coverage.units === 0 ? '—' : money(p.profit)}
           {loss && <TrendingDown size={16} className="inline ml-1.5 -mt-1" />}
         </p>
-        <p className="text-[12px] text-slate-500">
+        <p className="text-[12px] text-slate-400">
           profit{p.marginPct != null && ` · ${p.marginPct}% margin`}
         </p>
         <Coverage c={p.coverage} />
@@ -60,17 +60,17 @@ function Period({ title, p }) {
 function Board({ title, icon: Icon, rows, render }) {
   return (
     <div className="card p-4">
-      <p className="font-semibold text-slate-800 flex items-center gap-2 mb-2">
-        <Icon size={15} className="text-violet-600" /> {title}
+      <p className="font-semibold text-slate-200 flex items-center gap-2 mb-2">
+        <Icon size={15} className="text-violet-400" /> {title}
       </p>
       {!rows.length
-        ? <p className="text-[13px] text-slate-500">Nothing to rank yet.</p>
+        ? <p className="text-[13px] text-slate-400">Nothing to rank yet.</p>
         : (
           <ol className="space-y-1.5">
             {rows.map((p, i) => (
               <li key={p.productId || p.name} className="flex items-baseline justify-between gap-3 text-[13px]">
-                <span className="text-slate-700 truncate"><span className="text-slate-400 mr-1.5">{i + 1}.</span>{p.name}</span>
-                <span className="font-semibold text-slate-900 whitespace-nowrap">{render(p)}</span>
+                <span className="text-slate-300 truncate"><span className="text-slate-400 mr-1.5">{i + 1}.</span>{p.name}</span>
+                <span className="font-semibold text-white whitespace-nowrap">{render(p)}</span>
               </li>
             ))}
           </ol>
@@ -87,20 +87,20 @@ export default function Profit() {
     api.get('/api/admin/analytics/profit').then(setD).catch((e) => setErr(e?.message || 'Could not load'));
   }, []);
 
-  if (err) return <p className="text-rose-600 text-sm">{err}</p>;
+  if (err) return <p className="text-red-300 text-sm">{err}</p>;
   if (!d) return <PageLoader />;
 
   const sev = {
-    loss: { cls: 'bg-rose-50 text-rose-800 border-rose-200', icon: TrendingDown },
-    thin: { cls: 'bg-amber-50 text-amber-800 border-amber-200', icon: AlertTriangle },
-    unknown: { cls: 'bg-slate-50 text-slate-600 border-slate-200', icon: HelpCircle },
+    loss: { cls: 'bg-red-500/10 text-red-300 border-red-500/25', icon: TrendingDown },
+    thin: { cls: 'bg-amber-500/10 text-amber-300 border-amber-500/25', icon: AlertTriangle },
+    unknown: { cls: 'bg-white/5 text-slate-400 border-white/10', icon: HelpCircle },
   };
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-bold text-slate-900">Profit</h1>
-        <p className="text-[13px] text-slate-500">
+        <h1 className="text-xl font-bold text-white">Profit</h1>
+        <p className="text-[13px] text-slate-400">
           Periods are {d.bounds.tz} days, not UTC. Cost and margin cover only the units with a
           known cost — {d.catalogue.withCost} of {d.catalogue.active} active products have one.
         </p>
@@ -114,8 +114,8 @@ export default function Profit() {
 
       <div className="card p-4">
         <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Average margin</p>
-        <p className="mt-1 text-3xl font-bold text-slate-900">{pct(d.averageMarginPct)}</p>
-        <p className="text-[12px] text-slate-500">
+        <p className="mt-1 text-3xl font-bold text-white">{pct(d.averageMarginPct)}</p>
+        <p className="text-[12px] text-slate-400">
           this month, over costed revenue only
           {d.averageMarginPct == null && ' — nothing with a known cost has sold yet'}
         </p>
@@ -144,9 +144,9 @@ export default function Profit() {
       </div>
 
       <div className="card p-4">
-        <p className="font-semibold text-slate-800 mb-2">Per product, this month</p>
+        <p className="font-semibold text-slate-200 mb-2">Per product, this month</p>
         {!d.products.length
-          ? <p className="text-[13px] text-slate-500">Nothing has sold yet.</p>
+          ? <p className="text-[13px] text-slate-400">Nothing has sold yet.</p>
           : (
             <div className="overflow-x-auto">
               <table className="w-full text-[13px]">
@@ -165,8 +165,8 @@ export default function Profit() {
                     const loss = p.profit != null && p.profit < 0;
                     const thin = !loss && p.marginPct != null && p.marginPct < d.minimumMarginPercent;
                     return (
-                      <tr key={p.productId || p.name} className="border-t border-slate-100">
-                        <td className="py-2 pr-3 text-slate-800">
+                      <tr key={p.productId || p.name} className="border-t border-white/5">
+                        <td className="py-2 pr-3 text-slate-200">
                           {p.name}
                           {p.unitCostCents == null && (
                             <span className="ml-2 text-[11px] text-slate-400">no cost entered</span>
@@ -177,11 +177,11 @@ export default function Profit() {
                         {/* "—", never "€0.00": a cost nobody entered is unknown,
                             and rendering it as zero is what made the margin
                             read 100%. */}
-                        <td className="pr-3 text-slate-500">{eur(p.cost)}</td>
-                        <td className={`pr-3 font-semibold ${loss ? 'text-rose-600' : 'text-slate-900'}`}>
+                        <td className="pr-3 text-slate-400">{eur(p.cost)}</td>
+                        <td className={`pr-3 font-semibold ${loss ? 'text-red-300' : 'text-white'}`}>
                           {eur(p.profit)}
                         </td>
-                        <td className={`pr-3 ${loss ? 'text-rose-600 font-semibold' : thin ? 'text-amber-700 font-semibold' : ''}`}>
+                        <td className={`pr-3 ${loss ? 'text-red-300 font-semibold' : thin ? 'text-amber-300 font-semibold' : ''}`}>
                           {pct(p.marginPct)}
                         </td>
                       </tr>

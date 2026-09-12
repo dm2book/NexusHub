@@ -95,6 +95,22 @@ field maps, CSV columns, auth). `supplierService.js` provides CRUD, product mapp
 and **inventory / price / status / full** syncs, each recorded in `supplier_sync_runs`.
 New integration styles = one subclass + `registerConnector(...)`.
 
+**Supply dashboard** (`supplierDashboardService.js`, `GET /api/admin/suppliers/dashboard`)
+answers the product-shaped question the supplier-shaped metrics could not: per
+product the supplier, cost, code stock, supplier stock and last sync; per supplier
+the product count, stock value and average cost. Three separate things are called
+"stock" in this schema and it keeps them apart — `product_codes` (the shelf
+auto-delivery claims from), `supplier_products.available_stock` (what the supplier
+last reported, `null` = unknown) and `products.stock` (enforced by nothing, sold
+from by nothing). Unknown is never rendered as zero, stock value is summed only
+over mappings that have both a cost and a count with the coverage stated beside
+it, and warnings are grouped rather than emitted one per product.
+
+The cost rule itself lives once, in `services/costService.js`: `pickCostMapping()`
+(active supplier, cost present, lowest priority, then most recently synced) with
+`costCentsForMany()` doing the whole catalogue in two queries and `costCentsFor()`
+delegating to it, so there is no fast reader and slow reader to drift apart.
+
 ## 5. Automated fulfillment
 
 Files: `services/fulfillmentService.js`, `routes/admin/fulfillment.js`.

@@ -297,7 +297,14 @@ console.log('\n— The page cannot render an unknown as zero —');
   ok('…and a null margin is a dash, not 0%', /n == null \? '—' : `\$\{n\}%`/.test(page));
   ok('a product with no cost says so on its row', /no cost entered/.test(page));
   ok('coverage is shown beside every period', /<Coverage c=\{p\.coverage\}/.test(page));
-  ok('a loss is coloured as one', /text-rose-600/.test(page));
+  /* Was `text-rose-600`. The admin shell is dark — `theme-light` comes from
+     StoreLayout, not from here — so rose-600 on #101019 measures 2.6:1 and
+     slate-900, which this page also used, measures 1.06:1. The whole page was
+     converted to the dark palette; a loss is still coloured as one, in a shade
+     that can actually be seen. */
+  ok('a loss is coloured as one', /text-red-300/.test(page));
+  ok('…in the dark palette the admin actually renders in',
+    !/text-slate-(700|800|900)/.test(page));
   ok('the page says which timezone the days are in', /\{d\.bounds\.tz\}/.test(page));
   ok('…and how much of the catalogue is costed',
     /d\.catalogue\.withCost.*d\.catalogue\.active/s.test(page));

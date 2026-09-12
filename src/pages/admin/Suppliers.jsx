@@ -4,6 +4,7 @@ import { api } from '../../lib/api.js';
 import { date, money } from '../../lib/format.js';
 import { PageLoader, EmptyState, Modal } from '../../components/ui.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
+import SupplyDashboard from '../../components/admin/SupplyDashboard.jsx';
 
 const KIND_HINT = {
   api: 'config: { baseUrl, auth:{type,token}, endpoints:{catalog,fulfill,status}, fieldMap }',
@@ -100,6 +101,10 @@ export default function Suppliers() {
       <p className="text-slate-400 text-sm mb-6">
         Connector-based integration layer — API, CSV, Eldorado and manual suppliers. No suppliers are hardcoded.
       </p>
+
+      {/* Supply, product-first: the view that shows a product NO supplier
+          covers, which by definition appears on no supplier's card below. */}
+      <SupplyDashboard />
 
       {/* Performance dashboard */}
       {metrics.length > 0 && (() => {

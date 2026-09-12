@@ -34,7 +34,7 @@
  * Everything returns CENTS. `buyPrice` is the one historical value in euros and
  * it is multiplied here rather than in four call sites.
  */
-import { get } from '../db/index.js';
+import { all } from '../db/index.js';
 
 /** Cost in cents from an already-parsed metadata object, or null. */
 export function costCentsFromMetadata(meta = {}) {
@@ -47,6 +47,79 @@ export function costCentsFromMetadata(meta = {}) {
 }
 
 /**
+ * Which of a product's supplier mappings supplies its cost — the rule itself,
+ * as a pure function over already-fetched rows.
+ *
+ * It lived only inside one query's ORDER BY, which meant any second reader of
+ * the same question (the supplier dashboard needs it for all 72 products at
+ * once, not one at a time) had to restate it — and a restated rule is a rule
+ * that drifts. This file exists because that already happened to the COLUMN
+ * NAME four times over. Stating the ordering once, here, is the cheap version
+ * of that lesson.
+ *
+ * Rows are `supplier_products` joined to their supplier, needing only
+ * `cost`, `priority`, `last_synced_at` and the supplier's `status`.
+ */
+export function pickCostMapping(mappings = []) {
+  const usable = mappings.filter(
+    (m) => m && m.supplier_status === 'active'
+      && m.cost != null && Number.isFinite(Number(m.cost)));
+  if (!usable.length) return null;
+  const at = (m) => (m.last_synced_at ? Date.parse(m.last_synced_at) || 0 : -Infinity);
+  return [...usable].sort((a, b) =>
+    (Number(a.priority ?? 100) - Number(b.priority ?? 100))   // lower priority number wins
+    || (at(b) - at(a)))[0];                                   // then the most recently synced
+}
+
+/** Every product's active cost mappings, keyed by product id. */
+export async function costMappingsByProduct(productIds = []) {
+  const out = {};
+  if (!productIds.length) return out;
+  const rows = await all(
+    `SELECT sp.product_id, sp.cost, sp.priority, sp.last_synced_at,
+            sp.available_stock, sp.supplier_status AS sku_status,
+            s.id AS supplier_id, s.name AS supplier_name,
+            s.connector_kind, s.status AS supplier_status
+       FROM supplier_products sp
+       JOIN suppliers s ON s.id = sp.supplier_id
+      WHERE sp.product_id = ANY(@ids)`, { ids: productIds }).catch(() => []);
+  for (const r of rows) (out[r.product_id] ||= []).push(r);
+  return out;
+}
+
+/**
+ * Cost in cents for many products at once → { productId: cents|null }.
+ *
+ * Two queries for the whole catalogue instead of two PER PRODUCT. `costCentsFor`
+ * below is this function with one id, so there is exactly one implementation of
+ * "what does this cost" rather than a fast one and a slow one that agree until
+ * they do not.
+ */
+export async function costCentsForMany(productIds = []) {
+  const ids = [...new Set(productIds.filter(Boolean))];
+  const out = {};
+  if (!ids.length) return out;
+  for (const id of ids) out[id] = null;
+
+  const byProduct = await costMappingsByProduct(ids);
+  const needMeta = [];
+  for (const id of ids) {
+    const picked = pickCostMapping(byProduct[id]);
+    if (picked) out[id] = Math.round(Number(picked.cost));
+    else needMeta.push(id);
+  }
+  if (!needMeta.length) return out;
+
+  const rows = await all('SELECT id, metadata FROM products WHERE id = ANY(@ids)',
+    { ids: needMeta }).catch(() => []);
+  for (const r of rows) {
+    try { out[r.id] = costCentsFromMetadata(JSON.parse(r.metadata || '{}')); }
+    catch { out[r.id] = null; }
+  }
+  return out;
+}
+
+/**
  * Cost in cents for a product id, supplier mapping first.
  *
  * Returns null when there is none — never 0. A missing cost and a free product
@@ -55,16 +128,7 @@ export function costCentsFromMetadata(meta = {}) {
  */
 export async function costCentsFor(productId) {
   if (!productId) return null;
-  const mapped = await get(
-    `SELECT sp.cost FROM supplier_products sp
-       JOIN suppliers s ON s.id = sp.supplier_id
-      WHERE sp.product_id = @p AND sp.cost IS NOT NULL AND s.status = 'active'
-      ORDER BY sp.priority ASC, sp.last_synced_at DESC NULLS LAST LIMIT 1`, { p: productId })
-    .catch(() => null);
-  if (mapped?.cost != null && Number.isFinite(Number(mapped.cost))) return Math.round(Number(mapped.cost));
-
-  const row = await get('SELECT metadata FROM products WHERE id = @p', { p: productId }).catch(() => null);
-  try { return costCentsFromMetadata(JSON.parse(row?.metadata || '{}')); } catch { return null; }
+  return (await costCentsForMany([productId]))[productId] ?? null;
 }
 
 /** The same, in euros, for the pricing engine's arithmetic. */

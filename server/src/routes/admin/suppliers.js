@@ -5,6 +5,7 @@ import { asyncHandler } from '../../middleware/error.js';
 import { requirePermission } from '../../middleware/rbac.js';
 import * as suppliers from '../../services/supplier/supplierService.js';
 import { supplierMetrics } from '../../services/supplier/supplierMetricsService.js';
+import { supplierDashboard } from '../../services/supplier/supplierDashboardService.js';
 import { availableKinds } from '../../services/supplier/registry.js';
 import { audit } from '../../services/auditService.js';
 import { notFound } from '../../utils/errors.js';
@@ -22,6 +23,13 @@ router.get('/', requirePermission('suppliers.read'), asyncHandler(async (_req, r
 // Performance dashboard: margin, reliability, fulfillment speed per supplier.
 router.get('/metrics', requirePermission('suppliers.read'), asyncHandler(async (_req, res) => {
   res.json({ metrics: await supplierMetrics() });
+}));
+
+/* Product-first supply view: who supplies what, at what cost, with how much on
+   the shelf. Declared ABOVE `/:id` — Express matches in order, and a dashboard
+   route below it is read as a supplier whose id is the word "dashboard". */
+router.get('/dashboard', requirePermission('suppliers.read'), asyncHandler(async (_req, res) => {
+  res.json(await supplierDashboard());
 }));
 
 router.get('/:id', requirePermission('suppliers.read'), asyncHandler(async (req, res) => {
