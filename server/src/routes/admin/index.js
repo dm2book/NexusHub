@@ -2,7 +2,7 @@
  * sub-route additionally enforces fine-grained permissions via RBAC. */
 import { Router } from 'express';
 import { requireAuth } from '../../middleware/auth.js';
-import { requireStaff } from '../../middleware/rbac.js';
+import { requireStaff, requirePermission } from '../../middleware/rbac.js';
 import orders from './orders.js';
 import suppliers from './suppliers.js';
 import fulfillment from './fulfillment.js';
@@ -19,6 +19,7 @@ import money from './money.js';
 import { asyncHandler } from '../../middleware/error.js';
 import { launchChecks } from '../../services/launchCheckService.js';
 import { launchPlan } from '../../services/launchPlanService.js';
+import { launchCenter } from '../../services/launchCenterService.js';
 import { listAll as listAllDrops, createDrop, deleteDrop } from '../../services/dropService.js';
 import { z } from 'zod';
 import { get } from '../../db/index.js';
@@ -42,6 +43,20 @@ router.get('/launch-check', asyncHandler(async (_req, res) => {
  */
 router.get('/launch-plan', asyncHandler(async (_req, res) => {
   res.json(await launchPlan());
+}));
+
+/**
+ * The launch command centre: today's money, today's failures, today's people.
+ *
+ * Polled every few seconds by the page, so two things matter more than usual.
+ * `no-store` — a cached "live" number is worse than a stale one that admits it,
+ * and both this app's edge and any proxy in front of it will happily serve a
+ * five-minute-old JSON body otherwise. And the payload carries its own age, so
+ * the page can render "updated 3s ago" instead of the word "live".
+ */
+router.get('/launch-center', requirePermission('analytics.read'), asyncHandler(async (_req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json(await launchCenter());
 }));
 
 // Action-item counts for the admin sidebar badges, so open tickets / pending

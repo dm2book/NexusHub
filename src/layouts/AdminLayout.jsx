@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Outlet, NavLink, Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   Zap, BarChart3, ShoppingCart, Truck, PackageCheck, Package,
-  Mail, ShieldAlert, LogOut, Store, LifeBuoy, Menu, X, Users, ShieldCheck, Activity, Gauge, Tag, LayoutGrid, TrendingUp, Euro, Percent } from 'lucide-react';
+  Mail, ShieldAlert, LogOut, Store, LifeBuoy, Menu, X, Users, ShieldCheck, Activity, Gauge, Tag, LayoutGrid, TrendingUp, Euro, Percent, Radio } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { api } from '../lib/api.js';
 
@@ -10,6 +10,7 @@ const NAV = [
   /* Money before Analytics on purpose. Analytics answers how the shop is
      doing; this answers what it made, and that is the question an owner
      opens the admin to ask. */
+  { to: '/admin/live', icon: Radio, label: 'Live', perm: 'analytics.read' },
   { to: '/admin/money', icon: Euro, label: 'Money', perm: 'analytics.read' },
   { to: '/admin', icon: BarChart3, label: 'Analytics', end: true, perm: 'analytics.read' },
   { to: '/admin/operations', icon: Gauge, label: 'Operations', perm: 'orders.read' },

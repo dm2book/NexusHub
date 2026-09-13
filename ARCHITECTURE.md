@@ -111,6 +111,30 @@ The cost rule itself lives once, in `services/costService.js`: `pickCostMapping(
 `costCentsForMany()` doing the whole catalogue in two queries and `costCentsFor()`
 delegating to it, so there is no fast reader and slow reader to drift apart.
 
+## 4b. Launch command centre
+
+Files: `services/launchCenterService.js`, `GET /api/admin/launch-center`,
+`src/pages/admin/Live.jsx`.
+
+Ten figures about right now in one snapshot: revenue, profit and orders today,
+chargebacks, refunds, failed deliveries, low stock, new and returning customers,
+and adverts delivering traffic.
+
+**"Realtime" here means polling that admits its age.** This shop is one
+serverless function, where a held-open SSE stream is billed by the second and
+killed at the function's max duration — it would drop on a timer and leave a
+frozen number looking live. So the endpoint is cheap (nine grouped queries, no
+per-product round trips, `Cache-Control: no-store`), the payload carries
+`generatedAt` and `tookMs`, and the page renders "Updated 4s ago" rather than
+the word *live*. Polling stops while the tab is hidden and refreshes on return.
+
+Two rules the numbers depend on. **New + returning must partition the day's
+buyers exactly**, so both halves come from one query, and a buyer is an *email*
+— most orders here are guest checkouts with `user_id` NULL. **A refund and a
+chargeback are opposite facts** about the same money and are never summed. Low
+stock reuses `stockTierFor` and excludes products sourced live from a supplier,
+which are supposed to hold no codes.
+
 ## 5. Automated fulfillment
 
 Files: `services/fulfillmentService.js`, `routes/admin/fulfillment.js`.
