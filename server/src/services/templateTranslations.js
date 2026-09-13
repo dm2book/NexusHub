@@ -110,6 +110,7 @@ export const TEMPLATE_TRANSLATIONS = {
           <a href="{{order.url}}" style="display:block;padding:15px 24px;font:700 16px/1 'Segoe UI',Arial,sans-serif;color:#ffffff;text-decoration:none">View your order</a>
         </td>
       </tr></table>
+      {{order.reviewAskHtml}}
       <div style="font:400 13px/1.6 'Segoe UI',Arial,sans-serif;color:#8b8fa3;text-align:center;padding-top:16px">Something not right? Just reply to this email or open a ticket in our Discord — real humans, fast. 💬</div>`,
     },
     refund_issued: {
@@ -298,6 +299,7 @@ export const TEMPLATE_TRANSLATIONS = {
           <a href="{{order.url}}" style="display:block;padding:15px 24px;font:700 16px/1 'Segoe UI',Arial,sans-serif;color:#ffffff;text-decoration:none">Bestellung ansehen</a>
         </td>
       </tr></table>
+      {{order.reviewAskHtml}}
       <div style="font:400 13px/1.6 'Segoe UI',Arial,sans-serif;color:#8b8fa3;text-align:center;padding-top:16px">Stimmt etwas nicht? Antworte auf diese Mail oder öffne ein Ticket auf unserem Discord — echte Menschen, schnelle Antwort. 💬</div>`,
     },
     refund_issued: {
@@ -489,6 +491,7 @@ export const TEMPLATE_TRANSLATIONS = {
           <a href="{{order.url}}" style="display:block;padding:15px 24px;font:700 16px/1 'Segoe UI',Arial,sans-serif;color:#ffffff;text-decoration:none">Voir ma commande</a>
         </td>
       </tr></table>
+      {{order.reviewAskHtml}}
       <div style="font:400 13px/1.6 'Segoe UI',Arial,sans-serif;color:#8b8fa3;text-align:center;padding-top:16px">Quelque chose ne va pas ? Réponds à cet e-mail ou ouvre un ticket sur notre Discord — de vraies personnes, vite. 💬</div>`,
     },
     refund_issued: {

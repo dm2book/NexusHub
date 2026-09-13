@@ -500,11 +500,17 @@ export default function HomeStore() {
                 letters into a ::before takes it out of the running without
                 changing a pixel. */}
             <span className="fm-ghostword" aria-hidden />
+            {/* Film grain over the light, under the copy. One inline SVG; it is
+                what stops a large soft gradient reading as a banded purple
+                rectangle. */}
+            <span className="fm-grain" aria-hidden />
             {/* On xl the feature cards get their own column instead of floating
-                over the artwork, which used to bury the right-hand logos. */}
-            <div className="grid lg:grid-cols-[1.05fr_1fr] 2xl:grid-cols-[1.1fr_1fr_206px] gap-8 2xl:gap-6 items-center">
+                over the artwork, which used to bury the right-hand logos.
+                `z-[2]` puts every word above the stage decoration rather than
+                relying on which siblings happen to be positioned. */}
+            <div className="relative z-[2] grid lg:grid-cols-[1.05fr_1fr] 2xl:grid-cols-[1.1fr_1fr_206px] gap-8 2xl:gap-6 items-center">
               <div className="relative fm-stagger" style={{ '--fm-stagger': '90ms' }}>
-                <span className="inline-flex items-center gap-2 text-[13px] font-semibold text-violet-100 bg-white/10 border border-white/15 backdrop-blur rounded-full px-3 py-1.5">
+                <span className="fm-pill inline-flex items-center gap-2 text-[13px] font-semibold text-violet-100 rounded-full px-3.5 py-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-violet-300 animate-pulse" /> {tr('home.badge', 'Buyer protected · Real human support')}
                 </span>
                 {/* "Everything You Need, All in One Place" said nothing about
@@ -512,7 +518,7 @@ export default function HomeStore() {
                     page carrying zero information. It now names the three things
                     this shop actually stocks, and the second line is the part a
                     stranger taking a bank transfer is really weighing. */}
-                <h1 className="fm-head fm-streak text-white text-[30px] xs:text-[34px] sm:text-[50px] leading-[1.06] mt-4 tracking-[-.02em]">
+                <h1 className="fm-head fm-streak text-white text-[31px] xs:text-[35px] sm:text-[46px] lg:text-[50px] xl:text-[55px] leading-[1.04] mt-4 tracking-[-.028em]">
                   {tr('home.h1a', 'Game currency, gift cards')}<br />
                   <span className="fm-gradient-text">{tr('home.h1b', 'and subscriptions.')}</span>
                 </h1>
@@ -524,7 +530,7 @@ export default function HomeStore() {
                 <div className="flex flex-wrap gap-2 mt-4">
                   {pillars.map((p) => (
                     <Link key={p.key} to={landingPathFor(p.cats[0].slug)}
-                      className="fm-press text-[13px] font-semibold text-white/95 bg-white/10 hover:bg-white/[.16] border border-white/15 rounded-full px-3.5 py-2 transition">
+                      className="fm-pill fm-press text-[13px] font-semibold text-white/95 rounded-full px-3.5 py-2">
                       {tr(`home.pillar.${p.key}`, p.title)}
                     </Link>
                   ))}
@@ -541,7 +547,7 @@ export default function HomeStore() {
                       have. The real second question a stranger has, on a shop
                       with no reviews that asks for a bank transfer, is not
                       "where are the products" but "how does paying work". */}
-                  <Link to="/how-it-works" className="fm-press inline-flex items-center gap-2 font-semibold rounded-xl px-6 h-12 border border-white/25 text-white hover:bg-white/10 transition">
+                  <Link to="/how-it-works" className="fm-pill fm-press inline-flex items-center gap-2 font-semibold rounded-xl px-6 h-12 text-white">
                     {tr('home.howPay', 'How paying works')}
                   </Link>
                 </div>
@@ -575,7 +581,7 @@ export default function HomeStore() {
                      this shop can say, at the visual weight of a disclaimer.
                      Each now leads with the claim in white and carries the
                      qualifier behind it, on a panel that reads as one block. */
-                  <ul className="flex flex-col gap-2.5 mt-7 rounded-2xl bg-white/[.06] border border-white/12 backdrop-blur px-4 py-3.5">
+                  <ul className="fm-trustpanel flex flex-col gap-2.5 mt-7 rounded-2xl px-4 py-3.5">
                     {[
                       { lead: tr('home.trustWhoLead', 'A named person, in the Netherlands'),
                         rest: tr('home.trustWho2', 'not a faceless storefront — name and contact on every page') },
@@ -944,7 +950,22 @@ function HeroRender() {
   const ref = useRef(null);
   useParallax(ref);
   return (
-    <div ref={ref} className="relative h-[320px] sm:h-[360px]">
+    <div ref={ref} className="relative h-[250px] sm:h-[360px]">
+      {/* SCALED, not squashed.
+          Shortening this box on a phone to save a screenful of scrolling moved
+          the absolutely-positioned logos into each other — Valorant landed on
+          top of the Roblox coin and the Xbox tile disappeared behind the
+          PlayStation one. Percentages and fixed pixel sizes do not survive a
+          change of container height.
+
+          Scaling alone did not fix it either: every asset is placed at a
+          PERCENTAGE of the container width, so a 358px phone column squeezed
+          them together horizontally no matter what scale was applied — V-Bucks
+          landed on the PlayStation tile. The composition therefore gets a fixed
+          460px width (what the desktop column measures) and is centred and
+          scaled to fit: 460 × .78 ≈ 358, so the proportions are identical on a
+          phone and on a monitor. */}
+      <div className="absolute left-1/2 top-0 -translate-x-1/2 w-[460px] h-[320px] sm:h-[360px] origin-top scale-[.78] sm:scale-100">
       {/* ambient glow */}
       <div className="fm-px absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[340px] h-[340px] rounded-full blur-3xl" style={{ '--d': 0.03, background: 'radial-gradient(circle, rgba(124,92,255,.4), transparent 66%)' }} />
       {/* podium reflection */}
@@ -953,13 +974,13 @@ function HeroRender() {
       {/* sparkles (deepest layer — drift the most) */}
       {[['12%', '16%'], ['84%', '22%'], ['66%', '6%'], ['20%', '72%'], ['90%', '60%'], ['48%', '90%']].map(([l, t], i) => (
         <div key={i} className="fm-px absolute" style={{ left: l, top: t, '--d': 0.16 + (i % 3) * 0.04 }}>
-          <Sparkles size={i % 2 ? 16 : 12} className="text-violet-300/80 fm-orbit" style={{ animationDelay: `${i * 0.55}s`, '--orbit-dur': `${8 + i}s` }} />
+          <Sparkles size={i % 2 ? 16 : 12} className="text-violet-300/80 fm-drift" style={{ animationDelay: `${i * 0.55}s`, '--orbit-dur': `${8 + i}s` }} />
         </div>
       ))}
       {/* center V-Bucks (foreground — drifts least, feels closest) */}
       <div className="fm-px absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10" style={{ '--d': 0.04 }}>
         <span className="fm-hero-item" style={{ '--halo': HALO['v-bucks'] }}>
-          <img src={ICON('v-bucks')} alt="" className="w-[150px] h-[150px] object-contain drop-shadow-2xl fm-orbit"
+          <img src={ICON('v-bucks')} alt="" className="w-[150px] h-[150px] object-contain drop-shadow-2xl fm-drift"
             style={{ '--orbit-dur': '13s' }} />
         </span>
       </div>
@@ -970,6 +991,7 @@ function HeroRender() {
       <PxAsset icon="xbox"          depth={0.11} float="fm-float2" size="w-[84px] h-[84px]" pos="right-[18%] bottom-[4%]" delay=".2s" halo={HALO.xbox} />
       <PxAsset icon="playstation"   depth={0.09} float="fm-float3" size="w-28 h-28" pos="right-[3%] top-[32%]"  delay=".5s" halo={HALO.playstation} />
       <PxAsset icon="discord-nitro" depth={0.14} float="fm-float"  size="w-[68px] h-[68px]" pos="right-[24%] top-[4%]" delay=".8s" halo={HALO['discord-nitro']} />
+      </div>
     </div>
   );
 }

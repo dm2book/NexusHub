@@ -1233,6 +1233,35 @@ function consentHtml(order, lang) {
 }
 
 /**
+ * The review ask, in the mail that lands the moment the thing arrives.
+ *
+ * There is already a `review_request` mail, sent later on its own schedule.
+ * This is not that: it is one line at the bottom of the DELIVERY mail, which
+ * is the message with the highest open rate this shop will ever send and the
+ * only moment the buyer is holding what they paid for. A shop with no reviews
+ * at all has exactly one job with its first hundred orders, and asking a day
+ * later — after the feeling has gone — is asking at the wrong time.
+ *
+ * Renders as an empty string when no Trustpilot profile is configured, like
+ * every other optional block here, so an unconfigured shop simply sends one
+ * paragraph fewer rather than a button that goes nowhere.
+ *
+ * Points at the WRITE form, not the profile page: this is an ask, and a
+ * profile page makes them hunt for the button before they can start.
+ */
+function reviewAskHtml(order, lang) {
+  const url = config.shop.trustpilotReviewUrl;
+  if (!url) return '';
+  const c = emailCopy(lang);
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:22px 0 0">
+    <tr><td style="border-radius:12px;background-color:#14141f;border:1px solid #2a2a40;padding:16px 18px">
+      <div style="font:700 14px/1.3 'Segoe UI',Arial,sans-serif;color:#ffffff">${escapeHtml(c.reviewAskTitle)}</div>
+      <div style="font:400 13px/1.6 'Segoe UI',Arial,sans-serif;color:#9aa3b8;padding-top:6px">${escapeHtml(c.reviewAskBody)}</div>
+      <div style="padding-top:12px"><a href="${url}" style="font:700 13px/1 'Segoe UI',Arial,sans-serif;color:#f59e0b;text-decoration:none">⭐ ${escapeHtml(c.reviewAskCta)} →</a></div>
+    </td></tr></table>`;
+}
+
+/**
  * The one thing we still need from the buyer, asked where they will read it.
  *
  * A Robux order goes onto an account, and until we know which account it can
@@ -1435,6 +1464,7 @@ function emailContext(order, ctx = {}) {
       paymentHtml: paymentInstructionsHtml(order, lang),
       consentHtml: consentHtml(order, lang),
       needsFromBuyerHtml: needsFromBuyerHtml(order, lang),
+      reviewAskHtml: reviewAskHtml(order, lang),
       url: orderUrlFor(order),
     },
     refund: ctx.refundAmount != null

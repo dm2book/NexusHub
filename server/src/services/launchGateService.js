@@ -203,11 +203,25 @@ export function isAdminEmail(email) {
   return config.auth.adminEmails.includes(String(email || '').toLowerCase());
 }
 
-/** The launch day in words, as a visitor would say it: "24 September". */
+/**
+ * The launch day in words, as a visitor would say it: "24 October".
+ *
+ * In the SHOP's timezone, not UTC. This has no visitor to ask — it goes into
+ * API errors and emails — so it uses the zone the shop keeps its books in, the
+ * same one the profit dashboard counts its days in.
+ *
+ * UTC here forced a choice between two wrong answers. A shop opening at Dutch
+ * midnight is `2026-10-23T22:00:00Z`, which UTC renders as "23 October" — a
+ * message naming the day before the one it opens on. Setting
+ * `2026-10-24T00:00:00Z` instead to make the words read right opens the shop at
+ * 02:00 local. Formatting in the shop's own zone removes the choice.
+ */
 export function launchDayLabel() {
   const iso = launchAtIso();
   return iso
-    ? new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', timeZone: 'UTC' })
+    ? new Date(iso).toLocaleDateString('en-GB', {
+      day: 'numeric', month: 'long', timeZone: config.timezone || 'Europe/Amsterdam',
+    })
     : 'launch day';
 }
 

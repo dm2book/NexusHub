@@ -1547,4 +1547,37 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS lang TEXT;
       ALTER TABLE market_price_recommendations ADD COLUMN IF NOT EXISTS mean_cents INTEGER;
     `,
   },
+  {
+    id: '038_delivery_mail_review_ask',
+    /*
+     * The review ask, added to the mail that arrives WITH the thing bought.
+     *
+     * Editing defaultTemplates.js does nothing to a shop that is already
+     * running: the templates live in this table, seeded once, and admin-editable
+     * from then on. So a change to the shipped copy reaches new installs only —
+     * which is a change that looks done, passes its tests, and never appears in
+     * a single real email. Caught by rendering an order and finding the block
+     * absent, not by reading the diff.
+     *
+     * Anchored on the support line's style attribute, which is byte-identical in
+     * all four languages while the prose is not, so one statement places the
+     * token correctly in each. Two deliberate properties:
+     *
+     *   - `NOT LIKE '%reviewAskHtml%'` makes it idempotent.
+     *   - REPLACE finds nothing in a body an admin has rewritten, so their
+     *     version is left exactly as they wrote it rather than half-patched.
+     *
+     * The block itself renders empty until TRUSTPILOT_URL is set, so this is
+     * safe to run on a shop that has no profile yet.
+     */
+    sql: `
+      UPDATE email_templates
+         SET body_html = REPLACE(
+               body_html,
+               '<div style="font:400 13px/1.6 ''Segoe UI'',Arial,sans-serif;color:#8b8fa3;text-align:center;padding-top:16px">',
+               '{{order.reviewAskHtml}}<div style="font:400 13px/1.6 ''Segoe UI'',Arial,sans-serif;color:#8b8fa3;text-align:center;padding-top:16px">')
+       WHERE id = 'order_completed'
+         AND body_html NOT LIKE '%reviewAskHtml%';
+    `,
+  },
 ];

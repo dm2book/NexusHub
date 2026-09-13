@@ -112,6 +112,7 @@ export const DEFAULT_TEMPLATES = [
           <a href="{{order.url}}" style="display:block;padding:15px 24px;font:700 16px/1 'Segoe UI',Arial,sans-serif;color:#ffffff;text-decoration:none">Bekijk je bestelling</a>
         </td>
       </tr></table>
+      {{order.reviewAskHtml}}
       <div style="font:400 13px/1.6 'Segoe UI',Arial,sans-serif;color:#8b8fa3;text-align:center;padding-top:16px">Klopt er iets niet? Beantwoord deze mail of open een ticket in onze Discord — echte mensen, snel antwoord. 💬</div>`,
   },
   {
