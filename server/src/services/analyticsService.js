@@ -3,7 +3,7 @@
  * Revenue counts only paid, non-refunded orders.
  */
 import { get, all } from '../db/index.js';
-import { costCentsFor } from './costService.js';
+import { costCentsForMany } from './costService.js';
 import { formatMoney } from '../utils/money.js';
 import { visitorStats } from './trackingService.js';
 
@@ -90,11 +90,9 @@ async function supplierCost(since) {
      metadata.cost while the engine read metadata.costCents, which meant gross
      margin could show a healthy number on this page while every pricing
      recommendation was blocked for want of the same figure. */
-  const costMap = {};
-  for (const id of [...new Set(items.map((i) => i.pid).filter(Boolean))]) {
-    // null stays null. An unknown cost is unknown; only zero is zero.
-    costMap[id] = await costCentsFor(id);
-  }
+  // null stays null. An unknown cost is unknown; only zero is zero. Two
+  // queries for the whole set rather than two per product.
+  const costMap = await costCentsForMany(items.map((i) => i.pid).filter(Boolean));
   let cost = 0; let costedRevenue = 0; let costedUnits = 0; let totalUnits = 0;
   for (const i of items) {
     const qty = Number(i.qty) || 1;

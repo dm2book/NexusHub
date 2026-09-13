@@ -28,7 +28,7 @@
  * Losses are shown as losses.
  */
 import { all, get } from '../db/index.js';
-import { costCentsFor } from './costService.js';
+import { costCentsForMany } from './costService.js';
 import { config } from '../config/env.js';
 import { formatMoney } from '../utils/money.js';
 
@@ -94,12 +94,18 @@ async function linesSince(since) {
       WHERE ${PAID.replace(/status/g, 'o.status')} AND o.created_at >= @since`, { since });
 }
 
-/** Unit cost per product id, in cents. NULL where we do not know it. */
+/**
+ * Unit cost per product id, in cents. NULL where we do not know it.
+ *
+ * Two queries for the whole set. This was one `costCentsFor` per product inside
+ * an await loop — two round trips each — which is invisible locally and is
+ * roughly 3.6 seconds of pure waiting against a managed Postgres in another
+ * region once the catalogue and the day's sales are both in play. The command
+ * centre polls this every few seconds, so it is the difference between a live
+ * page and a page that is permanently catching up.
+ */
 async function costMapFor(lines) {
-  const ids = [...new Set(lines.map((l) => l.pid).filter(Boolean))];
-  const out = {};
-  for (const id of ids) out[id] = await costCentsFor(id);   // null stays null
-  return out;
+  return costCentsForMany(lines.map((l) => l.pid).filter(Boolean));
 }
 
 /**
@@ -286,9 +292,9 @@ export async function profitDashboard({ now = Date.now(), tz, limit = 10 } = {})
     `SELECT COUNT(*) AS n FROM products WHERE active = 1`).catch(() => ({ n: 0 }));
   const catalogueCosted = await (async () => {
     const rows = await all(`SELECT id FROM products WHERE active = 1`).catch(() => []);
-    let n = 0;
-    for (const r of rows) if ((await costCentsFor(r.id)) != null) n += 1;
-    return n;
+    // Was 2 queries per active product — 144 round trips on this catalogue.
+    const costs = await costCentsForMany(rows.map((r) => r.id));
+    return Object.values(costs).filter((c) => c != null).length;
   })();
 
   return {
