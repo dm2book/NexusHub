@@ -41,7 +41,16 @@ router.get('/:id', requirePermission('suppliers.read'), asyncHandler(async (req,
 router.post('/', requirePermission('suppliers.manage'), asyncHandler(async (req, res) => {
   const body = z.object({
     name: z.string().min(1),
-    connectorKind: z.enum(['api', 'csv', 'manual']),
+    /* The kinds the REGISTRY actually has, not a copy of them.
+       This was hardcoded to ['api','csv','manual'] while the registry had six
+       and the admin dropdown offered all six — so picking Kinguin, G2A or
+       Eldorado and pressing Create answered
+         "Invalid enum value. Expected 'api' | 'csv' | 'manual'"
+       The three integrations that auto-buy and auto-deliver were unreachable
+       through the only screen that creates a supplier, and the error blamed
+       the person typing. Derived here so a registerConnector() call is enough
+       to make a kind usable, which is what the registry says it is for. */
+    connectorKind: z.enum(availableKinds()),
     config: z.record(z.any()).optional(),
     credentialsRef: z.string().optional(),
   }).parse(req.body);
