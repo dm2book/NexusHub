@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Truck, Plus, RefreshCw, Plug, Link2 } from 'lucide-react';
+import { Truck, Plus, RefreshCw, Plug, Link2, Search } from 'lucide-react';
 import { api } from '../../lib/api.js';
 import { date, money } from '../../lib/format.js';
 import { PageLoader, EmptyState, Modal } from '../../components/ui.jsx';
@@ -38,6 +38,8 @@ export default function Suppliers() {
   const [products, setProducts] = useState([]);
   const [mappings, setMappings] = useState([]);
   const [mapForm, setMapForm] = useState({ productId: '', supplierSku: '', supplierUrl: '', costEuro: '', priority: '100' });
+  // Catalogue picker: search the supplier instead of hunting for an id by hand.
+  const [search, setSearch] = useState({ q: '', results: [], busy: false, err: '', ran: false, serverSide: false, searchedFor: '' });
 
   const load = () => {
     api.get('/api/admin/suppliers').then((r) => setSuppliers(r.suppliers)).catch(() => setSuppliers([]));
@@ -73,9 +75,55 @@ export default function Suppliers() {
 
   const openMap = async (s) => {
     setMapFor(s); setMapForm({ productId: '', supplierSku: '', supplierUrl: '', costEuro: '', priority: '100' });
+    setSearch({ q: '', results: [], busy: false, err: '', ran: false, serverSide: false, searchedFor: '' });
     if (!products.length) api.get('/api/admin/products').then((r) => setProducts(r.products || [])).catch(() => {});
     api.get(`/api/admin/suppliers/${s.id}/products`).then((r) => setMappings(r.mappings || [])).catch(() => setMappings([]));
   };
+  /* The picker. Mapping used to ask for a supplier SKU — for Kinguin a numeric
+     kinguinId — that could not be looked up anywhere in this admin, so the only
+     way to fill it was to go hunting on their site and retype a number, once
+     per product, with a chance each time of pointing a product at the wrong
+     listing and selling somebody the wrong thing. */
+  const runSearch = async (q, productId) => {
+    const term = (q || '').trim();
+    if (term.length < 3) {
+      setSearch((v) => ({ ...v, results: [], ran: false, err: '' }));
+      return;
+    }
+    setSearch((v) => ({ ...v, busy: true, err: '' }));
+    try {
+      const params = new URLSearchParams({ q: term });
+      if (productId) params.set('productId', productId);
+      const r = await api.get(`/api/admin/suppliers/${mapFor.id}/search?${params}`);
+      setSearch((v) => ({
+        ...v, busy: false, ran: true, results: r.results || [],
+        serverSide: !!r.serverSide, searchedFor: r.searchedFor || term,
+      }));
+    } catch (err) {
+      setSearch((v) => ({ ...v, busy: false, ran: true, results: [], err: err.message }));
+    }
+  };
+
+  /* Picking a product searches for it immediately, so the common path is
+     "choose product → click the right listing" with nothing typed at all. */
+  const pickProduct = (productId) => {
+    setMapForm((f) => ({ ...f, productId, supplierSku: '', costEuro: '', supplierUrl: '' }));
+    const p = products.find((x) => x.id === productId);
+    const q = p?.name || '';
+    setSearch((v) => ({ ...v, q }));
+    if (productId) runSearch(q, productId);
+  };
+
+  /** One click fills everything the mapping needs. */
+  const useResult = (r) => {
+    setMapForm((f) => ({
+      ...f,
+      supplierSku: r.supplierSku,
+      costEuro: r.cost != null ? (r.cost / 100).toFixed(2) : '',
+      supplierUrl: r.url || '',
+    }));
+  };
+
   const addMapping = async () => {
     if (!mapForm.productId || !mapForm.supplierSku.trim()) { toast.error('Pick a product and enter the supplier SKU/ID.'); return; }
     setBusy(true);
@@ -211,10 +259,77 @@ export default function Suppliers() {
         <p className="text-slate-500 text-sm mb-4">Link one of your products to this supplier’s SKU. Once mapped (and the supplier can fulfil), paid orders for that product are auto-sourced &amp; delivered — no manual step.</p>
         <div className="grid sm:grid-cols-2 gap-3">
           <div className="sm:col-span-2"><label className="label">Your product</label>
-            <select className="input" value={mapForm.productId} onChange={(e) => setMapForm({ ...mapForm, productId: e.target.value })}>
+            <select className="input" value={mapForm.productId} onChange={(e) => pickProduct(e.target.value)}>
               <option value="">Select a product…</option>
               {products.map((p) => <option key={p.id} value={p.id}>{p.name} — {money(p.price, p.currency)}</option>)}
             </select></div>
+        </div>
+
+        {/* Search the supplier's own catalogue. */}
+        <div className="mt-4">
+          <label className="label">Find it in {mapFor?.name || 'the supplier'}’s catalogue</label>
+          <div className="flex gap-2">
+            <input className="input flex-1" value={search.q}
+              onChange={(e) => setSearch((v) => ({ ...v, q: e.target.value }))}
+              onKeyDown={(e) => e.key === 'Enter' && runSearch(search.q, mapForm.productId)}
+              placeholder="e.g. Roblox gift card — at least 3 characters" />
+            <button onClick={() => runSearch(search.q, mapForm.productId)}
+              disabled={search.busy || search.q.trim().length < 3} className="btn-ghost text-sm">
+              <Search size={14} /> {search.busy ? 'Searching…' : 'Search'}
+            </button>
+          </div>
+          <p className="text-slate-400 text-xs mt-1">
+            Picking a product above searches for it automatically. Click a result to fill the SKU and cost.
+            {search.ran && !search.serverSide && ' This supplier has no catalogue search, so only what it already listed was filtered.'}
+          </p>
+
+          {/* What was actually asked is often not what was typed — the shop
+              writes "1,000 Robux" and the supplier lists "1000 Robux". Saying so
+              stops an empty list reading as "they do not carry it". */}
+          {search.ran && search.searchedFor && search.searchedFor !== search.q.trim() && (
+            <p className="text-slate-400 text-xs mt-1">
+              Searched for “{search.searchedFor}” — your product name found nothing.
+            </p>
+          )}
+          {search.err && <p className="text-amber-300 text-xs mt-2">{search.err}</p>}
+          {search.ran && !search.busy && !search.results.length && !search.err && (
+            <p className="text-slate-400 text-sm mt-2">
+              Nothing found for “{search.searchedFor || search.q}”. This supplier may simply not carry it —
+              which is worth knowing before you promise it on the shop.
+            </p>
+          )}
+
+          {search.results.length > 0 && (
+            <div className="card mt-2 max-h-72 overflow-y-auto divide-y divide-white/5">
+              {search.results.map((r) => (
+                <button key={r.supplierSku} onClick={() => useResult(r)}
+                  className={`w-full text-left px-3 py-2.5 hover:bg-white/5 transition
+                    ${mapForm.supplierSku === r.supplierSku ? 'bg-white/[0.07]' : ''}`}>
+                  <div className="flex items-baseline justify-between gap-3">
+                    <span className="text-slate-200 text-sm truncate">{r.name}</span>
+                    <span className="text-slate-300 text-sm whitespace-nowrap">{money(r.cost, 'EUR')}</span>
+                  </div>
+                  <div className="text-xs text-slate-400 mt-0.5 flex flex-wrap gap-x-2">
+                    <span className="font-mono">#{r.supplierSku}</span>
+                    {r.platform && <span>· {r.platform}</span>}
+                    {r.region && <span>· {r.region}</span>}
+                    <span className={r.status === 'in_stock' ? 'text-emerald-300' : 'text-amber-300'}>
+                      · {r.status === 'in_stock' ? `${r.availableStock ?? '?'} in stock` : 'out of stock'}
+                    </span>
+                    {/* The exact condition fulfillmentService refuses on. It is
+                        silent at order time — the order just never auto-delivers —
+                        so it has to be loud while choosing. */}
+                    {r.wouldRefuseAutoBuy
+                      ? <span className="text-red-300">· costs more than you sell it for — would never auto-buy</span>
+                      : r.marginPct != null && <span className="text-emerald-300">· {r.marginPct}% margin</span>}
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="grid sm:grid-cols-2 gap-3 mt-4">
           <div><label className="label">Supplier SKU / offer ID</label>
             <input className="input" value={mapForm.supplierSku} onChange={(e) => setMapForm({ ...mapForm, supplierSku: e.target.value })} placeholder="e.g. ELD-ROBUX-1000" /></div>
           <div className="sm:col-span-2"><label className="label">Listing URL (e.g. Eldorado link)</label>

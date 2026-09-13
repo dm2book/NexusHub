@@ -56,17 +56,66 @@ export class KinguinConnector extends SupplierConnector {
     catch (e) { return { ok: false, detail: e.message }; }
   }
 
-  async fetchCatalog() {
-    if (!this.config.apiKey) return [];
-    const data = await this.#request('/v1/products?limit=100');
-    const items = data?.results || data?.items || (Array.isArray(data) ? data : []);
-    return items.map((p) => ({
+  /**
+   * One Kinguin listing → one normalized catalog item.
+   *
+   * Shared by fetchCatalog and searchCatalog on purpose. Two copies of this
+   * mapping is how the price you see while choosing a product stops matching
+   * the price the sync writes a week later — and the cost is what the margin
+   * guard compares against before it is allowed to buy anything.
+   */
+  static normalise(p) {
+    const qty = Number(p.qty ?? p.textQty ?? 0);
+    return {
       supplierSku: String(p.kinguinId ?? p.productId ?? p.id ?? ''),
       name: p.name || p.originalName || 'Kinguin product',
       cost: Math.round(Number(p.price ?? p.retailPrice ?? 0) * 100),
-      availableStock: Number(p.qty ?? p.textQty ?? 0) || null,
-      status: Number(p.qty ?? 0) > 0 ? 'in_stock' : 'out_of_stock',
-    })).filter((x) => x.supplierSku);
+      availableStock: Number.isFinite(qty) && qty > 0 ? qty : null,
+      status: qty > 0 ? 'in_stock' : 'out_of_stock',
+      /* Context a person needs to tell two near-identical listings apart. The
+         same card in another region is a different product to the buyer, and
+         picking the wrong one means selling something that will not redeem. */
+      platform: p.platform || null,
+      region: p.regionalLimitations || p.regionId || null,
+      url: p.kinguinId ? `https://www.kinguin.net/category/${p.kinguinId}` : null,
+    };
+  }
+
+  #items(data) {
+    const items = data?.results || data?.items || (Array.isArray(data) ? data : []);
+    return items.map((p) => KinguinConnector.normalise(p)).filter((x) => x.supplierSku);
+  }
+
+  async fetchCatalog() {
+    if (!this.config.apiKey) return [];
+    return this.#items(await this.#request('/v1/products?limit=100'));
+  }
+
+  /* Kinguin searches server-side, which is the only useful kind here: the
+     catalogue runs to tens of thousands of listings, so filtering the first
+     hundred locally would find your product only by luck. */
+  get supportsSearch() { return !!this.config.apiKey; }
+
+  /**
+   * Search the supplier's catalogue by name.
+   *
+   * `name` needs at least 3 characters per Kinguin's own documentation, so a
+   * shorter term is refused HERE rather than sent and rejected — an API error
+   * for something we can see is wrong is a worse answer than "type a bit more".
+   *
+   * Results are ordered so the ones you can actually buy come first: in stock
+   * before out of stock, then cheapest. Nothing is filtered out — an
+   * out-of-stock listing at the right price is still the product you were
+   * looking for, and hiding it looks like the product does not exist.
+   */
+  async searchCatalog(query, { limit = 25 } = {}) {
+    const q = String(query || '').trim();
+    if (!this.config.apiKey || q.length < 3) return [];
+    const params = new URLSearchParams({ name: q, limit: String(Math.min(Math.max(1, limit), 100)) });
+    const rows = this.#items(await this.#request(`/v1/products?${params}`));
+    return rows.sort((a, b) =>
+      (a.status === 'in_stock' ? 0 : 1) - (b.status === 'in_stock' ? 0 : 1)
+      || (a.cost - b.cost));
   }
 
   /** Place the buy order (async delivery — poll checkFulfillment for keys). */
