@@ -61,5 +61,37 @@ console.log('\n— registry knows the kinguin kind —');
 const { availableKinds } = await import('../src/services/supplier/registry.js');
 ok(availableKinds().includes('kinguin'), 'kinguin registered as a connector kind', availableKinds().join(','));
 
+console.log('\n— …and reachable through the only screen that creates a supplier —');
+{
+  /* Registering a connector is not enough to be able to USE one. The create
+     route validated `connectorKind` against a hardcoded ['api','csv','manual']
+     while the registry held six and the admin dropdown offered all six, so
+     choosing Kinguin and pressing Create answered
+       "Invalid enum value. Expected 'api' | 'csv' | 'manual'"
+     — the three integrations that auto-buy and auto-deliver were unreachable,
+     and the error blamed the person typing. Reproduced against the running API
+     before it was fixed. */
+  const { readFileSync } = await import('node:fs');
+  const { join, dirname } = await import('node:path');
+  const { fileURLToPath } = await import('node:url');
+  const route = readFileSync(join(dirname(fileURLToPath(import.meta.url)),
+    '..', 'src', 'routes', 'admin', 'suppliers.js'), 'utf8');
+
+  ok(/connectorKind: z\.enum\(availableKinds\(\)\)/.test(route),
+    'the create route validates against the registry itself');
+  ok(!/z\.enum\(\['api', 'csv', 'manual'\]\)/.test(route),
+    'no second hardcoded copy of the kind list is left');
+
+  /* And the dropdown must not offer a kind the server will refuse — the two
+     lists disagreeing IS the bug, in whichever direction. */
+  const page = readFileSync(join(dirname(fileURLToPath(import.meta.url)),
+    '..', '..', 'src', 'pages', 'admin', 'Suppliers.jsx'), 'utf8');
+  const offered = [...page.matchAll(/<option value="([a-z0-9]+)">/g)].map((m) => m[1]);
+  ok(offered.length >= 6, `the dropdown offers ${offered.length} kinds`, offered.join(','));
+  const unknown = offered.filter((k) => !availableKinds().includes(k));
+  ok(unknown.length === 0, 'every kind the dropdown offers is one the server accepts',
+    unknown.join(','));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
