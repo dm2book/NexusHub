@@ -32,9 +32,17 @@ export default function LaunchBanner() {
   // early return, and a hook called conditionally is a hook that will explode
   // the first time the shop is open.
   /* The reader's real locale rather than "Dutch or English": a German visitor
-     was shown "24 October" formatted for en-GB. */
+     was shown "24 October" formatted for en-GB.
+
+     And the reader's own TIMEZONE, which UTC was not. A shop opening at Dutch
+     midnight is LAUNCH_DATE=2026-10-23T22:00:00Z, and formatted in UTC that
+     renders as "23 October" — a banner counting down to a date one day before
+     the one it opens on. The alternative trap is just as bad: pick
+     2026-10-24T00:00:00Z to make the label read right and the shop opens at
+     02:00 Dutch time. Formatting the instant in the reader's own zone makes
+     both correct for everyone, and needs no timezone shipped to the client. */
   const when = new Date(launchAt).toLocaleDateString(localeOf(lang),
-    { day: 'numeric', month: 'long', timeZone: 'UTC' });
+    { day: 'numeric', month: 'long' });
 
   /* Stored against the subscription as proof of what was agreed to, so it has
      to be the sentence this visitor actually read. */

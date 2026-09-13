@@ -161,5 +161,39 @@ console.log('\n— What it already did right, still done right —');
     !/24\s*\/\s*7|instant|guarantee|cheapest|best price/i.test(code));
 }
 
+console.log('\n— The day it says, and the moment it opens —');
+{
+  /* Formatting the launch instant in UTC forced a choice between two wrong
+     answers, and the owner hit it while setting the date:
+       2026-10-23T22:00:00Z  opens at Dutch midnight, and UTC renders "23 October"
+       2026-10-24T00:00:00Z  renders "24 October", and opens at 02:00 Dutch time
+     Neither is a shop that opens on the day it advertises. Measured, then fixed
+     by formatting in the shop's own zone — the same rule the profit dashboard
+     already counts its days by. */
+  const { launchDayLabel } = await import('../src/services/launchGateService.js');
+  const svc = read('server/src/services/launchGateService.js');
+
+  ok('the server label is formatted in the shop timezone, not UTC',
+    /timeZone: config\.timezone/.test(svc) && !/month: 'long', timeZone: 'UTC'/.test(svc));
+
+  const dutchMidnight = new Date('2026-10-23T22:00:00Z');
+  ok('…so Dutch midnight on the 24th is called the 24th',
+    dutchMidnight.toLocaleDateString('en-GB',
+      { day: 'numeric', month: 'long', timeZone: 'Europe/Amsterdam' }) === '24 October');
+  ok('…where UTC called it the 23rd',
+    dutchMidnight.toLocaleDateString('en-GB',
+      { day: 'numeric', month: 'long', timeZone: 'UTC' }) === '23 October');
+
+  /* The banner has a real visitor, so it uses THAT reader's zone — correct for
+     everyone and no timezone shipped to the client. */
+  const page = read('src/components/store/LaunchBanner.jsx');
+  ok('the banner drops the UTC override and uses the reader\'s own zone',
+    !/timeZone: 'UTC'/.test(page) && /day: 'numeric', month: 'long' \}\);/.test(page));
+  ok('…and still uses the reader\'s locale', /localeOf\(lang\)/.test(page));
+
+  ok('launchDayLabel answers something when no date is set',
+    typeof launchDayLabel() === 'string' && launchDayLabel().length > 0);
+}
+
 console.log(`\n${fail === 0 ? '✅' : '❌'} launch-banner: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
