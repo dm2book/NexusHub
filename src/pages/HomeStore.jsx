@@ -510,7 +510,7 @@ export default function HomeStore() {
                 relying on which siblings happen to be positioned. */}
             <div className="relative z-[2] grid lg:grid-cols-[1.05fr_1fr] 2xl:grid-cols-[1.1fr_1fr_206px] gap-8 2xl:gap-6 items-center">
               <div className="relative fm-stagger" style={{ '--fm-stagger': '90ms' }}>
-                <span className="inline-flex items-center gap-2 text-[13px] font-semibold text-violet-100 bg-white/10 border border-white/15 backdrop-blur rounded-full px-3 py-1.5">
+                <span className="fm-pill inline-flex items-center gap-2 text-[13px] font-semibold text-violet-100 rounded-full px-3.5 py-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-violet-300 animate-pulse" /> {tr('home.badge', 'Buyer protected · Real human support')}
                 </span>
                 {/* "Everything You Need, All in One Place" said nothing about
@@ -530,7 +530,7 @@ export default function HomeStore() {
                 <div className="flex flex-wrap gap-2 mt-4">
                   {pillars.map((p) => (
                     <Link key={p.key} to={landingPathFor(p.cats[0].slug)}
-                      className="fm-press text-[13px] font-semibold text-white/95 bg-white/10 hover:bg-white/[.16] border border-white/15 rounded-full px-3.5 py-2 transition">
+                      className="fm-pill fm-press text-[13px] font-semibold text-white/95 rounded-full px-3.5 py-2">
                       {tr(`home.pillar.${p.key}`, p.title)}
                     </Link>
                   ))}
@@ -547,7 +547,7 @@ export default function HomeStore() {
                       have. The real second question a stranger has, on a shop
                       with no reviews that asks for a bank transfer, is not
                       "where are the products" but "how does paying work". */}
-                  <Link to="/how-it-works" className="fm-press inline-flex items-center gap-2 font-semibold rounded-xl px-6 h-12 border border-white/25 text-white hover:bg-white/10 transition">
+                  <Link to="/how-it-works" className="fm-pill fm-press inline-flex items-center gap-2 font-semibold rounded-xl px-6 h-12 text-white">
                     {tr('home.howPay', 'How paying works')}
                   </Link>
                 </div>

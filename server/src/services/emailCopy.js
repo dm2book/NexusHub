@@ -120,6 +120,9 @@ const PHRASES = {
     paySendTo: (amt, target) => `Maak ${amt} over naar ${target}`,
     payPrefilled: 'bedrag staat er al in',
     payOr: 'Of maak het zelf over', payComplete: 'Rond je betaling af',
+    reviewAskTitle: 'Blij met je bestelling?',
+    reviewAskBody: 'Een korte review op Trustpilot kost twintig seconden en helpt de volgende koper meer dan wat wij over onszelf kunnen zeggen — wij kunnen er niets aan veranderen of weghalen.',
+    reviewAskCta: 'Schrijf een review op Trustpilot',
     payHow: (number) => `Betaal via een van de methoden hieronder en zet je bestelnummer <strong>${number}</strong> erbij als kenmerk. Je bestelling is bevestigd zodra we hem binnen hebben.`,
   },
   en: {
@@ -139,6 +142,9 @@ const PHRASES = {
     paySendTo: (amt, target) => `Send ${amt} to ${target}`,
     payPrefilled: 'amount filled in',
     payOr: 'Or pay it yourself', payComplete: 'Complete your payment',
+    reviewAskTitle: 'Happy with your order?',
+    reviewAskBody: 'A short review on Trustpilot takes twenty seconds and helps the next buyer more than anything we can say about ourselves — we cannot edit or remove a word of it.',
+    reviewAskCta: 'Leave a review on Trustpilot',
     payHow: (number) => `Pay using one of the methods below and put your order number <strong>${number}</strong> as the reference. Your order is confirmed as soon as we receive it.`,
   },
   de: {
@@ -158,6 +164,9 @@ const PHRASES = {
     paySendTo: (amt, target) => `Überweise ${amt} an ${target}`,
     payPrefilled: 'Betrag steht schon drin',
     payOr: 'Oder überweise selbst', payComplete: 'Schließ deine Zahlung ab',
+    reviewAskTitle: 'Zufrieden mit deiner Bestellung?',
+    reviewAskBody: 'Eine kurze Bewertung auf Trustpilot dauert zwanzig Sekunden und hilft dem nächsten Käufer mehr als alles, was wir über uns selbst sagen können — wir können dort kein Wort ändern oder löschen.',
+    reviewAskCta: 'Bewertung auf Trustpilot schreiben',
     payHow: (number) => `Zahl über eine der Methoden unten und gib deine Bestellnummer <strong>${number}</strong> als Verwendungszweck an. Deine Bestellung ist bestätigt, sobald wir sie haben.`,
   },
   fr: {
@@ -177,6 +186,9 @@ const PHRASES = {
     paySendTo: (amt, target) => `Vire ${amt} à ${target}`,
     payPrefilled: 'montant déjà rempli',
     payOr: 'Ou fais le virement toi-même', payComplete: 'Termine ton paiement',
+    reviewAskTitle: 'Content de ta commande ?',
+    reviewAskBody: 'Un court avis sur Trustpilot prend vingt secondes et aide le prochain acheteur bien plus que tout ce que nous pouvons dire de nous-mêmes — nous ne pouvons y modifier ni supprimer un mot.',
+    reviewAskCta: 'Laisser un avis sur Trustpilot',
     payHow: (number) => `Paie avec un des moyens ci-dessous et mets ton numéro de commande <strong>${number}</strong> en référence. Ta commande est confirmée dès que nous le recevons.`,
   },
 };

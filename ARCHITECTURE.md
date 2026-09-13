@@ -127,6 +127,25 @@ The cost rule itself lives once, in `services/costService.js`: `pickCostMapping(
 `costCentsForMany()` doing the whole catalogue in two queries and `costCentsFor()`
 delegating to it, so there is no fast reader and slow reader to drift apart.
 
+## 4a. The review ask
+
+Files: `services/orderService.js` (`reviewAskHtml`), `services/emailCopy.js`,
+migration `038_delivery_mail_review_ask`.
+
+The delivery mail — the highest open rate this shop has, and the only moment the
+buyer is holding what they paid for — now carries a one-block Trustpilot ask,
+localised in all four languages and pointing at the write form rather than the
+profile page. It renders as an empty string until `TRUSTPILOT_URL` is set, like
+every other optional block.
+
+The part worth remembering: **email templates live in the database**, seeded once
+and admin-editable after. Editing `defaultTemplates.js` reaches new installs and
+nothing else, so a change there alone is a change that passes its tests and never
+appears in a real email. The migration is what reaches a running shop; it is
+anchored on the support line's style attribute (byte-identical across languages
+while the prose is not), guarded by `NOT LIKE '%reviewAskHtml%'` so it is
+idempotent, and it silently does nothing to a body an admin has rewritten.
+
 ## 4b. Launch command centre
 
 Files: `services/launchCenterService.js`, `GET /api/admin/launch-center`,
