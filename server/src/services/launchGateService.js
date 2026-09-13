@@ -203,7 +203,7 @@ export function isAdminEmail(email) {
   return config.auth.adminEmails.includes(String(email || '').toLowerCase());
 }
 
-/** The launch day in words, as a visitor would say it: "24 September". */
+/** The launch day in words, as a visitor would say it: "24 October". */
 export function launchDayLabel() {
   const iso = launchAtIso();
   return iso

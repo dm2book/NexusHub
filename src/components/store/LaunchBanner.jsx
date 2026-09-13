@@ -10,7 +10,7 @@ import { api } from '../../lib/api.js';
  * can do about it.
  *
  * The date is rendered FROM the configured launch moment rather than written
- * out. A hard-coded "launches September 24" beside an environment variable that
+ * out. A hard-coded "launches October 24" beside an environment variable that
  * says otherwise is the exact failure this codebase keeps finding — a written
  * promise with no code behind it — and moving the date would leave the sentence
  * lying. Change LAUNCH_DATE and this sentence changes with it.
@@ -32,7 +32,7 @@ export default function LaunchBanner() {
   // early return, and a hook called conditionally is a hook that will explode
   // the first time the shop is open.
   /* The reader's real locale rather than "Dutch or English": a German visitor
-     was shown "24 September" formatted for en-GB. */
+     was shown "24 October" formatted for en-GB. */
   const when = new Date(launchAt).toLocaleDateString(localeOf(lang),
     { day: 'numeric', month: 'long', timeZone: 'UTC' });
 

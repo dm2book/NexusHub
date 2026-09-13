@@ -63,7 +63,7 @@ export async function launchPlan() {
           + 'succeeds, and visitors get no countdown in the meantime.'
         : 'LAUNCH_DATE is not set, and this shop is already open. Nothing is scheduled; the '
           + 'gate is simply not in the way any more.',
-    at ? null : 'Set LAUNCH_DATE=2026-09-24T00:00:00Z so the shop opens on its own.');
+    at ? null : 'Set LAUNCH_DATE=2026-10-24T00:00:00Z so the shop opens on its own.');
 
   /* The trap this whole file exists to catch: an override left switched on.
      LAUNCH_MODE is the manual release, and a manual release nobody remembers

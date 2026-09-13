@@ -119,7 +119,7 @@ async function request(path, { method = 'GET', body, raw = false, retry = true, 
 
   if (!res.ok) {
     /* A 4xx carries a message written for the person reading it — "That code has
-       expired", "This opens on 24 September" — and it must survive untouched.
+       expired", "This opens on 24 October" — and it must survive untouched.
        A 5xx does not: the server's generic fallback is the literal string
        "Internal server error", and during the database outage that is what a
        buyer got, in English, in a red box under the login form. It names a layer
