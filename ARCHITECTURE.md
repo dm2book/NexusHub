@@ -95,6 +95,22 @@ field maps, CSV columns, auth). `supplierService.js` provides CRUD, product mapp
 and **inventory / price / status / full** syncs, each recorded in `supplier_sync_runs`.
 New integration styles = one subclass + `registerConnector(...)`.
 
+**Catalogue search** (`SupplierConnector.searchCatalog`, `GET /api/admin/suppliers/:id/search`)
+backs the Map-products picker. Mapping used to ask for a supplier SKU — for
+Kinguin a numeric `kinguinId` — that could not be looked up anywhere in the
+admin, so the only way to fill it was to hunt on the supplier's website and
+retype a number once per product. Choosing a product now searches for it
+automatically and one click fills the SKU and the cost.
+
+The base class filters `fetchCatalog()`; Kinguin overrides it with a real
+server-side `?name=` query, and the payload says which of the two happened.
+`searchTermsFor()` handles the mismatch that made this useless at first: the shop
+writes "1,000 Robux" and the supplier lists "1000 Robux", so the separator is
+normalised and shorter fallback terms are tried in order. Every result carries
+the margin it would leave and `wouldRefuseAutoBuy` — the same condition
+`fulfillmentService` refuses on, which is silent at order time, so it has to be
+loud while choosing.
+
 **Supply dashboard** (`supplierDashboardService.js`, `GET /api/admin/suppliers/dashboard`)
 answers the product-shaped question the supplier-shaped metrics could not: per
 product the supplier, cost, code stock, supplier stock and last sync; per supplier

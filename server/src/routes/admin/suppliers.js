@@ -6,9 +6,11 @@ import { requirePermission } from '../../middleware/rbac.js';
 import * as suppliers from '../../services/supplier/supplierService.js';
 import { supplierMetrics } from '../../services/supplier/supplierMetricsService.js';
 import { supplierDashboard } from '../../services/supplier/supplierDashboardService.js';
-import { availableKinds } from '../../services/supplier/registry.js';
+import { availableKinds, createConnector } from '../../services/supplier/registry.js';
+import { searchTermsFor } from '../../services/supplier/SupplierConnector.js';
 import { audit } from '../../services/auditService.js';
 import { notFound } from '../../utils/errors.js';
+import { get } from '../../db/index.js';
 
 const router = Router();
 
@@ -104,6 +106,84 @@ router.post('/:id/products', requirePermission('suppliers.manage'),
       targetId: req.params.id, metadata: { productId: body.productId, sku: body.supplierSku }, req });
     res.status(201).json({ mapping });
   }));
+
+/**
+ * Search a supplier's catalogue, for the Map-products picker.
+ *
+ * This exists because mapping a product asked for a supplier SKU that could
+ * not be looked up anywhere in this admin. For Kinguin that SKU is a numeric
+ * kinguinId, so the only way to fill the field was to go hunting on their
+ * website and retype a number — seventy-one times, with seventy-one chances to
+ * map a product to the wrong listing and sell somebody the wrong thing.
+ *
+ * When `productId` is given, every result also carries what mapping it would
+ * MEAN: the margin against that product's price, and whether the auto-buy
+ * guard would refuse it. That guard (fulfillmentService: cost >= effective
+ * revenue → never auto-buy) is silent by design, so a mapping made at a loss
+ * looks fine here and simply never delivers. Better to say so while choosing.
+ */
+router.get('/:id/search', requirePermission('suppliers.read'), asyncHandler(async (req, res) => {
+  const { q, limit, productId } = z.object({
+    q: z.string().min(3, 'Type at least 3 characters').max(120),
+    limit: z.coerce.number().int().min(1).max(100).optional(),
+    productId: z.string().optional(),
+  }).parse(req.query);
+
+  const supplier = await suppliers.getSupplier(req.params.id);
+  if (!supplier) throw notFound('Supplier not found');
+
+  const connector = createConnector(supplier);
+
+  /* Try the term, then shorter ones, and stop at the first that finds
+     something. A shop writes "1,000 Robux" and a supplier lists "Roblox 1000
+     Robux Card": measured against a live catalogue the shop's own product name
+     returned 0 hits and "1000 Robux" returned 1. Every product here is named
+     with a thousands separator, so without this the picker comes back empty for
+     the whole catalogue and reads as "they do not carry any of it". */
+  const terms = searchTermsFor(q);
+  let results = [];
+  let searchedFor = terms[0] || q;
+  const tried = [];
+  for (const term of terms) {
+    tried.push(term);
+    // eslint-disable-next-line no-await-in-loop -- deliberately sequential: each
+    // is a request to somebody else's API and we stop at the first that works.
+    results = await connector.searchCatalog(term, { limit: limit || 25 });
+    if (results.length) { searchedFor = term; break; }
+  }
+
+  /* The product's own price, so the margin shown is against what this shop
+     actually charges rather than against nothing. */
+  const product = productId
+    ? await get('SELECT id, name, price FROM products WHERE id = @id', { id: productId })
+    : null;
+
+  res.json({
+    supplier: { id: supplier.id, name: supplier.name, kind: supplier.connector_kind },
+    /* What was actually asked, which is often not what was typed. Saying so
+       stops "no results" being read as "this supplier has nothing" when the
+       real answer is "we searched for the wrong string". */
+    searchedFor,
+    tried,
+    /* Said out loud: a connector without server-side search filtered whatever
+       fetchCatalog happened to return, which is not the same promise. */
+    serverSide: !!connector.supportsSearch,
+    product: product ? { id: product.id, name: product.name, priceCents: Number(product.price) } : null,
+    results: results.map((r) => {
+      const price = product ? Number(product.price) : null;
+      const marginCents = price != null && r.cost != null ? price - r.cost : null;
+      return {
+        ...r,
+        marginCents,
+        marginPct: marginCents != null && price > 0
+          ? Math.round((marginCents / price) * 1000) / 10 : null,
+        /* The exact condition fulfillmentService refuses on, so the warning
+           here and the behaviour later cannot disagree. */
+        wouldRefuseAutoBuy: price != null && r.cost != null ? r.cost >= price : null,
+      };
+    }),
+  });
+}));
 
 // Trigger a sync (inventory | price | status | full).
 router.post('/:id/sync', requirePermission('suppliers.sync'), asyncHandler(async (req, res) => {
