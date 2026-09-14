@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Euro, Percent, ShoppingCart, ShieldAlert, Undo2, PackageX,
-  Boxes, UserPlus, Repeat, Megaphone, RefreshCw, Dot,
+  Boxes, UserPlus, Repeat, Megaphone, RefreshCw, Dot, Hourglass,
 } from 'lucide-react';
 import { api } from '../../lib/api.js';
 import { money } from '../../lib/format.js';
@@ -118,6 +118,7 @@ export default function Live() {
   const ls = d.lowStock;
   const cu = d.customers;
   const ads = d.ads;
+  const wait = d.awaitingPayment || { orders: 0, ifAllPaidCents: 0, proofsWaiting: 0, oldestMinutes: null };
 
   const undelivered = fd.undeliveredPaidOrders + fd.openFailures;
 
@@ -156,6 +157,19 @@ export default function Live() {
               : ` · counted on ${t.coverage.pct ?? 0}% of revenue`}`} />
         <Tile icon={ShoppingCart} label="Orders today" value={int(t.orders)}
           sub={`${int(cu.buyers)} buyer(s)`} />
+        {/* The daily job in a shop that takes bank transfers, and nothing
+            counted it: the sidebar badge counts payment PROOFS, the orders
+            badge counts what is already paid. An order placed and not yet paid
+            for appeared in neither. */}
+        <Tile icon={Hourglass} label="Awaiting payment" value={int(wait.orders)}
+          tone={wait.proofsWaiting > 0 ? 'warn' : 'plain'}
+          sub={wait.orders === 0
+            ? 'nothing placed and unpaid'
+            /* "if all paid", never "revenue": an abandoned checkout looks
+               identical to an unmatched transfer from here. */
+            : `${eur(wait.ifAllPaidCents)} if all paid`
+              + (wait.proofsWaiting ? ` · ${int(wait.proofsWaiting)} proof(s) to review` : '')
+              + (wait.oldestMinutes != null ? ` · oldest ${Math.floor(wait.oldestMinutes / 60)}h` : '')} />
         <Tile icon={ShieldAlert} label="Chargebacks" value={int(cb.today)}
           tone={cb.today > 0 ? 'bad' : cb.last30Days > 0 ? 'warn' : 'plain'}
           sub={`${int(cb.last30Days)} in 30 days · ${eur(cb.last30DaysCents)} taken back`} />

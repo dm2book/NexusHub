@@ -113,6 +113,43 @@ export async function failedDeliveries(since, { now = Date.now() } = {}) {
 }
 
 /**
+ * Orders placed but not paid for — the daily job in a shop that takes bank
+ * transfers.
+ *
+ * Nothing counted these. The sidebar badge counts payment PROOFS a buyer
+ * submitted, and the orders badge counts what is already paid and waiting to be
+ * delivered. An order sitting in `pending` with no proof — somebody who ordered
+ * and whose transfer has not landed, or has landed and nobody matched it yet —
+ * appears in neither. In a shop whose entire payment flow is "pay by transfer
+ * with your order number as the reference", that is the queue the owner works
+ * from every morning.
+ *
+ * Two numbers, not one. `orders` includes people who will never pay — an
+ * abandoned checkout looks identical to an unmatched transfer from here, so
+ * calling the total "money waiting" would be an invented figure. `proofsWaiting`
+ * is the subset somebody has actually claimed to have paid, which is the part
+ * that can be acted on right now.
+ */
+export async function awaitingPayment({ now = Date.now() } = {}) {
+  const [orders, proofs] = await Promise.all([
+    get(`SELECT COUNT(*)::int AS n, COALESCE(SUM(total), 0)::bigint AS cents,
+                MIN(created_at) AS oldest
+           FROM orders WHERE status = 'pending'`).catch(() => null),
+    get(`SELECT COUNT(*)::int AS n FROM payment_proofs WHERE status = 'pending'`)
+      .catch(() => null),
+  ]);
+  const oldest = orders?.oldest ? Math.floor((now - Date.parse(orders.oldest)) / 60_000) : null;
+  return {
+    orders: n(orders?.n),
+    /* What it would be worth IF everyone paid. Named so it cannot be read as
+       revenue: it is not money, it is hope. */
+    ifAllPaidCents: n(orders?.cents),
+    oldestMinutes: Number.isFinite(oldest) ? oldest : null,
+    proofsWaiting: n(proofs?.n),
+  };
+}
+
+/**
  * Low stock, over the codes the shop can actually deliver from.
  *
  * `stockTierFor` is imported rather than re-derived, so this page and the
@@ -209,7 +246,7 @@ export async function launchCenter({ now = Date.now(), tz } = {}) {
   const bounds = periodBounds({ now, tz });
   const since = bounds.today;
 
-  const [orderAgg, lines, charge, refundReq, refundedOrders, customers, deliveries, stock, ads] =
+  const [orderAgg, lines, charge, refundReq, refundedOrders, customers, deliveries, waiting, stock, ads] =
     await Promise.all([
       get(`SELECT COUNT(*)::int AS orders, COALESCE(SUM(total), 0)::bigint AS revenue
              FROM orders WHERE status IN ${PAID} AND created_at >= @since`, { since })
@@ -233,6 +270,7 @@ export async function launchCenter({ now = Date.now(), tz } = {}) {
         .catch(() => null),
       customersToday(since),
       failedDeliveries(since, { now }),
+      awaitingPayment({ now }),
       lowStock(),
       activeAds({ now }),
     ]);
@@ -279,6 +317,7 @@ export async function launchCenter({ now = Date.now(), tz } = {}) {
       refundedCentsToday: n(refundedOrders?.cents),
     },
     failedDeliveries: deliveries,
+    awaitingPayment: waiting,
     lowStock: stock,
     customers,
     ads,

@@ -21,7 +21,7 @@
  * chargeback are opposite facts that must never be added together.
  */
 import { migrate } from '../src/db/migrate.js';
-import { run, nowIso } from '../src/db/index.js';
+import { run, all, nowIso } from '../src/db/index.js';
 import { newId } from '../src/utils/ids.js';
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -38,7 +38,7 @@ const ok = (name, cond, extra = '') => {
 
 await migrate();
 const {
-  launchCenter, customersToday, failedDeliveries, lowStock, activeAds,
+  launchCenter, customersToday, failedDeliveries, lowStock, activeAds, awaitingPayment,
   STALE_AFTER_SECONDS, UNDELIVERED_AFTER_MINUTES,
 } = await import('../src/services/launchCenterService.js');
 const { periodBounds } = await import('../src/services/profitService.js');
@@ -330,6 +330,56 @@ console.log('\n— Adverts that are delivering, not adverts that are switched on
      a census. */
   ok('the payload admits the figure is consent-limited', a.consentLimited === true);
   ok('…and the window it measured', a.windowHours === 24);
+}
+
+
+console.log('\n— Placed, and not paid for —');
+{
+  /* Nothing counted these. The sidebar badge counts payment PROOFS a buyer
+     submitted; the orders badge counts what is already paid and waiting to be
+     delivered. An order sitting in `pending` with no proof appeared in neither
+     — and in a shop whose whole payment flow is "transfer with your order
+     number as the reference", that is the queue the owner works from. */
+  await wipeOrders();
+  await run('DELETE FROM payment_proofs').catch(() => {});
+  const empty = await awaitingPayment();
+  ok('an empty queue is zero, not null', empty.orders === 0 && empty.ifAllPaidCents === 0);
+  ok('…and has no oldest', empty.oldestMinutes === null);
+
+  const p = await product('waiting', { price: 999 });
+  await order({ email: 'a@example.test', status: 'pending', createdAt: ago(20),
+    lines: [{ pid: p, qty: 1, unit: 999 }], total: 999 });
+  await order({ email: 'b@example.test', status: 'pending', createdAt: ago(3000), total: 2499 });
+  /* Paid and completed orders are somebody else's problem. */
+  await order({ email: 'c@example.test', status: 'completed', total: 5000 });
+  await order({ email: 'd@example.test', status: 'cancelled', total: 700 });
+
+  const w = await awaitingPayment();
+  ok('only orders still awaiting payment are counted', w.orders === 2, String(w.orders));
+  ok('…with what they would be worth if everyone paid', w.ifAllPaidCents === 3498, String(w.ifAllPaidCents));
+  /* Deliberately not called revenue: an abandoned checkout is indistinguishable
+     from an unmatched transfer here, so a total labelled "money waiting" would
+     be an invented figure. */
+  ok('…under a name that cannot be read as money in the bank',
+    'ifAllPaidCents' in w && !('revenueCents' in w));
+  ok('the oldest one is aged, so a forgotten order is visible',
+    w.oldestMinutes >= 2999, String(w.oldestMinutes));
+
+  const oid = (await all("SELECT id FROM orders WHERE status = 'pending' LIMIT 1"))[0].id;
+  await run(`INSERT INTO payment_proofs (id, order_id, method, status, created_at)
+             VALUES (@id,@o,'bank','pending',@at)`, { id: newId('pp'), o: oid, at });
+  const w2 = await awaitingPayment();
+  ok('a submitted proof is counted separately — that is the actionable half',
+    w2.proofsWaiting === 1 && w2.orders === 2, JSON.stringify(w2));
+
+  const d = await launchCenter();
+  ok('the board carries it', d.awaitingPayment.orders === 2);
+  const page = codeOf('src/pages/admin/Live.jsx');
+  ok('…and the page shows it', /Awaiting payment/.test(page));
+  ok('…calling it "if all paid", never revenue',
+    /if all paid/.test(page) && !/wait\.ifAllPaidCents[^}]*revenue/i.test(page));
+  ok('…and surfaces the proofs that can be acted on now',
+    /proof\(s\) to review/.test(page));
 }
 
 console.log('\n— "Live" has to mean something —');
