@@ -111,6 +111,25 @@ the margin it would leave and `wouldRefuseAutoBuy` — the same condition
 `fulfillmentService` refuses on, which is silent at order time, so it has to be
 loud while choosing.
 
+**Catalogue scan** (`catalogScanService.js`, `POST /api/admin/suppliers/:id/scan`)
+asks the picker's question for every active product at once and answers the one
+number that decides whether a launch date is real: how much of the catalogue can
+be auto-delivered, profitably. Batched by the client (ten at a time, sequential
+inside a batch) because two hundred calls to someone else's API is minutes of
+wall clock on a platform that kills a function at its max duration — and a
+request that dies at 90% leaves the owner with nothing.
+
+"Best" is not the top hit: it is the cheapest listing that is in stock **and**
+below the sell price, because `fulfillmentService` refuses to auto-buy at or
+above it, silently. When nothing qualifies the nearest candidate is still
+returned with a verdict saying why — `below_cost`, `out_of_stock`, `not_found`,
+`no_price` — since "the Roblox card costs €14.80 against your €9.99" is a
+different problem from "they do not carry it".
+
+It **proposes and never maps.** Matching is by name, and a bulk table of green
+ticks is exactly what gets accepted wholesale, so every row carries the
+supplier's own title, SKU and region and mapping is a click per row.
+
 **Supply dashboard** (`supplierDashboardService.js`, `GET /api/admin/suppliers/dashboard`)
 answers the product-shaped question the supplier-shaped metrics could not: per
 product the supplier, cost, code stock, supplier stock and last sync; per supplier
@@ -169,6 +188,32 @@ buyers exactly**, so both halves come from one query, and a buyer is an *email*
 chargeback are opposite facts** about the same money and are never summed. Low
 stock reuses `stockTierFor` and excludes products sourced live from a supplier,
 which are supposed to hold no codes.
+
+## 4c. The background sweep, judged on evidence
+
+Files: `services/maintenanceService.js` (`lastMaintenanceRun`), `diagnosticsService.js`,
+`launchCheckService.js`.
+
+Everything the shop does on its own happens in the hourly sweep: paid orders
+swept for delivery, the supplier queue drained so a purchase has its key
+collected, failed emails retried, reminders and review requests sent, IP
+addresses forgotten for the GDPR. All fire-and-forget, all silent when it stops.
+
+It was reported as **configuration** — `status: 'open'` when `CRON_SECRET` was
+unset, with a note about locking the endpoint. Both halves were wrong. Without
+that secret the endpoint in production does not stand open, it **refuses
+everything**, Vercel's own cron included, because Vercel only sends the
+`Authorization` header when the secret exists (verified live: `GET
+/api/cron/maintenance` → 403). The shop survives on a fallback that piggybacks
+on live traffic — so a quiet shop simply goes without, and every dashboard still
+reads green.
+
+The sweep now records that it finished (`kv.maintenance_last_run`, written last
+and best-effort so bookkeeping can never break the work it records), and the
+checks read that: health reports `never_run` / `running` / `stale` with the
+timestamp, and the launch report fails on a sweep that has never run or has
+stopped, warns when it runs only because traffic happened to trigger it, and
+names the steps that threw.
 
 ## 5. Automated fulfillment
 

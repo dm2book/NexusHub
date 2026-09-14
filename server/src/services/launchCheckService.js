@@ -7,6 +7,7 @@ import { config, manualPayMethods } from '../config/env.js';
 import { get, all } from '../db/index.js';
 import { iconFor } from '../db/demoSeed.js';
 import { botSeenRecently } from './discordService.js';
+import { lastMaintenanceRun } from './maintenanceService.js';
 import { configuredChannels, EVENTS as NOTIFY_EVENTS } from './notifyService.js';
 import { isEnabled as mollieEnabled, isTestKey as mollieTestKey, SUPPORTED_METHODS as MOLLIE_METHODS } from './mollieService.js';
 import {
@@ -128,6 +129,49 @@ export async function launchChecks() {
   if (!nProducts) add('catalog', 'Catalog', 'fail', 'No active products.');
   else add('catalog', 'Catalog', nStocked ? 'ok' : 'warn',
     `${nProducts} active products, ${nStocked} with pre-loaded codes${nStocked ? '' : ' — without codes every order needs manual delivery'}.`);
+
+  /* 3a. The hourly sweep, judged on whether it RAN.
+   *
+   * Everything that happens on its own happens here: paid orders swept for
+   * delivery, the supplier queue drained so a Kinguin purchase gets its key
+   * collected, failed emails retried, payment reminders and review requests
+   * sent, IP addresses forgotten for the GDPR. All of it fire-and-forget, all
+   * of it silent when it stops.
+   *
+   * This used to be reported as configuration — "is CRON_SECRET set" — which
+   * answers a different question and answers it wrongly in both directions.
+   * Without that secret Vercel's own cron call is REFUSED with a 403, because
+   * Vercel only sends the Authorization header when the secret exists; the shop
+   * survives on the traffic-triggered fallback, which means a quiet shop simply
+   * goes without and nothing says so. Verified against the live site.
+   */
+  const sweep = await lastMaintenanceRun().catch(() => null);
+  const cronAccepted = !!config.security.cronSecret || !config.isProd;
+  if (!sweep?.everRan) {
+    add('maintenance', 'Background sweep', 'fail',
+      'The hourly maintenance sweep has never completed. Paid orders are not swept for '
+      + 'delivery, supplier purchases never have their keys collected, and no reminder or '
+      + 'review request is sent.'
+      + (cronAccepted ? '' : ' CRON_SECRET is not set, so the scheduled call is refused with a 403.'));
+  } else if (sweep.stale) {
+    add('maintenance', 'Background sweep', 'fail',
+      `Last completed ${Math.floor(sweep.ageMinutes / 60)}h ago — it runs hourly, so it has stopped.`
+      + (cronAccepted ? '' : ' CRON_SECRET is not set, so the scheduled call is refused with a 403 '
+        + 'and the only thing left running it is live traffic.'));
+  } else if (!cronAccepted) {
+    /* Running, but only by luck: the scheduled call is being refused and the
+       fallback needs somebody to be on the site. */
+    add('maintenance', 'Background sweep', 'warn',
+      `Last ran ${sweep.ageMinutes} min ago, but only because live traffic triggered it — `
+      + 'CRON_SECRET is not set, so the hourly Vercel Cron call is refused with a 403. '
+      + 'Set it so the sweep does not depend on somebody visiting the site.');
+  } else if (sweep.errors.length) {
+    add('maintenance', 'Background sweep', 'warn',
+      `Runs on schedule, but ${sweep.errors.length} step(s) threw last time: ${sweep.errors.join(', ')}.`);
+  } else {
+    add('maintenance', 'Background sweep', 'ok',
+      `Ran ${sweep.ageMinutes} min ago with no errors.`);
+  }
 
   // 3b. Every active product has a picture — checked, not assumed.
   //
