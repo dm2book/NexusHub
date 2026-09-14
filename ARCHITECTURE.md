@@ -146,6 +146,23 @@ The cost rule itself lives once, in `services/costService.js`: `pickCostMapping(
 `costCentsForMany()` doing the whole catalogue in two queries and `costCentsFor()`
 delegating to it, so there is no fast reader and slow reader to drift apart.
 
+### Where market credentials come from
+
+`credentialsFor()` reads the **supplier row first, the environment second — for
+every marketplace**. It used to do that for Eldorado and G2A while reading only
+the environment for Kinguin and Eneba, with a comment above it promising all
+four. The consequence was concrete: an owner adds a Kinguin key through
+Suppliers, the connector buys with it, and Market keeps reporting "no Kinguin
+Integration API key" — the same key, one table away, invisible to the half of the
+system that could use it. Nothing about the price source was missing; it simply
+never received credentials.
+
+A row only wins when it carries something, so an empty supplier config cannot
+mask a working environment key, and paused suppliers are excluded — a key the
+owner switched off is not a permission. Having the key is still not the same as
+switching the source on: a source runs only when its key is listed in
+`MARKET_SOURCES`, because using somebody's API is an agreement, not a discovery.
+
 ## 4a. The review ask
 
 Files: `services/orderService.js` (`reviewAskHtml`), `services/emailCopy.js`,
