@@ -8,9 +8,10 @@ import { supplierMetrics } from '../../services/supplier/supplierMetricsService.
 import { supplierDashboard } from '../../services/supplier/supplierDashboardService.js';
 import { availableKinds, createConnector } from '../../services/supplier/registry.js';
 import { searchTermsFor } from '../../services/supplier/SupplierConnector.js';
+import { scanProducts, summarise } from '../../services/supplier/catalogScanService.js';
 import { audit } from '../../services/auditService.js';
 import { notFound } from '../../utils/errors.js';
-import { get } from '../../db/index.js';
+import { get, all } from '../../db/index.js';
 
 const router = Router();
 
@@ -183,6 +184,57 @@ router.get('/:id/search', requirePermission('suppliers.read'), asyncHandler(asyn
       };
     }),
   });
+}));
+
+/**
+ * The same question as the picker, asked for many products at once.
+ *
+ * BATCHED BY THE CLIENT, on purpose. Seventy products against a supplier that
+ * needs up to three search terms each is over two hundred calls to somebody
+ * else's API — minutes of wall clock, on a platform that kills a function at
+ * its max duration. A request that dies at 90% leaves the owner with nothing
+ * and no idea how far it got. Small batches finish, report, and the page walks
+ * the rest while showing progress.
+ *
+ * Sequential inside a batch too: firing them in parallel is how an integration
+ * gets rate-limited.
+ *
+ * This route READS. It proposes candidates and never writes a mapping — the
+ * match is by name, and a name match is a suggestion, not a fact.
+ */
+router.post('/:id/scan', requirePermission('suppliers.read'), asyncHandler(async (req, res) => {
+  const { productIds } = z.object({
+    /* Capped low deliberately: the cap is what keeps each request inside the
+       function timeout, so raising it is not a tuning knob, it is the failure. */
+    productIds: z.array(z.string()).min(1).max(10),
+  }).parse(req.body || {});
+
+  const supplier = await suppliers.getSupplier(req.params.id);
+  if (!supplier) throw notFound('Supplier not found');
+  const connector = createConnector(supplier);
+
+  const products = await all(
+    `SELECT id, name, price FROM products WHERE id = ANY(@ids)`, { ids: productIds });
+  /* Asked order, not database order — the page is stitching batches back
+     together into one table and a reordered batch would scramble it. */
+  const byId = Object.fromEntries(products.map((p) => [p.id, p]));
+  const ordered = productIds.map((id) => byId[id]).filter(Boolean);
+
+  const rows = await scanProducts(connector, ordered);
+  res.set('Cache-Control', 'no-store');
+  res.json({
+    supplier: { id: supplier.id, name: supplier.name, kind: supplier.connector_kind },
+    serverSide: !!connector.supportsSearch,
+    rows,
+    summary: summarise(rows),
+  });
+}));
+
+/** The active catalogue, so the page knows what there is to scan. */
+router.get('/:id/scan-targets', requirePermission('suppliers.read'), asyncHandler(async (_req, res) => {
+  const rows = await all(
+    `SELECT id, name, price FROM products WHERE active = 1 ORDER BY name ASC`);
+  res.json({ products: rows.map((p) => ({ id: p.id, name: p.name, priceCents: Number(p.price) })) });
 }));
 
 // Trigger a sync (inventory | price | status | full).

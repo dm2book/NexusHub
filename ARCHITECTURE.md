@@ -111,6 +111,25 @@ the margin it would leave and `wouldRefuseAutoBuy` — the same condition
 `fulfillmentService` refuses on, which is silent at order time, so it has to be
 loud while choosing.
 
+**Catalogue scan** (`catalogScanService.js`, `POST /api/admin/suppliers/:id/scan`)
+asks the picker's question for every active product at once and answers the one
+number that decides whether a launch date is real: how much of the catalogue can
+be auto-delivered, profitably. Batched by the client (ten at a time, sequential
+inside a batch) because two hundred calls to someone else's API is minutes of
+wall clock on a platform that kills a function at its max duration — and a
+request that dies at 90% leaves the owner with nothing.
+
+"Best" is not the top hit: it is the cheapest listing that is in stock **and**
+below the sell price, because `fulfillmentService` refuses to auto-buy at or
+above it, silently. When nothing qualifies the nearest candidate is still
+returned with a verdict saying why — `below_cost`, `out_of_stock`, `not_found`,
+`no_price` — since "the Roblox card costs €14.80 against your €9.99" is a
+different problem from "they do not carry it".
+
+It **proposes and never maps.** Matching is by name, and a bulk table of green
+ticks is exactly what gets accepted wholesale, so every row carries the
+supplier's own title, SKU and region and mapping is a click per row.
+
 **Supply dashboard** (`supplierDashboardService.js`, `GET /api/admin/suppliers/dashboard`)
 answers the product-shaped question the supplier-shaped metrics could not: per
 product the supplier, cost, code stock, supplier stock and last sync; per supplier

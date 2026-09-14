@@ -5,6 +5,7 @@ import { date, money } from '../../lib/format.js';
 import { PageLoader, EmptyState, Modal } from '../../components/ui.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
 import SupplyDashboard from '../../components/admin/SupplyDashboard.jsx';
+import CatalogScan from '../../components/admin/CatalogScan.jsx';
 
 const KIND_HINT = {
   api: 'config: { baseUrl, auth:{type,token}, endpoints:{catalog,fulfill,status}, fieldMap }',
@@ -340,6 +341,22 @@ export default function Suppliers() {
             <input type="number" className="input" value={mapForm.priority} onChange={(e) => setMapForm({ ...mapForm, priority: e.target.value })} placeholder="100 (lower = preferred)" /></div>
         </div>
         <button onClick={addMapping} disabled={busy} className="btn-primary mt-4">Map product</button>
+
+        {/* …or answer the question for the whole catalogue at once. Doing it a
+            product at a time is an hour of clicking to reach one number. */}
+        {mapFor && (
+          <div className="mt-6 pt-5 border-t border-white/5">
+            <div className="text-white text-sm">Or check every product at once</div>
+            <p className="text-slate-400 text-xs mt-1">
+              Searches {mapFor.name}’s catalogue for each active product and reports what it would
+              cost you and whether it could be auto-delivered. Nothing is mapped without your click.
+            </p>
+            <CatalogScan supplier={mapFor} onMapped={async () => {
+              const r = await api.get(`/api/admin/suppliers/${mapFor.id}/products`);
+              setMappings(r.mappings || []);
+            }} />
+          </div>
+        )}
 
         {mappings.length > 0 && (
           <div className="mt-6">
