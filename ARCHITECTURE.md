@@ -189,6 +189,32 @@ chargeback are opposite facts** about the same money and are never summed. Low
 stock reuses `stockTierFor` and excludes products sourced live from a supplier,
 which are supposed to hold no codes.
 
+## 4c. The background sweep, judged on evidence
+
+Files: `services/maintenanceService.js` (`lastMaintenanceRun`), `diagnosticsService.js`,
+`launchCheckService.js`.
+
+Everything the shop does on its own happens in the hourly sweep: paid orders
+swept for delivery, the supplier queue drained so a purchase has its key
+collected, failed emails retried, reminders and review requests sent, IP
+addresses forgotten for the GDPR. All fire-and-forget, all silent when it stops.
+
+It was reported as **configuration** — `status: 'open'` when `CRON_SECRET` was
+unset, with a note about locking the endpoint. Both halves were wrong. Without
+that secret the endpoint in production does not stand open, it **refuses
+everything**, Vercel's own cron included, because Vercel only sends the
+`Authorization` header when the secret exists (verified live: `GET
+/api/cron/maintenance` → 403). The shop survives on a fallback that piggybacks
+on live traffic — so a quiet shop simply goes without, and every dashboard still
+reads green.
+
+The sweep now records that it finished (`kv.maintenance_last_run`, written last
+and best-effort so bookkeeping can never break the work it records), and the
+checks read that: health reports `never_run` / `running` / `stale` with the
+timestamp, and the launch report fails on a sweep that has never run or has
+stopped, warns when it runs only because traffic happened to trigger it, and
+names the steps that threw.
+
 ## 5. Automated fulfillment
 
 Files: `services/fulfillmentService.js`, `routes/admin/fulfillment.js`.

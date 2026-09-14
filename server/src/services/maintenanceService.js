@@ -11,11 +11,39 @@ import { retryFailedEmails } from './emailService.js';
 import { sweepMemberRoles } from './discordRolesService.js';
 import { purgeExpiredLinkIntents } from './discordLinkService.js';
 import { pruneOutbox } from './discordService.js';
+import { getSetting, setSetting } from './settingsService.js';
 import { pruneAttribution } from './attributionService.js';
 import { sweepAlerts, pruneAlerts } from './notifyService.js';
 
 const HOURS = (n) => new Date(Date.now() - n * 3_600_000).toISOString();
 const DAYS = (n) => new Date(Date.now() - n * 86_400_000).toISOString();
+
+/** Where the last run records itself. */
+export const LAST_RUN_KEY = 'maintenance_last_run';
+
+/**
+ * When maintenance last actually ran, and whether that is recent enough.
+ *
+ * Evidence, not configuration. The sweep is scheduled hourly, so anything past
+ * a few hours means it has stopped — on Vercel the fallback rides on live
+ * traffic and a quiet shop can simply go without, which is exactly the state
+ * nobody notices until a paid order sits undelivered.
+ */
+export async function lastMaintenanceRun({ now = Date.now(), staleAfterHours = 6 } = {}) {
+  const rec = await getSetting(LAST_RUN_KEY, null).catch(() => null);
+  const at = rec?.finishedAt || rec?.at || null;
+  const ms = at ? now - Date.parse(at) : null;
+  return {
+    at,
+    ageMinutes: Number.isFinite(ms) ? Math.floor(ms / 60_000) : null,
+    /* Never run and long ago are different problems — one is "it was never
+       wired up", the other "it stopped" — so they stay distinguishable. */
+    everRan: !!at,
+    stale: !at || ms > staleAfterHours * 3_600_000,
+    staleAfterHours,
+    errors: rec?.errors || [],
+  };
+}
 
 export async function runMaintenance() {
   const summary = { otpPurged: 0, ipsForgotten: 0, sessionsExpired: 0, ordersCancelled: 0, remindersSent: 0, reviewRequestsSent: 0, cartRemindersSent: 0, fulfillmentsRetried: 0, at: nowIso() };
@@ -240,6 +268,27 @@ export async function runMaintenance() {
     const { pruneObservations } = await import('./market/observations.js');
     summary.marketObservationsPruned = await pruneObservations();
   } catch (e) { summary.marketError = e.message; }
+
+  /* Leave a trace that this actually happened.
+     Everything above is fire-and-forget: it runs on a schedule nobody watches,
+     and every failure mode is silent. The health check could only report
+     CONFIGURATION — "is CRON_SECRET set" — which answers a different question
+     from "has the sweep run", and answers it wrongly in both directions: a shop
+     with no secret still runs maintenance off live traffic, and a shop with a
+     secret can have a cron that 403s every hour while the dashboard looks fine.
+
+     One row, so the check can report evidence instead. Written last and
+     best-effort: a maintenance run that did its work and then failed to write
+     its own receipt is still a maintenance run. */
+  try {
+    await setSetting(LAST_RUN_KEY, {
+      at: summary.at,
+      finishedAt: nowIso(),
+      /* Which steps failed, if any. A sweep that ran and threw in four places
+         is not the same as a healthy one, and "it ran" would hide that. */
+      errors: Object.keys(summary).filter((k) => /Error$/.test(k)),
+    });
+  } catch { /* never let bookkeeping break the work it is recording */ }
 
   return summary;
 }

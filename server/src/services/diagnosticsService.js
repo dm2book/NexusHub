@@ -16,6 +16,7 @@
  * for anyone debugging; it is simply no longer what a visitor pays for.
  */
 import { run, get, all, nowIso } from '../db/index.js';
+import { lastMaintenanceRun } from './maintenanceService.js';
 import { config } from '../config/env.js';
 
 const KEY_TABLES = [
@@ -109,14 +110,42 @@ function storageHealth() {
     note: 'Payment screenshots are submitted as links; no blob storage required.' };
 }
 
-function queueHealth() {
-  const configured = !!config.security.cronSecret;
+/**
+ * Has the hourly sweep actually run — not "is a secret configured".
+ *
+ * This reported `status: 'open'` with a note about locking the endpoint, and
+ * both halves were wrong. Without CRON_SECRET the endpoint in production is not
+ * open, it REFUSES EVERYTHING — including Vercel's own cron, which only sends
+ * an Authorization header when that secret exists. So the scheduled call 403s
+ * every hour while the dashboard says the queue is fine. Verified against the
+ * live site: GET /api/cron/maintenance → 403 Bad cron secret.
+ *
+ * The shop survives that because maintenance also rides on live traffic, at
+ * most once an hour per warm instance — which means a quiet shop simply goes
+ * without, and nothing says so.
+ *
+ * So this answers the question that matters: when did it last finish, and did
+ * any step throw. `ok` stays true because the storefront's status dot reads it
+ * and a sweep an hour late is not an outage; the launch report is where a
+ * stopped sweep is shouted about.
+ */
+async function queueHealth() {
+  const locked = !!config.security.cronSecret;
+  const last = await lastMaintenanceRun().catch(() => null);
+  const note = !locked && config.isProd
+    ? 'CRON_SECRET is not set, so the hourly Vercel Cron call is REFUSED (403). '
+      + 'Maintenance only runs when live traffic happens to trigger it.'
+    : undefined;
   return {
     ok: true,
-    status: configured ? 'configured' : 'open',
+    status: last?.stale === false ? 'running' : last?.everRan ? 'stale' : 'never_run',
     type: 'vercel-cron',
     schedule: 'hourly /api/cron/maintenance',
-    note: configured ? undefined : 'Set CRON_SECRET to lock the maintenance endpoint in production.',
+    scheduledCallAccepted: locked || !config.isProd,
+    lastRunAt: last?.at ?? null,
+    lastRunAgeMinutes: last?.ageMinutes ?? null,
+    lastRunErrors: last?.errors ?? [],
+    note,
   };
 }
 
@@ -125,7 +154,7 @@ export async function healthSummary({ deep = false, tables = false } = {}) {
   const email = emailHealth();
   const sms = smsHealth();
   const storage = storageHealth();
-  const queue = queueHealth();
+  const queue = await queueHealth();
   return {
     ok: database.ok && (database.status !== 'down'),
     ts: nowIso(),
