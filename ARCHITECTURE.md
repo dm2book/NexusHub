@@ -187,9 +187,17 @@ idempotent, and it silently does nothing to a body an admin has rewritten.
 Files: `services/launchCenterService.js`, `GET /api/admin/launch-center`,
 `src/pages/admin/Live.jsx`.
 
-Ten figures about right now in one snapshot: revenue, profit and orders today,
-chargebacks, refunds, failed deliveries, low stock, new and returning customers,
-and adverts delivering traffic.
+Eleven figures about right now in one snapshot: revenue, profit and orders
+today, orders awaiting payment, chargebacks, refunds, failed deliveries, low
+stock, new and returning customers, and adverts delivering traffic.
+
+**Awaiting payment** is the daily job in a shop that takes bank transfers, and
+nothing counted it: the sidebar badge counts payment *proofs* a buyer submitted,
+the orders badge counts what is already paid and waiting to be delivered, and an
+order sitting in `pending` with no proof appeared in neither. Two numbers rather
+than one — the total is `ifAllPaidCents`, never "revenue", because an abandoned
+checkout is indistinguishable from an unmatched transfer from here, while
+`proofsWaiting` is the subset somebody has actually claimed to have paid.
 
 **"Realtime" here means polling that admits its age.** This shop is one
 serverless function, where a held-open SSE stream is billed by the second and
