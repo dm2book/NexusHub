@@ -262,22 +262,36 @@ export const bySourceKey = (key) => SOURCES.find((s) => s.key === key) || null;
  * configured where one exists — so an Eldorado key is entered once, not twice.
  */
 export async function credentialsFor(key) {
-  /* Environment first, because three of the four marketplaces issue a single
-     key and an operator should not have to create a supplier row to use one.
-     A supplier row still wins where it exists — that is where a key rotated by
-     the person who owns the account belongs. */
+  /* A supplier row first, the environment second — for EVERY marketplace.
+   *
+   * The comment here used to promise exactly that and the code did it for two
+   * of the four: Eldorado and G2A read the supplier row, Kinguin and Eneba read
+   * only the environment. The consequence is not abstract. An owner adds their
+   * Kinguin key through the admin, the connector buys with it happily, and
+   * Market keeps reporting "no Kinguin Integration API key" — the same key, one
+   * table away, invisible to the half of the system that could use it. The
+   * source is fully implemented; it simply never gets credentials.
+   *
+   * A row only wins when it actually carries something: an empty supplier
+   * config must not mask a working environment key, which is the other
+   * direction of the same bug.
+   *
+   * Paused suppliers are excluded, as everywhere else — a key the owner has
+   * switched off is not a permission.
+   */
   const fromEnv = config.market.credentials?.[key];
-  if (key === 'kinguin' || key === 'eneba') {
-    return fromEnv && Object.values(fromEnv).some(Boolean) ? fromEnv : null;
+  const envUsable = fromEnv && Object.values(fromEnv).some(Boolean) ? fromEnv : null;
+
+  const row = await get(
+    `SELECT config FROM suppliers WHERE connector_kind = @k AND status = 'active'
+      ORDER BY created_at LIMIT 1`, { k: key }).catch(() => null);
+  if (row) {
+    try {
+      const cfg = JSON.parse(row.config || '{}');
+      if (cfg && Object.values(cfg).some(Boolean)) return cfg;
+    } catch { /* a malformed config is not a reason to ignore the environment */ }
   }
-  if (key === 'eldorado' || key === 'g2a') {
-    const row = await get(
-      `SELECT config FROM suppliers WHERE connector_kind=@k AND status='active' ORDER BY created_at LIMIT 1`,
-      { k: key }).catch(() => null);
-    if (!row) return fromEnv && Object.values(fromEnv).some(Boolean) ? fromEnv : null;
-    try { return JSON.parse(row.config || '{}'); } catch { return null; }
-  }
-  return null;
+  return envUsable;
 }
 
 /**
