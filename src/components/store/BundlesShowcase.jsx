@@ -13,6 +13,22 @@ import { useI18n } from '../../lib/i18n.jsx';
  * its products into the cart — the discount then applies automatically at
  * checkout (the server validates it). Hides itself when there are no bundles.
  */
+/**
+ * Read the language the page is in off a bundle from the API.
+ *
+ * The response carries name/description in all four (nameDe, descriptionFr…),
+ * so this is a lookup rather than a second request — and it falls back to the
+ * base fields, which is what a bundle cached before this shipped still has.
+ */
+function bundleText(b, lang) {
+  const suffix = lang && lang !== 'en' ? lang[0].toUpperCase() + lang.slice(1) : '';
+  return {
+    name: b[`name${suffix}`] || b.name || '',
+    description: b[`description${suffix}`] || b.description
+      || (b.products || []).map((p) => p.name).join(' + '),
+  };
+}
+
 export default function BundlesShowcase() {
   const { t, lang } = useI18n();
   const [bundles, setBundles] = useState(null);
@@ -72,9 +88,14 @@ export default function BundlesShowcase() {
                 </span>
               ))}
             </div>
-            <h3 className="font-bold text-slate-900">{b.name}</h3>
+            {/* The bundle's own words in the language being read. This picked
+                the Dutch line only when the page was Dutch and fell back to
+                whatever the owner had typed otherwise — so a German page
+                showed "Top up both your shooters in one go and save 10%".
+                Every bundle now arrives with all four; see bundleCopy.js. */}
+            <h3 className="font-bold text-slate-900">{bundleText(b, lang).name}</h3>
             <p className="text-slate-400 text-sm mt-0.5 line-clamp-2">
-              {(lang === 'nl' && b.descriptionNl) || b.description || b.products.map((p) => p.name).join(' + ')}
+              {bundleText(b, lang).description}
             </p>
             <div className="flex items-baseline gap-2 mt-3">
               <span className="text-2xl font-extrabold text-violet-600">{money(b.total, b.currency)}</span>
