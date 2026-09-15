@@ -38,11 +38,20 @@ function Coverage({ c }) {
 
 function Period({ title, p }) {
   const loss = p.profit < 0;
+  const vat = p.vat || {};
   return (
     <div className="card p-4">
       <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">{title}</p>
       <p className="mt-2 text-2xl font-bold text-white">{money(p.revenue)}</p>
       <p className="text-[12px] text-slate-400">{p.orders} order(s) · {p.units} unit(s)</p>
+      {/* What was taken and what was kept, on separate lines, because they are
+          different amounts the moment the shop is VAT-registered — and the one
+          the margin is computed from is the second. */}
+      {vat.registered && (
+        <p className="text-[12px] text-amber-300/90 mt-1">
+          {money(p.netRevenue)} after {vat.pct}% BTW · {money(vat.amount)} set aside
+        </p>
+      )}
       <div className="mt-3 pt-3 border-t border-white/5">
         <p className={`text-xl font-bold ${loss ? 'text-red-300' : 'text-white'}`}>
           {p.coverage.units === 0 ? '—' : money(p.profit)}
@@ -118,6 +127,21 @@ export default function Profit() {
         <p className="text-[12px] text-slate-400">
           this month, over costed revenue only
           {d.averageMarginPct == null && ' — nothing with a known cost has sold yet'}
+        </p>
+        {/* The page has to say which of the two worlds it is reporting from.
+            A margin computed before registration and one computed after are
+            different numbers from the same sales, and the difference is about
+            a fifth. */}
+        <p className="text-[12px] mt-2 pt-2 border-t border-white/5 text-slate-400">
+          {d.vat?.registered
+            ? <>Net of {d.vat.pct}% BTW. One rate over every sale — a sale to a consumer in
+                another EU country is taxed at that country&rsquo;s rate, and orders do not
+                record where the buyer was, so treat this as an estimate. Supplier cost is
+                taken as entered.</>
+            : <>No BTW is taken out: no btw-identificatienummer is published, so the shop is
+                not shown as VAT-registered. Add one in <code>src/lib/legalIdentity.js</code> and
+                every margin here drops by the VAT share — on a &euro;9.99 sale at 21%, by
+                &euro;1.73.</>}
         </p>
       </div>
 

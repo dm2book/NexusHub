@@ -38,6 +38,10 @@ export const config = {
      day in every by-day figure. Amsterdam is UTC+1 or +2 depending on the
      season, which is why this is a zone name and not an offset. */
   timezone: env.SHOP_TIMEZONE || 'Europe/Amsterdam',
+  /* The VAT fraction to take out of a gross price on the profit page, e.g.
+     0.21. Only ever applied once a btw-identificatienummer is published — see
+     vatService — so setting it before registering changes nothing. */
+  vatRate: env.VAT_RATE ? Number(env.VAT_RATE) : undefined,
   appUrl: env.APP_URL
     || (isProd ? 'https://forgemarket.nl' : 'http://localhost:3000'),
   apiUrl: env.API_URL

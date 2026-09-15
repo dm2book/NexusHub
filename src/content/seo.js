@@ -82,19 +82,19 @@ export const PAGES = {
   '/shop': {
     nl: {
       title: 'Alle producten — game currency & giftcards',
-      description: 'De volledige catalogus: Robux, V-Bucks, Valorant Points, Steam, Discord Nitro en giftcards. Prijzen inclusief btw, betalen met iDEAL.',
+      description: 'De volledige catalogus: Robux, V-Bucks, Valorant Points, Steam, Discord Nitro en giftcards. De prijs die je ziet is de prijs die je betaalt, af te rekenen met iDEAL.',
     },
     en: {
       title: 'All products — game currency & gift cards',
-      description: 'The full catalogue: Robux, V-Bucks, Valorant Points, Steam, Discord Nitro and gift cards. Prices include VAT, pay with iDEAL.',
+      description: 'The full catalogue: Robux, V-Bucks, Valorant Points, Steam, Discord Nitro and gift cards. The price you see is the price you pay, with iDEAL.',
     },
     de: {
       title: 'Alle Produkte — Spielwährung & Geschenkkarten',
-      description: 'Der ganze Katalog: Robux, V-Bucks, Valorant Points, Steam, Discord Nitro und Geschenkkarten. Preise inklusive MwSt., zahlen mit iDEAL.',
+      description: 'Der ganze Katalog: Robux, V-Bucks, Valorant Points, Steam, Discord Nitro und Geschenkkarten. Der Preis, den du siehst, ist der Preis, den du zahlst — mit iDEAL.',
     },
     fr: {
       title: 'Tous les produits — monnaie de jeu et cartes cadeaux',
-      description: 'Tout le catalogue : Robux, V-Bucks, Valorant Points, Steam, Discord Nitro et cartes cadeaux. Prix TTC, paiement avec iDEAL.',
+      description: 'Tout le catalogue : Robux, V-Bucks, Valorant Points, Steam, Discord Nitro et cartes cadeaux. Le prix que tu vois est le prix que tu paies, avec iDEAL.',
     },
   },
   '/how-it-works': {
@@ -320,10 +320,10 @@ export const PAGES = {
     fr: { title: 'Se connecter', description: 'Connecte-toi sans mot de passe avec un code envoyé par e-mail, ou continue avec Discord.' },
   },
   '/cart': {
-    nl: { title: 'Winkelwagen', description: 'De producten in je winkelwagen, met het totaal inclusief btw en de betaalmethoden die je bij het afrekenen kunt kiezen.' },
+    nl: { title: 'Winkelwagen', description: 'De producten in je winkelwagen, met het totaal en de betaalmethoden die je bij het afrekenen kunt kiezen.' },
     en: { title: 'Cart', description: 'The products in your cart, with the total including VAT and the payment methods you can choose at checkout.' },
-    de: { title: 'Warenkorb', description: 'Die Produkte in deinem Warenkorb, mit dem Gesamtbetrag inklusive MwSt. und den Zahlungsmethoden, die du beim Bezahlen wählen kannst.' },
-    fr: { title: 'Panier', description: 'Les produits de ton panier, avec le total TTC et les moyens de paiement disponibles au moment de payer.' },
+    de: { title: 'Warenkorb', description: 'Die Produkte in deinem Warenkorb, mit dem Gesamtbetrag und den Zahlungsmethoden, die du beim Bezahlen wählen kannst.' },
+    fr: { title: 'Panier', description: 'Les produits de ton panier, avec le total et les moyens de paiement disponibles au moment de payer.' },
   },
 };
 
@@ -370,46 +370,6 @@ export const LANDING = {
       description: 'Robux kopen met iDEAL. Wat op voorraad staat gaat automatisch de deur uit; de rest zetten we met de hand op je Roblox-account, meestal binnen een paar uur.',
       h1: 'Robux kopen',
       sub: 'Robux voor je Roblox-account. Op voorraad gaat automatisch de deur uit; de rest zetten we met de hand voor je klaar.',
-    },
-    de: {
-      title: 'Warenkorb',
-      description: 'Die Produkte in deinem Warenkorb, mit dem Gesamtbetrag inklusive MwSt. und den Zahlungsmethoden, die du beim Bezahlen wählen kannst.',
-    },
-    fr: {
-      title: 'Panier',
-      description: 'Les produits de ton panier, avec le total TTC et les moyens de paiement disponibles au moment de payer.',
-    },
-    de: {
-      title: 'Anmelden',
-      description: 'Melde dich ohne Passwort mit einem Code per E-Mail an, oder mach mit Discord weiter.',
-    },
-    fr: {
-      title: 'Se connecter',
-      description: 'Connecte-toi sans mot de passe avec un code envoyé par e-mail, ou continue avec Discord.',
-    },
-    de: {
-      title: 'Cookie-Richtlinie',
-      description: 'Welche Cookies ForgeMarket setzt, was in deinem eigenen Browser bleibt und warum diese Seite kein Cookie-Banner hat.',
-    },
-    fr: {
-      title: 'Politique relative aux cookies',
-      description: 'Quels cookies ForgeMarket dépose, ce qui reste dans ton propre navigateur, et pourquoi ce site n’a pas de bandeau cookies.',
-    },
-    de: {
-      title: 'Datenschutzerklärung',
-      description: 'Welche personenbezogenen Daten ForgeMarket verarbeitet, auf welcher Rechtsgrundlage, wie lange sie gespeichert werden und welche Rechte du hast.',
-    },
-    fr: {
-      title: 'Politique de confidentialité',
-      description: 'Quelles données personnelles ForgeMarket traite, sur quelle base légale, combien de temps elles sont conservées et quels sont tes droits.',
-    },
-    de: {
-      title: 'Allgemeine Geschäftsbedingungen',
-      description: 'Die Bedingungen, die für jede Bestellung gelten: Zahlung, Lieferung, Widerrufsrecht und Rückerstattungen.',
-    },
-    fr: {
-      title: 'Conditions générales',
-      description: 'Les conditions qui s’appliquent à chaque commande : paiement, livraison, droit de rétractation et remboursements.',
     },
     en: {
       title: 'Buy Robux — straight to your Roblox account',
