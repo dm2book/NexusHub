@@ -946,52 +946,56 @@ const HALO = {
   'discord-nitro': 'rgba(99,102,241,.55)', giftcard: 'rgba(168,85,247,.5)',
 };
 
+/* The five brands this shop leads with, as a hand of cards.
+   Angles and depth are hand-placed rather than generated: a fan is a shape you
+   judge by eye, and an even spread reads as a chart. The middle card is nearest
+   and largest because that is where the eye lands first. */
+const FAN = [
+  { icon: 'steam', a: '-30deg', y: '26px', s: 0.87, tint: 'rgba(56,132,255,.62)' },
+  { icon: 'robux', a: '-15deg', y: '7px', s: 0.94, tint: 'rgba(16,185,129,.62)' },
+  { icon: 'v-bucks', a: '0deg', y: '-10px', s: 1.05, tint: 'rgba(56,132,255,.72)' },
+  { icon: 'playstation', a: '15deg', y: '7px', s: 0.94, tint: 'rgba(37,99,235,.66)' },
+  { icon: 'discord-nitro', a: '30deg', y: '26px', s: 0.87, tint: 'rgba(99,102,241,.66)' },
+];
+
 function HeroRender() {
   const ref = useRef(null);
   useParallax(ref);
   return (
     <div ref={ref} className="relative h-[250px] sm:h-[360px]">
-      {/* SCALED, not squashed.
-          Shortening this box on a phone to save a screenful of scrolling moved
-          the absolutely-positioned logos into each other — Valorant landed on
-          top of the Roblox coin and the Xbox tile disappeared behind the
-          PlayStation one. Percentages and fixed pixel sizes do not survive a
-          change of container height.
+      {/* SCALED, not squashed — see the note this replaced: every card is placed
+          from the centre, so the composition keeps its geometry and the whole
+          thing is scaled to fit a phone. The middle step is not decoration:
+          at 1024px the widened fan ran 15px off the right of the viewport,
+          measured in the browser. */}
+      <div className="absolute left-1/2 top-0 -translate-x-1/2 w-[460px] h-[320px] sm:h-[360px]
+                      origin-top scale-[.78] sm:scale-[.84] xl:scale-100">
+        {/* ambient light behind the hand */}
+        <div className="fm-px absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[360px] h-[360px] rounded-full blur-3xl"
+          style={{ '--d': 0.03, background: 'radial-gradient(circle, rgba(124,92,255,.42), transparent 66%)' }} />
 
-          Scaling alone did not fix it either: every asset is placed at a
-          PERCENTAGE of the container width, so a 358px phone column squeezed
-          them together horizontally no matter what scale was applied — V-Bucks
-          landed on the PlayStation tile. The composition therefore gets a fixed
-          460px width (what the desktop column measures) and is centred and
-          scaled to fit: 460 × .78 ≈ 358, so the proportions are identical on a
-          phone and on a monitor. */}
-      <div className="absolute left-1/2 top-0 -translate-x-1/2 w-[460px] h-[320px] sm:h-[360px] origin-top scale-[.78] sm:scale-100">
-      {/* ambient glow */}
-      <div className="fm-px absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[340px] h-[340px] rounded-full blur-3xl" style={{ '--d': 0.03, background: 'radial-gradient(circle, rgba(124,92,255,.4), transparent 66%)' }} />
-      {/* podium reflection */}
-      <div className="absolute left-1/2 bottom-4 -translate-x-1/2 w-[300px] h-[46px] rounded-[50%]"
-        style={{ background: 'radial-gradient(ellipse at center, rgba(168,85,247,.4), transparent 70%)' }} />
-      {/* sparkles (deepest layer — drift the most) */}
-      {[['12%', '16%'], ['84%', '22%'], ['66%', '6%'], ['20%', '72%'], ['90%', '60%'], ['48%', '90%']].map(([l, t], i) => (
-        <div key={i} className="fm-px absolute" style={{ left: l, top: t, '--d': 0.16 + (i % 3) * 0.04 }}>
-          <Sparkles size={i % 2 ? 16 : 12} className="text-violet-300/80 fm-drift" style={{ animationDelay: `${i * 0.55}s`, '--orbit-dur': `${8 + i}s` }} />
+        <div className="fm-fan">
+          <div className="fm-fan-inner">
+            {FAN.map((c) => (
+              <div key={c.icon} className="fm-fan-card"
+                style={{ '--a': c.a, '--y': c.y, '--s': c.s, '--tint': c.tint }}>
+                <img src={ICON(c.icon)} alt="" loading="lazy" />
+              </div>
+            ))}
+          </div>
+          <span className="fm-fan-shadow" aria-hidden />
         </div>
-      ))}
-      {/* center V-Bucks (foreground — drifts least, feels closest) */}
-      <div className="fm-px absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10" style={{ '--d': 0.04 }}>
-        <span className="fm-hero-item" style={{ '--halo': HALO['v-bucks'] }}>
-          <img src={ICON('v-bucks')} alt="" className="w-[150px] h-[150px] object-contain drop-shadow-2xl fm-drift"
-            style={{ '--orbit-dur': '13s' }} />
-        </span>
-      </div>
-      {/* surrounding cluster (mid layers, varied float + rotation) */}
-      <PxAsset icon="robux"         depth={0.10} float="fm-float2" size="w-28 h-28" pos="left-[4%] top-[24%]"    delay=".3s" halo={HALO.robux} />
-      <PxAsset icon="steam"         depth={0.12} float="fm-float3" size="w-[84px] h-[84px]" pos="left-[22%] top-[0%]" delay=".6s" halo={HALO.steam} />
-      <PxAsset icon="valorant"      depth={0.13} float="fm-float"  size="w-[84px] h-[84px]" pos="left-[8%] bottom-[8%]" delay=".9s" halo={HALO.valorant} />
-      <PxAsset icon="xbox"          depth={0.11} float="fm-float2" size="w-[84px] h-[84px]" pos="right-[18%] bottom-[4%]" delay=".2s" halo={HALO.xbox} />
-      <PxAsset icon="playstation"   depth={0.09} float="fm-float3" size="w-28 h-28" pos="right-[3%] top-[32%]"  delay=".5s" halo={HALO.playstation} />
-      <PxAsset icon="discord-nitro" depth={0.14} float="fm-float"  size="w-[68px] h-[68px]" pos="right-[24%] top-[4%]" delay=".8s" halo={HALO['discord-nitro']} />
+
+        {/* A few sparks, far fewer than before: they were competing with the
+            product art rather than lifting it. */}
+        {[['8%', '14%'], ['88%', '20%'], ['80%', '78%']].map(([l, t], i) => (
+          <div key={i} className="fm-px absolute" style={{ left: l, top: t, '--d': 0.16 + i * 0.04 }}>
+            <Sparkles size={i === 1 ? 16 : 12} className="text-violet-300/70 fm-drift"
+              style={{ animationDelay: `${i * 0.7}s`, '--orbit-dur': `${9 + i}s` }} />
+          </div>
+        ))}
       </div>
     </div>
   );
 }
+
