@@ -310,7 +310,10 @@ export default function HomeStore() {
             className="relative w-11 h-11 shrink-0 rounded-xl hover:bg-slate-100 grid place-items-center text-slate-700">
             <ShoppingCart size={20} />
             {count > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-violet-600 text-white text-[11px] font-semibold grid place-items-center">{count}</span>
+              /* Keyed on the count: a new number is a new element, so the pop
+                 runs on every change rather than once on the first one. */
+              <span key={count}
+                className="fm-pop absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-violet-600 text-white text-[11px] font-semibold grid place-items-center">{count}</span>
             )}
           </Link>
 
@@ -339,7 +342,7 @@ export default function HomeStore() {
               instead of pushing the primary call to action off the screen. */}
           {!user && (
             <Link to="/login" aria-label={tr('nav.signup', 'Sign Up')}
-              className="inline-flex items-center justify-center xs:justify-start gap-1.5 text-white text-[15px] font-semibold rounded-xl w-10 xs:w-auto px-0 xs:px-3.5 sm:px-4 h-10 shrink-0 min-w-0 max-w-[46vw] shadow-lg shadow-violet-500/30 hover:brightness-105 transition"
+              className="fm-shine inline-flex items-center justify-center xs:justify-start gap-1.5 text-white text-[15px] font-semibold rounded-xl w-10 xs:w-auto px-0 xs:px-3.5 sm:px-4 h-10 shrink-0 min-w-0 max-w-[46vw] shadow-lg shadow-violet-500/30 hover:brightness-105 transition"
               style={{ backgroundImage: 'linear-gradient(135deg,#7c5cff,#a855f7)' }}>
               {/* Below 400px there is room for roughly 72px here, and a button
                   reading "Accou…" is worse than no words at all. Same pattern the
@@ -396,9 +399,9 @@ export default function HomeStore() {
             <nav className="space-y-0.5">
               {CATEGORIES.map((c, i) => (
                 <Link key={c.label} to={c.slug ? landingPathFor(c.slug) : '/shop'}
-                  className={`flex items-center gap-3 px-2.5 py-2 rounded-xl text-[14.5px] font-medium transition
-                    ${i === 0 ? 'bg-violet-50 text-violet-700' : 'text-slate-600 hover:bg-slate-50'}`}>
-                  <span className="w-7 h-7 grid place-items-center shrink-0">
+                  className={`fm-navrow flex items-center gap-3 px-2.5 py-2 rounded-xl text-[14.5px] font-medium
+                    ${i === 0 ? 'is-active bg-violet-50 text-violet-700' : 'text-slate-600 hover:bg-slate-50'}`}>
+                  <span className="fm-navicon w-7 h-7 grid place-items-center shrink-0">
                     {c.node || (c.letter
                       ? <span className={`w-7 h-7 rounded-lg bg-gradient-to-br ${c.grad} grid place-items-center text-white text-xs font-bold`}>{c.letter}</span>
                       : <img src={categoryLogos[c.slug] || ICON(c.img)} alt="" className="w-7 h-7 object-contain" />)}
@@ -406,8 +409,8 @@ export default function HomeStore() {
                   {c.slug ? c.label : tr('shop.all', c.label)}
                 </Link>
               ))}
-              <Link to="/shop" className="flex items-center gap-3 px-2.5 py-2 rounded-xl text-[14.5px] font-medium text-slate-500 hover:bg-slate-50">
-                <span className="w-7 h-7 grid place-items-center"><Plus size={18} /></span>
+              <Link to="/shop" className="fm-navrow flex items-center gap-3 px-2.5 py-2 rounded-xl text-[14.5px] font-medium text-slate-500 hover:bg-slate-50">
+                <span className="fm-navicon w-7 h-7 grid place-items-center"><Plus size={18} /></span>
                 {tr('home.moreCategories', 'More Categories')}
               </Link>
             </nav>
@@ -419,7 +422,7 @@ export default function HomeStore() {
               style={{ backgroundImage: 'linear-gradient(150deg,#7c5cff,#9333ea)' }}>
               <div className="font-bold text-[15px] flex items-center gap-1.5">{tr('home.offer', 'Offer')} <span>🔥</span></div>
               <p className="text-white/90 text-[13px] mt-1 leading-snug">{announcement}</p>
-              <Link to="/shop" className="mt-4 flex items-center justify-center gap-2 bg-white text-violet-700 font-semibold text-sm rounded-xl h-10 hover:bg-violet-50 transition">
+              <Link to="/shop" className="fm-shine mt-4 flex items-center justify-center gap-2 bg-white text-violet-700 font-semibold text-sm rounded-xl h-10 hover:bg-violet-50 transition">
                 {tr('home.shopNow', 'Shop now')} <ArrowRight size={15} />
               </Link>
             </div>
@@ -430,8 +433,10 @@ export default function HomeStore() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="font-bold text-[15px]">ForgeBot</span>
-                <span className="inline-flex items-center gap-1 text-[11px] text-emerald-600 font-medium">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Online
+                <span className="inline-flex items-center gap-1.5 text-[11px] text-emerald-600 font-medium">
+                  {/* The same light the hero badge carries, so "online" looks
+                      the same wherever the shop says it. */}
+                  <span className="fm-livedot" style={{ width: 6, height: 6 }} aria-hidden /> Online
                 </span>
               </div>
             </div>
@@ -447,7 +452,7 @@ export default function HomeStore() {
                 avatar, a greeting and a green "Online" dot is a chat as far as
                 anyone tapping it is concerned — so now it opens the real one. */}
             <button type="button" onClick={() => openForgeChat()}
-              className="mt-3 w-full flex items-center justify-center gap-2 text-white font-semibold text-sm rounded-xl h-10 transition hover:brightness-105"
+              className="fm-shine mt-3 w-full flex items-center justify-center gap-2 text-white font-semibold text-sm rounded-xl h-10 transition hover:brightness-105"
               style={{ backgroundImage: 'linear-gradient(135deg,#7c5cff,#a855f7)' }}>
               <MessageCircle size={16} /> {tr('home.chat', 'Chat with us')}
             </button>
@@ -538,7 +543,7 @@ export default function HomeStore() {
                   ))}
                 </div>
                 <div className="flex flex-wrap items-center gap-3 mt-5">
-                  <Link to="/shop" className="fm-press inline-flex items-center gap-2 text-white font-semibold rounded-xl px-6 h-12 shadow-lg shadow-violet-500/30 hover:brightness-105 transition"
+                  <Link to="/shop" className="fm-press fm-shine inline-flex items-center gap-2 text-white font-semibold rounded-xl px-6 h-12 shadow-lg shadow-violet-500/30 hover:brightness-105 transition"
                     style={{ backgroundImage: 'linear-gradient(135deg,#7c5cff,#a855f7)' }}>
                     {tr('home.shopNowBig', 'Shop Now')} <ArrowRight size={18} />
                   </Link>
