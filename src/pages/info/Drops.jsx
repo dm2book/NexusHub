@@ -66,7 +66,21 @@ export default function Drops() {
           </div>
         )}
         <p className="text-center text-slate-500 text-sm mt-8">
-          {t('drops.tip', 'Tip: add products to your')} <Link to="/wishlist" className="text-violet-400 hover:underline">wishlist</Link> {t('drops.tip2', 'so you’re ready when they drop.')}
+          {/* The word inside the link was hardcoded English, so this sentence
+              read "zet producten op je wishlist" in Dutch and "setz Produkte
+              auf deine wishlist" in German — one English word in the middle of
+              a translated sentence, in every language including the shop's
+              own. It has its own key rather than borrowing the footer's label
+              and lowercasing it: German capitalises every noun and Dutch does
+              not capitalise one mid-sentence, so the casing is part of the
+              translation and not something a transform can decide. */}
+          {t('drops.tip', 'Tip: add products to your')}{' '}
+          <Link to="/wishlist" className="text-violet-400 hover:underline">
+            {t('drops.wishlistWord', 'wishlist')}
+          </Link>
+          {/* No space injected here: German puts a comma straight after the
+              link, and the other three carry their own leading space. */}
+          {t('drops.tip2', ' so you’re ready when they drop.')}
         </p>
       </div>
     </InfoShell>
