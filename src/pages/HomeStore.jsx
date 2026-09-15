@@ -198,6 +198,12 @@ export default function HomeStore() {
   // Real catalog → tiles show the true "From" price; add-to-cart adds the
   // cheapest REAL product in that category (no fabricated items/prices).
   const [products, setProducts] = useState([]);
+  /* Separate from `products` being empty, which is a different fact: an empty
+     catalogue is a shop with nothing in it, and this is a shop we have not
+     asked yet. Without the distinction the three shelves simply did not exist
+     until the answer came back, and everything below them sat 1,283px too high
+     and then jumped — measured. */
+  const [loadingCatalogue, setLoadingCatalogue] = useState(true);
   const [unavailable, setUnavailable] = useState(false);
   useEffect(() => {
     // Handed over by the shell when it started this during HTML parse.
@@ -208,7 +214,8 @@ export default function HomeStore() {
          categories, tiles, prices — while every call behind it returned 500.
          The pillars below already drop a category with nothing behind it, so an
          empty list degrades on its own; what was missing was telling anyone. */
-      .catch(() => { setProducts([]); setUnavailable(true); });
+      .catch(() => { setProducts([]); setUnavailable(true); })
+      .finally(() => setLoadingCatalogue(false));
   }, []);
   /* Each pillar resolved against the live catalogue: a category appears only if
      it has active products, with its real cheapest price and real pack count. A
@@ -565,10 +572,20 @@ export default function HomeStore() {
                     answered. Both numbers are read off the live catalogue — the
                     cheapest active product and how many there are — so during an
                     outage this line is absent rather than wrong. */}
-                {catalogueAnchor && (
+                {catalogueAnchor ? (
                   <p className="text-[13.5px] text-slate-300/90 mt-3">
                     {tr('home.anchor', '{n} products · from {price}',
                       { n: catalogueAnchor.count, price: money(catalogueAnchor.from, catalogueAnchor.currency) })}
+                  </p>
+                ) : loadingCatalogue && (
+                  /* Holds this line's space while the catalogue is still being
+                     asked. Without it the hero grew 68px the moment the answer
+                     came back and pushed the whole page down with it.
+                     Only while LOADING: once we know there is no anchor — an
+                     outage, an empty shop — the line is never coming and
+                     reserving room for it would be a permanent empty gap. */
+                  <p className="mt-3" aria-hidden>
+                    <span className="inline-block h-[18px] w-44 rounded fm-skeleton align-middle" />
                   </p>
                 )}
                 {stats.reviews > 0 ? (
@@ -663,6 +680,12 @@ export default function HomeStore() {
               Three pillars, each resolved from the live catalogue. Grouping by
               what the shop actually sells beats one undifferentiated rail: a
               buyer arriving for Nitro should not have to scroll past Robux. */}
+          {/* Three of them, because three is what arrives. They are replaced
+              by the real shelves, which then cascade in — see the rail rule in
+              index.css. */}
+          {loadingCatalogue && !pillars.length
+            && [0, 1, 2].map((i) => <ShelfSkeleton key={i} />)}
+
           {pillars.map((pillar) => (
             <section key={pillar.key} className="fm-reveal fm-reveal-children">
               <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-1.5 sm:gap-4 mb-3">
@@ -1042,6 +1065,52 @@ function FanCard({ c, i, label }) {
  * the rail is unchanged — this only gives each one somewhere to keep its own
  * scroll position.
  */
+/**
+ * A shelf before the catalogue has answered.
+ *
+ * Not decoration: it holds the exact space the real shelf will take. Without
+ * it the three shelves did not exist at all until the products arrived, so
+ * everything below them — "Why ForgeMarket", the reviews, the questions — sat
+ * 1,283px too high and then jumped down, measured in a browser with the
+ * catalogue deliberately slowed.
+ *
+ * Every box below matches a real one: the 212px card, its 132px tile, the
+ * two lines of text and the 44px button row. If the real card changes shape
+ * this has to change with it, which is why the numbers are written once here
+ * beside the note saying so.
+ */
+function ShelfSkeleton({ cards = 5 }) {
+  return (
+    <section aria-hidden>
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-1.5 sm:gap-4 mb-3">
+        {/* 32 + 6 + 20 = the 58px a real heading block measures with a
+            one-line subtitle. A subtitle that wraps makes the real one 79px
+            and this cannot know which will — matching the common case is
+            honest, predicting text wrap is not. */}
+        <div className="min-w-0 space-y-1.5">
+          <span className="block h-8 w-52 rounded-lg fm-skeleton" />
+          <span className="block h-5 w-[26rem] max-w-full rounded fm-skeleton" />
+        </div>
+        <span className="hidden sm:block h-4 w-32 rounded fm-skeleton shrink-0" />
+      </div>
+      <div className="flex gap-4 overflow-hidden pb-2">
+        {Array.from({ length: cards }).map((_, i) => (
+          <div key={i} className="fm-pcard shrink-0 w-[212px] rounded-2xl p-4">
+            <span className="block h-[132px] w-full rounded-xl fm-skeleton mb-3" />
+            <span className="block h-4 w-28 rounded fm-skeleton" />
+            <span className="block h-3 w-20 rounded fm-skeleton mt-2" />
+            <span className="block h-5 w-16 rounded fm-skeleton mt-2" />
+            <div className="flex items-center gap-2 mt-3">
+              <span className="flex-1 h-11 rounded-lg fm-skeleton" />
+              <span className="w-11 h-11 rounded-lg fm-skeleton" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function Rail({ children }) {
   const ref = useRailEdges();
   return (

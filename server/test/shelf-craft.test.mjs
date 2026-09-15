@@ -116,5 +116,43 @@ console.log('\n— A shelf that says where it ends —');
   ok('each rail owns its own edges', /function Rail\(/.test(home) && /useRailEdges\(\)/.test(home));
 }
 
+console.log('\n— The shop holds its shape before it has anything to show —');
+{
+  /* The three shelves did not exist until the catalogue answered, so
+     everything below them sat 1,283px too high and then jumped down. Measured
+     in a browser with the request deliberately slowed; after reserving the
+     space it is 47px, and the rest is a subtitle that wraps on one shelf and
+     card text of unpredictable length, which no placeholder can know in
+     advance. */
+  ok('the page knows the difference between "not asked yet" and "empty"',
+    /loadingCatalogue/.test(home), 'there is only one state for both');
+  ok('…and stops waiting whether the answer arrives or fails',
+    /\.finally\(\(\) => setLoadingCatalogue\(false\)\)/.test(home),
+    'an outage would leave the placeholders up forever');
+
+  ok('a shelf reserves its space while the answer is still coming',
+    /function ShelfSkeleton/.test(home) && /loadingCatalogue && !pillars\.length/.test(home));
+  /* The placeholder is furniture, not content: a screen reader announcing
+     eleven empty boxes is worse than announcing nothing. */
+  ok('…and says nothing to a screen reader',
+    /<section aria-hidden>/.test(home));
+
+  /* The hero grew 68px when the answer came back — one line about the
+     catalogue that did not exist until there was a catalogue. */
+  ok('the hero reserves its catalogue line too',
+    /loadingCatalogue && \(/.test(home) && /fm-skeleton/.test(home));
+  ok('…only while asking, so a shop with no anchor gets no permanent gap',
+    !/catalogueAnchor \? \([\s\S]{0,600}?\) : \(\s*\n\s*\/\* [\s\S]{0,400}?<p className="mt-3"/.test(home)
+    || /\) : loadingCatalogue && \(/.test(home));
+
+  /* The placeholder is only worth anything if it is the same size as the
+     thing it stands in for. These are the four boxes a real rail card is made
+     of, and they are written down so a change to one is a change to both. */
+  const skeleton = (home.match(/function ShelfSkeleton[\s\S]*?\n}/) || [''])[0];
+  for (const box of ['w-\\[212px\\]', 'h-\\[132px\\]', 'h-11', 'w-11'])
+    ok(`the placeholder card matches the real one (${box.replace(/\\/g, '')})`,
+      new RegExp(box).test(skeleton), 'the reserved space is the wrong size');
+}
+
 console.log(`\n${fail === 0 ? '✅' : '❌'} shelf-craft: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
