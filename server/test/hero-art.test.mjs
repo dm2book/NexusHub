@@ -243,8 +243,16 @@ console.log('\n— Real products, real files —');
 
   /* Links, not pictures of links. And each one has to say what it is: five
      cards all announcing themselves as "image" is a menu with no labels. */
-  ok('the cards are links', /<Link key=\{c\.icon\} to=\{fanHref\(c\)\}/.test(home));
-  ok('…each with a name a screen reader can read', /aria-label=\{tr\('home\.fanGo'/.test(home));
+  /* Behaviour, not spelling. Both of these used to be pinned to the exact
+     JSX — `<Link key={c.icon} to={fanHref(c)}` — and broke the day the card
+     moved into a component of its own, which changed nothing a visitor could
+     see. An assertion named "the cards are links" should fail when they stop
+     being links, and at no other time. */
+  const card = home.match(/<Link[^>]*className="fm-fan-card"[^>]*>/);
+  ok('the card is a Link', !!card, 'no <Link> carries the fm-fan-card class');
+  ok('…pointing wherever fanHref sends it', !!card && /to=\{fanHref\(/.test(card[0]));
+  ok('…each with a name a screen reader can read',
+    !!card && /aria-label=\{/.test(card[0]) && /'home\.fanGo'/.test(home));
   ok('…and the mark itself stays silent, not read out twice',
     /className="fm-fan-card"[\s\S]{0,400}?alt=""/.test(home));
   ok('the card is a block, so the link is the whole card',
