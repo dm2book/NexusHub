@@ -964,14 +964,39 @@ const HALO = {
    them. Rising z makes the two orders agree: each card is in front of the one
    to its left, exactly as it is written. hero-art.test.mjs holds it to that. */
 const FAN = [
-  { icon: 'steam', a: '-30deg', y: '26px', s: 0.87, z: '0px', tint: 'rgba(56,132,255,.62)' },
-  { icon: 'robux', a: '-15deg', y: '7px', s: 0.94, z: '14px', tint: 'rgba(16,185,129,.62)' },
-  { icon: 'v-bucks', a: '0deg', y: '-10px', s: 1.05, z: '28px', tint: 'rgba(56,132,255,.72)' },
-  { icon: 'playstation', a: '15deg', y: '7px', s: 0.94, z: '42px', tint: 'rgba(37,99,235,.66)' },
-  { icon: 'discord-nitro', a: '30deg', y: '26px', s: 0.87, z: '56px', tint: 'rgba(99,102,241,.66)' },
+  { icon: 'steam', brand: 'Steam', cat: 'giftcard', find: 'Steam',
+    a: '-30deg', y: '26px', s: 0.87, z: '0px', tint: 'rgba(56,132,255,.62)' },
+  { icon: 'robux', brand: 'Robux', cat: 'robux',
+    a: '-15deg', y: '7px', s: 0.94, z: '14px', tint: 'rgba(16,185,129,.62)' },
+  { icon: 'v-bucks', brand: 'V-Bucks', cat: 'v-bucks',
+    a: '0deg', y: '-10px', s: 1.05, z: '28px', tint: 'rgba(56,132,255,.72)' },
+  { icon: 'playstation', brand: 'PlayStation', cat: 'giftcard', find: 'PlayStation',
+    a: '15deg', y: '7px', s: 0.94, z: '42px', tint: 'rgba(37,99,235,.66)' },
+  { icon: 'discord-nitro', brand: 'Discord Nitro', cat: 'discord-nitro',
+    a: '30deg', y: '26px', s: 0.87, z: '56px', tint: 'rgba(99,102,241,.66)' },
 ];
 
+/**
+ * Where a card goes when you click it.
+ *
+ * Three of these brands are categories of their own and land on their own
+ * page. Two are NOT, and that is the whole reason this function exists rather
+ * than a template string: there is no `steam` or `playstation` category in
+ * this catalogue. Steam Wallet (three products) and the PlayStation Store card
+ * (one) are filed under `giftcard`, which is checked against the live
+ * catalogue and not assumed — `/steam` would have been a 404 dressed up as a
+ * product link, and `/giftcards` alone drops someone who clicked the Steam
+ * logo into a shelf of ten cards to hunt through.
+ *
+ * So those two carry the search that finds them within their category. It is a
+ * real, linkable URL: the shelf reads it on arrival.
+ */
+export const fanHref = (c) => (c.find
+  ? `${landingPathFor(c.cat)}?search=${encodeURIComponent(c.find)}`
+  : landingPathFor(c.cat));
+
 function HeroRender() {
+  const { t: tr } = useI18n();
   const ref = useRef(null);
   const tilt = useRef(null);
   useParallax(ref);
@@ -1000,10 +1025,16 @@ function HeroRender() {
           <div className="fm-fan-inner fm-px" style={{ '--d': 0.07 }}>
             <div ref={tilt} className="fm-fan-tilt">
               {FAN.map((c, i) => (
-                <div key={c.icon} className="fm-fan-card"
+                /* A link, not a picture of one. Five brand logos at the top of
+                   a shop are five things a visitor will try to click, and
+                   until now all five did nothing.
+                   The accessible name carries the brand, so the mark can stay
+                   alt="" — read out, "Steam" twice in a row is noise. */
+                <Link key={c.icon} to={fanHref(c)} className="fm-fan-card"
+                  aria-label={tr('home.fanGo', 'Browse {brand}', { brand: c.brand })}
                   style={{ '--a0': c.a, '--y0': c.y, '--s0': c.s, '--z0': c.z, '--i': i, '--tint': c.tint }}>
                   <img src={ICON(c.icon)} alt="" loading="lazy" />
-                </div>
+                </Link>
               ))}
             </div>
           </div>

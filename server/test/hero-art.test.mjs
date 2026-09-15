@@ -28,6 +28,10 @@
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+/* The shipped catalogue, exported for exactly this: checking a claim about
+   what the shop sells without standing up a database. */
+import { CATALOG } from '../src/db/demoSeed.js';
+import { landingPathFor } from '../../src/content/seo.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const css = readFileSync(join(ROOT, 'src', 'index.css'), 'utf8');
@@ -193,6 +197,54 @@ console.log('\n— Real products, real files —');
     const file = ['webp', 'svg'].map((e) => join(dir, `${name}.${e}`)).find(existsSync);
     ok(`${name} has an icon on disk`, !!file, `${name}.(webp|svg) missing`);
   }
+
+/* ── Where a card goes ──────────────────────────────────────────────────── */
+  console.log('\n  · a click has to land somewhere real ·');
+  /* Five brand logos at the top of a shop are five things a visitor will try
+     to click. Three of these brands are categories; two are NOT. There is no
+     `steam` and no `playstation` category in this catalogue — Steam Wallet and
+     the PlayStation Store card are filed under `giftcard` — so the obvious
+     link, /steam, would have been a 404 wearing a product's logo.
+     Checked against the shipped catalogue, not against a memory of it. */
+  const CARDS = [...block[1].matchAll(
+    /icon:\s*'([^']+)',\s*brand:\s*'([^']+)',\s*cat:\s*'([^']+)'(?:,\s*find:\s*'([^']+)')?/g)]
+    .map((m) => ({ icon: m[1], brand: m[2], cat: m[3], find: m[4] }));
+  ok('every card declares where it goes', CARDS.length === 5, `${CARDS.length} of 5`);
+
+  const norm = (x) => String(x || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  for (const c of CARDS) {
+    const inCat = CATALOG.filter((p) => p.category === c.cat);
+    ok(`${c.brand} → a category the shop actually has (${c.cat})`, inCat.length > 0,
+      'no product carries that category');
+    /* And the destination must show THIS brand, not merely exist. A logo that
+       drops you in a shelf of ten unrelated cards is a dead end with a picture
+       on it. */
+    const found = inCat.filter((p) => !c.find || norm(p.name).includes(norm(c.find)));
+    ok(`   …with ${c.brand} products on it (${found.length})`, found.length > 0,
+      c.find ? `nothing in ${c.cat} matches "${c.find}"` : `${c.cat} is empty`);
+    if (c.find) {
+      ok(`   …and the search narrows it (${found.length} of ${inCat.length})`,
+        found.length < inCat.length, 'the search filters nothing out');
+    } else {
+      ok(`   …and ${c.brand} needs no search to find it`,
+        inCat.every((p) => norm(p.category) === norm(c.cat)));
+    }
+    const href = c.find
+      ? `${landingPathFor(c.cat)}?search=${encodeURIComponent(c.find)}`
+      : landingPathFor(c.cat);
+    ok(`   ${href}`, !href.includes('undefined') && href.startsWith('/'), href);
+  }
+
+  /* Links, not pictures of links. And each one has to say what it is: five
+     cards all announcing themselves as "image" is a menu with no labels. */
+  ok('the cards are links', /<Link key=\{c\.icon\} to=\{fanHref\(c\)\}/.test(home));
+  ok('…each with a name a screen reader can read', /aria-label=\{tr\('home\.fanGo'/.test(home));
+  ok('…and the mark itself stays silent, not read out twice',
+    /className="fm-fan-card"[\s\S]{0,400}?alt=""/.test(home));
+  ok('the card is a block, so the link is the whole card',
+    /display:\s*block/.test(ruleBody('.fm-fan-card') || ''));
+  ok('…and the keyboard can see where it is',
+    /\.fm-fan-card:focus-visible\s*\{[^}]*outline:/.test(css));
 
   /* Every brand the sentence beside the artwork names has a card, so the copy
      and the art cannot promise two different shops. The art may show more than

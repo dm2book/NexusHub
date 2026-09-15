@@ -498,6 +498,10 @@ const NL = {
   'home.packs1': '1 pakket beschikbaar',
   'home.howPay': 'Hoe betalen werkt',
   'home.anchor': '{n} producten · vanaf {price}',
+  /* Het toegankelijke label van de vijf kaarten in de hero. Een schermlezer
+     leest hier alleen dit — het logo zelf blijft stil — dus het moet zeggen
+     waar de klik heen gaat, niet wat er op de kaart staat. */
+  'home.fanGo': 'Bekijk {brand}',
   'home.viewProduct': 'Bekijken',
   'home.addOne': '{n} in je winkelwagen',
   'home.trustWhoLead': 'Een persoon met naam, in Nederland',

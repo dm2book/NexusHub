@@ -262,6 +262,19 @@ console.log('— Landing pages for what this shop sells —');
   ok('\u2026and no longer a button that only rewrites a query string',
     !/setCategory\(c\)/.test(shop));
 
+  /* One component serves every landing route, which means React keeps the
+     same instance alive as a visitor walks from one category to the next —
+     and `search` was seeded from the URL exactly once, at mount. So a link
+     carrying ?search= (the homepage's Steam and PlayStation cards both do,
+     because neither is a category of its own) filtered correctly on arrival
+     and then followed the visitor: clicking through to /robux kept filtering
+     the Robux shelf by "Steam" and showed an empty shop with nothing on the
+     page to explain why. The box follows the URL now. */
+  ok('a search in the URL is read on every navigation, not only on mount',
+    /params\.get\('search'\)/.test(shop) && /setSearch\(urlSearch\)/.test(shop));
+  ok('\u2026and typing is not undone by it — the box does not write the URL',
+    !/setSearchParams/.test(shop));
+
   // The helper must never hand out a link to a shelf that does not exist.
   ok('a category with no page of its own still gets a working link',
     landingPathFor('spotify') === '/shop?category=spotify');
