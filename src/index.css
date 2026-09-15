@@ -971,6 +971,9 @@ a.fm-pill:hover, button.fm-pill:hover {
   width: 140px; height: 198px; margin: -99px 0 0 -70px;
   border-radius: 20px;
   overflow: hidden;
+  /* Each card is a link now. `display: block` because an <a> is inline by
+     default and would size itself to the mark inside it. */
+  display: block; text-decoration: none; cursor: pointer;
   /* Fanned from a point BELOW the cards, the way a hand of cards actually
      pivots — rotating about their own centres splays them like a windmill.
      The pivot sits far below rather than just under the edge: the further the
@@ -1061,9 +1064,20 @@ a.fm-pill:hover, button.fm-pill:hover {
    stage's perspective actually makes it larger, rather than pretending to.
    Pointer-capable devices only: on a touch screen :hover sticks after a tap
    and leaves one card stranded in the air. */
+/* Outside the pointer query on purpose: a keyboard exists on devices that
+   have no pointer at all, and a link you can reach but cannot see is worse
+   than one that does not move. */
+.fm-fan-card:focus-visible {
+  outline: 2px solid rgba(214,203,255,.95);
+  outline-offset: 4px;
+}
 @media (hover: hover) and (pointer: fine) {
   .fm-fan:hover .fm-fan-card { --a: calc(var(--a0, 0deg) * 1.18); }
-  .fm-fan:hover .fm-fan-card:hover {
+  /* Same lift for the mouse and for the keyboard, written once — two copies
+     of it is two things to keep in step, and this file has already paid for
+     that lesson twice. */
+  .fm-fan:hover .fm-fan-card:hover,
+  .fm-fan-card:focus-visible {
     --y: calc(var(--y0, 0px) - 22px);
     --s: calc(var(--s0, 1) * 1.07);
     /* Forward by less than one step of the fan's own depth, so the card that

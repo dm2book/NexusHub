@@ -56,6 +56,24 @@ console.log('\n— Nothing is half-translated —');
     const blank = Object.entries(dict).filter(([, v]) => !String(v).trim());
     ok(`…and leaves none blank`, blank.length === 0, blank.slice(0, 4).map(([k]) => k).join(', '));
   }
+  /* One entry per key, read off the FILE rather than the imported object —
+     by the time it is an object the duplicates are gone and the damage with
+     them.
+     Both of these dictionaries carried every key twice: 786 keys written out
+     in 1,572 lines, the whole file appended to itself. The two copies happened
+     to agree, so nothing rendered wrong and nothing ever failed. What it cost
+     was the next edit: in an object literal the last key wins, so fixing a
+     translation in the first half of the file changed precisely nothing, with
+     no error to explain why. */
+  for (const [code, file] of [['de', 'de.js'], ['fr', 'fr.js']]) {
+    const text = readFileSync(join(ROOT, 'src', 'lib', 'i18n', file), 'utf8');
+    const keys = [...text.matchAll(/^\s{2}'([^']+)':/gm)].map((m) => m[1]);
+    const seen = new Set(), twice = new Set();
+    for (const k of keys) (seen.has(k) ? twice : seen).add(k);
+    ok(`${code} writes each key exactly once (${keys.length} lines, ${seen.size} keys)`,
+      twice.size === 0, `${twice.size} repeated: ${[...twice].slice(0, 5).join(', ')}`);
+  }
+
   /* Two languages that agree on a long sentence means one was copied. Short
      strings legitimately match (Support, FAQ, Discord, Menu), so only sentences
      are compared. */

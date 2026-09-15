@@ -75,6 +75,17 @@ export default function Shop({ landingCategory = null, landingPath = null } = {}
   const categories = useMemo(
     () => [...new Set((products || []).map((p) => p.category).filter(Boolean))], [products]);
 
+  /* The search box follows the URL.
+     `search` is seeded from window.location ONCE, at mount — and every landing
+     route renders this same component, so React keeps the instance alive as a
+     visitor moves between them. Arriving at /giftcards?search=Steam from the
+     homepage worked; walking on from there to /robux kept filtering the Robux
+     shelf by "Steam" and showed an empty shop with no explanation. Typing in
+     the box does not touch the URL, so this only fires on a real navigation
+     and never fights the person typing. */
+  const urlSearch = params.get('search') || '';
+  useEffect(() => { setSearch(urlSearch); }, [urlSearch]);
+
   useEffect(() => { setShown(PAGE); }, [category, sort, search]);
 
   const visible = useMemo(() => {
