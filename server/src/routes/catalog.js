@@ -424,14 +424,11 @@ let bundlesCache = { at: 0, data: null };
 router.get('/bundles', asyncHandler(async (_req, res) => {
   publicCache(res, 300);
   if (!bundlesCache.data || Date.now() - bundlesCache.at > 30_000) {
-    const bundles = await pricedBundles();
-    // Bundles are hand-written promos; the Dutch line is generated from the
-    // products in them so a new bundle is never English-only on a Dutch page.
-    bundlesCache = { at: Date.now(), data: bundles.map((b) => ({
-      ...b,
-      descriptionNl: b.descriptionNl
-        || `${(b.products || []).map((p) => p.name).join(' + ')} — samen voordeliger.`,
-    })) };
+    /* Every bundle already carries a name and a line in all four languages —
+       see bundleCopy.js. This used to compose the Dutch one here, in the
+       route, and only the Dutch one, so a German page showed whatever English
+       the owner had typed. */
+    bundlesCache = { at: Date.now(), data: await pricedBundles() };
   }
   res.json({ bundles: bundlesCache.data });
 }));

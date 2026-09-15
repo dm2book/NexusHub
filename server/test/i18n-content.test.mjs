@@ -141,5 +141,61 @@ console.log('\n— …and so does the catalogue —');
     /from '\.\/productCopy\.js'/.test(client) && !/const NL_TAIL = \{/.test(client));
 }
 
+console.log('\n— …and so do the bundles —');
+{
+  /* A bundle has no category to generate copy from — it is a set somebody
+     named and priced — so its description was whatever the owner typed, in
+     whatever language they typed it. The one seeded bundle read "Top up both
+     your shooters in one go and save 10%" on a German page.
+     What a bundle does have is its members and its discount, and those make a
+     sentence that is true in any language. */
+  const { bundleCopy, BUNDLE_LANGS } = await import(join(ROOT, 'src/lib/bundleCopy.js'));
+  ok('a bundle can describe itself in every language the shop offers',
+    LANG_CODES.every((c) => BUNDLE_LANGS.includes(c)), BUNDLE_LANGS.join(','));
+
+  const bundle = {
+    name: 'FPS Duo Pack', description: 'Top up both your shooters and save 10%.',
+    discountPercent: 10, products: [{ name: '1,000 Apex Coins' }, { name: '1,000 VP — Valorant' }],
+  };
+  /* Measured on a bundle with NOTHING typed, because that is what the
+     generator is for. The first version of this used the seeded bundle, whose
+     hand-written English wins for `en` — so "every language names its
+     members" failed on the one language that was behaving correctly. */
+  const bare = { ...bundle, description: null };
+  const lines = LANG_CODES.map((c) => bundleCopy(bare, c).description);
+  ok('every language gets a line', lines.every((l) => l && l.length > 10));
+  ok('…and they are different lines', new Set(lines).size === lines.length,
+    'two languages produced the same sentence');
+  ok('the members are named in all of them',
+    lines.every((l) => l.includes('1,000 Apex Coins')), lines.find((l) => !l.includes('1,000 Apex Coins')));
+  ok('…and the saving is stated in all of them',
+    lines.every((l) => l.includes('10%')));
+
+  /* The NAME is somebody's invention, not a sentence. Machine-translating it
+     is how a shop ends up calling its own promotion something nobody
+     recognises — so it stays as typed unless the owner translated it. */
+  ok('the name is left alone', LANG_CODES.every((c) => bundleCopy(bundle, c).name === 'FPS Duo Pack'));
+  const typed = { ...bundle, copy: { nameDe: 'FPS-Duo-Paket', descriptionDe: 'Beide Shooter auf einmal.' } };
+  ok('…unless the owner wrote one, and then it wins',
+    bundleCopy(typed, 'de').name === 'FPS-Duo-Paket'
+    && bundleCopy(typed, 'de').description === 'Beide Shooter auf einmal.');
+  ok('…for that language only', bundleCopy(typed, 'fr').name === 'FPS Duo Pack');
+
+  /* A bundle with no discount is a real state — it can exist purely to group
+     things — and "0% cheaper together" is a worse sentence than none. */
+  const plain = { ...bare, discountPercent: 0 };
+  ok('a bundle at 0% does not claim a saving',
+    LANG_CODES.every((c) => !/\d+\s*%/.test(bundleCopy(plain, c).description)),
+    LANG_CODES.map((c) => bundleCopy(plain, c).description).find((l) => /\d+\s*%/.test(l)));
+  ok('…but still says what is in it',
+    LANG_CODES.every((c) => bundleCopy(plain, c).description.includes('1,000 Apex Coins')));
+
+  /* One generator, both sides — the same arrangement product copy uses. */
+  const svc = readFileSync(join(ROOT, 'server', 'src', 'services', 'bundleService.js'), 'utf8');
+  const route = readFileSync(join(ROOT, 'server', 'src', 'routes', 'catalog.js'), 'utf8');
+  ok('the server reads the shared generator', /bundleCopyAll/.test(svc));
+  ok('…and the route no longer writes Dutch of its own', !/samen voordeliger/.test(route));
+}
+
 console.log(`\n${fail === 0 ? '✅' : '❌'} i18n-content: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

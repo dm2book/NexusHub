@@ -8,10 +8,15 @@ import { newId } from '../utils/ids.js';
 import { getProduct } from './productService.js';
 import { badRequest, notFound } from '../utils/errors.js';
 import { postDropEvent } from './discordService.js';
+import { bundleCopyAll } from '../../../src/lib/bundleCopy.js';
 
 const parseIds = (s) => { try { const a = JSON.parse(s || '[]'); return Array.isArray(a) ? a : []; } catch { return []; } };
+const parseCopy = (s) => { try { const o = JSON.parse(s || '{}'); return o && typeof o === 'object' ? o : {}; } catch { return {}; } };
 const shape = (r) => r && ({
   id: r.id, name: r.name, description: r.description,
+  // The owner's own translations, if they wrote any. Everything else is
+  // generated per language from the members and the discount.
+  copy: parseCopy(r.copy),
   productIds: parseIds(r.product_ids), discountPercent: Number(r.discount_percent),
   active: !!r.active, createdAt: r.created_at,
 });
@@ -30,11 +35,15 @@ export async function pricedBundles() {
     if (products.length < 2 || products.length !== b.productIds.length) continue; // need the full set
     const subtotal = products.reduce((s, p) => s + p.price, 0);
     const discount = Math.round(subtotal * b.discountPercent / 100);
-    out.push({
+    const shaped = {
       id: b.id, name: b.name, description: b.description, discountPercent: b.discountPercent,
       products: products.map((p) => ({ id: p.id, name: p.name, category: p.category, price: p.price, image: p.image })),
       subtotal, discount, total: subtotal - discount, currency: products[0].currency || 'EUR',
-    });
+    };
+    /* A name and a line in every language the shop is read in, carried on the
+       response so the storefront picks one without a second request — the same
+       arrangement the product rows use. */
+    out.push({ ...shaped, ...bundleCopyAll({ ...shaped, copy: b.copy }) });
   }
   return out;
 }

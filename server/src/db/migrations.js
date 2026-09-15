@@ -1603,4 +1603,23 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS lang TEXT;
       ALTER TABLE newsletter_signups ADD COLUMN IF NOT EXISTS lang TEXT;
     `,
   },
+  {
+    id: '040_bundle_copy',
+    /*
+     * Somewhere to put a bundle's own words in another language.
+     *
+     * Products describe themselves in four languages from a per-category
+     * recipe, but a bundle has no category — it is a set somebody named and
+     * priced. So its description was whatever the owner typed, in whatever
+     * language they typed it: the shop's one seeded bundle read "Top up both
+     * your shooters in one go and save 10%" on a German page.
+     *
+     * What a bundle DOES have is its members and its discount, and those make
+     * a sentence that is true in any language. That is generated rather than
+     * stored (see src/lib/bundleCopy.js). This column is for the other case:
+     * an owner who wants to write the German themselves, and whose words must
+     * outrank anything generated.
+     */
+    sql: `ALTER TABLE bundles ADD COLUMN IF NOT EXISTS copy TEXT;`,
+  },
 ];
