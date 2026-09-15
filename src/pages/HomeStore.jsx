@@ -21,6 +21,7 @@ import { useStats } from '../lib/useStats.js';
 import { useReviews } from '../lib/useReviews.js';
 import { useReveal } from '../lib/useReveal.js';
 import { useParallax } from '../lib/useParallax.js';
+import { usePointerTilt } from '../lib/usePointerTilt.js';
 import RecentlyDelivered from '../components/store/RecentlyDelivered.jsx';
 const CommandPalette = lazy(() => import('../components/store/CommandPalette.jsx'));
 import MobileTabBar from '../components/store/MobileTabBar.jsx';
@@ -950,17 +951,31 @@ const HALO = {
    Angles and depth are hand-placed rather than generated: a fan is a shape you
    judge by eye, and an even spread reads as a chart. The middle card is nearest
    and largest because that is where the eye lands first. */
+/* The resting position of each card, and nothing else: the angle it sits at,
+   how far down its own axis it has slid, its size, and how far forward it
+   stands. The stylesheet turns those four into a transform — see the note on
+   @property there. `z` is what the tilt has to work with: with every card in
+   the same plane, leaning the hand would just rotate a flat picture.
+   `z` RISES from left to right and never falls, and that is load-bearing.
+   Inside a preserve-3d scene the browser paints by depth, not by source
+   order, so the first arrangement tried here — the middle card furthest
+   forward — silently reversed the stack on the right of the fan and hid the
+   PlayStation and Nitro marks under the card that was supposed to be behind
+   them. Rising z makes the two orders agree: each card is in front of the one
+   to its left, exactly as it is written. hero-art.test.mjs holds it to that. */
 const FAN = [
-  { icon: 'steam', a: '-30deg', y: '26px', s: 0.87, tint: 'rgba(56,132,255,.62)' },
-  { icon: 'robux', a: '-15deg', y: '7px', s: 0.94, tint: 'rgba(16,185,129,.62)' },
-  { icon: 'v-bucks', a: '0deg', y: '-10px', s: 1.05, tint: 'rgba(56,132,255,.72)' },
-  { icon: 'playstation', a: '15deg', y: '7px', s: 0.94, tint: 'rgba(37,99,235,.66)' },
-  { icon: 'discord-nitro', a: '30deg', y: '26px', s: 0.87, tint: 'rgba(99,102,241,.66)' },
+  { icon: 'steam', a: '-30deg', y: '26px', s: 0.87, z: '0px', tint: 'rgba(56,132,255,.62)' },
+  { icon: 'robux', a: '-15deg', y: '7px', s: 0.94, z: '14px', tint: 'rgba(16,185,129,.62)' },
+  { icon: 'v-bucks', a: '0deg', y: '-10px', s: 1.05, z: '28px', tint: 'rgba(56,132,255,.72)' },
+  { icon: 'playstation', a: '15deg', y: '7px', s: 0.94, z: '42px', tint: 'rgba(37,99,235,.66)' },
+  { icon: 'discord-nitro', a: '30deg', y: '26px', s: 0.87, z: '56px', tint: 'rgba(99,102,241,.66)' },
 ];
 
 function HeroRender() {
   const ref = useRef(null);
+  const tilt = useRef(null);
   useParallax(ref);
+  usePointerTilt(tilt);
   return (
     <div ref={ref} className="relative h-[250px] sm:h-[360px]">
       {/* SCALED, not squashed — see the note this replaced: every card is placed
@@ -969,19 +984,28 @@ function HeroRender() {
           at 1024px the widened fan ran 15px off the right of the viewport,
           measured in the browser. */}
       <div className="absolute left-1/2 top-0 -translate-x-1/2 w-[460px] h-[320px] sm:h-[360px]
-                      origin-top scale-[.78] sm:scale-[.84] xl:scale-100">
-        {/* ambient light behind the hand */}
-        <div className="fm-px absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[360px] h-[360px] rounded-full blur-3xl"
+                      origin-top scale-[.78] sm:scale-[.80] xl:scale-100">
+        {/* ambient light behind the hand, breathing on its own clock and
+            drifting on scroll. fm-px moves things with the `translate`
+            property rather than `transform`, which is why it can sit on the
+            same element as an animation that owns `transform`. */}
+        <div className="fm-fan-glow fm-px absolute left-1/2 top-1/2 w-[360px] h-[360px] rounded-full blur-3xl"
           style={{ '--d': 0.03, background: 'radial-gradient(circle, rgba(124,92,255,.42), transparent 66%)' }} />
 
         <div className="fm-fan">
-          <div className="fm-fan-inner">
-            {FAN.map((c) => (
-              <div key={c.icon} className="fm-fan-card"
-                style={{ '--a': c.a, '--y': c.y, '--s': c.s, '--tint': c.tint }}>
-                <img src={ICON(c.icon)} alt="" loading="lazy" />
-              </div>
-            ))}
+          {/* Three nested layers, one transform each, because they move on
+              different clocks: the breath (fm-fan-inner), the lean toward the
+              cursor (fm-fan-tilt), and each card's own place in the fan.
+              Folded together they would fight over one transform property. */}
+          <div className="fm-fan-inner fm-px" style={{ '--d': 0.07 }}>
+            <div ref={tilt} className="fm-fan-tilt">
+              {FAN.map((c, i) => (
+                <div key={c.icon} className="fm-fan-card"
+                  style={{ '--a0': c.a, '--y0': c.y, '--s0': c.s, '--z0': c.z, '--i': i, '--tint': c.tint }}>
+                  <img src={ICON(c.icon)} alt="" loading="lazy" />
+                </div>
+              ))}
+            </div>
           </div>
           <span className="fm-fan-shadow" aria-hidden />
         </div>
