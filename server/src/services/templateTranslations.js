@@ -173,6 +173,19 @@ export const TEMPLATE_TRANSLATIONS = {
       <p style="text-align:center;color:#8b93a7;font-size:13px">Something not right? Just reply to this email or open
       a ticket in our Discord and we'll make it right.</p>`,
     },
+    launch_announcement: {
+      subject: '{{shop.name}} is open \u{1F680}',
+      body_html: `
+      <div class="badge">\u{1F680}</div>
+      <h1 style="text-align:center">We're open</h1>
+      <p style="text-align:center;max-width:440px;margin-left:auto;margin-right:auto">You asked us to let you know
+      when {{shop.name}} opened. It has — the shop is live and you can order.</p>
+      <p style="text-align:center"><a class="btn" href="{{shop.url}}/shop">Open the shop</a></p>
+      <p style="text-align:center;color:#8b93a7;font-size:13px">In stock goes out automatically; everything else by
+      hand, usually within a few hours. You pay after ordering.</p>
+      <p style="text-align:center;color:#8b93a7;font-size:12px;margin-top:22px">You are getting this once because you
+      signed up. <a href="{{newsletter.unsubscribeUrl}}" style="color:#8b93a7">Unsubscribe</a></p>`,
+    },
     gift_card: {
       subject: 'You received a {{giftCard.amount}} {{brand.name}} gift card 🎁',
       body_html: `
@@ -365,6 +378,19 @@ export const TEMPLATE_TRANSLATIONS = {
       <p style="text-align:center;color:#8b93a7;font-size:13px">Stimmt etwas nicht? Antworte auf diese
       Mail oder öffne ein Ticket auf unserem Discord, dann bringen wir das in Ordnung.</p>`,
     },
+    launch_announcement: {
+      subject: '{{shop.name}} hat ge\u00f6ffnet \u{1F680}',
+      body_html: `
+      <div class="badge">\u{1F680}</div>
+      <h1 style="text-align:center">Wir haben ge\u00f6ffnet</h1>
+      <p style="text-align:center;max-width:440px;margin-left:auto;margin-right:auto">Du wolltest Bescheid wissen,
+      sobald {{shop.name}} \u00f6ffnet. Es ist so weit \u2014 der Shop ist offen und du kannst bestellen.</p>
+      <p style="text-align:center"><a class="btn" href="{{shop.url}}/shop">Zum Shop</a></p>
+      <p style="text-align:center;color:#8b93a7;font-size:13px">Was auf Lager ist, geht automatisch raus; alles andere
+      von Hand, meist innerhalb weniger Stunden. Du zahlst erst nach der Bestellung.</p>
+      <p style="text-align:center;color:#8b93a7;font-size:12px;margin-top:22px">Diese Mail bekommst du einmalig, weil
+      du dich eingetragen hast. <a href="{{newsletter.unsubscribeUrl}}" style="color:#8b93a7">Abmelden</a></p>`,
+    },
     gift_card: {
       subject: 'Du hast einen {{brand.name}}-Gutschein über {{giftCard.amount}} bekommen 🎁',
       body_html: `
@@ -555,6 +581,19 @@ export const TEMPLATE_TRANSLATIONS = {
       {{review.trustpilotHtml}}
       <p style="text-align:center;color:#8b93a7;font-size:13px">Quelque chose ne va pas ? Réponds à cet e-mail
       ou ouvre un ticket sur notre Discord, et nous arrangerons ça.</p>`,
+    },
+    launch_announcement: {
+      subject: '{{shop.name}} est ouvert \u{1F680}',
+      body_html: `
+      <div class="badge">\u{1F680}</div>
+      <h1 style="text-align:center">Nous sommes ouverts</h1>
+      <p style="text-align:center;max-width:440px;margin-left:auto;margin-right:auto">Tu voulais \u00eatre pr\u00e9venu
+      d\u00e8s l\u2019ouverture de {{shop.name}}. C\u2019est fait \u2014 la boutique est ouverte et tu peux commander.</p>
+      <p style="text-align:center"><a class="btn" href="{{shop.url}}/shop">Voir la boutique</a></p>
+      <p style="text-align:center;color:#8b93a7;font-size:13px">Ce qui est en stock part automatiquement ; le reste \u00e0
+      la main, g\u00e9n\u00e9ralement en quelques heures. Tu paies apr\u00e8s la commande.</p>
+      <p style="text-align:center;color:#8b93a7;font-size:12px;margin-top:22px">Tu re\u00e7ois cet e-mail une seule fois
+      parce que tu t\u2019\u00e9tais inscrit. <a href="{{newsletter.unsubscribeUrl}}" style="color:#8b93a7">Se d\u00e9sabonner</a></p>`,
     },
     gift_card: {
       subject: 'Tu as reçu une carte cadeau {{brand.name}} de {{giftCard.amount}} 🎁',

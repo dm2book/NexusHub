@@ -186,6 +186,23 @@ export const DEFAULT_TEMPLATES = [
       een ticket in onze Discord, dan lossen we het op.</p>`,
   },
   {
+    id: 'launch_announcement',
+    name: 'Launch Announcement',
+    subject: '{{shop.name}} is open \u{1F680}',
+    /* The one mail the pre-launch banner promised. Sent once, only after the
+       shop has actually opened, only to people who signed up before it did. */
+    body_html: `
+      <div class="badge">\u{1F680}</div>
+      <h1 style="text-align:center">We zijn open</h1>
+      <p style="text-align:center;max-width:440px;margin-left:auto;margin-right:auto">Je vroeg of we je een
+      berichtje wilden sturen zodra {{shop.name}} opengaat. Bij dezen: de winkel is open en je kunt bestellen.</p>
+      <p style="text-align:center"><a class="btn" href="{{shop.url}}/shop">Bekijk de winkel</a></p>
+      <p style="text-align:center;color:#8b93a7;font-size:13px">Op voorraad gaat automatisch de deur uit; de rest
+      met de hand, meestal binnen een paar uur. Je betaalt pas na je bestelling.</p>
+      <p style="text-align:center;color:#8b93a7;font-size:12px;margin-top:22px">Je krijgt deze mail eenmalig omdat je
+      je had aangemeld. <a href="{{newsletter.unsubscribeUrl}}" style="color:#8b93a7">Uitschrijven</a></p>`,
+  },
+  {
     id: 'gift_card',
     name: 'Gift Card',
     subject: 'Je hebt een {{brand.name}}-cadeaubon van {{giftCard.amount}} gekregen 🎁',

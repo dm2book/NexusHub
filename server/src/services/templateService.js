@@ -59,6 +59,11 @@ export const EMAIL_THEMES = {
   cart_reminder:     { accent: '#7c5cff', accent2: '#d946ef', eyebrow: 'Staat nog in je winkelwagen', pills: ['🛒 Geen account nodig', '💸 Geen verborgen kosten'] },
   review_request:    { accent: '#f59e0b', accent2: '#f97316', eyebrow: 'Hoe deden we het?', pills: ['⭐ Kost 20 seconden'] },
   gift_card:         { accent: '#d946ef', accent2: '#a855f7', eyebrow: 'Cadeaubon',         pills: ['🎁 Vervalt niet zolang hij niet gebruikt is'] },
+  launch_announcement: { accent: '#22d3ee', accent2: '#6366f1', eyebrow: 'We zijn open',
+    /* Only what is true on day one. The shop has no reviews and no sales
+       history to boast about, and a launch mail that overclaims is the first
+       thing a new buyer has to weigh against. */
+    pills: ['\u{1F680} De winkel is open', '\u{1F6E1} Geld terug als we niet leveren'] },
   // Security mail: no marketing, no distractions, nothing to click by mistake.
   login_otp:         { accent: '#64748b', accent2: '#475569', eyebrow: 'Beveiligingscode',  pills: [] },
 };

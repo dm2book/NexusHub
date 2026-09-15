@@ -12,6 +12,7 @@ import { sweepMemberRoles } from './discordRolesService.js';
 import { purgeExpiredLinkIntents } from './discordLinkService.js';
 import { pruneOutbox } from './discordService.js';
 import { getSetting, setSetting } from './settingsService.js';
+import { sendLaunchAnnouncements } from './newsletterService.js';
 import { pruneAttribution } from './attributionService.js';
 import { sweepAlerts, pruneAlerts } from './notifyService.js';
 
@@ -46,7 +47,7 @@ export async function lastMaintenanceRun({ now = Date.now(), staleAfterHours = 6
 }
 
 export async function runMaintenance() {
-  const summary = { otpPurged: 0, ipsForgotten: 0, sessionsExpired: 0, ordersCancelled: 0, remindersSent: 0, reviewRequestsSent: 0, cartRemindersSent: 0, fulfillmentsRetried: 0, at: nowIso() };
+  const summary = { otpPurged: 0, ipsForgotten: 0, sessionsExpired: 0, ordersCancelled: 0, remindersSent: 0, reviewRequestsSent: 0, cartRemindersSent: 0, fulfillmentsRetried: 0, launchAnnounced: 0, at: nowIso() };
 
   // 1. Purge OTP codes that are long expired / already consumed (keep table small).
   try {
@@ -162,6 +163,18 @@ export async function runMaintenance() {
     summary.manualQueued = sweep.queued;
     summary.autoDispensed = sweep.dispensed;
   } catch (e) { summary.manualQueueError = e.message; }
+
+  /* 9b. The mail the pre-launch banner promised.
+   *
+   *     Does nothing until the shop is actually open, and nothing twice — the
+   *     row is stamped before the send. Here rather than on a timer at the
+   *     launch moment because the sweep is what already runs unattended, and a
+   *     launch that slips by a day should still send the mail on the day it
+   *     actually happened. */
+  try {
+    const ann = await sendLaunchAnnouncements({ limit: 40 });
+    summary.launchAnnounced = ann.sent;
+  } catch (e) { summary.launchAnnounceError = e.message; }
 
   // 10. Re-send transactional emails that failed on a transient provider error
   //     (their full render context is persisted with the log row).

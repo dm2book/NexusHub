@@ -5,7 +5,7 @@ import { config, manualPayMethods, commerceBlockers } from '../config/env.js';
 import { asyncHandler } from '../middleware/error.js';
 import { publicCache } from '../utils/httpCache.js';
 import { requireLaunched, launchAtIso } from '../services/launchGateService.js';
-import { subscribe } from '../services/newsletterService.js';
+import { subscribe, unsubscribe, tokenMatches } from '../services/newsletterService.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 import { listProducts, getProduct, trendingProducts, priceHistory } from '../services/productService.js';
 import { availableCounts, availableCount } from '../services/codeStockService.js';
@@ -216,6 +216,30 @@ const paymentProvider = () =>
  * the drops. Rate limited per IP because it writes, and shared so the limit
  * means the same thing on every instance.
  */
+/**
+ * Getting off the list, from the link in the mail.
+ *
+ * A GET because that is what an email client follows, and the HMAC in the link
+ * is what makes it safe: without it this route would be a way to unsubscribe
+ * strangers, and — by answering differently for a known address — a way to ask
+ * whether somebody is on the list at all, which is exactly what the signup is
+ * careful never to reveal. So the answer is the same either way.
+ *
+ * Plain text, not a redirect into the app: this is reached from an inbox, often
+ * on a phone, sometimes long after the shop has changed, and a confirmation you
+ * can read without JavaScript is worth more than a styled page.
+ */
+router.get('/newsletter/unsubscribe', asyncHandler(async (req, res) => {
+  const { e, t } = z.object({
+    e: z.string().email().max(200),
+    t: z.string().max(64),
+  }).parse(req.query || {});
+  if (tokenMatches(e, t)) await unsubscribe(e);
+  res.type('text/plain; charset=utf-8').send(
+    'You have been unsubscribed. You will not get any more email from us.\n\n'
+    + 'Je bent uitgeschreven. Je krijgt geen mail meer van ons.\n');
+}));
+
 router.post('/newsletter',
   rateLimit({ bucket: 'newsletter', windowMs: 60_000, max: 5, shared: true }),
   asyncHandler(async (req, res) => {
@@ -226,8 +250,13 @@ router.post('/newsletter',
       // reconstructed later from whatever the form says today.
       consentText: z.string().max(400).optional(),
       source: z.string().max(40).optional(),
+      /* The language the banner was in. Recorded so the launch mail arrives in
+         the one they read the consent sentence in, rather than the shop's. */
+      lang: z.string().max(5).optional(),
     }).parse(req.body || {});
-    const r = await subscribe(body.email, { source: body.source || 'prelaunch', consentText: body.consentText });
+    const r = await subscribe(body.email, {
+      source: body.source || 'prelaunch', consentText: body.consentText, lang: body.lang,
+    });
     // Same answer either way: a different one would turn this into a way to ask
     // whether an address is already on the list.
     res.status(201).json({ ok: true, subscribed: true, alreadySubscribed: r.alreadySubscribed });
