@@ -283,21 +283,50 @@ async function pushReviewToSite({ author, avatarUrl, stars, body, externalId, di
  * post-launch state and the default the site itself uses, and being wrong in
  * that direction shows a working shop rather than hiding one.
  */
-let launchCache = { at: 0, openAt: null };
-async function shopOpensAt() {
-  if (Date.now() - launchCache.at < 300_000) return launchCache.openAt;
-  let openAt = null;
+/* ONE fetch of the site's own config, cached, feeding everything here that has
+   to agree with the website.
+ *
+ * It was fetched for the launch date alone, while the same response also
+ * carries the shop's Trustpilot links — which the bot was reading from its own
+ * environment instead. That meant the owner had to set TRUSTPILOT_URL twice,
+ * on Vercel and again on Railway, and a shop that set it once looked correct
+ * everywhere except in Discord. Two copies of one fact is the drift this
+ * codebase keeps paying for. */
+let launchCache = { at: 0, cfg: null };
+async function siteConfig() {
+  if (Date.now() - launchCache.at < 300_000) return launchCache.cfg;
+  let cfg = null;
   try {
     const res = await fetch(`${FORGEMARKET_API_URL.replace(/\/$/, '')}/api/config`,
       { signal: AbortSignal.timeout(8000) });
-    if (res.ok) {
-      const cfg = await res.json();
-      const t = cfg?.launchAt ? Date.parse(cfg.launchAt) : NaN;
-      openAt = Number.isFinite(t) ? t : null;
-    }
+    if (res.ok) cfg = await res.json();
   } catch { /* unreachable — treated as open, see above */ }
-  launchCache = { at: Date.now(), openAt };
-  return openAt;
+  launchCache = { at: Date.now(), cfg };
+  return cfg;
+}
+
+async function shopOpensAt() {
+  const cfg = await siteConfig();
+  const t = cfg?.launchAt ? Date.parse(cfg.launchAt) : NaN;
+  return Number.isFinite(t) ? t : null;
+}
+
+/**
+ * The shop's Trustpilot links, from the site unless this bot overrides them.
+ *
+ * The environment wins where it is set — an operator override, and the only
+ * thing that still works when the website cannot be reached. Otherwise they
+ * come from the same /api/config the launch date does, so setting
+ * TRUSTPILOT_URL once on the website is enough for Discord too.
+ *
+ * Returns empty strings when neither has one, which every caller already
+ * treats as "say nothing" rather than printing a dead link.
+ */
+async function trustpilotLinks() {
+  if (TRUSTPILOT_URL) return { profile: TRUSTPILOT_URL, write: TRUSTPILOT_REVIEW_URL };
+  const cfg = await siteConfig();
+  const profile = cleanUrl(cfg?.trustpilotUrl, '');
+  return { profile, write: cleanUrl(cfg?.trustpilotReviewUrl, '') || profile };
 }
 
 const shopIsOpen = async () => {
@@ -678,7 +707,8 @@ async function syncPanelCopy(guild) {
     const channelIdByName = {};
     guild.channels.cache.forEach((c) => { if (c.name) channelIdByName[c.name] = c.id; });
     const panels = buildPanels({
-      storeUrl: STORE_URL, guildName: guild.name, channelIdByName, trustpilotUrl: TRUSTPILOT_URL,
+      storeUrl: STORE_URL, guildName: guild.name, channelIdByName,
+      trustpilotUrl: (await trustpilotLinks()).profile,
     });
 
     for (const [chName, panel] of Object.entries(panels)) {
@@ -940,7 +970,8 @@ async function handleButton(i) {
     const channelIdByName = {};
     i.guild.channels.cache.forEach((c) => { if (c.name) channelIdByName[c.name] = c.id; });
     const rulesCopy = buildPanels({
-      storeUrl: STORE_URL, guildName: i.guild.name, channelIdByName, trustpilotUrl: TRUSTPILOT_URL,
+      storeUrl: STORE_URL, guildName: i.guild.name, channelIdByName,
+      trustpilotUrl: (await trustpilotLinks()).profile,
     }).rules;
     const rules = new EmbedBuilder().setColor(0x6366f1)
       .setTitle('📜 Read & accept the rules')
@@ -1946,11 +1977,14 @@ async function postVouch(i) {
      #vouchers; on the website it is pending review. Somebody who just wrote
      something nice and then went to look for it would have found nothing, which
      is the worst possible thing to do to the one person willing to advocate. */
+  /* From the site unless this bot overrides it, so the owner sets the profile
+     once on the website rather than again here. */
+  const { write: tpWrite } = await trustpilotLinks();
   return i.reply({
     ephemeral: true,
     content: 'Thanks for the vouch! 💚 It is up in #vouchers now, and it goes on the website '
       + 'once a person has read it — reviews there only ever come from real people, so each one is checked.'
-      + (TRUSTPILOT_REVIEW_URL ? `\n\n⭐ Would you put it on Trustpilot too? It helps more than you'd think: ${TRUSTPILOT_REVIEW_URL}` : ''),
+      + (tpWrite ? `\n\n⭐ Would you put it on Trustpilot too? It helps more than you'd think: ${tpWrite}` : ''),
   });
 }
 

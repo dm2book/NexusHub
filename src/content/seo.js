@@ -26,9 +26,25 @@
  * is no longer worth anything to a search engine.
  */
 
+/* The shop's own address, from the environment where there is one.
+ *
+ * This was the literal below, and the runtime reads `config.appUrl` — so the
+ * prerendered canonicals said `https://forgemarket.nl` while the sitemap, which
+ * the server generates from APP_URL, said `https://www.forgemarket.nl`. Two
+ * sources of truth for the one fact that has to be identical everywhere: a
+ * canonical is the page telling search engines its real address, and pointing
+ * it at a host the deployment does not serve is the worst version of getting it
+ * wrong.
+ *
+ * `process` is guarded because this module is imported by the browser bundle as
+ * well as by scripts/prerender.mjs in Node. In the browser the literal is used,
+ * which is correct — the client only ever builds links for the origin it is
+ * already on. */
+const ENV_URL = (typeof process !== 'undefined' && process.env && process.env.APP_URL) || '';
+
 export const SITE = {
   name: 'ForgeMarket',
-  url: 'https://forgemarket.nl',
+  url: (ENV_URL || 'https://www.forgemarket.nl').replace(/\/+$/, ''),
   // The social image. 1200x630 is what every scraper crops to.
   ogImage: '/og.png',
   twitter: null,   // no account yet; the card renders fine without it

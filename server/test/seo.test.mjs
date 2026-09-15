@@ -364,5 +364,37 @@ console.log('— Sitemap —');
   ok('entries declare how often they change', /changefreq/.test(src));
 }
 
+console.log('\n— The site has one address, not two —');
+{
+  /* The prerendered canonicals said https://forgemarket.nl while the sitemap,
+     which the server generates from APP_URL, said https://www.forgemarket.nl.
+     A canonical is the page telling a search engine its real address, so two
+     answers is the one disagreement that cannot be harmless — and the apex is
+     not in this deployment's alias list. */
+  const { SITE } = await import('../../src/content/seo.js');
+  const rd = (rel) => readFileSync(join(ROOT, rel), 'utf8');
+  const home = rd('dist/index.html');
+  const canon = (home.match(/<link rel="canonical" href="([^"]+)"/) || [])[1] || '';
+  ok('the homepage has a canonical', !!canon, canon);
+
+  /* The sitemap is generated at request time, not built, so read the
+     generator's source rather than guessing what it would emit. */
+  const seoRoute = rd('server/src/routes/seo.js');
+  const sitemapHost = /config\.appUrl/.test(seoRoute) ? new URL(SITE.url).origin : '';
+  ok('…and it agrees with where the sitemap points',
+    !!sitemapHost && canon.startsWith(sitemapHost), `${canon} vs ${sitemapHost}`);
+
+  ok('both come from one source rather than a literal',
+    /process\.env\.APP_URL/.test(rd('src/content/seo.js'))
+    && /config\.appUrl/.test(seoRoute));
+
+  /* The structured data carries the address too — three more places it could
+     disagree. */
+  for (const field of ['"@id":"' + SITE.url, '"url":"' + SITE.url]) {
+    ok(`the structured data uses the same host (${field.slice(0, 14)}…)`,
+      home.includes(field), field);
+  }
+}
+
 console.log(`\n${fail === 0 ? '✅' : '❌'} seo: ${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);

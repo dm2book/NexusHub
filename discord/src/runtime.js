@@ -71,7 +71,7 @@ export const ENV_SPEC = {
     ['ANTHROPIC_API_KEY', 'AI answers in #ask-the-bot. Without it a rule-based FAQ answers instead.'],
     ['AI_MODEL', 'Defaults to claude-sonnet-4-6.'],
     ['DISCORD_INVITE_URL', 'Fallback invite until the bot mints its own permanent one.'],
-    ['TRUSTPILOT_URL', 'Leave blank until the profile exists — panels hide the link rather than 404.'],
+    ['TRUSTPILOT_URL', 'Usually leave blank: the bot reads the profile from the website\u2019s /api/config, so setting it there is enough. Set it here only to override that.'],
     ['TRUSTPILOT_REVIEW_URL', 'Derived from TRUSTPILOT_URL when blank.'],
     ['PORT', 'Health endpoint port. Railway sets this for you.'],
     ['LOG_LEVEL', 'debug | info | warn | error. Default info.'],
