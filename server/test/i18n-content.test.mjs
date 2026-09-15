@@ -141,6 +141,33 @@ console.log('\n— …and so does the catalogue —');
     /from '\.\/productCopy\.js'/.test(client) && !/const NL_TAIL = \{/.test(client));
 }
 
+console.log('\n— No entry says the same language twice —');
+{
+  /* The duplicate-key trap, in the file where I sprang it on myself.
+   *
+   * de.js and fr.js each carried every key twice and nothing broke, because
+   * the last one silently wins. Having found that, I then wrote a script that
+   * inserted German and French into seo.js and mis-parked five of them inside
+   * the /robux landing route — forty lines of page titles sitting in a route
+   * about Robux, invisible, because the correct blocks came after them and
+   * won. Every rendered value was right. The file was wrong.
+   *
+   * An object literal cannot tell you this after it is parsed: by then the
+   * losers are gone. So this reads the source. */
+  const src = readFileSync(join(ROOT, 'src', 'content', 'seo.js'), 'utf8');
+  const entries = [...src.matchAll(/^  ('(?:\/[a-z0-9-]*)'|[A-Za-z_$][\w$]*):\s*\{([\s\S]*?)^  \},/gm)];
+  ok(`seo.js holds ${entries.length} routes`, entries.length >= 35, `${entries.length}`);
+
+  const doubled = [];
+  for (const [, name, body] of entries) {
+    for (const code of LANG_CODES) {
+      const n = (body.match(new RegExp(`^    ${code}:\\s*\\{`, 'gm')) || []).length;
+      if (n > 1) doubled.push(`${name} has ${n} × ${code}`);
+    }
+  }
+  ok('no route declares a language twice', doubled.length === 0, doubled.slice(0, 6).join('; '));
+}
+
 console.log('\n— …and so do the bundles —');
 {
   /* A bundle has no category to generate copy from — it is a set somebody

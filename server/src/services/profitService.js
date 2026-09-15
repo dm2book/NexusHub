@@ -31,6 +31,7 @@ import { all, get } from '../db/index.js';
 import { costCentsForMany } from './costService.js';
 import { config } from '../config/env.js';
 import { formatMoney } from '../utils/money.js';
+import { vatContext, netCents, vatCents } from './vatService.js';
 
 /* The same statuses analyticsService counts as money in. A pending order is not
    revenue and a refunded one is not either. */
@@ -114,7 +115,7 @@ async function costMapFor(lines) {
  * Revenue covers everything. Cost, profit and margin cover only what we can
  * price, and `coverage` says how much of the revenue that was.
  */
-export function rollUp(lines, costMap) {
+export function rollUp(lines, costMap, { vat = vatContext() } = {}) {
   let revenue = 0; let units = 0;
   let costedRevenue = 0; let cost = 0; let costedUnits = 0;
   const orders = new Set();
@@ -134,9 +135,20 @@ export function rollUp(lines, costMap) {
     }
   }
 
-  const profit = costedRevenue - cost;
+  /* Profit comes out of what the shop KEEPS, not out of what the buyer paid.
+     Once a btw-identificatienummer exists, part of every price is collected
+     for the Belastingdienst and is nobody's margin. Before registration the
+     rate is 0 and every figure below is exactly what it was. */
+  const netRevenue = netCents(revenue, vat.rate);
+  const costedNetRevenue = netCents(costedRevenue, vat.rate);
+  const profit = costedNetRevenue - cost;
   return {
     revenue,
+    /* Both, always, and never one pretending to be the other: `revenue` is
+       what was taken, `netRevenue` is what was earned. */
+    netRevenue,
+    vat: { rate: vat.rate, pct: vat.pct, registered: vat.registered, estimate: vat.estimate,
+      amount: vatCents(revenue, vat.rate) },
     orders: orders.size,
     units,
     /* Cost and profit describe the COSTED part of the period only. Reported
@@ -144,8 +156,9 @@ export function rollUp(lines, costMap) {
        a revenue it was not computed over. */
     cost,
     costedRevenue,
+    costedNetRevenue,
     profit,
-    marginPct: costedRevenue > 0 ? Math.round((profit / costedRevenue) * 1000) / 10 : null,
+    marginPct: costedNetRevenue > 0 ? Math.round((profit / costedNetRevenue) * 1000) / 10 : null,
     coverage: {
       units: costedUnits,
       unitsTotal: units,
@@ -163,7 +176,7 @@ export function rollUp(lines, costMap) {
  * A product with no cost gets `null` for cost, profit and margin — never a
  * zero. Its revenue is still counted, because it really was earned.
  */
-export function perProduct(lines, costMap) {
+export function perProduct(lines, costMap, { vat = vatContext() } = {}) {
   const by = new Map();
   for (const l of lines) {
     const key = l.pid || `name:${l.name}`;
@@ -180,13 +193,19 @@ export function perProduct(lines, costMap) {
   return [...by.values()].map((p) => {
     const known = p.unitCostCents != null;
     const cost = known ? p.unitCostCents * p.units : null;
-    const profit = known ? p.revenue - cost : null;
+    /* Against what the product EARNED, not what it was rung up for. Same rule
+       as the period roll-up: whatever VAT is collected on a sale was never
+       this product's margin. */
+    const netRevenue = netCents(p.revenue, vat.rate);
+    const profit = known ? netRevenue - cost : null;
     return {
       ...p,
+      netRevenue,
       cost,
       profit,
-      marginPct: known && p.revenue > 0 ? Math.round((profit / p.revenue) * 1000) / 10 : null,
+      marginPct: known && netRevenue > 0 ? Math.round((profit / netRevenue) * 1000) / 10 : null,
       revenueFormatted: formatMoney(p.revenue),
+      netRevenueFormatted: formatMoney(netRevenue),
       costFormatted: known ? formatMoney(cost) : null,
       profitFormatted: known ? formatMoney(profit) : null,
     };
@@ -277,12 +296,17 @@ export async function profitDashboard({ now = Date.now(), tz, limit = 10 } = {})
   };
 
   const [todayLines, weekLines] = await Promise.all([inRange(bounds.today), inRange(bounds.week)]);
-  const products = perProduct(monthLines, costMap);
+
+  /* Read once and passed down, so every figure on the page came out of the
+     same rate. Two calls would be two chances for the roll-up and the product
+     table to disagree about what the shop keeps. */
+  const vat = vatContext();
+  const products = perProduct(monthLines, costMap, { vat });
 
   const periods = {
-    today: rollUp(todayLines, costMap),
-    week: rollUp(weekLines, costMap),
-    month: rollUp(monthLines, costMap),
+    today: rollUp(todayLines, costMap, { vat }),
+    week: rollUp(weekLines, costMap, { vat }),
+    month: rollUp(monthLines, costMap, { vat }),
   };
 
   /* Catalogue coverage is a different question from sales coverage: how much of
@@ -300,6 +324,7 @@ export async function profitDashboard({ now = Date.now(), tz, limit = 10 } = {})
   return {
     generatedAt: new Date(now).toISOString(),
     bounds,
+    vat,
     periods,
     /* The headline margin, over the month and over costed revenue only. Null
        rather than 0 when nothing costed has sold: no margin is a different

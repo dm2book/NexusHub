@@ -316,5 +316,71 @@ console.log('\n— The page cannot render an unknown as zero —');
     /router\.use\(requirePermission\('analytics\.read'\)\)/.test(read('server/src/routes/admin/analytics.js')));
 }
 
+console.log('\n— A fifth of every price is not the margin —');
+{
+  /* Once a btw-identificatienummer exists, part of every price is collected
+     for the Belastingdienst and is nobody's profit. This page counted all of
+     it: on a €9.99 pack costing €7.00 it reported a 29.9% margin, where the
+     margin a registered seller actually keeps is 15.3%. Margins are what
+     prices get set from, so that is not a rounding error.
+     Before registration nothing comes out, because before registration
+     nothing should. */
+  const { rollUp, perProduct } = await import('../src/services/profitService.js');
+  const { vatRate, netCents, vatCents, NL_STANDARD_RATE } =
+    await import('../src/services/vatService.js');
+
+  ok('no btw-id means no VAT is taken out', vatRate({ legal: { vat: '' } }) === 0);
+  ok('…and a blank one is not a tax position either', vatRate({ legal: { vat: '   ' } }) === 0);
+  ok('a published btw-id means the Dutch standard rate by default',
+    vatRate({ legal: { vat: 'NL123456789B01' }, rate: undefined }) === NL_STANDARD_RATE);
+  ok('…and a rate can be set for a seller who charges another',
+    vatRate({ legal: { vat: 'NL1B01' }, rate: 0.09 }) === 0.09);
+  ok('a nonsense rate falls back rather than corrupting every figure',
+    vatRate({ legal: { vat: 'NL1B01' }, rate: 'banana' }) === NL_STANDARD_RATE
+    && vatRate({ legal: { vat: 'NL1B01' }, rate: 2 }) === NL_STANDARD_RATE);
+
+  ok('net and VAT add back up to what the buyer paid',
+    netCents(999, 0.21) + vatCents(999, 0.21) === 999);
+  ok('…at every rate, with no cent lost to rounding',
+    [0, 0.06, 0.09, 0.19, 0.21, 0.25].every((r) =>
+      [1, 7, 99, 999, 4999, 123457].every((g) => netCents(g, r) + vatCents(g, r) === g)));
+
+  const lines = [{ pid: 'p1', name: '1,000 Robux', qty: 1, unit_price: 999, order_id: 'o1' }];
+  const costMap = { p1: 700 };
+  const off = rollUp(lines, costMap, { vat: { rate: 0, pct: 0, registered: false, estimate: true } });
+  const on = rollUp(lines, costMap, { vat: { rate: 0.21, pct: 21, registered: true, estimate: true } });
+
+  ok('unregistered: the figures are untouched',
+    off.netRevenue === 999 && off.profit === 299 && off.marginPct === 29.9,
+    JSON.stringify({ net: off.netRevenue, profit: off.profit, margin: off.marginPct }));
+  ok('registered: profit is what is left after the BTW comes out',
+    on.netRevenue === 826 && on.profit === 126 && on.marginPct === 15.3,
+    JSON.stringify({ net: on.netRevenue, profit: on.profit, margin: on.marginPct }));
+  ok('…and what the buyer paid is still reported, unchanged',
+    on.revenue === 999 && on.vat.amount === 173);
+
+  /* The product table and the period roll-up must not disagree about what the
+     shop keeps — they are read side by side on the same screen. */
+  const [prod] = perProduct(lines, costMap, { vat: { rate: 0.21, pct: 21, registered: true, estimate: true } });
+  ok('per-product margin uses the same rule as the period',
+    prod.marginPct === on.marginPct && prod.profit === on.profit,
+    `${prod.marginPct} vs ${on.marginPct}`);
+
+  /* One rate over every sale is an estimate, not a calculation of what is
+     owed: a consumer in another EU country is taxed at their own rate and the
+     order does not record where they were. The page has to say so. */
+  const page = read('src/pages/admin/Profit.jsx');
+  ok('the page says which of the two worlds it is reporting from',
+    /btw-identificatienummer/.test(page) && /BTW/.test(page));
+  ok('…and does not present one rate as a tax calculation',
+    /estimate/i.test(page));
+
+  /* The claim the shop makes to buyers has to come from the same fact. */
+  const seo = read('src/content/seo.js');
+  ok('no page promises "prices include VAT" without a btw-id behind it',
+    !/inclusief btw|include VAT|inklusive MwSt|TTC/i.test(seo),
+    'a meta description still claims it');
+}
+
 console.log(`\n${fail === 0 ? '✅' : '❌'} profit-dashboard: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
