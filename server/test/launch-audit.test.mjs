@@ -125,9 +125,22 @@ console.log('\n— A Dutch shop sends Dutch email —');
   /* A live database seeded with the English copy has to pick the Dutch one up,
      while anything the owner edited by hand is left alone — which is what the
      legacy list is for. */
-  ok('every template has its English body registered as legacy',
-    DEFAULT_TEMPLATES.every((t) => (LEGACY_TEMPLATE_BODIES[t.id] || []).length > 0),
-    DEFAULT_TEMPLATES.filter((t) => !(LEGACY_TEMPLATE_BODIES[t.id] || []).length).map((t) => t.id).join(', '));
+  /* Templates that shipped English and were rewritten need their original
+     registered, or a shop seeded before the rewrite keeps sending English.
+     A template BORN DUTCH has no such original — registering an invented one
+     would be a fabricated "previous body" in a list whose whole purpose is to
+     recognise bodies that actually existed. Listed explicitly rather than
+     inferred, so adding a template is a conscious decision either way. */
+  const BORN_DUTCH = new Set(['launch_announcement']);
+  const needLegacy = DEFAULT_TEMPLATES.filter((t) => !BORN_DUTCH.has(t.id));
+  ok('every template that was rewritten has its English body registered as legacy',
+    needLegacy.every((t) => (LEGACY_TEMPLATE_BODIES[t.id] || []).length > 0),
+    needLegacy.filter((t) => !(LEGACY_TEMPLATE_BODIES[t.id] || []).length).map((t) => t.id).join(', '));
+  ok('…and the exemptions really are Dutch from the start',
+    [...BORN_DUTCH].every((id) => {
+      const t = DEFAULT_TEMPLATES.find((x) => x.id === id);
+      return t && DUTCH.test(`${t.subject} ${t.body_html}`) && !ENGLISH_ONLY.test(t.body_html);
+    }), [...BORN_DUTCH].join(', '));
 
   // The seeded rows, not just the source: this is what actually gets sent.
   const stored = await get(`SELECT subject, body_html FROM email_templates WHERE id='order_completed'`);
