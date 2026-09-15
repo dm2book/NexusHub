@@ -10,7 +10,11 @@ import { usePageMeta } from '../../lib/useMeta.js';
 import { SUPPORT_EMAIL } from '../../lib/support.js';
 
 export default function Contact() {
-  usePageMeta('Contact & support', 'Get help with an order, a payment or a delivery. Reach us on Discord or by email — we answer every message.');
+  /* No arguments: usePageMeta falls back to this route's own copy in
+     content/seo.js, which exists in all four languages. Passing an English
+     string here overrode it — the tab said "Contact & support" above a page written in
+     German. */
+  usePageMeta();
   const { user } = useAuth();
   const toast = useToast();
   const { t } = useI18n();

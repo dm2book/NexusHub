@@ -7,7 +7,11 @@ import { useI18n } from '../../lib/i18n.jsx';
 import { usePageMeta } from '../../lib/useMeta.js';
 
 export default function Drops() {
-  usePageMeta('Drops & restocks', 'Upcoming restocks, launches and flash sales on Robux, V-Bucks, Valorant Points and gift cards.');
+  /* No arguments: usePageMeta falls back to this route's own copy in
+     content/seo.js, which exists in all four languages. Passing an English
+     string here overrode it — the tab said "Drops & restocks" above a page written in
+     German. */
+  usePageMeta();
   const { t, lang } = useI18n();
   const [drops, setDrops] = useState(null);
   const [invite, setInvite] = useState(null); // live (never-expiring) invite from the API

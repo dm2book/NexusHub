@@ -40,8 +40,11 @@ const FACTS = (t) => [
 ];
 
 export default function About() {
-  usePageMeta('About ForgeMarket',
-    'Who runs ForgeMarket, how orders are really delivered, how you pay, and what happens if something goes wrong.');
+  /* No arguments: usePageMeta falls back to this route's own copy in
+     content/seo.js, which exists in all four languages. Passing an English
+     string here overrode it — the tab said "About ForgeMarket" above a page written in
+     German. */
+  usePageMeta();
   const { t } = useI18n();
   const facts = FACTS(t);
 

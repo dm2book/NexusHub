@@ -15,7 +15,11 @@ import { matchBundle } from '../lib/bundles.js';
 import { useStickyBarLift } from '../lib/useStickyBarLift.js';
 
 export default function Cart() {
-  usePageMeta('Your cart', 'Review the items in your cart before checking out.');
+  /* No arguments: usePageMeta falls back to this route's own copy in
+     content/seo.js, which exists in all four languages. Passing an English
+     string here overrode it — the tab said "Your cart" above a page written in
+     German. */
+  usePageMeta();
   useStickyBarLift(); // keep the chat bubble off the sticky checkout bar
   const { items, setQty, remove, subtotal, currency, add } = useCart();
   const { user } = useAuth();

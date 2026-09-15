@@ -47,7 +47,11 @@ export default function Trust() {
   const stats = useStats();
   const reviews = useReviews();
   const { t } = useI18n();
-  usePageMeta('Trust Center — ForgeMarket', 'Delivery, review and refund statistics, security guarantees and proof you can trust ForgeMarket.');
+  /* No arguments: usePageMeta falls back to this route's own copy in
+     content/seo.js, which exists in all four languages. Passing an English
+     string here overrode it — the tab said "Trust Center — ForgeMarket" above a page written in
+     German. */
+  usePageMeta();
   const avgDelivery = stats.avgDeliverySeconds == null ? '—'
     : stats.avgDeliverySeconds < 60 ? `< ${Math.max(1, Math.round(stats.avgDeliverySeconds))}s`
     : `${Math.round(stats.avgDeliverySeconds / 60)}m`;

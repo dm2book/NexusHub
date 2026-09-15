@@ -1,3 +1,4 @@
+import { describeProduct, COPY_LANGS } from './productCopy.js';
 import {
   Gamepad2, Gift, Coins, Crown, Sparkles, Ticket, CreditCard, Package,
   Crosshair, Gem, Swords, Trophy, Music, Film, Smartphone, ShoppingBag, Diamond,
@@ -42,6 +43,24 @@ const MAP = {
   subscription: { icon: Ticket, grad: 'from-amber-500 to-orange-500', label: 'Subscriptions' },
   mystery: { icon: Gift, grad: 'from-amber-400 to-rose-500', label: 'Mystery Box' },
 };
+
+/**
+ * A category's name in the language being read.
+ *
+ * Thirty-three of these and only two need translating: the rest are proper
+ * nouns — Robux is Robux in Berlin, Clash of Clans is Clash of Clans in Lyon —
+ * and translating them would be worse than leaving them. "Gift Cards" and
+ * "Subscriptions" are ordinary words, and they were the eyebrow on a third of
+ * the cards in the shop, in English, on every page.
+ *
+ * The English label is the DEFAULT rather than a separate table, so a category
+ * without a translation renders its own name instead of a missing key, and
+ * adding one is a single line in each dictionary.
+ */
+export function categoryLabel(category, t) {
+  const fallback = categoryVisual(category).label;
+  return typeof t === 'function' ? t(`cat.${category}`, fallback) : fallback;
+}
 
 export function categoryVisual(category) {
   const key = String(category || '').toLowerCase();
@@ -144,41 +163,16 @@ export { CreditCard };
  * Rendering `description` directly is what left the whole shop in English after
  * switching to Dutch.
  */
+/**
+ * The description to show, in the language being read.
+ *
+ * Products served by the API arrive with one per language (see withCopy).
+ * This also covers the client-side sample catalogue — used before the API
+ * answers and when it cannot — which would otherwise show English on a German
+ * page. Both sides call the same generator now: the table that produces these
+ * sentences used to be written out twice, and the copy here had already lost
+ * its `gta` entry.
+ */
 export function productDescription(product, lang) {
-  if (!product) return '';
-  if (lang !== 'nl') return product.description || '';
-  if (product.descriptionNl) return product.descriptionNl;
-  // Products served by the API always carry descriptionNl. This covers the
-  // client-side sample catalogue (used before the API answers, and as a
-  // fallback when it cannot), which would otherwise show English on a Dutch
-  // page. Mirrors server/src/services/productCopy.js.
-  const name = String(product.name || '').trim();
-  if (!name) return product.description || '';
-  const tail = NL_TAIL[String(product.category || '').toLowerCase()];
-  return tail ? `${name} ${tail}` : `${name} — een officiële top-up, geleverd op het account dat je opgeeft.`;
+  return describeProduct(product, COPY_LANGS.includes(lang) ? lang : 'en');
 }
-
-const NL_TAIL = {
-  robux: 'rechtstreeks op je Roblox-account.',
-  'v-bucks': 'voor skins, emotes en de Battle Pass.',
-  valorant: 'voor agents, skins en de Battle Pass.',
-  cod: 'voor operators, blueprints en de Battle Pass.',
-  apex: 'voor legends, skins en Apex-packs.',
-  genshin: 'voor wishes en de Battle Pass.',
-  brawl: 'voor brawlers, skins en de Brawl Pass.',
-  clash: 'voor bouwers, boosts en kisten.',
-  clashroyale: 'voor kisten, kaarten en de Pass Royale.',
-  league: 'voor champions, skins en de Battle Pass.',
-  pubg: 'voor crates, skins en de Royale Pass.',
-  freefire: 'voor characters, skins en de Elite Pass.',
-  mlbb: 'voor heroes, skins en de Starlight Pass.',
-  pokemongo: 'voor items, meer opslag en raid passes.',
-  eafc: 'voor Ultimate Team-packs en drafts.',
-  gta: "voor auto's, panden en bedrijven in GTA Online.",
-  minecraft: 'voor skins, werelden en texture packs.',
-  gamepass: '— honderden games op console, pc en cloud.',
-  spotify: '— muziek zonder reclame, offline luisteren en betere kwaliteit.',
-  'discord-nitro': '— betere emoji, grotere uploads en een boost voor je server.',
-  giftcard: '— officiële code, wissel je in op je eigen account.',
-  mystery: '— elke box keert echt winkeltegoed uit, tot een jackpot van €150.',
-};

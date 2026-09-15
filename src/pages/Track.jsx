@@ -33,7 +33,11 @@ const stepIndex = (status) => {
 };
 
 export default function Track() {
-  usePageMeta('Track your order', 'Enter your order number to see its status, payment details and delivery.');
+  /* No arguments: usePageMeta falls back to this route's own copy in
+     content/seo.js, which exists in all four languages. Passing an English
+     string here overrode it — the tab said "Track your order" above a page written in
+     German. */
+  usePageMeta();
   const [params] = useSearchParams();
   const toast = useToast();
   const { t } = useI18n();

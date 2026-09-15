@@ -55,7 +55,11 @@ const STATUS_COLOR = { online: '#23a55a', idle: '#f0b232', dnd: '#f23f43', offli
 
 export default function Discord() {
   const { t } = useI18n();
-  usePageMeta('ForgeMarket Support on Discord', 'Get help with an order, follow restocks and giveaways, and read buyer vouches.');
+  /* No arguments: usePageMeta falls back to this route's own copy in
+     content/seo.js, which exists in all four languages. Passing an English
+     string here overrode it — the tab said "ForgeMarket Support on Discord" above a page written in
+     German. */
+  usePageMeta();
   const { user } = useAuth();
   const [server, setServer] = useState(null);
   // Offering "link my account" when Discord login isn't configured sends the

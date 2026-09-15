@@ -43,6 +43,30 @@ const COPY = {
     left: (n) => `nog ${n}`,
     actions: { shop: 'Naar de shop', track: 'Bestelling volgen', discord: 'Vraag het op Discord', how: 'Hoe het werkt', reviews: 'Lees reviews' },
   },
+  de: {
+    title: 'Forge-Assistent',
+    status: 'Antwortet mit echten Shop-Daten',
+    placeholder: 'Frag einfach…',
+    greeting: 'Hi! Ich bin Forge ⚡ Frag mich nach Preisen, Lieferung, Bezahlen oder deiner Bestellung — oder füg deine Bestellnummer ein, dann sehe ich nach.',
+    offline: 'Ich erreiche den Shop gerade nicht, und dann sage ich lieber nichts als etwas Falsches. Versuch es gleich noch einmal oder frag uns auf Discord — dort antwortet ein Mensch.',
+    browse: 'Alles ansehen →',
+    inStock: 'Auf Lager',
+    byHand: 'Von Hand, ein paar Stunden',
+    left: (n) => `noch ${n}`,
+    actions: { shop: 'Zum Shop', track: 'Bestellung verfolgen', discord: 'Auf Discord fragen', how: 'So funktioniert es', reviews: 'Bewertungen lesen' },
+  },
+  fr: {
+    title: 'Assistant Forge',
+    status: 'Répond avec les vraies données de la boutique',
+    placeholder: 'Pose ta question…',
+    greeting: 'Salut ! Je suis Forge ⚡ Demande-moi les prix, la livraison, le paiement ou ta commande — ou colle ton numéro de commande et je le retrouve.',
+    offline: 'Je n’arrive pas à joindre la boutique pour le moment, et je préfère ne rien dire plutôt que de me tromper. Réessaie dans un instant, ou demande-nous sur Discord — une vraie personne y répond.',
+    browse: 'Voir tout →',
+    inStock: 'En stock',
+    byHand: 'À la main, quelques heures',
+    left: (n) => `il en reste ${n}`,
+    actions: { shop: 'Aller à la boutique', track: 'Suivre ma commande', discord: 'Demander sur Discord', how: 'Comment ça marche', reviews: 'Lire les avis' },
+  },
 };
 
 const QUICK = {
