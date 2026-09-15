@@ -1580,4 +1580,27 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS lang TEXT;
          AND body_html NOT LIKE '%reviewAskHtml%';
     `,
   },
+  {
+    id: '039_launch_announcement',
+    /*
+     * The banner promises "we will email you on the day" and nothing could keep
+     * it.
+     *
+     * newsletterService could subscribe, unsubscribe, count and list — and send
+     * nothing. Every address collected before launch was a promise that would
+     * be broken at midnight unless somebody remembered to export a list and
+     * write the mail by hand.
+     *
+     * `announced_at` stamps a subscriber BEFORE the send, the same way
+     * review_request_sent_at does, so a crash or a second sweep cannot mail
+     * anyone twice. `lang` records the language the banner was in when they
+     * signed up, because a Dutch shop with English and German visitors
+     * otherwise has to guess, and a launch mail in the wrong language reads
+     * like spam from a stranger.
+     */
+    sql: `
+      ALTER TABLE newsletter_signups ADD COLUMN IF NOT EXISTS announced_at TEXT;
+      ALTER TABLE newsletter_signups ADD COLUMN IF NOT EXISTS lang TEXT;
+    `,
+  },
 ];

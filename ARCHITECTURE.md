@@ -175,6 +175,34 @@ owner switched off is not a permission. Having the key is still not the same as
 switching the source on: a source runs only when its key is listed in
 `MARKET_SOURCES`, because using somebody's API is an agreement, not a discovery.
 
+## 4a0. The launch announcement
+
+Files: `services/newsletterService.js`, migration `039_launch_announcement`,
+template `launch_announcement`, `routes/catalog.js`.
+
+The pre-launch banner promises "we will email you on the day" and nothing could
+keep it: the service could subscribe, unsubscribe, count and list, and send
+nothing. Every address collected before launch was a promise that would break at
+midnight unless somebody remembered to export a list by hand.
+
+`sendLaunchAnnouncements()` runs in the hourly sweep and is mostly rules about
+**not** sending. Not before the shop opens — it asks the same gate the checkout
+asks, because announcing a launch that has not happened is the worst thing it
+could do. Not to anyone who subscribed *after* opening, who was already looking
+at an open shop. Never twice: the row is claimed with a conditional `UPDATE …
+WHERE announced_at IS NULL` before the send, so two sweeps racing cannot both
+win, and a crash costs one missed mail rather than a duplicate to hundreds of
+strangers on launch night. In batches of 40, because the provider has a rate
+limit and a launch list is the one moment it all goes at once.
+
+The mail is localised from the `lang` recorded at signup — the banner is shown
+in the visitor's language and the consent sentence is stored in it, so guessing
+would be a choice rather than a necessity. Unsubscribing works from an HMAC of
+the address: a bare `?email=` would make the route a way to unsubscribe
+strangers and, by answering differently for a known address, a way to ask who is
+on the list — which is exactly what `subscribe()` is careful never to reveal. So
+the answer is identical either way.
+
 ## 4a. The review ask
 
 Files: `services/orderService.js` (`reviewAskHtml`), `services/emailCopy.js`,

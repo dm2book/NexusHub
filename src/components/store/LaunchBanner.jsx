@@ -53,7 +53,11 @@ export default function LaunchBanner() {
     if (state === 'sending' || !email.trim()) return;
     setState('sending');
     try {
-      await api.post('/api/newsletter', { email: email.trim(), consentText, source: 'prelaunch-banner' });
+      /* The language this visitor is reading in, so the launch mail arrives in
+         the same one as the sentence they agreed to. */
+      await api.post('/api/newsletter', {
+        email: email.trim(), consentText, source: 'prelaunch-banner', lang,
+      });
       setState('done');
     } catch (err) {
       /* Two failures, two sentences. A 4xx means the address; a 5xx or a dead
