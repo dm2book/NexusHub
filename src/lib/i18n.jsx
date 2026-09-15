@@ -502,6 +502,11 @@ const NL = {
      leest hier alleen dit — het logo zelf blijft stil — dus het moet zeggen
      waar de klik heen gaat, niet wat er op de kaart staat. */
   'home.fanGo': 'Bekijk {brand}',
+  /* Twee van de drieëndertig categorieën zijn gewone woorden; de rest zijn
+     eigennamen en blijven in elke taal hetzelfde. */
+  'cat.giftcard': 'Cadeaukaarten',
+  'cat.subscription': 'Abonnementen',
+  'bot.online': 'Online',
   'home.viewProduct': 'Bekijken',
   'home.addOne': '{n} in je winkelwagen',
   'home.trustWhoLead': 'Een persoon met naam, in Nederland',

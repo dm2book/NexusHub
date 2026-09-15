@@ -70,6 +70,14 @@ export const PAGES = {
       title: 'Buy Robux, V-Bucks & gift cards — delivered fast',
       description: 'Robux, V-Bucks, Valorant Points and gift cards from a small Dutch shop. In stock goes out automatically, the rest by hand within hours. Money back if we cannot deliver.',
     },
+    de: {
+      title: 'Robux, V-Bucks & Geschenkkarten kaufen — schnell geliefert',
+      description: 'Robux, V-Bucks, Valorant Points und Geschenkkarten aus einem kleinen niederländischen Shop. Was auf Lager ist, geht automatisch raus, der Rest von Hand innerhalb weniger Stunden. Geld zurück, wenn wir nicht liefern können.',
+    },
+    fr: {
+      title: 'Acheter des Robux, V-Bucks et cartes cadeaux — livrés vite',
+      description: 'Robux, V-Bucks, Valorant Points et cartes cadeaux dans une petite boutique néerlandaise. Ce qui est en stock part automatiquement, le reste à la main en quelques heures. Remboursé si nous ne pouvons pas livrer.',
+    },
   },
   '/shop': {
     nl: {
@@ -79,6 +87,14 @@ export const PAGES = {
     en: {
       title: 'All products — game currency & gift cards',
       description: 'The full catalogue: Robux, V-Bucks, Valorant Points, Steam, Discord Nitro and gift cards. Prices include VAT, pay with iDEAL.',
+    },
+    de: {
+      title: 'Alle Produkte — Spielwährung & Geschenkkarten',
+      description: 'Der ganze Katalog: Robux, V-Bucks, Valorant Points, Steam, Discord Nitro und Geschenkkarten. Preise inklusive MwSt., zahlen mit iDEAL.',
+    },
+    fr: {
+      title: 'Tous les produits — monnaie de jeu et cartes cadeaux',
+      description: 'Tout le catalogue : Robux, V-Bucks, Valorant Points, Steam, Discord Nitro et cartes cadeaux. Prix TTC, paiement avec iDEAL.',
     },
   },
   '/how-it-works': {
@@ -90,6 +106,14 @@ export const PAGES = {
       title: 'How it works — ordering and delivery',
       description: 'From order to delivery in three steps. What is in stock goes out automatically; the rest a person delivers by hand, usually within a few hours.',
     },
+    de: {
+      title: 'So funktioniert es — bestellen und liefern',
+      description: 'Von der Bestellung zur Lieferung in drei Schritten. Was auf Lager ist, geht automatisch raus; den Rest liefert ein Mensch von Hand, meistens innerhalb weniger Stunden.',
+    },
+    fr: {
+      title: 'Comment ça marche — commande et livraison',
+      description: 'De la commande à la livraison en trois étapes. Ce qui est en stock part automatiquement ; le reste, une personne le livre à la main, en général en quelques heures.',
+    },
   },
   '/payment-methods': {
     nl: {
@@ -99,6 +123,14 @@ export const PAGES = {
     en: {
       title: 'Payment methods — iDEAL, Bancontact, PayPal',
       description: 'Pay with iDEAL, Bancontact, Apple Pay, credit card or PayPal through Mollie. Your order confirms automatically, usually within seconds.',
+    },
+    de: {
+      title: 'Zahlungsmethoden — iDEAL, Bancontact, PayPal',
+      description: 'Zahle mit iDEAL, Bancontact, Apple Pay, Kreditkarte oder PayPal über Mollie. Deine Bestellung wird automatisch bestätigt, meistens innerhalb von Sekunden.',
+    },
+    fr: {
+      title: 'Moyens de paiement — iDEAL, Bancontact, PayPal',
+      description: 'Paie avec iDEAL, Bancontact, Apple Pay, carte bancaire ou PayPal via Mollie. Ta commande est confirmée automatiquement, en général en quelques secondes.',
     },
   },
   '/track': {
@@ -110,6 +142,14 @@ export const PAGES = {
       title: 'Track your order — live status',
       description: 'Enter your order number and follow your order live. No account needed; the page updates itself the moment your payment is confirmed.',
     },
+    de: {
+      title: 'Bestellung verfolgen — Status in Echtzeit',
+      description: 'Gib deine Bestellnummer ein und verfolge deine Bestellung live. Kein Konto nötig; die Seite aktualisiert sich selbst, sobald deine Zahlung bestätigt ist.',
+    },
+    fr: {
+      title: 'Suivre ta commande — statut en direct',
+      description: 'Saisis ton numéro de commande et suis ta commande en direct. Aucun compte nécessaire ; la page se met à jour dès que ton paiement est confirmé.',
+    },
   },
   '/refunds': {
     nl: {
@@ -119,6 +159,14 @@ export const PAGES = {
     en: {
       title: 'Refund policy — when you get your money back',
       description: 'When you are entitled to a refund, how to request one, and how long it takes. Includes the model withdrawal form.',
+    },
+    de: {
+      title: 'Rückerstattungen — wann du dein Geld zurückbekommst',
+      description: 'Wann dir eine Rückerstattung zusteht, wie du sie beantragst und wie lange sie dauert. Mit Muster-Widerrufsformular.',
+    },
+    fr: {
+      title: 'Politique de remboursement — quand tu es remboursé',
+      description: 'Quand tu as droit à un remboursement, comment le demander et combien de temps cela prend. Avec le formulaire type de rétractation.',
     },
   },
   '/faq': {
@@ -130,6 +178,14 @@ export const PAGES = {
       title: 'Frequently asked questions about orders',
       description: 'How fast is delivery, which payment methods are accepted, what if a code does not work, and how refunds are handled.',
     },
+    de: {
+      title: 'Häufige Fragen zu Bestellungen',
+      description: 'Wie schnell geliefert wird, welche Zahlungsmethoden gehen, was passiert, wenn ein Code nicht funktioniert, und wie Rückerstattungen laufen.',
+    },
+    fr: {
+      title: 'Questions fréquentes sur les commandes',
+      description: 'Les délais de livraison, les moyens de paiement acceptés, que faire si un code ne marche pas, et comment se passent les remboursements.',
+    },
   },
   '/about': {
     nl: {
@@ -139,6 +195,14 @@ export const PAGES = {
     en: {
       title: 'About ForgeMarket — who runs the shop',
       description: 'ForgeMarket is run by one person in the Netherlands. What we sell, how we deliver, and why a human answers your message.',
+    },
+    de: {
+      title: 'Über ForgeMarket — wer den Shop führt',
+      description: 'ForgeMarket wird von einer Person in den Niederlanden geführt. Was wir verkaufen, wie wir liefern, und warum ein Mensch auf deine Nachricht antwortet.',
+    },
+    fr: {
+      title: 'À propos de ForgeMarket — qui tient la boutique',
+      description: 'ForgeMarket est tenue par une seule personne aux Pays-Bas. Ce que nous vendons, comment nous livrons, et pourquoi c’est un humain qui répond à ton message.',
     },
   },
   '/contact': {
@@ -150,6 +214,14 @@ export const PAGES = {
       title: 'Contact — a real person answers',
       description: 'Questions about an order, or something gone wrong? Email us or open a ticket on Discord. We reply within one working day, usually sooner.',
     },
+    de: {
+      title: 'Kontakt — ein echter Mensch antwortet',
+      description: 'Fragen zu einer Bestellung oder ist etwas schiefgelaufen? Schreib uns eine E-Mail oder öffne ein Ticket auf Discord. Wir antworten innerhalb eines Werktags, meistens früher.',
+    },
+    fr: {
+      title: 'Contact — une vraie personne répond',
+      description: 'Une question sur une commande, ou un problème ? Écris-nous un e-mail ou ouvre un ticket sur Discord. Nous répondons sous un jour ouvré, en général plus tôt.',
+    },
   },
   '/reviews': {
     nl: {
@@ -159,6 +231,14 @@ export const PAGES = {
     en: {
       title: 'Reviews from real orders',
       description: 'What buyers write after ordering. Every review here belongs to an order that was genuinely placed and delivered.',
+    },
+    de: {
+      title: 'Bewertungen aus echten Bestellungen',
+      description: 'Was Käufer nach ihrer Bestellung schreiben. Jede Bewertung hier gehört zu einer Bestellung, die wirklich aufgegeben und geliefert wurde.',
+    },
+    fr: {
+      title: 'Avis de vraies commandes',
+      description: 'Ce que les acheteurs écrivent après avoir commandé. Chaque avis ici correspond à une commande réellement passée et livrée.',
     },
   },
   '/trust': {
@@ -170,6 +250,14 @@ export const PAGES = {
       title: 'Trust Center — why buying here is safe',
       description: 'How we deliver, what happens when something goes wrong, what data we keep and how your order is protected.',
     },
+    de: {
+      title: 'Trust Center — warum der Kauf hier sicher ist',
+      description: 'Wie wir liefern, was passiert, wenn etwas schiefgeht, welche Daten wir behalten und wie deine Bestellung geschützt ist.',
+    },
+    fr: {
+      title: 'Centre de confiance — pourquoi acheter ici est sûr',
+      description: 'Comment nous livrons, ce qui se passe en cas de problème, quelles données nous gardons et comment ta commande est protégée.',
+    },
   },
   '/discord': {
     nl: {
@@ -179,6 +267,14 @@ export const PAGES = {
     en: {
       title: 'Discord — support, drops and giveaways',
       description: 'Join the ForgeMarket Discord for help with your order, restock alerts, deals and giveaways.',
+    },
+    de: {
+      title: 'Discord — Support, Drops und Giveaways',
+      description: 'Komm in den ForgeMarket-Discord für Hilfe bei deiner Bestellung, Restock-Benachrichtigungen, Angebote und Giveaways.',
+    },
+    fr: {
+      title: 'Discord — support, drops et giveaways',
+      description: 'Rejoins le Discord ForgeMarket pour de l’aide sur ta commande, des alertes de réassort, des offres et des giveaways.',
     },
   },
   '/drops': {
@@ -190,26 +286,44 @@ export const PAGES = {
       title: 'Drops & restocks — what is coming in',
       description: 'Upcoming drops, restocks and offers. See what is coming back in stock before it goes.',
     },
+    de: {
+      title: 'Drops & Restocks — was reinkommt',
+      description: 'Kommende Drops, Restocks und Angebote. Sieh, was wieder auf Lager kommt, bevor es weg ist.',
+    },
+    fr: {
+      title: 'Drops et réassorts — ce qui arrive',
+      description: 'Les prochains drops, réassorts et offres. Vois ce qui revient en stock avant que ça reparte.',
+    },
   },
   '/terms': {
     nl: { title: 'Algemene voorwaarden', description: 'De voorwaarden die gelden bij elke bestelling: betaling, levering, herroepingsrecht en terugbetaling.' },
     en: { title: 'Terms and conditions', description: 'The terms that apply to every order: payment, delivery, right of withdrawal and refunds.' },
+    de: { title: 'Allgemeine Geschäftsbedingungen', description: 'Die Bedingungen, die für jede Bestellung gelten: Zahlung, Lieferung, Widerrufsrecht und Rückerstattungen.' },
+    fr: { title: 'Conditions générales', description: 'Les conditions qui s’appliquent à chaque commande : paiement, livraison, droit de rétractation et remboursements.' },
   },
   '/privacy': {
     nl: { title: 'Privacybeleid', description: 'Welke persoonsgegevens ForgeMarket verwerkt, op welke grondslag, hoe lang ze bewaard worden en welke rechten je hebt.' },
     en: { title: 'Privacy policy', description: 'What personal data ForgeMarket processes, on what legal basis, how long it is kept, and your rights.' },
+    de: { title: 'Datenschutzerklärung', description: 'Welche personenbezogenen Daten ForgeMarket verarbeitet, auf welcher Rechtsgrundlage, wie lange sie gespeichert werden und welche Rechte du hast.' },
+    fr: { title: 'Politique de confidentialité', description: 'Quelles données personnelles ForgeMarket traite, sur quelle base légale, combien de temps elles sont conservées et quels sont tes droits.' },
   },
   '/cookies': {
     nl: { title: 'Cookiebeleid', description: 'Welke cookies ForgeMarket plaatst, wat er in je eigen browser blijft, en waarom deze site geen cookiebanner heeft.' },
     en: { title: 'Cookie policy', description: 'Which cookies ForgeMarket sets, what stays in your own browser, and why this site has no cookie banner.' },
+    de: { title: 'Cookie-Richtlinie', description: 'Welche Cookies ForgeMarket setzt, was in deinem eigenen Browser bleibt und warum diese Seite kein Cookie-Banner hat.' },
+    fr: { title: 'Politique relative aux cookies', description: 'Quels cookies ForgeMarket dépose, ce qui reste dans ton propre navigateur, et pourquoi ce site n’a pas de bandeau cookies.' },
   },
   '/login': {
     nl: { title: 'Inloggen', description: 'Log in zonder wachtwoord met een code per e-mail, of ga verder met Discord.' },
     en: { title: 'Sign in', description: 'Sign in without a password using a code sent by email, or continue with Discord.' },
+    de: { title: 'Anmelden', description: 'Melde dich ohne Passwort mit einem Code per E-Mail an, oder mach mit Discord weiter.' },
+    fr: { title: 'Se connecter', description: 'Connecte-toi sans mot de passe avec un code envoyé par e-mail, ou continue avec Discord.' },
   },
   '/cart': {
     nl: { title: 'Winkelwagen', description: 'De producten in je winkelwagen, met het totaal inclusief btw en de betaalmethoden die je bij het afrekenen kunt kiezen.' },
     en: { title: 'Cart', description: 'The products in your cart, with the total including VAT and the payment methods you can choose at checkout.' },
+    de: { title: 'Warenkorb', description: 'Die Produkte in deinem Warenkorb, mit dem Gesamtbetrag inklusive MwSt. und den Zahlungsmethoden, die du beim Bezahlen wählen kannst.' },
+    fr: { title: 'Panier', description: 'Les produits de ton panier, avec le total TTC et les moyens de paiement disponibles au moment de payer.' },
   },
 };
 
@@ -257,11 +371,63 @@ export const LANDING = {
       h1: 'Robux kopen',
       sub: 'Robux voor je Roblox-account. Op voorraad gaat automatisch de deur uit; de rest zetten we met de hand voor je klaar.',
     },
+    de: {
+      title: 'Warenkorb',
+      description: 'Die Produkte in deinem Warenkorb, mit dem Gesamtbetrag inklusive MwSt. und den Zahlungsmethoden, die du beim Bezahlen wählen kannst.',
+    },
+    fr: {
+      title: 'Panier',
+      description: 'Les produits de ton panier, avec le total TTC et les moyens de paiement disponibles au moment de payer.',
+    },
+    de: {
+      title: 'Anmelden',
+      description: 'Melde dich ohne Passwort mit einem Code per E-Mail an, oder mach mit Discord weiter.',
+    },
+    fr: {
+      title: 'Se connecter',
+      description: 'Connecte-toi sans mot de passe avec un code envoyé par e-mail, ou continue avec Discord.',
+    },
+    de: {
+      title: 'Cookie-Richtlinie',
+      description: 'Welche Cookies ForgeMarket setzt, was in deinem eigenen Browser bleibt und warum diese Seite kein Cookie-Banner hat.',
+    },
+    fr: {
+      title: 'Politique relative aux cookies',
+      description: 'Quels cookies ForgeMarket dépose, ce qui reste dans ton propre navigateur, et pourquoi ce site n’a pas de bandeau cookies.',
+    },
+    de: {
+      title: 'Datenschutzerklärung',
+      description: 'Welche personenbezogenen Daten ForgeMarket verarbeitet, auf welcher Rechtsgrundlage, wie lange sie gespeichert werden und welche Rechte du hast.',
+    },
+    fr: {
+      title: 'Politique de confidentialité',
+      description: 'Quelles données personnelles ForgeMarket traite, sur quelle base légale, combien de temps elles sont conservées et quels sont tes droits.',
+    },
+    de: {
+      title: 'Allgemeine Geschäftsbedingungen',
+      description: 'Die Bedingungen, die für jede Bestellung gelten: Zahlung, Lieferung, Widerrufsrecht und Rückerstattungen.',
+    },
+    fr: {
+      title: 'Conditions générales',
+      description: 'Les conditions qui s’appliquent à chaque commande : paiement, livraison, droit de rétractation et remboursements.',
+    },
     en: {
       title: 'Buy Robux — straight to your Roblox account',
       description: 'Buy Robux with iDEAL. What is in stock goes out automatically; the rest we add to your Roblox account by hand, usually within a few hours.',
       h1: 'Buy Robux',
       sub: 'Robux for your Roblox account. In stock goes out automatically; the rest we prepare by hand.',
+    },
+    de: {
+      title: 'Robux kaufen — direkt auf dein Roblox-Konto',
+      description: 'Robux kaufen mit iDEAL. Was auf Lager ist, geht automatisch raus; den Rest buchen wir von Hand auf dein Roblox-Konto, meistens innerhalb weniger Stunden.',
+      h1: 'Robux kaufen',
+      sub: 'Robux für dein Roblox-Konto. Was auf Lager ist, geht automatisch raus; den Rest bereiten wir von Hand vor.',
+    },
+    fr: {
+      title: 'Acheter des Robux — directement sur ton compte Roblox',
+      description: 'Achète des Robux avec iDEAL. Ce qui est en stock part automatiquement ; le reste, nous l’ajoutons à la main sur ton compte Roblox, en général en quelques heures.',
+      h1: 'Acheter des Robux',
+      sub: 'Des Robux pour ton compte Roblox. Ce qui est en stock part automatiquement ; le reste, nous le préparons à la main.',
     },
   },
   '/v-bucks': {
@@ -278,6 +444,18 @@ export const LANDING = {
       h1: 'Buy V-Bucks',
       sub: 'V-Bucks for Fortnite, paid with iDEAL. Delivered automatically when we have stock.',
     },
+    de: {
+      title: 'V-Bucks für Fortnite kaufen — schnell geliefert',
+      description: 'V-Bucks kaufen mit iDEAL, Bancontact oder PayPal. Was auf Lager ist, wird automatisch geliefert, der Rest von Hand innerhalb weniger Stunden.',
+      h1: 'V-Bucks kaufen',
+      sub: 'V-Bucks für Fortnite, bezahlt mit iDEAL. Automatisch geliefert, solange wir Lagerbestand haben.',
+    },
+    fr: {
+      title: 'Acheter des V-Bucks pour Fortnite — livrés vite',
+      description: 'Achète des V-Bucks avec iDEAL, Bancontact ou PayPal. Ce qui est en stock est livré automatiquement, le reste à la main en quelques heures.',
+      h1: 'Acheter des V-Bucks',
+      sub: 'Des V-Bucks pour Fortnite, payés avec iDEAL. Livrés automatiquement tant que nous avons du stock.',
+    },
   },
   '/valorant-points': {
     category: 'valorant',
@@ -292,6 +470,18 @@ export const LANDING = {
       description: 'Buy Valorant Points from a Dutch shop. Pay with iDEAL and get your VP automatically or delivered by hand, usually within a few hours.',
       h1: 'Buy Valorant Points',
       sub: 'Valorant Points (VP) with iDEAL. Automatic when in stock, otherwise by hand within a few hours.',
+    },
+    de: {
+      title: 'Valorant Points kaufen — VP mit iDEAL',
+      description: 'Valorant Points bei einem niederländischen Shop kaufen. Zahle mit iDEAL und erhalte deine VP automatisch oder von Hand geliefert, meistens innerhalb weniger Stunden.',
+      h1: 'Valorant Points kaufen',
+      sub: 'Valorant Points (VP) mit iDEAL. Automatisch, solange vorrätig, sonst von Hand innerhalb weniger Stunden.',
+    },
+    fr: {
+      title: 'Acheter des Valorant Points — des VP avec iDEAL',
+      description: 'Achète des Valorant Points dans une boutique néerlandaise. Paie avec iDEAL et reçois tes VP automatiquement ou livrés à la main, en général en quelques heures.',
+      h1: 'Acheter des Valorant Points',
+      sub: 'Des Valorant Points (VP) avec iDEAL. Automatique tant qu’il y a du stock, sinon à la main en quelques heures.',
     },
   },
   '/giftcards': {
@@ -308,6 +498,18 @@ export const LANDING = {
       h1: 'Buy gift cards',
       sub: 'Digital gift cards for Steam, PlayStation, Xbox and more. The code arrives by email.',
     },
+    de: {
+      title: 'Geschenkkarten kaufen — Steam, PlayStation, Xbox',
+      description: 'Digitale Geschenkkarten für Steam, PlayStation, Xbox, Netflix und mehr. Code per E-Mail, zahlen mit iDEAL, Geld zurück, wenn wir nicht liefern können.',
+      h1: 'Geschenkkarten kaufen',
+      sub: 'Digitale Geschenkkarten für Steam, PlayStation, Xbox und mehr. Der Code kommt per E-Mail.',
+    },
+    fr: {
+      title: 'Acheter des cartes cadeaux — Steam, PlayStation, Xbox',
+      description: 'Cartes cadeaux numériques pour Steam, PlayStation, Xbox, Netflix et plus. Code par e-mail, paiement avec iDEAL, remboursé si nous ne pouvons pas livrer.',
+      h1: 'Acheter des cartes cadeaux',
+      sub: 'Des cartes cadeaux numériques pour Steam, PlayStation, Xbox et plus. Le code arrive par e-mail.',
+    },
   },
   '/fc-points': {
     category: 'eafc',
@@ -322,6 +524,18 @@ export const LANDING = {
       description: 'Buy FC Points for EA SPORTS FC with iDEAL. In stock goes out automatically, the rest we prepare by hand.',
       h1: 'Buy FC Points',
       sub: 'FC Points for EA SPORTS FC, for packs and Ultimate Team. Pay with iDEAL, delivered automatically or by hand.',
+    },
+    de: {
+      title: 'FC Points für EA FC kaufen — schnell geliefert',
+      description: 'FC Points für EA SPORTS FC mit iDEAL kaufen. Was auf Lager ist, geht automatisch raus, den Rest bereiten wir von Hand vor.',
+      h1: 'FC Points kaufen',
+      sub: 'FC Points für EA SPORTS FC, für Packs und Ultimate Team. Zahle mit iDEAL, geliefert automatisch oder von Hand.',
+    },
+    fr: {
+      title: 'Acheter des FC Points pour EA FC — livrés vite',
+      description: 'Achète des FC Points pour EA SPORTS FC avec iDEAL. Ce qui est en stock part automatiquement, le reste, nous le préparons à la main.',
+      h1: 'Acheter des FC Points',
+      sub: 'Des FC Points pour EA SPORTS FC, pour les packs et Ultimate Team. Paie avec iDEAL, livré automatiquement ou à la main.',
     },
   },
   '/cod-points': {
@@ -338,6 +552,18 @@ export const LANDING = {
       h1: 'Buy CoD Points',
       sub: 'CP for Call of Duty and Warzone — for bundles, skins and the Battle Pass.',
     },
+    de: {
+      title: 'CoD Points kaufen — Call of Duty CP mit iDEAL',
+      description: 'CoD Points (CP) für Call of Duty und Warzone kaufen. Zahle mit iDEAL; was auf Lager ist, geht automatisch raus.',
+      h1: 'CoD Points kaufen',
+      sub: 'CP für Call of Duty und Warzone — für Bundles, Skins und den Battle Pass.',
+    },
+    fr: {
+      title: 'Acheter des CoD Points — des CP Call of Duty avec iDEAL',
+      description: 'Achète des CoD Points (CP) pour Call of Duty et Warzone. Paie avec iDEAL ; ce qui est en stock part automatiquement.',
+      h1: 'Acheter des CoD Points',
+      sub: 'Des CP pour Call of Duty et Warzone — pour les bundles, les skins et le Battle Pass.',
+    },
   },
   '/apex-coins': {
     category: 'apex',
@@ -352,6 +578,18 @@ export const LANDING = {
       description: 'Buy Apex Coins for Apex Legends. Pay with iDEAL or Bancontact; in stock is delivered automatically, the rest by hand.',
       h1: 'Buy Apex Coins',
       sub: 'Apex Coins for Apex Legends — for legends, skins and the Battle Pass.',
+    },
+    de: {
+      title: 'Apex Coins kaufen — Apex Legends mit iDEAL',
+      description: 'Apex Coins für Apex Legends kaufen. Zahle mit iDEAL oder Bancontact; was auf Lager ist, wird automatisch geliefert, der Rest von Hand.',
+      h1: 'Apex Coins kaufen',
+      sub: 'Apex Coins für Apex Legends — für Legenden, Skins und den Battle Pass.',
+    },
+    fr: {
+      title: 'Acheter des Apex Coins — Apex Legends avec iDEAL',
+      description: 'Achète des Apex Coins pour Apex Legends. Paie avec iDEAL ou Bancontact ; ce qui est en stock est livré automatiquement, le reste à la main.',
+      h1: 'Acheter des Apex Coins',
+      sub: 'Des Apex Coins pour Apex Legends — pour les légendes, les skins et le Battle Pass.',
     },
   },
   '/genshin-crystals': {
@@ -368,6 +606,18 @@ export const LANDING = {
       h1: 'Buy Genesis Crystals',
       sub: 'Genesis Crystals for Genshin Impact — for wishes, the Battle Pass and Welkin.',
     },
+    de: {
+      title: 'Genesis Crystals kaufen — Genshin Impact aufladen',
+      description: 'Genesis Crystals für Genshin Impact kaufen, bezahlt mit iDEAL. Automatisch geliefert, solange vorrätig, sonst von Hand.',
+      h1: 'Genesis Crystals kaufen',
+      sub: 'Genesis Crystals für Genshin Impact — für Wishes, den Battle Pass und Welkin.',
+    },
+    fr: {
+      title: 'Acheter des Genesis Crystals — recharge Genshin Impact',
+      description: 'Achète des Genesis Crystals pour Genshin Impact, payés avec iDEAL. Livrés automatiquement tant qu’il y a du stock, sinon à la main.',
+      h1: 'Acheter des Genesis Crystals',
+      sub: 'Des Genesis Crystals pour Genshin Impact — pour les vœux, le Battle Pass et le Welkin.',
+    },
   },
   '/clash-of-clans-gems': {
     category: 'clash',
@@ -382,6 +632,18 @@ export const LANDING = {
       description: 'Buy Gems for Clash of Clans. Pay with iDEAL; what is in stock goes out automatically, the rest within a few hours.',
       h1: 'Buy Clash of Clans Gems',
       sub: 'Gems for Clash of Clans — for builders, boosts and the Gold Pass.',
+    },
+    de: {
+      title: 'Clash of Clans Gems kaufen — mit iDEAL',
+      description: 'Gems für Clash of Clans kaufen. Zahle mit iDEAL; was auf Lager ist, geht automatisch raus, der Rest innerhalb weniger Stunden.',
+      h1: 'Clash of Clans Gems kaufen',
+      sub: 'Gems für Clash of Clans — für Bauarbeiter, Boosts und den Gold Pass.',
+    },
+    fr: {
+      title: 'Acheter des gemmes Clash of Clans — avec iDEAL',
+      description: 'Achète des gemmes pour Clash of Clans. Paie avec iDEAL ; ce qui est en stock part automatiquement, le reste en quelques heures.',
+      h1: 'Acheter des gemmes Clash of Clans',
+      sub: 'Des gemmes pour Clash of Clans — pour les ouvriers, les boosts et le Gold Pass.',
     },
   },
   '/clash-royale-gems': {
@@ -398,6 +660,18 @@ export const LANDING = {
       h1: 'Buy Clash Royale Gems',
       sub: 'Gems for Clash Royale — for chests, cards and the Pass Royale.',
     },
+    de: {
+      title: 'Clash Royale Gems kaufen — schnell geliefert',
+      description: 'Gems für Clash Royale mit iDEAL kaufen. Was auf Lager ist, wird automatisch geliefert, den Rest bereiten wir von Hand vor.',
+      h1: 'Clash Royale Gems kaufen',
+      sub: 'Gems für Clash Royale — für Truhen, Karten und den Pass Royale.',
+    },
+    fr: {
+      title: 'Acheter des gemmes Clash Royale — livrées vite',
+      description: 'Achète des gemmes pour Clash Royale avec iDEAL. Ce qui est en stock est livré automatiquement, le reste, nous le préparons à la main.',
+      h1: 'Acheter des gemmes Clash Royale',
+      sub: 'Des gemmes pour Clash Royale — pour les coffres, les cartes et le Pass Royale.',
+    },
   },
   '/brawl-stars-gems': {
     category: 'brawl',
@@ -412,6 +686,18 @@ export const LANDING = {
       description: 'Buy Gems for Brawl Stars. Pay with iDEAL, Bancontact or PayPal; delivered automatically as soon as stock is there.',
       h1: 'Buy Brawl Stars Gems',
       sub: 'Gems for Brawl Stars — for brawlers, skins and the Brawl Pass.',
+    },
+    de: {
+      title: 'Brawl Stars Gems kaufen — mit iDEAL',
+      description: 'Gems für Brawl Stars kaufen. Zahle mit iDEAL, Bancontact oder PayPal; geliefert wird automatisch, sobald Lagerbestand da ist.',
+      h1: 'Brawl Stars Gems kaufen',
+      sub: 'Gems für Brawl Stars — für Brawler, Skins und den Brawl Pass.',
+    },
+    fr: {
+      title: 'Acheter des gemmes Brawl Stars — avec iDEAL',
+      description: 'Achète des gemmes pour Brawl Stars. Paie avec iDEAL, Bancontact ou PayPal ; la livraison est automatique dès qu’il y a du stock.',
+      h1: 'Acheter des gemmes Brawl Stars',
+      sub: 'Des gemmes pour Brawl Stars — pour les brawlers, les skins et le Brawl Pass.',
     },
   },
   '/free-fire-diamonds': {
@@ -428,6 +714,18 @@ export const LANDING = {
       h1: 'Buy Free Fire Diamonds',
       sub: 'Diamonds for Free Fire — for skins, characters and the Elite Pass.',
     },
+    de: {
+      title: 'Free Fire Diamonds kaufen — schnell geliefert',
+      description: 'Diamonds für Free Fire mit iDEAL kaufen. Was auf Lager ist, geht automatisch raus, der Rest von Hand innerhalb weniger Stunden.',
+      h1: 'Free Fire Diamonds kaufen',
+      sub: 'Diamonds für Free Fire — für Skins, Charaktere und den Elite Pass.',
+    },
+    fr: {
+      title: 'Acheter des diamants Free Fire — livrés vite',
+      description: 'Achète des diamants pour Free Fire avec iDEAL. Ce qui est en stock part automatiquement, le reste à la main en quelques heures.',
+      h1: 'Acheter des diamants Free Fire',
+      sub: 'Des diamants pour Free Fire — pour les skins, les personnages et l’Elite Pass.',
+    },
   },
   '/riot-points': {
     category: 'league',
@@ -442,6 +740,18 @@ export const LANDING = {
       description: 'Buy Riot Points (RP) for League of Legends, paid with iDEAL. Delivered automatically when in stock.',
       h1: 'Buy Riot Points',
       sub: 'RP for League of Legends — for champions, skins and the Battle Pass.',
+    },
+    de: {
+      title: 'Riot Points kaufen — RP für League of Legends',
+      description: 'Riot Points (RP) für League of Legends kaufen, bezahlt mit iDEAL. Automatisch geliefert, solange vorrätig.',
+      h1: 'Riot Points kaufen',
+      sub: 'RP für League of Legends — für Champions, Skins und den Battle Pass.',
+    },
+    fr: {
+      title: 'Acheter des Riot Points — des RP pour League of Legends',
+      description: 'Achète des Riot Points (RP) pour League of Legends, payés avec iDEAL. Livrés automatiquement tant qu’il y a du stock.',
+      h1: 'Acheter des Riot Points',
+      sub: 'Des RP pour League of Legends — pour les champions, les skins et le Battle Pass.',
     },
   },
   '/gta-shark-cards': {
@@ -458,6 +768,18 @@ export const LANDING = {
       h1: 'Buy GTA Shark Cards',
       sub: 'Shark Cards for GTA Online — in-game cash for cars, weapons and businesses.',
     },
+    de: {
+      title: 'GTA Shark Cards kaufen — Geld für GTA Online',
+      description: 'Shark Cards für GTA Online kaufen. Zahle mit iDEAL und erhalte dein Ingame-Geld automatisch oder von Hand geliefert.',
+      h1: 'GTA Shark Cards kaufen',
+      sub: 'Shark Cards für GTA Online — Ingame-Geld für Autos, Waffen und Unternehmen.',
+    },
+    fr: {
+      title: 'Acheter des Shark Cards GTA — de l’argent pour GTA Online',
+      description: 'Achète des Shark Cards pour GTA Online. Paie avec iDEAL et reçois ton argent en jeu automatiquement ou livré à la main.',
+      h1: 'Acheter des Shark Cards GTA',
+      sub: 'Des Shark Cards pour GTA Online — de l’argent en jeu pour les voitures, les armes et les entreprises.',
+    },
   },
   '/minecoins': {
     category: 'minecraft',
@@ -472,6 +794,18 @@ export const LANDING = {
       description: 'Buy Minecoins for Minecraft. Pay with iDEAL; in stock goes out automatically, the rest by hand.',
       h1: 'Buy Minecoins',
       sub: 'Minecoins for Minecraft — for skins, worlds and texture packs.',
+    },
+    de: {
+      title: 'Minecoins kaufen — Minecraft mit iDEAL',
+      description: 'Minecoins für Minecraft kaufen. Zahle mit iDEAL; was auf Lager ist, geht automatisch raus, der Rest von Hand.',
+      h1: 'Minecoins kaufen',
+      sub: 'Minecoins für Minecraft — für Skins, Welten und Texture Packs.',
+    },
+    fr: {
+      title: 'Acheter des Minecoins — Minecraft avec iDEAL',
+      description: 'Achète des Minecoins pour Minecraft. Paie avec iDEAL ; ce qui est en stock part automatiquement, le reste à la main.',
+      h1: 'Acheter des Minecoins',
+      sub: 'Des Minecoins pour Minecraft — pour les skins, les mondes et les packs de textures.',
     },
   },
   '/pubg-uc': {
@@ -488,6 +822,18 @@ export const LANDING = {
       h1: 'Buy PUBG UC',
       sub: 'Unknown Cash for PUBG Mobile — for crates, skins and the Royale Pass.',
     },
+    de: {
+      title: 'PUBG UC kaufen — Unknown Cash mit iDEAL',
+      description: 'UC für PUBG Mobile kaufen, bezahlt mit iDEAL. Was auf Lager ist, wird automatisch geliefert, der Rest innerhalb weniger Stunden.',
+      h1: 'PUBG UC kaufen',
+      sub: 'Unknown Cash für PUBG Mobile — für Kisten, Skins und den Royale Pass.',
+    },
+    fr: {
+      title: 'Acheter des UC PUBG — de l’Unknown Cash avec iDEAL',
+      description: 'Achète des UC pour PUBG Mobile, payés avec iDEAL. Ce qui est en stock est livré automatiquement, le reste en quelques heures.',
+      h1: 'Acheter des UC PUBG',
+      sub: 'De l’Unknown Cash pour PUBG Mobile — pour les caisses, les skins et le Royale Pass.',
+    },
   },
   '/mobile-legends-diamonds': {
     category: 'mlbb',
@@ -502,6 +848,18 @@ export const LANDING = {
       description: 'Buy Diamonds for Mobile Legends: Bang Bang with iDEAL. Delivered automatically as soon as stock is there, otherwise by hand.',
       h1: 'Buy Mobile Legends Diamonds',
       sub: 'Diamonds for Mobile Legends: Bang Bang — for heroes, skins and the Pass.',
+    },
+    de: {
+      title: 'Mobile Legends Diamonds kaufen — MLBB aufladen',
+      description: 'Diamonds für Mobile Legends: Bang Bang mit iDEAL kaufen. Geliefert wird automatisch, sobald Lagerbestand da ist, sonst von Hand.',
+      h1: 'Mobile Legends Diamonds kaufen',
+      sub: 'Diamonds für Mobile Legends: Bang Bang — für Helden, Skins und den Pass.',
+    },
+    fr: {
+      title: 'Acheter des diamants Mobile Legends — recharge MLBB',
+      description: 'Achète des diamants pour Mobile Legends: Bang Bang avec iDEAL. Livrés automatiquement dès qu’il y a du stock, sinon à la main.',
+      h1: 'Acheter des diamants Mobile Legends',
+      sub: 'Des diamants pour Mobile Legends: Bang Bang — pour les héros, les skins et le Pass.',
     },
   },
   '/pokemon-go': {
@@ -518,6 +876,18 @@ export const LANDING = {
       h1: 'Buy PokéCoins',
       sub: 'PokéCoins for Pokemon GO — for items, storage and raids.',
     },
+    de: {
+      title: 'Pokémon GO Münzen kaufen — PokéCoins mit iDEAL',
+      description: 'PokéCoins für Pokémon GO kaufen. Zahle mit iDEAL; was auf Lager ist, wird automatisch geliefert, der Rest von Hand.',
+      h1: 'PokéCoins kaufen',
+      sub: 'PokéCoins für Pokémon GO — für Items, mehr Speicherplatz und Raids.',
+    },
+    fr: {
+      title: 'Acheter des pièces Pokémon GO — des PokéCoins avec iDEAL',
+      description: 'Achète des PokéCoins pour Pokémon GO. Paie avec iDEAL ; ce qui est en stock est livré automatiquement, le reste à la main.',
+      h1: 'Acheter des PokéCoins',
+      sub: 'Des PokéCoins pour Pokémon GO — pour les objets, le stockage et les raids.',
+    },
   },
   '/discord-nitro': {
     category: 'discord-nitro',
@@ -533,6 +903,18 @@ export const LANDING = {
       h1: 'Buy Discord Nitro',
       sub: 'Nitro for Discord — emoji everywhere, bigger uploads and a better stream.',
     },
+    de: {
+      title: 'Discord Nitro kaufen — 1 Monat oder 1 Jahr',
+      description: 'Discord Nitro mit iDEAL kaufen. Der Code kommt per E-Mail; was auf Lager ist, geht automatisch raus, der Rest von Hand.',
+      h1: 'Discord Nitro kaufen',
+      sub: 'Nitro für Discord — Emojis überall, größere Uploads und ein besserer Stream.',
+    },
+    fr: {
+      title: 'Acheter Discord Nitro — 1 mois ou 1 an',
+      description: 'Achète Discord Nitro avec iDEAL. Le code arrive par e-mail ; ce qui est en stock part automatiquement, le reste à la main.',
+      h1: 'Acheter Discord Nitro',
+      sub: 'Nitro pour Discord — des emojis partout, des envois plus lourds et un meilleur stream.',
+    },
   },
   '/game-currency': {
     category: '',
@@ -547,6 +929,18 @@ export const LANDING = {
       description: 'Game currency for Roblox, Fortnite, Valorant and more, from one Dutch shop. Pay with iDEAL, delivered automatically or by hand.',
       h1: 'Buy game currency',
       sub: 'All game currency in one place: Robux, V-Bucks, Valorant Points and more.',
+    },
+    de: {
+      title: 'Spielwährung kaufen — Robux, V-Bucks, VP',
+      description: 'Spielwährung für Roblox, Fortnite, Valorant und mehr, aus einem niederländischen Shop. Zahle mit iDEAL, geliefert automatisch oder von Hand.',
+      h1: 'Spielwährung kaufen',
+      sub: 'Alle Spielwährungen an einem Ort: Robux, V-Bucks, Valorant Points und mehr.',
+    },
+    fr: {
+      title: 'Acheter de la monnaie de jeu — Robux, V-Bucks, VP',
+      description: 'De la monnaie de jeu pour Roblox, Fortnite, Valorant et plus, depuis une boutique néerlandaise. Paie avec iDEAL, livraison automatique ou à la main.',
+      h1: 'Acheter de la monnaie de jeu',
+      sub: 'Toute la monnaie de jeu au même endroit : Robux, V-Bucks, Valorant Points et plus.',
     },
   },
 };
@@ -590,12 +984,19 @@ export const ALIASES = {
   '/retourbeleid': '/refunds',
 };
 
-/** Metadata for a path, falling back to the homepage's. */
+/**
+ * Metadata for a path, falling back to the homepage's.
+ *
+ * In the language asked for, not "Dutch or English". This picked between two
+ * languages while the shop offered four, so a German reader's browser tab said
+ * "Buy Robux, V-Bucks & gift cards" above a page written in German — on every
+ * page of the site.
+ */
 export function metaFor(path, lang = 'nl') {
   const clean = (path || '/').replace(/\/+$/, '') || '/';
   const resolved = ALIASES[clean] || clean;
   const page = PAGES[resolved] || LANDING[resolved] || PAGES['/'];
-  return page[lang === 'nl' ? 'nl' : 'en'];
+  return page[lang] || page.en;
 }
 
 /** The canonical URL for a path — the alias resolves to the page it duplicates. */

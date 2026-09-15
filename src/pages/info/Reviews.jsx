@@ -114,7 +114,11 @@ export default function Reviews() {
      we do NOT control, which is exactly why it belongs on this page rather
      than only in the footer. Hidden until the profile exists. */
   const trustpilot = useTrustpilot();
-  usePageMeta('Customer reviews', 'Reviews from real ForgeMarket orders, plus vouches from ForgeMarket Support on Discord.');
+  /* No arguments: usePageMeta falls back to this route's own copy in
+     content/seo.js, which exists in all four languages. Passing an English
+     string here overrode it — the tab said "Customer reviews" above a page written in
+     German. */
+  usePageMeta();
   const reviews = useReviews();
   const stats = useStats();
   const { t } = useI18n();

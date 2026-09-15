@@ -20,7 +20,11 @@ const STEPS = [
 ];
 
 export default function PaymentMethods() {
-  usePageMeta('Payment methods', 'Which payment methods ForgeMarket accepts, how to pay, and how your payment is confirmed.');
+  /* No arguments: usePageMeta falls back to this route's own copy in
+     content/seo.js, which exists in all four languages. Passing an English
+     string here overrode it — the tab said "Payment methods" above a page written in
+     German. */
+  usePageMeta();
   const { t, lang } = useI18n();
   const [methods, setMethods] = useState(null);
   useEffect(() => { getConfig().then((c) => setMethods(c.paymentMethods || [])); }, []);

@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ShoppingCart, Zap, Clock } from 'lucide-react';
-import { categoryVisual, money, carriesOwnBackground, productDescription } from '../../lib/catalog.js';
+import { categoryVisual, categoryLabel, money, carriesOwnBackground, productDescription } from '../../lib/catalog.js';
 import { useI18n } from '../../lib/i18n.jsx';
 import { useCart } from '../../context/CartContext.jsx';
 import { iconFor } from '../../lib/sampleCatalog.js';
@@ -125,7 +125,7 @@ function LightProductCard({ product, onAdd, priority = false }) {
             z-10 and sit over it. */}
         <ProductMedia product={product} priority={priority} className="absolute inset-0" />
       </a>
-      <div className="text-[11px] font-semibold uppercase tracking-wide text-violet-700">{v.label}</div>
+      <div className="text-[11px] font-semibold uppercase tracking-wide text-violet-700">{categoryLabel(product.category, t)}</div>
       <Link to={to} className="font-bold text-[15px] text-slate-900 mt-0.5 hover:text-violet-600 line-clamp-2">{product.name}</Link>
       {desc && <p className="text-[12.5px] text-slate-400 mt-1 line-clamp-2">{desc}</p>}
       <div className="text-[12px] text-slate-400 mt-3 pt-0.5 mt-auto">

@@ -4,7 +4,12 @@ import InfoShell from '../../components/InfoShell.jsx';
 import { useI18n } from '../../lib/i18n.jsx';
 import { usePageMeta } from '../../lib/useMeta.js';
 
-// Full EN + NL content sets — the page renders one language, never a mix.
+/* One full content set per language the shop offers — the page renders one
+   language, never a mix.
+   It carried EN and NL only, and `CONTENT[lang] || CONTENT.en` meant a German
+   or French reader got this entire page in English: the heading, all four
+   steps and all three promises. i18n-content.test now refuses a map like this
+   one that does not cover every offered language. */
 const CONTENT = {
   en: {
     eyebrow: 'Guide', title: 'How it works', subtitle: 'From cart to in-game in four simple steps.',
@@ -36,10 +41,44 @@ const CONTENT = {
     ],
     cta: 'Begin met shoppen',
   },
+  de: {
+    eyebrow: 'Anleitung', title: 'So funktioniert es', subtitle: 'Vom Warenkorb ins Spiel, in vier einfachen Schritten.',
+    steps: [
+      [Wallet, 'Aussuchen', 'Wähle deine Spiele-Aufladung, Geschenkkarte oder dein Abo im Shop.'],
+      [CreditCard, 'Bezahlen, wie du willst', 'Zahle mit Tikkie, Revolut oder PayPal — deine Bestellnummer ist der Verwendungszweck.'],
+      [ShieldCheck, 'Wir bestätigen', 'Deine Zahlung wird geprüft (während der Öffnungszeiten meist innerhalb von Minuten).'],
+      [PackageCheck, 'Du bekommst deinen Code', 'Auf Lager: automatisch verschickt, sobald wir bestätigen. Sonst von Hand geliefert, meistens in wenigen Stunden.'],
+    ],
+    perks: [
+      [Zap, 'Was auf Lager ist, geht von allein raus', 'Sobald die Zahlung bestätigt ist, wartest du nicht auf uns.'],
+      [ShieldCheck, 'Geld zurück', 'Können wir deine Bestellung nicht liefern, bekommst du alles zurück.'],
+      [Headphones, 'Ein echter Mensch', 'Öffne jederzeit ein Ticket in Discord — tagsüber antworten wir am schnellsten.'],
+    ],
+    cta: 'Zum Shop',
+  },
+  fr: {
+    eyebrow: 'Guide', title: 'Comment ça marche', subtitle: 'Du panier au jeu, en quatre étapes simples.',
+    steps: [
+      [Wallet, 'Choisis ton produit', 'Choisis ta recharge de jeu, ta carte cadeau ou ton abonnement dans la boutique.'],
+      [CreditCard, 'Paie comme tu veux', 'Paie avec Tikkie, Revolut ou PayPal — ton numéro de commande sert de référence.'],
+      [ShieldCheck, 'On confirme', 'Ton paiement est vérifié (en général en quelques minutes pendant les heures d’ouverture).'],
+      [PackageCheck, 'Tu reçois ton code', 'En stock : envoyé automatiquement dès qu’on confirme. Sinon livré à la main, en général en quelques heures.'],
+    ],
+    perks: [
+      [Zap, 'Ce qui est en stock part tout seul', 'Une fois le paiement confirmé, tu ne nous attends pas.'],
+      [ShieldCheck, 'Remboursé', 'Si nous ne pouvons pas livrer ta commande, tu es remboursé intégralement.'],
+      [Headphones, 'Une vraie personne', 'Ouvre un ticket sur Discord quand tu veux — la réponse est la plus rapide en journée.'],
+    ],
+    cta: 'Aller à la boutique',
+  },
 };
 
 export default function HowItWorks() {
-  usePageMeta('How it works — order to delivery', 'Pick your item, pay by bank transfer with the reference shown, and get your code once the payment is confirmed.');
+  /* No arguments: usePageMeta falls back to this route's own copy in
+     content/seo.js, which exists in all four languages. Passing an English
+     string here overrode it — the tab said "How it works — order to delivery" above a page written in
+     German. */
+  usePageMeta();
   const { lang } = useI18n();
   const L = CONTENT[lang] || CONTENT.en;
   return (

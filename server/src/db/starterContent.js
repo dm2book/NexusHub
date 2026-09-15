@@ -75,9 +75,56 @@ async function dedupeMysteryBoxes() {
   }
 }
 
+/**
+ * The mystery box's own words, in all four languages.
+ *
+ * Every other product in the shop describes itself from a per-category recipe
+ * (src/lib/productCopy.js). This one cannot: its description is the terms of
+ * the product — that every box pays out, what the ceiling is, that more boxes
+ * in one order improve the odds, and that a free reroll is included. A
+ * generated line loses all four, and a buyer who reads the shop in German
+ * should not be agreeing to terms they were shown in English.
+ */
+const BOX_COPY = {
+  description:
+    'Every box wins a real prize, paid out instantly as store credit — up to a €150 jackpot. ' +
+    'Buy more boxes in one order for better odds, and every box comes with one free risk-free reroll.',
+  translations: {
+    descriptionNl:
+      'Elke box wint een echte prijs, direct uitbetaald als winkeltegoed — tot een jackpot van €150. ' +
+      'Meer boxen in één bestelling geeft betere kansen, en bij elke box zit één gratis reroll zonder risico.',
+    descriptionDe:
+      'Jede Box gewinnt einen echten Preis, sofort ausgezahlt als Shop-Guthaben — bis zu einem Jackpot von 150 €. ' +
+      'Mehr Boxen in einer Bestellung verbessern die Chancen, und zu jeder Box gehört ein kostenloser Reroll ohne Risiko.',
+    descriptionFr:
+      'Chaque boîte gagne un vrai lot, versé immédiatement en crédit boutique — jusqu’à un jackpot de 150 €. ' +
+      'Plus de boîtes dans une même commande améliorent les chances, et chaque boîte inclut un relancement gratuit et sans risque.',
+  },
+};
+
+/**
+ * Give a box that already exists the words it was created without.
+ *
+ * The seeder only runs for a shop that has no box, so a shop created before
+ * the translations existed would keep the English terms in every language
+ * forever. It fills gaps only: anything typed in the admin is left alone,
+ * because the owner's wording outranks this file's.
+ */
+async function backfillBoxCopy(row) {
+  let meta;
+  try { meta = JSON.parse(row.metadata || '{}'); } catch { return; }
+  const missing = Object.entries(BOX_COPY.translations)
+    .filter(([field]) => !String(meta[field] || '').trim());
+  if (!missing.length) return;
+  for (const [field, text] of missing) meta[field] = text;
+  await run('UPDATE products SET metadata = @m, updated_at = @at WHERE id = @id',
+    { m: JSON.stringify(meta), at: nowIso(), id: row.id });
+  console.log(`[starter] mystery box: added ${missing.map(([f]) => f).join(', ')}`);
+}
+
 async function mysteryBox() {
-  const existing = await get(`SELECT id FROM products WHERE kind = 'mystery' AND active = 1 LIMIT 1`);
-  if (existing) return;
+  const existing = await get(`SELECT id, metadata FROM products WHERE kind = 'mystery' AND active = 1 LIMIT 1`);
+  if (existing) return backfillBoxCopy(existing);
   const at = nowIso();
   const inserted = await run(
     `INSERT INTO products (id, name, category, description, price, currency, kind, active, metadata, created_at, updated_at)
@@ -86,8 +133,7 @@ async function mysteryBox() {
     {
       id: BOX_ID,
       name: 'Forge Mystery Box',
-      desc: 'Every box wins a real prize, paid out instantly as store credit — up to a €150 jackpot. ' +
-        'Buy more boxes in one order for better odds, and every box comes with one free risk-free reroll.',
+      desc: BOX_COPY.description,
       // The one seeded product that shipped without a cover, so it rendered the
       // generic gradient placeholder while all 71 others had real art — on the
       // highest-margin item in the shop. mystery.svg has been sitting in
@@ -95,7 +141,13 @@ async function mysteryBox() {
       /* The generated artboard when it exists, the plain icon otherwise. Same
          rule as demoSeed's imageFor — without it this one product was the only
          thing in a 72-product grid still on the old art. */
-      meta: JSON.stringify({ featured: true, image: boxArt() }),
+      /* The three other languages carried as typed copy, because this is the
+         one product whose description is not decoration: it states the odds,
+         the payout and the free reroll. The generated per-category sentence
+         says only "every box pays out real store credit", which is true and
+         drops every term that matters — and a Dutch reader was already getting
+         that shorter line on the shop's highest-margin item. */
+      meta: JSON.stringify({ featured: true, image: boxArt(), ...BOX_COPY.translations }),
       at,
     });
   if (!inserted.changes) return; // another instance just created it

@@ -29,7 +29,7 @@ import MobileTabBar from '../components/store/MobileTabBar.jsx';
 import AnnouncementBar from '../components/store/AnnouncementBar.jsx';
 import StoreFooter from '../components/store/StoreFooter.jsx';
 import SellerIdentity from '../components/store/SellerIdentity.jsx';
-import { money, carriesOwnBackground } from '../lib/catalog.js';
+import { money, carriesOwnBackground, categoryLabel } from '../lib/catalog.js';
 import { withFallback, SAMPLE_PRODUCTS, iconPath, CATALOG_UNAVAILABLE } from '../lib/sampleCatalog.js';
 import { useCategoryLogos } from '../lib/useCategoryLogos.js';
 import { useTrustpilot } from '../lib/useTrustpilot.js';
@@ -156,8 +156,11 @@ export default function HomeStore() {
   }, []);
   // The tab title and the Google result. It carried the same interchangeable
   // slogan the hero used to, in the one place a searcher sees before clicking.
-  usePageMeta('ForgeMarket — game currency, gift cards and subscriptions',
-    'Robux, V-Bucks, Steam, Discord Nitro and more, from a small shop run in the Netherlands. In stock is sent automatically, everything else by hand — money back if we cannot deliver.');
+  /* No arguments: usePageMeta falls back to this route's own copy in
+     content/seo.js, which exists in all four languages. Passing an English
+     string here overrode it — the tab said "ForgeMarket — game currency, gift cards and subscriptions" above a page written in
+     German. */
+  usePageMeta();
   // Organization + site-search structured data for rich Google results.
   useJsonLd('org', {
     '@context': 'https://schema.org',
@@ -374,7 +377,7 @@ export default function HomeStore() {
                   <Link key={c.slug} to={landingPathFor(c.slug)} onClick={() => setMenuOpen(false)}
                     className="flex items-center gap-2.5 px-2.5 py-2.5 rounded-xl text-[14px] font-medium text-slate-600 hover:bg-slate-50">
                     <img src={categoryLogos[c.slug] || ICON(c.img)} alt="" className="w-6 h-6 object-contain shrink-0" />
-                    <span className="truncate">{c.label}</span>
+                    <span className="truncate">{categoryLabel(c.slug, tr)}</span>
                   </Link>
                 ))}
               </div>
@@ -406,7 +409,7 @@ export default function HomeStore() {
                       ? <span className={`w-7 h-7 rounded-lg bg-gradient-to-br ${c.grad} grid place-items-center text-white text-xs font-bold`}>{c.letter}</span>
                       : <img src={categoryLogos[c.slug] || ICON(c.img)} alt="" className="w-7 h-7 object-contain" />)}
                   </span>
-                  {c.slug ? c.label : tr('shop.all', c.label)}
+                  {c.slug ? categoryLabel(c.slug, tr) : tr('shop.all', c.label)}
                 </Link>
               ))}
               <Link to="/shop" className="fm-navrow flex items-center gap-3 px-2.5 py-2 rounded-xl text-[14.5px] font-medium text-slate-500 hover:bg-slate-50">
@@ -436,7 +439,7 @@ export default function HomeStore() {
                 <span className="inline-flex items-center gap-1.5 text-[11px] text-emerald-600 font-medium">
                   {/* The same light the hero badge carries, so "online" looks
                       the same wherever the shop says it. */}
-                  <span className="fm-livedot" style={{ width: 6, height: 6 }} aria-hidden /> Online
+                  <span className="fm-livedot" style={{ width: 6, height: 6 }} aria-hidden /> {tr('bot.online', 'Online')}
                 </span>
               </div>
             </div>
@@ -720,7 +723,7 @@ export default function HomeStore() {
                           loading="lazy" decoding="async" className="fm-logo w-[84px] h-[84px]" />
                       )}
                     </div>
-                    <h3 className="font-bold text-[15px] text-slate-900">{c.label}</h3>
+                    <h3 className="font-bold text-[15px] text-slate-900">{categoryLabel(c.slug, tr)}</h3>
                     {/* "1 packs available" shipped on Xbox Game Pass and on
                         Spotify — the two single-product categories. */}
                     <p className="text-[12.5px] text-slate-500 mt-0.5">

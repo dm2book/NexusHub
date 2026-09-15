@@ -5,7 +5,7 @@ import { api } from '../lib/api.js';
 import { withEarly } from '../lib/earlyFetch.js';
 import { useCart } from '../context/CartContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
-import { categoryVisual, normalizeSearch } from '../lib/catalog.js';
+import { categoryVisual, categoryLabel, normalizeSearch } from '../lib/catalog.js';
 import { withFallback, iconFor, CATALOG_UNAVAILABLE } from '../lib/sampleCatalog.js';
 import { useCategoryLogos, logoFor } from '../lib/useCategoryLogos.js';
 import LightProductCard from '../components/store/LightProductCard.jsx';
@@ -52,7 +52,11 @@ export default function Shop({ landingCategory = null, landingPath = null } = {}
      the title a crawler read lived in two files and could drift apart —
      exactly the failure the rest of this module exists to prevent. */
   const landing = landingPath ? LANDING[landingPath] : null;
-  const landingCopy = landing ? (lang === 'nl' ? landing.nl : landing.en) : null;
+  /* The landing copy in the language being read, not "Dutch or English". The
+     route's heading and its one line of prose were picked with a hardcoded
+     `lang === 'nl' ? nl : en`, so a German reader on /robux met an English H1
+     above a shelf of German product descriptions. */
+  const landingCopy = landing ? (landing[lang] || landing.en) : null;
   // No arguments: usePageMeta falls back to this route's own copy in
   // content/seo.js — the same copy the prerendered HTML already carries, for
   // /shop and for every landing route alike. Passing a hardcoded "Shop" here
@@ -146,7 +150,7 @@ export default function Shop({ landingCategory = null, landingPath = null } = {}
                     {img ? <img src={img} alt="" className="w-7 h-7 object-contain" />
                       : <span className={`w-7 h-7 rounded-lg bg-gradient-to-br ${v.grad} grid place-items-center`}><Icon size={15} className="text-white" /></span>}
                   </span>
-                  <span className="truncate">{v.label}</span>
+                  <span className="truncate">{categoryLabel(c, t)}</span>
                 </Link>
               );
             })}
@@ -175,7 +179,7 @@ export default function Shop({ landingCategory = null, landingPath = null } = {}
                 than the category label — because that heading is the page's
                 single strongest on-page signal and the one a visitor reads
                 first to know they are in the right place. */}
-            {landingCopy?.h1 || (category ? categoryVisual(category).label : t('shop.all', 'All Products'))}
+            {landingCopy?.h1 || (category ? categoryLabel(category, t) : t('shop.all', 'All Products'))}
           </h1>
           {/* A landing page says what IT is about. The generic shop line under
               a "Robux kopen" heading is the on-page equivalent of a title tag
@@ -220,7 +224,7 @@ export default function Shop({ landingCategory = null, landingPath = null } = {}
                     on ? 'chip-active' : 'bg-white text-slate-600 border-slate-200'}`}>
                   {img ? <img src={img} alt="" className="w-7 h-7 object-contain" />
                     : <span className={`w-7 h-7 rounded-lg bg-gradient-to-br ${v.grad} grid place-items-center`}><Icon size={14} className="text-white" /></span>}
-                  <span className="whitespace-nowrap">{v.label}</span>
+                  <span className="whitespace-nowrap">{categoryLabel(c, t)}</span>
                 </Link>
               );
             })}

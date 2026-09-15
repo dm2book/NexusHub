@@ -4,7 +4,10 @@
  * need to do — the #1 question for game top-ups, and a big trust builder.
  *
  * Keyed by product category. Anything without a specific entry falls back to
- * `default` (code / top-up). Bilingual (en / nl) to match the storefront.
+ * `default` (code / top-up). One set per language the storefront offers — it
+ * was en/nl only, so `entry[lang] || entry.en` handed a German buyer the
+ * delivery terms of their own order in English, including the sentence about
+ * never being asked for a password.
  */
 export const DELIVERY_INFO = {
   robux: {
@@ -15,7 +18,10 @@ export const DELIVERY_INFO = {
        For Robux the answer was already written three lines down, in the steps:
        a username, never a password. That is the single most reassuring thing
        this category can say and it was the one thing the FAQ left out. */
-    field: { en: 'Roblox username', nl: 'Roblox-gebruikersnaam' },
+    field: {
+      en: 'Roblox username', nl: 'Roblox-gebruikersnaam',
+      de: 'Roblox-Benutzername', fr: 'nom d’utilisateur Roblox',
+    },
     en: {
       // "Roblox+" is a third-party browser extension, not a Roblox product, so
       // calling it official was simply false — and "fully account-safe" is an
@@ -46,6 +52,32 @@ export const DELIVERY_INFO = {
         'We vragen NOOIT om je wachtwoord — de uitbetaalmethode heeft dat nooit nodig.',
       ],
     },
+    de: {
+      method: 'Direkt auf dein Roblox-Konto — wir brauchen nur deinen Benutzernamen, niemals dein Passwort, und du loggst dich nirgendwo ein.',
+      steps: [
+        'Aktiviere die Bestätigung in zwei Schritten (2FA) in deinem Roblox-Konto — ohne sie können wir nicht liefern.',
+        'Schick uns deinen Roblox-Benutzernamen (in deiner Bestellung oder per Ticket).',
+        'Wir liefern die Robux auf dein Konto. Fertig! 🎉',
+      ],
+      notes: [
+        'Roblox erlaubt höchstens 5.000 R$ pro Konto und Tag. Größere Bestellungen teilen wir automatisch auf mehrere Tage auf — 10.000 R$ kommen also über 2 Tage an.',
+        'Große Bestellungen liefern wir schneller über 2 Konten: ein Kollege und ich erledigen gleichzeitig je einen Teil deiner Bestellung.',
+        'Wir fragen NIEMALS nach deinem Passwort — der Auszahlungsweg braucht es nie.',
+      ],
+    },
+    fr: {
+      method: 'Directement sur ton compte Roblox — nous avons seulement besoin de ton nom d’utilisateur, jamais de ton mot de passe, et tu ne te connectes nulle part.',
+      steps: [
+        'Active la validation en deux étapes (2FA) sur ton compte Roblox — obligatoire avant que nous puissions livrer.',
+        'Envoie-nous ton nom d’utilisateur Roblox (dans ta commande ou par ticket).',
+        'Nous livrons les Robux sur ton compte. C’est fait ! 🎉',
+      ],
+      notes: [
+        'Roblox autorise au maximum 5 000 R$ par compte et par jour. Les commandes plus grandes sont réparties automatiquement sur plusieurs jours — 10 000 R$ arrivent donc en 2 jours.',
+        'Les grosses commandes sont livrées plus vite via 2 comptes : un collègue et moi traitons chacun une partie de ta commande en même temps.',
+        'Nous ne demanderons JAMAIS ton mot de passe — le moyen de versement n’en a jamais besoin.',
+      ],
+    },
   },
 
   'v-bucks': {
@@ -73,6 +105,30 @@ export const DELIVERY_INFO = {
         'Houd je code privé: eenmaal ingewisseld kan een code niet worden terugbetaald.',
       ],
     },
+    de: {
+      method: 'Geliefert als offizieller V-Bucks-Geschenkkartencode, den du selbst einlöst — funktioniert auf jeder Plattform.',
+      steps: [
+        'Dein Code erscheint sofort in deinem Dashboard und per E-Mail.',
+        'Löse ihn in Fortnite oder in deinem Epic-Games-Konto ein.',
+        'Deine V-Bucks sind sofort da. 🎮',
+      ],
+      notes: [
+        'Codes sind regionsgebunden — achte darauf, dass dein Konto zur Region auf dem Produkt passt.',
+        'Behalte deinen Code für dich: einmal eingelöst, lässt sich ein Code nicht erstatten.',
+      ],
+    },
+    fr: {
+      method: 'Livré sous forme de code de carte cadeau V-Bucks officiel que tu utilises toi-même — fonctionne sur toutes les plateformes.',
+      steps: [
+        'Ton code apparaît immédiatement dans ton tableau de bord et par e-mail.',
+        'Utilise-le dans Fortnite ou sur ton compte Epic Games.',
+        'Tes V-Bucks arrivent tout de suite. 🎮',
+      ],
+      notes: [
+        'Les codes dépendent de la région — vérifie que ton compte correspond à la région indiquée sur le produit.',
+        'Garde ton code pour toi : une fois utilisé, un code ne peut pas être remboursé.',
+      ],
+    },
   },
 
   default: {
@@ -98,6 +154,30 @@ export const DELIVERY_INFO = {
       notes: [
         'Eventuele account-vereisten (zoals 2FA aanzetten of je regio) zie je vóór het afrekenen en in onze Discord.',
         'Loopt iets niet goed? Open een ticket — we helpen snel en in aanmerking komende bestellingen zijn met geld-terug-garantie.',
+      ],
+    },
+    de: {
+      method: 'Geliefert als offizieller Code (oder als direkte Aufladung, je nach Produkt) — sofort und kontosicher.',
+      steps: [
+        'Nach der Zahlung erscheint dein Code bzw. deine Bestätigung im Dashboard und per E-Mail.',
+        'Folge den kurzen Einlöseschritten, die wir mitschicken.',
+        'Fertig — viel Spaß! ✅',
+      ],
+      notes: [
+        'Etwaige Kontovoraussetzungen (etwa 2FA aktivieren oder die passende Region) siehst du vor dem Bezahlen und in unserem Discord.',
+        'Hängt etwas oder stimmt etwas nicht? Öffne ein Ticket — wir helfen schnell, und infrage kommende Bestellungen haben Geld-zurück-Garantie.',
+      ],
+    },
+    fr: {
+      method: 'Livré sous forme de code officiel (ou de recharge directe, selon le produit) — immédiat et sans risque pour ton compte.',
+      steps: [
+        'Après le paiement, ton code ou ta confirmation apparaît dans ton tableau de bord et par e-mail.',
+        'Suis les quelques étapes d’utilisation que nous joignons.',
+        'C’est tout — bon jeu ! ✅',
+      ],
+      notes: [
+        'Les éventuelles conditions de compte (activer la 2FA, correspondre à la bonne région) sont indiquées avant le paiement et sur notre Discord.',
+        'Quelque chose bloque ou ne va pas ? Ouvre un ticket — nous aidons vite, et les commandes éligibles sont garanties satisfait ou remboursé.',
       ],
     },
   },

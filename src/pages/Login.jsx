@@ -23,7 +23,11 @@ function friendlyError(err) {
 }
 
 export default function Login() {
-  usePageMeta('Log in', 'Sign in to ForgeMarket to see your orders, store credit and rewards.');
+  /* No arguments: usePageMeta falls back to this route's own copy in
+     content/seo.js, which exists in all four languages. Passing an English
+     string here overrode it — the tab said "Log in" above a page written in
+     German. */
+  usePageMeta();
   const { login, user, loading: authLoading } = useAuth();
   const toast = useToast();
   const { t } = useI18n();

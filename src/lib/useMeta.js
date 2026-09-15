@@ -41,7 +41,10 @@ const setMeta = (attr, key, value) => {
 export function usePageMeta(title, description, { image, type = 'website' } = {}) {
   useEffect(() => {
     const path = window.location.pathname;
-    const fallback = metaFor(path, document.documentElement.lang === 'nl' ? 'nl' : 'en');
+    /* The language the document is actually in. Collapsing it to "nl or en"
+       here undid metaFor's other two languages: the German page metadata
+       existed and could never be reached. */
+    const fallback = metaFor(path, document.documentElement.lang || 'nl');
     const t = title ? `${title} · ${SITE.name}` : `${fallback.title} · ${SITE.name}`;
     const d = description || fallback.description;
     const canonical = canonicalFor(path);
