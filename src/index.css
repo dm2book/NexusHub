@@ -388,7 +388,17 @@ h1, h2, h3, .font-display, .fm-head {
 
 /* Animated gradient text */
 @keyframes fmGrad { 0%,100%{background-position:0% 50%} 50%{background-position:100% 50%} }
-.fm-gradient-text { background-image: linear-gradient(90deg,#7c5cff,#a855f7,#ec4899,#7c5cff); background-size: 300% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: fmGrad 6s ease infinite; }
+/* Six stops rather than three. At three the sweep spent most of its cycle
+   somewhere between violet and pink and read as one flat mauve; the extra
+   stops give it a cyan and an indigo to travel through, so the line is a
+   different colour every time you look back at it. */
+.fm-gradient-text {
+  background-image: linear-gradient(90deg,
+    #7c5cff, #a855f7, #ec4899, #f472b6, #8b5cf6, #38bdf8, #7c5cff);
+  background-size: 300% 100%;
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  animation: fmGrad 6s ease infinite;
+}
 
 /* Marquee for trust strip */
 @keyframes fmMarquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
@@ -885,6 +895,29 @@ h1, h2, h3, .font-display, .fm-head {
 }
 .fm-ghostword::before { content: 'FORGE'; }
 
+/* The badge's dot. It was a flat violet circle on Tailwind's animate-pulse,
+   which fades a whole element in and out — the shape a skeleton loader uses
+   while it waits for something. On a badge that reads "Buyer protected · Real
+   human support" the one thing it should not say is "loading".
+   A lit core that stays lit, with a ring leaving it: the shape of a signal
+   being sent, which is what a live indicator is. */
+.fm-livedot {
+  position: relative; flex: none;
+  width: 7px; height: 7px; border-radius: 50%;
+  background: #34d399;
+  box-shadow: 0 0 0 1px rgba(52,211,153,.35), 0 0 10px 1px rgba(52,211,153,.75);
+}
+.fm-livedot::after {
+  content: ''; position: absolute; inset: -1px; border-radius: 50%;
+  border: 1px solid rgba(52,211,153,.8);
+  animation: fmLive 2.6s var(--ease-glide) infinite;
+}
+@keyframes fmLive {
+  0%       { transform: scale(1);   opacity: .85; }
+  70%, 100% { transform: scale(3.1); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) { .fm-livedot::after { animation: none; } }
+
 /* The small furniture on the stage: the badge, the three pillar chips and the
    secondary button.
    All three were flat `bg-white/10` pills — the only elements in the hero not
@@ -892,11 +925,18 @@ h1, h2, h3, .font-display, .fm-head {
    read as placeholders next to a lit card and a lit trust panel. Same recipe as
    the panel: a lit top edge, a contained rim, and depth underneath. */
 .fm-pill {
-  background: linear-gradient(180deg, rgba(255,255,255,.13), rgba(255,255,255,.055));
+  position: relative;
+  /* Lit from the top left like everything else on this stage, rather than an
+     even wash: the old flat pair of whites made them read as the same grey
+     slab at every angle, which is why they looked disabled beside a lit
+     button. */
+  background:
+    linear-gradient(145deg, rgba(255,255,255,.17), rgba(255,255,255,.05) 46%, rgba(255,255,255,.075));
   box-shadow:
-    inset 0 1px 0 rgba(255,255,255,.26),
-    inset 0 0 0 1px rgba(255,255,255,.09),
-    0 8px 20px -14px rgba(0,0,0,.9);
+    inset 0 1px 0 rgba(255,255,255,.30),
+    inset 0 0 0 1px rgba(255,255,255,.10),
+    inset 0 -8px 14px -12px rgba(0,0,0,.7),
+    0 10px 22px -14px rgba(0,0,0,.9);
   backdrop-filter: blur(10px);
   transition: background var(--dur-quick) var(--ease-glide),
               transform var(--dur-quick) var(--ease-spring),
@@ -905,12 +945,15 @@ h1, h2, h3, .font-display, .fm-head {
 /* Only the ones you can click lift. The badge is a label, and a label that
    reacts to the mouse is a promise of an action that never comes. */
 a.fm-pill:hover, button.fm-pill:hover {
-  background: linear-gradient(180deg, rgba(255,255,255,.20), rgba(255,255,255,.09));
+  background: linear-gradient(145deg, rgba(255,255,255,.24), rgba(255,255,255,.08) 46%, rgba(255,255,255,.12));
   transform: translateY(-1px);
+  /* The rim picks up the stage's own violet on hover instead of going a
+     brighter grey. Grey-on-grey said "pressed", not "live". */
   box-shadow:
-    inset 0 1px 0 rgba(255,255,255,.34),
-    inset 0 0 0 1px rgba(255,255,255,.14),
-    0 12px 26px -14px rgba(0,0,0,.95);
+    inset 0 1px 0 rgba(255,255,255,.38),
+    inset 0 0 0 1px rgba(167,139,250,.38),
+    0 12px 26px -12px rgba(0,0,0,.95),
+    0 0 22px -6px rgba(139,92,246,.45);
 }
 @media (prefers-reduced-motion: reduce) { a.fm-pill:hover, button.fm-pill:hover { transform: none; } }
 
@@ -1004,9 +1047,11 @@ a.fm-pill:hover, button.fm-pill:hover {
           stopping dead. A banded panel lived here for one render and read as
           a grey smudge — and it collided with the name up the edge, which is
           the thing actually worth showing;
-       4. a wash of the brand colour down the whole face, so the colour
-          survives past the fold;
-       5. the body. Not black — a very dark blue, which keeps the card a
+       4. a wash of the brand colour down the whole face — and RETURNING at
+          the foot, because a card that fades to nothing at the bottom has no
+          bottom. It also had nothing to give back to the reflection below it;
+       5. the body. Not black, and not darkest at the foot either: a very dark
+          blue that lifts again towards the bottom edge, which keeps the card a
           material rather than a hole in the page. */
   background:
     repeating-linear-gradient(105deg,
@@ -1015,8 +1060,9 @@ a.fm-pill:hover, button.fm-pill:hover {
     linear-gradient(100deg,
       transparent 44%, rgba(255,255,255,.05) 62%, transparent 100%),
     linear-gradient(168deg,
-      var(--tint, rgba(124,92,255,.5)) 0%, rgba(12,12,26,.20) 46%, rgba(10,10,22,.55) 100%),
-    linear-gradient(168deg, #1a1b33 0%, #0b0b17 70%);
+      var(--tint, rgba(124,92,255,.5)) 0%, rgba(12,12,26,.18) 44%,
+      var(--tint, rgba(124,92,255,.5)) 96%),
+    linear-gradient(168deg, #20213c 0%, #141428 58%, #1b1a33 100%);
   /* Light comes from the top left of this stage — the same direction the
      stage's own shadow side is drawn from. So the top and left edges catch it
      and the bottom and right ones do not, which is what gives a rectangle
@@ -1157,6 +1203,12 @@ a.fm-pill:hover, button.fm-pill:hover {
 }
 
 /* What the cards sit on, so they are held rather than floating. */
+/* The reflection. Mirrored about the foot of the hand, faded to nothing
+   downwards and slightly blurred — a real surface returns less of an object
+   the further from it you look, and never returns it sharply.
+   It carries no sheen and no foil: those are highlights, and a highlight is
+   the one thing a dim reflection should not have. Behind everything in Z so
+   the hand itself is never painted over by its own image. */
 /* What the hand sits on. Two layers, because one blob is not a shadow:
    a tight dark core directly under the cards, which is the bit that makes
    them look like they are resting on something, and a wide coloured bloom

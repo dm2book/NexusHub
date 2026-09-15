@@ -512,7 +512,7 @@ export default function HomeStore() {
             <div className="relative z-[2] grid lg:grid-cols-[1.05fr_1fr] 2xl:grid-cols-[1.1fr_1fr_206px] gap-8 2xl:gap-6 items-center">
               <div className="relative fm-stagger" style={{ '--fm-stagger': '90ms' }}>
                 <span className="fm-pill inline-flex items-center gap-2 text-[13px] font-semibold text-violet-100 rounded-full px-3.5 py-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-violet-300 animate-pulse" /> {tr('home.badge', 'Buyer protected · Real human support')}
+                  <span className="fm-livedot" aria-hidden /> {tr('home.badge', 'Buyer protected · Real human support')}
                 </span>
                 {/* "Everything You Need, All in One Place" said nothing about
                     what is sold or why to trust it — the biggest text on the
@@ -995,6 +995,35 @@ export const fanHref = (c) => (c.find
   ? `${landingPathFor(c.cat)}?search=${encodeURIComponent(c.find)}`
   : landingPathFor(c.cat));
 
+/**
+ * One card of the hand.
+ *
+ * Briefly this also rendered a mirrored copy of itself as a reflection. It was
+ * removed rather than tuned: this hand FLOATS — it breathes, it leans, it
+ * casts a soft shadow onto nothing in particular — and a mirror image needs a
+ * surface to be in. Reflected about the lowest card it read as a second, dimmer
+ * hand hanging in the air below the first, with a gap between them that no
+ * amount of masking explained. The card faces kept the change it prompted:
+ * they no longer fade to black at the foot.
+ */
+function FanCard({ c, i, label }) {
+  return (
+    <Link to={fanHref(c)} aria-label={label}
+      className="fm-fan-card"
+      style={{ '--a0': c.a, '--y0': c.y, '--s0': c.s, '--z0': c.z, '--i': i, '--tint': c.tint }}>
+      <img src={ICON(c.icon)} alt="" loading="lazy" />
+      {/* The brand, up the left edge. Two thirds of every card was empty dark,
+          and the left edge is the one strip that stays in view whatever is
+          stacked in front of it — so this is the only place a name can be
+          written and still be read on four of the five. A brand name, not a
+          denomination: printing "€25" on artwork would be inventing a product.
+          aria-hidden because the link already says it; read out twice it is
+          just noise. */}
+      <span className="fm-fan-name" aria-hidden>{c.brand}</span>
+    </Link>
+  );
+}
+
 function HeroRender() {
   const { t: tr } = useI18n();
   const ref = useRef(null);
@@ -1030,26 +1059,13 @@ function HeroRender() {
               Folded together they would fight over one transform property. */}
           <div className="fm-fan-inner fm-px" style={{ '--d': 0.07 }}>
             <div ref={tilt} className="fm-fan-tilt">
+              {/* Links. Five brand logos at the top of a shop are five things
+                  a visitor will try to click, and for a long time all five did
+                  nothing. The accessible name carries the brand, so the mark
+                  can stay alt="" — read out, "Steam" twice in a row is noise. */}
               {FAN.map((c, i) => (
-                /* A link, not a picture of one. Five brand logos at the top of
-                   a shop are five things a visitor will try to click, and
-                   until now all five did nothing.
-                   The accessible name carries the brand, so the mark can stay
-                   alt="" — read out, "Steam" twice in a row is noise. */
-                <Link key={c.icon} to={fanHref(c)} className="fm-fan-card"
-                  aria-label={tr('home.fanGo', 'Browse {brand}', { brand: c.brand })}
-                  style={{ '--a0': c.a, '--y0': c.y, '--s0': c.s, '--z0': c.z, '--i': i, '--tint': c.tint }}>
-                  <img src={ICON(c.icon)} alt="" loading="lazy" />
-                  {/* The brand, up the left edge. Two thirds of every card was
-                      empty dark, and the left edge is the one strip that stays
-                      in view whatever is stacked in front of it — so this is
-                      the only place a name can be written and still be read on
-                      four of the five. A brand name, not a denomination:
-                      printing "€25" on artwork would be inventing a product.
-                      aria-hidden because the link already says it; read out
-                      twice it is just noise. */}
-                  <span className="fm-fan-name" aria-hidden>{c.brand}</span>
-                </Link>
+                <FanCard key={c.icon} c={c} i={i}
+                  label={tr('home.fanGo', 'Browse {brand}', { brand: c.brand })} />
               ))}
             </div>
           </div>
