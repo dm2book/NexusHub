@@ -22,6 +22,7 @@ import { useReviews } from '../lib/useReviews.js';
 import { useReveal } from '../lib/useReveal.js';
 import { useParallax } from '../lib/useParallax.js';
 import { usePointerTilt } from '../lib/usePointerTilt.js';
+import { useRailEdges } from '../lib/useRailEdges.js';
 import RecentlyDelivered from '../components/store/RecentlyDelivered.jsx';
 const CommandPalette = lazy(() => import('../components/store/CommandPalette.jsx'));
 import MobileTabBar from '../components/store/MobileTabBar.jsx';
@@ -668,9 +669,12 @@ export default function HomeStore() {
                   {tr('home.viewAll', 'View All Products')} <ArrowRight size={15} />
                 </Link>
               </div>
-              <div className="fm-rail flex gap-4 overflow-x-auto pb-2 scroll-smooth snap-x">
+              {/* The fade at each end is driven by where this rail actually
+                  is — see useRailEdges. Cut clean through the fifth card with
+                  a hidden scrollbar, it gave no sign it could be scrolled. */}
+              <Rail>
                 {pillar.solo ? pillar.solo.map((p) => (
-                  <div key={p.id} className="snap-start shrink-0 w-[212px] bg-white rounded-2xl border border-slate-200/70 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all p-4">
+                  <div key={p.id} className="fm-pcard snap-start shrink-0 w-[212px] rounded-2xl p-4">
                     <Link to={`/product/${p.id}`} className="block fm-logo-plinth rounded-xl h-[132px] grid place-items-center mb-3 overflow-hidden">
                       <img src={p.image} alt="" aria-hidden="true" loading="lazy" decoding="async"
                         className={carriesOwnBackground(p.image) ? 'w-full h-full object-contain' : 'fm-logo w-[84px] h-[84px]'} />
@@ -681,8 +685,7 @@ export default function HomeStore() {
                     </div>
                     <div className="flex items-center gap-2 mt-3">
                       <Link to={`/product/${p.id}`}
-                        className="flex-1 text-center text-white text-sm font-semibold rounded-lg h-11 grid place-items-center hover:brightness-105 transition"
-                        style={{ backgroundImage: 'linear-gradient(135deg,#7c5cff,#a855f7)' }}>
+                        className="fm-cta flex-1 text-center text-sm font-semibold rounded-lg h-11 grid place-items-center">
                         {tr('home.viewProduct', 'View')}
                       </Link>
                       <button aria-label={tr('home.addOne', 'Add {n} to your cart', { n: p.name })}
@@ -693,7 +696,7 @@ export default function HomeStore() {
                     </div>
                   </div>
                 )) : pillar.cats.map((c) => (
-                  <div key={c.slug} className="snap-start shrink-0 w-[212px] bg-white rounded-2xl border border-slate-200/70 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all p-4">
+                  <div key={c.slug} className="fm-pcard snap-start shrink-0 w-[212px] rounded-2xl p-4">
                     {/* The cheapest pack's own artboard, not a category badge.
                         The gift-card shelf below shows real product art and the
                         other two showed a logo on a pale tray, so one page was
@@ -725,8 +728,7 @@ export default function HomeStore() {
                     </div>
                     <div className="flex items-center gap-2 mt-3">
                       <Link to={landingPathFor(c.slug)}
-                        className="flex-1 text-center text-white text-sm font-semibold rounded-lg h-11 grid place-items-center hover:brightness-105 transition"
-                        style={{ backgroundImage: 'linear-gradient(135deg,#7c5cff,#a855f7)' }}>
+                        className="fm-cta flex-1 text-center text-sm font-semibold rounded-lg h-11 grid place-items-center">
                         {tr('home.browseCat', 'Browse')}
                       </Link>
                       <button aria-label={tr('home.addCheapest', 'Add the cheapest {n} pack to your cart', { n: c.label })}
@@ -737,7 +739,7 @@ export default function HomeStore() {
                     </div>
                   </div>
                 ))}
-              </div>
+              </Rail>
             </section>
           ))}
 
@@ -1021,6 +1023,23 @@ function FanCard({ c, i, label }) {
           just noise. */}
       <span className="fm-fan-name" aria-hidden>{c.brand}</span>
     </Link>
+  );
+}
+
+/**
+ * A horizontal shelf that says where it ends.
+ *
+ * A component rather than a ref in the loop above, because there are three of
+ * these and a hook cannot be called once per iteration. Everything else about
+ * the rail is unchanged — this only gives each one somewhere to keep its own
+ * scroll position.
+ */
+function Rail({ children }) {
+  const ref = useRailEdges();
+  return (
+    <div ref={ref} className="fm-rail flex gap-4 overflow-x-auto pb-2 scroll-smooth snap-x">
+      {children}
+    </div>
   );
 }
 
