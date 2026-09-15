@@ -374,8 +374,11 @@ h1, h2, h3, .font-display, .fm-head {
 .fm-page { animation: fmPageIn .36s var(--ease-expressive) backwards; }
 
 /* Scroll-reveal (toggled via IntersectionObserver adding .is-in) */
-.fm-reveal { opacity: 0; transform: translateY(22px); transition: opacity .7s var(--ease-expressive), transform .7s var(--ease-expressive); }
-.fm-reveal.is-in { opacity: 1; transform: none; }
+/* .fm-reveal lives further down, with the rest of the scroll choreography.
+   It was declared here too, and every property in this copy was redeclared
+   there — so this block had been doing nothing since the day the second one
+   was written. Two rules for one class is also how the hero's centrepiece
+   logo ended up 17px wide (see fm-drift). */
 
 /* Premium card hover lift + sheen (hover-capable pointers only). */
 .fm-lift { transition: transform var(--dur-base) var(--ease-expressive), box-shadow var(--dur-base) var(--ease-glide); }
@@ -413,7 +416,8 @@ h1, h2, h3, .font-display, .fm-head {
 .fm-hero-item > img { position: relative; z-index: 1; }
 @keyframes fmHalo { 0%,100% { opacity: .78; transform: scale(1); } 50% { opacity: 1; transform: scale(1.08); } }
 @media (prefers-reduced-motion: reduce) { .fm-float3, .fm-hero-item::before { animation: none !important; } }
-.fm-float  { animation: fmFloat 5s ease-in-out infinite; will-change: transform; }
+/* .fm-float, likewise, is defined with the motion block below; only its
+   will-change was not redeclared there, so that is all that moved. */
 .fm-float2 { animation: fmFloat2 6.5s ease-in-out infinite; will-change: transform; }
 @media (prefers-reduced-motion: reduce) { .fm-float, .fm-float2 { animation: none !important; } }
 
@@ -711,7 +715,7 @@ h1, h2, h3, .font-display, .fm-head {
 
 /* Gentle idle float for hero artwork — slow enough to read as depth, not as a
    distraction. */
-.fm-float { animation: fmFloat 6s var(--ease-glide) infinite; }
+.fm-float { animation: fmFloat 6s var(--ease-glide) infinite; will-change: transform; }
 @keyframes fmFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
 
 @media (prefers-reduced-motion: reduce) {
@@ -917,6 +921,91 @@ a.fm-pill:hover, button.fm-pill:hover {
     inset 0 1px 0 rgba(255,255,255,.22),
     inset 0 0 0 1px rgba(255,255,255,.08),
     0 12px 30px -18px rgba(0,0,0,.9);
+}
+
+/* ── The hero's hand of cards ──────────────────────────────────────────────
+   Seven app icons at seven arbitrary positions, each with the same coloured
+   halo, is not a composition — it is a pile. And it says nothing about what is
+   being sold.
+
+   This shop sells CARDS: gift cards and top-up cards. So the artwork is a hand
+   of them, fanned from a single point, overlapping, with the middle one
+   nearest. One object with a reading order instead of seven competing for
+   attention, and a shape anybody recognises before they have read a word.
+
+   Built from the brand icons already shipped — no new assets, no invented
+   denominations or fake official artwork on them. A logo on a neutral card is
+   what a reseller's shelf looks like; a made-up "€10 card" would be a product
+   that does not exist. */
+.fm-fan {
+  position: relative;
+  width: 100%; height: 100%;
+  perspective: 1100px;
+  transform-style: preserve-3d;
+}
+.fm-fan-card {
+  position: absolute; left: 50%; top: 50%;
+  width: 140px; height: 198px; margin: -99px 0 0 -70px;
+  border-radius: 20px;
+  /* Fanned from a point BELOW the cards, the way a hand of cards actually
+     pivots — rotating about their own centres splays them like a windmill.
+     The pivot sits far below rather than just under the edge: the further the
+     pivot, the wider the tops separate for the same angle, and the tops are
+     where the marks live. At 148% the card in front cut the Steam mark in
+     half. */
+  transform-origin: 50% 190%;
+  transform: rotate(var(--a)) translateY(var(--y, 0)) scale(var(--s, 1));
+  /* The brand colour has to survive being 60% covered by the card in front of
+     it, so it is carried in the TOP of the card rather than washed across the
+     whole face. */
+  background:
+    linear-gradient(170deg, rgba(255,255,255,.16), rgba(255,255,255,.02) 38%),
+    linear-gradient(170deg, var(--tint, rgba(124,92,255,.5)) 0%, var(--tint, rgba(124,92,255,.5)) 26%, rgba(10,10,22,.97) 74%);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.30),
+    inset 0 0 0 1px rgba(255,255,255,.10),
+    0 26px 50px -26px rgba(0,0,0,.95);
+  /* Top LEFT corner on every card — the reason a playing card puts its rank
+     in the corner rather than the middle. The cards paint left to right, so
+     each one is covered on its right by the card in front of it and only its
+     left edge stays in view; a mark in the middle is a mark you cannot see.
+     Two earlier tries proved it: centred showed one logo out of five, and
+     corner-OUTWARD (left card left, right card right) cut Steam and
+     PlayStation in half against the card in front. */
+  backdrop-filter: blur(2px);
+  transition: transform var(--dur-slow, .5s) var(--ease-spring, cubic-bezier(.22,.61,.36,1));
+}
+/* The sheen that makes a flat rectangle read as a surface catching light. */
+.fm-fan-card::after {
+  content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  background: linear-gradient(115deg, transparent 38%, rgba(255,255,255,.13) 50%, transparent 62%);
+}
+.fm-fan-card img {
+  position: absolute; left: 15px; top: 16px;
+  width: 50px; height: 50px; object-fit: contain;
+  filter: drop-shadow(0 6px 14px rgba(0,0,0,.65));
+}
+
+/* The whole hand breathes as ONE object. Seven separate float animations is
+   what made the old version read as debris. */
+.fm-fan-inner { position: absolute; inset: 0; animation: fmFanFloat 9s var(--ease-glide) infinite; }
+@keyframes fmFanFloat {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50%      { transform: translateY(-10px) rotate(-1deg); }
+}
+/* Spread on hover — a hand of cards is a thing you open. */
+.fm-fan:hover .fm-fan-card { transform: rotate(calc(var(--a) * 1.22)) translateY(var(--y, 0)) scale(var(--s, 1)); }
+
+/* What the cards sit on, so they are held rather than floating. */
+.fm-fan-shadow {
+  position: absolute; left: 50%; bottom: 8%; width: 300px; height: 40px;
+  transform: translateX(-50%); border-radius: 50%; pointer-events: none;
+  background: radial-gradient(ellipse at center, rgba(168,85,247,.42), transparent 70%);
+  filter: blur(2px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .fm-fan-inner { animation: none !important; }
+  .fm-fan:hover .fm-fan-card { transform: rotate(var(--a)) translateY(var(--y, 0)) scale(var(--s, 1)); }
 }
 
 /* Each floating icon gets its own drift, so the cluster reads as depth rather
