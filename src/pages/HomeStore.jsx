@@ -2,7 +2,7 @@ import { useEffect, useState, useRef, useMemo, lazy, Suspense } from 'react';
 import DeferUntilIdle from '../components/DeferUntilIdle.jsx';
 import ScrollProgress from '../components/store/ScrollProgress.jsx';
 import { Link } from 'react-router-dom';
-import { Search, ShoppingCart, Zap, ShieldCheck, Headphones, Tag, Star, ArrowRight, Plus, LayoutGrid, Users, CheckCircle2, Clock, MessageCircle, ChevronRight, Sparkles, Shield, Menu, X, BadgeCheck, User as UserIcon, UserPlus, CloudOff } from 'lucide-react';
+import { Search, ShoppingCart, Zap, ShieldCheck, Headphones, Tag, Star, ArrowRight, Plus, LayoutGrid, Users, CheckCircle2, Clock, MessageCircle, ChevronRight, Shield, Menu, X, BadgeCheck, User as UserIcon, UserPlus, CloudOff } from 'lucide-react';
 import { useCart } from '../context/CartContext.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { usePageMeta, useJsonLd } from '../lib/useMeta.js';
@@ -1018,6 +1018,12 @@ function HeroRender() {
           style={{ '--d': 0.03, background: 'radial-gradient(circle, rgba(124,92,255,.42), transparent 66%)' }} />
 
         <div className="fm-fan">
+          {/* The ground, BEFORE the hand. It used to be written after it, and
+              a shadow painted after the thing casting it is a purple wash
+              lying across the bottom of the cards. Pushed back in Z as well,
+              because inside a preserve-3d scene source order is not what
+              decides who is in front. */}
+          <span className="fm-fan-shadow" aria-hidden />
           {/* Three nested layers, one transform each, because they move on
               different clocks: the breath (fm-fan-inner), the lean toward the
               cursor (fm-fan-tilt), and each card's own place in the fan.
@@ -1034,19 +1040,31 @@ function HeroRender() {
                   aria-label={tr('home.fanGo', 'Browse {brand}', { brand: c.brand })}
                   style={{ '--a0': c.a, '--y0': c.y, '--s0': c.s, '--z0': c.z, '--i': i, '--tint': c.tint }}>
                   <img src={ICON(c.icon)} alt="" loading="lazy" />
+                  {/* The brand, up the left edge. Two thirds of every card was
+                      empty dark, and the left edge is the one strip that stays
+                      in view whatever is stacked in front of it — so this is
+                      the only place a name can be written and still be read on
+                      four of the five. A brand name, not a denomination:
+                      printing "€25" on artwork would be inventing a product.
+                      aria-hidden because the link already says it; read out
+                      twice it is just noise. */}
+                  <span className="fm-fan-name" aria-hidden>{c.brand}</span>
                 </Link>
               ))}
             </div>
           </div>
-          <span className="fm-fan-shadow" aria-hidden />
         </div>
 
         {/* A few sparks, far fewer than before: they were competing with the
-            product art rather than lifting it. */}
-        {[['8%', '14%'], ['88%', '20%'], ['80%', '78%']].map(([l, t], i) => (
-          <div key={i} className="fm-px absolute" style={{ left: l, top: t, '--d': 0.16 + i * 0.04 }}>
-            <Sparkles size={i === 1 ? 16 : 12} className="text-violet-300/70 fm-drift"
-              style={{ animationDelay: `${i * 0.7}s`, '--orbit-dur': `${9 + i}s` }} />
+            product art rather than lifting it. Drawn in CSS rather than taken
+            from the icon set — see .fm-glint. Each one drifts and twinkles on
+            its own clock, so three of them never pulse together. */}
+        {[['8%', '14%', 13], ['88%', '20%', 18], ['80%', '78%', 11]].map(([l, t, g], i) => (
+          <div key={i} className="fm-px absolute fm-drift" style={{ left: l, top: t, '--d': 0.16 + i * 0.04, '--orbit-dur': `${9 + i}s` }}>
+            <span className="fm-glint" aria-hidden
+              style={{ '--g': `${g}px`, '--glint-dur': `${5.5 + i * 1.3}s`, animationDelay: `${i * 0.9}s` }}>
+              <i />
+            </span>
           </div>
         ))}
       </div>
