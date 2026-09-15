@@ -36,11 +36,18 @@ const home = readFileSync(join(ROOT, 'src', 'pages', 'HomeStore.jsx'), 'utf8');
 let pass = 0, fail = 0;
 const ok = (name, cond, extra = '') => { if (cond) { pass++; console.log(`  ✅ ${name}`); } else { fail++; console.log(`  ❌ ${name} ${extra}`); } };
 
-/** The value of one declaration inside a top-level rule block. */
+/**
+ * Everything one selector declares, wherever it declares it.
+ *
+ * All of its blocks joined rather than the last one: a card is styled in one
+ * place and silenced in another (the reduced-motion block), and reading only
+ * the last match reported the card as having no width at all — it was reading
+ * `opacity: 1 !important` and nothing else.
+ */
 const ruleBody = (selector) => {
   const esc = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const m = [...css.matchAll(new RegExp(`(?:^|\\})\\s*${esc}\\s*\\{([^}]*)\\}`, 'g'))];
-  return m.length ? m[m.length - 1][1] : null;
+  return m.length ? m.map((x) => x[1]).join(';\n') : null;
 };
 const px = (body, prop) => {
   const hit = body && body.match(new RegExp(`(?:^|[;\\s])${prop}\\s*:\\s*(-?[\\d.]+)px`));
@@ -125,6 +132,53 @@ console.log('\n— A mark you cannot see is not a mark —');
   ok('the fan is not laid out with flex alignment', !/justify-content:\s*var\(/.test(card || ''));
 }
 
+console.log('\n— …and depth must not reshuffle the stack —');
+{
+  /* The cards live in a preserve-3d scene, and inside one of those the browser
+     paints by DEPTH, not by source order. Give the middle card the largest
+     translateZ and it jumps in front of the two on its right — which is
+     exactly what happened the first time depth was added here, and it hid the
+     PlayStation and Nitro marks under the card that is written behind them.
+     As long as z never falls from left to right, the two orders agree. */
+  const block = home.match(/const FAN = \[([\s\S]*?)\];/);
+  const z = block ? [...block[1].matchAll(/z:\s*'(-?[\d.]+)px'/g)].map((m) => Number(m[1])) : [];
+  ok('every card declares a depth', z.length === 5, `${z.length}`);
+  ok(`depth never falls from left to right (${z.join(' → ')})`,
+    z.every((v, i) => i === 0 || v >= z[i - 1]));
+
+  /* The hover lift moves a card forward by LESS than one step of that depth,
+     so the card that rises stays in its place in the hand. Lifting it clear
+     of everything took the mark of the card behind it with it. */
+  const step = z.length > 1 ? Math.min(...z.slice(1).map((v, i) => v - z[i])) : 0;
+  const lift = Number((css.match(/--z:\s*calc\(var\(--z0[^)]*\)\s*\+\s*(\d+)px\)/) || [])[1]);
+  ok(`the hover lift (${lift}px) stays inside one depth step (${step}px)`,
+    Number.isFinite(lift) && lift > 0 && lift < step, `lift=${lift} step=${step}`);
+}
+
+console.log('\n— One transform, four numbers —');
+{
+  /* Resting, dealt, spread and picked up are four states of one card. Each
+     one written as a full transform chain is four copies to keep in step, and
+     the copies WILL drift — the spread-on-hover rule had already lost the
+     translateZ the base rule gained. Registering the four numbers is what
+     lets every state be a number instead of a chain. */
+  for (const prop of ['--a', '--y', '--s', '--z']) {
+    ok(`${prop} is registered, so it can animate`,
+      new RegExp(`@property\\s+\\${prop}\\s*\\{`).test(css));
+  }
+  const chains = [...css.matchAll(/transform:\s*rotate\(var\(--a\)\)[^;]*/g)];
+  ok('the transform chain is written exactly once', chains.length === 1, `${chains.length} copies`);
+
+  /* `backwards`, never `forwards`: a finished forwards animation outranks
+     every rule below it, and the hand would deal itself and then refuse to
+     spread, lift or tilt for the rest of the visit. */
+  const deal = ruleBody('.fm-fan-card');
+  ok('the deal hands control back when it ends',
+    /animation:[^;]*\bbackwards\b/.test(deal || '') && !/animation:[^;]*\bforwards\b/.test(deal || ''));
+  ok('…and the deal keyframe has no second copy of the resting numbers',
+    /@keyframes fmFanDeal\s*\{\s*from\s*\{[^}]*\}\s*\}/.test(css.replace(/\/\*[\s\S]*?\*\//g, ' ')));
+}
+
 // ── 3. Nothing invented ─────────────────────────────────────────────────────
 console.log('\n— Real products, real files —');
 {
@@ -160,8 +214,20 @@ console.log('\n— Motion and size —');
 {
   ok('the whole hand animates as one object, not five',
     /\.fm-fan-inner\s*\{[^}]*animation:/.test(css));
-  ok('…and stops for prefers-reduced-motion',
-    /prefers-reduced-motion[\s\S]{0,400}\.fm-fan-inner\s*\{\s*animation:\s*none/.test(css));
+
+  /* Everything that moves has to be able to stop. Each of these is a separate
+     animation on a separate element, so each is a separate way to miss one. */
+  const quiet = css.split('@media (prefers-reduced-motion: reduce)').slice(1).join('\n');
+  for (const sel of ['.fm-fan-inner', '.fm-fan-card', '.fm-fan-card::after', '.fm-fan-glow']) {
+    ok(`${sel} stops for prefers-reduced-motion`, quiet.includes(sel), 'not listed');
+  }
+  ok('…and the tilt goes with it', /\.fm-fan-tilt\s*\{\s*transform:\s*none/.test(quiet));
+  /* The hook refuses on its own too: a touch screen has no pointer to follow,
+     and every listener there is a scroll cost for an effect nobody can see. */
+  const tilt = readFileSync(join(ROOT, 'src', 'lib', 'usePointerTilt.js'), 'utf8');
+  ok('the tilt hook asks before listening at all',
+    /prefers-reduced-motion/.test(tilt) && /hover: hover/.test(tilt));
+  ok('…and writes at most once a frame', /requestAnimationFrame/.test(tilt));
   /* A phone is 390px wide and the composition is 460px. It is scaled down as
      a whole rather than reflowed, and the middle step exists because at
      1024px the fan ran off the right of the viewport. */

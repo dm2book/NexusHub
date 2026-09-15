@@ -816,7 +816,6 @@ h1, h2, h3, .font-display, .fm-head {
 @media (prefers-reduced-motion: reduce) {
   .fm-beam { animation: none !important; }
 }
-/* Faint scanning sheen so the stage is never completely static. */
 /* The pre-launch banner, in the same material as the hero below it.
  *
  * It used to be a flat two-stop purple slab — `linear-gradient(135deg,#7c5cff,
@@ -856,6 +855,7 @@ h1, h2, h3, .font-display, .fm-head {
   .fm-launch-dot::after { animation: none }
 }
 
+/* Faint scanning sheen so the stage is never completely static. */
 .fm-stage::after {
   content: ''; position: absolute; inset: 0; pointer-events: none;
   background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,.055) 50%, transparent 60%);
@@ -937,16 +937,40 @@ a.fm-pill:hover, button.fm-pill:hover {
    denominations or fake official artwork on them. A logo on a neutral card is
    what a reseller's shelf looks like; a made-up "€10 card" would be a product
    that does not exist. */
+/* Every state of a card — resting, dealt, spread, picked up — is expressed as
+   four numbers, and the transform that turns them into a position is written
+   ONCE. Registering them as typed properties is what makes that possible: an
+   unregistered custom property cannot be transitioned or animated, so each
+   state would need its own full copy of the transform chain, and three copies
+   of one chain is three chances for them to drift apart. Everything below
+   moves a card by setting --a/--y/--s/--z and nothing else. */
+@property --a { syntax: '<angle>';  inherits: false; initial-value: 0deg; }
+@property --y { syntax: '<length>'; inherits: false; initial-value: 0px; }
+@property --s { syntax: '<number>'; inherits: false; initial-value: 1; }
+@property --z { syntax: '<length>'; inherits: false; initial-value: 0px; }
+
 .fm-fan {
   position: relative;
   width: 100%; height: 100%;
   perspective: 1100px;
   transform-style: preserve-3d;
 }
+/* The hand follows the cursor across the whole stage, not just across itself:
+   an object that only reacts once the pointer is on top of it reads as a
+   hover effect, where one that leans from across the room reads as depth.
+   The angles arrive from usePointerTilt; 0deg is the fallback AND the resting
+   value, so with no pointer there is genuinely no tilt. */
+.fm-fan-tilt {
+  position: absolute; inset: 0;
+  transform-style: preserve-3d;
+  transform: rotateY(var(--tx, 0deg)) rotateX(var(--ty, 0deg));
+  transition: transform .5s var(--ease-glide);
+}
 .fm-fan-card {
   position: absolute; left: 50%; top: 50%;
   width: 140px; height: 198px; margin: -99px 0 0 -70px;
   border-radius: 20px;
+  overflow: hidden;
   /* Fanned from a point BELOW the cards, the way a hand of cards actually
      pivots — rotating about their own centres splays them like a windmill.
      The pivot sits far below rather than just under the edge: the further the
@@ -954,7 +978,13 @@ a.fm-pill:hover, button.fm-pill:hover {
      where the marks live. At 148% the card in front cut the Steam mark in
      half. */
   transform-origin: 50% 190%;
-  transform: rotate(var(--a)) translateY(var(--y, 0)) scale(var(--s, 1));
+  /* The one chain. --a0/--y0/--s0/--z0 are the card's resting numbers, set
+     once in the component; --a/--y/--s/--z are where it is right now. */
+  --a: var(--a0, 0deg);
+  --y: var(--y0, 0px);
+  --s: var(--s0, 1);
+  --z: var(--z0, 0px);
+  transform: rotate(var(--a)) translateZ(var(--z)) translateY(var(--y)) scale(var(--s));
   /* The brand colour has to survive being 60% covered by the card in front of
      it, so it is carried in the TOP of the card rather than washed across the
      whole face. */
@@ -973,12 +1003,44 @@ a.fm-pill:hover, button.fm-pill:hover {
      corner-OUTWARD (left card left, right card right) cut Steam and
      PlayStation in half against the card in front. */
   backdrop-filter: blur(2px);
-  transition: transform var(--dur-slow, .5s) var(--ease-spring, cubic-bezier(.22,.61,.36,1));
+  transition: --a var(--dur-slow, .5s) var(--ease-spring),
+              --y var(--dur-slow, .5s) var(--ease-spring),
+              --s var(--dur-slow, .5s) var(--ease-spring),
+              --z var(--dur-slow, .5s) var(--ease-spring),
+              box-shadow var(--dur-slow, .5s) var(--ease-glide);
+  /* Dealt, not simply present. The hand assembles itself out of a single
+     stack in the middle — which is where a fan of cards comes from — one card
+     every 95ms, left to right, in the order they overlap.
+     `backwards` and not `forwards`: the animation supplies the state BEFORE
+     its turn comes and hands control straight back to the rules above when it
+     is done. With `forwards` the finished animation would outrank them and
+     nothing could move the card again — no spread, no lift, no tilt. */
+  animation: fmFanDeal .9s var(--ease-spring) backwards;
+  animation-delay: calc(var(--i, 0) * 95ms);
 }
-/* The sheen that makes a flat rectangle read as a surface catching light. */
+/* Only a `from`. The implicit `to` is wherever the card actually rests, so
+   the deal has no second copy of the resting numbers to fall out of step
+   with — add a card, change an angle, and this keyframe is still correct. */
+@keyframes fmFanDeal {
+  from { opacity: 0; --a: 0deg; --y: 78px; --s: .78; }
+}
+/* The sheen that makes a flat rectangle read as a surface catching light —
+   and it travels, because a still highlight is a painted-on stripe. One
+   narrow band crosses each card in turn, so the light sweeps the whole hand
+   rather than five cards blinking together.
+   A moving strip behind `overflow: hidden`, not a moving background-position:
+   this way it is a transform, which the compositor handles without repainting
+   the card underneath it. */
 .fm-fan-card::after {
-  content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
-  background: linear-gradient(115deg, transparent 38%, rgba(255,255,255,.13) 50%, transparent 62%);
+  content: ''; position: absolute; top: -20%; bottom: -20%; left: -46%; width: 46%;
+  pointer-events: none;
+  background: linear-gradient(105deg, transparent, rgba(255,255,255,.15) 45%, rgba(255,255,255,.21) 55%, transparent);
+  animation: fmFanSheen 7s var(--ease-glide) infinite;
+  animation-delay: calc(var(--i, 0) * 190ms);
+}
+@keyframes fmFanSheen {
+  0%       { transform: translateX(0); }
+  38%, 100% { transform: translateX(370%); }
 }
 .fm-fan-card img {
   position: absolute; left: 15px; top: 16px;
@@ -993,8 +1055,29 @@ a.fm-pill:hover, button.fm-pill:hover {
   0%, 100% { transform: translateY(0) rotate(0deg); }
   50%      { transform: translateY(-10px) rotate(-1deg); }
 }
-/* Spread on hover — a hand of cards is a thing you open. */
-.fm-fan:hover .fm-fan-card { transform: rotate(calc(var(--a) * 1.22)) translateY(var(--y, 0)) scale(var(--s, 1)); }
+/* A hand of cards is a thing you open, and then one you pick a card out of.
+   Both are just numbers now: the fan widens its angles, and the card under
+   the cursor comes up off the others and forward in Z — which under the
+   stage's perspective actually makes it larger, rather than pretending to.
+   Pointer-capable devices only: on a touch screen :hover sticks after a tap
+   and leaves one card stranded in the air. */
+@media (hover: hover) and (pointer: fine) {
+  .fm-fan:hover .fm-fan-card { --a: calc(var(--a0, 0deg) * 1.18); }
+  .fm-fan:hover .fm-fan-card:hover {
+    --y: calc(var(--y0, 0px) - 22px);
+    --s: calc(var(--s0, 1) * 1.07);
+    /* Forward by less than one step of the fan's own depth, so the card that
+       rises stays in its place in the stack. Lifting it clear of everything
+       looked like pulling a card OUT of the hand, and it took the mark of the
+       card behind it with it. A card you push up out of a fan stays in the
+       fan. */
+    --z: calc(var(--z0, 0px) + 10px);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,.42),
+      inset 0 0 0 1px rgba(255,255,255,.18),
+      0 40px 70px -28px rgba(0,0,0,.95);
+  }
+}
 
 /* What the cards sit on, so they are held rather than floating. */
 .fm-fan-shadow {
@@ -1003,9 +1086,24 @@ a.fm-pill:hover, button.fm-pill:hover {
   background: radial-gradient(ellipse at center, rgba(168,85,247,.42), transparent 70%);
   filter: blur(2px);
 }
+/* Someone who asked for less motion gets the composition and none of the
+   movement: no breathing, no deal, no travelling light, no tilt. The hand is
+   still a hand — it is just already dealt. */
 @media (prefers-reduced-motion: reduce) {
-  .fm-fan-inner { animation: none !important; }
-  .fm-fan:hover .fm-fan-card { transform: rotate(var(--a)) translateY(var(--y, 0)) scale(var(--s, 1)); }
+  .fm-fan-inner,
+  .fm-fan-card,
+  .fm-fan-card::after,
+  .fm-fan-glow { animation: none !important; }
+  .fm-fan-card { opacity: 1 !important; }
+  .fm-fan-tilt { transform: none !important; transition: none !important; }
+}
+
+/* The light the hand is sitting in, breathing a little out of step with the
+   hand itself — 11s against 9s, so the two never line up into one pulse. */
+.fm-fan-glow { animation: fmFanGlow 11s var(--ease-glide) infinite; }
+@keyframes fmFanGlow {
+  0%, 100% { opacity: .75; transform: translate(-50%, -50%) scale(.94); }
+  50%      { opacity: 1;   transform: translate(-50%, -50%) scale(1.06); }
 }
 
 /* Each floating icon gets its own drift, so the cluster reads as depth rather
