@@ -537,6 +537,100 @@ h1, h2, h3, .font-display, .fm-head {
   }
 }
 
+/* THE CATEGORY LIST.
+   Twenty-one rows that changed background colour on hover and did nothing
+   else — the most-used navigation in the shop, and the least alive thing on
+   the page. Three things move, all of them in the direction you are going:
+   a rail arrives at the left edge, the row steps toward it, and the icon
+   leans forward. The active row is simply the same state, already arrived. */
+.fm-navrow {
+  position: relative;
+  transition: background-color var(--dur-quick) var(--ease-glide),
+              color var(--dur-quick) var(--ease-glide),
+              transform var(--dur-quick) var(--ease-spring);
+}
+.fm-navrow::before {
+  content: ''; position: absolute; left: 0; top: 50%;
+  width: 3px; height: 0; border-radius: 3px;
+  background: linear-gradient(180deg, #a855f7, #7c5cff);
+  transform: translateY(-50%);
+  transition: height var(--dur-base) var(--ease-spring);
+}
+.fm-navrow img, .fm-navrow svg, .fm-navrow .fm-navicon {
+  transition: transform var(--dur-base) var(--ease-spring);
+}
+.fm-navrow.is-active::before { height: 62%; }
+@media (hover: hover) and (pointer: fine) {
+  .fm-navrow:hover { transform: translateX(3px); }
+  .fm-navrow:hover::before { height: 62%; }
+  .fm-navrow:hover img, .fm-navrow:hover svg, .fm-navrow:hover .fm-navicon { transform: scale(1.12); }
+}
+.fm-navrow:focus-visible::before { height: 62%; }
+
+/* THE SHINE.
+   A band of light crossing a filled button when you point at it. It is the
+   oldest trick for making a flat rectangle read as a surface, and the reason
+   it is worth having here is that this shop's primary buttons are the only
+   solid colour on a very quiet page: if anything is going to answer a cursor,
+   it should be them.
+   Cheap by construction — one transform on a pseudo-element, clipped by the
+   button's own radius, and it only exists while the pointer is over it. */
+.fm-shine { position: relative; overflow: hidden; isolation: isolate; }
+.fm-shine::after {
+  content: ''; position: absolute; top: -40%; bottom: -40%; left: -30%; width: 26%;
+  background: linear-gradient(105deg, transparent, rgb(255 255 255 / .45), transparent);
+  transform: translateX(-160%) skewX(-12deg);
+  pointer-events: none;
+}
+@media (hover: hover) and (pointer: fine) {
+  .fm-shine:hover::after, .fm-shine:focus-visible::after {
+    animation: fmShine .72s var(--ease-glide);
+  }
+}
+@keyframes fmShine {
+  from { transform: translateX(-160%) skewX(-12deg); }
+  to   { transform: translateX(620%)  skewX(-12deg); }
+}
+
+/* THE SHELF ARRIVING.
+   A revealed section already fades its own direct children in, which meant a
+   rail of eight cards arrived as one slab. The cards cascade now, so a shelf
+   fills rather than appears — 45ms apart, capped at the eighth, because past
+   that a visitor is waiting for a list to finish loading that has already
+   loaded. */
+.fm-reveal.fm-reveal-children .fm-rail > * {
+  opacity: 0; transform: translateY(14px) scale(.985);
+  transition: opacity .5s var(--ease-expressive), transform .5s var(--ease-expressive);
+}
+.fm-reveal.fm-reveal-children.is-in .fm-rail > * { opacity: 1; transform: none; }
+.fm-reveal.fm-reveal-children.is-in .fm-rail > *:nth-child(1) { transition-delay: 90ms; }
+.fm-reveal.fm-reveal-children.is-in .fm-rail > *:nth-child(2) { transition-delay: 135ms; }
+.fm-reveal.fm-reveal-children.is-in .fm-rail > *:nth-child(3) { transition-delay: 180ms; }
+.fm-reveal.fm-reveal-children.is-in .fm-rail > *:nth-child(4) { transition-delay: 225ms; }
+.fm-reveal.fm-reveal-children.is-in .fm-rail > *:nth-child(5) { transition-delay: 270ms; }
+.fm-reveal.fm-reveal-children.is-in .fm-rail > *:nth-child(6) { transition-delay: 315ms; }
+.fm-reveal.fm-reveal-children.is-in .fm-rail > *:nth-child(7) { transition-delay: 360ms; }
+.fm-reveal.fm-reveal-children.is-in .fm-rail > *:nth-child(n+8) { transition-delay: 405ms; }
+
+/* THE CART COUNT gets no rule here on purpose.
+   It used to change from 3 to 4 with no event at all — the number a person
+   just caused to change was the one thing on screen that did not acknowledge
+   it. The fix is in the markup, not the stylesheet: keyed on the count in
+   React, a new number is a new ELEMENT, so the .fm-pop that has been in this
+   file all along runs again on every change instead of once on the first.
+   A second .fm-pop was written here before that was noticed, and both it and
+   its keyframes were silently losing to the originals further down — the
+   duplicate-rule check caught it. Five other components already use that one;
+   quietly making it bouncier would have changed all of them. */
+
+@media (prefers-reduced-motion: reduce) {
+  .fm-navrow, .fm-navrow::before, .fm-navrow img, .fm-navrow svg, .fm-navrow .fm-navicon,
+  .fm-reveal.fm-reveal-children .fm-rail > * { transition: none !important; }
+  .fm-navrow:hover { transform: none !important; }
+  .fm-shine::after { display: none !important; }
+  .fm-reveal.fm-reveal-children .fm-rail > * { opacity: 1 !important; transform: none !important; }
+}
+
 /* ── Phase 7: premium micro-interactions ───────────────────────────────── */
 .btn-primary:active, .btn-ghost:active, .btn:active { transform: translateY(0) scale(.98); }
 
