@@ -191,9 +191,14 @@ console.log('\n— The review DM asks where it counts most —');
      nothing rendered — never a dead link or an empty bullet. */
   ok('…and renders nothing when no profile is configured',
     /trustpilotReviewUrl\s*\?[\s\S]{0,260}: ''/.test(svc));
+  /* Behaviour, not spelling. This named the vouch reply's variable
+     (`TRUSTPILOT_REVIEW_URL ?`) and broke the moment that reply started asking
+     the shared resolver instead — an assertion that fails for an improvement,
+     which is the third time today. What it is for: every review prompt in the
+     shop offers Trustpilot. */
   ok('the other prompts still have it',
     /trustpilotHtml/.test(read('server/src/services/orderService.js'))
-    && /TRUSTPILOT_REVIEW_URL \?/.test(read('discord/src/bot.js')));
+    && /Would you put it on Trustpilot too\?/.test(read('discord/src/bot.js')));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
