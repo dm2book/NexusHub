@@ -28,7 +28,8 @@ const config = readFileSync(join(HERE, '..', 'src', 'config.js'), 'utf8');
 console.log('— No call to action promises a checkout that is closed —');
 {
   ok('the bot asks the store when it opens', /\/api\/config/.test(bot) && /launchAt/.test(bot));
-  ok('…and caches the answer instead of asking per click', /launchCache/.test(bot));
+  ok('…and caches the answer instead of asking per click',
+    /Date\.now\(\) - launchCache\.at < 300_000/.test(bot));
   ok('one helper decides what a shop button says', /async function shopCta\(/.test(bot));
   ok('…and every shop button is built from it', /async function shopButton\(/.test(bot));
 
@@ -57,12 +58,50 @@ console.log('\n— Steps nobody needed to take —');
   ok('…and links the runners-up too, instead of naming them',
     /\[\$\{p\.name\}\]\(\$\{STORE_URL\}\/product\/\$\{p\.id\}\)/.test(bot));
 
+  /* Was `await shopButton\(\)` — the bare call. The button gained attribution
+     arguments (`null, 'verify'`, so a sale that started in Discord can be
+     traced back to it) and this failed on the punctuation while the thing it is
+     named after — a way out of Discord and into the shop — was still there.
+     An assertion that tracks a call signature instead of a behaviour fails for
+     improvements. */
   ok('verifying ends with a way out of Discord, not two channel names',
-    /Verified!\*\* Welcome in[\s\S]{0,700}await shopButton\(\)/.test(bot));
+    /Verified!\*\* Welcome in[\s\S]{0,700}await shopButton\(/.test(bot));
   ok('…and points at the roles that drive restock pings',
     /Verified!\*\* Welcome in[\s\S]{0,700}chanRef\(i\.guild, 'roles'\)/.test(bot));
   ok('…while still saying when the shop opens',
     /Verified!\*\* Welcome in[\s\S]{0,400}cta\.note/.test(bot));
+}
+
+
+console.log('\n— One place to set the Trustpilot profile, not two —');
+{
+  /* The bot fetched /api/config for the launch date while reading Trustpilot
+     from its OWN environment — so the owner had to set TRUSTPILOT_URL twice,
+     on Vercel and again on Railway, and a shop that set it once looked right
+     everywhere except in Discord. The same response already carries it. */
+  ok('the site config is fetched once and shared',
+    /async function siteConfig\(/.test(bot)
+    && /async function shopOpensAt\(\) \{\s*const cfg = await siteConfig\(\)/.test(bot));
+  ok('…and Trustpilot comes from it', /async function trustpilotLinks\(/.test(bot)
+    && /cfg\?\.trustpilotUrl/.test(bot));
+  /* The bot's own value still wins: an operator override, and the only thing
+     that works when the website cannot be reached. */
+  ok('a value set on the bot still overrides the site',
+    /if \(TRUSTPILOT_URL\) return \{ profile: TRUSTPILOT_URL/.test(bot));
+  ok('…and the write form falls back to the profile when only one is known',
+    /cleanUrl\(cfg\?\.trustpilotReviewUrl, ''\) \|\| profile/.test(bot));
+
+  /* Every caller now asks the resolver rather than the constant, or the two
+     would disagree the moment one of them is set. */
+  ok('the panels ask the resolver', !/trustpilotUrl: TRUSTPILOT_URL/.test(bot));
+  ok('…and so does the vouch reply',
+    /const \{ write: tpWrite \} = await trustpilotLinks\(\)/.test(bot)
+    && /tpWrite \?/.test(bot));
+
+  /* Unset everywhere must stay silent — a panel with a dead Trustpilot link is
+     worse than a panel without one. */
+  ok('nothing is printed when neither has a profile',
+    /trustpilotUrl = ''/.test(readFileSync(join(HERE, '..', 'src', 'panels.js'), 'utf8')));
 }
 
 console.log('\n— The end of the funnel leads back into it —');

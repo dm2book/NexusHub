@@ -593,7 +593,17 @@ export async function postReviewRequest(discordUserId, { orderNumber, productNam
       description: (productName ? `Your **${productName}** landed a day ago.\n\n` : 'Your order landed a day ago.\n\n')
         + 'A review here only counts if it came from a delivered order, so yours is worth '
         + 'more than a page of five stars from nobody.\n\n'
-        + `Type \`/vouch\` in the server, or [write it on the site](${config.appUrl}/reviews).`,
+        + `Type \`/vouch\` in the server, or [write it on the site](${config.appUrl}/reviews).`
+        /* The same ask the delivery email carries, in the place a Discord buyer
+           actually reads. The vouch reply already offers Trustpilot after
+           somebody writes one; this is the step before it, and it was the only
+           review prompt in the shop that did not mention the one page we cannot
+           edit — which is exactly why it is worth more than the two we can.
+           Empty when no profile is configured, like every other optional line. */
+        + (config.shop.trustpilotReviewUrl
+          ? `\n\n⭐ Or put it on [Trustpilot](${config.shop.trustpilotReviewUrl}) — `
+            + 'that one is public and we cannot change a word of it.'
+          : ''),
       color: 0xf59e0b,
       footer: { text: `${config.email.fromName}${orderNumber ? ` · ${orderNumber}` : ''}` },
       timestamp: new Date().toISOString(),
