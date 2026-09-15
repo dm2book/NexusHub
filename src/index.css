@@ -876,7 +876,11 @@ h1, h2, h3, .font-display, .fm-head {
      it is the biggest thing on the page then Lighthouse grades the site's
      loading speed on when a watermark finished painting. */
   font-size: clamp(72px, 17vw, 220px); line-height: .8;
-  color: transparent; -webkit-text-stroke: 1.5px rgba(255,255,255,.07);
+  /* Fainter, and masked away where the copy is. At .07 the outline of the R
+     ran straight through the subtitle and read as a stray rounded rectangle
+     behind the words rather than as a watermark. */
+  color: transparent; -webkit-text-stroke: 1.5px rgba(255,255,255,.045);
+  mask-image: linear-gradient(100deg, transparent 6%, #000 46%);
   pointer-events: none; user-select: none;
 }
 .fm-ghostword::before { content: 'FORGE'; }
@@ -988,15 +992,40 @@ a.fm-pill:hover, button.fm-pill:hover {
   --s: var(--s0, 1);
   --z: var(--z0, 0px);
   transform: rotate(var(--a)) translateZ(var(--z)) translateY(var(--y)) scale(var(--s));
-  /* The brand colour has to survive being 60% covered by the card in front of
-     it, so it is carried in the TOP of the card rather than washed across the
-     whole face. */
+  /* The face, in five layers, because a flat gradient with a logo dropped on
+     it is a coloured rectangle and not a card. From the top:
+
+       1. the foil's grain — hairlines at the same angle as the sheen, so the
+          light that travels across it has something to catch;
+       2. the brand's own glow, anchored ON the mark rather than spread in a
+          band across the top. The band left every card identically black
+          below the halfway line: five brands, one bottom half;
+       3. a soft lift across the lower half, so it falls away rather than
+          stopping dead. A banded panel lived here for one render and read as
+          a grey smudge — and it collided with the name up the edge, which is
+          the thing actually worth showing;
+       4. a wash of the brand colour down the whole face, so the colour
+          survives past the fold;
+       5. the body. Not black — a very dark blue, which keeps the card a
+          material rather than a hole in the page. */
   background:
-    linear-gradient(170deg, rgba(255,255,255,.16), rgba(255,255,255,.02) 38%),
-    linear-gradient(170deg, var(--tint, rgba(124,92,255,.5)) 0%, var(--tint, rgba(124,92,255,.5)) 26%, rgba(10,10,22,.97) 74%);
+    repeating-linear-gradient(105deg,
+      rgba(255,255,255,.035) 0 1px, transparent 1px 6px),
+    radial-gradient(58% 34% at 26% 13%, var(--tint, rgba(124,92,255,.5)), transparent 72%),
+    linear-gradient(100deg,
+      transparent 44%, rgba(255,255,255,.05) 62%, transparent 100%),
+    linear-gradient(168deg,
+      var(--tint, rgba(124,92,255,.5)) 0%, rgba(12,12,26,.20) 46%, rgba(10,10,22,.55) 100%),
+    linear-gradient(168deg, #1a1b33 0%, #0b0b17 70%);
+  /* Light comes from the top left of this stage — the same direction the
+     stage's own shadow side is drawn from. So the top and left edges catch it
+     and the bottom and right ones do not, which is what gives a rectangle
+     thickness. A single even ring around all four made it a sticker. */
   box-shadow:
-    inset 0 1px 0 rgba(255,255,255,.30),
-    inset 0 0 0 1px rgba(255,255,255,.10),
+    inset 1px 1px 0 rgba(255,255,255,.34),
+    inset -1px -1px 0 rgba(0,0,0,.45),
+    inset 0 0 0 1px rgba(255,255,255,.07),
+    inset 0 -30px 40px -34px rgba(0,0,0,.9),
     0 26px 50px -26px rgba(0,0,0,.95);
   /* Top LEFT corner on every card — the reason a playing card puts its rank
      in the corner rather than the middle. The cards paint left to right, so
@@ -1027,6 +1056,22 @@ a.fm-pill:hover, button.fm-pill:hover {
 @keyframes fmFanDeal {
   from { opacity: 0; --a: 0deg; --y: 78px; --s: .78; }
 }
+/* Foil. A gift card is a printed plastic thing and the one detail that reads
+   as "not a screenshot of a div" is the way its ink shifts colour with the
+   angle you hold it at.
+   Started FROM the card's own angle, so no two cards in the fan show the same
+   part of the spectrum — and because the hand spreads by changing that angle,
+   the colours travel as it opens. --a0 rather than --a: a registered property
+   does not inherit into a pseudo-element, and the plain one does. */
+.fm-fan-card::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: conic-gradient(from calc(var(--a0, 0deg) + 50deg) at 32% 18%,
+    rgba(255,90,170,.16), rgba(80,200,255,.14) 22%, rgba(150,110,255,.18) 46%,
+    rgba(255,205,120,.12) 68%, rgba(120,255,220,.12) 84%, rgba(255,90,170,.16));
+  mix-blend-mode: screen;
+  opacity: .55;
+}
+
 /* The sheen that makes a flat rectangle read as a surface catching light —
    and it travels, because a still highlight is a painted-on stripe. One
    narrow band crosses each card in turn, so the light sweeps the whole hand
@@ -1035,15 +1080,33 @@ a.fm-pill:hover, button.fm-pill:hover {
    this way it is a transform, which the compositor handles without repainting
    the card underneath it. */
 .fm-fan-card::after {
-  content: ''; position: absolute; top: -20%; bottom: -20%; left: -46%; width: 46%;
+  content: ''; position: absolute; top: -20%; bottom: -20%; left: -32%; width: 32%;
   pointer-events: none;
-  background: linear-gradient(105deg, transparent, rgba(255,255,255,.15) 45%, rgba(255,255,255,.21) 55%, transparent);
+  /* Narrow and dim: a glint, not a wash. At 46% of the card's width and .21
+     white it was a grey stripe parked across the face, and with the card now
+     carrying foil and a name there is far less room for one. */
+  background: linear-gradient(105deg, transparent, rgba(255,255,255,.10) 42%, rgba(255,255,255,.16) 55%, transparent);
   animation: fmFanSheen 7s var(--ease-glide) infinite;
   animation-delay: calc(var(--i, 0) * 190ms);
 }
 @keyframes fmFanSheen {
   0%       { transform: translateX(0); }
   38%, 100% { transform: translateX(370%); }
+}
+/* Set up the left edge, reading upward, the way a ticket stub or a book spine
+   carries its name. Sized and tracked to fit the widest of them — DISCORD
+   NITRO — inside the strip the card in front leaves showing. */
+.fm-fan-name {
+  /* Anchored to the FOOT, not the head. Set from the top, DISCORD NITRO — the
+     longest of the five — ran off the bottom edge of its own card. From the
+     foot every name ends on the same line, like the spines on a shelf, and a
+     longer one simply starts higher. */
+  position: absolute; left: 19px; bottom: 16px;
+  writing-mode: vertical-rl; transform: rotate(180deg);
+  font-size: 9px; font-weight: 700; letter-spacing: .22em; text-transform: uppercase;
+  color: rgba(255,255,255,.62);
+  text-shadow: 0 1px 6px rgba(0,0,0,.8);
+  pointer-events: none; white-space: nowrap;
 }
 .fm-fan-card img {
   position: absolute; left: 15px; top: 16px;
@@ -1094,11 +1157,23 @@ a.fm-pill:hover, button.fm-pill:hover {
 }
 
 /* What the cards sit on, so they are held rather than floating. */
+/* What the hand sits on. Two layers, because one blob is not a shadow:
+   a tight dark core directly under the cards, which is the bit that makes
+   them look like they are resting on something, and a wide coloured bloom
+   for the light the stage is lit with. A single purple ellipse gave the
+   colour and none of the contact. */
 .fm-fan-shadow {
   position: absolute; left: 50%; bottom: 8%; width: 300px; height: 40px;
-  transform: translateX(-50%); border-radius: 50%; pointer-events: none;
-  background: radial-gradient(ellipse at center, rgba(168,85,247,.42), transparent 70%);
+  transform: translateX(-50%) translateZ(-60px); border-radius: 50%; pointer-events: none;
+  background: radial-gradient(ellipse at center, rgba(168,85,247,.40), transparent 70%);
   filter: blur(2px);
+}
+.fm-fan-shadow::before {
+  content: ''; position: absolute; left: 50%; top: 42%;
+  width: 190px; height: 20px; margin-left: -95px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgba(3,2,10,.80), rgba(3,2,10,.30) 55%, transparent 76%);
+  filter: blur(7px);
 }
 /* Someone who asked for less motion gets the composition and none of the
    movement: no breathing, no deal, no travelling light, no tilt. The hand is
@@ -1132,7 +1207,40 @@ a.fm-pill:hover, button.fm-pill:hover {
 
    Renamed rather than patched around, because the bug was never the width — it
    was two unrelated components answering to one name. */
+/* A glint of light, drawn rather than iconified.
+   Two crossed spikes tapering to nothing plus a small bloom at the crossing —
+   which is what a point of light does to a lens. The four-pointed asterisk
+   from the icon set that used to sit here has a hard outline and a little
+   plus beside it, and at 12px on a dark stage it reads as clipart, not as
+   light. Same three positions, a tenth of the visual noise. */
+.fm-glint {
+  position: relative; display: block;
+  width: var(--g, 14px); height: var(--g, 14px);
+  pointer-events: none;
+  /* Its own slow breath, on a duration set per glint, so three points of
+     light never pulse in time with each other. */
+  animation: fmGlint var(--glint-dur, 6s) var(--ease-glide) infinite;
+}
+.fm-glint::before, .fm-glint::after {
+  content: ''; position: absolute; left: 50%; top: 50%;
+  background: linear-gradient(var(--dir, 0deg),
+    transparent, rgba(226,214,255,.95) 50%, transparent);
+  transform: translate(-50%, -50%) rotate(var(--rot, 0deg));
+}
+/* The long spike and the short one, so it reads as a star rather than a plus. */
+.fm-glint::before { width: 1.2px; height: 100%; }
+.fm-glint::after  { width: 1.2px; height: 52%; --rot: 90deg; }
+.fm-glint > i {
+  position: absolute; inset: -60%;
+  background: radial-gradient(circle, rgba(214,201,255,.55), transparent 62%);
+}
+
 .fm-drift { animation: fmOrbit var(--orbit-dur, 11s) var(--ease-glide) infinite; will-change: transform; }
+@keyframes fmGlint {
+  0%, 100% { opacity: .35; transform: scale(.82) rotate(0deg); }
+  50%      { opacity: 1;   transform: scale(1.06) rotate(12deg); }
+}
+
 @keyframes fmOrbit {
   0%,100% { transform: translate3d(0,0,0) rotate(0deg); }
   33%     { transform: translate3d(6px,-14px,0) rotate(2.5deg); }
@@ -1153,7 +1261,7 @@ a.fm-pill:hover, button.fm-pill:hover {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .fm-stage::after, .fm-drift, .fm-streak {
+  .fm-stage::after, .fm-drift, .fm-streak, .fm-glint {
     animation: none !important; transform: none !important; filter: none !important; opacity: 1 !important;
   }
 }

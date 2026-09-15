@@ -48,9 +48,15 @@ const ok = (name, cond, extra = '') => { if (cond) { pass++; console.log(`  ✅ 
  * the last match reported the card as having no width at all — it was reading
  * `opacity: 1 !important` and nothing else.
  */
+const cssCode = css.replace(/\/\*[\s\S]*?\*\//g, ' ');
 const ruleBody = (selector) => {
   const esc = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const m = [...css.matchAll(new RegExp(`(?:^|\\})\\s*${esc}\\s*\\{([^}]*)\\}`, 'g'))];
+  /* Read from the comment-stripped copy: the anchor is "start of file, or the
+     brace that closed the rule before", and a rule introduced by a comment —
+     as most of them in this file are — has a `/` in front of it instead. That
+     returned null for .fm-fan-name and reported a rule that is plainly there
+     as missing. */
+  const m = [...cssCode.matchAll(new RegExp(`(?:^|\\})\\s*${esc}\\s*\\{([^}]*)\\}`, 'g'))];
   return m.length ? m.map((x) => x[1]).join(';\n') : null;
 };
 const px = (body, prop) => {
@@ -243,6 +249,20 @@ console.log('\n— Real products, real files —');
     /className="fm-fan-card"[\s\S]{0,400}?alt=""/.test(home));
   ok('the card is a block, so the link is the whole card',
     /display:\s*block/.test(ruleBody('.fm-fan-card') || ''));
+
+  /* The brand up the left edge. It exists because two thirds of every card
+     was empty, and it can only live on the left because that is the only
+     strip the card in front leaves showing. Anchored to the FOOT: set from
+     the top, DISCORD NITRO ran off the bottom of its own card. */
+  ok('every card carries its brand as well as its mark',
+    (home.match(/className="fm-fan-name"/g) || []).length === 1
+    && CARDS.every((c) => c.brand));
+  const name = ruleBody('.fm-fan-name') || '';
+  ok('…set up the edge, not across the face', /writing-mode:\s*vertical/.test(name));
+  ok('…anchored to the foot so the longest still fits', /bottom:\s*\d+px/.test(name)
+    && !/(^|;)\s*top:/.test(name), name.trim().slice(0, 60));
+  ok('…and silent to a screen reader, which already heard it from the link',
+    /className="fm-fan-name" aria-hidden/.test(home));
   ok('…and the keyboard can see where it is',
     /\.fm-fan-card:focus-visible\s*\{[^}]*outline:/.test(css));
 
@@ -274,6 +294,7 @@ console.log('\n— Motion and size —');
     ok(`${sel} stops for prefers-reduced-motion`, quiet.includes(sel), 'not listed');
   }
   ok('…and the tilt goes with it', /\.fm-fan-tilt\s*\{\s*transform:\s*none/.test(quiet));
+  ok('…and so do the glints', quiet.includes('.fm-glint'), 'not listed');
   /* The hook refuses on its own too: a touch screen has no pointer to follow,
      and every listener there is a scroll cost for an effect nobody can see. */
   const tilt = readFileSync(join(ROOT, 'src', 'lib', 'usePointerTilt.js'), 'utf8');
