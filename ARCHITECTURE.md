@@ -83,6 +83,18 @@ search. Row actions: **View, Fulfill, Mark Complete, Refund, Contact Customer** 
 guarded by a permission). The detail page features a large **“Complete Order”** button
 with a **confirmation modal**. All actions are audit-logged.
 
+### Running the tests
+
+`node server/test/run-all.mjs` runs every `server/test/*.test.mjs` against a
+fresh Postgres database per file, then the Discord bot's own suites as one
+further entry. The bot's eight suites — 279 assertions covering the funnel,
+permissions, the scam guard, tickets and the server blueprint — live in
+`discord/test` and need no database, so they were in no runner at all:
+`discord/package.json` had no test script and this one scans `server/test/`
+only. One of them had been failing, on an assertion pinned to a call signature
+that changed when the shop button gained attribution arguments. Nothing reported
+it because nothing ran it. `npm test` inside `discord/` runs them alone.
+
 ## 4. Supplier integration layer
 
 Files: `services/supplier/*`.

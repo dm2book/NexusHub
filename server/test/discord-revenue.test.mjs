@@ -172,5 +172,29 @@ console.log('\n— The referral command is findable —');
   ok('and says what it pays', /5% of every order it brings/.test(bot));
 }
 
+console.log('\n— The review DM asks where it counts most —');
+{
+  /* Every other review prompt in this shop offers Trustpilot: the delivery
+     email, the vouch confirmation, the reviews page after you submit. This DM
+     — the one a Discord buyer gets a day after delivery, which for this shop's
+     audience is the most-read of the lot — offered only /vouch and the site.
+     Both of those are pages the owner controls, which is exactly why they are
+     worth less than the one they cannot. */
+  const svc = read('server/src/services/discordService.js');
+  ok('the delivery DM offers Trustpilot too',
+    /postReviewRequest[\s\S]{0,1400}trustpilotReviewUrl/.test(svc));
+  ok('…pointing at the write form, not the profile page',
+    /config\.shop\.trustpilotReviewUrl/.test(svc));
+  ok('…and says why that one is worth more',
+    /cannot change a word of it/.test(svc));
+  /* Same rule as every optional block in this codebase: nothing configured,
+     nothing rendered — never a dead link or an empty bullet. */
+  ok('…and renders nothing when no profile is configured',
+    /trustpilotReviewUrl\s*\?[\s\S]{0,260}: ''/.test(svc));
+  ok('the other prompts still have it',
+    /trustpilotHtml/.test(read('server/src/services/orderService.js'))
+    && /TRUSTPILOT_REVIEW_URL \?/.test(read('discord/src/bot.js')));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

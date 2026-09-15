@@ -57,8 +57,14 @@ console.log('\n— Steps nobody needed to take —');
   ok('…and links the runners-up too, instead of naming them',
     /\[\$\{p\.name\}\]\(\$\{STORE_URL\}\/product\/\$\{p\.id\}\)/.test(bot));
 
+  /* Was `await shopButton\(\)` — the bare call. The button gained attribution
+     arguments (`null, 'verify'`, so a sale that started in Discord can be
+     traced back to it) and this failed on the punctuation while the thing it is
+     named after — a way out of Discord and into the shop — was still there.
+     An assertion that tracks a call signature instead of a behaviour fails for
+     improvements. */
   ok('verifying ends with a way out of Discord, not two channel names',
-    /Verified!\*\* Welcome in[\s\S]{0,700}await shopButton\(\)/.test(bot));
+    /Verified!\*\* Welcome in[\s\S]{0,700}await shopButton\(/.test(bot));
   ok('…and points at the roles that drive restock pings',
     /Verified!\*\* Welcome in[\s\S]{0,700}chanRef\(i\.guild, 'roles'\)/.test(bot));
   ok('…while still saying when the shop opens',
