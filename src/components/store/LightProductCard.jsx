@@ -46,7 +46,7 @@ function LightProductCard({ product, onAdd, priority = false }) {
   };
 
   return (
-    <div className="group w-full bg-white rounded-2xl border border-slate-200/70 shadow-sm fm-lift p-3 sm:p-4 flex flex-col">
+    <div className="fm-pcard group w-full rounded-2xl p-3 sm:p-4 flex flex-col">
       {/* Two kinds of tile, because there are two kinds of artwork.
 
           A generated icon is a transparent badge drawn FOR the plinth: it wants
@@ -93,8 +93,13 @@ function LightProductCard({ product, onAdd, priority = false }) {
             <span className="text-[10px] font-bold text-amber-800 bg-amber-100 rounded-full px-2 py-0.5">★ {t('card.featured', 'Featured')}</span>
           )}
         </div>
+        {/* Not animate-pulse. That fades a whole element in and out — it is
+            the shape a skeleton loader makes while it waits for data, so the
+            one badge on this card carrying a real fact about the shelf was
+            the one that looked like it had not loaded yet. It is a solid,
+            legible chip now; the number is the urgency. */}
         {product.stockLeft > 0 && (
-          <span className="absolute top-2.5 right-2.5 z-10 text-[10px] font-bold text-red-600 bg-red-100 rounded-full px-2 py-0.5 animate-pulse">
+          <span className="absolute top-2.5 right-2.5 z-10 text-[10px] font-bold text-white bg-rose-600/95 rounded-full px-2 py-0.5 shadow-sm ring-1 ring-inset ring-white/25 backdrop-blur">
             {product.stockLeft === 1 ? t('card.lastOne', 'Last one!') : t('card.onlyLeft', 'Only {n} left', { n: product.stockLeft })}
           </span>
         )}
@@ -130,8 +135,10 @@ function LightProductCard({ product, onAdd, priority = false }) {
         )}
       </div>
       <div className="flex items-center gap-2 mt-3">
-        <Link to={`/product/${product.id}`} className="flex-1 text-center text-sm font-semibold rounded-lg h-11 sm:h-10 grid place-items-center hover:brightness-105 transition"
-          style={{ backgroundImage: 'linear-gradient(135deg,#7c5cff,#a855f7)', color: '#fff' }}>{t('product.buyNow', 'Buy Now')}</Link>
+        <Link to={`/product/${product.id}`}
+          className="fm-cta flex-1 text-center text-sm font-semibold rounded-lg h-11 sm:h-10 grid place-items-center">
+          {t('product.buyNow', 'Buy Now')}
+        </Link>
         <button aria-label="Add to cart"
           onClick={(e) => {
             flyToCart(e.currentTarget.closest('.group')?.querySelector('[data-morph]'));

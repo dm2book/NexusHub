@@ -437,7 +437,105 @@ h1, h2, h3, .font-display, .fm-head {
 
 /* Hidden-scrollbar horizontal rail (trending / popular carousels) */
 .fm-rail::-webkit-scrollbar { height: 0; }
-.fm-rail { scrollbar-width: none; }
+
+/* THE PRODUCT CARD.
+   It is drawn seventy-two times across this shop, so a millimetre here is
+   worth more than anything in the hero. It was `bg-white + border + shadow-sm`
+   — correct, and completely flat: the same card whether you were pointing at
+   it or not.
+   Two shadows rather than one. The tight one is contact, the wide one is the
+   card's height off the page, and only a real object has both. On hover the
+   contact stays put and the height grows, which is what lifting something
+   actually looks like. */
+.fm-pcard {
+  position: relative;
+  background: #fff;
+  border: 1px solid rgb(226 232 240 / .8);
+  box-shadow: 0 1px 2px rgb(15 23 42 / .05), 0 6px 16px -12px rgb(15 23 42 / .20);
+  transition: box-shadow var(--dur-base) var(--ease-glide),
+              border-color var(--dur-base) var(--ease-glide),
+              transform var(--dur-base) var(--ease-spring);
+}
+/* The artwork leans in slightly. The tile is already overflow-hidden for the
+   badges, so the zoom costs nothing but a transform on an image that is
+   composited anyway. */
+.fm-pcard .fm-card-media img { transition: transform .55s var(--ease-glide); }
+@media (hover: hover) and (pointer: fine) {
+  .fm-pcard:hover {
+    transform: translateY(-4px);
+    border-color: rgb(167 139 250 / .55);
+    box-shadow: 0 2px 4px rgb(15 23 42 / .06), 0 24px 42px -22px rgb(76 29 149 / .45);
+  }
+  .fm-pcard:hover .fm-card-media img { transform: scale(1.045); }
+}
+/* Focus belongs to whatever inside the card was tabbed to, but the CARD is
+   what a person sees, so it answers too. */
+.fm-pcard:focus-within {
+  border-color: rgb(167 139 250 / .7);
+  box-shadow: 0 2px 4px rgb(15 23 42 / .06), 0 20px 36px -22px rgb(76 29 149 / .4);
+}
+@media (prefers-reduced-motion: reduce) {
+  .fm-pcard, .fm-pcard .fm-card-media img { transition: none; }
+  .fm-pcard:hover { transform: none; }
+  .fm-pcard:hover .fm-card-media img { transform: none; }
+}
+
+/* The horizontal rails on the homepage hide their scrollbar, which left the
+   fifth card cut clean through with nothing to say it could be scrolled.
+   The fade is driven by useRailEdges: 0 on a side with nothing beyond it, so
+   a rail that fits shows no fade at all and never pretends there is more.
+   The vertical padding is not spacing — it is room for the cards to lift into,
+   because a mask clips to the element's own box and a card rising 4px out of
+   an unpadded rail loses its top edge. */
+.fm-rail {
+  scrollbar-width: none;
+  --fade-l: 0px; --fade-r: 0px;
+  padding-block: 6px; margin-block: -6px;
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 var(--fade-l),
+    #000 calc(100% - var(--fade-r)), transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0, #000 var(--fade-l),
+    #000 calc(100% - var(--fade-r)), transparent 100%);
+  transition: --fade-l .25s linear, --fade-r .25s linear;
+}
+
+/* THE CARD'S OWN BUTTON.
+   Fifteen of these are on screen at once on the homepage, and every one of
+   them was the same filled violet slab. Fifteen equal shouts is silence: the
+   grid read as a wall of buttons with some artwork behind it, and the thing
+   actually worth looking at — the product — was the quietest element on its
+   own card.
+   So it is quiet until you are pointing at its card, and then it lights. The
+   click target, the label and the destination are untouched; only its volume
+   depends on whether you are looking at it.
+   On a touch screen there is no pointing, so it simply stays lit — the block
+   below is inside a hover query for exactly that reason, and the filled style
+   is the default rather than the exception. */
+.fm-cta {
+  background-image: linear-gradient(135deg, #7c5cff, #a855f7);
+  color: #fff;
+  box-shadow: 0 6px 16px -10px rgb(124 92 255 / .9);
+  transition: background-color var(--dur-base) var(--ease-glide),
+              color var(--dur-base) var(--ease-glide),
+              box-shadow var(--dur-base) var(--ease-glide),
+              filter var(--dur-quick) var(--ease-glide);
+}
+.fm-cta:hover { filter: brightness(1.06); }
+@media (hover: hover) and (pointer: fine) {
+  .fm-cta {
+    background-image: none;
+    background-color: rgb(245 243 255);          /* violet-50 */
+    color: rgb(109 40 217);                       /* violet-700, 7.6:1 on that */
+    box-shadow: inset 0 0 0 1px rgb(196 181 253 / .9);
+  }
+  .fm-pcard:hover .fm-cta,
+  .fm-pcard:focus-within .fm-cta,
+  .fm-cta:hover, .fm-cta:focus-visible {
+    background-image: linear-gradient(135deg, #7c5cff, #a855f7);
+    background-color: transparent;
+    color: #fff;
+    box-shadow: 0 8px 20px -10px rgb(124 92 255 / .95);
+  }
+}
 
 /* ── Phase 7: premium micro-interactions ───────────────────────────────── */
 .btn-primary:active, .btn-ghost:active, .btn:active { transform: translateY(0) scale(.98); }
