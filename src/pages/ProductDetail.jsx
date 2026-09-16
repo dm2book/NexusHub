@@ -373,8 +373,21 @@ export default function ProductDetail() {
       </nav>
 
       <div className="grid lg:grid-cols-2 gap-10">
-        {/* visual — shared-element morph target, with pointer-driven 3D tilt */}
-        <Tilt max={6} className="h-80 lg:h-[420px]">
+        {/* The artwork follows you down the page.
+            Measured on a Robux pack: this column is 420px and the one beside it
+            is 735 — five amounts, a quantity stepper, two buttons and four
+            trust lines — so a third of the block was empty white below the
+            picture, and the product scrolled out of sight exactly while
+            somebody was choosing which size of it to buy.
+            The STICKY element is the artwork, and the grid cell around it is
+            left to stretch. Tried the other way round first — the cell itself
+            sticky, with items-start so it would not stretch — and it came
+            unstuck 300px down: a sticky element travels inside its parent's
+            box, and a cell shrunk to its own content has no box to travel in.
+            84px clears the 68px header with room to breathe, the same offset
+            the shop's sidebar uses. */}
+        <div>
+        <Tilt max={6} className="h-80 lg:h-[420px] lg:sticky lg:top-[84px]">
         <div style={{ viewTransitionName: 'product-hero' }}
           className={`shine-host group relative rounded-3xl h-full overflow-hidden animate-fade-in ${
             isForgeArtboard(product.image) && !heroBroken ? 'bg-[#0b0918]'
@@ -452,6 +465,7 @@ export default function ProductDetail() {
           )}
         </div>
         </Tilt>
+        </div>
 
         {/* details */}
         <div className="animate-fade-up">

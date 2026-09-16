@@ -54,7 +54,7 @@ const NL = {
   'nav.howShort': 'Uitleg',
   'nav.support': 'Support',
   'nav.searchShort': 'Zoeken…',
-  'nav.search': 'Zoek producten...',
+  'nav.search': 'Producten zoeken…',   // 132 of 138px
   'nav.login': 'Inloggen',
   'nav.signup': 'Account maken',
   'nav.account': 'Account',

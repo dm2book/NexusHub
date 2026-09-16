@@ -28,7 +28,7 @@ export default {
   'nav.howShort': 'Le principe',
   'nav.support': 'Aide',
   'nav.searchShort': 'Rechercher…',
-  'nav.search': 'Rechercher un produit...',
+  'nav.search': 'Trouver un produit…', // 134 of 138px
   'nav.login': 'Se connecter',
   'nav.signup': 'Créer un compte',
   'nav.account': 'Compte',

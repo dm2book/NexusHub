@@ -96,7 +96,19 @@ export default function StoreNav() {
 
   return (
     <header className={`fm-nav sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-slate-200/70 ${scrolled ? 'is-scrolled' : ''}`}>
-      {/* xl:gap-5, not gap-6. Measured at 1440: the row is 1400px, padding takes
+      {/* Why 1400 and not the xl breakpoint that already existed.
+          The wordmark used to appear at xl (1280px), where it does NOT fit:
+          measured, the row needs about 120 more pixels than 1280 leaves after
+          padding, and the wordmark is 119 of them. So switching it on there
+          forced the nav to give up its last word instead — "Suppor" at every
+          width from 1280 to 1920, in every language, which is what the German
+          and French screenshots were actually showing.
+          The container caps at 1400px, so from 1400 up the room is fixed and
+          sufficient. Below that the mark alone says the same thing. The
+          existing comment already said the wordmark "waits for a width that
+          fits it whole"; only the threshold was wrong.
+
+          xl:gap-5, not gap-6. Measured at 1440: the row is 1400px, padding takes
           64 and seven 24px gaps take 168, leaving 1168 — and the children came
           to exactly 1168. The row was full to the pixel, so the wordmark gave
           way by the two pixels it was short and the shop's own name rendered as
@@ -107,7 +119,7 @@ export default function StoreNav() {
             it the browser squeezes these 40px buttons down to 20-27px — measured.
             w-11 puts them on the 44px thumb target instead of just under it. */}
         <button onClick={() => setOpen((v) => !v)} aria-label={t('nav.menu', 'Menu')}
-          className="lg:hidden w-11 h-11 shrink-0 -ml-1.5 rounded-xl hover:bg-slate-100 grid place-items-center text-slate-700">
+          className="min-[1152px]:hidden w-11 h-11 shrink-0 -ml-1.5 rounded-xl hover:bg-slate-100 grid place-items-center text-slate-700">
           {open ? <X size={20} /> : <Menu size={20} />}
         </button>
         {/* The wordmark is allowed to shrink; the mark and the buttons are not.
@@ -123,15 +135,21 @@ export default function StoreNav() {
               is actually visible: giving way there means truncating the name of
               the shop, which is the one label on this row that must never be
               the thing that gives. */}
-          <Link to="/" aria-label="ForgeMarket" className="flex items-center gap-2.5 min-w-0 xl:shrink-0">
+          <Link to="/" aria-label="ForgeMarket" className="flex items-center gap-2.5 min-w-0 min-[1400px]:shrink-0">
           <span className="w-9 h-9 shrink-0 rounded-xl flex items-center justify-center text-white shadow-lg shadow-violet-500/30"
             style={{ backgroundImage: 'linear-gradient(135deg,#7c5cff,#a855f7)' }}>
             <Zap size={18} fill="white" />
           </span>
-          <span className="hidden xl:inline text-xl font-extrabold tracking-tight text-slate-900 truncate">ForgeMarket</span>
+          <span className="hidden min-[1400px]:inline text-xl font-extrabold tracking-tight text-slate-900 truncate">ForgeMarket</span>
         </Link>
 
-        <nav className="hidden lg:flex items-center gap-5 xl:gap-7 text-[15px] font-medium text-slate-600 min-w-0 overflow-hidden">
+        {/* 1152, not the lg breakpoint. At 1024 the desktop nav switched on
+            with six items and a search box in a row that had space for five —
+            measured, the last link was cut by 34 to 40px depending on the
+            language. Below 1152 the menu button beside the logo carries the
+            same links, in full, so nothing is lost by waiting; the two
+            thresholds move together for that reason. */}
+        <nav className="hidden min-[1152px]:flex items-center gap-5 xl:gap-6 text-[15px] font-medium text-slate-600 min-w-0 overflow-hidden">
           {NAV.map((n) => (
             <Link key={n.label} to={n.to}
               className={`relative py-1 whitespace-nowrap hover:text-slate-900 transition ${active(n.to) ? 'text-violet-600' : ''}`}>
@@ -148,7 +166,7 @@ export default function StoreNav() {
             lighter grey measures 2.34:1 — well under the 4.5:1 that small text
             needs. Same visual weight, actually readable. */}
         <button onClick={() => window.dispatchEvent(new CustomEvent('forge:cmdk'))}
-          className="hidden md:flex items-center gap-2 bg-slate-100 rounded-xl px-3.5 h-10 w-[190px] xl:w-[264px] text-slate-500 hover:bg-slate-200/70 transition">
+          className="hidden md:flex items-center gap-2 bg-slate-100 rounded-xl px-3.5 h-10 w-[190px] min-[1400px]:w-[232px] text-slate-500 hover:bg-slate-200/70 transition">
           <Search size={16} />
           {/* Two labels, because the box is a fixed 190px below xl and 240px
               above it, and "Search for products..." does not fit in 190 — nor
@@ -157,11 +175,11 @@ export default function StoreNav() {
               than a short one, so the narrow width gets a label written for
               it. Same pattern the Sign Up button beside this one already uses:
               the icon always fits, the words appear when there is room. */}
-          <span className="text-sm whitespace-nowrap xl:hidden">{t('nav.searchShort', 'Search…')}</span>
-          <span className="text-sm whitespace-nowrap hidden xl:inline truncate">{t('nav.search', 'Search for products...')}</span>
+          <span className="text-sm whitespace-nowrap min-[1400px]:hidden">{t('nav.searchShort', 'Search…')}</span>
+          <span className="text-sm whitespace-nowrap hidden min-[1400px]:inline truncate">{t('nav.search', 'Search products…')}</span>
           <kbd className="ml-auto text-[11px] bg-white border border-slate-200 rounded px-1.5 py-0.5">⌘K</kbd>
         </button>
-        <button onClick={() => window.dispatchEvent(new CustomEvent('forge:cmdk'))} aria-label={t('nav.search', 'Search for products...')}
+        <button onClick={() => window.dispatchEvent(new CustomEvent('forge:cmdk'))} aria-label={t('nav.search', 'Search products…')}
           className="md:hidden w-11 h-11 shrink-0 rounded-xl hover:bg-slate-100 grid place-items-center text-slate-700">
           <Search size={20} />
         </button>
