@@ -283,16 +283,16 @@ export default function HomeStore() {
             hands back 28. */}
         <div className="max-w-[1400px] 2xl:max-w-[1560px] mx-auto px-4 lg:px-8 h-[68px] flex items-center gap-3 sm:gap-4 xl:gap-5">
           <button onClick={() => setMenuOpen((v) => !v)} aria-label={tr('nav.menu', 'Menu')} aria-expanded={menuOpen}
-            className="lg:hidden w-11 h-11 shrink-0 -ml-1.5 rounded-xl hover:bg-slate-100 grid place-items-center text-slate-700">
+            className="min-[1152px]:hidden w-11 h-11 shrink-0 -ml-1.5 rounded-xl hover:bg-slate-100 grid place-items-center text-slate-700">
             {menuOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
 
           {/* Named explicitly: the wordmark is hidden below xl, so on a phone this
             link is a lone icon and a screen reader announces nothing at all. */}
           {/* Shrinks below xl, where it is a lone icon and shrinking is what
-              keeps a 390px row from scrolling sideways. Never at xl and up,
+              keeps a 390px row from scrolling sideways. Never above 1400px,
               where what gives way is the name of the shop. */}
-          <Link to="/" aria-label="ForgeMarket" className="flex items-center gap-2.5 min-w-0 xl:shrink-0">
+          <Link to="/" aria-label="ForgeMarket" className="flex items-center gap-2.5 min-w-0 min-[1400px]:shrink-0">
             <span className="w-9 h-9 shrink-0 rounded-xl flex items-center justify-center text-white shadow-lg shadow-violet-500/30"
               style={{ backgroundImage: 'linear-gradient(135deg,#7c5cff,#a855f7)' }}>
               <Zap size={18} fill="white" />
@@ -302,10 +302,10 @@ export default function HomeStore() {
                 wordmark is what gives way. It used to return at 400px and then
                 truncate — "F…" beside the mark reads as a broken page rather
                 than a deliberate one, so it waits for 640px instead. */}
-            <span className="hidden xl:inline fm-head text-xl truncate">ForgeMarket</span>
+            <span className="hidden min-[1400px]:inline fm-head text-xl truncate">ForgeMarket</span>
           </Link>
 
-          <nav className="hidden lg:flex items-center gap-5 xl:gap-7 text-[15px] font-medium text-slate-600 min-w-0 overflow-hidden">
+          <nav className="hidden min-[1152px]:flex items-center gap-5 xl:gap-6 text-[15px] font-medium text-slate-600 min-w-0 overflow-hidden">
             {NAV.map((n, i) => (
               <Link key={n.label} to={n.to}
                 className={`relative py-1 whitespace-nowrap hover:text-slate-900 transition ${i === 0 ? 'text-violet-600' : ''}`}>
@@ -323,12 +323,12 @@ export default function HomeStore() {
                the same bar did not follow: on slate-100 the lighter grey
                measures 2.34:1, well under the 4.5:1 small text needs. Same
                visual weight, actually readable. */
-            className="hidden md:flex items-center gap-2 bg-slate-100 rounded-xl px-3.5 h-10 w-[190px] xl:w-[264px] text-slate-500 hover:bg-slate-200/70 transition">
+            className="hidden md:flex items-center gap-2 bg-slate-100 rounded-xl px-3.5 h-10 w-[190px] min-[1400px]:w-[232px] text-slate-500 hover:bg-slate-200/70 transition">
             <Search size={16} />
             {/* A label written for the narrow box rather than truncated into
                 it — see StoreNav for the measurement. */}
-            <span className="text-sm whitespace-nowrap xl:hidden">{tr('nav.searchShort', 'Search…')}</span>
-            <span className="text-sm whitespace-nowrap truncate hidden xl:inline">{tr('nav.search', 'Search for products...')}</span>
+            <span className="text-sm whitespace-nowrap min-[1400px]:hidden">{tr('nav.searchShort', 'Search…')}</span>
+            <span className="text-sm whitespace-nowrap truncate hidden min-[1400px]:inline">{tr('nav.search', 'Search products…')}</span>
             <kbd className="ml-auto text-[11px] bg-white border border-slate-200 rounded px-1.5 py-0.5 text-slate-400">⌘K</kbd>
           </button>
           <button onClick={() => window.dispatchEvent(new CustomEvent('forge:cmdk'))} aria-label="Search"

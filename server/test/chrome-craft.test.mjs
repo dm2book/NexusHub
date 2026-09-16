@@ -114,13 +114,40 @@ console.log('\n— The header does not eat its own name —');
      a lone icon — that is what keeps a 390px row from scrolling sideways. It
      is wrong at xl and up, where the thing that gives way is the shop's name. */
   for (const [who, src] of BARS) {
+    /* Read off the wordmark rather than written out: the threshold moved once
+       already (xl → 1400, after measuring that xl does not fit), and this
+       check was pinned to the old spelling within the hour. What matters is
+       that the brand stops shrinking at the SAME width the wordmark appears
+       at — pin the relationship, not the number. */
+    const shows = (src.match(/hidden (\S+):inline[^"]*">ForgeMarket</) || [])[1];
     ok(`${who}: the wordmark cannot be squeezed where it is visible`,
-      /aria-label="ForgeMarket"[^>]*xl:shrink-0/.test(src),
-      'the brand link shrinks at xl, so the name truncates again');
+      !!shows && new RegExp(`aria-label="ForgeMarket"[^>]*${shows.replace(/[[\]]/g, '\\$&')}:shrink-0`).test(src),
+      `the brand link shrinks at the width the wordmark appears (${shows || '?'})`);
     ok(`${who}: …and may still shrink below xl, where it is only an icon`,
       /aria-label="ForgeMarket"[^>]*min-w-0/.test(src));
     ok(`${who}: the row leaves the gap room this needed`, /xl:gap-5/.test(src),
       'the row is back to being full to the pixel');
+
+    /* A breakpoint is a guess about how much room there is; these two were
+       wrong in the same way and had to be measured, not chosen.
+       · The wordmark appeared at xl (1280), where the row needs about 120 more
+         pixels than 1280 leaves and the wordmark is 119 of them — so the nav
+         gave up its last word instead, and "Suppor" showed at every width from
+         1280 to 1920 in every language. The container caps at 1400, so from
+         there the room is fixed and enough.
+       · The desktop nav appeared at lg (1024) with six links and a search box
+         in a row with space for five: the last link was cut by 34-40px.
+       Below each threshold nothing is lost — the mark alone says the shop's
+       name, and the menu button carries the same links in full. */
+    ok(`${who}: the wordmark waits for a width that fits it whole`,
+      /hidden min-\[1400px\]:inline[^"]*">ForgeMarket</.test(src)
+      || /hidden min-\[1400px\]:inline[^"]*truncate">ForgeMarket</.test(src),
+      'the wordmark is back on a breakpoint that does not fit it');
+    ok(`${who}: the desktop nav waits for a width that fits it`,
+      /hidden min-\[1152px\]:flex/.test(src), 'the nav appears at 1024 again');
+    ok(`${who}: …and the menu button steps aside at the same width`,
+      /min-\[1152px\]:hidden w-11/.test(src),
+      'the two thresholds drifted, so there is a width with neither');
     /* On slate-100 the lighter grey measures 2.34:1, under the 4.5:1 small
        text needs. The shared bar fixed it; this copy had not followed. */
     ok(`${who}: the search box's own label is readable on its ground`,
@@ -135,9 +162,39 @@ console.log('\n— The header does not eat its own name —');
      box rather than a short one. */
   for (const [who, src] of BARS) {
     ok(`${who}: the search box has a label written for its narrow width`,
-      /nav\.searchShort/.test(src) && /xl:hidden/.test(src));
-    ok(`${who}: …and the full one only where it fits`, /hidden xl:inline/.test(src));
+      /nav\.searchShort/.test(src) && /whitespace-nowrap min-\[\d+px\]:hidden/.test(src),
+      'the short label is gone, or no longer hides at a measured width');
+    ok(`${who}: …and the full one only where it fits`,
+      /hidden min-\[\d+px\]:inline/.test(src));
   }
+}
+
+console.log('\n— Every label fits the box it is in —');
+{
+  /* The search box is 232px wide, which leaves 138 for the label once the
+     icon, the ⌘K key and the padding are taken out. Measured in the browser
+     with the real font — three rounds of "still clipped" came from writing a
+     label and then finding out. Anything longer is truncated mid-word beside a
+     magnifying glass, which reads as broken rather than short.
+     The English default lives in the component; the other three are in the
+     dictionaries with their measured width written beside them. */
+  const LIMIT = 138;
+  const WIDTHS = { 'Search products…': 121, 'Producten zoeken…': 132,
+    'Produkte suchen…': 124, 'Trouver un produit…': 134 };
+  for (const [label, px] of Object.entries(WIDTHS))
+    ok(`"${label}" fits (${px} of ${LIMIT}px)`, px <= LIMIT);
+
+  const dicts = ['src/lib/i18n.jsx', 'src/lib/i18n/de.js', 'src/lib/i18n/fr.js']
+    .map((f) => [f, readFileSync(join(ROOT, f), 'utf8')]);
+  for (const [f, src] of dicts) {
+    const m = src.match(/^  'nav\.search': '([^']*)'/m);
+    ok(`${f.split('/').pop()} still uses a label that was measured`,
+      !!m && Object.prototype.hasOwnProperty.call(WIDTHS, m[1]),
+      m ? `"${m[1]}" has no measured width — measure it against ${LIMIT}px first` : 'no nav.search');
+  }
+  for (const [who, src] of BARS)
+    ok(`${who}: the English default is the measured one`,
+      /'Search products…'/.test(src), 'the long English label is back');
 }
 
 console.log(`\n${fail === 0 ? '✅' : '❌'} chrome-craft: ${pass} passed, ${fail} failed`);

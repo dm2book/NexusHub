@@ -107,9 +107,14 @@ console.log('\n— The header row fits in any language —');
     ok(`${label}: the row gap is smaller on small screens`,
       gaps.length === 3 && gaps[0] < gaps[1] && gaps[1] < gaps[2],
       `gaps ${gaps.join(' → ') || 'not found'} — the row must not use one gap at every width`);
-    // The wordmark is the one thing that can go: the mark says the same thing.
+    /* The wordmark is the one thing that can go: the mark says the same thing.
+       The WIDTH is not pinned here — it moved from xl to 1400 once measuring
+       showed xl does not fit, and a check that names a breakpoint fails on the
+       fix rather than on the fault. chrome-craft holds the measurement; this
+       holds the property: it waits for some width, and truncates at none. */
+    const shown = src.match(/hidden (\S+):inline[^"]*">ForgeMarket</);
     ok(`${label}: the wordmark waits for a width that fits it whole`,
-      /hidden xl:inline[^"]*">ForgeMarket</.test(src), 'wordmark shown where it only truncates');
+      !!shown, 'the wordmark is shown at every width, including ones it truncates at');
   }
 
   // Both link to /login on a passwordless shop, so one of them is redundant

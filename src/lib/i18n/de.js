@@ -28,7 +28,7 @@ export default {
   'nav.howShort': 'Ablauf',
   'nav.support': 'Support',
   'nav.searchShort': 'Suchen…',
-  'nav.search': 'Produkte suchen...',
+  'nav.search': 'Produkte suchen…',    // 124 of 138px
   'nav.login': 'Anmelden',
   'nav.signup': 'Konto erstellen',
   'nav.account': 'Konto',
