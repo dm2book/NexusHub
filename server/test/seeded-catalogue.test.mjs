@@ -101,5 +101,27 @@ console.log('\n— Only what needs it, and only what it needs —');
     'a product name containing </script> would break the page');
 }
 
+console.log('\n— The product page was the last one still waiting —');
+{
+  /* Every other route came in under 300ms against a slow API. The product page
+     took 2,162ms, because the product the API inlines into the HTML only
+     exists on a DIRECT hit — and the common path is not a direct hit, it is
+     clicking a card in the shop, which is a client-side navigation with no new
+     HTML at all. Measured on that journey with the API 2s slow:
+     3,063ms → 608ms. */
+  const detail = read('src/pages/ProductDetail.jsx');
+  ok('the product page falls back to the catalogue in the page',
+    /readSeed\('products'\)/.test(detail), 'a client-side navigation still waits for the API');
+  ok('…and the inlined product still wins where there is one',
+    /if \(BOOT\) \{[\s\S]{0,160}?if \(BOOT\.id === id\) return BOOT;/.test(detail));
+  /* Dropping it when the id differs is what stops every product page after
+     the first from flashing the one the visitor originally landed on. */
+  ok('…and is dropped the moment a different product is asked for',
+    /BOOT = null;/.test(detail));
+  ok('the seeded copy is looked up BY ID, never just the first one',
+    /\.find\(\(p\) => p && p\.id === id\)/.test(detail),
+    'this could show the wrong product, which is worse than showing none');
+}
+
 console.log(`\n${fail === 0 ? '✅' : '❌'} seeded-catalogue: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
