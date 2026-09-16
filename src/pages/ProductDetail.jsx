@@ -17,6 +17,7 @@ import { useReviews } from '../lib/useReviews.js';
 import { useStats } from '../lib/useStats.js';
 import { useWishlist } from '../lib/wishlist.js';
 import { usePageMeta, useJsonLd } from '../lib/useMeta.js';
+import { readSeed } from '../lib/seed.js';
 import { landingPathFor, SITE } from '../content/seo.js';
 import { useI18n } from '../lib/i18n.jsx';
 import { useConfig } from '../lib/useConfig.js';
@@ -110,10 +111,36 @@ if (typeof window !== 'undefined') {
   BOOT = window.__FM_BOOT__?.product || null;
   delete window.__FM_BOOT__;
 }
+/**
+ * Something to draw for this product, before asking anyone.
+ *
+ * Two sources, in order of how much they know:
+ *
+ *   1. The product the API inlined into this page's HTML. Complete, and only
+ *      present on a DIRECT hit — a shared link, a search result, a bookmark.
+ *
+ *   2. The catalogue baked into the page the visitor arrived on (lib/seed.js).
+ *      This is the one that matters for the common path: clicking a product
+ *      from the shop is a client-side navigation, so there is no new HTML and
+ *      therefore no inlined product. That page used to mount with nothing and
+ *      wait for /api/products/:id — measured at 2,162ms against a slow API,
+ *      while every other route was under 300ms. It was the only slow page left.
+ *
+ * The seeded copy carries what the top of the page draws — name, price, image,
+ * description, category — and not the rest. That is fine and deliberate: the
+ * page already handles `product === null` completely, so partial is strictly
+ * better than nothing, and the fetch below fills in the remainder a moment
+ * later. Nothing here is ever acted on; the server prices the order.
+ */
 function bootProduct(id) {
-  if (!BOOT) return null;
-  if (BOOT.id !== id) { BOOT = null; return null; }
-  return BOOT;
+  if (BOOT) {
+    if (BOOT.id === id) return BOOT;
+    // Asked for a different product: drop it, or every page after the first
+    // would flash the one they originally landed on.
+    BOOT = null;
+  }
+  const seeded = readSeed('products');
+  return Array.isArray(seeded) ? seeded.find((p) => p && p.id === id) || null : null;
 }
 
 export default function ProductDetail() {

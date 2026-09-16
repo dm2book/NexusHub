@@ -192,8 +192,21 @@ console.log('\n— The page asks for each thing once —');
     !/\}, \[product\]\);/.test(page), 'an effect still keys on the whole object');
   ok('the boot payload is read once and dropped',
     /delete window\.__FM_BOOT__/.test(page));
+  /* Behaviour, not spelling. This was pinned to `BOOT.id !== id` and broke
+     when the same check was written the other way round — a rewrite that
+     changed nothing a visitor could see. What matters is that the inlined
+     product is compared against the id being asked for and thrown away when
+     they differ; without that, every product page after the first flashes the
+     one the visitor originally landed on. */
+  const boot = (page.match(/function bootProduct\(id\) \{[\s\S]*?\n\}/) || [''])[0];
   ok('…and never answers for a different product',
-    /BOOT\.id !== id/.test(page));
+    /BOOT\.id\s*[!=]==\s*id/.test(boot) && /BOOT = null/.test(boot),
+    'bootProduct no longer checks the id it was asked for');
+  /* The same rule for the copy it now falls back to: a catalogue seeded into
+     the page is only useful if it is searched by id. Handing back the first
+     product would be instant and wrong, which is worse than slow. */
+  ok('…and the seeded fallback is looked up by id too',
+    !/readSeed\('products'\)/.test(boot) || /id === id|p\.id === id/.test(boot));
 }
 
 console.log('\n— The pack covers are not cropped —');
