@@ -1,9 +1,10 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Search, ShoppingCart, Zap, ArrowRight, Shield, Menu, X, User } from 'lucide-react';
 import { useCart } from '../../context/CartContext.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useI18n, LANGUAGES } from '../../lib/i18n.jsx';
+import MobileDrawer from './MobileDrawer.jsx';
 
 /**
  * Language chooser.
@@ -20,7 +21,64 @@ export function LangSwitch({ className = '' }) {
   const { lang, setLang } = useI18n();
   const [open, setOpen] = useState(false);
   const box = useRef(null);
+  const panel = useRef(null);
+  const [place, setPlace] = useState(null);
   const current = LANGUAGES.find((l) => l.code === lang) || LANGUAGES[0];
+
+  /**
+   * Keep the list on the screen, wherever the button happens to sit.
+   *
+   * It was `right-0`, which is correct for the switcher in the desktop header
+   * — it hangs to the left of a button on the right-hand side. The same
+   * component is also the first thing in the mobile drawer's footer, on the
+   * LEFT, and there a 164px list hanging leftwards runs off the edge of the
+   * phone: measured at 390px wide, the panel started at x = -90 and every one
+   * of the four languages began off-screen. You could see a sliver reading
+   * "…ands" and had no way to find out what the other three were. On the one
+   * control whose entire job is to show you what is on offer.
+   *
+   * Clamped rather than given an `align` prop: the call site is what was
+   * wrong, so a prop is one more thing to get wrong the next time this button
+   * is moved. The component asks the viewport instead.
+   */
+  useLayoutEffect(() => {
+    if (!open) { setPlace(null); return undefined; }
+    const position = () => {
+      const anchor = box.current;
+      const list = panel.current;
+      if (!anchor || !list) return;
+      const a = anchor.getBoundingClientRect();
+      const GUTTER = 12;
+      const GAP = 6;
+
+      // Horizontal: where `right-0` would put it, pulled back onto the screen.
+      const w = list.offsetWidth;
+      const wanted = a.right - w;
+      const room = Math.max(GUTTER, window.innerWidth - w - GUTTER);
+      const left = Math.round(Math.max(GUTTER, Math.min(wanted, room)) - a.left);
+
+      /* Vertical: the phone's fixed tab bar is the real floor, not the bottom
+         of the window. Opening downwards from a button sitting just above it
+         put Français behind the bar — three of four languages listed, which is
+         the same failure as the horizontal one in a different direction. The
+         height comes from --fm-bottom-bar, the same number .fm-fab and
+         .fm-clears-tabbar use, and CSS zeroes it above lg where there is no
+         bar; a hardcoded 73 here would be a third copy. */
+      const bar = parseInt(getComputedStyle(document.documentElement)
+        .getPropertyValue('--fm-bottom-bar'), 10) || 0;
+      const floor = window.innerHeight - bar - GUTTER;
+      const h = list.offsetHeight;
+      const below = floor - a.bottom - GAP;
+      const above = a.top - GUTTER - GAP;
+      const up = h > below && above > below;
+      const top = Math.round(up ? -(Math.min(h, above) + GAP) : a.height + GAP);
+
+      setPlace({ left, top, maxHeight: Math.max(120, Math.round(up ? above : below)) });
+    };
+    position();
+    window.addEventListener('resize', position);
+    return () => window.removeEventListener('resize', position);
+  }, [open]);
 
   // Click outside and Escape both close it — a menu that traps you is worse
   // than no menu.
@@ -42,8 +100,10 @@ export function LangSwitch({ className = '' }) {
         🌐 {current.short}
       </button>
       {open && (
-        <ul role="listbox" aria-label="Language"
-          className="absolute right-0 top-11 z-50 min-w-[164px] rounded-xl border border-slate-200 bg-white shadow-lg py-1">
+        <ul ref={panel} role="listbox" aria-label="Language"
+          style={place == null ? undefined
+            : { left: place.left, right: 'auto', top: place.top, maxHeight: place.maxHeight }}
+          className="absolute right-0 top-11 z-50 min-w-[164px] max-w-[calc(100vw-24px)] overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg py-1">
           {LANGUAGES.map((l) => (
             <li key={l.code}>
               <button role="option" aria-selected={l.code === lang} lang={l.code}
@@ -231,8 +291,7 @@ export default function StoreNav() {
       </div>
 
       {/* Mobile drawer */}
-      {open && (
-        <div className="lg:hidden border-t border-slate-200/70 bg-white px-4 py-3 space-y-1 fm-page">
+      <MobileDrawer open={open} className="px-4 py-3 space-y-1">
           {NAV.map((n) => (
             <Link key={n.label} to={n.to}
               className={`block px-3 py-2.5 rounded-xl text-[15px] font-medium ${active(n.to) ? 'bg-violet-50 text-violet-700' : 'text-slate-700 hover:bg-slate-50'}`}>
@@ -249,8 +308,7 @@ export default function StoreNav() {
             <Link to="/login" className="block text-center text-white font-semibold rounded-xl py-2.5 mt-1"
               style={{ backgroundImage: 'linear-gradient(135deg,#7c5cff,#a855f7)' }}>{t('nav.signup', 'Sign Up')}</Link>
           )}
-        </div>
-      )}
+      </MobileDrawer>
     </header>
   );
 }

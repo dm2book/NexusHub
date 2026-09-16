@@ -862,6 +862,21 @@ h1, h2, h3, .font-display, .fm-head {
    bar in the same corner, which is taller — measured with elementFromPoint, the
    bubble was sitting on the right-hand end of the Checkout button and eating
    real taps. Those pages raise --fm-fab-lift while they are mounted. */
+/* Anything that ends at the bottom edge of a phone has to clear the same bar
+   the bubble does. The mobile menu did not: measured on an iPhone SE, its last
+   row — the language switcher — ended 33px below the top of the tab bar, and
+   elementFromPoint at the button's own centre returned the "Home" tab. Not a
+   cosmetic overlap; the control could not be tapped. Same 73px, same media
+   query, for the same reason: the bar is lg:hidden and CSS is the only thing
+   that can see a breakpoint. */
+:root { --fm-bottom-bar: 73px; }
+@media (min-width: 1024px) { :root { --fm-bottom-bar: 0px; } }
+.fm-clears-tabbar { padding-bottom: calc(var(--fm-bottom-bar) + env(safe-area-inset-bottom) + 0.75rem); }
+
+/* An open menu owns the screen. The bubble is fixed to the same corner and
+   sat on top of the categories. */
+body.fm-menu-open .fm-fab { display: none; }
+
 .fm-fab       { bottom: calc(var(--fm-fab-lift, 73px) + env(safe-area-inset-bottom) + 0.75rem); }
 .fm-fab-panel { bottom: calc(var(--fm-fab-lift, 73px) + env(safe-area-inset-bottom) + 5.5rem); }
 @media (min-width: 1024px) {
