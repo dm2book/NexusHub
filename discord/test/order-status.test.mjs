@@ -2,7 +2,7 @@
  * /order tells a buyer what is happening and whether they need to act.
  * Runs without Postgres or a Discord token — pure payload → view.
  */
-import { orderStatusView, ORDER_STATE } from '../src/orderStatus.js';
+import { orderStatusView, ORDER_STATE, ORDER_UI, BOT_LANGS, botLang, say } from '../src/orderStatus.js';
 
 let pass = 0, fail = 0;
 const ok = (name, cond, extra = '') => { if (cond) { pass++; console.log(`  ✅ ${name}`); } else { fail++; console.log(`  ❌ ${name} ${extra}`); } };
@@ -68,8 +68,58 @@ console.log('— /order status view —');
 // Every status the store can emit needs a mapping — a missing one shows a raw enum.
 {
   const STORE_STATUSES = ['pending', 'payment_received', 'processing', 'awaiting_fulfillment', 'completed', 'refunded', 'cancelled', 'failed'];
-  ok('every store status has buyer-facing copy', STORE_STATUSES.every((s) => ORDER_STATE[s]?.next),
+  /* `?.next` on its own stopped meaning anything the moment `next` became a
+     table of languages: an object is truthy whether or not it holds a word.
+     This asks for a sentence, in every language, which is the thing the buyer
+     actually reads. */
+  const written = (table) => BOT_LANGS.every((l) => typeof table?.[l] === 'string' && table[l].length > 10);
+  ok('every store status has buyer-facing copy', STORE_STATUSES.every((s) => written(ORDER_STATE[s]?.next)),
     STORE_STATUSES.filter((s) => !ORDER_STATE[s]).join(', '));
+}
+
+console.log('\n— …and it is readable by the member who asked —');
+{
+  /* The shop sells across the border and its storefront, its emails and its
+     on-site assistant all answer in the buyer's language. /order — the place a
+     worried buyer goes when the email has not arrived — answered everyone in
+     English. Discord sends the member's own locale with every interaction, so
+     there was never anything for anyone to configure. */
+  ok('the bot writes every language the shop is read in', BOT_LANGS.length >= 4, BOT_LANGS.join(','));
+
+  for (const [locale, want] of [['nl', 'nl'], ['de', 'de'], ['fr', 'fr'], ['en-GB', 'en'],
+    ['en-US', 'en'], ['pt-BR', 'en'], [undefined, 'en'], ['', 'en']]) {
+    ok(`locale ${locale ?? '(none)'} → ${want}`, botLang(locale) === want, botLang(locale));
+  }
+
+  /* One marker word per language rather than "it returned a string": a
+     fallback returns a string too. */
+  const MARK = { nl: 'betaling', en: 'payment', de: 'Zahlung', fr: 'paiement' };
+  for (const [lang, word] of Object.entries(MARK)) {
+    const v = orderStatusView({ ...base, status: 'pending', history: [] }, { lang });
+    ok(`[${lang}] the title and the next step are in ${lang}`,
+      `${v.title} ${v.description}`.toLowerCase().includes(word.toLowerCase()),
+      `${v.title} — ${v.description.slice(0, 50)}`);
+  }
+
+  /* The furniture too. A German embed with English field names is the version
+     that looks like nobody checked. */
+  for (const lang of BOT_LANGS) {
+    const v = orderStatusView({ ...base, status: 'pending', history: [] }, { lang });
+    const names = v.fields.map((f) => f.name);
+    ok(`[${lang}] the field names are translated as well`,
+      names[0] === ORDER_UI.progress[lang] && names.includes(ORDER_UI.reference[lang]),
+      names.join(', '));
+    ok(`[${lang}] …and so is the footer and the author line`,
+      v.footer === ORDER_UI.live[lang] && v.author.startsWith(ORDER_UI.order[lang]),
+      `${v.author} / ${v.footer}`);
+  }
+
+  /* Nothing in this file may reach a buyer as `undefined`. */
+  const tables = [...Object.values(ORDER_STATE).flatMap((st) => [st.title, st.next]), ...Object.values(ORDER_UI)];
+  ok(`all ${tables.length} copy tables are complete`,
+    tables.every((t) => BOT_LANGS.every((l) => typeof t[l] === 'string' && t[l].length > 0)),
+    'a missing language shows nothing at all');
+  ok('…and an unknown language still says something', say(ORDER_UI.total, 'xx') === ORDER_UI.total.en);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

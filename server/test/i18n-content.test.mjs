@@ -45,7 +45,24 @@ const DELIBERATELY_UNTRANSLATED = new Set([
 
 const walk = (dir) => readdirSync(dir, { withFileTypes: true })
   .flatMap((e) => (e.isDirectory() ? walk(join(dir, e.name)) : [join(dir, e.name)]));
-const files = walk(join(ROOT, 'src')).filter((f) => /\.jsx?$/.test(f));
+
+/**
+ * Three trees, not one.
+ *
+ * This walked `src` only, and the note at the top of this file listed "an
+ * assistant that answered in English on a page written in German" among the
+ * things it had caught. It had not: the assistant's copy lives in
+ * server/src/services/assistantService.js, outside everything this scanned, and
+ * it was still nl + en — which turned out to be worse than an English answer.
+ * The widget's own chrome had German and French, so the shop showed a fully
+ * German assistant whose endpoint rejected `lang: "de"` as an invalid enum
+ * value. Every message a German or French visitor sent was a 400.
+ *
+ * The bot's copy lives in a third tree again, and answers the same buyer.
+ */
+const files = ['src', 'server/src', 'discord/src']
+  .flatMap((d) => walk(join(ROOT, d)))
+  .filter((f) => /\.jsx?$/.test(f));
 
 console.log('— Every language-keyed map covers every language —');
 {
@@ -85,11 +102,37 @@ console.log('— Every language-keyed map covers every language —');
     return out;
   };
 
+  /**
+   * The other shape: one entry per topic, each holding a short string per
+   * language — `delivery: { nl: '…', en: '…' }`.
+   *
+   * mapsIn above only sees language keys that open a block, so every one of
+   * these was invisible to it: the assistant's answers, its order statuses and
+   * its redeem steps are all written this way, and all three were nl + en long
+   * after the shop had four languages. A brace group with no nested braces of
+   * its own, containing an `nl:` string, is one of these.
+   */
+  const inlineIn = (src) => {
+    const out = [];
+    for (const m of src.matchAll(/\{[^{}]*?\bnl:\s*['"`][^{}]*?\}/g)) {
+      if (m[0].includes('${')) continue; // a template literal, not a copy table
+      const langs = new Set([...m[0].matchAll(/\b([a-z]{2}):\s*['"`]/g)].map((x) => x[1])
+        .filter((c) => LANG_CODES.includes(c)));
+      /* Two languages before this counts as copy. A single `nl` is as likely to
+         be a value that happens to be named after one — the query object
+         `{ id: eventKey, nl: 'nl' }` that falls back to the Dutch email
+         template is not a translation waiting to be finished. */
+      if (langs.size < 2) continue;
+      out.push({ line: src.slice(0, m.index).split('\n').length, siblings: langs });
+    }
+    return out;
+  };
+
   const maps = [];
   for (const file of files) {
     const src = readFileSync(file, 'utf8');
     const rel = relative(ROOT, file);
-    for (const found of mapsIn(src)) {
+    for (const found of [...mapsIn(src), ...inlineIn(src)]) {
       maps.push({ rel, line: found.line, missing: LANG_CODES.filter((c) => !found.siblings.has(c)) });
     }
   }

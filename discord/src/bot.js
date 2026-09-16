@@ -21,7 +21,7 @@ import {
 import Anthropic from '@anthropic-ai/sdk';
 import { FAQ, GAME_ROLES, NOTIFY_ROLES, LEVEL_ROLES, DELIVERY_INFO, CATEGORY_GAME_ROLE,
 } from './config.js';
-import { orderStatusView } from './orderStatus.js';
+import { orderStatusView, botLang, say, ORDER_UI } from './orderStatus.js';
 import { buildPanels, panelNeedsUpdate } from './panels.js';
 import { log, reportEnv, startHealthServer, loginWithRetry } from './runtime.js';
 import { scamReason } from './scamGuard.js';
@@ -525,7 +525,12 @@ function leadLog(guild, text) {
 }
 
 // ── AI ─────────────────────────────────────────────────────────────────────
-async function askAI(question, products) {
+/** What to tell the model about who is reading. */
+const REPLY_IN = {
+  nl: 'Dutch', en: 'English', de: 'German', fr: 'French',
+};
+
+async function askAI(question, products, lang = 'en') {
   if (!anthropic) return ruleBasedAnswer(question, products);
   const catalog = products.slice(0, 40).map((p) => `- ${p.name} (${p.category}) — ${money(p.price, p.currency)}`).join('\n')
     || '(catalog unavailable — point users to the store)';
@@ -536,6 +541,8 @@ async function askAI(question, products) {
         "You are Forge, the friendly, professional assistant for ForgeMarket, a premium gaming top-up marketplace " +
         "(game currency, gift cards, subscriptions). Voice: helpful, concise, trustworthy — never pushy.\n\n" +
         "Rules:\n" +
+        `- Reply in ${REPLY_IN[lang] || REPLY_IN.en} unless the question is clearly written in another language, ` +
+        "in which case answer in the language of the question. Never answer in a language the reader did not use.\n" +
         "- Keep replies short (Discord). Use light formatting and at most a couple emojis.\n" +
         "- Recommend ONLY products from the catalog below. Never invent prices or items.\n" +
         "- If the request is vague, ask ONE qualifying question (game, amount, budget).\n" +
@@ -1210,7 +1217,8 @@ async function openTicket(i, type, { orderNumber = '', details = '' } = {}) {
   // Order number in the form? Post the live status right away, before staff arrive.
   const num = orderNumber.match(ORDER_RE)?.[0]?.toUpperCase();
   if (num) {
-    orderStatusEmbed(num).then((e) => { if (e) channel.send({ embeds: [e] }).catch(() => {}); });
+    /* A ticket is opened from a modal, which carries the member's locale too. */
+    orderStatusEmbed(num, botLang(i.locale)).then((e) => { if (e) channel.send({ embeds: [e] }).catch(() => {}); });
   }
   leadLog(i.guild, `🎫 Ticket opened by <@${i.user.id}> — **${label}** → <#${channel.id}>`);
   return i.editReply(`✅ Your ticket is ready: <#${channel.id}>`);
@@ -1498,7 +1506,11 @@ async function handleCommand(i) {
     const q = i.commandName === 'recommend'
       ? `Recommend a product. Game: ${i.options.getString('game') || 'any'}. Budget: ${i.options.getString('budget') || 'any'}.`
       : i.options.getString('question');
-    const answer = await askAI(q, products);
+    /* /recommend builds its prompt in English out of two dropdown values, so
+       without this a German member asking for a Robux recommendation got an
+       English answer every time — there was nothing German left in the prompt
+       for the model to take a hint from. */
+    const answer = await askAI(q, products, botLang(i.locale));
     if (BUY_INTENT.test(q)) leadLog(i.guild, `💡 Buying intent from <@${i.user.id}>: "${q.slice(0, 120)}"`);
     return i.editReply(answer.slice(0, 1900));
   }
@@ -1610,7 +1622,10 @@ client.on(Events.MessageCreate, async (m) => {
   if (m.author.bot || m.channel.name !== 'ask-the-bot') return;
   await m.channel.sendTyping().catch(() => {});
   const products = await getProducts();
-  const answer = await askAI(m.content, products);
+  /* A message carries no locale, but it carries the question itself — and the
+     rule above tells the model to follow the language it is written in. The
+     server's own language is the default for anything ambiguous. */
+  const answer = await askAI(m.content, products, botLang(m.guild?.preferredLocale));
   if (BUY_INTENT.test(m.content)) leadLog(m.guild, `💡 Buying intent from <@${m.author.id}>: "${m.content.slice(0, 120)}"`);
   m.reply(answer.slice(0, 1900)).catch(() => {});
 });
@@ -1890,33 +1905,34 @@ async function pollOutbox(c) {
 }
 
 // ── Order status (shared by /order, ticket auto-lookup and the ticket form) ──
-async function orderStatusEmbed(num) {
+async function orderStatusEmbed(num, lang = 'en') {
   if (!FORGEMARKET_API_URL) return null;
   try {
     const res = await fetch(`${FORGEMARKET_API_URL}/api/track/${encodeURIComponent(num)}`);
     if (!res.ok) return null;
-    const v = orderStatusView(await res.json(), { money });
+    const v = orderStatusView(await res.json(), { money, lang });
     return new EmbedBuilder().setColor(v.color)
       .setAuthor({ name: v.author, iconURL: BRAND_ICON })
       .setTitle(v.title).setDescription(v.description || null)
       .addFields(...v.fields)
-      .setFooter({ text: 'Live from the store' }).setTimestamp();
+      .setFooter({ text: v.footer }).setTimestamp();
   } catch { return null; }
 }
 
 async function lookupOrder(i) {
   await i.deferReply({ ephemeral: true });
   const num = i.options.getString('number').trim();
-  if (!FORGEMARKET_API_URL) return i.editReply('Order lookup isn’t configured yet.');
-  const e = await orderStatusEmbed(num);
-  if (!e) {
-    return i.editReply(`No order found for \`${num}\`. Order numbers look like \`FM-2026-XXXXXXXX\` — ` +
-      'check the confirmation email, or open a ticket in #open-a-ticket and we’ll look it up for you.');
-  }
+  /* Discord already knows which language this member reads it in, and the
+     answer to "where is my order" is only worth giving in a language they
+     understand. Nobody has to set anything. */
+  const lang = botLang(i.locale);
+  if (!FORGEMARKET_API_URL) return i.editReply(say(ORDER_UI.notConfigured, lang));
+  const e = await orderStatusEmbed(num, lang);
+  if (!e) return i.editReply(say(ORDER_UI.notFound, lang).replace('%s', num));
   // The track page is the live version of this embed and needs no account, so
   // the buyer never has to come back and re-run the command to refresh.
   const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setLabel('Live status page').setStyle(ButtonStyle.Link)
+    new ButtonBuilder().setLabel(say(ORDER_UI.page, lang)).setStyle(ButtonStyle.Link)
       .setURL(`${STORE_URL}/track?number=${encodeURIComponent(num)}`),
   );
   return i.editReply({ embeds: [e], components: [row] });
@@ -2491,7 +2507,9 @@ client.on(Events.MessageCreate, async (m) => {
     // Inside a ticket the channel is private (owner + staff only), so posting the
     // status saves everyone a round trip.
     if (m.channel.topic?.startsWith('ticket-owner:')) {
-      const e = await orderStatusEmbed(match[0].toUpperCase());
+      /* A plain message carries no locale of its own, so the server's own
+         language is the best available guess for who is reading this channel. */
+      const e = await orderStatusEmbed(match[0].toUpperCase(), botLang(m.guild?.preferredLocale));
       if (e) await m.reply({ embeds: [e] });
       return;
     }

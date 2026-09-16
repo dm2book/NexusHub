@@ -180,9 +180,16 @@ export function withFallback(list) {
  * expensive place to break that: the visitor believes they can buy.
  */
 export const CATALOG_UNAVAILABLE = {
-  title: { en: 'We cannot load the shop right now', nl: 'We kunnen de winkel nu niet laden' },
+  title: {
+    en: 'We cannot load the shop right now',
+    nl: 'We kunnen de winkel nu niet laden',
+    de: 'Wir können den Shop gerade nicht laden',
+    fr: 'Nous ne pouvons pas charger la boutique pour le moment',
+  },
   hint: {
     en: 'This is on our side, not yours. Nothing is wrong with your connection — please try again in a few minutes.',
     nl: 'Dit ligt aan ons, niet aan jou. Er is niets mis met je verbinding — probeer het over een paar minuten opnieuw.',
+    de: 'Das liegt an uns, nicht an dir. Mit deiner Verbindung ist alles in Ordnung — versuch es bitte in ein paar Minuten noch einmal.',
+    fr: 'Cela vient de nous, pas de toi. Ta connexion n’a rien — réessaie dans quelques minutes, s’il te plaît.',
   },
 };

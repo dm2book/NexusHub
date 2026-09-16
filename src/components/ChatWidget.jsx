@@ -72,6 +72,8 @@ const COPY = {
 const QUICK = {
   en: ['How long does delivery take?', 'How do I pay?', 'Is this legit?', 'Price of Robux'],
   nl: ['Hoe lang duurt levering?', 'Hoe betaal ik?', 'Is dit betrouwbaar?', 'Wat kost Robux?'],
+  de: ['Wie lange dauert die Lieferung?', 'Wie bezahle ich?', 'Ist das seriös?', 'Was kostet Robux?'],
+  fr: ['Combien de temps pour la livraison ?', 'Comment je paie ?', 'C’est fiable ?', 'Prix des Robux ?'],
 };
 
 const ACTION_TO = { shop: '/shop', track: '/track', discord: '/discord', how: '/how-it-works', reviews: '/reviews' };
@@ -91,9 +93,10 @@ export { openForgeChat } from '../lib/forgeChat.js';
 
 export default function ChatWidget() {
   const { lang } = useI18n();
-  /* COPY carries nl and en. Any other language falls back to English rather
-     than to Dutch — the assistant's answers are written prose, and half-Dutch
-     for a French reader is worse than plain English. */
+  /* COPY now carries all four, as does the server that writes the answers.
+     The fallback stays for a language added to the switcher before this table:
+     English, never Dutch — half-Dutch for a French reader is worse than plain
+     English. */
   const L = COPY[lang] || COPY.en;
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState([]);

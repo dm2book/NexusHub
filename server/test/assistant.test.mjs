@@ -16,7 +16,20 @@ process.env.NODE_ENV ||= 'development';
 let pass = 0, fail = 0;
 const ok = (name, cond, extra = '') => { if (cond) { pass++; console.log(`  ✅ ${name}`); } else { fail++; console.log(`  ❌ ${name} ${extra}`); } };
 
-const { answer, detectLang } = await import('../src/services/assistantService.js');
+const { answer, detectLang, quickReplies } = await import('../src/services/assistantService.js');
+const { readFileSync } = await import('node:fs');
+const { join, dirname } = await import('node:path');
+const { fileURLToPath } = await import('node:url');
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const { LANG_CODES } = await import(join(ROOT, 'src/lib/i18n/registry.js'));
+
+/** The pending-payment line, per language — the answer to a bare order number. */
+const STATUS_TEXT = {
+  nl: '⏳ We wachten nog op je betaling. Betaal met je bestelnummer als referentie — de status springt vanzelf om.',
+  en: '⏳ We are still waiting for your payment. Pay with your order number as the reference — the status flips by itself.',
+  de: '⏳ Wir warten noch auf deine Zahlung. Überweise mit deiner Bestellnummer als Verwendungszweck — der Status springt dann von selbst um.',
+  fr: '⏳ Nous attendons encore ton paiement. Paie en indiquant ton numéro de commande comme référence — le statut change tout seul.',
+};
 
 const PRODUCTS = [
   { id: 'p1', name: '1,000 Robux', category: 'robux', price: 999, currency: 'EUR', instant: true, stockLeft: 3 },
@@ -126,6 +139,69 @@ console.log('\n— Edges —');
   ok('every answer has text', [
     await ask('hi'), await ask('thanks'), await ask('discord'), await ask('login'),
   ].every((r) => typeof r.text === 'string' && r.text.length > 0));
+}
+
+console.log('\n— All four languages, end to end —');
+{
+  /* This section exists because of a failure that was not a translation gap.
+     The widget's chrome — title, greeting, buttons, the offline notice — was
+     already written in German and French, so a visitor on /de met a fully
+     German assistant. The endpoint's zod schema was still
+     `z.enum(['nl','en'])`, so the first thing they typed came back 400.
+     Not a worse answer in German: no answer in German. */
+  const { CHAT_LANGS } = await import('../src/services/assistantService.js');
+  ok('the assistant knows every language the shop is read in',
+    LANG_CODES.every((c) => CHAT_LANGS.includes(c)), `knows ${CHAT_LANGS.join(',')}`);
+
+  const route = readFileSync(join(ROOT, 'server/src/routes/catalog.js'), 'utf8');
+  ok('/api/chat validates against that list rather than its own copy of it',
+    /lang: z\.enum\(CHAT_LANGS\)/.test(route),
+    'a hand-written enum here is how German became a 400');
+
+  /* Asked in a language, answered in it — checked by a word that exists in
+     that language only, not by "it returned something". */
+  const MARK = {
+    nl: [['hoe lang duurt levering', 'voorraad'], ['hoe betaal ik', 'referentie']],
+    en: [['how long does delivery take', 'stock'], ['how do i pay', 'reference']],
+    de: [['wie lange dauert die lieferung', 'Lager'], ['wie bezahle ich', 'Verwendungszweck']],
+    fr: [['combien de temps pour la livraison', 'stock'], ['comment je paie', 'référence']],
+  };
+  for (const [lang, cases] of Object.entries(MARK)) {
+    for (const [q, word] of cases) {
+      const r = await ask(q, { lang });
+      ok(`[${lang}] "${q}" answers in ${lang}`, r.text.toLowerCase().includes(word.toLowerCase()),
+        `got: ${r.text.slice(0, 70)}`);
+    }
+  }
+
+  /* A message with no language marker at all keeps the page's language.
+     Ties used to resolve by list order, which handed a French reader English. */
+  for (const lang of LANG_CODES) {
+    const r = await ask('FM-2026-8KQ2R7XZ', { lang });
+    ok(`[${lang}] a bare order number is answered in the page's language`,
+      r.text === `**FM-2026-8KQ2R7XZ** — ${STATUS_TEXT[lang]}`, `got: ${r.text.slice(0, 60)}`);
+  }
+
+  /* The single most common thing typed into a shop's chat: a game name, on its
+     own. It used to reach the "I do not have a good answer" line — and only
+     ever worked by accident, for categories with four packs or fewer. Robux,
+     the best-selling thing here, has more than four. */
+  for (const lang of LANG_CODES) {
+    const r = await ask('Robux', { lang });
+    ok(`[${lang}] a bare product name lists the packs`,
+      Array.isArray(r.products) && r.products.length > 0 && r.products[0].name.includes('Robux'),
+      `got: ${r.text.slice(0, 60)}`);
+  }
+
+  /* …but an intent still wins over a product name it happens to contain. */
+  const refund = await ask('Robux niet aangekomen', { lang: 'nl' });
+  ok('a refund question that names a product is still a refund answer',
+    !refund.products && refund.text.includes('geld terug'), refund.text.slice(0, 60));
+
+  ok('quick replies exist in every language',
+    LANG_CODES.every((c) => quickReplies(c).length === 4)
+    && new Set(LANG_CODES.map((c) => quickReplies(c)[0])).size === LANG_CODES.length,
+    'two languages share a first suggestion — one of them is falling back');
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

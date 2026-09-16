@@ -17,6 +17,7 @@ import { deliveryField } from '../lib/deliveryInfo.js';
 import { matchBundle } from '../lib/bundles.js';
 import { useStickyBarLift } from '../lib/useStickyBarLift.js';
 import { rememberOrder, recallOrder, forgetOrder } from '../lib/lastOrder.js';
+import { rememberMyOrder } from '../lib/myOrders.js';
 import { reportStep, attributionForOrder } from '../lib/attribution.js';
 
 const METHOD_ICON = { tikkie: '🟢', revolut: '⚫', paypal: '🔵' };
@@ -263,6 +264,12 @@ export default function Checkout() {
            the honest outcome — an unattributed sale, not a guessed one. */
         ...attributionForOrder(),
       });
+
+      /* Remembered here, once, rather than in each of the five branches below:
+         a guest buyer's order number otherwise lives only in the URL they are
+         about to be redirected away from and in an email that has not arrived
+         yet. This is what lets /track offer it back to them tomorrow. */
+      rememberMyOrder(order.number);
 
       if (provider === 'mollie') {
         // The payment is created BEFORE the cart is cleared: if Mollie refuses,
