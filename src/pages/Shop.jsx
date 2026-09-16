@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { Search, SlidersHorizontal, PackageX, LayoutGrid, CloudOff } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { withEarly } from '../lib/earlyFetch.js';
+import { readSeed } from '../lib/seed.js';
 import { useCart } from '../context/CartContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { categoryVisual, categoryLabel, normalizeSearch } from '../lib/catalog.js';
@@ -29,7 +30,11 @@ export default function Shop({ landingCategory = null, landingPath = null } = {}
   const toast = useToast();
   const { t, lang } = useI18n();
   const [params] = useSearchParams();
-  const [products, setProducts] = useState(null);
+  /* Baked into this page's HTML at build time — see lib/seed.js. `null` still
+     means "we have not been told anything", which is what draws the skeleton
+     cards; a seeded page skips that state because it already has a shelf to
+     show. The live request below replaces it either way. */
+  const [products, setProducts] = useState(() => readSeed('products'));
   const [search, setSearch] = useState(() => new URLSearchParams(window.location.search).get('search') || '');
   const [sort, setSort] = useState('popular');
   /* Measured at 390px: rendering the whole catalogue made this page 15,455px —

@@ -16,6 +16,7 @@ import { LangSwitch } from '../components/store/StoreNav.jsx';
 import { flyToCart } from '../lib/flyToCart.js';
 import { api } from '../lib/api.js';
 import { withEarly } from '../lib/earlyFetch.js';
+import { readSeed } from '../lib/seed.js';
 import { getConfig } from '../lib/useConfig.js';
 import { useStats } from '../lib/useStats.js';
 import { useReviews } from '../lib/useReviews.js';
@@ -197,13 +198,19 @@ export default function HomeStore() {
 
   // Real catalog → tiles show the true "From" price; add-to-cart adds the
   // cheapest REAL product in that category (no fabricated items/prices).
-  const [products, setProducts] = useState([]);
+  /* Read out of the HTML, synchronously, before the first paint — see
+     lib/seed.js. A promise, however fast, still costs a frame with nothing in
+     it, so this is a useState initialiser and not an effect. The live request
+     below still runs and replaces whatever was baked in. */
+  const [products, setProducts] = useState(() => readSeed('products') || []);
   /* Separate from `products` being empty, which is a different fact: an empty
      catalogue is a shop with nothing in it, and this is a shop we have not
      asked yet. Without the distinction the three shelves simply did not exist
      until the answer came back, and everything below them sat 1,283px too high
-     and then jumped — measured. */
-  const [loadingCatalogue, setLoadingCatalogue] = useState(true);
+     and then jumped — measured.
+     A page that was seeded is not waiting for anything, so it never shows the
+     placeholders at all. */
+  const [loadingCatalogue, setLoadingCatalogue] = useState(() => !readSeed('products'));
   const [unavailable, setUnavailable] = useState(false);
   useEffect(() => {
     // Handed over by the shell when it started this during HTML parse.
