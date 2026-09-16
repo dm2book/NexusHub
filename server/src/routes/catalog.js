@@ -17,8 +17,7 @@ import { pricedBundles } from '../services/bundleService.js';
 import { peekGiftCard } from '../services/giftCardService.js';
 import { createOrder, getOrderByNumber, getOrder, markPaymentReceived, getPspPayment } from '../services/orderService.js';
 import { requestRefund, getRefundRequestForOrder } from '../services/supportService.js';
-import { answer } from '../services/assistantService.js';
-import { withCopy } from '../services/productCopy.js';
+import { CHAT_LANGS, answer } from '../services/assistantService.js';
 /* The landing pages, from the one place that declares them. Shared with the
    prerender and the router rather than retyped — see the sitemap handler. */
 import { LANDING } from '../../../src/content/seo.js';
@@ -318,7 +317,11 @@ router.post('/chat',
   asyncHandler(async (req, res) => {
     const { message, lang } = z.object({
       message: z.string().min(1).max(500),
-      lang: z.enum(['nl', 'en']).optional(),
+      // CHAT_LANGS, not a literal list: the storefront posts whatever language
+      // it is being read in, and this enum rejecting 'de' made every message on
+      // a German or French page a 400 — an assistant that was fully translated
+      // in the chrome and dead the moment anyone typed.
+      lang: z.enum(CHAT_LANGS).optional(),
     }).parse(req.body);
 
     const products = await listProducts({ activeOnly: true }).catch(() => []);
@@ -357,19 +360,32 @@ router.get('/products', asyncHandler(async (_req, res) => {
   publicCache(res, 60);
   const products = await listProducts({ activeOnly: true });
   const counts = await availableCounts(products.map((p) => p.id));
-  res.json({ products: products.map((p) => withCopy({
-    ...p,
-    stockLeft: stockLeftFor(p, counts[p.id] || 0),
-    instant: instantFor(p, counts[p.id] || 0),
-  })) });
+  // productPayload, not a second copy of it: this endpoint spelled the same
+  // three lines out by hand, which is how /products/trending came to spell
+  // none of them.
+  res.json({ products: products.map((p) => productPayload(p, counts[p.id] || 0)) });
 }));
 
 // Trending products (most-sold recently). Registered before /products/:id.
+//
+// Every row goes through productPayload, the same shape /products/:id hands
+// out. It did not before, and the difference was not cosmetic: `instant` was
+// simply absent here, and the card reads a missing flag as false — so 1,000
+// Robux said "In stock" in the shop and "By hand" in the trending rail on the
+// cart page, about the same product, at the same moment. A delivery promise
+// that depends on which shelf you found it on is worse than no badge at all.
+//
+// The CDN window came down from 300s to 60s to match /products for the same
+// reason: the two rails now agree, and they should also stop agreeing at the
+// same time rather than one of them carrying a sold-out promise four minutes
+// longer than the other.
 let trendingCache = { at: 0, data: null };
 router.get('/products/trending', asyncHandler(async (_req, res) => {
-  publicCache(res, 300);
+  publicCache(res, 60);
   if (!trendingCache.data || Date.now() - trendingCache.at > 60_000) {
-    trendingCache = { at: Date.now(), data: await trendingProducts({ days: 14, limit: 8 }) };
+    const rows = await trendingProducts({ days: 14, limit: 8 });
+    const counts = await availableCounts(rows.map((p) => p.id));
+    trendingCache = { at: Date.now(), data: rows.map((p) => productPayload(p, counts[p.id] || 0)) };
   }
   res.json({ products: trendingCache.data });
 }));

@@ -3,7 +3,8 @@ import PayFacts from '../components/store/PayFacts.jsx';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
   Search, Loader2, ExternalLink, Copy, Check, CreditCard, Cog, PackageCheck,
-  ShoppingBag, Mail, LayoutDashboard, RotateCcw, XCircle,
+  ShoppingBag, Mail, LayoutDashboard, RotateCcw, XCircle, Clock, ShieldCheck,
+  MessageCircle, History, X,
 } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { getConfig } from '../lib/useConfig.js';
@@ -14,6 +15,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { feedback } from '../lib/feedback.js';
 import Confetti from '../components/Confetti.jsx';
 import { usePageMeta } from '../lib/useMeta.js';
+import { myOrders, rememberMyOrder, forgetMyOrder } from '../lib/myOrders.js';
 
 const METHOD_ICON = { tikkie: '🟢', revolut: '⚫', paypal: '🔵', bunq: '🟡' };
 // No URL building here on purpose: the server resolves every method for this
@@ -49,8 +51,24 @@ export default function Track() {
   const [cfg, setCfg] = useState({ paymentMethods: [], paymentNote: '' });
   const prevStatus = useRef(null);
   const [celebrate, setCelebrate] = useState(false);
+  const [mine, setMine] = useState([]);
 
   useEffect(() => { getConfig().then(setCfg); }, []);
+
+  /* Orders placed on this device, with their live status.
+     Looked up rather than remembered: a stored "Delivered" that is now a refund
+     would be the page's own lie, on the page whose whole job is the truth about
+     an order. A number that no longer resolves drops off the list by itself. */
+  useEffect(() => {
+    const nums = myOrders();
+    if (!nums.length) return;
+    let live = true;
+    Promise.all(nums.map((n) => api.get(`/api/track/${encodeURIComponent(n)}`)
+      .then((o) => ({ number: n, status: o.status }))
+      .catch(() => null)))
+      .then((rows) => { if (live) setMine(rows.filter(Boolean)); });
+    return () => { live = false; };
+  }, []);
 
   const lookup = async (num, { silent = false } = {}) => {
     if (!silent) { setBusy(true); setError(''); setResult(null); }
@@ -61,6 +79,14 @@ export default function Track() {
         setCelebrate(true); feedback('success');
       }
       prevStatus.current = r.status;
+      /* A number that resolves is one of theirs — typed in from the email,
+         followed from a link, or arriving here after checkout. Remembering it
+         on the way through is what makes the list above work for an order
+         placed on another device.
+         Not on the silent poll: that runs every five seconds while an order is
+         in flight, and rewriting the list each time would be a storage write a
+         second for an open tab, all of it saying the same thing. */
+      if (!silent) rememberMyOrder(r.number);
       setResult(r); setError('');
     } catch (err) { if (!silent) setError(err.message); }
     finally { if (!silent) setBusy(false); }
@@ -102,6 +128,64 @@ export default function Track() {
       </form>
 
       {error && <div className="card p-4 text-red-300 border border-red-500/30">{error}</div>}
+
+      {/* Nothing looked up yet.
+          This page was a heading, one line and an input — eight words on an
+          empty screen, for the page someone opens precisely because they are
+          worried. Worse, it asked for the one thing a guest buyer is most
+          likely to have lost: checkout needs no account here, so the order
+          number exists in a closed tab and an email, and nowhere else.
+          So: their own orders first, then the four questions that bring people
+          to this page in the first place. */}
+      {!result && !busy && (
+        <>
+          {mine.length > 0 && (
+            <div className="card p-5 mb-6 fm-pop">
+              <div className="flex items-center gap-2 text-white font-semibold mb-1">
+                <History size={16} className="text-indigo-300" />
+                {t('track.mine', 'Orders from this device')}
+              </div>
+              <p className="text-slate-500 text-xs mb-3">
+                {t('track.mineSub', 'Kept in this browser only, so you do not have to dig out the email.')}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {mine.map((o) => (
+                  <span key={o.number} className="group inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition-colors ps-3 pe-1.5 py-1.5">
+                    <button type="button" onClick={() => { setNumber(o.number); prevStatus.current = null; lookup(o.number); }}
+                      className="inline-flex items-center gap-2">
+                      <span className="font-mono text-sm text-white">{o.number}</span>
+                      <StatusBadge status={o.status} />
+                    </button>
+                    <button type="button" aria-label={t('track.mineForget', 'Forget this order')}
+                      onClick={() => { forgetMyOrder(o.number); setMine((l) => l.filter((x) => x.number !== o.number)); }}
+                      className="p-1 rounded-lg text-slate-600 hover:text-slate-300 hover:bg-white/10">
+                      <X size={13} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="grid sm:grid-cols-2 gap-4">
+            <HelpCard icon={Mail} title={t('track.q1', 'Where do I find my order number?')}
+              body={t('track.a1', 'In the confirmation email we sent the moment you ordered — it starts with FM- and is also the reference on your payment. No email? Check spam, then ask us.')} />
+            <HelpCard icon={Clock} title={t('track.q2', 'How long does delivery take?')}
+              body={t('track.a2', 'In-stock items go out automatically as soon as your payment is confirmed. Everything else we buy in and deliver by hand, usually within a few hours during the day.')} />
+            <HelpCard icon={ShieldCheck} title={t('track.q3', 'I paid but nothing happened')}
+              body={t('track.a3', 'We match every payment by hand. Until we do, the order stays on “awaiting payment” — that is normal for the first few minutes. Look it up above and the page will update by itself.')} />
+            <HelpCard icon={MessageCircle} title={t('track.q4', 'Still stuck?')}
+              body={t('track.a4', 'Tell us your order number and we will look it up ourselves. A person answers — not a bot.')}
+              to="/contact" cta={t('track.contactSupport', 'Contact support →')} />
+          </div>
+
+          {user && (
+            <Link to="/account/orders" className="btn-ghost w-full mt-4 justify-center">
+              <LayoutDashboard size={16} /> {t('track.allOrders', 'See all your orders')}
+            </Link>
+          )}
+        </>
+      )}
 
       {result && (
         <div className="card p-6 fm-pop">
@@ -319,6 +403,24 @@ export default function Track() {
           <Timeline history={result.history} t={t} />
         </div>
       )}
+    </div>
+  );
+}
+
+/** One question and its answer, in the empty state. */
+function HelpCard({ icon: Icon, title, body, to, cta }) {
+  return (
+    <div className="card p-5 h-full">
+      <div className="flex items-start gap-3">
+        <span className="w-9 h-9 shrink-0 rounded-xl grid place-items-center bg-indigo-500/15 border border-indigo-400/20 text-indigo-300">
+          <Icon size={17} />
+        </span>
+        <div className="min-w-0">
+          <div className="text-white font-semibold text-[15px]">{title}</div>
+          <p className="text-slate-400 text-[13px] mt-1 leading-relaxed">{body}</p>
+          {to && <Link to={to} className="text-indigo-300 text-[13px] hover:underline mt-2 inline-block">{cta}</Link>}
+        </div>
+      </div>
     </div>
   );
 }
