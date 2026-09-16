@@ -98,21 +98,45 @@ console.log('\n— The adverts —');
      so this test can read them; anything that trips the list must be marked
      `retire` with a reason. The failure that matters is a creative that trips
      the list and is NOT marked — a new claim, or an old one quietly unmarked. */
-  const creatives = readFileSync(join(ROOT, 'scripts/ad/static-creatives.mjs'), 'utf8');
-  const entries = [...creatives.matchAll(/\{\s*\n\s*file: '([^']+)'[\s\S]*?(?=\n  \},)/g)]
-    .map((m) => ({ file: m[1], body: m[0] }));
+  /* Imported, not regex-parsed out of the source. The record used to be a
+     hand-typed transcription of words baked into a PNG, and this read it as
+     text; now the artwork is GENERATED from those same strings, so the module
+     is the copy and importing it removes the one thing a transcription can get
+     wrong — a claim on the banner that never made it into the record. */
+  const { STATIC_CREATIVES } = await import(join(ROOT, 'scripts/ad/static-creatives.mjs'));
+  const entries = STATIC_CREATIVES.map((c) => ({ ...c, text: (c.copy || []).join(' | ') }));
   ok('every shipped raster creative has its copy written down', entries.length >= 9, `${entries.length}`);
+
   const unmarked = entries.filter((e) => {
-    const copy = (e.body.match(/copy: \[([\s\S]*?)\]/) || [, ''])[1];
-    const bad = BANNED_LIST.some(([re]) => re.test(copy)) || /\d(?:[.,]\d)?\/5|★/.test(copy);
-    return bad && !/retire:/.test(e.body);
+    const bad = BANNED_LIST.some(([re]) => re.test(e.text)) || /\d(?:[.,]\d)?\/5|★/.test(e.text);
+    return bad && !e.retire;
   }).map((e) => e.file);
   ok('a creative that carries a banned claim is marked for retirement',
     unmarked.length === 0, unmarked.join(', '));
 
+  /* The point of the whole exercise: nothing is still shipping a claim that
+     was already found and written down. Four were marked and kept shipping for
+     months, because marking a PNG does not redraw it. */
+  const stillRetiring = entries.filter((e) => e.retire).map((e) => e.file);
+  ok('nothing ships that is already marked for retirement',
+    stillRetiring.length === 0,
+    `${stillRetiring.join(', ')} — redraw with: node scripts/art/social-generate.mjs`);
+
   // The record has to describe the files that actually ship.
   const missing = entries.filter((e) => !existsSync(join(ROOT, e.file))).map((e) => e.file);
   ok('and every entry points at a file that exists', missing.length === 0, missing.join(', '));
+
+  /* …and describe the bytes that actually ship. `sha` pins an entry to one
+     version of the artwork; without checking it, a redraw could silently keep
+     the previous description of what it says. */
+  const { createHash } = await import('node:crypto');
+  const wrongSha = entries.filter((e) => {
+    if (!existsSync(join(ROOT, e.file))) return false;
+    const real = createHash('sha256').update(readFileSync(join(ROOT, e.file))).digest('hex').slice(0, 16);
+    return e.sha !== real;
+  }).map((e) => e.file);
+  ok('and the bytes it describes are the bytes on disk', wrongSha.length === 0,
+    `${wrongSha.join(', ')} — re-run scripts/art/social-generate.mjs and copy the new sha`);
 }
 
 console.log('\n— The file only crawlers read —');

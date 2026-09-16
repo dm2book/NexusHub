@@ -45,8 +45,16 @@ const ENV_URL = (typeof process !== 'undefined' && process.env && process.env.AP
 export const SITE = {
   name: 'ForgeMarket',
   url: (ENV_URL || 'https://www.forgemarket.nl').replace(/\/+$/, ''),
-  // The social image. 1200x630 is what every scraper crops to.
-  ogImage: '/og.png',
+  /* The social image. 1200x630 is what every scraper crops to.
+
+     The `?v=` is the artwork's own hash, for the same reason the Discord
+     banners carry one: Facebook, X and Discord cache a share card by URL, and
+     the card that was cached says "Digital goods, delivered instantly",
+     "4.9/5" and "24/7 support" — three claims this shop retracted. Redrawing
+     the file alone would have changed nothing anyone sees. Regenerate with
+     scripts/art/social-generate.mjs and update this to the new hash; the
+     freshness test says so out loud if the two drift. */
+  ogImage: '/og.jpg?v=7dad09e1',
   twitter: null,   // no account yet; the card renders fine without it
 };
 

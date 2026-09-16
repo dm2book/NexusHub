@@ -20,9 +20,10 @@ import {
 } from 'discord.js';
 import Anthropic from '@anthropic-ai/sdk';
 import { FAQ, GAME_ROLES, NOTIFY_ROLES, LEVEL_ROLES, DELIVERY_INFO, CATEGORY_GAME_ROLE,
+  bannerImage,
 } from './config.js';
 import { orderStatusView, botLang, say, ORDER_UI } from './orderStatus.js';
-import { buildPanels, panelNeedsUpdate } from './panels.js';
+import { buildPanels, panelNeedsUpdate, panelFooterIsStale, PANEL_FOOTER, isPanelFooter } from './panels.js';
 import { log, reportEnv, startHealthServer, loginWithRetry } from './runtime.js';
 import { scamReason } from './scamGuard.js';
 
@@ -453,7 +454,10 @@ const anthropic = ANTHROPIC_API_KEY ? new Anthropic({ apiKey: ANTHROPIC_API_KEY 
 // ?v=2 busts Discord's media-proxy cache: a panel posted while the site briefly
 // served no image (e.g. mid domain-switch) would otherwise keep showing the
 // stale/blank cached copy. Bump this whenever the banner artwork changes.
-const BANNER = (n) => `${STORE_URL}/discord/banner-${n}.png?v=2`;
+/* One definition, in config.js, shared with the panels. This helper had its
+   own copy of the URL and its own `?v=2`, so roughly half the server's embeds
+   could point at a different version of the same picture than the other half. */
+const BANNER = (n) => bannerImage(n).replace('{STORE_URL}', STORE_URL);
 /** #name → a real clickable mention, or plain #name if that channel is missing.
  *  Discord only linkifies <#id>; a name in those brackets renders as raw text. */
 const chanRef = (guild, name) => {
@@ -682,7 +686,7 @@ async function syncPanelBanners(guild) {
       if (!ch || typeof ch.messages?.fetch !== 'function') continue;
       const msgs = await ch.messages.fetch({ limit: 30 }).catch(() => null);
       const mine = msgs?.find((m) => m.author.id === client.user.id
-        && m.embeds[0]?.footer?.text === 'forgemarket-setup');
+        && isPanelFooter(m.embeds[0]?.footer?.text));
       if (!mine) { missing.push(chName); continue; }
       const url = BANNER(banner);
       if (mine.embeds[0].image?.url === url) { edited += 0; continue; } // already current
@@ -723,11 +727,15 @@ async function syncPanelCopy(guild) {
       if (!ch || typeof ch.messages?.fetch !== 'function') continue;
       const msgs = await ch.messages.fetch({ limit: 30 }).catch(() => null);
       const mine = msgs?.find((m) => m.author.id === client.user.id
-        && m.embeds[0]?.footer?.text === 'forgemarket-setup');
+        && isPanelFooter(m.embeds[0]?.footer?.text));
       if (!mine) continue;                       // not built yet — setup.js posts it
-      if (!panelNeedsUpdate(mine.embeds[0], panel)) continue;
+      /* Two reasons to edit: the copy moved, or the panel is still signed
+         with the old internal marker. The second happens exactly once per
+         panel and then never again. */
+      if (!panelNeedsUpdate(mine.embeds[0], panel) && !panelFooterIsStale(mine.embeds[0])) continue;
       const e = EmbedBuilder.from(mine.embeds[0])
-        .setTitle(panel.title).setDescription(panel.description);
+        .setTitle(panel.title).setDescription(panel.description)
+        .setFooter({ text: PANEL_FOOTER });
       await mine.edit({ embeds: [e] }).catch(() => {});
       edited++;
       console.log(`  · [panel-copy] #${chName} updated`);
@@ -738,7 +746,7 @@ async function syncPanelCopy(guild) {
 }
 
 // Startup self-check: are the brand banners actually reachable AND actually
-// images? A stale/misconfigured site deploy answers /discord/banner-*.png with
+// images? A stale/misconfigured site deploy answers /discord/banner-*.jpg with
 // the SPA's index.html (HTTP 200, but text/html) — Discord then shows a blank
 // embed. A plain HEAD 200 would hide that, so we GET and inspect the content
 // type: only a real image/* response counts as "live".

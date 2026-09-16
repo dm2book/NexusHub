@@ -12,6 +12,7 @@
  *   (DISCORD_STOCK_WEBHOOK_URL, falls back to the order webhook).
  */
 import { config } from '../config/env.js';
+import { bannerUrl } from '../../../src/lib/discordBanners.js';
 import { run, get, all, nowIso } from '../db/index.js';
 import { newId } from '../utils/ids.js';
 
@@ -448,13 +449,18 @@ export async function postDropEvent(kind, data = {}) {
 
   // Product announcements show the product's own art when available; every
   // drop gets the brand banner so the channel looks consistently premium.
-  // Every kind must be in here: an unmapped kind produced the URL
-  // /discord/banner-undefined.png, which Discord renders as a broken image.
+  //
+  // The URL comes from the shared map rather than being built here. This line
+  // wrote `.png` with no `?v=` at all, which meant two things at once: it was
+  // the only place still naming a file that no longer exists, and even once
+  // corrected it would have gone on serving whatever Discord had cached the
+  // first time. bannerUrl also absorbs the fallback this comment used to
+  // describe — an unmapped kind produced /discord/banner-undefined.png.
   const banner = {
     product: 'products', restock: 'products', coupon: 'deals', bundle: 'deals',
     'drop-scheduled': 'deals',
   }[kind] || 'products';
-  embed.image = { url: `${config.appUrl}/discord/banner-${banner}.png` };
+  embed.image = { url: bannerUrl(banner, config.appUrl) };
   /* Absolute, always. `data.image` is a site-relative path like
      /products/art/robux-4500.svg, and Discord silently drops a thumbnail whose
      url is not a full URL — so every product drop announced its artwork to

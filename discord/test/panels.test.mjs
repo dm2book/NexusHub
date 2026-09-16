@@ -3,7 +3,10 @@
  * only way to correct one was to delete and re-pin every panel by hand.
  * These checks cover what that costs when it goes wrong.
  */
-import { buildPanels, panelNeedsUpdate, linkChannels } from '../src/panels.js';
+import {
+  buildPanels, panelNeedsUpdate, linkChannels,
+  PANEL_FOOTER, isPanelFooter, panelFooterIsStale,
+} from '../src/panels.js';
 import { CATEGORIES, FAQ } from '../src/config.js';
 
 let pass = 0, fail = 0;
@@ -108,6 +111,39 @@ console.log('\n— Copy sync —');
   ok('an image difference alone is not a copy change',
     !panelNeedsUpdate({ title: 'T', description: 'D', image: { url: 'a.png' } }, { title: 'T', description: 'D', image: 'b.png' }));
   ok('a missing embed is handled', !panelNeedsUpdate(undefined, { title: 'T', description: 'D' }));
+}
+
+console.log('\n— What the panels are signed with —');
+{
+  /* Every pinned panel carried the footer `forgemarket-setup` — the name of
+     the script that posted it, in small grey type under the welcome message,
+     the rules, the price list and the support panel. It could not simply be
+     deleted: that string is also how setup.js and the bot's copy sync find
+     their own panels among other messages in a channel. */
+  ok('the footer is something a member can read', /forgemarket\.nl/i.test(PANEL_FOOTER));
+  ok('…and is not the name of a script', !/setup|script|marker/i.test(PANEL_FOOTER));
+
+  ok('a panel signed with the new footer is recognised', isPanelFooter(PANEL_FOOTER));
+  /* The panels already pinned on the live server carry the old string. If that
+     stopped being recognised, every one of them would be posted a second time
+     instead of edited. */
+  ok('…and so is one already on the server with the old marker', isPanelFooter('forgemarket-setup'));
+  ok('but somebody else\'s footer is not', !isPanelFooter('something else') && !isPanelFooter(undefined));
+
+  /* Two separate questions, deliberately. Folding the footer into
+     panelNeedsUpdate would have made "identical copy does not churn the API"
+     false for every panel on the server. */
+  const same = { title: 'T', description: 'D', footer: { text: PANEL_FOOTER } };
+  ok('an up-to-date panel needs no copy edit', !panelNeedsUpdate(same, { title: 'T', description: 'D' }));
+  ok('…and no footer edit either', !panelFooterIsStale(same));
+
+  const old = { title: 'T', description: 'D', footer: { text: 'forgemarket-setup' } };
+  ok('a panel still carrying the old marker is rewritten once',
+    panelFooterIsStale(old));
+  ok('…even though its copy has not changed',
+    !panelNeedsUpdate(old, { title: 'T', description: 'D' }));
+  ok('…and once rewritten it is left alone',
+    !panelFooterIsStale({ ...old, footer: { text: PANEL_FOOTER } }));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
