@@ -142,10 +142,72 @@ function renderHead(path, { title, description, canonical, noindex, ld = [], og 
   return html.replace('</head>', `    ${head}\n  </head>`);
 }
 
+/**
+ * The catalogue, baked into the pages that show it.
+ *
+ * earlyFetch already starts the request during HTML parse; it cannot remove
+ * the request. This does: the shelves paint out of the first byte, with no
+ * round trip to a function and a database in another datacentre, and the live
+ * fetch still runs and replaces what is here.
+ *
+ * Only the fields a first paint needs. The full row is 69KB of JSON per page
+ * — most of it stock bookkeeping, image geometry and timestamps that nothing
+ * on a shelf reads. What is kept is what a card draws, in four languages,
+ * because the page's language is chosen in the browser and this file cannot
+ * know it.
+ *
+ * A build with no database writes no seed and every page behaves exactly as it
+ * did before. That is deliberate: this may only ever remove waiting.
+ */
+async function bakeCatalogue() {
+  try {
+    const { listProducts } = await import(join(ROOT, 'server/src/services/productService.js'));
+    const { availableCounts } = await import(join(ROOT, 'server/src/services/codeStockService.js'));
+    const { stockLeftFor, instantFor } = await import(join(ROOT, 'server/src/services/productPayload.js'));
+    const { withCopy } = await import(join(ROOT, 'server/src/services/productCopy.js'));
+    const rows = await listProducts({ activeOnly: true });
+    const counts = await availableCounts(rows.map((p) => p.id));
+    return rows.map((p) => {
+      const full = withCopy({
+        ...p, stockLeft: stockLeftFor(p, counts[p.id] || 0), instant: instantFor(p, counts[p.id] || 0),
+      });
+      return {
+        id: full.id, name: full.name, category: full.category, price: full.price,
+        currency: full.currency, image: full.image, active: full.active,
+        featured: full.featured, instant: full.instant, stockLeft: full.stockLeft,
+        compareAtPrice: full.compareAtPrice, sold: full.sold,
+        description: full.description, descriptionNl: full.descriptionNl,
+        descriptionDe: full.descriptionDe, descriptionFr: full.descriptionFr,
+      };
+    });
+  } catch (err) {
+    console.log(`  · no catalogue baked in (${String(err.message || err).slice(0, 60)}) — pages will fetch as before`);
+    return null;
+  }
+}
+
+const SEED = await bakeCatalogue();
+/* Only the routes that draw products. Baking 40KB into the privacy policy buys
+   nothing and costs every reader of it. */
+const SEEDED_ROUTES = new Set(['/', '/shop', ...Object.keys(LANDING)]);
+
+const seedTag = (route) => {
+  if (!SEED || !SEEDED_ROUTES.has(route)) return '';
+  const json = JSON.stringify({ products: SEED, builtAt: new Date().toISOString() })
+    /* `</script>` inside a string would end the tag early, and a lone U+2028
+       is a newline to a JS parser but not to JSON.stringify. Both turn a data
+       blob into a syntax error on someone else's page. */
+    .replace(/</g, '\\u003c').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
+  return `<script>window.__FM_SEED=${json}</script>`;
+};
+
 const write = (route, html) => {
   const dir = route === '/' ? DIST : join(DIST, route);
   mkdirSync(dir, { recursive: true });
-  writeFileSync(join(dir, 'index.html'), withRouteChunk(html, route));
+  const tag = seedTag(route);
+  const out = withRouteChunk(html, route);
+  writeFileSync(join(dir, 'index.html'),
+    tag ? out.replace('</body>', `  ${tag}\n</body>`) : out);
 };
 
 // Emitted on every page: a search engine building an entity for this site
