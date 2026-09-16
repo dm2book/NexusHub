@@ -91,12 +91,22 @@ console.log('\n— The header row fits in any language —');
     // "Hoe het werkt" wrapped onto three lines and tripled the header height.
     ok(`${label}: desktop links never wrap`,
       /relative py-1 whitespace-nowrap/.test(src), 'nav links can wrap');
-    // The search placeholder broke onto two lines once the box was squeezed.
+    /* The search placeholder broke onto two lines once the box was squeezed.
+       Asked of EVERY label in the box, not of one spelling: the box now
+       carries a short label for its narrow width and the full one above xl,
+       and the old check was pinned to a single class order that the split
+       broke — while both spans were still nowrap. */
+    const labels = [...src.matchAll(/<span className="text-sm([^"]*)"/g)].map((m) => m[1]);
     ok(`${label}: the search label never wraps`,
-      /text-sm truncate whitespace-nowrap/.test(src), 'search label can wrap');
-    // Six 24px gaps is 144px of a 390px row.
+      labels.length > 0 && labels.every((c) => /whitespace-nowrap/.test(c)),
+      `${labels.filter((c) => !/whitespace-nowrap/.test(c)).length} of ${labels.length} can wrap`);
+    /* Six 24px gaps is 144px of a 390px row, so the gap has to grow with the
+       width. The exact xl value is not the point and pinning it broke the day
+       the row needed four pixels back for the wordmark. */
+    const gaps = (src.match(/gap-(\d+) sm:gap-(\d+) xl:gap-(\d+)/) || []).slice(1).map(Number);
     ok(`${label}: the row gap is smaller on small screens`,
-      /gap-3 sm:gap-4 xl:gap-6/.test(src), 'row still uses one gap at every width');
+      gaps.length === 3 && gaps[0] < gaps[1] && gaps[1] < gaps[2],
+      `gaps ${gaps.join(' → ') || 'not found'} — the row must not use one gap at every width`);
     // The wordmark is the one thing that can go: the mark says the same thing.
     ok(`${label}: the wordmark waits for a width that fits it whole`,
       /hidden xl:inline[^"]*">ForgeMarket</.test(src), 'wordmark shown where it only truncates');

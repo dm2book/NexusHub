@@ -53,6 +53,7 @@ const NL = {
   // /payment-methods, waar de volledige zin hoort te staan.
   'nav.howShort': 'Uitleg',
   'nav.support': 'Support',
+  'nav.searchShort': 'Zoeken…',
   'nav.search': 'Zoek producten...',
   'nav.login': 'Inloggen',
   'nav.signup': 'Account maken',

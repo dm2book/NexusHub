@@ -27,6 +27,7 @@ export default {
   'nav.how': 'So funktioniert es',
   'nav.howShort': 'Ablauf',
   'nav.support': 'Support',
+  'nav.searchShort': 'Suchen…',
   'nav.search': 'Produkte suchen...',
   'nav.login': 'Anmelden',
   'nav.signup': 'Konto erstellen',

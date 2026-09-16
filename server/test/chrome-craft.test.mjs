@@ -19,6 +19,15 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const footer = readFileSync(join(ROOT, 'src', 'components', 'store', 'StoreFooter.jsx'), 'utf8');
+/* TWO bars, not one. The homepage renders its own copy of this header, and
+   fixing only the shared component left the shop's name truncated on the one
+   page most visitors land on first — which is exactly how the two drifted far
+   enough apart for the homepage to still carry a 2.34:1 contrast failure the
+   shared bar had already fixed. Every rule below is asked of both. */
+const BARS = [
+  ['StoreNav', readFileSync(join(ROOT, 'src', 'components', 'store', 'StoreNav.jsx'), 'utf8')],
+  ['HomeStore', readFileSync(join(ROOT, 'src', 'pages', 'HomeStore.jsx'), 'utf8')],
+];
 const code = footer
   .replace(/\{\s*\/\*[\s\S]*?\*\/\s*\}/g, ' ')
   .replace(/\/\*[\s\S]*?\*\//g, ' ')
@@ -94,5 +103,42 @@ console.log('\n— Nothing here is invented —');
   ok('…and the support address for a real mailbox', /SUPPORT_EMAIL &&/.test(code));
 }
 
-console.log(`\n${fail === 0 ? '✅' : '❌'} footer-craft: ${pass} passed, ${fail} failed`);
+console.log('\n— The header does not eat its own name —');
+{
+  /* Measured at 1440: the row is 1400px, padding takes 64 and seven 24px gaps
+     take 168, leaving 1168 — and the children came to exactly 1168. Full to
+     the pixel. The wordmark is the designated give-way element, so it gave way
+     by the two pixels it was short and the shop rendered its own name as
+     "ForgeMar…" on every desktop width from 1280 to 1920.
+     Shrinking IS right below xl, where the wordmark is hidden and the link is
+     a lone icon — that is what keeps a 390px row from scrolling sideways. It
+     is wrong at xl and up, where the thing that gives way is the shop's name. */
+  for (const [who, src] of BARS) {
+    ok(`${who}: the wordmark cannot be squeezed where it is visible`,
+      /aria-label="ForgeMarket"[^>]*xl:shrink-0/.test(src),
+      'the brand link shrinks at xl, so the name truncates again');
+    ok(`${who}: …and may still shrink below xl, where it is only an icon`,
+      /aria-label="ForgeMarket"[^>]*min-w-0/.test(src));
+    ok(`${who}: the row leaves the gap room this needed`, /xl:gap-5/.test(src),
+      'the row is back to being full to the pixel');
+    /* On slate-100 the lighter grey measures 2.34:1, under the 4.5:1 small
+       text needs. The shared bar fixed it; this copy had not followed. */
+    ok(`${who}: the search box's own label is readable on its ground`,
+      !/bg-slate-100[^"]*text-slate-400/.test(src),
+      'slate-400 on slate-100 is 2.34:1');
+  }
+
+  /* The search box is a fixed width, so the label has to be written for the
+     width rather than truncated into it: "Search for products..." does not fit
+     in 190px, and "Rechercher un produit..." did not fit in 240 either. A
+     placeholder chopped mid-word beside a magnifying glass reads as a broken
+     box rather than a short one. */
+  for (const [who, src] of BARS) {
+    ok(`${who}: the search box has a label written for its narrow width`,
+      /nav\.searchShort/.test(src) && /xl:hidden/.test(src));
+    ok(`${who}: …and the full one only where it fits`, /hidden xl:inline/.test(src));
+  }
+}
+
+console.log(`\n${fail === 0 ? '✅' : '❌'} chrome-craft: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
