@@ -13,6 +13,7 @@ import { usePageMeta, useJsonLd } from '../lib/useMeta.js';
 import { landingPathFor } from '../content/seo.js';
 import { useI18n } from '../lib/i18n.jsx';
 import { LangSwitch } from '../components/store/StoreNav.jsx';
+import MobileDrawer from '../components/store/MobileDrawer.jsx';
 import { flyToCart } from '../lib/flyToCart.js';
 import { api } from '../lib/api.js';
 import { withEarly } from '../lib/earlyFetch.js';
@@ -387,9 +388,8 @@ export default function HomeStore() {
           )}
         </div>
         {/* Mobile menu — the pages below were otherwise unreachable from '/'. */}
-        {menuOpen && (
-          <div className="lg:hidden border-t border-slate-200/70 bg-white px-4 py-3 fm-page">
-            <nav className="space-y-0.5">
+        <MobileDrawer open={menuOpen} className="px-4 py-3">
+          <nav className="space-y-0.5">
               {NAV.map((n) => (
                 <Link key={n.label} to={n.to} onClick={() => setMenuOpen(false)}
                   className="flex items-center justify-between px-2.5 py-3 rounded-xl text-[15px] font-medium text-slate-700 hover:bg-slate-50">
@@ -418,8 +418,7 @@ export default function HomeStore() {
                 {user ? tr('nav.account', 'Account') : tr('nav.login', 'Log in')}
               </Link>
             </div>
-          </div>
-        )}
+        </MobileDrawer>
       </header>
 
       {/* ── Body: sidebar + main ────────────────────────────────── */}

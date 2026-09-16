@@ -93,8 +93,15 @@ console.log('— New plus returning is the number of buyers, or the board lies �
   await order({ email: 'first@example.test', createdAt: at });                     // brand new
   await order({ email: 'again@example.test', createdAt: daysAgo(9) });             // history
   await order({ email: 'again@example.test', createdAt: at });                     // …back today
-  await order({ email: 'twice@example.test', createdAt: ago(120) });               // new, twice today
-  await order({ email: 'twice@example.test', createdAt: ago(10) });
+  /* Anchored to the local day this card reports on, not to "two hours ago".
+     periodBounds resolves `today` in the shop's timezone, so between local
+     midnight and 02:00 an order made 120 minutes ago belongs to YESTERDAY —
+     and twice@ then has history and counts as returning. This suite went red
+     every night for those two hours and green again by morning, which is the
+     worst kind of guard: one nobody trusts and everybody re-runs. */
+  const justAfterMidnight = new Date(Date.parse(t) + 60_000).toISOString();
+  await order({ email: 'twice@example.test', createdAt: justAfterMidnight });      // new, twice today
+  await order({ email: 'twice@example.test', createdAt: at });
 
   const c = await customersToday(t);
   ok('a first-ever buyer counts as new', c.new === 2, String(c.new));
