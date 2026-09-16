@@ -276,7 +276,12 @@ export default function HomeStore() {
 
       {/* ── Top nav ─────────────────────────────────────────────── */}
       <header className={`fm-nav sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-slate-200/70 ${navScrolled ? 'is-scrolled' : ''}`}>
-        <div className="max-w-[1400px] 2xl:max-w-[1560px] mx-auto px-4 lg:px-8 h-[68px] flex items-center gap-3 sm:gap-4 xl:gap-6">
+        {/* Same row as StoreNav's, and the same fix: at 1440 the padding and
+            seven 24px gaps left exactly as many pixels as the children needed,
+            so the wordmark gave way by the two it was short and the shop
+            rendered its own name as "ForgeMar…". Four pixels off each gap
+            hands back 28. */}
+        <div className="max-w-[1400px] 2xl:max-w-[1560px] mx-auto px-4 lg:px-8 h-[68px] flex items-center gap-3 sm:gap-4 xl:gap-5">
           <button onClick={() => setMenuOpen((v) => !v)} aria-label={tr('nav.menu', 'Menu')} aria-expanded={menuOpen}
             className="lg:hidden w-11 h-11 shrink-0 -ml-1.5 rounded-xl hover:bg-slate-100 grid place-items-center text-slate-700">
             {menuOpen ? <X size={20} /> : <Menu size={20} />}
@@ -284,7 +289,10 @@ export default function HomeStore() {
 
           {/* Named explicitly: the wordmark is hidden below xl, so on a phone this
             link is a lone icon and a screen reader announces nothing at all. */}
-          <Link to="/" aria-label="ForgeMarket" className="flex items-center gap-2.5 min-w-0">
+          {/* Shrinks below xl, where it is a lone icon and shrinking is what
+              keeps a 390px row from scrolling sideways. Never at xl and up,
+              where what gives way is the name of the shop. */}
+          <Link to="/" aria-label="ForgeMarket" className="flex items-center gap-2.5 min-w-0 xl:shrink-0">
             <span className="w-9 h-9 shrink-0 rounded-xl flex items-center justify-center text-white shadow-lg shadow-violet-500/30"
               style={{ backgroundImage: 'linear-gradient(135deg,#7c5cff,#a855f7)' }}>
               <Zap size={18} fill="white" />
@@ -311,9 +319,16 @@ export default function HomeStore() {
 
           {/* Real global search — opens the ⌘K command palette */}
           <button onClick={() => window.dispatchEvent(new CustomEvent('forge:cmdk'))}
-            className="hidden md:flex items-center gap-2 bg-slate-100 rounded-xl px-3.5 h-10 w-[190px] xl:w-[260px] text-slate-400 hover:bg-slate-200/70 transition">
+            /* slate-500, not slate-400. StoreNav fixed this and this copy of
+               the same bar did not follow: on slate-100 the lighter grey
+               measures 2.34:1, well under the 4.5:1 small text needs. Same
+               visual weight, actually readable. */
+            className="hidden md:flex items-center gap-2 bg-slate-100 rounded-xl px-3.5 h-10 w-[190px] xl:w-[264px] text-slate-500 hover:bg-slate-200/70 transition">
             <Search size={16} />
-            <span className="text-sm truncate whitespace-nowrap">{tr('nav.search', 'Search for products...')}</span>
+            {/* A label written for the narrow box rather than truncated into
+                it — see StoreNav for the measurement. */}
+            <span className="text-sm whitespace-nowrap xl:hidden">{tr('nav.searchShort', 'Search…')}</span>
+            <span className="text-sm whitespace-nowrap truncate hidden xl:inline">{tr('nav.search', 'Search for products...')}</span>
             <kbd className="ml-auto text-[11px] bg-white border border-slate-200 rounded px-1.5 py-0.5 text-slate-400">⌘K</kbd>
           </button>
           <button onClick={() => window.dispatchEvent(new CustomEvent('forge:cmdk'))} aria-label="Search"

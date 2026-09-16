@@ -96,7 +96,13 @@ export default function StoreNav() {
 
   return (
     <header className={`fm-nav sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-slate-200/70 ${scrolled ? 'is-scrolled' : ''}`}>
-      <div className="max-w-[1400px] mx-auto px-4 lg:px-8 h-[68px] flex items-center gap-3 sm:gap-4 xl:gap-6">
+      {/* xl:gap-5, not gap-6. Measured at 1440: the row is 1400px, padding takes
+          64 and seven 24px gaps take 168, leaving 1168 — and the children came
+          to exactly 1168. The row was full to the pixel, so the wordmark gave
+          way by the two pixels it was short and the shop's own name rendered as
+          "ForgeMar…" on every desktop width from 1280 to 1920. Four pixels off
+          each gap hands back 28. */}
+      <div className="max-w-[1400px] mx-auto px-4 lg:px-8 h-[68px] flex items-center gap-3 sm:gap-4 xl:gap-5">
         {/* shrink-0 is load-bearing: this row is over-full at 390px, and without
             it the browser squeezes these 40px buttons down to 20-27px — measured.
             w-11 puts them on the 44px thumb target instead of just under it. */}
@@ -111,7 +117,13 @@ export default function StoreNav() {
             thing here that can give way without losing a function. */}
         {/* Named explicitly: the wordmark is hidden below xl, so on a phone this
             link is a lone icon and a screen reader announces nothing at all. */}
-          <Link to="/" aria-label="ForgeMarket" className="flex items-center gap-2.5 min-w-0">
+          {/* Allowed to shrink below xl, where it is a lone icon and shrinking
+              costs nothing — that is what keeps a 390px row from scrolling
+              sideways. NOT allowed to shrink at xl and up, where the wordmark
+              is actually visible: giving way there means truncating the name of
+              the shop, which is the one label on this row that must never be
+              the thing that gives. */}
+          <Link to="/" aria-label="ForgeMarket" className="flex items-center gap-2.5 min-w-0 xl:shrink-0">
           <span className="w-9 h-9 shrink-0 rounded-xl flex items-center justify-center text-white shadow-lg shadow-violet-500/30"
             style={{ backgroundImage: 'linear-gradient(135deg,#7c5cff,#a855f7)' }}>
             <Zap size={18} fill="white" />
@@ -136,9 +148,17 @@ export default function StoreNav() {
             lighter grey measures 2.34:1 — well under the 4.5:1 that small text
             needs. Same visual weight, actually readable. */}
         <button onClick={() => window.dispatchEvent(new CustomEvent('forge:cmdk'))}
-          className="hidden md:flex items-center gap-2 bg-slate-100 rounded-xl px-3.5 h-10 w-[190px] xl:w-[240px] text-slate-500 hover:bg-slate-200/70 transition">
+          className="hidden md:flex items-center gap-2 bg-slate-100 rounded-xl px-3.5 h-10 w-[190px] xl:w-[264px] text-slate-500 hover:bg-slate-200/70 transition">
           <Search size={16} />
-          <span className="text-sm truncate whitespace-nowrap">{t('nav.search', 'Search for products...')}</span>
+          {/* Two labels, because the box is a fixed 190px below xl and 240px
+              above it, and "Search for products..." does not fit in 190 — nor
+              does "Rechercher un produit..." in 240. A placeholder chopped
+              mid-word beside a magnifying glass reads as a broken box rather
+              than a short one, so the narrow width gets a label written for
+              it. Same pattern the Sign Up button beside this one already uses:
+              the icon always fits, the words appear when there is room. */}
+          <span className="text-sm whitespace-nowrap xl:hidden">{t('nav.searchShort', 'Search…')}</span>
+          <span className="text-sm whitespace-nowrap hidden xl:inline truncate">{t('nav.search', 'Search for products...')}</span>
           <kbd className="ml-auto text-[11px] bg-white border border-slate-200 rounded px-1.5 py-0.5">⌘K</kbd>
         </button>
         <button onClick={() => window.dispatchEvent(new CustomEvent('forge:cmdk'))} aria-label={t('nav.search', 'Search for products...')}
