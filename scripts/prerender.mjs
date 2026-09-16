@@ -131,7 +131,7 @@ function renderHead(path, { title, description, canonical, noindex, ld = [], og 
     '<meta property="og:image:height" content="630" />',
     `<meta property="og:locale" content="nl_NL" />`,
     `<meta property="og:locale:alternate" content="en_US" />`,
-    // summary_large_image needs an image at least 300px wide; og.png is 1200.
+    // summary_large_image needs an image at least 300px wide; og.jpg is 1200.
     '<meta name="twitter:card" content="summary_large_image" />',
     `<meta name="twitter:title" content="${esc(og.title || title)}" />`,
     `<meta name="twitter:description" content="${esc(og.description || description)}" />`,

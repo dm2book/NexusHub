@@ -177,7 +177,7 @@ console.log('— Images —');
     const size = statSync(join(DIST, name)).size;
     ok(`${name} is under ${limit}KB (now ${KB(size)}KB, was 121KB)`, size < limit * 1024);
   }
-  const og = statSync(join(DIST, 'og.png')).size;
+  const og = statSync(join(DIST, 'og.jpg')).size;
   ok(`the social preview is under 150KB (now ${KB(og)}KB, was 386KB)`, og < 150 * 1024);
 }
 

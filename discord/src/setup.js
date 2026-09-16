@@ -22,7 +22,7 @@ import {
   StringSelectMenuBuilder, StringSelectMenuOptionBuilder,
 } from 'discord.js';
 import { ROLES, CATEGORIES, STAFF, MEMBERS, GAME_ROLES, NOTIFY_ROLES, LEVEL_ROLES } from './config.js';
-import { buildPanels } from './panels.js';
+import { buildPanels, PANEL_FOOTER, isPanelFooter } from './panels.js';
 import { resolveOverwrites, DANGEROUS_FOR_BOT, botInviteUrl } from './permissions.js';
 import { TICKET_TYPES } from './tickets.js';
 
@@ -35,7 +35,7 @@ if (!/^https?:\/\//.test(STORE_URL)) STORE_URL = `https://${STORE_URL}`;
 let TRUSTPILOT_URL = (process.env.TRUSTPILOT_URL || '').trim();
 if (TRUSTPILOT_URL && !/^https?:\/\//.test(TRUSTPILOT_URL)) TRUSTPILOT_URL = `https://${TRUSTPILOT_URL}`;
 
-const MARKER = 'forgemarket-setup';
+const MARKER = PANEL_FOOTER;
 
 const P = PermissionFlagsBits;
 const TYPE = {
@@ -498,7 +498,7 @@ async function postOnce(channel, embedBuilder, rows = []) {
   if (!channel || !channel.isTextBased?.()) return 'no-channel';
   const recent = await channel.messages.fetch({ limit: 25 }).catch(() => null);
   const mine = recent ? [...recent.values()].filter(
-    (m) => m.author.id === client.user.id && m.embeds[0]?.footer?.text === MARKER) : [];
+    (m) => m.author.id === client.user.id && isPanelFooter(m.embeds[0]?.footer?.text)) : [];
   if (mine.length && !REPOST) return 'exists';
   if (REPOST) { for (const m of mine) await m.delete().catch(() => {}); }
   const sent = await channel.send({ embeds: [embedBuilder], components: rows });

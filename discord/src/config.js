@@ -250,9 +250,36 @@ export const LEVEL_ROLES = [
 ];
 
 // ── Onboarding & content ────────────────────────────────────────────────────
+/**
+ * The brand banners' versions — a deliberate copy of src/lib/discordBanners.js.
+ *
+ * The bot's Docker image copies only `discord/`, so this tree cannot import
+ * from src/. The copy is therefore the price of shipping the bot on its own,
+ * and server/test/creative-freshness.test.mjs fails if the two ever disagree —
+ * which is the only thing that makes a duplicate safe.
+ *
+ * Discord caches an embed image by URL and never looks again, so the version is
+ * the artwork's own hash: regenerate with `node scripts/art/social-generate.mjs`
+ * and paste the hashes it prints, in both places.
+ */
+export const BANNER_VERSION = {
+  welcome: 'ff710d19',
+  rules: 'e144095a',
+  verify: '67cbd42f',
+  products: '750e032b',
+  deals: 'fe6d198c',
+  giveaways: 'e9aa014e',
+  support: '4e29c726',
+  vouches: 'e9958175',
+};
+
+/** The banner URL for a channel, with {STORE_URL} still to be substituted. */
+export const bannerImage = (name) =>
+  `{STORE_URL}/discord/banner-${name}.jpg?v=${BANNER_VERSION[name] || ''}`;
+
 export const MESSAGES = {
   welcome: (g) => ({
-    image: '{STORE_URL}/discord/banner-welcome.png?v=2',
+    image: bannerImage('welcome'),
     color: 0x7c5cff,
     title: `Welcome to ${g} ⚡`,
     description:
@@ -266,7 +293,7 @@ export const MESSAGES = {
       "Money back if it doesn't arrive · real human support · no account needed to buy.",
   }),
   rules: {
-    image: '{STORE_URL}/discord/banner-rules.png?v=2',
+    image: bannerImage('rules'),
     color: 0x94a3b8,
     title: '📜 Server Rules',
     description:
@@ -294,7 +321,7 @@ export const MESSAGES = {
       "👉 First step: verify in <#verify>.",
   },
   verify: {
-    image: '{STORE_URL}/discord/banner-verify.png?v=2',
+    image: bannerImage('verify'),
     color: 0x22c55e,
     title: '✅ Verify to enter',
     description:
@@ -302,7 +329,7 @@ export const MESSAGES = {
       "marketplace, community, giveaways and support.\n\nThis keeps the community safe from bots and scammers.",
   },
   ticketPanel: {
-    image: '{STORE_URL}/discord/banner-support.png?v=2',
+    image: bannerImage('support'),
     color: 0x3b82f6,
     title: '🎫 Open a support ticket',
     description:
@@ -314,7 +341,7 @@ export const MESSAGES = {
       "We answer as fast as we can during the day — and every ticket gets a real person, not a bot.",
   },
   products: {
-    image: '{STORE_URL}/discord/banner-products.png?v=2',
+    image: bannerImage('products'),
     color: 0x6366f1,
     title: '🛒 The ForgeMarket catalog',
     description:
@@ -336,7 +363,7 @@ export const MESSAGES = {
       "Something wrong? Open a ticket in <#open-a-ticket>. If an order never arrives, you get your money back.",
   },
   deals: {
-    image: '{STORE_URL}/discord/banner-deals.png?v=2',
+    image: bannerImage('deals'),
     color: 0xef4444,
     title: '🔥 Deals & bundles',
     description:
@@ -355,7 +382,7 @@ export const MESSAGES = {
       "Verify in <#verify>, then browse <#products>. Welcome aboard! 🎉",
   },
   supportInfo: {
-    image: '{STORE_URL}/discord/banner-support.png?v=2',
+    image: bannerImage('support'),
     color: 0x3b82f6,
     title: '📋 How support works',
     description:
@@ -368,7 +395,7 @@ export const MESSAGES = {
   // "and you don't have to take our word for it" — but only once there is a
   // profile to point at. Unset, the line is absent rather than dead.
   reviewsIntro: ({ trustpilotUrl = '' } = {}) => ({
-    image: '{STORE_URL}/discord/banner-vouches.png?v=2',
+    image: bannerImage('vouches'),
     color: 0x22c55e,
     title: '⭐ Verified customer reviews',
     description:
@@ -385,7 +412,7 @@ export const MESSAGES = {
     description: "Real screenshots of completed deliveries. Transparency builds trust. 🔒",
   },
   giveawaysIntro: {
-    image: '{STORE_URL}/discord/banner-giveaways.png?v=2',
+    image: bannerImage('giveaways'),
     color: 0xa855f7,
     title: '🎉 Giveaways',
     description:
@@ -429,7 +456,7 @@ export const MESSAGES = {
       "{STORE_URL}/track — no account needed.",
   },
   priceList: {
-    image: '{STORE_URL}/discord/banner-products.png?v=2',
+    image: bannerImage('products'),
     color: 0x6366f1,
     title: '🏷️ Prices',
     // Deliberately no prices here. The bot posts a live, auto-syncing price
@@ -440,7 +467,7 @@ export const MESSAGES = {
       "Looking for something that isn't listed? Ask in <#ask-the-bot> — if we can get it, we will.",
   },
   vouchersIntro: {
-    image: '{STORE_URL}/discord/banner-vouches.png?v=2',
+    image: bannerImage('vouches'),
     color: 0x22c55e,
     title: '💚 Vouchers & vouches',
     description:
@@ -449,7 +476,7 @@ export const MESSAGES = {
       "Real customers only. Verified reviews are also posted in <#reviews>.",
   },
   discountCodes: {
-    image: '{STORE_URL}/discord/banner-deals.png?v=2',
+    image: bannerImage('deals'),
     color: 0xec4899,
     title: '🏷️ Discount & voucher codes',
     description:

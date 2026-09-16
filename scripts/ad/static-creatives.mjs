@@ -15,87 +15,58 @@
  *   banner-vouches.png  "★★★★★", "Real buyers, real proof of delivery" — on a
  *                       shop with 0 orders and 0 reviews.
  *
- * Every one of those strings is on the banned list. The shop is one person; the
- * product pages say "delivered by hand, usually within a few hours" and "order
- * late at night and it goes out first thing in the morning"; /api/stats returns
- * reviews: 0 and rating: null.
+ * All four were marked `retire` here, with the reason — and then kept shipping
+ * for months, because marking a PNG does not redraw it and nothing in this
+ * repo could. They are now drawn by scripts/art/social.mjs and the four claims
+ * are gone: the welcome banner says what is sold, the support banner says a
+ * person answers, the vouches banner describes the mechanism instead of
+ * asserting buyers who do not exist yet, and og.png carries none of them.
  *
- * So the copy lives here, in text, and the test reads it like any other
- * buyer-facing surface. A creative whose copy trips the banned list must be
- * marked `retire` with the reason — which is a fact recorded in code review
- * rather than a claim hidden in pixels. `sha` pins the entry to the exact bytes
- * it describes, so a redrawn banner cannot quietly keep an old, wrong entry.
+ * ── WHY THIS FILE NO LONGER RETYPES THE COPY ──────────────────────────────
+ * It used to hold a hand-written `copy: [...]` per file, which was the best
+ * available answer while the art came from outside the repo. It also meant the
+ * test was reading a transcription, and a transcription can be wrong in the
+ * one direction that matters: a banner could gain a claim and the record could
+ * fail to mention it. Now that the artwork is generated FROM a spec, the spec
+ * is the copy, and this derives from it. There is no second version to drift.
  *
- * Update path: replace the artwork, update `copy` and `sha`, drop `retire`.
- * Nothing else changes.
+ * `sha` stays written by hand. It pins each entry to the exact bytes it
+ * describes, so a redrawn creative has to be acknowledged here rather than
+ * quietly inheriting an old record. Regenerate with:
+ *
+ *     node scripts/art/social-generate.mjs
  */
+import { SOCIAL, OG } from '../art/social.mjs';
+
+/** Every word a spec prints, in the order it appears on the artwork. */
+const wordsOf = (s) => [
+  'FORGEMARKET',
+  ...(s.chip ? [s.chip] : []),
+  s.title,
+  s.sub,
+  ...(s.pills || []),
+  ...(s.facts || []),
+];
 
 export const STATIC_CREATIVES = [
   {
-    file: 'public/og.png', sha: 'f349cd14f9bd970f', size: '1200x630',
-    where: 'the link preview on every share, and the fallback share card for any product',
-    copy: ['FORGEMARKET', 'Digital goods, delivered instantly',
-      'Instant delivery', 'Buyer protection', '4.9/5', '24/7 support'],
-    retire: 'claims instant delivery on a shop where 0 of 72 products auto-deliver, '
-      + 'a 4.9/5 rating on 0 reviews, and 24/7 support from one person',
+    ...OG, size: OG.size || '1200x630', sha: '7dad09e14d9a0294',
+    copy: wordsOf(OG),
   },
-  {
-    file: 'public/discord/banner-welcome.png', sha: 'b2cd69b5cd51e7ec', size: '2200x720',
-    where: 'the top of the Discord server',
-    copy: ['FORGEMARKET', 'WELCOME', 'Instant game top-ups, delivered in seconds',
-      'INSTANT DELIVERY', 'Robux', 'V-Bucks', 'Valorant', 'CoD', 'Apex', 'Nitro'],
-    retire: 'says instant twice, and "delivered in seconds" is on the banned list verbatim',
-  },
-  {
-    file: 'public/discord/banner-support.png', sha: 'e5e9d9e27ad3c243', size: '2200x720',
-    where: 'the Discord support channel',
-    copy: ['FORGEMARKET', 'SUPPORT', 'Open a ticket — we reply fast, 24/7',
-      '24/7', 'Orders', 'Payments', 'Refunds', 'Partnerships'],
-    retire: 'one person cannot answer 24/7, and the shop’s own delivery copy says '
-      + 'a late-night order is handled the next morning',
-  },
-  {
-    file: 'public/discord/banner-vouches.png', sha: '006de2e098570f41', size: '2200x720',
-    where: 'the Discord vouches channel',
-    copy: ['FORGEMARKET', 'VOUCHES & REVIEWS', 'Real buyers, real proof of delivery',
-      'VERIFIED', 'Proof of delivery', 'Buyer-protected'],
-    retire: 'a five-star row and "real buyers" on a shop that has never taken an order',
-  },
-
-  // ── The five that are already true ──────────────────────────────────────
-  {
-    file: 'public/discord/banner-deals.png', sha: '00c85d0a5bbc9a6a', size: '2200x720',
-    where: 'the Discord deals channel',
-    copy: ['FORGEMARKET', 'DROPS & DEALS', 'Flash sales, restocks & discount codes',
-      'LIMITED TIME', 'Flash sales', 'Restocks', 'Coupons', 'VIP perks'],
-  },
-  {
-    file: 'public/discord/banner-giveaways.png', sha: 'a73a50c86657c143', size: '2200x720',
-    where: 'the Discord giveaways channel',
-    copy: ['FORGEMARKET', 'GIVEAWAYS', 'Free drops for verified members, every week',
-      'FREE STUFF', 'Weekly', 'VIP bonus entries', 'Real prizes'],
-    // Not a delivery or rating claim, but it IS a cadence promise. It stays
-    // true only while there really is a weekly giveaway.
-    watch: '"every week" is a commitment, not a description — retire it if the cadence stops',
-  },
-  {
-    file: 'public/discord/banner-products.png', sha: '2e5ecf8025efcd90', size: '2200x720',
-    where: 'the Discord products channel',
-    copy: ['FORGEMARKET', 'SHOP & PRICES', 'Live prices, synced straight from the store',
-      'LIVE PRICES', 'Robux', 'V-Bucks', 'Valorant', 'Genshin', 'Brawl Stars'],
-  },
-  {
-    file: 'public/discord/banner-rules.png', sha: 'efe8df32f5dbb0fa', size: '2200x720',
-    where: 'the Discord rules channel',
-    copy: ['FORGEMARKET', 'RULES', 'Keep it safe — staff never DM you first',
-      'READ FIRST', 'Be respectful', 'No scams', 'One account'],
-  },
-  {
-    file: 'public/discord/banner-verify.png', sha: '258e8c64c82a2daa', size: '2200x720',
-    where: 'the Discord verify channel',
-    copy: ['FORGEMARKET', 'VERIFY & UNLOCK', 'One tap opens the whole server',
-      'SECURE', 'Marketplace', 'Community', 'Giveaways', 'Support'],
-  },
+  ...SOCIAL.map((s) => ({
+    file: s.file, where: s.where, size: '2200x720',
+    sha: {
+      welcome: 'ff710d194d40cd9a',
+      rules: 'e144095a1328f01a',
+      verify: '67cbd42fb88b01d7',
+      products: '750e032b008da79f',
+      deals: 'fe6d198c78fc9cac',
+      giveaways: 'e9aa014e693c4327',
+      support: '4e29c7265b55ff0b',
+      vouches: 'e99581753a3b10df',
+    }[s.id],
+    copy: wordsOf(s),
+  })),
 ];
 
 /** The ones still shipping a claim the shop cannot back. */

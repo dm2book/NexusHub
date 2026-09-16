@@ -70,10 +70,14 @@ console.log('\n— The whole email follows the buyer, not just the template —'
   /* One marker per language for each half of the mail: a word from the
      TEMPLATE, and a word from a block the SERVER generates. Both have to move. */
   const EXPECT = {
-    nl: { subject: /Bedankt voor je bestelling/, total: /Totaal/, withdrawal: /Herroepingsrecht/ },
-    en: { subject: /Thanks for your order/, total: /Total/, withdrawal: /Right of withdrawal/ },
-    de: { subject: /Danke für deine Bestellung/, total: /Gesamt/, withdrawal: /Widerrufsrecht/ },
-    fr: { subject: /Merci pour ta commande/, total: /Total/, withdrawal: /Droit de rétractation/ },
+    nl: { subject: /Bedankt voor je bestelling/, total: /Totaal/, withdrawal: /Herroepingsrecht/,
+      eyebrow: 'Bestelling ontvangen', foot: 'Bestelling volgen' },
+    en: { subject: /Thanks for your order/, total: /Total/, withdrawal: /Right of withdrawal/,
+      eyebrow: 'Order received', foot: 'Track order' },
+    de: { subject: /Danke für deine Bestellung/, total: /Gesamt/, withdrawal: /Widerrufsrecht/,
+      eyebrow: 'Bestellung eingegangen', foot: 'Bestellung verfolgen' },
+    fr: { subject: /Merci pour ta commande/, total: /Total/, withdrawal: /Droit de rétractation/,
+      eyebrow: 'Commande reçue', foot: 'Suivre ma commande' },
   };
   for (const [lang, want] of Object.entries(EXPECT)) {
     const order = await createOrder({
@@ -86,6 +90,23 @@ console.log('\n— The whole email follows the buyer, not just the template —'
     ok(`[${lang}] the subject is written in it`, want.subject.test(mail.subject), mail.subject);
     ok(`[${lang}] …and the order summary the server generates`, want.total.test(body));
     ok(`[${lang}] …and the withdrawal-right footnote`, want.withdrawal.test(body));
+    /* The frame around the letter, on a mail that really went through
+       renderTemplate. Asserting on wrapBranded directly proves the tables are
+       complete and nothing else: it takes the language as an argument, so it
+       passes just as happily when the send path never works out which language
+       to hand it — which is exactly how the header, the two promises and the
+       whole footer stayed Dutch on every German mail. */
+    ok(`[${lang}] …and the header saying which mail this is`, body.includes(want.eyebrow),
+      `expected "${want.eyebrow}"`);
+    /* Read out of the footer block, not out of the whole mail. "Bestellung
+       verfolgen" is also the label on the button inside the German letter, so
+       searching the page passed while the footer under it was still Dutch. */
+    const foot = text((mail.html.match(/<div class="foot">[\s\S]*?<\/div>\s*<\/div>/) || [''])[0]);
+    ok(`[${lang}] …and the footer links`, foot.includes(want.foot),
+      `expected "${want.foot}" in: ${foot.slice(0, 90)}`);
+    const strays = Object.entries(EXPECT)
+      .filter(([l, o]) => l !== lang && foot.includes(o.foot)).map(([l]) => l);
+    ok(`[${lang}] …with no other language left in the footer`, strays.length === 0, strays.join(', '));
   }
 }
 
@@ -151,6 +172,44 @@ console.log('\n— The language reaches mail that has no order behind it —');
   });
   const after = await get('SELECT lang FROM users WHERE id=@id', { id: uid });
   ok('…and ordering in one records it against the person', after?.lang === 'fr', String(after?.lang));
+}
+
+console.log('\n— …and so does the frame around it —');
+{
+  /* The bodies were translated; the frame was not.
+     A German delivery mail arrived with GELEVERD printed across its header, two
+     Dutch promises under the letter and a Dutch footer — three Dutch fragments
+     wrapped around a German letter, from a shop the buyer had never bought
+     from before. That is not a rough edge, it is the thing that makes a real
+     email look like a forged one, which is the exact failure the rest of this
+     file exists to prevent. Nothing caught it because every assertion above
+     reads the BODY. */
+  const { EMAIL_THEMES, wrapBranded } = await import('../src/services/templateService.js');
+  const LANGS = ['nl', 'en', 'de', 'fr'];
+
+  const tables = Object.values(EMAIL_THEMES)
+    .flatMap((t) => [t.eyebrow, ...(t.pills || [])]);
+  ok(`all ${tables.length} header and footer strings exist in every language`,
+    tables.every((t) => LANGS.every((l) => typeof t[l] === 'string' && t[l].length > 0)),
+    'a missing one prints the Dutch, or nothing at all');
+
+  /* An unknown language must still produce a sentence rather than `undefined`
+     in someone's inbox. */
+  const odd = wrapBranded('<p>letter</p>', { theme: EMAIL_THEMES.order_completed, lang: 'pt' });
+  ok('an unwritten language falls back to a real sentence', !/undefined/.test(odd));
+
+  /* One action colour. Half the templates draw their button as an inline
+     table hardcoded to the brand purple; the .btn class followed the mail's
+     accent, so a delivery mail had a green header and a purple button while a
+     refund had purple and purple. */
+  const green = wrapBranded('<p>x</p>', { theme: EMAIL_THEMES.order_completed, lang: 'nl' });
+  const purple = wrapBranded('<p>x</p>', { theme: EMAIL_THEMES.refund_issued, lang: 'nl' });
+  const btnOf = (html) => (html.match(/a\.btn\{[^}]*\}/) || [''])[0];
+  ok('the button is the same colour in every mail', btnOf(green) === btnOf(purple) && btnOf(green).length > 0);
+  ok('…and it is the brand purple the templates already hardcode',
+    /#7c5cff/.test(btnOf(green)), btnOf(green).slice(0, 80));
+  ok('…while the header still follows the mail\'s own accent',
+    green.includes('#34d399') && purple.includes('#a855f7'));
 }
 
 console.log(`\n${fail === 0 ? '✅' : '❌'} email-languages: ${pass} passed, ${fail} failed`);

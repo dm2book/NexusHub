@@ -285,14 +285,14 @@ router.get('/product/:id', asyncHandler(async (req, res, next) => {
      grep found `-banner.svg` referenced only by its own test.
      Caveat worth knowing: an SVG og:image is not rendered by every social
      platform. Where it is not, the crawler falls back to the site-level
-     /og.png, which is a real 1200x630 raster — so a share card is never blank,
+     /og.jpg, which is a real 1200x630 raster — so a share card is never blank,
      it is just less specific. */
   const banner = /\/products\/art\/[^/]+\.svg$/.test(product.image || '')
     ? product.image.replace(/\.svg$/, '-banner.svg') : null;
   const share = banner || product.image;
   const image = share
     ? (share.startsWith('http') ? share : SITE_URL() + share)
-    : `${SITE_URL()}/og.png`;
+    : `${SITE_URL()}/og.jpg?v=7dad09e1`;
   const imageSize = banner ? { w: 1600, h: 900 } : { w: 1200, h: 630 };
 
   // A rating is attached ONLY when real reviews exist. schema.org will happily

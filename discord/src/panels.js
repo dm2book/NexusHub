@@ -16,6 +16,38 @@
 import { MESSAGES, FAQ } from './config.js';
 
 /**
+ * The footer under every pinned panel.
+ *
+ * It read `forgemarket-setup` — an internal marker, in small grey type, under
+ * the welcome message, the rules, the price list and the support panel: the
+ * most-read messages on the server, each signed with the name of the script
+ * that posted them.
+ *
+ * It cannot simply be deleted, because that string is also how setup.js and the
+ * bot's copy sync recognise their own panels among other messages in a channel.
+ * So it becomes a footer worth reading that happens to be just as unique. The
+ * old value stays recognised (and only recognised) so the panels already posted
+ * on the live server are found and rewritten rather than duplicated.
+ */
+export const PANEL_FOOTER = 'ForgeMarket · forgemarket.nl';
+const LEGACY_FOOTERS = ['forgemarket-setup'];
+
+/** Is this one of our own pinned panels? */
+export const isPanelFooter = (text) =>
+  text === PANEL_FOOTER || LEGACY_FOOTERS.includes(String(text ?? ''));
+
+/**
+ * Is this panel still signed with the old internal marker?
+ *
+ * Deliberately not folded into panelNeedsUpdate. That function answers "has
+ * the copy changed", and a panel whose copy is identical must still be edited
+ * once to replace its footer — two different questions, and merging them would
+ * have made "identical copy does not churn the API" false.
+ */
+export const panelFooterIsStale = (existingEmbed) =>
+  !!existingEmbed && existingEmbed.footer?.text !== PANEL_FOOTER;
+
+/**
  * Discord only renders `<#123456789>` as a channel link. The panels are written
  * with readable `<#open-a-ticket>` placeholders, which would otherwise show up
  * as literal text in the most-read messages on the server.
