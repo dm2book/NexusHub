@@ -32,6 +32,8 @@ export default {
   'nav.signup': 'Créer un compte',
   'nav.account': 'Compte',
   'footer.tagline': 'La marketplace des produits numériques — prix honnêtes, vrai support, chaque commande suivie.',
+  'footer.discordPlain': 'Support ForgeMarket sur Discord',
+  'footer.whoSells': 'À qui tu achètes',
   'footer.discord': '💬 Support ForgeMarket sur Discord',
   'footer.shop': 'Boutique',
   'footer.company': 'Entreprise',
