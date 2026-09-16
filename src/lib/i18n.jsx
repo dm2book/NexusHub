@@ -60,6 +60,8 @@ const NL = {
 
   // Footer
   'footer.tagline': 'Dé marketplace voor digitale producten — eerlijke prijzen, echte support, elke bestelling te volgen.',
+  'footer.discordPlain': 'ForgeMarket-support op Discord',
+  'footer.whoSells': 'Van wie je koopt',
   'footer.discord': '💬 ForgeMarket Support op Discord',
   'footer.shop': 'Winkel',
   'footer.company': 'Bedrijf',
