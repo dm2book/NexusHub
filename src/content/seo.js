@@ -71,7 +71,7 @@ export const FOCUS = ['Robux', 'V-Bucks', 'Valorant Points', 'giftcards', 'game 
 export const PAGES = {
   '/': {
     nl: {
-      title: 'Robux, V-Bucks & giftcards kopen — direct geleverd',
+      title: 'Robux, V-Bucks & giftcards kopen — Nederlandse shop',
       description: 'Koop Robux, V-Bucks, Valorant Points en giftcards bij een Nederlandse shop. Op voorraad gaat automatisch de deur uit, de rest met de hand binnen een paar uur.',
     },
     en: {
@@ -482,7 +482,7 @@ export const LANDING = {
   '/fc-points': {
     category: 'eafc',
     nl: {
-      title: 'FC Points kopen voor EA FC — direct geleverd',
+      title: 'FC Points kopen voor EA FC — veilig en snel',
       description: 'FC Points kopen met iDEAL voor EA SPORTS FC. Op voorraad gaat automatisch de deur uit, de rest zetten we met de hand voor je klaar.',
       h1: 'FC Points kopen',
       sub: 'FC Points voor EA SPORTS FC, voor packs en Ultimate Team. Betalen met iDEAL, levering automatisch of met de hand.',
@@ -617,7 +617,7 @@ export const LANDING = {
   '/clash-royale-gems': {
     category: 'clashroyale',
     nl: {
-      title: 'Clash Royale Gems kopen — direct geleverd',
+      title: 'Clash Royale Gems kopen — veilig en snel',
       description: 'Gems kopen voor Clash Royale met iDEAL. Op voorraad wordt automatisch geleverd, de rest zetten we met de hand voor je klaar.',
       h1: 'Clash Royale Gems kopen',
       sub: 'Gems voor Clash Royale — voor chests, kaarten en de Pass Royale.',
