@@ -7,3 +7,7 @@ server/.env
 .DS_Store
 .vite/
 .vercel/
+
+# A packaged brand kit is built from public/brand by scripts/art/logo.mjs;
+# there is no reason to keep a 1MB copy of it in history.
+forgemarket-brand-kit.zip
