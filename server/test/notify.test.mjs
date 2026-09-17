@@ -241,6 +241,60 @@ console.log('\n— All five events are connected to real state changes —');
   }
 }
 
+console.log('\n— The channel that needs no setup —');
+{
+  /* Production had no Discord webhook, no Telegram bot and no Pushover key, so
+     the launch dashboard said "Nothing set, a chargeback waits until you happen
+     to look" — on a shop that sends order confirmations and login codes every
+     day and knows the owner's address. It could always have emailed. */
+  const { alertRoute, configuredChannels } = await import('../src/services/notifyService.js');
+  const { config } = await import('../src/config/env.js');
+
+  const keep = {
+    discord: config.notify.discordWebhookUrl, ops: config.discord.orderWebhookUrl,
+    tg: config.notify.telegram.botToken, tgc: config.notify.telegram.chatId,
+    po: config.notify.pushover.token, pou: config.notify.pushover.user,
+    mail: config.notify.email,
+  };
+  const clearInstant = () => {
+    config.notify.discordWebhookUrl = ''; config.discord.orderWebhookUrl = '';
+    config.notify.telegram.botToken = ''; config.notify.telegram.chatId = '';
+    config.notify.pushover.token = ''; config.notify.pushover.user = '';
+  };
+
+  clearInstant();
+  config.notify.email = '';
+  const viaAdmin = alertRoute();
+  ok('with nothing configured it still has somewhere to go',
+    viaAdmin.fallback && viaAdmin.to === config.auth.adminEmails[0], JSON.stringify(viaAdmin));
+
+  config.notify.email = 'ops@example.test';
+  ok('…and NOTIFY_EMAIL wins over the admin address', alertRoute().to === 'ops@example.test');
+
+  /* The rule that makes it safe to add. An alert that arrives on a phone AND
+     in an inbox is an alert that gets muted in both. */
+  config.notify.discordWebhookUrl = 'https://discord.test/hook';
+  const withDiscord = alertRoute();
+  ok('the moment something faster exists, email steps aside',
+    !withDiscord.fallback && withDiscord.channels.includes('Discord'), JSON.stringify(withDiscord));
+  ok('…and email is never counted as an instant channel',
+    !configuredChannels().includes('Email'), configuredChannels().join(','));
+
+  clearInstant();
+  config.notify.email = '';
+  const saved = config.auth.adminEmails.slice();
+  config.auth.adminEmails.length = 0;
+  const nowhere = alertRoute();
+  ok('with no address at all it says so rather than pretending',
+    !nowhere.fallback && nowhere.channels.length === 0, JSON.stringify(nowhere));
+  config.auth.adminEmails.push(...saved);
+
+  config.notify.discordWebhookUrl = keep.discord; config.discord.orderWebhookUrl = keep.ops;
+  config.notify.telegram.botToken = keep.tg; config.notify.telegram.chatId = keep.tgc;
+  config.notify.pushover.token = keep.po; config.notify.pushover.user = keep.pou;
+  config.notify.email = keep.mail;
+}
+
 globalThis.fetch = realFetch;
 server.close();
 console.log(`\n${pass} passed, ${fail} failed`);

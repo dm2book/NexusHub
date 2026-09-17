@@ -279,13 +279,23 @@ export async function sendRawEmail({ to, subject, innerHtml, context = {}, logTa
   const subj = renderTokens(subject, ctx);
   const html = wrapBranded(renderTokens(innerHtml, ctx), { preheader: subj });
   const from = `${config.email.fromName} <${config.email.fromAddress}>`;
+  /* The same two the transactional path has carried since it was measured on
+     the wire, and this one never did: a Reply-To that reaches a person, and a
+     plain-text alternative. Without the text part the message goes out as
+     `Content-Type: text/html` with no multipart, which is a spam-filter
+     penalty — and it is the only thing a watch preview or a screen reader in
+     text mode has to show. It mattered more once owner alerts started coming
+     through here: an alert about a chargeback is the last message that should
+     be sorted into junk. */
+  const replyTo = config.email.replyTo || undefined;
+  const text = htmlToText(html);
   try {
     let info; let status;
     if (config.email.resendApiKey) {
-      info = await sendViaResend({ from, to, subject: subj, html });
+      info = await sendViaResend({ from, to, subject: subj, html, text, replyTo });
       status = 'sent';
     } else {
-      info = await (await getTransport()).sendMail({ from, to, subject: subj, html });
+      info = await (await getTransport()).sendMail({ from, to, subject: subj, html, text, replyTo });
       status = config.email.smtpUrl ? 'sent' : 'recorded';
     }
     await run(`INSERT INTO email_log (id, template_id, to_email, subject, status, provider_ref, created_at)

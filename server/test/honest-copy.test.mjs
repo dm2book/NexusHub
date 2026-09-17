@@ -52,6 +52,7 @@ const BANNED_LIST = [
   [/delivered\s+in\s+seconds/i, 'delivered in seconds'],
   [/automated\s+fulfil?lment/i, 'automated fulfilment'],
   [/multi-supplier\s+engine/i, 'multi-supplier engine'],
+  [/get\s+it\s+instantly/i, 'get it instantly'],
 ];
 
 /**
@@ -78,6 +79,13 @@ const BANNED_TRANSLATED = [
   [/sofort(ige[rns]?)?\s*[,]?\s*(geliefert|lieferung)/i, 'de: Sofortlieferung'],
   [/livraison\s+imm[ée]diate/i, 'fr: livraison immédiate'],
   [/livr[ée]e?\s+instantan[ée]ment/i, 'fr: livré instantanément'],
+  /* The same promise worded as a benefit rather than a service: "Get it
+     instantly", "Ontvang het direct", "Bekomm es sofort", "Reçois-le tout de
+     suite". It was the fourth step on the payment page, two sections above
+     that page's own line saying the rest is delivered by hand. */
+  [/ontvang\s+(het|je|ze)\s+direct/i, 'nl: ontvang het direct'],
+  [/bekomm\s+(es|sie|deine)\s+sofort/i, 'de: bekomm es sofort'],
+  [/re[cç]ois[- ](le|les|tes|ton)\s+tout\s+de\s+suite/i, 'fr: reçois-le tout de suite'],
 ];
 
 /**

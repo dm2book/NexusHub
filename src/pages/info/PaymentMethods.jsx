@@ -12,11 +12,17 @@ const META = {
   revolut: { icon: '⚫', name: 'Revolut', blurb: 'Send your payment instantly via your Revolut link.' },
   paypal: { icon: '🔵', name: 'PayPal', blurb: 'Pay with your PayPal balance, bank or card — buyer-protected.' },
 };
+/* The last step said "Get it instantly — we confirm your payment and your
+   items are delivered automatically", on a page whose own perk box two
+   sections down says in-stock items go out automatically and the rest is
+   delivered by hand within a few hours. Two promises about the same moment,
+   on the same screen. The second step also named three providers on a page
+   that reads the real list from config directly above it. */
 const STEPS = [
   ['Pick your item', 'Add a product to your cart and go to checkout.'],
-  ['Choose a method', 'Select Tikkie, Revolut or PayPal at checkout.'],
+  ['Choose a method', 'Pick one of the methods above — they are the ones switched on right now.'],
   ['Pay with your order number', 'Use your order number (e.g. FM-2026-XXXX) as the payment reference.'],
-  ['Get it instantly', 'We confirm your payment and your items are delivered automatically.'],
+  ['We confirm, then it ships', 'Once your payment is confirmed, anything in stock goes out automatically and the rest follows by hand.'],
 ];
 
 export default function PaymentMethods() {
