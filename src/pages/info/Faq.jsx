@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { ChevronDown } from 'lucide-react';
 import InfoShell from '../../components/InfoShell.jsx';
 import { useI18n } from '../../lib/i18n.jsx';
+import { getConfig } from '../../lib/useConfig.js';
 import { usePageMeta, useJsonLd } from '../../lib/useMeta.js';
 import { faqLd } from '../../content/seo.js';
 
@@ -10,6 +11,31 @@ import { faqLd } from '../../content/seo.js';
    It carried EN and NL only, so `CONTENT[lang] || CONTENT.en` served a German
    or French reader the entire help centre in English. i18n-content.test now
    refuses a map like this one that does not cover every offered language. */
+/**
+ * Which methods are on, answered by the shop rather than by this file.
+ *
+ * It used to name five providers and a PSP: "iDEAL, Bancontact, Apple Pay,
+ * credit card and PayPal, through Mollie". The shop takes Tikkie, by hand.
+ * That answer is also fed to Google as FAQ structured data, so it was a
+ * machine-readable claim as well as a human one.
+ *
+ * A token rather than a rewrite, because the honest answer changes the day a
+ * Mollie key is set — and an answer that has to be edited by hand on that day
+ * is an answer that will be wrong again.
+ */
+const PAY_NOW = '{{methods}}';
+
+const SENTENCE = {
+  en: { known: (m) => `Right now: ${m}.`, none: 'The methods on offer are shown at checkout.',
+        auto: 'Confirmation is automatic.', hand: 'We confirm every payment by hand, usually within minutes during the day.' },
+  nl: { known: (m) => `Op dit moment: ${m}.`, none: 'Welke methoden er zijn zie je bij het afrekenen.',
+        auto: 'De bevestiging gaat automatisch.', hand: 'We bevestigen elke betaling met de hand, overdag meestal binnen een paar minuten.' },
+  de: { known: (m) => `Aktuell: ${m}.`, none: 'Welche Methoden es gibt, siehst du an der Kasse.',
+        auto: 'Die Bestätigung läuft automatisch.', hand: 'Wir bestätigen jede Zahlung von Hand, tagsüber meist innerhalb weniger Minuten.' },
+  fr: { known: (m) => `En ce moment : ${m}.`, none: 'Les moyens disponibles sont indiqués au moment de payer.',
+        auto: 'La confirmation est automatique.', hand: 'Nous confirmons chaque paiement à la main, en journée généralement en quelques minutes.' },
+};
+
 const CONTENT = {
   en: {
     eyebrow: 'Help center', title: 'Frequently asked questions',
@@ -20,7 +46,7 @@ const CONTENT = {
         ['Can I track my order?', 'Yes — use the order page in your dashboard, or the public Track Order page with your order number.'],
       ] },
       { title: 'Payments & refunds', items: [
-        ['Which payment methods are supported?', 'iDEAL, Bancontact, Apple Pay, credit card and PayPal, through our payment provider Mollie. Your order is confirmed automatically — with iDEAL usually within seconds.'],
+        ['Which payment methods are supported?', `You order first and pay after, with your order number as the reference — nothing is charged automatically. ${PAY_NOW}`],
         ['How do refunds work?', 'Request a refund from your order page or open a ticket in our Discord. Once approved, eligible orders are refunded to your original method.'],
       ] },
       { title: 'Account & security', items: [
@@ -39,7 +65,7 @@ const CONTENT = {
         ['Kan ik mijn bestelling volgen?', 'Ja — via de bestelpagina in je dashboard, of via de publieke Volg-pagina met je bestelnummer.'],
       ] },
       { title: 'Betalingen & terugbetalingen', items: [
-        ['Welke betaalmethoden worden ondersteund?', 'iDEAL, Bancontact, Apple Pay, creditcard en PayPal, via onze betaaldienstverlener Mollie. Je bestelling wordt automatisch bevestigd — bij iDEAL meestal binnen seconden.'],
+        ['Welke betaalmethoden worden ondersteund?', `Je bestelt eerst en betaalt daarna, met je bestelnummer als referentie — er wordt niets automatisch afgeschreven. ${PAY_NOW}`],
         ['Hoe werken terugbetalingen?', 'Vraag een terugbetaling aan via je bestelpagina of open een ticket in onze Discord. Na goedkeuring wordt het bedrag teruggestort via je oorspronkelijke betaalmethode.'],
       ] },
       { title: 'Account & veiligheid', items: [
@@ -58,7 +84,7 @@ const CONTENT = {
         ['Kann ich meine Bestellung verfolgen?', 'Ja — über die Bestellseite in deinem Dashboard oder über die öffentliche Verfolgen-Seite mit deiner Bestellnummer.'],
       ] },
       { title: 'Zahlungen & Rückerstattungen', items: [
-        ['Welche Zahlungsmethoden werden unterstützt?', 'iDEAL, Bancontact, Apple Pay, Kreditkarte und PayPal, über unseren Zahlungsdienstleister Mollie. Deine Bestellung wird automatisch bestätigt — bei iDEAL meistens innerhalb von Sekunden.'],
+        ['Welche Zahlungsmethoden werden unterstützt?', `Du bestellst zuerst und zahlst danach, mit deiner Bestellnummer als Verwendungszweck — es wird nichts automatisch abgebucht. ${PAY_NOW}`],
         ['Wie funktionieren Rückerstattungen?', 'Beantrage eine Rückerstattung auf deiner Bestellseite oder öffne ein Ticket in unserem Discord. Nach der Freigabe wird der Betrag auf deinem ursprünglichen Zahlungsweg zurückerstattet.'],
       ] },
       { title: 'Konto & Sicherheit', items: [
@@ -77,7 +103,7 @@ const CONTENT = {
         ['Puis-je suivre ma commande ?', 'Oui — via la page de commande de ton tableau de bord, ou via la page de suivi publique avec ton numéro de commande.'],
       ] },
       { title: 'Paiements & remboursements', items: [
-        ['Quels moyens de paiement sont acceptés ?', 'iDEAL, Bancontact, Apple Pay, carte bancaire et PayPal, via notre prestataire de paiement Mollie. Ta commande est confirmée automatiquement — avec iDEAL, en général en quelques secondes.'],
+        ['Quels moyens de paiement sont acceptés ?', `Tu commandes d’abord et tu paies ensuite, avec ton numéro de commande comme référence — rien n’est prélevé automatiquement. ${PAY_NOW}`],
         ['Comment fonctionnent les remboursements ?', 'Demande un remboursement depuis ta page de commande ou ouvre un ticket sur notre Discord. Une fois approuvé, le montant est remboursé sur ton moyen de paiement d’origine.'],
       ] },
       { title: 'Compte & sécurité', items: [
@@ -96,7 +122,35 @@ export default function Faq() {
      German. */
   usePageMeta();
   const { lang } = useI18n();
-  const L = CONTENT[lang] || CONTENT.en;
+  const base = CONTENT[lang] || CONTENT.en;
+
+  /* Ask the shop which methods are on, and fill the token in. Until the answer
+     arrives the sentence simply ends after "shown at checkout" — true either
+     way, and never a list that turns out to be wrong a moment later. */
+  const [methods, setMethods] = useState(null);
+  useEffect(() => {
+    getConfig()
+      .then((c) => setMethods({
+        names: [
+          ...(c.paymentMethods || []).map((m) => m.label).filter(Boolean),
+          ...(c.mollieMethods || []).map((m) => m.label || m.id).filter(Boolean),
+        ],
+        automatic: (c.mollieMethods || []).length > 0 || (c.paymentProvider && c.paymentProvider !== 'manual'),
+      }))
+      .catch(() => setMethods({ names: [], automatic: false }));
+  }, []);
+
+  const L = useMemo(() => {
+    const S = SENTENCE[lang] || SENTENCE.en;
+    const names = [...new Set(methods?.names || [])];
+    const filled = [names.length ? S.known(names.join(', ')) : S.none,
+      methods ? (methods.automatic ? S.auto : S.hand) : ''].filter(Boolean).join(' ');
+    const swap = (t) => t.replace('{{methods}}', filled).replace(/\s+([.,])/g, '$1').trim();
+    return {
+      ...base,
+      groups: base.groups.map((g) => ({ ...g, items: g.items.map(([q, a]) => [q, swap(a)]) })),
+    };
+  }, [base, lang, methods]);
   // Built from the questions this page actually renders, not a hand-kept second
   // list. FAQ markup that does not match the visible page is the fastest way to
   // lose the rich result it was added for.

@@ -294,7 +294,24 @@ console.log('— schema.org —');
   const org = home.find((d) => d['@type'] === 'OnlineStore');
   ok('the organisation has a stable @id other blocks can reference',
     org['@id'] === `${SITE.url}/#organization`);
-  ok('…names the payment methods actually accepted', /iDEAL/.test(org.paymentAccepted || ''));
+  /* This asserted /iDEAL/ — it pinned the claim rather than the rule its own
+     name states. The shop takes Tikkie, by hand; iDEAL was a hardcoded string
+     in a schema.org block, which is a machine-readable claim a crawler cannot
+     check against the checkout the way a reader can.
+     The field now comes from the same config the checkout reads, and is left
+     OUT when nothing is configured — the same treatment the address already
+     got for the same reason. */
+  const { manualPayMethods } = await import('../src/config/env.js');
+  const live = manualPayMethods().map((m) => m.label);
+  if (live.length) {
+    ok(`…names the payment methods actually accepted (${live.join(', ')})`,
+      live.every((n) => (org.paymentAccepted || '').includes(n)), org.paymentAccepted || '(absent)');
+  } else {
+    ok('…and claims no payment method when none is configured',
+      !org.paymentAccepted, org.paymentAccepted || '(absent)');
+  }
+  ok('…and never hardcodes one', !/iDEAL/.test(readFileSync(join(ROOT, 'src/content/seo.js'), 'utf8')
+    .match(/export function organizationLd[\s\S]*?\n\}/)?.[0] || ''));
   // legalIdentity.js is still empty. An invented address in structured data is
   // exactly the kind of mismatch that earns a manual action, so it is left out
   // rather than filled with a placeholder.

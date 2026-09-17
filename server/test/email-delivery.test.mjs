@@ -115,7 +115,19 @@ ok('order confirmation, payment confirmation and delivery were all sent',
     (t) => logs.some((l) => l.template_id === t && l.status === 'sent')),
   JSON.stringify(logs));
 ok('nothing failed', logs.every((l) => l.status === 'sent'), JSON.stringify(logs));
-ok('every send is logged', logs.length === inbox.length, `${logs.length} logged, ${inbox.length} on the wire`);
+/* Counted per recipient. `logs` is filtered to the buyer, and `inbox` is
+   every message the SMTP server saw — which was the same number only while the
+   buyer was the only person this shop emails. Owner alerts now fall back to
+   email when no Discord or Telegram channel is set, so an unfiltered
+   comparison here measured "did anything else send a mail", which is not what
+   this line is called. */
+/* The To: header, not the body. An owner alert about this very order quotes
+   the buyer's address inside it, so a substring match over the whole message
+   counted the alerts as mail to the buyer — 5 where there were 3. */
+const recipient = (m) => (m.match(/^To:.*$/mi) || [''])[0];
+const toBuyer = inbox.filter((m) => recipient(m).includes(buyer));
+ok('every send to the buyer is logged', logs.length === toBuyer.length,
+  `${logs.length} logged, ${toBuyer.length} on the wire to ${buyer}`);
 
 console.log('\n— The headers that actually left the building —');
 {

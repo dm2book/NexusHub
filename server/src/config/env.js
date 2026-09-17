@@ -247,6 +247,11 @@ export const config = {
       token: env.PUSHOVER_TOKEN || '',
       user: env.PUSHOVER_USER || '',
     },
+    /* Where to email an alert when no instant channel is set up.
+       Defaults to the first admin address, because the shop already knows it
+       and already has a working transport — the alternative was a launch
+       checklist saying "nothing is set" on a shop that can send mail. */
+    email: (env.NOTIFY_EMAIL || '').trim(),
   },
 
   security: {

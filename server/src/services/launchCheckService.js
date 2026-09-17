@@ -8,7 +8,7 @@ import { get, all } from '../db/index.js';
 import { iconFor } from '../db/demoSeed.js';
 import { botSeenRecently } from './discordService.js';
 import { lastMaintenanceRun } from './maintenanceService.js';
-import { configuredChannels, EVENTS as NOTIFY_EVENTS } from './notifyService.js';
+import { alertRoute, configuredChannels, EVENTS as NOTIFY_EVENTS } from './notifyService.js';
 import { isEnabled as mollieEnabled, isTestKey as mollieTestKey, SUPPORTED_METHODS as MOLLIE_METHODS } from './mollieService.js';
 import {
   isEnabled as stripeEnabled, isTestKey as stripeTestKey,
@@ -369,10 +369,22 @@ export async function launchChecks() {
      owner not to trust it. */
   const eventCount = Object.keys(NOTIFY_EVENTS).length;
   if (!notify.length) {
-    add('notify', 'Owner alerts', 'warn',
-      'Nothing set, so a chargeback, a failed fulfilment or a sold-out product waits until you '
-      + 'happen to look. Set any one of NOTIFY_DISCORD_WEBHOOK_URL, TELEGRAM_BOT_TOKEN + '
-      + 'TELEGRAM_CHAT_ID, or PUSHOVER_TOKEN + PUSHOVER_USER.');
+    /* The shop already has a working email transport and knows the owner's
+       address, so "nothing is set" was never quite true — it just had no
+       channel that used them. It does now, and this says which case you are
+       in rather than only complaining. */
+    const route = alertRoute();
+    if (route.fallback) {
+      add('notify', 'Owner alerts', 'warn',
+        `No instant channel, so alerts go to ${route.to} by email — which is slower than a phone `
+        + 'and easier to miss. Set any one of NOTIFY_DISCORD_WEBHOOK_URL, TELEGRAM_BOT_TOKEN + '
+        + 'TELEGRAM_CHAT_ID, or PUSHOVER_TOKEN + PUSHOVER_USER and the email stops by itself.');
+    } else {
+      add('notify', 'Owner alerts', 'fail',
+        'Nothing set and no admin address to fall back on, so a chargeback, a failed fulfilment '
+        + 'or a sold-out product waits until you happen to look. Set NOTIFY_EMAIL, or any one of '
+        + 'NOTIFY_DISCORD_WEBHOOK_URL, TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID, PUSHOVER_TOKEN + PUSHOVER_USER.');
+    }
   } else {
     /* Undelivered alerts are the thing worth surfacing here. Channels being
        configured says the plumbing exists; a queue of pending ones says it is

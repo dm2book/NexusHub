@@ -221,7 +221,25 @@ try {
   ({ SUPPORT_EMAIL: email } = await import(join(ROOT, 'src/lib/support.js')));
 } catch { /* optional */ }
 
-const org = organizationLd({ email, legal });
+/* What the shop can actually be paid with, read from the same config the
+   checkout reads — not a list written down once and left behind. Empty when
+   nothing is configured, and organizationLd then omits the field rather than
+   claiming five providers the checkout has never heard of. */
+let paymentAccepted = '';
+try {
+  const { config, manualPayMethods } = await import(join(ROOT, 'server/src/config/env.js'));
+  const names = [
+    ...manualPayMethods().map((m) => m.label),
+    /* One key switches Mollie on, and it is Mollie that decides which of these
+       a given buyer is offered — so this is what the shop CAN be paid with,
+       which is the question schema.org asks. */
+    ...(config.payments.mollie.apiKey ? ['iDEAL', 'Bancontact', 'Apple Pay', 'Credit Card', 'PayPal'] : []),
+    ...(config.payments.stripe.secretKey ? ['Credit Card'] : []),
+  ].filter(Boolean);
+  paymentAccepted = [...new Set(names)].join(', ');
+} catch { /* no config at build time — the field is left out, which is honest */ }
+
+const org = organizationLd({ email, legal, paymentAccepted });
 const site = websiteLd();
 
 const NAME = { '/': 'Home', '/shop': 'Shop' };

@@ -285,12 +285,72 @@ function pushover(event, { title, lines, url }) {
  * @param {{title: string, lines: string[], url?: string}} message
  * @returns {Promise<{sent: string[], failed: string[], configured: number}>}
  */
+/**
+ * The fallback channel: email.
+ *
+ * Owner alerts needed a Discord webhook, a Telegram bot or a Pushover key, and
+ * production had none of the three — so a chargeback, a failed fulfilment or a
+ * sold-out product waited until somebody happened to look. Meanwhile the shop
+ * has a working email transport and knows the owner's address: it sends order
+ * confirmations and login codes with it every day.
+ *
+ * ONLY when nothing faster is configured. An alert that arrives on a phone and
+ * again in an inbox is an alert that gets muted in both, so the moment a
+ * Discord webhook or a Telegram bot appears this steps aside. That also makes
+ * it safe to add: an owner who has already set one up sees no change at all.
+ *
+ * Imported lazily because emailService imports THIS module for alertOwner, and
+ * a static import back would be a cycle — the kind that resolves to undefined
+ * at module-init time and fails only in production, on the first alert.
+ */
+function email(event, { title, lines, url }) {
+  if (configuredChannels().length) return null;      // something faster is on
+  const to = config.notify.email || config.auth.adminEmails[0] || '';
+  if (!to) return null;
+  const meta = EVENTS[event];
+  const esc = (v) => String(v).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+
+  /* Not through sendOnce. That is the webhook path — it reads res.ok, retries
+     a 5xx and honours a 429's retry-after, none of which an SMTP send has.
+     Handing it `true` made every alert "refused: undefined". sendRawEmail
+     already writes its own row in email_log with sent / recorded / failed, and
+     the durable layer above retries at its own level. */
+  return (async () => {
+    const { sendRawEmail } = await import('./emailService.js');
+    const body = [
+      `<h1>${meta.emoji} ${esc(title)}</h1>`,
+      ...(lines || []).map((l) => `<p>${esc(l)}</p>`),
+      url ? `<p><a class="btn" href="${esc(url)}">Open it</a></p>` : '',
+      /* Said in the mail itself, because the owner's first question on seeing
+         one of these is "why is this in my inbox and not on my phone". */
+      '<div class="notice">You are getting this by email because no Discord, '
+      + 'Telegram or Pushover channel is configured. Set one and these stop.</div>',
+    ].filter(Boolean).join('\n');
+    try {
+      const { status } = await sendRawEmail({
+        to,
+        subject: `${meta.emoji} ${title}`,
+        innerHtml: body,
+        logTag: `alert:${event}`,
+      });
+      /* `recorded` is the JSON transport with no SMTP configured — the message
+         exists in email_log and nothing left the building. Counting that as
+         sent would make a shop with no mail transport look like one that is
+         alerting its owner. */
+      return status === 'sent';
+    } catch (err) {
+      console.error('[notify] email failed:', err.message);
+      return false;
+    }
+  })();
+}
+
 export async function notifyOwner(event, message) {
   if (!EVENTS[event]) {
     console.error(`[notify] unknown event "${event}"`);
     return { sent: [], failed: [], configured: 0 };
   }
-  const channels = { discord, telegram, pushover };
+  const channels = { discord, telegram, pushover, email };
   const started = Object.entries(channels)
     .map(([name, fn]) => {
       let p = null;
@@ -533,11 +593,25 @@ export async function pruneAlerts({ days = 30 } = {}) {
   return n;
 }
 
-/** Which channels are wired up — used by the launch dashboard. */
+/**
+ * Which INSTANT channels are wired up — used by the launch dashboard, and by
+ * the email fallback to decide whether it is needed.
+ *
+ * Email is deliberately not in here. It is the fallback, so counting it would
+ * switch itself off the moment it switched itself on.
+ */
 export function configuredChannels() {
   const out = [];
   if (config.notify.discordWebhookUrl || config.discord.orderWebhookUrl) out.push('Discord');
   if (config.notify.telegram.botToken && config.notify.telegram.chatId) out.push('Telegram');
   if (config.notify.pushover.token && config.notify.pushover.user) out.push('Pushover');
   return out;
+}
+
+/** Where an alert would actually go right now, including the email fallback. */
+export function alertRoute() {
+  const instant = configuredChannels();
+  if (instant.length) return { channels: instant, fallback: false, to: null };
+  const to = config.notify.email || config.auth.adminEmails[0] || '';
+  return to ? { channels: ['Email'], fallback: true, to } : { channels: [], fallback: false, to: null };
 }
