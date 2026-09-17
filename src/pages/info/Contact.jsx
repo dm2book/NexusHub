@@ -38,12 +38,12 @@ export default function Contact() {
       <div className="grid lg:grid-cols-3 gap-6">
         <div className="space-y-4">
           <ContactCard icon={LifeBuoy} title={t('contact.ticket', 'Support ticket')} text={t('contact.ticketSub', 'Best for order issues. Tracked in your dashboard.')} />
-          <ContactCard icon={MessageCircle} title="Discord" text={t('contact.discordSub', 'The fastest way to reach us — order help, questions and updates.')} cta={<Link to="/discord" className="text-indigo-400 text-sm">{t('contact.openDiscord', 'Open Discord →')}</Link>} />
+          <ContactCard icon={MessageCircle} title="Discord" text={t('contact.discordSub', 'The fastest way to reach us — order help, questions and updates.')} cta={<Link to="/discord" className="text-indigo-400 text-sm fm-hit inline-flex items-center">{t('contact.openDiscord', 'Open Discord →')}</Link>} />
           {/* Only shown once a real address exists — an email card with no email
               in it is worse than no card. */}
           {SUPPORT_EMAIL && (
             <ContactCard icon={Mail} title="E-mail" text={SUPPORT_EMAIL}
-              cta={<a href={`mailto:${SUPPORT_EMAIL}`} className="text-indigo-400 text-sm">{t('contact.sendEmail', 'Send an email →')}</a>} />
+              cta={<a href={`mailto:${SUPPORT_EMAIL}`} className="text-indigo-400 text-sm fm-hit inline-flex items-center">{t('contact.sendEmail', 'Send an email →')}</a>} />
           )}
         </div>
 

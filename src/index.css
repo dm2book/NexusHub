@@ -862,6 +862,19 @@ h1, h2, h3, .font-display, .fm-head {
    bar in the same corner, which is taller — measured with elementFromPoint, the
    bubble was sitting on the right-hand end of the Checkout button and eating
    real taps. Those pages raise --fm-fab-lift while they are mounted. */
+/* A standalone text link is a real control.
+   A "see more" beside a section heading, or the action at the foot of a card,
+   is the only route to that page on the screen — and measured on a phone these
+   were 17 to 20px tall, under the 24px floor WCAG sets and well under the 44px
+   Apple asks for. The padding is pulled straight back out of the flow by an
+   equal negative margin, so the target grows to 44px and nothing on the page
+   moves. Not applied to links inside a sentence: those are exempt, and padding
+   them would break the line box they sit in.
+   Named fm-hit, not fm-tap: .fm-tap already exists a few hundred lines up as
+   the press-feedback helper, and two rules for one class is how the hero's
+   centrepiece logo once ended up 17px wide. */
+.fm-hit { padding-top: .75rem; padding-bottom: .75rem; margin-top: -.75rem; margin-bottom: -.75rem; }
+
 /* Anything that ends at the bottom edge of a phone has to clear the same bar
    the bubble does. The mobile menu did not: measured on an iPhone SE, its last
    row — the language switcher — ended 33px below the top of the tab bar, and
