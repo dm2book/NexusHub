@@ -161,7 +161,18 @@ console.log('— What should and should not be indexed —');
   ok('nothing that should rank is accidentally noindexed', wrong.length === 0, wrong.join(', '));
 
   const robots = readFileSync(join(DIST, 'robots.txt'), 'utf8');
-  ok('robots.txt points at the sitemap', /Sitemap: https:\/\/forgemarket\.nl\/sitemap\.xml/.test(robots));
+  /* Against SITE.url, not against a URL written out here. This asserted the
+     APEX — and the apex is not attached to the Vercel project, so Google read
+     robots.txt on www, followed that line to a host serving nothing, and never
+     fetched the shop's own map of itself. Every canonical on the site says
+     www; only this one line disagreed, and the test agreed with the line
+     instead of with the site. */
+  ok(`robots.txt points at the sitemap on ${SITE.url}`,
+    robots.includes(`Sitemap: ${SITE.url}/sitemap.xml`),
+    (robots.match(/^Sitemap:.*$/m) || ['(no Sitemap line)'])[0]);
+  ok('…and names no other host anywhere in the file',
+    !new RegExp(`https?://(?!${SITE.url.replace(/^https?:\/\//, '').replace(/\./g, '\\.')})[^/\\s]*forgemarket\\.nl`).test(robots),
+    (robots.match(/https?:\/\/[^/\s]*forgemarket\.nl/g) || []).join(', '));
   ok('…allows the shop', /^Allow: \/$/m.test(robots));
   for (const p of ['/account', '/admin', '/checkout', '/api/']) {
     ok(`…disallows ${p}`, new RegExp(`^Disallow: ${p.replace('/', '\\/')}`, 'm').test(robots));

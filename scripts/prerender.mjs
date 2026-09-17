@@ -348,4 +348,28 @@ writeFileSync(join(shellDir, 'routeChunks.js'),
       .filter((f) => !alreadyPreloaded.has(f)),
   }, null, 2)};\n`);
 
+/**
+ * robots.txt, pointed at the host the rest of the site claims to live on.
+ *
+ * It is a hand-written file in public/, and it named the APEX — the first
+ * comment line and, worse, the `Sitemap:` directive. Every canonical on the
+ * site says https://www.forgemarket.nl, the apex is not attached to the Vercel
+ * project, and Google's only route to the sitemap is that one line. So a
+ * crawler read robots.txt on www, was sent to a host that serves nothing, and
+ * the shop's own map of itself was never fetched.
+ *
+ * Rewritten here rather than corrected by hand, because a second copy of the
+ * site's address is a second thing to get wrong the next time it moves.
+ */
+{
+  const src = join(ROOT, 'public', 'robots.txt');
+  if (existsSync(src)) {
+    const host = SITE.url.replace(/\/+$/, '');
+    const fixed = readFileSync(src, 'utf8')
+      .replace(/https?:\/\/[^/\s]*forgemarket\.nl/g, host);
+    writeFileSync(join(DIST, 'robots.txt'), fixed);
+    console.log(`  · robots.txt points at ${host}`);
+  }
+}
+
 console.log(`prerendered ${count} routes with their own metadata`);
