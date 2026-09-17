@@ -76,7 +76,7 @@ export default function Cart() {
                     : <span className={`w-11 h-11 sm:w-12 sm:h-12 rounded-lg bg-gradient-to-br ${v.grad} grid place-items-center`}><Icon size={22} className="text-white" /></span>}
                 </div>
                 <div className="min-w-0 sm:flex-1 self-center">
-                  <Link to={`/product/${it.id}`} className="font-semibold text-slate-900 hover:text-violet-600 transition line-clamp-2">{it.name}</Link>
+                  <Link to={`/product/${it.id}`} className="font-semibold text-slate-900 py-1 -my-1 hover:text-violet-600 transition line-clamp-2">{it.name}</Link>
                   <div className="text-slate-400 text-sm">{money(it.price, it.currency)} {t('cart.each', 'each')}</div>
                 </div>
                 <button onClick={() => remove(it.id)} aria-label={t('cart.remove', 'Remove')}

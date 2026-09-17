@@ -672,7 +672,7 @@ export default function HomeStore() {
           <section className="fm-reveal fm-reveal-children">
             <div className="flex items-center justify-between mb-4">
               <h2 className="fm-head text-2xl">{tr('home.howTitle', 'How it works')}</h2>
-              <Link to="/how-it-works" className="text-sm font-semibold text-violet-600 hover:text-violet-700 inline-flex items-center gap-1">
+              <Link to="/how-it-works" className="text-sm font-semibold text-violet-600 hover:text-violet-700 inline-flex items-center gap-1 fm-hit">
                 {tr('home.howMore', 'More detail')} <ChevronRight size={15} />
               </Link>
             </div>
@@ -717,7 +717,7 @@ export default function HomeStore() {
                   </p>
                 </div>
                 <Link to={landingPathFor(pillar.cats[0].slug)}
-                  className="shrink-0 self-start sm:self-auto text-violet-700 font-semibold text-sm inline-flex items-center gap-1 hover:gap-2 transition-all">
+                  className="shrink-0 self-start sm:self-auto text-violet-700 font-semibold text-sm inline-flex items-center gap-1 hover:gap-2 transition-all fm-hit">
                   {tr('home.viewAll', 'View All Products')} <ArrowRight size={15} />
                 </Link>
               </div>
@@ -854,7 +854,7 @@ export default function HomeStore() {
                   </div>
                 )}
               </div>
-              <Link to="/reviews" className="shrink-0 text-violet-700 font-semibold text-sm inline-flex items-center gap-1 hover:gap-2 transition-all">
+              <Link to="/reviews" className="shrink-0 text-violet-700 font-semibold text-sm inline-flex items-center gap-1 hover:gap-2 transition-all fm-hit">
                 {tr('footer.reviews', 'Reviews')} <ArrowRight size={15} />
               </Link>
             </div>
@@ -905,7 +905,7 @@ export default function HomeStore() {
           <section className="fm-reveal">
             <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-1.5 sm:gap-4 mb-3">
               <h2 className="fm-head text-2xl">{tr('home.faqTitle', 'Questions people ask first')}</h2>
-              <Link to="/faq" className="shrink-0 text-violet-700 font-semibold text-sm inline-flex items-center gap-1 hover:gap-2 transition-all">
+              <Link to="/faq" className="shrink-0 text-violet-700 font-semibold text-sm inline-flex items-center gap-1 hover:gap-2 transition-all fm-hit">
                 {tr('home.faqAll', 'All questions')} <ArrowRight size={15} />
               </Link>
             </div>

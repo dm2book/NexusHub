@@ -51,8 +51,16 @@ function WithdrawalForm({ form, nl }) {
       <h2 className="text-white text-xl font-display mb-2">{form.h}</h2>
       <p className="text-slate-400 leading-relaxed mb-4">{form.intro}</p>
       <div className="rounded-xl border border-white/10 bg-white/[0.03] overflow-hidden">
+        {/* break-words, not just pre-wrap.
+            pre-wrap breaks on whitespace, and the dotted rules in this form are
+            one unbroken run of dots — so on a phone the line after "Order
+            number:" ran past the right edge and the box became a sideways
+            scroller. Measured at 390px: 383px of content in a 348px box, with
+            35px of a statutory form off-screen. A legal form nobody can read
+            without dragging it sideways is the one place on the site where that
+            is not a cosmetic complaint. */}
         <pre id="withdrawal-form-text"
-          className="px-4 py-4 text-[13px] leading-relaxed text-slate-300 whitespace-pre-wrap font-mono overflow-x-auto">
+          className="px-4 py-4 text-[13px] leading-relaxed text-slate-300 whitespace-pre-wrap break-words font-mono">
           {text}
         </pre>
         <div className="border-t border-white/5 px-4 py-3">

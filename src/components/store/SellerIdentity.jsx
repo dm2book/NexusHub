@@ -89,9 +89,14 @@ export default function SellerIdentity({ compact = false }) {
             <Mail size={12} /> {t('seller.contact', 'Contact')}
           </dt>
           <dd className="text-slate-200">
-            <a href={`mailto:${SUPPORT_EMAIL}`} className="text-violet-300 hover:text-violet-200 transition">{SUPPORT_EMAIL}</a>
+            {/* The seller panel is where someone who has decided something went
+                wrong looks for a way to reach a person, so these two are
+                controls rather than decoration. Measured on a phone they were
+                17px and 20px tall, under the 24px floor; fm-hit lifts both to
+                44 without moving the panel. */}
+            <a href={`mailto:${SUPPORT_EMAIL}`} className="inline-flex items-center fm-hit text-violet-300 hover:text-violet-200 transition">{SUPPORT_EMAIL}</a>
             <span className="block text-slate-400 mt-0.5">
-              <Link to="/discord" className="inline-flex items-center gap-1 text-violet-300 hover:text-violet-200 transition">
+              <Link to="/discord" className="inline-flex items-center gap-1 fm-hit text-violet-300 hover:text-violet-200 transition">
                 <MessageCircle size={12} /> {t('seller.discord', 'ForgeMarket Support on Discord')}
               </Link>
             </span>

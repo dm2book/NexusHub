@@ -126,7 +126,11 @@ function LightProductCard({ product, onAdd, priority = false }) {
         <ProductMedia product={product} priority={priority} className="absolute inset-0" />
       </a>
       <div className="text-[11px] font-semibold uppercase tracking-wide text-violet-700">{categoryLabel(product.category, t)}</div>
-      <Link to={to} className="font-bold text-[15px] text-slate-900 mt-0.5 hover:text-violet-600 line-clamp-2">{product.name}</Link>
+      {/* py-1 -my-1: the title is a second route to the product page beside the
+          artwork above it and the 44px button below, and at 23px tall it was a
+          pixel under the 24px floor. The padding is pulled back out so the
+          grid does not move. */}
+      <Link to={to} className="font-bold text-[15px] text-slate-900 mt-0.5 py-1 -my-1 hover:text-violet-600 line-clamp-2">{product.name}</Link>
       {desc && <p className="text-[12.5px] text-slate-400 mt-1 line-clamp-2">{desc}</p>}
       <div className="text-[12px] text-slate-400 mt-3 pt-0.5 mt-auto">
         {t('home.from', 'From')} <span className="fm-num text-violet-600 text-[18px]">{money(product.price, product.currency)}</span>
