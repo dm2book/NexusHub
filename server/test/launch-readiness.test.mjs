@@ -32,6 +32,8 @@ process.env.NODE_ENV ||= 'development';
 process.env.LAUNCH_MODE ||= 'open';
 
 
+import { readFileSync } from 'node:fs';
+
 let pass = 0, fail = 0;
 const ok = (name, cond, extra = '') => { if (cond) { pass++; console.log(`  ✅ ${name}`); } else { fail++; console.log(`  ❌ ${name} ${extra}`); } };
 
@@ -236,6 +238,43 @@ console.log('\n— The launch dashboard agrees with the checkout —');
     || ['NOTIFY_DISCORD_WEBHOOK_URL', 'TELEGRAM_BOT_TOKEN', 'PUSHOVER_TOKEN']
       .every((v) => by.notify.detail.includes(v)),
     by.notify?.detail);
+}
+
+console.log('\n— A picture the owner uploaded is a picture —');
+{
+  /* Found in production: the dashboard reported a BLOCKER reading "45 of 71
+     active products have no usable image", and every one of them loaded.
+     Checked two on the live site — 200, image/webp, 63KB and 33KB.
+     artStatus only knew the files that ship in public/, and an uploaded photo
+     is not one: it goes into the database and is served by
+     /api/images/<md5>.webp. A readiness dashboard that cries wolf about 45
+     products is one the owner stops reading, which costs more than the check
+     was ever worth. */
+  const { artStatus } = await import('../../src/lib/shippedArt.js');
+
+  ok('an image served from the database counts as art',
+    artStatus('/api/images/9fe4f614475cf978ef42a7ea3bb3a7fb.webp') === 'stored',
+    artStatus('/api/images/9fe4f614475cf978ef42a7ea3bb3a7fb.webp'));
+
+  /* Only the shape the route itself accepts. It 404s on anything that is not
+     32 hex characters, so calling those missing is the truth, not a gap. */
+  for (const bad of ['/api/images/NOTAHASH.webp', '/api/images/9fe4f614475cf978ef42a7ea3bb3a7fb',
+    '/api/images/../secret.webp', '/api/imagesx/9fe4f614475cf978ef42a7ea3bb3a7fb.webp']) {
+    ok(`…but ${bad} is not`, artStatus(bad) === 'missing', artStatus(bad));
+  }
+
+  /* The other four verdicts still mean what they meant. */
+  for (const [src, want] of [['/products/robux.svg', 'ok'], ['/products/nope.svg', 'missing'],
+    ['https://example.com/a.png', 'remote'], ['data:image/png;base64,AAA', 'uploaded'],
+    ['', 'none'], [null, 'none']]) {
+    ok(`${JSON.stringify(src)} → ${want}`, artStatus(src) === want, artStatus(src));
+  }
+
+  /* And the dashboard says how many, so "all products have art" is a claim
+     with a number behind it rather than one to be taken on trust. */
+  const svc = readFileSync(new URL('../src/services/launchCheckService.js', import.meta.url), 'utf8');
+  ok('the dashboard counts the stored ones out loud', /\$\{stored\} stored/.test(svc));
+  ok('…and no longer calls them untested', !/set, not fetch-tested/.test(svc));
 }
 
 srv.close();
