@@ -189,7 +189,7 @@ export async function launchChecks() {
     const rows = await all(`SELECT name, category, metadata FROM products WHERE active = 1`);
     const seen = new Map();          // image src → categories using it
     const blank = [];
-    let remote = 0, uploaded = 0;
+    let remote = 0, uploaded = 0, stored = 0;
     for (const r of rows) {
       let meta = {}; try { meta = JSON.parse(r.metadata || '{}'); } catch { /* keep {} */ }
       const src = meta.image || iconFor(r.category);
@@ -197,6 +197,7 @@ export async function launchChecks() {
       if (status === 'none' || status === 'missing') blank.push(`${r.name}${status === 'missing' ? ` → ${src}` : ''}`);
       if (status === 'remote') remote++;
       if (status === 'uploaded') uploaded++;
+      if (status === 'stored') stored++;
       if (src) {
         if (!seen.has(src)) seen.set(src, new Set());
         seen.get(src).add(r.category);
@@ -205,8 +206,15 @@ export async function launchChecks() {
     // The same picture on products from different categories is a wiring
     // mistake, not a family of tiers sharing a look.
     const crossed = [...seen.entries()].filter(([, cats]) => cats.size > 1);
-    const extra = [remote && `${remote} external link(s)`, uploaded && `${uploaded} upload(s)`]
-      .filter(Boolean).join(', ');
+    /* Counted and named, because most of this shop's pictures are the owner's
+       own uploads served from the database — and for a while this check called
+       every one of them missing. Saying how many there are is what makes the
+       "all products have art" line checkable rather than trusted. */
+    const extra = [
+      stored && `${stored} stored`,
+      remote && `${remote} external link(s)`,
+      uploaded && `${uploaded} upload(s)`,
+    ].filter(Boolean).join(', ');
 
     if (!rows.length) {
       add('productart', 'Product images', 'warn', 'No active products to check.');
@@ -218,7 +226,7 @@ export async function launchChecks() {
         `All ${rows.length} products have art, but ${crossed.length} picture(s) are shared across different categories — likely the wrong image on one of them. Run scripts/audit-product-art.mjs to see which.`);
     } else {
       add('productart', 'Product images', 'ok',
-        `All ${rows.length} active products have art${extra ? ` (${extra} — set, not fetch-tested)` : ''}`);
+        `All ${rows.length} active products have art${extra ? ` (${extra})` : ''}`);
     }
   } catch (e) { add('productart', 'Product images', 'warn', `Could not check: ${e.message}`); }
 

@@ -372,13 +372,30 @@ export const SHIPPED_ART = new Set([
 /**
  * Does this image source resolve to something?
  *
- * Returns 'ok' | 'missing' | 'remote' | 'uploaded' | 'none'. Remote links and
- * data-URI uploads are the owner's own; we can say they are set, not that they
- * still load, and pretending otherwise would be the more expensive lie.
+ * Returns 'ok' | 'stored' | 'missing' | 'remote' | 'uploaded' | 'none'. Remote
+ * links and data-URI uploads are the owner's own; we can say they are set, not
+ * that they still load, and pretending otherwise would be the more expensive
+ * lie.
+ *
+ * `stored` is the one this file originally had no idea about. A picture the
+ * owner uploads is not a file in public/ — it goes into the database and is
+ * served by /api/images/<md5>.webp, a route whose whole design is that the URL
+ * carries the content hash. This knew only the shipped list, so every one of
+ * those came back `missing`, and the launch dashboard in production reported a
+ * BLOCKER reading "45 of 71 active products have no usable image".
+ *
+ * They all load. Two were checked on the live site: 200, image/webp, 63KB and
+ * 33KB. A readiness dashboard that cries wolf about 45 products is one the
+ * owner stops reading, which costs more than the check was ever worth.
  */
 export function artStatus(src) {
   if (!src || typeof src !== 'string') return 'none';
   if (src.startsWith('data:')) return 'uploaded';
   if (/^https?:/i.test(src)) return 'remote';
-  return SHIPPED_ART.has(src.split('?')[0]) ? 'ok' : 'missing';
+  const path = src.split('?')[0];
+  /* Exactly the shape the route accepts — it 404s on anything that is not 32
+     hex characters, so a near-miss is genuinely missing. The id IS the content
+     hash, so a URL of this shape either serves those bytes or nothing. */
+  if (/^\/api\/images\/[a-f0-9]{32}\.[a-z0-9]+$/i.test(path)) return 'stored';
+  return SHIPPED_ART.has(path) ? 'ok' : 'missing';
 }
