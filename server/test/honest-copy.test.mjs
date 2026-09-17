@@ -54,6 +54,42 @@ const BANNED_LIST = [
   [/multi-supplier\s+engine/i, 'multi-supplier engine'],
 ];
 
+/**
+ * The same promise, in the other three languages the shop is written in.
+ *
+ * Kept separate because these are only applied to the translated copy, where
+ * the one exemption lives: the statutory withdrawal waiver REQUIRES the buyer
+ * to ask for immediate delivery in so many words, and rewriting that to sound
+ * humbler would break the thing it exists to record.
+ *
+ * Found the hard way. The English was cleaned up and the translations were
+ * not, so `checkout.p2` — a line under "Buyer protection" on the checkout
+ * screen — read "Sent as soon as your payment is confirmed" in English and
+ * "Directe, automatische levering", "Sofortige, automatische Lieferung" and
+ * "Livraison immédiate et automatique" in the other three. And the homepage's
+ * own <title>, the line Google prints above everything else, promised "direct
+ * geleverd" two lines above a description saying the rest is delivered by hand
+ * within a few hours.
+ */
+const BANNED_TRANSLATED = [
+  [/direct(e)?\s+(gelever|levering|verstuur)/i, 'nl: direct geleverd'],
+  [/directe\s+levering/i, 'nl: directe levering'],
+  [/meteen\s+gelever/i, 'nl: meteen geleverd'],
+  [/sofort(ige[rns]?)?\s*[,]?\s*(geliefert|lieferung)/i, 'de: Sofortlieferung'],
+  [/livraison\s+imm[ée]diate/i, 'fr: livraison immédiate'],
+  [/livr[ée]e?\s+instantan[ée]ment/i, 'fr: livré instantanément'],
+];
+
+/**
+ * Keys whose whole purpose is to say "deliver it now".
+ *
+ * Article 16(m) of the Consumer Rights Directive: a buyer of digital content
+ * loses their 14-day withdrawal right only if they expressly requested
+ * immediate performance and acknowledged the loss. The shop has to record
+ * those words, so these are the one place the phrase belongs.
+ */
+const WAIVER_KEY = /consent|withdraw|herroep|widerruf|r[ée]tractation|legal\.t5/i;
+
 console.log('— Claims we cannot back —');
 {
   // Each pattern is a promise this shop cannot keep: one person confirms every
@@ -67,6 +103,38 @@ console.log('— Claims we cannot back —');
     }
   }
   ok('no buyer-facing file promises what the shop cannot deliver', hits.length === 0, hits.join(' | '));
+}
+
+console.log('\n— …and the same in the other three languages —');
+{
+  /* BUYER_FACING is src/pages + src/components + index.html. Every string a
+     Dutch, German or French visitor actually reads lives in neither: the
+     dictionaries in src/lib/i18n and the page metadata in src/content/seo.js.
+     So the rule above had been enforced on the English fallbacks only, and a
+     claim removed in English survived in three languages for months. */
+  const TRANSLATED = [
+    'src/lib/i18n.jsx', 'src/lib/i18n/de.js', 'src/lib/i18n/fr.js',
+    'src/content/seo.js',
+  ];
+  const ALL = [...BANNED_LIST, ...BANNED_TRANSLATED];
+  for (const rel of TRANSLATED) {
+    const src = codeOf(join(ROOT, rel));
+    const hits = [];
+    for (const line of src.split('\n')) {
+      if (WAIVER_KEY.test(line)) continue;       // the words the law requires
+      for (const [re, label] of ALL) {
+        if (re.test(line)) hits.push(`${label} → ${line.trim().slice(0, 74)}`);
+      }
+    }
+    ok(`${rel} promises nothing the shop cannot do`, hits.length === 0, hits.slice(0, 4).join(' | '));
+  }
+
+  /* The waiver has to keep saying it, or the exemption above is hiding a
+     different bug — a shop that stopped recording the thing it must record. */
+  const nl = readFileSync(join(ROOT, 'src/lib/i18n.jsx'), 'utf8');
+  ok('…while the withdrawal waiver still asks for immediate delivery',
+    /'checkout\.consent':[^\n]*meteen gelever/i.test(nl),
+    'the law requires the buyer to request it in so many words');
 }
 
 console.log('\n— The adverts —');
