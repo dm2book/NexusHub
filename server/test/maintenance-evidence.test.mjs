@@ -39,11 +39,17 @@ const ok = (name, cond, extra = '') => {
 };
 
 await migrate();
-const { runMaintenance, lastMaintenanceRun, LAST_RUN_KEY } =
+const { runMaintenance, lastMaintenanceRun, LAST_RUN_KEY, CRON } =
   await import('../src/services/maintenanceService.js');
 const { setSetting } = await import('../src/services/settingsService.js');
 
 const forget = () => run('DELETE FROM kv WHERE key = @k', { k: LAST_RUN_KEY });
+/* "Stopped" measured against the real cadence, not a number.
+   These backdated by nine hours, which was beyond the old six-hour window and
+   is well inside the cadence vercel.json actually schedules — daily. Two whole
+   intervals is stopped under any schedule this project picks, and it follows
+   the schedule if it changes. */
+const STOPPED_HOURS = CRON.everyHours * 2;
 const backdate = (hoursAgo, errors = []) => setSetting(LAST_RUN_KEY, {
   at: new Date(Date.now() - hoursAgo * 3600_000).toISOString(),
   finishedAt: new Date(Date.now() - hoursAgo * 3600_000).toISOString(),
@@ -97,9 +103,15 @@ console.log('— The sweep leaves a receipt —');
 
 console.log('\n— Stale is stale —');
 {
-  await backdate(9);
+  await backdate(STOPPED_HOURS);
   const s = await lastMaintenanceRun();
-  ok('nine hours ago is stale on an hourly schedule', s.stale === true, String(s.ageMinutes));
+  ok(`${STOPPED_HOURS}h ago is stale on a ${CRON.everyHours}h schedule`, s.stale === true, String(s.ageMinutes));
+
+  /* And the other half, which nothing asserted: a run inside the window is
+     NOT stale. Without this the window could shrink back to six hours and the
+     suite would stay green while the shop called itself broken all day. */
+  await backdate(Math.round(CRON.everyHours * 0.5));
+  ok(`…but half an interval ago is not`, (await lastMaintenanceRun()).stale === false);
   ok('…and the age is reported in minutes', s.ageMinutes >= 540, String(s.ageMinutes));
 
   await backdate(1);
@@ -123,7 +135,7 @@ console.log('\n— The health check reports evidence, not configuration —');
   ok('…with the timestamp attached', !!Date.parse(now.lastRunAt));
   ok('…and the age', now.lastRunAgeMinutes === 0);
 
-  await backdate(9);
+  await backdate(STOPPED_HOURS);
   ok('a stopped sweep says stale', (await healthSummary()).queue.status === 'stale');
 
   /* The storefront footer polls /api/health for its status dot. A sweep an
@@ -165,10 +177,14 @@ console.log('\n— A stopped sweep is a launch blocker —');
   ok('…supplier keys', /keys collected/.test(never.detail));
   ok('…and the mails', /review request/.test(never.detail));
 
-  await backdate(9);
+  await backdate(STOPPED_HOURS);
   const stopped = checkUnder({});
   ok('having stopped is a FAIL too', stopped.status === 'fail', stopped.status);
-  ok('…and says how long ago', /9h ago/.test(stopped.detail), stopped.detail);
+  /* Derived from the backdate, not typed as "9h" — the literal survived the
+     window changing and only the message it checks moved. */
+  ok('…and says how long ago', new RegExp(`${STOPPED_HOURS}h ago`).test(stopped.detail), stopped.detail);
+  ok('…and names the real cadence rather than a hardcoded one',
+    stopped.detail.includes(CRON.describe()), stopped.detail);
 
   await backdate(0.2, ['emailRetryError', 'marketError']);
   const noisy = checkUnder({});
