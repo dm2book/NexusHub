@@ -364,6 +364,25 @@ export default function Checkout() {
                   ✓ {t('checkout.filledIn', 'The amount is already in the link — you only have to confirm.')}
                 </p>
               )}
+              {/* The half that link cannot carry.
+                  paypal.me and revolut.me take the amount and nothing else, and
+                  this shop matches a payment to an order by its reference. Told
+                  "the amount is already in, you only have to confirm", a buyer
+                  taps and pays with no reference at all — and two people paying
+                  the same amount on the same day become indistinguishable. It
+                  only became possible the day a second method was switched on;
+                  with a per-order Tikkie request the request IS the reference. */}
+              {pm.url && !pm.reference && placed?.number && (
+                <div className="mt-2 rounded-xl border border-amber-400/30 bg-amber-400/10 p-3">
+                  <p className="text-amber-200 text-xs font-semibold">
+                    ⚠ {t('checkout.refNeeded', 'Put your order number in the payment description')}
+                  </p>
+                  <p className="text-slate-300 text-xs mt-1">
+                    {t('checkout.refWhy', '{label} does not carry it for us, and it is the only thing that ties your payment to this order.', { label: pm.label })}
+                  </p>
+                  <p className="font-mono text-white text-sm mt-1.5">{placed.number}</p>
+                </div>
+              )}
               <p className="text-slate-500 text-xs mt-3">{note || t('checkout.noteDefault', 'After paying, your order is confirmed within minutes during open hours.')}</p>
             </div>
           )}

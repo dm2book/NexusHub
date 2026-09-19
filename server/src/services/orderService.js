@@ -1311,7 +1311,11 @@ function paymentInstructionsHtml(order, lang) {
     }
     // Saying which links already carry the amount is the difference between a
     // buyer tapping once and a buyer typing a number wrong.
-    const note = m.prefilled ? ` <span style="color:#34d399">· ${escapeHtml(c.payPrefilled)}</span>` : '';
+    /* Two facts, not one. The amount a link carries is worth saying; the
+       reference it does NOT carry is worth saying louder, because that is the
+       one the shop needs to match the money to this order. */
+    const note = (m.prefilled ? ` <span style="color:#34d399">· ${escapeHtml(c.payPrefilled)}</span>` : '')
+      + (m.prefilled && !m.reference ? ` <span style="color:#f5b324">· ${escapeHtml(c.payRefNeeded)}</span>` : '');
     return `<tr><td><strong>${m.label}</strong>${note}</td><td class="r">` +
       `<a href="${m.url}">${escapeHtml(String(m.url).replace(/^https?:\/\//, ''))}</a></td></tr>`;
   }).join('');

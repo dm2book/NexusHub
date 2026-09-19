@@ -302,12 +302,29 @@ export default function Track() {
                 {(result.payMethods || []).map((m) => (
                   m.url
                     ? (
-                      <a key={m.id} href={m.url} target="_blank" rel="noreferrer" className="btn-primary text-sm">
-                        <ExternalLink size={15} /> {METHOD_ICON[m.id] || '💳'} {m.label}
-                        {/* Telling the buyer which links already carry the amount
-                            is the difference between one tap and a typo. */}
-                        {m.prefilled && <span className="text-emerald-200 text-[11px]">· {t('track.filledIn', 'amount filled in')}</span>}
-                      </a>
+                      /* The button says what to tap; the notes sit UNDER it.
+                         They were inline inside the pill, which was fine while
+                         there was one of them — a second pushed the label into
+                         three cramped lines on a 390px phone, measured, with
+                         the amber note wrapping over the method name. */
+                      <span key={m.id} className="flex flex-col gap-1 min-w-[9rem]">
+                        <a href={m.url} target="_blank" rel="noreferrer" className="btn-primary text-sm justify-center">
+                          <ExternalLink size={15} /> {METHOD_ICON[m.id] || '💳'} {m.label}
+                        </a>
+                        {/* Which links already carry the amount is the
+                            difference between one tap and a typo. */}
+                        {m.prefilled && (
+                          <span className="text-emerald-300 text-[11px] leading-snug">✓ {t('track.filledIn', 'amount filled in')}</span>
+                        )}
+                        {/* And the half it does not carry. Saying only what a
+                            link fills in, on a page listing three methods side
+                            by side, reads as "this one is the easy one" — when
+                            the easy one is the one that arrives with no
+                            reference at all. */}
+                        {m.prefilled && !m.reference && (
+                          <span className="text-amber-300 text-[11px] leading-snug">⚠ {t('track.refNeeded', 'add your order number')}</span>
+                        )}
+                      </span>
                     )
                     : <span key={m.id} className="btn-ghost text-sm cursor-default">{METHOD_ICON[m.id] || '💳'} {m.label}: {m.target}</span>
                 ))}
