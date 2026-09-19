@@ -16,7 +16,7 @@
  * for anyone debugging; it is simply no longer what a visitor pays for.
  */
 import { run, get, all, nowIso } from '../db/index.js';
-import { lastMaintenanceRun } from './maintenanceService.js';
+import { CRON, lastMaintenanceRun } from './maintenanceService.js';
 import { config } from '../config/env.js';
 
 const KEY_TABLES = [
@@ -133,14 +133,14 @@ async function queueHealth() {
   const locked = !!config.security.cronSecret;
   const last = await lastMaintenanceRun().catch(() => null);
   const note = !locked && config.isProd
-    ? 'CRON_SECRET is not set, so the hourly Vercel Cron call is REFUSED (403). '
+    ? `CRON_SECRET is not set, so the ${CRON.describe()} call is REFUSED (403). `
       + 'Maintenance only runs when live traffic happens to trigger it.'
     : undefined;
   return {
     ok: true,
     status: last?.stale === false ? 'running' : last?.everRan ? 'stale' : 'never_run',
     type: 'vercel-cron',
-    schedule: 'hourly /api/cron/maintenance',
+    schedule: CRON.describe(),
     scheduledCallAccepted: locked || !config.isProd,
     lastRunAt: last?.at ?? null,
     lastRunAgeMinutes: last?.ageMinutes ?? null,

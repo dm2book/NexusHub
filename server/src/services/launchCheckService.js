@@ -7,7 +7,7 @@ import { config, manualPayMethods } from '../config/env.js';
 import { get, all } from '../db/index.js';
 import { iconFor } from '../db/demoSeed.js';
 import { botSeenRecently } from './discordService.js';
-import { lastMaintenanceRun } from './maintenanceService.js';
+import { CRON, lastMaintenanceRun } from './maintenanceService.js';
 import { alertRoute, configuredChannels, EVENTS as NOTIFY_EVENTS } from './notifyService.js';
 import { isEnabled as mollieEnabled, isTestKey as mollieTestKey, SUPPORTED_METHODS as MOLLIE_METHODS } from './mollieService.js';
 import {
@@ -155,7 +155,7 @@ export async function launchChecks() {
       + (cronAccepted ? '' : ' CRON_SECRET is not set, so the scheduled call is refused with a 403.'));
   } else if (sweep.stale) {
     add('maintenance', 'Background sweep', 'fail',
-      `Last completed ${Math.floor(sweep.ageMinutes / 60)}h ago — it runs hourly, so it has stopped.`
+      `Last completed ${Math.floor(sweep.ageMinutes / 60)}h ago — it is scheduled ${CRON.describe()}, so it has stopped.`
       + (cronAccepted ? '' : ' CRON_SECRET is not set, so the scheduled call is refused with a 403 '
         + 'and the only thing left running it is live traffic.'));
   } else if (!cronAccepted) {

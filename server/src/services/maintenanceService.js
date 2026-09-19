@@ -30,7 +30,32 @@ export const LAST_RUN_KEY = 'maintenance_last_run';
  * traffic and a quiet shop can simply go without, which is exactly the state
  * nobody notices until a paid order sits undelivered.
  */
-export async function lastMaintenanceRun({ now = Date.now(), staleAfterHours = 6 } = {}) {
+/**
+ * When the sweep is actually scheduled, and how late is late.
+ *
+ * vercel.json is the platform's copy and the only one that makes the job run;
+ * this is the application's, so the health check can say how long a gap is
+ * normal instead of guessing. server/test/maintenance-schedule.test.mjs fails
+ * when the two disagree.
+ *
+ * It was guessing. `staleAfterHours` defaulted to 6 while the cron fires once
+ * a day, and /api/health described the job as "hourly" in a hardcoded string —
+ * so for eighteen hours out of every twenty-four a shop running exactly as
+ * configured reported its own queue as `stale`, with no errors and nothing
+ * wrong. A health check that cries wolf daily is one nobody reads, which costs
+ * more than the check is worth.
+ */
+export const CRON = {
+  expression: '0 4 * * *',
+  everyHours: 24,
+  describe: () => 'daily 04:00 UTC /api/cron/maintenance',
+};
+
+/* Late, with margin — a run that slipped by a few hours has not stopped.
+   Half the interval again, so a daily job is only called stale at 36 hours. */
+const DEFAULT_STALE_HOURS = CRON.everyHours * 1.5;
+
+export async function lastMaintenanceRun({ now = Date.now(), staleAfterHours = DEFAULT_STALE_HOURS } = {}) {
   const rec = await getSetting(LAST_RUN_KEY, null).catch(() => null);
   const at = rec?.finishedAt || rec?.at || null;
   const ms = at ? now - Date.parse(at) : null;
