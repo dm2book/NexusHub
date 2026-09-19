@@ -11,7 +11,7 @@ import { retryFailedEmails } from './emailService.js';
 import { sweepMemberRoles } from './discordRolesService.js';
 import { purgeExpiredLinkIntents } from './discordLinkService.js';
 import { pruneOutbox } from './discordService.js';
-import { getSetting, setSetting } from './settingsService.js';
+import { getSetting, setSetting, migrateCategoryLogos } from './settingsService.js';
 import { sendLaunchAnnouncements } from './newsletterService.js';
 import { pruneAttribution } from './attributionService.js';
 import { sweepAlerts, pruneAlerts } from './notifyService.js';
@@ -22,14 +22,6 @@ const DAYS = (n) => new Date(Date.now() - n * 86_400_000).toISOString();
 /** Where the last run records itself. */
 export const LAST_RUN_KEY = 'maintenance_last_run';
 
-/**
- * When maintenance last actually ran, and whether that is recent enough.
- *
- * Evidence, not configuration. The sweep is scheduled hourly, so anything past
- * a few hours means it has stopped — on Vercel the fallback rides on live
- * traffic and a quiet shop can simply go without, which is exactly the state
- * nobody notices until a paid order sits undelivered.
- */
 /**
  * When the sweep is actually scheduled, and how late is late.
  *
@@ -306,6 +298,24 @@ export async function runMaintenance() {
     const { pruneObservations } = await import('./market/observations.js');
     summary.marketObservationsPruned = await pruneObservations();
   } catch (e) { summary.marketError = e.message; }
+
+  /* 16. Category logos that are still base64 inside the settings row.
+   *
+   *      /api/config is fetched on every page load and carried the bytes of
+   *      every owner-set logo inline — measured live at 1.33 MB, of which
+   *      1 328 498 bytes were sixteen pictures, with `max-age=0` so none of it
+   *      could be reused on the next page. Writing the fix only helps logos
+   *      uploaded after it; this is what helps the ones already there.
+   *
+   *      Content-addressed, so running it again finds the same rows and writes
+   *      nothing. */
+  try {
+    const logos = await migrateCategoryLogos();
+    if (logos.moved) {
+      summary.categoryLogosMoved = logos.moved;
+      summary.categoryLogoBytesFreed = logos.freedBytes;
+    }
+  } catch (e) { summary.categoryLogoError = e.message; }
 
   /* Leave a trace that this actually happened.
      Everything above is fire-and-forget: it runs on a schedule nobody watches,

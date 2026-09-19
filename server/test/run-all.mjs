@@ -60,7 +60,12 @@ if (existsSync(join(discordDir, 'test', 'run-all.mjs'))) {
   const r = spawnSync(process.execPath, [join(discordDir, 'test', 'run-all.mjs')], {
     stdio: 'inherit', env: process.env, timeout: 5 * 60_000,
   });
-  results.push({ file: 'discord/test (8 suites)', ok: r.status === 0 });
+  /* Counted, not typed. The label said "(8 suites)" while the directory held
+     nine — a number in a test report that nothing checks drifts the moment
+     somebody adds a file, and a report that is wrong about itself is the last
+     place you want to be wrong. */
+  const n = readdirSync(join(discordDir, 'test')).filter((f) => f.endsWith('.test.mjs')).length;
+  results.push({ file: `discord/test (${n} suite${n === 1 ? '' : 's'})`, ok: r.status === 0 });
 }
 
 console.log('\n══════════ SUMMARY ══════════');
