@@ -85,5 +85,49 @@ console.log('\n— Shapes and edges —');
   ok('null methods, no crash', payMethodsFor(null, ORDER).length === 0);
 }
 
+console.log('\n— The half a link cannot carry —');
+{
+  /* This shop matches money to an order by the reference. While Tikkie was the
+     only method that never mattered: the owner attaches a payment request per
+     order, so the request IS the reference. The day a second method is
+     switched on it matters a great deal — paypal.me and revolut.me take the
+     amount and nothing else, and the buyer is told "the amount is already in
+     the link, you only have to confirm". Two buyers paying the same amount on
+     the same day then become indistinguishable. */
+  const order = { total: 2699, currency: 'EUR', number: 'FM-2026-REFTEST' };
+  const m = (target, id = 'x') => payMethodUrl({ id, label: id, target, kind: 'link' }, order);
+
+  for (const [target, name] of [['paypal.me/shop', 'PayPal'], ['revolut.me/shop', 'Revolut']]) {
+    const r = m(target, name);
+    ok(`${name} fills in the amount`, r.prefilled === true);
+    ok(`…and says it does NOT carry the reference`, r.reference === false,
+      'the UI reads this to decide whether to tell the buyer to type it');
+    ok(`…which the URL confirms`, !String(r.url).includes(order.number), r.url);
+  }
+
+  const bunq = m('bunq.me/shop', 'bunq');
+  ok('bunq carries both, and says so', bunq.prefilled === true && bunq.reference === true);
+  ok('…and the order number really is in the URL', String(bunq.url).includes(order.number), bunq.url);
+
+  const tk = m('https://tikkie.me/pay/abc', 'Tikkie');
+  ok('Tikkie claims neither', tk.prefilled === false && tk.reference === false);
+
+  const mail = payMethodUrl({ id: 'pp', label: 'PayPal', target: 'me@shop.test', kind: 'email' }, order);
+  ok('an email handle claims neither either', mail.prefilled === false && mail.reference === false);
+
+  /* Every surface that tells a buyer about a link has to read BOTH flags.
+     Reporting only `prefilled` is what turned "we filled the amount in for
+     you" into an instruction to pay with no reference. */
+  const { readFileSync } = await import('node:fs');
+  const { join, dirname } = await import('node:path');
+  const { fileURLToPath } = await import('node:url');
+  const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+  for (const f of ['src/pages/Checkout.jsx', 'src/pages/Track.jsx', 'server/src/services/orderService.js']) {
+    const src = readFileSync(join(ROOT, f), 'utf8');
+    ok(`${f} reads the reference flag, not just the amount`,
+      /\.reference/.test(src), 'it tells the buyer the amount is handled and stops there');
+  }
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

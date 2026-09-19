@@ -33,9 +33,22 @@ const ensureHttps = (raw) => {
 /**
  * @param method  { id, label, target, kind } from manualPayMethods()
  * @param order   { total, currency, number }
- * @returns { id, label, url, kind, prefilled, note }
- *          `prefilled` is what the storefront uses to tell the buyer whether
- *          they still have to type the amount — never guess that in the UI.
+ * @returns { id, label, url, kind, prefilled, reference }
+ *
+ * TWO separate facts, because they are separately true and the shop was only
+ * reporting one of them.
+ *
+ * `prefilled` — does the link carry the AMOUNT.
+ * `reference` — does the link carry the ORDER NUMBER.
+ *
+ * Only bunq.me carries both. paypal.me and revolut.me take the amount and
+ * nothing else, and this whole shop reconciles a payment by its reference: the
+ * order number in the description is the only thing tying money to an order.
+ * While Tikkie was the only method that did not matter — the owner attaches a
+ * payment request per order, so the request IS the reference. The moment a
+ * buyer can tap a PayPal link instead, "the amount is already in the link, you
+ * only have to confirm" is an instruction to pay with no reference at all, and
+ * two buyers paying the same amount on the same day become indistinguishable.
  */
 export function payMethodUrl(method, order) {
   const amount = decimal(order?.total);
@@ -45,27 +58,30 @@ export function payMethodUrl(method, order) {
   // A PayPal handle can also be an email address, which has no link form at all.
   if (method?.kind === 'email') {
     return { id: method.id, label: method.label, kind: 'email', url: null,
-      target: method.target, amount, prefilled: false };
+      target: method.target, amount, prefilled: false, reference: false };
   }
 
   let url = base;
   let prefilled = false;
+  let carriesReference = false;
 
   if (/paypal\.me/i.test(base)) {
     url = `${base}/${amount}EUR`;
-    prefilled = true;
+    prefilled = true;              // the amount only — PayPal.me has no note field
   } else if (/revolut\.me/i.test(base)) {
     url = `${base}/${amount}`;
-    prefilled = true;
+    prefilled = true;              // likewise
   } else if (/bunq\.me/i.test(base)) {
     // bunq takes a description too, so even the reference is filled in.
     url = `${base}/${amount}/${encodeURIComponent(reference)}`;
     prefilled = true;
+    carriesReference = true;
   }
   // Tikkie and anything unrecognised: the plain link. The buyer types the
   // amount, unless the owner attached a per-order request.
 
-  return { id: method.id, label: method.label, kind: 'link', url, amount, prefilled };
+  return { id: method.id, label: method.label, kind: 'link', url, amount, prefilled,
+    reference: carriesReference };
 }
 
 /** Every configured method, resolved for this order. */
