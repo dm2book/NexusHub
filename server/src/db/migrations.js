@@ -1622,4 +1622,35 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS lang TEXT;
      */
     sql: `ALTER TABLE bundles ADD COLUMN IF NOT EXISTS copy TEXT;`,
   },
+  {
+    id: '041_shared_images_survive_a_delete',
+    /*
+     * A picture is shared, so one product may not take it with it.
+     *
+     * product_images is addressed by content: the id is the SHA-256 of the
+     * bytes, and storeImage() returns the EXISTING row when the same picture is
+     * uploaded again. That is the whole reason the URL may claim to be
+     * immutable, and the reason forty variants of one game cost one row instead
+     * of forty.
+     *
+     * The column recording which product first uploaded it was declared
+     * ON DELETE CASCADE, which says the opposite: that the row belongs to that
+     * one product. Both are in the schema at once, and the FK wins.
+     *
+     * Measured: two products given the same picture share one row; deleting the
+     * first one deletes the row, and the second product's image URL starts
+     * returning 404 with nothing anywhere saying why. The same now reaches the
+     * category logos, which live in the store since they stopped being base64
+     * inside /api/config.
+     *
+     * product_id is provenance — who uploaded it first — not ownership, so it
+     * becomes NULL when that product goes and the picture stays.
+     */
+    sql: `
+      ALTER TABLE product_images DROP CONSTRAINT IF EXISTS product_images_product_id_fkey;
+      ALTER TABLE product_images
+        ADD CONSTRAINT product_images_product_id_fkey
+        FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL;
+    `,
+  },
 ];

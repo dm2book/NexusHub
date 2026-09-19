@@ -40,9 +40,21 @@ const put = await fetch(`${base}/api/admin/categories/logo`, {
   method: 'PUT', headers: auth, body: JSON.stringify({ slug: 'robux', image: logo }) });
 ok('setting a category logo returns 200', put.status === 200, `status=${put.status}`);
 
-// The storefront reads it from the public config (no auth).
+/* The storefront reads it from the public config (no auth) — as a URL.
+   It used to be the base64 itself, and /api/config is fetched on every page
+   load: measured on the live shop at 1.33 MB, of which 1 328 498 bytes were
+   sixteen inline logos with `max-age=0` on them. */
 const cfg = await (await fetch(`${base}/api/config`)).json();
-ok('public config exposes the logo', cfg.categoryLogos?.robux === logo);
+const stored = cfg.categoryLogos?.robux;
+ok('public config exposes the logo', !!stored);
+ok('…as a URL, not as base64', /^\/api\/images\/[a-f0-9]{32}\.[a-z0-9]+$/.test(stored || ''), stored?.slice(0, 40));
+
+// And the URL has to actually serve the bytes that were uploaded.
+const served = await fetch(`${base}${stored}`);
+const bytes = Buffer.from(await served.arrayBuffer());
+ok('the URL serves the picture', served.status === 200 && bytes.equals(Buffer.from(logo.split(',')[1], 'base64')));
+ok('…with an immutable cache header', /immutable/.test(served.headers.get('cache-control') || ''),
+  served.headers.get('cache-control'));
 
 // An unsafe value is rejected — same guard as product images.
 const bad = await fetch(`${base}/api/admin/categories/logo`, {
@@ -51,7 +63,7 @@ ok('unsafe image value is rejected', bad.status === 400, `status=${bad.status}`)
 
 // The rejected write left the good logo in place.
 const cfg2 = await (await fetch(`${base}/api/config`)).json();
-ok('previous logo survives a rejected write', cfg2.categoryLogos?.robux === logo);
+ok('previous logo survives a rejected write', cfg2.categoryLogos?.robux === stored);
 
 // Clearing removes just that entry.
 await fetch(`${base}/api/admin/categories/logo`, {
@@ -60,7 +72,31 @@ const clear = await fetch(`${base}/api/admin/categories/logo`, {
   method: 'PUT', headers: auth, body: JSON.stringify({ slug: 'v-bucks', image: null }) });
 const cfg3 = await (await fetch(`${base}/api/config`)).json();
 ok('clearing a logo works', clear.status === 200 && !cfg3.categoryLogos['v-bucks']);
-ok('clearing one leaves the others', cfg3.categoryLogos?.robux === logo);
+ok('clearing one leaves the others', cfg3.categoryLogos?.robux === stored);
+
+/* The same picture twice is one row and one URL — the whole reason the URL may
+   claim to be immutable. */
+await fetch(`${base}/api/admin/categories/logo`, {
+  method: 'PUT', headers: auth, body: JSON.stringify({ slug: 'spotify', image: logo }) });
+const cfg4 = await (await fetch(`${base}/api/config`)).json();
+ok('the same picture under another category reuses one URL', cfg4.categoryLogos?.spotify === stored);
+
+/* Logos saved before any of this existed. The sweep is what moves them, and
+   running it twice must not write a second copy or a second row. */
+const { setSetting } = await import('../src/services/settingsService.js');
+const { migrateCategoryLogos } = await import('../src/services/settingsService.js');
+await setSetting('category_logos', { robux: stored, legacy: logo });
+const first = await migrateCategoryLogos();
+ok('the sweep moves a logo left as base64', first.moved === 1, JSON.stringify(first));
+ok('…and reports the bytes it took out of the config', first.freedBytes === logo.length);
+const cfg5 = await (await fetch(`${base}/api/config`)).json();
+ok('…leaving a URL behind', cfg5.categoryLogos?.legacy === stored);
+const second = await migrateCategoryLogos();
+ok('running it again moves nothing', second.moved === 0, JSON.stringify(second));
+
+/* What this is all for: the size of the answer the storefront gets. */
+const raw = await (await fetch(`${base}/api/config`)).text();
+ok('the public config stays small with logos set', raw.length < 20_000, `${raw.length} bytes`);
 
 // Staff auth is required to change logos.
 const anon = await fetch(`${base}/api/admin/categories/logo`, {
