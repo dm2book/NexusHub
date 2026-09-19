@@ -19,16 +19,16 @@ import {
   ModalBuilder, TextInputBuilder, TextInputStyle, MessageType,
 } from 'discord.js';
 import Anthropic from '@anthropic-ai/sdk';
-import { FAQ, GAME_ROLES, NOTIFY_ROLES, LEVEL_ROLES, DELIVERY_INFO, CATEGORY_GAME_ROLE,
+import { FAQ, GAME_ROLES, NOTIFY_ROLES, LEVEL_ROLES, CATEGORY_GAME_ROLE,
   bannerImage,
 } from './config.js';
 import { orderStatusView, botLang, say, ORDER_UI } from './orderStatus.js';
+import { deliveryFor, DELIVERY_CATEGORIES, DELIVERY_FIELD } from './generated/delivery.js';
 import { buildPanels, panelNeedsUpdate, panelFooterIsStale, PANEL_FOOTER, isPanelFooter } from './panels.js';
 import { log, reportEnv, startHealthServer, loginWithRetry } from './runtime.js';
 import { scamReason } from './scamGuard.js';
 
 // Delivery explanation for a product category (falls back to a generic one).
-const deliveryFor = (category) => DELIVERY_INFO[category] || DELIVERY_INFO.default;
 
 const SELF_ROLES = [...GAME_ROLES, ...NOTIFY_ROLES];
 const STAFF_ROLE_NAMES = ['Owner', 'Admin', 'Moderator', 'Support'];
@@ -513,15 +513,60 @@ const money = (cents, cur = 'EUR') =>
  * `instant` is true only when a code is in stock and the product auto-delivers,
  * which is the one case where "straight away" is a promise we can keep.
  */
-function availabilityLine(p) {
+/**
+ * When you get it — in the language the member asked in.
+ *
+ * `instant` is the store's own honest flag: true only when a code is on the
+ * shelf AND the product auto-delivers. A missing flag reads as "by hand",
+ * which is the safe direction.
+ *
+ * Translated because /price now answers the "how is it delivered" half in the
+ * member's language, and a German sentence under an English heading beside an
+ * English availability line is worse than being consistently English.
+ */
+const AVAILABILITY = {
+  nl: {
+    stock: '✅ Op voorraad — gaat automatisch de deur uit zodra je betaling bevestigd is.',
+    left: (n) => ` **Nog ${n}.**`,
+    hand: '🕐 Met de hand geleverd nadat je betaling bevestigd is — overdag meestal binnen een paar uur.',
+  },
+  en: {
+    stock: '✅ In stock — sent automatically once your payment is confirmed.',
+    left: (n) => ` **Only ${n} left.**`,
+    hand: '🕐 Delivered by hand after your payment is confirmed — usually within a few hours during the day.',
+  },
+  de: {
+    stock: '✅ Auf Lager — geht automatisch raus, sobald deine Zahlung bestätigt ist.',
+    left: (n) => ` **Nur noch ${n}.**`,
+    hand: '🕐 Von Hand geliefert, nachdem deine Zahlung bestätigt ist — tagsüber meist innerhalb weniger Stunden.',
+  },
+  fr: {
+    stock: '✅ En stock — envoyé automatiquement dès que ton paiement est confirmé.',
+    left: (n) => ` **Il n’en reste que ${n}.**`,
+    hand: '🕐 Livré à la main après confirmation de ton paiement — en journée, généralement en quelques heures.',
+  },
+};
+
+function availabilityLine(p, lang = 'en') {
+  const T = AVAILABILITY[lang] || AVAILABILITY.en;
   const left = Number(p?.stockLeft);
   if (p?.instant) {
-    return Number.isFinite(left) && left > 0
-      ? `✅ In stock — sent automatically once your payment is confirmed. **Only ${left} left.**`
-      : '✅ In stock — sent automatically once your payment is confirmed.';
+    return T.stock + (Number.isFinite(left) && left > 0 ? T.left(left) : '');
   }
-  return '🕐 Delivered by hand after your payment is confirmed — usually within a few hours during the day.';
+  return T.hand;
 }
+
+/** The field names /price puts around those answers. */
+const PRICE_UI = {
+  nl: { when: '⏱️ Wanneer je het krijgt', how: '📦 Hoe het geleverd wordt',
+    also: '**Ook gevonden:**', footer: 'Live prijzen uit de winkel · /delivery geeft de volledige stappen' },
+  en: { when: '⏱️ When you get it', how: '📦 How it’s delivered',
+    also: '**Also matching:**', footer: 'Live prices from the store · use /delivery for full steps' },
+  de: { when: '⏱️ Wann du es bekommst', how: '📦 Wie es geliefert wird',
+    also: '**Passt auch:**', footer: 'Live-Preise aus dem Shop · /delivery zeigt alle Schritte' },
+  fr: { when: '⏱️ Quand tu le reçois', how: '📦 Comment c’est livré',
+    also: '**Correspond aussi :**', footer: 'Prix en direct de la boutique · /delivery donne toutes les étapes' },
+};
 
 function leadLog(guild, text) {
   const ch = findChannel(guild, 'leads');
@@ -2035,7 +2080,9 @@ async function priceCmd(i) {
   }
   const top = scored.slice(0, 5);
   const best = top[0].p;
-  const d = deliveryFor(best.category);
+  const lang = botLang(i.locale);
+  const P = PRICE_UI[lang] || PRICE_UI.en;
+  const d = deliveryFor(best.category, lang);
   const cta = await shopLink(`${STORE_URL}/product/${best.id}`);
   const e = new EmbedBuilder().setColor(0x6366f1)
     .setTitle(`🏷️ ${best.name}`)
@@ -2046,37 +2093,145 @@ async function priceCmd(i) {
          listed, with its price, and then had to go and find it themselves —
          one search away from a product we had already identified for them. */
       (top.length > 1
-        ? `\n\n**Also matching:**\n${top.slice(1).map(({ p }) =>
+        ? `\n\n${P.also}\n${top.slice(1).map(({ p }) =>
           `• [${p.name}](${STORE_URL}/product/${p.id}) — ${money(p.price, p.currency)}`).join('\n')}`
         : ''))
     // The store already computes an honest availability flag per product —
     // `instant` is true only when a code is in stock AND the product
     // auto-delivers. Showing it here answers the question behind /price
     // ("when do I get it?") with the same answer the product page gives.
-    .addFields({ name: '⏱️ When you get it', value: availabilityLine(best) })
-    .addFields({ name: '📦 How it’s delivered', value: d.method.slice(0, 1024) })
-    .setFooter({ text: 'Live prices from the store · use /delivery for full steps' });
+    .addFields({ name: P.when, value: availabilityLine(best, lang) })
+    .addFields({ name: P.how, value: d.method.slice(0, 1024) })
+    .setFooter({ text: P.footer });
   return i.editReply({ embeds: [e] });
 }
 
 // ── /delivery → full per-category delivery explanation ───────────────────────
+/**
+ * How a product is delivered — for every category the shop can answer for, in
+ * the language the member uses Discord in.
+ *
+ * It used to know two. A five-entry keyword map matched robux and v-bucks;
+ * anything else fell through as a raw query string, so `/delivery valorant`
+ * looked up the category "valorant" in a table that did not have it and
+ * answered with the generic paragraph, under the heading "How your order is
+ * delivered". `/delivery nitro` did the same, because the real category is
+ * `discord-nitro`. The command whose entire job is answering "how do I get
+ * it" gave a specific answer for two of the twenty-one things on sale, and
+ * never said it was guessing.
+ *
+ * Now: the catalogue names the category, the shared table answers it, and when
+ * there is no specific recipe the reply says so out loud and points at a
+ * person rather than pretending the generic paragraph was the answer.
+ */
+/**
+ * The furniture around a delivery answer, in the four languages the shop is
+ * read in. The answer itself comes from the shared table; these are the field
+ * names and the sentence that admits when there is no specific recipe.
+ */
+const DELIVERY_UI = {
+  nl: {
+    title: (n) => `📦 Zo wordt ${n} geleverd`,
+    titleGeneric: '📦 Zo levert ForgeMarket',
+    steps: 'Stappen', notes: 'Goed om te weten', needed: 'Wat we van je nodig hebben',
+    neverPassword: 'je wachtwoord vragen we nooit.',
+    notSure: 'Gaat het om iets anders?',
+    askUs: 'Voor dit product hebben we nog geen uitgeschreven stappen. Open een ticket, dan zegt een mens je precies hoe het gaat — voordat je betaalt.',
+    footer: 'ForgeMarket · geld terug als het nooit aankomt',
+  },
+  en: {
+    title: (n) => `📦 How ${n} is delivered`,
+    titleGeneric: '📦 How ForgeMarket delivers',
+    steps: 'Steps', notes: 'Good to know', needed: 'What we need from you',
+    neverPassword: 'we never ask for your password.',
+    notSure: 'Something else?',
+    askUs: 'We have not written the steps for this product yet. Open a ticket and a person will tell you exactly how it works — before you pay.',
+    footer: 'ForgeMarket · money back if it never arrives',
+  },
+  de: {
+    title: (n) => `📦 So wird ${n} geliefert`,
+    titleGeneric: '📦 So liefert ForgeMarket',
+    steps: 'Schritte', notes: 'Gut zu wissen', needed: 'Was wir von dir brauchen',
+    neverPassword: 'nach deinem Passwort fragen wir nie.',
+    notSure: 'Geht es um etwas anderes?',
+    askUs: 'Für dieses Produkt haben wir die Schritte noch nicht aufgeschrieben. Öffne ein Ticket, dann sagt dir ein Mensch genau, wie es läuft — bevor du zahlst.',
+    footer: 'ForgeMarket · Geld zurück, wenn nichts ankommt',
+  },
+  fr: {
+    title: (n) => `📦 Comment ${n} est livré`,
+    titleGeneric: '📦 Comment ForgeMarket livre',
+    steps: 'Étapes', notes: 'Bon à savoir', needed: 'Ce dont nous avons besoin',
+    neverPassword: 'nous ne demandons jamais ton mot de passe.',
+    notSure: 'Il s’agit d’autre chose ?',
+    askUs: 'Pour ce produit, les étapes ne sont pas encore écrites. Ouvre un ticket et une personne t’expliquera exactement comment ça se passe — avant que tu paies.',
+    footer: 'ForgeMarket · remboursé si rien n’arrive',
+  },
+};
+
+/** Human names for a category, for the heading when no product matched. */
+const CATEGORY_LABEL = {
+  robux: 'Robux', 'v-bucks': 'V-Bucks', valorant: 'Valorant Points',
+  'discord-nitro': 'Discord Nitro', giftcard: 'a gift card',
+  gamepass: 'Game Pass', spotify: 'Spotify', minecraft: 'Minecraft',
+};
+
 async function deliveryCmd(i) {
+  await i.deferReply({ ephemeral: true });
+  const lang = botLang(i.locale);
   const q = (i.options.getString('product') || '').toLowerCase().trim();
-  // Match a category by keyword; default to Robux (our most-asked product).
-  const map = { robux: 'robux', roblox: 'robux', vbucks: 'v-bucks', 'v-bucks': 'v-bucks', fortnite: 'v-bucks' };
-  const key = Object.keys(map).find((k) => q.includes(k));
-  const category = key ? map[key] : (q || 'robux');
-  const d = deliveryFor(category);
-  const label = category === 'v-bucks' ? 'V-Bucks' : category === 'robux' ? 'Robux' : 'your order';
-  const e = new EmbedBuilder().setColor(0x7c5cff)
-    .setTitle(`📦 How ${label} is delivered`)
+  const T = DELIVERY_UI[lang] || DELIVERY_UI.en;
+
+  /* Resolved against the real catalogue first — a member types what is on the
+     shelf ("1000 robux", "nitro", "steam card"), not a category slug. */
+  let category = null;
+  let label = null;
+  const products = await getProducts().catch(() => []);
+  const hit = products.find((p) => p.name.toLowerCase() === q)
+    || products.find((p) => p.name.toLowerCase().includes(q) && q.length > 2)
+    || products.find((p) => q.split(/\s+/).some((w) => w.length > 2 && p.name.toLowerCase().includes(w)));
+  if (hit) { category = hit.category; label = hit.name; }
+
+  if (!category) {
+    /* Then by category, including the words people actually use for one —
+       "nitro" for discord-nitro, "fortnite" for v-bucks. */
+    const ALIAS = {
+      robux: 'robux', roblox: 'robux', vbucks: 'v-bucks', 'v-bucks': 'v-bucks', fortnite: 'v-bucks',
+      valorant: 'valorant', vp: 'valorant', riot: 'valorant',
+      nitro: 'discord-nitro', discord: 'discord-nitro',
+      giftcard: 'giftcard', 'gift card': 'giftcard', steam: 'giftcard', playstation: 'giftcard',
+      psn: 'giftcard', xbox: 'giftcard', nintendo: 'giftcard',
+      gamepass: 'gamepass', 'game pass': 'gamepass', xboxgamepass: 'gamepass',
+      spotify: 'spotify', minecraft: 'minecraft', minecoins: 'minecraft',
+    };
+    const key = Object.keys(ALIAS).find((k) => q.includes(k));
+    if (key) category = ALIAS[key];
+    else if (DELIVERY_CATEGORIES.includes(q)) category = q;
+  }
+
+  const specific = category && DELIVERY_CATEGORIES.includes(category);
+  const d = deliveryFor(specific ? category : 'default', lang);
+  const field = specific ? (DELIVERY_FIELD[category] || {})[lang] : null;
+
+  const e = new EmbedBuilder().setColor(specific ? 0x7c5cff : 0x94a3b8)
+    .setTitle(specific ? T.title(label || CATEGORY_LABEL[category] || category) : T.titleGeneric)
     .setThumbnail(BRAND_ICON)
     .setDescription(d.method)
     .addFields(
-      { name: 'Steps', value: d.steps.map((s, n) => `**${n + 1}.** ${s}`).join('\n').slice(0, 1024) },
-      { name: 'Good to know', value: d.notes.map((n) => `• ${n}`).join('\n').slice(0, 1024) })
-    .setFooter({ text: 'ForgeMarket · money back if it never arrives' });
-  return i.reply({ embeds: [e], ephemeral: true });
+      { name: T.steps, value: d.steps.map((x, n) => `**${n + 1}.** ${x}`).join('\n').slice(0, 1024) },
+      { name: T.notes, value: d.notes.map((n) => `• ${n}`).join('\n').slice(0, 1024) });
+
+  /* The single most reassuring thing a top-up category can say, and the one
+     the old command never surfaced: what we need from you, and what we never
+     ask for. */
+  if (field) e.addFields({ name: T.needed, value: `**${field}** — ${T.neverPassword}` });
+
+  /* Not an answer dressed up as one. A member asking about a category with no
+     written recipe gets told that, and gets a person. */
+  if (!specific) {
+    e.addFields({ name: T.notSure, value: T.askUs });
+  }
+  e.setFooter({ text: T.footer });
+  return i.editReply({ embeds: [e] });
 }
 
 // ── /drops → upcoming drops from the store's drop calendar ───────────────────

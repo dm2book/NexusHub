@@ -9,6 +9,8 @@
  * delivery terms of their own order in English, including the sentence about
  * never being asked for a password.
  */
+import { REDEEM } from './redeemRecipes.js';
+
 export const DELIVERY_INFO = {
   robux: {
     /* The one detail the buyer has to hand over, named once here.
@@ -183,10 +185,51 @@ export const DELIVERY_INFO = {
   },
 };
 
-/** Delivery info for a category in the given language (falls back to default / en). */
+/**
+ * Delivery info for a category, in the given language.
+ *
+ * DELIVERY_INFO above is hand-written and covers the two categories whose
+ * delivery is genuinely unusual: Robux goes onto the account, V-Bucks ships as
+ * a gift card. Everything else in this shop is the same shape — a code by
+ * email — and what differs is WHERE you redeem it, which is exactly what the
+ * recipes in redeemRecipes.js already say, in four languages.
+ *
+ * So the recipes fill the gap rather than a second set of prose. Before this,
+ * a buyer asking about Valorant, Nitro, Game Pass, Spotify, Minecraft or a
+ * gift card got the generic answer on the product page and in Discord, while
+ * the real steps were already written and already translated — they were just
+ * locked inside the email.
+ */
 export function deliveryInfo(category, lang = 'en') {
-  const entry = DELIVERY_INFO[category] || DELIVERY_INFO.default;
-  return entry[lang] || entry.en;
+  const key = String(category || '').toLowerCase();
+  const own = DELIVERY_INFO[key];
+  if (own) return own[lang] || own.en;
+
+  const recipe = (REDEEM[lang] || REDEEM.en || {})[key];
+  if (recipe) {
+    const generic = DELIVERY_INFO.default[lang] || DELIVERY_INFO.default.en;
+    return {
+      ...generic,
+      /* The recipe's own sentence about where it is redeemed, so the answer is
+         about THIS product rather than about the shop in general. */
+      method: recipe.title,
+      steps: [...recipe.steps.map(stripTags)],
+      notes: generic.notes,
+    };
+  }
+  return DELIVERY_INFO.default[lang] || DELIVERY_INFO.default.en;
+}
+
+/* The recipes are written for an email, so they carry <strong> around the site
+   you redeem at. Discord and the product page render text, not HTML. */
+const stripTags = (html) => String(html).replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+
+/** Which categories can be answered specifically rather than generically. */
+export function deliveryCategories() {
+  return [...new Set([
+    ...Object.keys(DELIVERY_INFO).filter((k) => k !== 'default'),
+    ...Object.keys(REDEEM.en || {}).filter((k) => k !== '_'),
+  ])].sort();
 }
 
 /**

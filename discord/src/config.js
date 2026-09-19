@@ -536,48 +536,13 @@ export const MESSAGES = {
 // Per-category delivery explanation — mirrors the site's product pages so the
 // answer to "how do I get it?" is consistent everywhere. Keyed by category;
 // anything else falls back to `default`.
-export const DELIVERY_INFO = {
-  robux: {
-    // Kept in step with src/lib/deliveryInfo.js — same claim, said twice, so a
-    // correction to one that misses the other leaves the false version live in
-    // Discord. "Roblox+" is a third-party extension, not an official method.
-    method: 'Sent straight to your Roblox account — we only need your username, never your password, and you never log in anywhere.',
-    steps: [
-      'Turn on 2-Step Verification (2FA) on your Roblox account — required before we can deliver.',
-      'Send us your Roblox username (in your order or a support ticket).',
-      'We deliver the Robux to your account. Done! 🎉',
-    ],
-    notes: [
-      'Max 5,000 R$ per account per day (Roblox rule). Bigger orders split across days — e.g. 10,000 R$ over 2 days.',
-      'Large orders can be delivered faster via 2 accounts: a colleague and I each complete part at the same time.',
-      'We never ask for your password.',
-    ],
-  },
-  'v-bucks': {
-    method: 'Delivered as an official V-Bucks gift card code you redeem yourself — works on every platform.',
-    steps: [
-      'Your code arrives by email once your payment is confirmed.',
-      'Redeem it in Fortnite / your Epic Games account.',
-      'Your V-Bucks show up right away. 🎮',
-    ],
-    notes: [
-      'Codes are region-based — match your account to the product’s region.',
-      'Keep your code private: a redeemed code can’t be refunded.',
-    ],
-  },
-  default: {
-    method: 'Delivered as an official code, or topped up straight onto your account — depending on the product.',
-    steps: [
-      'Once your payment is confirmed, your code or confirmation arrives by email.',
-      'Follow the short redeem steps we include with it.',
-      'Enjoy — you’re all set. ✅',
-    ],
-    notes: [
-      'Any account requirements (2FA, region) are shown before checkout.',
-      'Stuck? Open a ticket — eligible orders are money-back guaranteed.',
-    ],
-  },
-};
+/* DELIVERY_INFO used to live here with two categories — robux and v-bucks —
+   under a comment promising it was "kept in step with src/lib/deliveryInfo.js".
+   Both had two, the shop sells twenty-one, and the recipes for eight of them
+   were already written and translated inside the delivery email.
+   It is now generated into src/generated/delivery.js from the shop's own
+   table, so the bot and the product page cannot answer differently.
+   Regenerate: node scripts/gen-discord-delivery.mjs */
 
 // FAQ — powers the #faq channel AND the AI fallback.
 export const FAQ = [
