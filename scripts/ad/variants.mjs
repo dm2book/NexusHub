@@ -142,6 +142,21 @@ export const S = {
   goods: { from: 'delivered-detail', to: 'email-open', speed: 1.4, weight: 0.9, zoom: 'in', label: 'the goods' },
   email: { from: 'email-open', to: 'email-detail', speed: 1.2, weight: 1.8, zoom: 'punch', label: 'the email', notify: true },
   code: { from: 'email-detail', to: 'end', speed: 1.2, weight: 1.4, zoom: 'in', label: 'the code' },
+
+  /* ── The seller's side ────────────────────────────────────────────────────
+     Only exist when the recording was made with --seller-token, which is what
+     films a hand-delivered order being delivered by hand. Nothing in the
+     catalogue carries pre-loaded stock, so this is not an edge case — it is how
+     every order on this shop is actually fulfilled, and until now the camera
+     had never been pointed at it.
+
+     Slow on purpose. Every other scene in this file is ramped to 2-6x because
+     a website is boring; this one is a person doing something for the viewer,
+     and speeding it up would throw away the only footage in the cut that a
+     marketplace of third-party sellers structurally cannot make. */
+  sellerQueue: { from: 'seller-queue', to: 'seller-open', speed: 1.3, weight: 1.2, zoom: 'punch', label: 'the queue' },
+  sellerWork: { from: 'seller-open', to: 'seller-send', speed: 1.0, weight: 2.2, zoom: 'in', label: 'by hand' },
+  sellerSend: { from: 'seller-send', to: 'confirmed', speed: 1.4, weight: 1.0, zoom: 'punch', label: 'sent' },
   /* The money moving. The grammar went straight from checkout to confirmed, so
      the one beat between placing an order and it existing — the payment — was
      never a scene anything could be pinned to. */
@@ -711,6 +726,104 @@ export const VARIANTS = [
     needs: ['name', 'price', 'order', 'delivery'],
   },
   {
+    id: 'P',
+    slug: 'de-andere-kant',
+    name: 'De andere kant (NL)',
+    lang: 'nl',
+    /*
+     * ── Why this cut exists ──────────────────────────────────────────────
+     *
+     * Every advert in this category is filmed from the BUYER's side of the
+     * screen, and every one of them stops at the checkout. Nobody shows the
+     * delivery, because a marketplace of thousands of third-party sellers has
+     * no single delivery to show — whatever it filmed would be one seller on
+     * one day presented as the platform, which is the thing their legal team
+     * will not sign. The gap is not an oversight in their advertising. It is a
+     * property of their business model, and it is permanent.
+     *
+     * This shop has the opposite problem and therefore the opposite asset. It
+     * holds no pre-loaded stock at all, so every single order is delivered by
+     * a person — and with --seller-token the recorder now films that person
+     * doing it. This cut is built around that footage.
+     *
+     * ── What it deliberately does not do ─────────────────────────────────
+     *
+     * It never says cheaper. Ten of the seventy-one products are fixed-face-
+     * value gift cards and all ten sell ABOVE face value; there is also not one
+     * observed competitor price in the database. So the price fight is both
+     * unwinnable and unevidenced, and the whole category is standing in that
+     * corner shouting the same word.
+     *
+     * It features 1.000 V-Bucks for the same reason. The previous flagship
+     * opened on a Steam Wallet card whose own artwork reads "10 EUR" beside a
+     * price pill reading "11.99" — the worst markup in the catalogue, framed as
+     * a comparison, in the most expensive second of the advert. A V-Bucks pack
+     * has no printed face value, so there is no number on the artwork for the
+     * price to lose to.
+     *
+     * And it makes no promise about WHEN. There is no measured delivery time in
+     * this system, so there is no honest sentence about hours or minutes to be
+     * written. What it can say is who — and who is the part that is actually
+     * different.
+     */
+    target: 14,
+    card: 1.6,
+    hero: 1.2,
+    priceCard: false,
+    scenes: [
+      { ...S.product, settle: 0.35, speed: 1.4, weight: 1.6, zoom: 'at', zoomAt: 'price-onscreen', zoomTo: 1.45 },
+      { ...S.buy, speed: 2.4, weight: 0.6 },
+      { ...S.checkout, speed: 3.0, weight: 0.8 },
+      /* Ends at `seller-queue`, not at `confirmed`.
+         S.pay spans order-placed → confirmed, and with a seller pass in the
+         recording that range now CONTAINS the whole seller sequence — so the
+         payment scene and the three seller scenes were cut from the same
+         footage twice over. It showed as a "Betaald." caption sitting on top of
+         an admin screen, and it put the unmasked moment before the privacy pass
+         back into the advert. Found by grepping the rendered frames, not the
+         source. */
+      { ...S.pay, to: 'seller-queue' },
+      /* The queue LIST is deliberately not a scene.
+         It is a real queue with real customers on it, and masking it reliably
+         at frame granularity defeated four attempts — each one verified against
+         the rendered file, each still leaking a frame or two. The modal shows
+         one order and nobody else by construction, so the seller's side starts
+         there. It is also the better shot: the list is a list, and the modal is
+         a person doing your order. */
+      S.sellerWork,
+      S.sellerSend,
+      S.email,
+      S.codeReveal,
+    ],
+    /* The card lands between the seller sending it and the mail arriving —
+       the one beat where the viewer has just watched a person do something and
+       has not yet been told what it means. */
+    inserts: [
+      { before: 'email-open', card: 'statement.png', len: 1.3, zoom: 'punch' },
+    ],
+    /* Frame one is the product, and the first words are the seller's. Not a
+       feature, not a price, not a logo: a person claiming the work. */
+    hook: 'Dit stuur ik zelf.',
+    captions: [
+      { at: 'the product', text: '{name} — {price}', sub: 'Wat je ziet, betaal je.', style: 'big' },
+      { at: 'buy', text: 'Geen account nodig.', style: 'big' },
+      { at: 'checkout', text: 'Betalen met Tikkie.', style: 'big' },
+      { at: 'payment', text: 'Betaald.', style: 'big' },
+      /* The three shots nobody else in this category can make. */
+      { at: 'by hand', text: 'En dan kom ik in beeld.', sub: 'Jouw bestelling. Mijn scherm.', style: 'big' },
+      { at: 'sent', text: "Met de hand ingepakt en verstuurd.", style: 'big' },
+      { at: 'the email', text: 'Je bestelling van ForgeMarket', sub: 'in je inbox', style: 'notify' },
+      { at: 'the code', text: 'Verstuurd door een mens.', style: 'big' },
+    ],
+    cta: 'forgemarket.nl',
+    /* The seller beats are required, not optional. A cut whose entire argument
+       is "a person does this" must not render off a recording where nobody was
+       filmed doing it — it would be the same advert as everyone else's, making
+       a claim it did not film. */
+    needs: ['price', 'order', 'delivery', 'orderNumber'],
+    needsBeats: ['seller-open', 'seller-send'],
+  },
+  {
     id: 'N',
     slug: 'flagship',
     name: 'Flagship (NL)',
@@ -788,7 +901,20 @@ export const variantById = (id) =>
  * Returns null when it can, or the reason it cannot — which the caller prints
  * and moves on, rather than filling the gap with something invented.
  */
-export function blockedReason(variant, { tokens, order, review, mystery }) {
+export function blockedReason(variant, { tokens, order, review, mystery, beats }) {
+  /* Beats a cut cannot be honest without.
+     `needs` guards the WORDS — a caption whose token has no value removes
+     itself. This guards the PICTURES. A cut whose whole argument is "a person
+     packs your order" must not be renderable from a recording in which nobody
+     was filmed doing it; without this it would quietly fall back to the same
+     website montage as every other cut and keep the claim. */
+  if (variant.needsBeats?.length) {
+    const have = new Set((beats || []).map((b) => b.label));
+    const missing = variant.needsBeats.filter((b) => !have.has(b));
+    if (missing.length) {
+      return `this recording has no ${missing.join(', ')} — re-record with --seller-token`;
+    }
+  }
   for (const need of variant.needs || []) {
     if (need === 'order') {
       if (order?.status !== 'completed') {

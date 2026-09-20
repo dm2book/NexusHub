@@ -134,6 +134,24 @@ async function shoot(html, file) {
   console.log(`  ${file}`);
 }
 
+/* The same renderer, but keeping its background. An overlay card must be
+   transparent or it covers the footage; a card that IS the shot must not be,
+   or it composites onto whatever frame it was spliced in front of. */
+async function shootOpaque(html, file) {
+  await p.goto(`${BASE}/`, { waitUntil: 'domcontentloaded' }).catch(() => {});
+  await p.evaluate((h) => { document.open(); document.write(h); document.close(); }, html);
+  await p.evaluate(async () => {
+    await Promise.all([
+      document.fonts.load('800 124px "Bricolage Grotesque"'),
+      document.fonts.load('600 58px "Inter"'),
+    ]).catch(() => {});
+    await document.fonts.ready;
+  });
+  await p.waitForTimeout(300);
+  await p.screenshot({ path: path.join(OUT, file) });
+  console.log(`  ${file}`);
+}
+
 console.log(`\n🎴 ${OUT}`);
 
 // ── The price badge ─────────────────────────────────────────────────────────
@@ -315,6 +333,42 @@ if (ART) {
       font-size:60px;line-height:1.05;letter-spacing:-.02em;color:#fff}
     .fprice{font-family:'Inter',system-ui,sans-serif;font-weight:700;font-size:46px;
       line-height:1.1;color:#c9bfff;padding-top:4px}`), 'productchip.png');
+}
+
+/* ── A statement, full frame, for the middle of the advert ──────────────────
+ *
+ * Every card this file rendered was for the FRONT of the cut (the hero, the
+ * price badge) or the BACK (the end card), because those were the only two
+ * places compose.mjs could put a still. With inserts it can put one anywhere,
+ * and the middle is where the one sentence an advert is actually about belongs:
+ * the beat where the footage stops and the shop says the thing.
+ *
+ * Opaque on purpose — unlike every other card here this one REPLACES the
+ * picture for a beat rather than sitting on it, so it needs its own ground.
+ *
+ *   node scripts/ad/cards.mjs --statement="Geen bot." --statement-sub="Een mens pakt 'm in."
+ */
+const STATEMENT = arg('statement');
+if (STATEMENT) {
+  const SUB = arg('statement-sub', '');
+  await p.evaluate(() => {
+    document.documentElement.style.removeProperty('background');
+    document.body.style.removeProperty('background');
+  }).catch(() => {});
+  await shootOpaque(page(`
+    <div class="swrap">
+      <div class="sline">${esc(STATEMENT)}</div>
+      ${SUB ? `<div class="ssub">${esc(SUB)}</div>` : ''}
+    </div>`, `
+    html,body{background:#07060f}
+    .swrap{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;
+      padding:0 96px;text-align:center;
+      background:radial-gradient(120% 70% at 50% 34%,#1b1140 0%,#0b0818 55%,#07060f 100%)}
+    .sline{font-family:'Bricolage Grotesque','Inter',sans-serif;font-weight:800;
+      font-size:124px;line-height:1.02;letter-spacing:-.035em;color:#fff;
+      text-shadow:0 10px 60px rgba(124,92,255,.35)}
+    .ssub{font-family:'Inter',system-ui,sans-serif;font-weight:600;font-size:58px;
+      line-height:1.18;color:#c9bfff;padding-top:34px;max-width:860px}`), 'statement.png');
 }
 
 await browser.close();

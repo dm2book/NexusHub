@@ -145,7 +145,7 @@ console.log('\n— The performance edit, measured against the first cut —');
   ok('the advert is cut to twelve seconds, not eighteen', V.target === 12, String(V.target));
   ok('…and the end card comes down with it', V.card !== undefined && V.card < 2.6, String(V.card));
   ok('…without a hardcoded floor padding it back up',
-    /min: Math\.min\(15, TARGET - HERO - 1\)/.test(compose));
+    /min: Math\.min\(15, TARGET - HERO(?: - INSERT_LEN)? - 1\)/.test(compose));
 
   /* The waiting shots are the ones with nothing in them: `confirmed → delivery`
      is the shop polling, and the track page is a status list that does not

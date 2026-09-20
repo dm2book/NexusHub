@@ -231,7 +231,7 @@ console.log('\n— It is the existing toolkit, assembled —');
   ok('it declares the platforms it is cut for',
     Array.isArray(F.platforms) && ['tiktok', 'reels', 'shorts'].every((p) => F.platforms.includes(p)));
   ok('and every earlier variant still resolves',
-    VARIANTS.length === 14 && !!variantById('K') && !!variantById('L') && !!variantById('M'));
+    VARIANTS.length >= 14 && !!variantById('K') && !!variantById('L') && !!variantById('M'));
 }
 
 console.log(`\n${fail === 0 ? '✅' : '❌'} ad-flagship: ${pass} passed, ${fail} failed`);
