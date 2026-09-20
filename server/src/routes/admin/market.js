@@ -18,6 +18,7 @@ import { audit } from '../../services/auditService.js';
 import { badRequest } from '../../utils/errors.js';
 import { config } from '../../config/env.js';
 import { sourceStatuses } from '../../services/market/sources.js';
+import { productsToAdd } from '../../services/market/opportunity.js';
 import { recordObservation, observationsFor } from '../../services/market/observations.js';
 import { discoveryReport, decideCandidate, runDiscovery, createProductFromCandidate }
   from '../../services/market/discovery.js';
@@ -84,6 +85,26 @@ router.get('/observations/:marketProductId', requirePermission('products.read'),
 // ── Discovery ──────────────────────────────────────────────────────────────
 router.get('/discovery', requirePermission('products.read'), asyncHandler(async (_req, res) => {
   res.json(await discoveryReport());
+}));
+
+/**
+ * Products to add, ranked — discovery's output turned into a decision.
+ *
+ * Read-only on purpose. Nothing here approves, creates or prices anything; the
+ * only route into the catalogue is still the candidate approval path, which
+ * records who decided. `sort` is one of the three the admin offers, and an
+ * unknown one falls back to the overall grade rather than erroring: a bad query
+ * string should not empty the page somebody is trying to read.
+ */
+router.get('/opportunities', requirePermission('products.read'), asyncHandler(async (req, res) => {
+  const { sort, grade, limit } = z.object({
+    sort: z.enum(['margin', 'competition', 'revenue', 'opportunity']).optional(),
+    grade: z.enum(['high', 'medium', 'low', 'unrated']).optional(),
+    limit: z.coerce.number().int().min(1).max(500).optional(),
+  }).parse(req.query || {});
+  res.json(await productsToAdd({
+    sort: sort || 'opportunity', grade: grade || null, limit: limit || 100,
+  }));
 }));
 
 router.post('/discovery/run', requirePermission('products.write'), asyncHandler(async (req, res) => {

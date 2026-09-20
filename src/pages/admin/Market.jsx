@@ -22,6 +22,10 @@ import { useToast } from '../../context/ToastContext.jsx';
  */
 
 const fmt = (cents) => (cents == null ? '—' : `€${(cents / 100).toFixed(2)}`);
+/* The opportunities endpoint returns euros, the pricing one returns cents, and
+   a formatter that silently divides by 100 either way is a bug waiting for a
+   copy-paste. Two names, so the unit is visible at the call site. */
+const money = (eur) => (eur == null ? '—' : `€${Number(eur).toFixed(2)}`);
 const pct = (n) => (n == null ? '—' : `${Number(n).toFixed(1)}%`);
 const ago = (iso) => {
   if (!iso) return 'never';
@@ -46,6 +50,22 @@ function Section({ title, subtitle, right, children }) {
     </section>
   );
 }
+
+const SORTS = [
+  { key: 'opportunity', label: 'Best overall' },
+  { key: 'margin', label: 'Highest margin' },
+  { key: 'competition', label: 'Lowest competition' },
+  { key: 'revenue', label: 'Highest opportunity' },
+];
+
+/* HIGH borrows the colour the rest of this page uses for "recommended", so a
+   grade reads the same way as every other verdict in the admin. */
+const GRADE_STYLE = { high: 'recommended', medium: 'requires_review', low: 'rejected', unrated: 'disabled' };
+const COMPETITION = {
+  low: 'text-emerald-300 font-semibold',
+  medium: 'text-amber-300 font-semibold',
+  high: 'text-rose-300 font-semibold',
+};
 
 const STATUS_STYLE = {
   available: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/25',
@@ -93,7 +113,18 @@ export default function AdminMarket() {
   const [history, setHistory] = useState([]);
   const [busy, setBusy] = useState('');
   const [open, setOpen] = useState('newCandidates');
+  const [toAdd, setToAdd] = useState(null);
+  const [sort, setSort] = useState('opportunity');
   const [form, setForm] = useState({ source: 'manual', title: '', price: '', currency: 'EUR', url: '', availability: 'in_stock' });
+
+  /* Its own fetch, because it is the one panel with a control that changes the
+     request. Folding it into load() would re-fetch four other endpoints every
+     time somebody changed the sort. */
+  const loadToAdd = useCallback(async (which) => {
+    const r = await api.get(`/api/admin/market/opportunities?sort=${encodeURIComponent(which)}`)
+      .catch(() => null);
+    setToAdd(r || { products: [], evidence: null });
+  }, []);
 
   const load = useCallback(async () => {
     const [s, d, p, h] = await Promise.all([
@@ -109,6 +140,7 @@ export default function AdminMarket() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { loadToAdd(sort); }, [loadToAdd, sort]);
 
   const act = async (label, fn) => {
     setBusy(label);
@@ -229,6 +261,117 @@ export default function AdminMarket() {
       </Section>
 
       {/* ── Discovery ───────────────────────────────────────────────────── */}
+      {/* ── Products to Add ──────────────────────────────────────────────────
+          The ranked table. Every number on it is a query over observations that
+          were actually recorded, and the ones that cannot be computed say so
+          rather than showing a zero — a blank margin column is the honest
+          output of a shop with no cost prices, and a 0% one would be a lie
+          that happens to sort correctly. */}
+      <Section title="Products to Add"
+        subtitle="What the market sells that ForgeMarket does not, ranked. Nothing here has been added — this is a shortlist, and adding one is still a decision you make in Product discovery below."
+        right={
+          <div className="flex flex-wrap gap-1.5">
+            {SORTS.map((o) => (
+              <button key={o.key} onClick={() => setSort(o.key)}
+                className={`rounded-lg px-2.5 py-1.5 text-[12px] font-semibold border transition
+                  ${sort === o.key ? 'bg-violet-500/15 border-violet-500/40 text-violet-300'
+                    : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'}`}>
+                {o.label}
+              </button>
+            ))}
+          </div>
+        }>
+        {toAdd?.evidence?.blockers?.length > 0 && (
+          <ul className="mb-4 space-y-1.5">
+            {toAdd.evidence.blockers.map((b, i) => (
+              <li key={i} className="flex gap-2 text-[12.5px] text-amber-300/90">
+                <AlertTriangle size={14} className="shrink-0 mt-0.5" /><span>{b}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {!toAdd ? <p className="text-[13px] text-slate-400">Loading…</p>
+          : toAdd.products.length === 0
+            ? <p className="text-[13px] text-slate-400">
+                Nothing to propose yet. Every product the market has been observed selling is
+                either already in the catalogue or already decided on.
+              </p>
+            : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-[13px]">
+                  <thead className="text-slate-400 text-left">
+                    <tr>
+                      <th className="py-2 font-semibold">Product</th>
+                      <th className="font-semibold">Low / avg / high</th>
+                      <th className="font-semibold text-right">Offers</th>
+                      <th className="font-semibold">Competition</th>
+                      <th className="font-semibold text-right">Margin</th>
+                      <th className="font-semibold text-right">Opportunity</th>
+                      <th className="font-semibold">Verdict</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {toAdd.products.map((r) => (
+                      <tr key={r.candidateId} className="border-t border-white/5 align-top">
+                        <td className="py-2.5 pr-3">
+                          <div className="text-slate-200 font-medium">{r.name}</div>
+                          <div className="text-[11.5px] text-slate-500">
+                            {/* `unknown` is what the parser stores when a title
+                                does not say — printing it three times tells the
+                                reader nothing and crowds out what it does say. */}
+                            {[r.category, r.platform, r.region]
+                              .filter((v) => v && v !== 'unknown' && v !== 'any')
+                              .join(' · ') || '—'}
+                          </div>
+                        </td>
+                        <td className="pr-3 tabular-nums text-slate-300">
+                          {money(r.lowEur)} / {money(r.meanEur)} / {money(r.highEur)}
+                          {r.officialEur != null && (
+                            <div className="text-[11.5px] text-slate-500">official {money(r.officialEur)}</div>
+                          )}
+                        </td>
+                        <td className="pr-3 text-right tabular-nums text-slate-300">
+                          {r.offerCount}
+                          <div className="text-[11.5px] text-slate-500">{r.sourceCount} source(s)</div>
+                        </td>
+                        <td className="pr-3">
+                          {r.competition.level
+                            ? <><span className={COMPETITION[r.competition.level]}>{r.competition.level}</span>
+                                <div className="text-[11.5px] text-slate-500">
+                                  {r.competition.score}/100{r.competition.spreadPct != null
+                                    ? ` · spread ${r.competition.spreadPct}%` : ''}
+                                </div></>
+                            : <span className="text-slate-500">—</span>}
+                        </td>
+                        <td className="pr-3 text-right tabular-nums">
+                          {r.margin.marginPct == null
+                            ? <span className="text-slate-500" title={r.margin.reason}>unknown</span>
+                            : <><span className="text-slate-200">{pct(r.margin.marginPct)}</span>
+                                <div className="text-[11.5px] text-slate-500">{r.margin.basis}</div></>}
+                        </td>
+                        <td className="pr-3 text-right tabular-nums">
+                          <span className="text-slate-200">{r.revenue.score}/100</span>
+                          <div className="text-[11.5px] text-slate-500">
+                            {r.revenue.eurPerMonth == null
+                              ? r.revenue.basis.replace(/_/g, ' ')
+                              : `≈ ${money(r.revenue.eurPerMonth)}/mo`}
+                          </div>
+                        </td>
+                        <td>
+                          <Pill status={GRADE_STYLE[r.grade]}>{r.grade.toUpperCase()}</Pill>
+                          <div className="text-[11.5px] text-slate-500 mt-1 max-w-xs">
+                            {r.gradeReasons[0]}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+      </Section>
+
       <Section title="Product discovery"
         subtitle="Every canonical product we have observed, and whether ForgeMarket already sells it. Nothing here has been added to the catalogue — approving a candidate is a decision you make, recorded with your name against it."
         right={<button onClick={() => act('discover', async () => {
