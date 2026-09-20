@@ -385,6 +385,17 @@ export const config = {
        that scales, and until now the engine only refused a NEGATIVE margin —
        which means it would happily recommend selling at 0.4% and call it fine. */
     minimumMarginPercent: num(env.MINIMUM_MARGIN_PERCENT, 6),
+
+    /* What a product costs this shop, as a fraction of the cheapest price the
+       market is asking — used ONLY to estimate the margin on a product this
+       shop does not sell yet and therefore has no cost for.
+
+       Unset by default, and it stays unset: a number here is an assumption
+       about wholesale pricing, and a discovery report that grades opportunities
+       on an assumption nobody made is worse than one that says it cannot tell.
+       When products in the same category do have cost prices, those are used
+       instead and this is never consulted. */
+    assumedCostRatio: env.MARKET_ASSUMED_COST_RATIO ? num(env.MARKET_ASSUMED_COST_RATIO, 0) : null,
     maxCompetitorUndercutPercent: num(env.MAX_COMPETITOR_UNDERCUT_PERCENT, 5),
     targetMarketPosition: num(env.TARGET_MARKET_POSITION, 0.98),
     promotionMargin: num(env.PROMOTION_MARGIN, 0.08),
