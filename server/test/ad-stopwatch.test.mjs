@@ -261,8 +261,8 @@ console.log('\n— The storyboard describes the cut that will actually be render
      would ever render. Same three arguments as compose, or it is fiction. */
   ok('it reads the target off the variant', /String\(v\.target \|\| 20\)/.test(story));
   ok('…and the card length too', /card: v\.card \?\? 2\.6/.test(story));
-  ok('…and the same floor', /min: Math\.min\(15, TARGET - HERO - 1\)/.test(story));
-  ok('compose passes exactly those', /min: Math\.min\(15, TARGET - HERO - 1\)/.test(compose));
+  ok('…and the same floor', /min: Math\.min\(15, TARGET - HERO(?: - INSERT_LEN)? - 1\)/.test(story));
+  ok('compose passes exactly those', /min: Math\.min\(15, TARGET - HERO(?: - INSERT_LEN)? - 1\)/.test(compose));
   /* A hero still is paid for out of the footage, so the storyboard has to make
      the same subtraction or it describes an edit nothing will render. */
   ok('…including the hero it does not have', /target: TARGET - HERO/.test(story)

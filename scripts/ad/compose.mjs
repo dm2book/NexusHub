@@ -25,6 +25,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { planCuts, resolveTiming, timeline } from './timing.mjs';
+import { boxCentre, resolveInserts, shiftAt } from './framing.mjs';
 import {
   SW_W, stopwatchFrames, stopwatchBlockedReason, clockZero, renderStopwatch, formatClock,
 } from './stopwatch.mjs';
@@ -113,6 +114,14 @@ for (const f of [RAW, path.join(IN, 'beats.json')]) {
 const manifest = JSON.parse(fs.readFileSync(path.join(IN, 'beats.json'), 'utf8'));
 const beats = manifest.beats;
 const at = (label) => beats.find((b) => b.label === label)?.atMs ?? null;
+/* Where a thing was on screen, not just when.
+   record.mjs has measured the price's bounding box since the beginning
+   (record.mjs:275) and nothing has ever read it — every push in this file aims
+   at the middle of the frame or at a hardcoded top-20% band, so the shot of the
+   price pushes in on whatever happens to be beside it. Boxes are in the
+   recorder's 540x960 capture space; normalised here so the zoom expressions
+   stay resolution-independent. */
+const boxAt = (label) => boxCentre(beats.find((x) => x.label === label)?.box);
 
 const ff = (args, label) => {
   try {
@@ -200,7 +209,7 @@ const tokens = tokensFor({
 });
 
 if (variant) {
-  const why = blockedReason(variant, { tokens, order, review: extras.review, mystery: extras.mystery })
+  const why = blockedReason(variant, { tokens, order, review: extras.review, mystery: extras.mystery, beats })
     /* A variant whose whole premise is a timed delivery, cut from a recording
        where nothing was delivered, is not a weaker version of the idea — it is
        a different claim. Refused before a frame is rendered. */
@@ -217,6 +226,32 @@ const PLAN = variant ? variant.scenes : SCENES;
    its length. Both live in timing.mjs so storyboard.mjs gets the same answer —
    two copies of this maths is how an edit and its storyboard drift apart. */
 const cuts = planCuts(PLAN, at);
+/* Aim a scene at the thing the recorder measured, from the command line:
+     --aim=price-onscreen         (repeatable, optional :zoomTo)
+   So a shot can be tried against an existing recording without editing a
+   variant — which is how you find out whether a push is pointing at anything. */
+for (const a of process.argv.filter((x) => x.startsWith('--aim='))) {
+  /* scene@target:zoomTo — the scene and the thing it aims at are usually not
+     the same beat. `price-onscreen` is measured INSIDE the product scene, not
+     at its start, so `--aim=product@price-onscreen:1.8` is the shape that
+     actually describes what the edit wants. `--aim=product` aims a scene at
+     its own beat. */
+  const [spec, to] = a.slice('--aim='.length).split(':');
+  const [beat, targetBeat] = spec.split('@');
+  const cut = cuts.find((c) => c.from === beat || c.label === beat);
+  if (!cut) {
+    console.warn(`\n⚠ --aim=${beat}: no scene starts there (have: ${cuts.map((c) => c.from).join(', ')})`);
+    continue;
+  }
+  const aimAt = targetBeat || beat;
+  if (!boxAt(aimAt)) {
+    console.warn(`\n⚠ --aim=${spec}: '${aimAt}' carries no measured box — leaving the scene's own zoom`);
+    continue;
+  }
+  cut.zoom = 'at';
+  cut.zoomAt = aimAt;
+  if (to) cut.zoomTo = Number(to);
+}
 if (!cuts.length) { console.error('No usable scenes in beats.json.'); process.exit(1); }
 /* The floor follows the target rather than sitting at a hardcoded fifteen.
    A variant asking for twelve seconds was being padded back up to fifteen, and
@@ -245,11 +280,53 @@ if ((variant?.hero ?? 0) > 0 && !HERO) {
   console.warn(`\n⚠ no hero.png in ${IN} — this product has no artwork, so the cut opens on the footage.`);
 }
 
+/* ── Cards in the middle of the advert ──────────────────────────────────────
+ *
+ * A still could only ever be the FIRST thing (`hero`) or the LAST (`endcard`).
+ * Everything between them had to be a window into raw.webm, because the
+ * timeline is a list of beat-to-beat spans of one recording (timing.mjs).
+ *
+ * That ruled out the whole middle of the grammar this advert is competing
+ * against: the proof card, the price ladder, the pattern interrupt, the one
+ * held sentence that lets a viewer catch up. The recording is a person using a
+ * website, and a website cannot say "een mens pakt je bestelling in" — only a
+ * card can, and a card could not be put where that sentence belongs.
+ *
+ * An insert is declared against a BEAT rather than a scene number, because the
+ * scene list is resolved from whichever beats the recording actually produced:
+ *   inserts: [{ before: 'email-open', card: 'proof.png', len: 1.2, zoom: 'punch' }]
+ * An insert whose beat is not in this recording is dropped, loudly — the same
+ * rule the rest of the toolkit follows, where footage that does not exist
+ * removes the claim rather than faking it.
+ *
+ * Like the hero, an insert comes out of the FOOTAGE budget rather than on top
+ * of it, so a cut asking for twelve seconds still gets twelve. */
+/* Also reachable from the command line, so an insert can be tried against an
+   existing recording without editing a variant:
+     --insert=email-open:proof.png:1.2:punch   (repeatable) */
+const cliInserts = process.argv
+  .filter((a) => a.startsWith('--insert='))
+  .map((a) => {
+    const [before, card, len, zoom] = a.slice('--insert='.length).split(':');
+    return { before, card, len: len ? Number(len) : 1.0, zoom: zoom || 'punch' };
+  });
+
+const declaredInserts = [...(variant?.inserts || []), ...cliInserts];
+const insertPlan = resolveInserts(declaredInserts, cuts, {
+  exists: (card) => fs.existsSync(path.join(IN, card)),
+});
+for (const d of insertPlan.dropped) {
+  console.warn(`\n⚠ insert skipped — ${d.why}`);
+}
+const INSERTS = insertPlan.placed.map((i) => ({ ...i, file: path.join(IN, i.card) }));
+const INSERT_LEN = insertPlan.total;
+
 const resolved = resolveTiming(cuts, {
-  target: TARGET - HERO, card: CARD_LEN, min: Math.min(15, TARGET - HERO - 1),
+  target: TARGET - HERO - INSERT_LEN, card: CARD_LEN,
+  min: Math.min(15, TARGET - HERO - INSERT_LEN - 1),
 });
 let CARD = resolved.card;
-const total = HERO + resolved.total;
+const total = HERO + INSERT_LEN + resolved.total;
 
 console.log(`\n🎬 ${cuts.length} scenes · ${total.toFixed(1)}s (target ${TARGET}s)`);
 for (const c of cuts) console.log(`   ${c.played.toFixed(2)}s  ${c.label} (${c.speed.toFixed(1)}×)`);
@@ -267,8 +344,15 @@ const swSpec = variant?.stopwatch || null;
    footage does not start at zero when a still is in front of it. Before the
    offset the clock read the footage a hero's length early — and a clock that is
    wrong is the one thing that file exists to prevent. */
-const swRows = swSpec ? timeline(cuts, CARD).rows.map((r) => ({ ...r, in: r.in + HERO, out: r.out + HERO })) : [];
-const swBody = HERO + cuts.reduce((a, c) => a + c.played, 0);
+/* An insert sits BEFORE the scene it names, so every scene from that one on
+   plays later than the timeline thinks. Unshifted, the clock would read the
+   footage an insert early — and a clock that disagrees with the picture is the
+   one thing the stopwatch exists to prevent. */
+const shiftFor = (i) => shiftAt(i, INSERTS, HERO);
+const swRows = swSpec
+  ? timeline(cuts, CARD).rows.map((r, i) => ({ ...r, in: r.in + shiftFor(i), out: r.out + shiftFor(i) }))
+  : [];
+const swBody = HERO + INSERT_LEN + cuts.reduce((a, c) => a + c.played, 0);
 const swZero = swSpec ? clockZero(swSpec, swRows) : null;
 if (swZero?.error) { console.error(`\n✖ ${swZero.error}\n`); process.exit(1); }
 const sw = swSpec ? stopwatchFrames({
@@ -464,7 +548,26 @@ cuts.forEach((c, i) => {
       + `:x='iw/2-(iw/zoom/2)'`
       + `:y='max(0, ih*0.20 - (ih/zoom/2) + ih*0.10*(1-on/${frames}))'`
       + `:d=1:s=${W}x${H}:fps=${FPS}`,
-  }[c.zoom] || '';
+    /* A push into a MEASURED place in the frame.
+       `focus` aims at a fixed top-20% band, which is right for the email and
+       wrong for everything else — and the one shot this advert lives on, the
+       price, is measured by the recorder and was never aimed at. This reads the
+       box off the beat the scene starts at and lands the crop on its centre,
+       clamped so the window never walks off the edge of the picture. A scene
+       asking for `at` on a beat that carries no box falls back to `in`, because
+       a push at the wrong thing is worse than a gentle one at everything. */
+    at: (() => {
+      const box = (c.zoomAt ? boxAt(c.zoomAt) : null) || boxAt(c.from);
+      if (!box) return null;
+      const end = Math.max(1.15, Number(c.zoomTo || 1.5));
+      const z = `min(1.02+${(end - 1.02).toFixed(3)}*on/${frames},${end.toFixed(3)})`;
+      // Top-left of the crop window: the box centre, minus half the window,
+      // then clamped into the picture.
+      const cx = `min(max(iw*${box.cx.toFixed(4)}-(iw/zoom/2),0),iw-iw/zoom)`;
+      const cy = `min(max(ih*${box.cy.toFixed(4)}-(ih/zoom/2),0),ih-ih/zoom)`;
+      return `zoompan=z='${z}':x='${cx}':y='${cy}':d=1:s=${W}x${H}:fps=${FPS}`;
+    })(),
+  }[c.zoom] || (c.zoom === 'at' ? `zoompan=z='min(1.0+${(0.055 * ZOOM).toFixed(3)}*on/${frames},${(1 + 0.06 * ZOOM).toFixed(3)})':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=${W}x${H}:fps=${FPS}` : '');
 
   parts.push(
     `[${rawIdx}:v]trim=start=${c.start.toFixed(3)}:duration=${c.srcLen.toFixed(3)},setpts=PTS-STARTPTS,`
@@ -607,6 +710,24 @@ caps.forEach((c, ci) => {
   parts.push(`[${src}][${nm}]overlay=0:0:enable='between(t,${start.toFixed(3)},${(start + hold).toFixed(3)})':`
     + `format=auto,format=yuv420p[${dst}]`);
   names[i] = dst;
+});
+
+/* The inserts, spliced into the middle.
+   Built exactly like the hero — a still, pushed or punched so the frame is
+   never dead — and placed BEFORE the scene whose beat it was declared against.
+   Back to front, so an earlier splice cannot move a later index. */
+INSERTS.forEach((ins, k) => {
+  const nf = Math.max(2, Math.round(ins.len * FPS));
+  const iIdx = addInput('-loop', '1', '-framerate', String(FPS), '-t', ins.len.toFixed(3), '-i', ins.file);
+  const move = ins.zoom === 'punch'
+    ? `zoompan=z='max(${(1 + 0.09 * ZOOM).toFixed(3)}-${(0.09 * ZOOM).toFixed(3)}*on/${nf},1.0)'`
+    : `zoompan=z='min(1.0+${(0.08 * ZOOM).toFixed(3)}*on/${nf},${(1 + 0.09 * ZOOM).toFixed(3)})'`;
+  const nm = `vins${k}`;
+  parts.push(`[${iIdx}:v]scale=${W}:${H}:force_original_aspect_ratio=increase:flags=lanczos,`
+    + `crop=${W}:${H},fps=${FPS},`
+    + `${move}:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=${W}x${H}:fps=${FPS},`
+    + `trim=duration=${ins.len.toFixed(3)},setpts=PTS-STARTPTS,format=yuv420p[${nm}]`);
+  names.splice(ins.at, 0, nm);
 });
 
 /* The hero, in front of everything.

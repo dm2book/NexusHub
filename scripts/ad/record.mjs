@@ -46,6 +46,11 @@ const EMAIL = arg('email') || process.env.AD_BUYER_EMAIL || '';
 const CHROME = arg('chrome') || process.env.AD_CHROME
   || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const SLOW = Number(arg('slow', '120'));           // ms between actions, for legible footage
+/* The owner's own session, for filming the seller's side of a hand-delivered
+   order. Never minted here — an advert recorder that can grant itself admin is
+   a recorder that can do anything an admin can. */
+const SELLER_TOKEN = arg('seller-token') || process.env.AD_SELLER_TOKEN || '';
+const SELLER_CODE = arg('seller-code') || 'XXXX-YYYY-ZZZZ';
 const TIMEOUT = Number(arg('timeout', '120')) * 1000;
 
 if (!SKU && !PRODUCT_ID) {
@@ -209,6 +214,30 @@ await page.addInitScript(() => {
 });
 
 /** Move the painted cursor to an element, then click it for real. */
+/* Why not `networkidle`.
+ *
+ * The storefront warms its data before React hydrates (src/lib/earlyFetch.js),
+ * and those speculative requests are never resolved or cancelled in a way the
+ * browser reports — measured on the V-Bucks product page: four requests still
+ * open ten seconds after the page had fully rendered. `networkidle` therefore
+ * never fires on a product page, and the recorder timed out on a page that had
+ * been finished and interactive the whole time.
+ *
+ * It looked like it worked because the usual path CLICKS a product card and
+ * never navigates directly. The direct navigation is the fallback for a product
+ * that is not on the shelf the recorder is looking at — so the failure only
+ * appeared for products further down the catalogue, which is most of them.
+ *
+ * So: wait for the document, then for the thing the next step actually needs.
+ * A page is ready when what the camera is pointing at is on it, not when a
+ * telemetry beacon has stopped. */
+async function open(url, ready) {
+  await page.goto(url, { waitUntil: 'domcontentloaded', timeout: TIMEOUT });
+  if (ready) await page.locator(ready).first().waitFor({ state: 'visible', timeout: TIMEOUT }).catch(() => {});
+  await page.waitForLoadState('load', { timeout: TIMEOUT }).catch(() => {});
+  await page.waitForTimeout(450);
+}
+
 async function tap(locator, label) {
   await locator.scrollIntoViewIfNeeded().catch(() => {});
   const box = await locator.boundingBox();
@@ -228,7 +257,7 @@ async function tap(locator, label) {
 let order = null;
 try {
   // ── 1. Open ForgeMarket ─────────────────────────────────────────────────
-  await page.goto(`${BASE}/`, { waitUntil: 'networkidle', timeout: TIMEOUT });
+  await open(`${BASE}/`, 'h1');
   t0 = Date.now();
   beat('open');
   await page.getByRole('button', { name: /Accept|Accepteren|Akzeptieren|Accepter/i })
@@ -236,7 +265,7 @@ try {
   await page.waitForTimeout(600);
 
   // ── 2. Browse ───────────────────────────────────────────────────────────
-  await page.goto(`${BASE}/shop`, { waitUntil: 'networkidle', timeout: TIMEOUT });
+  await open(`${BASE}/shop`, 'h1');
   beat('shop');
   await page.waitForTimeout(500);
   /* A real scroll through the catalogue. The edit ramps this hard — it is the
@@ -252,7 +281,7 @@ try {
   // ── 3-4. Pick it, open the product page ─────────────────────────────────
   const card = page.locator(`a[href="/product/${product.id}"]`).first();
   if (await card.count()) await tap(card, 'select');
-  else { await page.goto(`${BASE}/product/${product.id}`, { waitUntil: 'networkidle' }); beat('select'); }
+  else { await open(`${BASE}/product/${product.id}`, 'h1'); beat('select'); }
   await page.waitForURL(/\/product\//, { timeout: TIMEOUT }).catch(() => {});
   /* Hold here. This is the shot the advert is built around — the product, its
      price, the delivery promise — and the edit cannot show for two seconds
@@ -390,6 +419,244 @@ try {
   if (!orderNumber) throw new Error('No order number in the URL — the purchase did not go through.');
   beat('order-placed', { orderNumber });
 
+  /* ── 7b. The other side of the screen ───────────────────────────────────
+   *
+   * Sixty-one of this shop's seventy-one products are account top-ups and
+   * none of the seventy-one carries pre-loaded stock, so the overwhelmingly
+   * normal case is that a PERSON opens the queue and sends the order by hand.
+   * The recorder could not film that. It placed an order, waited for the site
+   * to say `completed` on its own, and gave up on everything that a human
+   * actually delivers — which is to say, on the shop as it really operates.
+   *
+   * That refusal was also throwing away the one shot nobody else in this
+   * category can take. A marketplace with thousands of third-party sellers has
+   * no single fulfilment to film; whatever it filmed would be one seller on
+   * one day presented as the platform. A shop run by one person does have one,
+   * and it is a person typing a code at 23:41.
+   *
+   * The seller pass needs the owner's own session, which is deliberately not
+   * something this script can mint: pass `--seller-token=` (or AD_SELLER_TOKEN)
+   * from a signed-in admin. Without it the recorder behaves exactly as before.
+   */
+  if (SELLER_TOKEN && order?.status !== 'completed') {
+    try {
+      await page.evaluate((t) => localStorage.setItem('fm_token', t), SELLER_TOKEN);
+
+      await open(`${BASE}/admin/fulfillment`, 'h1');
+      await page.waitForTimeout(450);
+
+      /* The queue, with this order in it. Filmed before anything is clicked —
+         the shot is "there is a real list and your order is on it". */
+      /* The queue is fetched after the page renders, so wait for THIS order to
+         be on it before touching the DOM. Masking first hid a list that had not
+         arrived yet, and the row lookup then found nothing — the recorder
+         reported the order was not in the queue when it simply was not there
+         yet. */
+      const row = page.locator(`text=${orderNumber}`).first();
+      await row.waitFor({ state: 'visible', timeout: 20000 }).catch(() => {});
+
+      /* Other people are in this frame, and they must never be in it — not
+         even for one frame.
+         The manual queue is a real queue: it lists every paid order waiting,
+         with the buyer's e-mail address and, for an account top-up, the
+         in-game name the shop is about to top up. On the real shop those are
+         other customers.
+         Applied once the queue has rendered, and then forced again before
+         every frame the edit cuts on. An init-script version looked stricter
+         and silently never ran; this one is measured working (one row visible
+         out of three) and the assertion below is what proves it each time.
+         Nothing about the shop is faked. What is removed is other people. */
+      await page.evaluate((num) => {
+        /* Only on the fulfilment queue.
+           `.card` is the storefront's class too — product cards, bundles, the
+           track page all use it. An unscoped rule hid the shop itself, which is
+           most of the advert. */
+        const onQueue = () => location.pathname.startsWith('/admin/fulfillment');
+        const install = () => {
+          if (!onQueue()) {
+            document.getElementById('__ad_privacy')?.remove();
+            return;
+          }
+          if (document.getElementById('__ad_privacy')) return;
+          const style = document.createElement('style');
+          style.id = '__ad_privacy';
+          /* Hidden by DEFAULT, revealed by exception — a row that has just
+             been created is already hidden, so there is no window. */
+          style.textContent = '.card{display:none !important}'
+            + '.card.__ad_show{display:block !important}'
+            + '.__ad_blur{filter:blur(9px);-webkit-filter:blur(9px)}';
+          (document.head || document.documentElement).appendChild(style);
+        };
+        install();
+        document.addEventListener('DOMContentLoaded', install);
+
+        const EMAIL = /[\w.+-]+@[\w-]+\.[\w.]+/;
+        const apply = () => {
+          install();
+          if (!onQueue()) return;
+          for (const c of document.querySelectorAll('.card')) {
+            if (!c.querySelector('button, a')) { c.classList.add('__ad_show'); continue; }
+            c.classList.toggle('__ad_show', c.textContent.includes(num));
+          }
+          for (const el of document.querySelectorAll('div,span,button')) {
+            if (el.children.length) continue;
+            if (EMAIL.test((el.textContent || '').trim())) el.classList.add('__ad_blur');
+          }
+        };
+        window.__adMask = apply;
+        const start = () => {
+          apply();
+          new MutationObserver(apply).observe(document.documentElement, { childList: true, subtree: true });
+        };
+        if (document.body) start();
+        else document.addEventListener('DOMContentLoaded', start);
+      }, orderNumber).catch(() => {});
+      await page.waitForTimeout(250);
+
+      await page.evaluate(() => window.__adMask?.()).catch(() => {});
+      await page.waitForTimeout(250);
+
+      /* Distinguish "not signed in" from "not in the queue".
+         An expired token renders the admin page with an empty list, and the
+         only symptom was the recorder reporting that a freshly-placed order was
+         not in the queue — which sent me looking at the queue for an hour while
+         the real answer was a 401. */
+      const signedOut = await page.locator('text=/Authentication required|Sign in|Inloggen/i').count()
+        .then((n) => n > 0).catch(() => false);
+      const onQueue = await row.count().then((n) => n > 0).catch(() => false);
+      if (!onQueue) {
+        throw new Error(signedOut
+          ? 'the seller token was rejected — mint a fresh one (access tokens are short-lived)'
+          : `${orderNumber} is not in the manual queue`);
+      }
+      await row.scrollIntoViewIfNeeded().catch(() => {});
+      await page.evaluate(() => window.__adMask?.()).catch(() => {});
+
+      /* The invariant, checked rather than hoped for.
+         Four attempts at masking this screen each looked right in the code and
+         each left other customers in the rendered file — the leak is always a
+         frame or two, and a frame or two is the whole problem. So the recorder
+         now MEASURES what is on screen before it marks the beat the edit cuts
+         on, and refuses to film the seller's side if anyone else is visible.
+         A missing seller sequence loses a shot. A leaked one publishes a
+         stranger's e-mail address in an advert. */
+      const visible = await page.evaluate(() => {
+        const rows = [...document.querySelectorAll('.card')]
+          .filter((c) => c.querySelector('button, a'))
+          .filter((c) => getComputedStyle(c).display !== 'none');
+        const EMAIL = /[\w.+-]+@[\w-]+\.[\w.]+/;
+        const addresses = new Set();
+        for (const r of rows) {
+          const m = (r.textContent || '').match(EMAIL);
+          if (m && getComputedStyle(r).filter.indexOf('blur') < 0) addresses.add(m[0]);
+        }
+        return { rows: rows.length, addresses: [...addresses] };
+      }).catch(() => ({ rows: -1, addresses: [] }));
+      /* Recorded, and the edit is told whether it may be used.
+         Masking a live React list turned out to be unwinnable at frame
+         granularity — four attempts, each verified against the rendered file,
+         each still leaking a frame or two of other customers. So the list is no
+         longer something the advert cuts to: variant P starts the seller
+         footage at the MODAL, which by construction shows one order and no
+         one else. This beat still exists for cuts that want it, and it carries
+         the measurement so nothing can use it blindly. */
+      beat('seller-queue', { orderNumber, othersVisible: Math.max(0, visible.rows - 1) });
+      if (visible.rows !== 1) {
+        console.warn(`  ⚠ ${visible.rows - 1} other order(s) visible on the queue`
+          + ' — this beat is marked unusable; the cut starts at the modal instead');
+      }
+      await page.waitForTimeout(1200);
+
+      /* The Fulfill button IN THIS ORDER'S ROW.
+         Taking the first one on the page instead delivered whatever happened to
+         be at the top of the queue — measured: a different order entirely was
+         fulfilled, returned 200, and this order sat pending while the recorder
+         waited for it. The queue is oldest-first, so on any real shop with a
+         backlog it would have been wrong every single time. */
+      /* The innermost element that holds BOTH this order's number and a Fulfill
+         button. Guessing at the row's markup (`li, tr, [class*=rounded]`) matched
+         nothing at all — the queue renders plain divs — so the lookup is by what
+         the row CONTAINS rather than by what it is called. */
+      const card = page.locator('div')
+        .filter({ hasText: orderNumber })
+        .filter({ has: page.getByRole('button', { name: /Fulfill|Afhandelen|Leveren/i }) })
+        .last();
+      const fulfil = (await card.count())
+        ? card.getByRole('button', { name: /Fulfill|Afhandelen|Leveren/i }).first()
+        : null;
+      if (!fulfil || !(await fulfil.count())) {
+        throw new Error(`no Fulfill button in the row for ${orderNumber}`);
+      }
+      await page.evaluate(() => window.__adMask?.()).catch(() => {});
+      await tap(fulfil, 'seller-open');
+      /* And prove the modal opened on the right order before typing anything
+         into it — the whole failure above was a click that looked fine. */
+      await page.locator(`text=${orderNumber}`).first().waitFor({ state: 'visible', timeout: 8000 });
+      await page.waitForTimeout(700);
+
+      /* Two shapes of hand delivery, and the account one is the better shot.
+         A code product asks the seller to paste a code. An ACCOUNT top-up —
+         which is what most of this catalogue is — shows the seller the buyer's
+         own in-game name and says "top that account up, then confirm". There is
+         no code field on that form at all, which is why looking for one failed
+         on the first product tried.
+
+         Filmed either way, and the account variant is marked so the edit can
+         use the line that is actually true of it. */
+      const targetLine = page.locator('text=/Deliver to|Lever aan/i').first();
+      const isAccount = await page.locator('text=/direct account top-up/i').count()
+        .then((n) => n > 0).catch(() => false);
+      if (await targetLine.count()) {
+        const tb = await targetLine.boundingBox().catch(() => null);
+        beat('seller-target', { box: tb || undefined, account: isAccount });
+        await page.waitForTimeout(1100);
+      }
+
+      if (!isAccount) {
+        /* Typed, not filled. `fill()` sets the value in one frame, and the whole
+           point of this shot is that somebody is doing it. */
+        const codeField = page.locator('textarea[placeholder*="XXXX"], input[placeholder*="XXXX"]').first();
+        if (!(await codeField.count())) throw new Error('no code field on a code fulfilment form');
+        const box = await codeField.boundingBox().catch(() => null);
+        if (box) {
+          await page.evaluate(([x, y]) => window.__adGlide?.(x, y),
+            [box.x + box.width / 2, box.y + box.height / 2]).catch(() => {});
+        }
+        await codeField.click();
+        beat('seller-code', { box: box || undefined });
+        await codeField.type(SELLER_CODE, { delay: 55 });
+        await page.waitForTimeout(700);
+      }
+
+      await page.evaluate(() => window.__adMask?.()).catch(() => {});
+      const deliver = page.getByRole('button', { name: /^Deliver$|Verstuur|Afleveren/i }).first();
+      if (!(await deliver.count())) throw new Error('no Deliver button in the fulfilment form');
+      await tap(deliver, 'seller-send');
+      /* The queue reloads behind the closing modal — mask it before any of
+         those frames are recorded, not after. */
+      await page.evaluate(() => window.__adMask?.()).catch(() => {});
+      await page.waitForTimeout(400);
+      await page.evaluate(() => window.__adMask?.()).catch(() => {});
+      await page.waitForTimeout(1200);
+      /* Confirmed against the shop, not against the click. */
+      const after = await api(`/api/track/${encodeURIComponent(orderNumber)}`).catch(() => null);
+      if (after?.status === 'awaiting_fulfillment') {
+        throw new Error(`Deliver was clicked but ${orderNumber} is still awaiting fulfilment`);
+      }
+
+      /* Back to the buyer's side. The advert is about what the buyer sees
+         happen; the seller pass is the reason it happens. */
+      await page.evaluate(() => localStorage.removeItem('fm_token'));
+      await open(`${BASE}/track?number=${encodeURIComponent(orderNumber)}`, 'h1');
+    } catch (e) {
+      /* A seller pass that half-happened is not a reason to lose the purchase
+         that did happen — but it must never be silent, because its absence
+         changes what the advert is allowed to say. */
+      console.warn(`\n  ⚠ seller pass skipped: ${e.message}`);
+      await page.evaluate(() => localStorage.removeItem('fm_token')).catch(() => {});
+    }
+  }
+
   // ── 8. Order confirmation, read back from the site ──────────────────────
   const deadline = Date.now() + TIMEOUT;
   for (;;) {
@@ -408,9 +675,8 @@ try {
   await page.waitForTimeout(2200);
 
   // ── 9-11. The delivery, on the real order page ──────────────────────────
-  await page.goto(`${BASE}/track?number=${encodeURIComponent(orderNumber)}`,
-    { waitUntil: 'networkidle', timeout: TIMEOUT });
-  await page.waitForTimeout(900);
+  await open(`${BASE}/track?number=${encodeURIComponent(orderNumber)}`, 'h1');
+  await page.waitForTimeout(450);
   beat('delivery');
   await page.waitForTimeout(1400);
   // Down to the delivered item itself — the proof the whole advert is for.

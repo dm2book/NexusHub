@@ -35,6 +35,7 @@ const { VARIANTS, variantById, tokensFor, fill, blockedReason } =
 const { CUTS } = await import(join(ROOT, 'scripts/ad/cuts.mjs'));
 const { planCuts, resolveTiming } = await import(join(ROOT, 'scripts/ad/timing.mjs'));
 const compose = read('scripts/ad/compose.mjs');
+const framing = read('scripts/ad/framing.mjs');
 const cards = read('scripts/ad/cards.mjs');
 const makeAd = read('scripts/ad/make-ad.mjs');
 
@@ -168,7 +169,13 @@ console.log('— The hero does not shift anything underneath it —');
   /* The stopwatch reads the recording's own clock off these rows. Wrong by a
      hero, it would have read the footage a second early — and a clock that is
      wrong is the one thing that file exists to prevent. */
-  ok('the stopwatch rows are offset too', /r\.in \+ HERO, out: r\.out \+ HERO/.test(compose));
+  /* Expressed as the rule rather than as one spelling of it: the rows are
+     shifted by whatever sits in front of the footage. That was the hero alone;
+     it is now the hero plus any mid-timeline insert, and shiftAt() in
+     framing.mjs is the single place that decides. */
+  ok('the stopwatch rows are offset too', /in: r\.in \+ shiftFor\(i\)/.test(compose)
+    && /shiftAt\(i, INSERTS, HERO\)/.test(compose)
+    && /hero \+ inserts\.reduce/.test(framing));
   ok('…and its frame count covers the hero', /const swBody = HERO \+/.test(compose));
 }
 
@@ -198,12 +205,12 @@ console.log('— Nothing that already worked was disturbed —');
      which is the property: the overlays are opt-in, not a default that quietly
      redressed everything composed without them. */
   ok('…and only the flagship opted in as well',
-    VARIANTS.filter((v) => v.productCard === true).map((v) => v.id).join(',') === 'M,N'),
+    VARIANTS.filter((v) => v.productCard === true).map((v) => v.id).sort().join(',') === 'M,N'),
   ok('…nor any cut', CUTS.every((c) => c.productCard !== true));
   ok('the hero is off unless a variant asks',
-    VARIANTS.filter((v) => (v.hero ?? 0) > 0).map((v) => v.id).join(',') === 'M,N'
+    VARIANTS.filter((v) => (v.hero ?? 0) > 0).map((v) => v.id).sort().join(',') === 'M,N,P'
     && CUTS.every((c) => !c.hero));
-  ok('every earlier variant still resolves', VARIANTS.length === 14 && !!variantById('K') && !!variantById('L'));
+  ok('every earlier variant still resolves', VARIANTS.length >= 14 && !!variantById('K') && !!variantById('L'));
   ok('and the price badge still lands on whichever scene asks for it',
     /const idx = cuts\.findIndex\(\(c\) => c\.price\)/.test(compose));
 }
