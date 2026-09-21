@@ -19,7 +19,8 @@ import { addVerifiedReview } from '../services/reviewsService.js';
 import { updateProfile, updatePreferences, publicUser } from '../services/userService.js';
 import { loyaltyFor } from '../services/loyaltyService.js';
 import { affiliateStats } from '../services/affiliateService.js';
-import { coinBalance, coinHistory, redeemReward, forgeShopCatalog, spendCoins } from '../services/forgeCoinService.js';
+import { coinBalance, coinHistory, coinTotals, redeemReward, forgeShopCatalog, spendCoins,
+  COINS_PER_EURO_CENTS } from '../services/forgeCoinService.js';
 import { pullsForOrder, rerollPull } from '../services/mysteryBoxService.js';
 import { getMembership, grantMembership, FORGE_PLUS, MEMBERSHIP_DAYS } from '../services/membershipService.js';
 import { saveCart, getCart } from '../services/cartService.js';
@@ -318,10 +319,15 @@ router.post('/orders/:id/mystery/:pullId/reroll', asyncHandler(async (req, res) 
 
 // ── Forge Coins + Forge Shop ─────────────────────────────────────────────────
 router.get('/coins', asyncHandler(async (req, res) => {
-  const [balance, history, shop] = await Promise.all([
+  const [balance, history, shop, totals] = await Promise.all([
     coinBalance(req.user.id), coinHistory(req.user.id), forgeShopCatalog(),
+    coinTotals(req.user.id),
   ]);
-  res.json({ balance, history, shop });
+  /* The earn rate travels with the payload rather than being written into the
+     page. It is a pricing decision that lives in one constant, and a page that
+     repeats "1 coin per €10" in its own words is a second copy that goes stale
+     silently the day the rate changes. */
+  res.json({ balance, history, shop, totals, perCoinCents: COINS_PER_EURO_CENTS });
 }));
 
 router.post('/coins/redeem', asyncHandler(async (req, res) => {

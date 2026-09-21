@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Coins, Ticket, Sparkles, Copy, Check, History } from 'lucide-react';
 import { api } from '../../lib/api.js';
-import { money, date } from '../../lib/format.js';
+import { money, dateShort } from '../../lib/format.js';
 import { PageLoader } from '../../components/ui.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
 
@@ -38,9 +38,34 @@ export default function ForgeShop() {
   /* The cheapest thing still out of reach — so the header can say what the
      balance is FOR, not only what it is. Undefined once everything is
      affordable, and the line disappears rather than congratulating anyone. */
-  const next = (data?.shop || [])
-    .filter((r) => r.cost > (data?.balance ?? 0))
-    .sort((a, b) => a.cost - b.cost)[0];
+  const shop = [...(data?.shop || [])].sort((a, b) => a.cost - b.cost);
+  const balance = data?.balance ?? 0;
+  const next = shop.find((r) => r.cost > balance);
+
+  /* Lifetime, from the server's own SUMs. NOT from `history`, which is the last
+     twenty rows — adding those up is right for a new member and quietly wrong
+     for everybody else, in the flattering direction, because the oldest rows
+     drop off first. */
+  const earned = data?.totals?.earned ?? null;
+  const spent = data?.totals?.spent ?? null;
+
+  /* The earn rate comes from the payload. Writing "1 coin per €10" into this
+     page would be a second copy of a pricing decision that lives in one
+     constant, and it would go stale silently the day that constant changes. */
+  const perCoin = (data?.perCoinCents ?? 1000) / 100;
+
+  /* Which reward gives the most discount per coin. The €25 card's blurb claims
+     "best value" in prose; this works it out from cost and value, so the badge
+     cannot disagree with the numbers beside it — and it moves on its own if the
+     owner adds an item in the admin. Boosts have no euro value and are left
+     out of the comparison rather than counted as zero. */
+  const priced = shop.filter((r) => r.kind === 'coupon' && r.value > 0 && r.cost > 0);
+  const bestValueId = priced.length > 1
+    ? priced.reduce((a, b) => (b.value / b.cost > a.value / a.cost ? b : a)).id
+    : null;
+
+  /* What getting there actually takes, in the currency a shopper thinks in. */
+  const spendToReach = (cost) => Math.max(0, cost - balance) * perCoin;
 
   return (
     <div className="space-y-6">
@@ -48,74 +73,137 @@ export default function ForgeShop() {
           It was an orange-to-pink gradient, which is the loudest thing on the
           page and belongs to no other surface in this product — the logo, the
           active nav item and every primary button are indigo/violet. The gold
-          stays on the COINS, where it means something, and the panel joins the
-          rest of the shop. */}
-      <div className="rounded-2xl p-6 text-white relative overflow-hidden
-        border border-white/10 bg-elevated/60 shadow-lg shadow-primary/10">
-        <div className="orb w-72 h-72 bg-primary/20 -top-24 -right-16 pointer-events-none" />
-        <div className="relative flex flex-wrap items-center gap-5">
-          <span className="w-14 h-14 rounded-2xl grid place-items-center text-amber-300
-            bg-amber-400/10 ring-1 ring-amber-400/25">
-            <Coins size={28} />
-          </span>
-          <div>
-            <div className="text-sm text-slate-400">Your Forge Coins</div>
-            <div className="text-4xl font-extrabold leading-none text-amber-300 tabular-nums">
-              {data.balance}
+          stays on the COINS, where it means something. */}
+      <div className="relative overflow-hidden rounded-3xl border border-white/10
+        bg-gradient-to-br from-elevated/80 via-elevated/50 to-space-black/60 p-6 sm:p-8">
+        <div className="orb w-80 h-80 bg-primary/20 -top-28 -right-20 pointer-events-none" />
+        <div className="orb w-56 h-56 bg-amber-500/10 -bottom-24 left-1/3 pointer-events-none" />
+
+        <div className="relative flex flex-col lg:flex-row lg:items-end gap-8">
+          <div className="min-w-0">
+            <div className="text-[13px] uppercase tracking-widest text-slate-500 font-semibold">
+              Your Forge Coins
             </div>
+            <div className="flex items-end gap-3 mt-1">
+              <Coins size={34} className="text-amber-300 mb-1.5 shrink-0" />
+              <span className="text-6xl sm:text-7xl font-extrabold leading-none tabular-nums
+                bg-gradient-to-b from-amber-200 to-amber-400 bg-clip-text text-transparent">
+                {balance}
+              </span>
+            </div>
+            <p className="text-slate-400 text-sm mt-3 max-w-md">
+              Every <b className="text-slate-200">{money(data.perCoinCents ?? 1000)}</b> you spend
+              earns a coin, automatically. Spend them below.
+            </p>
           </div>
-          {/* What the balance is worth right now, instead of only what it is. */}
-          {next && (
-            <div className="sm:ml-auto text-sm text-slate-400">
-              {next.cost - data.balance} more for <span className="text-slate-200">{next.label}</span>
+
+          {/* Facts, not decoration: two lifetime sums and the next thing the
+              balance is working toward. */}
+          <dl className="grid grid-cols-2 sm:grid-cols-3 gap-x-8 gap-y-3 lg:ml-auto">
+            <div>
+              <dt className="text-[11px] uppercase tracking-wider text-slate-500">Earned</dt>
+              <dd className="text-slate-200 font-semibold tabular-nums">
+                {earned == null ? '—' : earned}
+              </dd>
             </div>
-          )}
+            <div>
+              <dt className="text-[11px] uppercase tracking-wider text-slate-500">Spent</dt>
+              <dd className="text-slate-200 font-semibold tabular-nums">
+                {spent == null ? '—' : spent}
+              </dd>
+            </div>
+            <div className="col-span-2 sm:col-span-1">
+              <dt className="text-[11px] uppercase tracking-wider text-slate-500">Next reward</dt>
+              <dd className="text-slate-200 font-semibold">
+                {/* The label in full. Trimming " discount code" off it turned
+                    "€10 discount code" into "€10", so the line read "9 more for
+                    €10" — which sounds like a price, not a reward. */}
+                {next
+                  ? <>{next.cost - balance}
+                      <span className="text-slate-500 font-normal"> → {next.label}</span></>
+                  : <span className="text-emerald-300">everything unlocked</span>}
+              </dd>
+            </div>
+          </dl>
         </div>
-        <p className="relative text-slate-400 text-sm mt-4 max-w-2xl">
-          Earn <b className="text-slate-200">1 coin for every €10</b> you spend — automatically.
-          Spend them below on discount codes and giveaway boosts.
-        </p>
       </div>
 
       {/* Shop */}
       <div>
-        <h2 className="text-lg text-white font-bold mb-3">Forge Shop</h2>
+        <div className="flex items-baseline justify-between gap-4 mb-3">
+          <h2 className="text-lg text-white font-bold">Forge Shop</h2>
+          <span className="text-[12.5px] text-slate-500">
+            Codes are single-use and never expire.
+          </span>
+        </div>
         {/* Four across on a wide screen. The page was capped at max-w-3xl, so on
             a 1400px window the content sat in 770px and the right half of the
-            screen was empty. */}
+            screen was empty. Ordered cheapest first, so the one a shopper can
+            actually reach is the one they read first. */}
         <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-4">
-          {data.shop.map((r) => {
+          {shop.map((r) => {
             const Icon = ICON[r.kind] || Ticket;
-            const afford = data.balance >= r.cost;
+            const afford = balance >= r.cost;
+            const pct = Math.min(100, Math.round((balance / r.cost) * 100));
+            const away = spendToReach(r.cost);
+            const best = r.id === bestValueId;
             return (
-              <div key={r.id} className="card p-5 flex flex-col">
-                <div className="flex items-center gap-3 mb-2">
-                  <span className="w-10 h-10 rounded-xl bg-amber-500/15 text-amber-400 grid place-items-center"><Icon size={18} /></span>
-                  <div className="font-semibold text-white">{r.label}</div>
-                </div>
-                <p className="text-slate-400 text-sm flex-1">{r.blurb}</p>
-                {/* How close you are, not just that you are not there.
-                    "Need 15 more" on a dead grey button says the door is shut;
-                    the bar says how far along you already are, from numbers the
-                    page is holding anyway. */}
-                {!afford && (
-                  <div className="mt-4" aria-hidden="true">
-                    <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
-                      <div className="h-full rounded-full bg-gradient-to-r from-amber-500 to-amber-300
-                        transition-[width] duration-500"
-                        style={{ width: `${Math.min(100, Math.round((data.balance / r.cost) * 100))}%` }} />
+              <div key={r.id}
+                className={`relative rounded-2xl border p-5 flex flex-col transition
+                  ${afford
+                    ? 'border-amber-400/30 bg-gradient-to-b from-amber-400/[0.07] to-transparent hover:border-amber-400/50'
+                    : 'border-white/10 bg-elevated/40 hover:border-white/20'}`}>
+                {best && (
+                  <span className="absolute -top-2.5 right-4 rounded-full bg-amber-400/15
+                    border border-amber-400/35 px-2 py-0.5 text-[10.5px] font-bold uppercase
+                    tracking-wider text-amber-300">
+                    Best value
+                  </span>
+                )}
+
+                <div className="flex items-center gap-3 mb-3">
+                  <span className={`w-11 h-11 rounded-xl grid place-items-center shrink-0 transition
+                    ${afford
+                      ? 'bg-amber-400/15 text-amber-300 ring-1 ring-amber-400/30'
+                      : 'bg-white/5 text-slate-500 ring-1 ring-white/10'}`}>
+                    <Icon size={19} />
+                  </span>
+                  <div className="min-w-0">
+                    <div className="font-semibold text-white leading-tight">{r.label}</div>
+                    <div className="inline-flex items-center gap-1 text-amber-300/90 text-[13px]
+                      font-bold tabular-nums mt-0.5">
+                      <Coins size={13} /> {r.cost}
                     </div>
                   </div>
-                )}
-                <div className="flex items-center justify-between gap-3 mt-4">
-                  <span className="inline-flex items-center gap-1.5 text-amber-300 font-bold tabular-nums">
-                    <Coins size={15} /> {r.cost}
-                  </span>
-                  <button onClick={() => redeem(r)} disabled={!afford || busy === r.id}
-                    className={`text-sm font-semibold rounded-xl px-4 py-2 transition whitespace-nowrap
-                      ${afford ? 'btn-primary' : 'bg-white/5 text-slate-500 cursor-not-allowed'}`}>
-                    {busy === r.id ? '…' : afford ? 'Redeem' : `${r.cost - data.balance} to go`}
-                  </button>
+                </div>
+
+                <p className="text-slate-400 text-[13px] leading-relaxed flex-1">{r.blurb}</p>
+
+                {/* How close you are, and what closing the gap actually takes.
+                    "Need 15 more" on a dead grey button says the door is shut;
+                    this says how far along you are and what it costs to finish,
+                    both from numbers the page is already holding. */}
+                <div className="mt-4">
+                  {afford ? (
+                    <button onClick={() => redeem(r)} disabled={busy === r.id}
+                      className="btn-primary w-full text-sm font-semibold rounded-xl py-2.5">
+                      {busy === r.id ? '…' : 'Redeem'}
+                    </button>
+                  ) : (
+                    <>
+                      <div className="flex items-baseline justify-between text-[11.5px] mb-1.5">
+                        <span className="text-slate-500 tabular-nums">{pct}%</span>
+                        <span className="text-slate-500">
+                          ≈ {money(Math.round(away * 100))} more spent
+                        </span>
+                      </div>
+                      <div className="h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
+                        <div className="h-full rounded-full bg-gradient-to-r from-amber-500 to-amber-300
+                          transition-[width] duration-700"
+                          style={{ width: `${pct}%` }} />
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
             );
@@ -124,28 +212,61 @@ export default function ForgeShop() {
       </div>
 
       {/* History */}
-      <div className="card p-5">
-        <h3 className="text-white font-semibold mb-3 flex items-center gap-2"><History size={16} className="text-slate-400" /> History</h3>
+      <div className="rounded-2xl border border-white/10 bg-elevated/40 p-5">
+        <div className="flex items-baseline justify-between gap-4 mb-3">
+          <h3 className="text-white font-semibold flex items-center gap-2">
+            <History size={16} className="text-slate-400" /> History
+          </h3>
+          {data.history?.length > 0 && (
+            <span className="text-[12px] text-slate-500">last {data.history.length}</span>
+          )}
+        </div>
+
         {(!data.history || data.history.length === 0) ? (
-          <p className="text-slate-500 text-sm">No coins yet — place an order to start earning.</p>
+          /* An empty ledger is not an error, and it is the state most members
+             are in. It gets the one sentence that explains how to leave it,
+             with the rate from the payload rather than typed in again. */
+          <div className="flex items-start gap-3 rounded-xl bg-space-black/40 px-4 py-4">
+            <span className="w-9 h-9 rounded-lg bg-white/5 text-slate-500 grid place-items-center shrink-0">
+              <Coins size={17} />
+            </span>
+            <div>
+              <div className="text-slate-300 text-sm font-medium">No coins yet</div>
+              <p className="text-slate-500 text-[13px] mt-0.5">
+                They arrive on their own — one for every {money(data.perCoinCents ?? 1000)} of a
+                paid order. Nothing to sign up for.
+              </p>
+            </div>
+          </div>
         ) : (
           <div className="divide-y divide-white/5">
             {data.history.map((h, i) => {
               const code = h.reason === 'redeem' && /^FORGE[A-Z0-9]+$/.test(h.ref || '') ? h.ref : null;
+              const up = h.delta > 0;
               return (
-                <div key={i} className="flex items-center justify-between gap-3 py-2.5 text-sm">
-                  <div className="min-w-0">
-                    <div className="text-slate-200">{REASON[h.reason] || h.reason}</div>
-                    <div className="text-slate-500 text-xs">{date(h.createdAt)}</div>
+                <div key={i} className="flex items-center justify-between gap-3 py-3 text-sm">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className={`w-8 h-8 rounded-lg grid place-items-center shrink-0
+                      ${up ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}`}>
+                      {up ? <Coins size={15} /> : <Ticket size={15} />}
+                    </span>
+                    <div className="min-w-0">
+                      <div className="text-slate-200 truncate">{REASON[h.reason] || h.reason}</div>
+                      <div className="text-slate-500 text-xs">{dateShort(h.createdAt)}</div>
+                    </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     {code && (
                       <button onClick={() => copy(code)}
-                        className="inline-flex items-center gap-1.5 font-mono text-xs text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-lg px-2 py-1 hover:bg-amber-500/20 transition">
+                        className="inline-flex items-center gap-1.5 font-mono text-xs text-amber-300
+                          bg-amber-500/10 border border-amber-500/30 rounded-lg px-2 py-1
+                          hover:bg-amber-500/20 transition">
                         {code} {copied === code ? <Check size={12} /> : <Copy size={12} />}
                       </button>
                     )}
-                    <span className={`font-bold ${h.delta > 0 ? 'text-emerald-400' : 'text-slate-400'}`}>{h.delta > 0 ? '+' : ''}{h.delta}</span>
+                    <span className={`font-bold tabular-nums ${up ? 'text-emerald-400' : 'text-slate-400'}`}>
+                      {up ? '+' : ''}{h.delta}
+                    </span>
                   </div>
                 </div>
               );
@@ -154,7 +275,10 @@ export default function ForgeShop() {
         )}
       </div>
 
-      <p className="text-slate-500 text-xs">Redeemed a discount code? It stays in your <b className="text-slate-400">History</b> above — copy it any time and use it at checkout. Codes are single-use.</p>
+      <p className="text-slate-500 text-xs">
+        Redeemed a discount code? It stays in your <b className="text-slate-400">History</b> above —
+        copy it any time and use it at checkout. Codes are single-use.
+      </p>
     </div>
   );
 }
