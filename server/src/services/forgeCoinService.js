@@ -68,6 +68,23 @@ async function lockUser(userId) {
 }
 
 /** Recent ledger entries for the account page. */
+/**
+ * Lifetime earned and spent, as two sums.
+ *
+ * NOT derivable from coinHistory: that returns the most recent twenty rows, so
+ * adding them up gives a total that is right for a new member and quietly wrong
+ * for everyone else — and wrong in the flattering direction, because the oldest
+ * rows drop off first. Two SUMs over the whole ledger instead.
+ */
+export async function coinTotals(userId) {
+  if (!userId) return { earned: 0, spent: 0 };
+  const r = await get(
+    `SELECT COALESCE(SUM(delta) FILTER (WHERE delta > 0), 0) AS earned,
+            COALESCE(SUM(-delta) FILTER (WHERE delta < 0), 0) AS spent
+       FROM forge_coin_ledger WHERE user_id = @u`, { u: userId });
+  return { earned: Number(r?.earned || 0), spent: Number(r?.spent || 0) };
+}
+
 export function coinHistory(userId, limit = 20) {
   return all(
     `SELECT delta, reason, ref, created_at AS "createdAt" FROM forge_coin_ledger
