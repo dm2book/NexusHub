@@ -61,7 +61,12 @@ export default function AccountLayout() {
   return (
     <div className="min-h-screen flex">
       {/* Desktop sidebar */}
-      <aside className="w-64 shrink-0 border-r border-white/5 bg-elevated/50 hidden md:flex flex-col">
+      {/* Pinned and one viewport tall — see AdminLayout for what a stretched
+          flex child does to a sidebar on a long page. The account pages are
+          shorter today, which is exactly why this would have gone unnoticed
+          until one of them grew. */}
+      <aside className="w-64 shrink-0 border-r border-white/5 bg-elevated/50
+        hidden md:flex flex-col sticky top-0 self-start h-screen">
         <Sidebar />
       </aside>
 
@@ -77,7 +82,8 @@ export default function AccountLayout() {
 
       <div className="flex-1 min-w-0 relative">
         <div className="orb w-96 h-96 bg-primary/10 -top-40 right-0 pointer-events-none" />
-        <header className="relative h-16 border-b border-white/5 flex items-center justify-between px-4 sm:px-6 backdrop-blur-sm">
+        <header className="sticky top-0 z-30 h-16 border-b border-white/5 flex items-center
+          justify-between px-4 sm:px-6 bg-space-black/95 backdrop-blur-md">
           <div className="flex items-center gap-2">
             <button onClick={() => setOpen(true)} className="md:hidden p-2 -ml-2 rounded-lg text-slate-200 hover:bg-white/5">
               <Menu size={20} />
