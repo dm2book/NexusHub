@@ -173,9 +173,104 @@ export async function redeemReward(userId, rewardId) {
       }, userId);
       return { reward, couponCode: code };
     }
-    // Non-coupon rewards (e.g. giveaway boost) are fulfilled by staff in Discord.
+    /* A boost becomes a ROW, not a promise.
+       It used to debit the coins and return — nothing was written, no staff
+       member was told, and the giveaway keeps its entrants in a Set, so the
+       extra entry could not have been honoured even by hand. The coins bought
+       nothing. */
+    if (reward.kind === 'boost') {
+      const boostRef = newId('gbst');
+      await run(
+        `INSERT INTO giveaway_boosts (id, user_id, source_ref, created_at)
+         VALUES (@id, @u, @ref, @at)`,
+        { id: boostRef, u: userId, ref: reward.id, at: nowIso() });
+      return { reward, boostId: boostRef };
+    }
     return { reward };
   });
+}
+
+/** Unconsumed boosts a member is holding. */
+export async function openBoosts(userId) {
+  if (!userId) return 0;
+  const r = await get(
+    `SELECT COUNT(*) AS n FROM giveaway_boosts WHERE user_id=@u AND consumed_at IS NULL`,
+    { u: userId });
+  return Number(r?.n || 0);
+}
+
+/**
+ * Claim boosts for a draw — atomically, and once.
+ *
+ * Takes the entrants of one giveaway and consumes at most one boost each,
+ * stamped with that giveaway's id. The stamp is what makes a retry safe: a bot
+ * that reconnects mid-draw and asks again gets the boosts it already claimed
+ * for THAT giveaway rather than eating a second one, so nobody ends up with two
+ * extra entries for one purchase.
+ */
+export async function claimBoosts(userIds = [], giveawayRef) {
+  if (!giveawayRef || !userIds.length) return {};
+  return tx(async () => {
+    const out = {};
+    for (const userId of [...new Set(userIds)]) {
+      const already = await all(
+        `SELECT id FROM giveaway_boosts WHERE user_id=@u AND consumed_ref=@ref`,
+        { u: userId, ref: giveawayRef });
+      if (already.length) { out[userId] = already.length; continue; }
+      const open = await get(
+        `SELECT id FROM giveaway_boosts
+          WHERE user_id=@u AND consumed_at IS NULL
+          ORDER BY created_at ASC LIMIT 1`, { u: userId });
+      if (!open) continue;
+      await run(
+        `UPDATE giveaway_boosts SET consumed_at=@at, consumed_ref=@ref WHERE id=@id`,
+        { at: nowIso(), ref: giveawayRef, id: open.id });
+      out[userId] = 1;
+    }
+    return out;
+  });
+}
+
+/**
+ * Where a member stands, computed once.
+ *
+ * The account page worked this out in the browser — the next reward, how far
+ * off it is, which reward is the best value per coin — and `/balance` in
+ * Discord showed a bare number. Two surfaces answering the same question, one
+ * of them not answering it, and the arithmetic living in a React component
+ * where the bot could not reach it.
+ *
+ * Here, so both read the same answer and neither can drift from the other.
+ */
+export async function coinProgress(userId) {
+  const [balance, shop, totals, boosts] = await Promise.all([
+    coinBalance(userId), forgeShopCatalog(), coinTotals(userId), openBoosts(userId),
+  ]);
+  const sorted = [...shop].sort((a, b) => a.cost - b.cost);
+  const next = sorted.find((r) => r.cost > balance) || null;
+
+  /* Which reward gives the most discount per coin. The €25 card's blurb says
+     "best value" in prose; this works it out, so the claim cannot outlive the
+     numbers — and it moves on its own when the owner adds an item. A boost has
+     no euro value and is left OUT rather than scored zero, which would make it
+     the worst by arithmetic on a quantity it does not have. */
+  const priced = sorted.filter((r) => r.kind === 'coupon' && r.value > 0 && r.cost > 0);
+  const bestValueId = priced.length > 1
+    ? priced.reduce((a, b) => (b.value / b.cost > a.value / a.cost ? b : a)).id
+    : null;
+
+  return {
+    balance, shop: sorted, totals, boosts,
+    perCoinCents: COINS_PER_EURO_CENTS,
+    bestValueId,
+    next: next ? {
+      id: next.id, label: next.label, cost: next.cost,
+      coinsAway: next.cost - balance,
+      /* The same distance in the currency a shopper thinks in. "46 to go" is a
+         number nobody can act on; €460 of spending is. */
+      spendAwayCents: (next.cost - balance) * COINS_PER_EURO_CENTS,
+    } : null,
+  };
 }
 
 // ── Admin: manage custom Forge Shop items ────────────────────────────────────

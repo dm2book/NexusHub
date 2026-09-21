@@ -1782,4 +1782,44 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS lang TEXT;
         ON webhook_events (order_id, received_at DESC);
     `,
   },
+  {
+    id: '045_giveaway_boosts',
+    /*
+     * A reward the shop sold and nothing could deliver.
+     *
+     * The Forge Shop sells a "Giveaway boost" for 8 coins — "+1 bonus entry in
+     * this week's giveaway (claim in Discord)". Redeeming it debited the coins,
+     * wrote a ledger row, and returned. Nothing else happened anywhere:
+     *
+     *   · there is no command in Discord to claim it;
+     *   · no staff member is told it was bought;
+     *   · and the giveaway keeps its entrants in a Set of user ids, so ONE
+     *       extra entry is not representable — not by the bot, and not by a
+     *       human trying to honour it by hand.
+     *
+     * So the coins bought nothing at all. This is the row that makes the boost
+     * a thing that exists: unconsumed until a draw uses it, and consumed
+     * against a specific giveaway so one boost is one extra entry in one draw
+     * rather than a permanent advantage.
+     *
+     * `consumed_ref` is the giveaway's message id, and the partial unique index
+     * is what makes a retried draw safe: claiming the same boost for the same
+     * giveaway twice cannot insert twice, so a bot that reconnects mid-draw
+     * does not hand somebody two entries for one boost.
+     */
+    sql: `
+      CREATE TABLE IF NOT EXISTS giveaway_boosts (
+        id           TEXT PRIMARY KEY,
+        user_id      TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        source_ref   TEXT,                    -- the ledger row that paid for it
+        consumed_at  TEXT,
+        consumed_ref TEXT,                    -- the giveaway it was spent on
+        created_at   TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_giveaway_boosts_open
+        ON giveaway_boosts (user_id) WHERE consumed_at IS NULL;
+      CREATE INDEX IF NOT EXISTS idx_giveaway_boosts_ref
+        ON giveaway_boosts (consumed_ref);
+    `,
+  },
 ];
