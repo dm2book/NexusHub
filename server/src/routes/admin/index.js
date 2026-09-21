@@ -15,6 +15,7 @@ import social from './social.js';
 import monetization from './monetization.js';
 import categories from './categories.js';
 import market from './market.js';
+import daily from './daily.js';
 import money from './money.js';
 import { asyncHandler } from '../../middleware/error.js';
 import { launchChecks } from '../../services/launchCheckService.js';
@@ -104,6 +105,7 @@ router.use('/social', social);
 router.use('/monetization', monetization);
 router.use('/categories', categories);
 router.use('/market', market);
+router.use('/daily', daily);
 router.use('/money', money);
 
 export default router;

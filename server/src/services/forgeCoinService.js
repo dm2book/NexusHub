@@ -190,6 +190,24 @@ export async function redeemReward(userId, rewardId) {
   });
 }
 
+/**
+ * Give somebody a boost without charging for it.
+ *
+ * The paid path debits coins and then writes the row; a milestone has already
+ * been earned by other means, so it writes the row alone. Separate function
+ * rather than a flag on the paid one, because "charge them or do not" is
+ * exactly the sort of parameter that eventually gets passed the wrong way
+ * round by a caller that was not thinking about money.
+ */
+export async function redeemBoostFor(userId, sourceRef = 'granted') {
+  const id = newId('gbst');
+  await run(
+    `INSERT INTO giveaway_boosts (id, user_id, source_ref, created_at)
+     VALUES (@id, @u, @ref, @at)`,
+    { id, u: userId, ref: sourceRef, at: nowIso() });
+  return { boostId: id };
+}
+
 /** Unconsumed boosts a member is holding. */
 export async function openBoosts(userId) {
   if (!userId) return 0;

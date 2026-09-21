@@ -1822,4 +1822,76 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS lang TEXT;
         ON giveaway_boosts (consumed_ref);
     `,
   },
+  {
+    id: '046_daily_rewards',
+    /*
+     * Showing up, and being paid for it.
+     *
+     * ── WHY THE POINTS ARE NOT FORGE COINS ────────────────────────────────
+     * The obvious build is to pay the daily reward in the currency that already
+     * exists. It would ruin the shop. A Forge Coin is earned at one per €10 of
+     * spend and buys 33–38 cents of discount (15 coins → €5, 65 → €25), which
+     * forgeCoinService's own pricing note warns must not be loosened. Paying
+     * 10 / 20 / 30 coins for three logins hands over roughly €22 of discount for
+     * nothing — more than the margin on six orders — and a fortnight of
+     * clicking a button would out-earn a real customer.
+     *
+     * So streak points are their own thing: a score that shows up on a
+     * dashboard, and the real value sits in the MILESTONES, which are bounded
+     * by the calendar. Day 30 can be reached once every thirty days.
+     *
+     * ── ONE CLAIM PER DAY, ENFORCED BY THE INDEX ──────────────────────────
+     * UNIQUE (user_id, day) is the guarantee. A check-then-insert can be raced
+     * by two tabs and pay twice; a unique index cannot. The claim row is also
+     * the audit trail — what was paid, on what streak, from which address, and
+     * anything the fraud checks noticed.
+     *
+     * `day` is a calendar day in the SHOP's timezone, not a rolling 24 hours.
+     * A strict 24-hour window drifts later every day, so a member who claims at
+     * 20:00 and comes back at 19:00 the next evening loses their streak — it
+     * punishes exactly the habit the feature exists to build.
+     */
+    sql: `
+      CREATE TABLE IF NOT EXISTS daily_streaks (
+        user_id        TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+        current_streak INTEGER NOT NULL DEFAULT 0,
+        longest_streak INTEGER NOT NULL DEFAULT 0,
+        last_claim_day TEXT,
+        last_claim_at  TEXT,
+        total_points   BIGINT  NOT NULL DEFAULT 0,
+        total_claims   INTEGER NOT NULL DEFAULT 0,
+        created_at     TEXT NOT NULL,
+        updated_at     TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS daily_claims (
+        id           TEXT PRIMARY KEY,
+        user_id      TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        day          TEXT NOT NULL,
+        streak_day   INTEGER NOT NULL,
+        points       INTEGER NOT NULL DEFAULT 0,
+        milestone    TEXT,
+        reward_ref   TEXT,
+        ip           TEXT,
+        flags        TEXT NOT NULL DEFAULT '[]',
+        created_at   TEXT NOT NULL
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_daily_claims_once
+        ON daily_claims (user_id, day);
+      CREATE INDEX IF NOT EXISTS idx_daily_claims_day ON daily_claims (day DESC);
+      CREATE INDEX IF NOT EXISTS idx_daily_claims_ip ON daily_claims (ip, created_at DESC);
+
+      /* The curve, editable by the owner. A row per day that differs from the
+         default; days with no row fall through to the formula in the service,
+         so the table stays small and the owner only stores what they changed. */
+      CREATE TABLE IF NOT EXISTS daily_reward_rules (
+        day         INTEGER PRIMARY KEY,
+        points      INTEGER NOT NULL DEFAULT 0,
+        reward_kind TEXT,                     -- boost | coupon | null
+        reward_value INTEGER,                 -- cents for a coupon, count for a boost
+        label       TEXT,
+        updated_at  TEXT NOT NULL
+      );
+    `,
+  },
 ];

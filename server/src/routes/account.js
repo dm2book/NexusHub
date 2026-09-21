@@ -21,6 +21,7 @@ import { loyaltyFor } from '../services/loyaltyService.js';
 import { affiliateStats } from '../services/affiliateService.js';
 import { coinBalance, coinHistory, coinProgress, redeemReward, spendCoins }
   from '../services/forgeCoinService.js';
+import { dailyStatus, claimDaily } from '../services/dailyRewardService.js';
 import { pullsForOrder, rerollPull } from '../services/mysteryBoxService.js';
 import { getMembership, grantMembership, FORGE_PLUS, MEMBERSHIP_DAYS } from '../services/membershipService.js';
 import { saveCart, getCart } from '../services/cartService.js';
@@ -316,6 +317,27 @@ router.post('/orders/:id/mystery/:pullId/reroll', asyncHandler(async (req, res) 
   const result = await rerollPull(req.user.id, req.params.id, req.params.pullId);
   res.json({ ...result, pulls: await pullsForOrder(req.params.id) });
 }));
+
+// ── Daily login rewards ──────────────────────────────────────────────────────
+router.get('/daily', asyncHandler(async (req, res) => {
+  res.json(await dailyStatus(req.user.id));
+}));
+
+/**
+ * Claim today.
+ *
+ * Rate limited on top of the once-a-day rule, because the rule is enforced by a
+ * unique index and a member hammering the button would otherwise send a burst
+ * of writes that all fail — cheap for them, not for the database.
+ */
+router.post('/daily/claim',
+  rateLimit({ bucket: 'daily', windowMs: 60_000, max: 10 }),
+  asyncHandler(async (req, res) => {
+    const out = await claimDaily(req.user.id, {
+      ip: req.ip, actor: { id: req.user.id, email: req.user.email },
+    });
+    res.json(out);
+  }));
 
 // ── Forge Coins + Forge Shop ─────────────────────────────────────────────────
 router.get('/coins', asyncHandler(async (req, res) => {

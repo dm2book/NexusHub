@@ -4,6 +4,7 @@ import {
   ShoppingBag, Wallet, Gift, Bell, Clock, Cog, Truck, CheckCircle2, RotateCcw, ArrowRight,
 } from 'lucide-react';
 import { api } from '../../lib/api.js';
+import DailyRewardCard from '../../components/account/DailyRewardCard.jsx';
 import { money, dateShort } from '../../lib/format.js';
 import { StatusBadge, EmptyState, SkeletonStat, SkeletonRows, Skeleton } from '../../components/ui.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
@@ -37,6 +38,10 @@ export default function Dashboard() {
   const loyalty = data.loyalty;
   return (
     <div>
+      {/* The daily claim, above everything else: it is the reason a member
+          opens this page on a day they were not going to buy anything. */}
+      <DailyRewardCard />
+
       {/* Gradient welcome header with live loyalty tier + progress to the next */}
       <div className="fm-hero-brand relative overflow-hidden rounded-2xl p-6 mb-7 text-white shadow-lg shadow-violet-900/30"
         style={{ backgroundImage: 'linear-gradient(120deg,#4f46e5,#7c3aed 55%,#a21caf)' }}>
