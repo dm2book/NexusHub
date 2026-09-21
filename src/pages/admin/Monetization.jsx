@@ -1,18 +1,20 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
   Tag, Gift, Package, Plus, Trash2, Eye, EyeOff, Power, Copy, Percent, Euro,
-  BarChart3, TrendingDown, Wallet, CalendarDays, Coins,
+  BarChart3, TrendingDown, Wallet, CalendarDays, Coins, Flame,
 } from 'lucide-react';
 import { api } from '../../lib/api.js';
 import { money, date } from '../../lib/format.js';
 import { PageLoader } from '../../components/ui.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
+import DailyRewards from '../../components/admin/DailyRewards.jsx';
 
 const TABS = [
   { id: 'coupons', label: 'Coupons', icon: Tag },
   { id: 'giftcards', label: 'Gift cards', icon: Gift },
   { id: 'bundles', label: 'Bundles', icon: Package },
   { id: 'forgeShop', label: 'Forge Shop', icon: Coins },
+  { id: 'daily', label: 'Daily rewards', icon: Flame },
   { id: 'drops', label: 'Drops', icon: CalendarDays },
   { id: 'report', label: 'Report', icon: BarChart3 },
 ];
@@ -45,7 +47,7 @@ export default function Monetization() {
             className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm border transition ${
               tab === t.id ? 'bg-primary/20 border-primary/40 text-white' : 'border-white/10 text-slate-400 hover:text-white'}`}>
             <t.icon size={15} /> {t.label}
-            {t.id !== 'report' && t.id !== 'drops' && <span className="text-xs text-slate-500">{data[t.id === 'giftcards' ? 'giftCards' : t.id]?.length || 0}</span>}
+            {t.id !== 'report' && t.id !== 'drops' && t.id !== 'daily' && <span className="text-xs text-slate-500">{data[t.id === 'giftcards' ? 'giftCards' : t.id]?.length || 0}</span>}
           </button>
         ))}
       </div>
@@ -54,6 +56,7 @@ export default function Monetization() {
       {tab === 'giftcards' && <GiftCards cards={data.giftCards} toast={toast} call={call} busy={busy} />}
       {tab === 'bundles' && <Bundles bundles={data.bundles} products={products} toast={toast} call={call} busy={busy} />}
       {tab === 'forgeShop' && <ForgeShopItems items={data.forgeShop} toast={toast} call={call} busy={busy} />}
+      {tab === 'daily' && <DailyRewards toast={toast} />}
       {tab === 'drops' && <Drops toast={toast} />}
       {tab === 'report' && <Report toast={toast} />}
     </div>
