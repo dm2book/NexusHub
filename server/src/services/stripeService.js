@@ -146,6 +146,79 @@ export const WEBHOOK_EVENTS = [
   'charge.dispute.created',
 ];
 
+/**
+ * What Stripe says about the account behind the key.
+ *
+ * A live key is not the same as a live account. Stripe issues keys immediately
+ * and enables charges only once the onboarding form is finished, so a shop can
+ * be fully "configured" — key set, webhook set, iDEAL on — and have every
+ * checkout refused at Stripe's end. And `payouts_enabled` is the quieter one:
+ * charges succeed, the money sits in the Stripe balance, and nothing reaches
+ * the bank account, which looks like a working shop until somebody checks the
+ * bank.
+ *
+ * Null when the question cannot be asked. An unreachable API, a restricted key
+ * without account permission, or an outage is not evidence that anything is
+ * wrong.
+ */
+export async function accountStatus() {
+  const s = await stripe();
+  if (!s) return null;
+  try {
+    const a = await s.accounts.retrieve();
+    return {
+      id: a.id || null,
+      country: a.country || null,
+      chargesEnabled: a.charges_enabled !== false,
+      payoutsEnabled: a.payouts_enabled !== false,
+      currentlyDue: a.requirements?.currently_due || [],
+      disabledReason: a.requirements?.disabled_reason || null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Whether Stripe is actually pointed at this shop, and for the right events.
+ *
+ * The readiness check has always told the owner to create this endpoint; it
+ * never checked whether they did, or whether the one they created still points
+ * here. Both fail silently in the same direction — the buyer pays, Stripe takes
+ * the money, and no order is ever marked paid — and a leftover endpoint from a
+ * preview URL looks, in the Stripe dashboard, exactly like a correct one.
+ *
+ * Events matter individually: without `charge.refunded` a refund issued in
+ * Stripe never reaches the order, and without `charge.dispute.created` a
+ * chargeback arrives as a surprise on a bank statement.
+ */
+export function evaluateEndpoints(endpoints = [], appUrl = '') {
+  const expected = `${String(appUrl || '').replace(/\/+$/, '')}/api/payments/stripe/webhook`;
+  /* A disabled endpoint is listed in the dashboard looking much like a live
+     one, and delivers nothing. */
+  const live = endpoints.filter((e) => (e.status || 'enabled') !== 'disabled');
+  const match = live.find((e) => String(e.url || '').replace(/\/+$/, '') === expected) || null;
+  /* Stripe's "all events" wildcard covers everything, so it is not a gap. */
+  const missingEvents = match
+    ? ((match.events || []).includes('*')
+      ? [] : WEBHOOK_EVENTS.filter((x) => !(match.events || []).includes(x)))
+    : WEBHOOK_EVENTS.slice();
+  return { expected, endpoints, matching: match, missingEvents };
+}
+
+export async function webhookStatus(appUrl) {
+  const s = await stripe();
+  if (!s) return null;
+  try {
+    const list = await s.webhookEndpoints.list({ limit: 50 });
+    return evaluateEndpoints((list?.data || []).map((e) => ({
+      url: e.url, status: e.status || 'enabled', events: e.enabled_events || [],
+    })), appUrl);
+  } catch {
+    return null;
+  }
+}
+
 /** Verify a webhook payload (raw Buffer) and return the Stripe event. */
 export async function constructEvent(rawBody, signature) {
   const s = await stripe();

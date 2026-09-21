@@ -64,6 +64,72 @@ const withEnv = (env) => {
   try { return JSON.parse(line); } catch { return { status: '?', detail: r.stderr || line }; }
 };
 
+console.log('— Is Stripe actually pointed at this shop? —');
+{
+  /* Telling the owner to create the endpoint was never the same as checking
+     that they did. Both of these fail in the direction that costs money and
+     looks healthy: the buyer pays, Stripe keeps the money, no order is marked
+     paid, and the shop notices nothing. */
+  const { evaluateEndpoints, WEBHOOK_EVENTS: EVENTS } =
+    await import('../src/services/stripeService.js');
+  const APP = 'https://www.forgemarket.nl';
+  const all = (url, status = 'enabled') => ({ url, status, events: EVENTS.slice() });
+
+  const none = evaluateEndpoints([], APP);
+  ok('no endpoint at all is every event missing', none.matching === null
+    && none.missingEvents.length === EVENTS.length);
+  ok('…and it names the URL Stripe should be sending to',
+    none.expected === `${APP}/api/payments/stripe/webhook`, none.expected);
+
+  const good = evaluateEndpoints([all(`${APP}/api/payments/stripe/webhook`)], APP);
+  ok('a complete endpoint is clean', !!good.matching && good.missingEvents.length === 0,
+    JSON.stringify(good.missingEvents));
+
+  /* A leftover endpoint from a preview deployment looks identical in the
+     dashboard and delivers to a URL that is not this shop. */
+  const stale = evaluateEndpoints([all('https://forgemarket-git-main-x.vercel.app/api/payments/stripe/webhook')], APP);
+  ok('an endpoint pointing somewhere else does not count', stale.matching === null);
+
+  /* And a disabled one delivers nothing while still being listed. */
+  const off = evaluateEndpoints([all(`${APP}/api/payments/stripe/webhook`, 'disabled')], APP);
+  ok('a disabled endpoint does not count either', off.matching === null);
+
+  /* Trailing slashes are a configuration detail, not a different shop. */
+  const slashed = evaluateEndpoints([all(`${APP}/api/payments/stripe/webhook/`)], 'https://www.forgemarket.nl/');
+  ok('a trailing slash is not a different endpoint', !!slashed.matching);
+
+  const partial = evaluateEndpoints([{
+    url: `${APP}/api/payments/stripe/webhook`, status: 'enabled',
+    events: ['checkout.session.completed'],
+  }], APP);
+  ok('a partly-subscribed endpoint reports exactly what is missing',
+    partial.missingEvents.includes('charge.refunded')
+    && partial.missingEvents.includes('charge.dispute.created')
+    && !partial.missingEvents.includes('checkout.session.completed'),
+    JSON.stringify(partial.missingEvents));
+
+  const wild = evaluateEndpoints([{
+    url: `${APP}/api/payments/stripe/webhook`, status: 'enabled', events: ['*'],
+  }], APP);
+  ok('…and Stripe\u2019s all-events wildcard is not a gap', wild.missingEvents.length === 0);
+
+  /* The consequences are spelled out where the owner reads them, per event. */
+  ok('the check says what a missing refund event costs',
+    /charge\.refunded[\s\S]{0,120}never reaches the order/.test(checks), '');
+  ok('…and what a missing dispute event costs',
+    /charge\.dispute\.created[\s\S]{0,140}surprise on your bank statement/.test(checks), '');
+  /* A key is not an activated account: Stripe issues keys before onboarding is
+     finished, and charges are refused until it is. */
+  ok('the account check exists and names charges',
+    /stripe_account[\s\S]{0,400}will not accept payments/.test(checks), '');
+  ok('…and payouts, which fail more quietly',
+    /never reach your bank account/.test(checks), '');
+  /* Unreachable is not evidence. */
+  ok('an unanswerable question is a warning, not a failure',
+    /Could not ask Stripe about the account/.test(checks)
+    && /Could not read the webhook endpoints/.test(checks), '');
+}
+
 console.log('— The one that takes the money and delivers nothing —');
 {
   /* The webhook fails CLOSED, which is right: an unverified payment

@@ -107,9 +107,17 @@ export function ensureReady() {
          laptop that is a rounding error; from a function in Frankfurt to a
          database in Virginia it is a whole extra round trip on the first request
          after every cold start, to learn two unrelated facts. */
+      /* The seller identity joins them rather than following them. It is one
+         small row, and everything that states who is selling — the invoice, the
+         VAT sentence in the terms, /api/config, the launch check — reads the
+         object it fills. Deferring it to background upkeep would mean the first
+         request after every cold start answers with the build's values and the
+         second with the owner's. */
       const [seeded, products] = await Promise.all([
         isSeeded(),
         get('SELECT COUNT(*) AS n FROM products WHERE active = 1').catch(() => ({ n: 1 })),
+        import('./services/sellerIdentityService.js')
+          .then((m) => m.applyStoredIdentity()).catch(() => {}),
       ]);
       if (!seeded) await (await import('./db/seed.js')).seed(); // empty DB needs roles/permissions/templates first
       // Zero-config: an empty shop must have products before we serve it, else

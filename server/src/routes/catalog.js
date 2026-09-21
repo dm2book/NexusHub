@@ -32,6 +32,7 @@ import { publicStats } from '../services/publicStatsService.js';
 import { recordPageView } from '../services/trackingService.js';
 import { recordVisit, recordEvent, attachOrder, adoptVisit } from '../services/attributionService.js';
 import { getCategoryLogos } from '../services/settingsService.js';
+import { sellerLegalBlock } from '../services/sellerIdentityService.js';
 import { addReview, listReviews, addVerifiedReview } from '../services/reviewsService.js';
 import { verifyIngest, canonicalReview } from '../middleware/ingestSignature.js';
 import { audit } from '../services/auditService.js';
@@ -295,6 +296,10 @@ router.get('/config', asyncHandler(async (_req, res) => {
     announcement: config.shop.announcement,  // optional promo bar text
     trustpilotUrl: config.shop.trustpilotUrl,  // '' when the shop has no profile yet
     trustpilotReviewUrl: config.shop.trustpilotReviewUrl,  // the form, for surfaces that ask
+    /* Who is selling. Public by law — it is the block the legal pages have to
+       show before somebody buys — and served here because it is now editable in
+       the admin: a value typed on the 15th has to appear without a rebuild. */
+    legal: await sellerLegalBlock().catch(() => null),
     oauthProviders: listEnabledProviders(),
     discordEnabled: !!config.discord.inviteUrl || !!config.discord.guildId,
     brand: config.email.fromName,

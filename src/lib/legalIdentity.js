@@ -54,6 +54,28 @@ export const LEGAL = {
   vat: pick(viteEnv.VITE_LEGAL_VAT, 'VITE_LEGAL_VAT'),
 };
 
+/**
+ * Take the values the server holds.
+ *
+ * The environment half above is what this BUILD was made with; the owner can
+ * now type the same fields into the admin, and the server sends them with
+ * /api/config on every page load. This merges those over the built-in ones, in
+ * place, because LEGAL is the single object that the legal pages, the SEO
+ * metadata, the refund page and the terms' VAT sentence all read — handing
+ * each of them a second source is how an invoice and a terms page end up
+ * naming different sellers.
+ *
+ * Only non-empty strings are taken: an absent field means "the server has
+ * nothing to say about this", not "blank it".
+ */
+export function applyLegal(patch) {
+  if (!patch || typeof patch !== 'object') return LEGAL;
+  for (const [k, v] of Object.entries(patch)) {
+    if (k in LEGAL && typeof v === 'string' && v.trim()) LEGAL[k] = v.trim();
+  }
+  return LEGAL;
+}
+
 /** The environment variables that fill the block above, for the launch check. */
 export const LEGAL_ENV = {
   legalName: 'VITE_LEGAL_NAME',
