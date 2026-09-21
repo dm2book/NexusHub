@@ -13,6 +13,7 @@ import { isEnabled as mollieEnabled, isTestKey as mollieTestKey, SUPPORTED_METHO
 import {
   isEnabled as stripeEnabled, isTestKey as stripeTestKey,
   hasWebhookSecret as stripeWebhook, enabledMethods as stripeMethods, WEBHOOK_EVENTS,
+  accountStatus as stripeAccount, webhookStatus as stripeWebhookStatus,
 } from './stripeService.js';
 // The only place the server reaches into the SPA tree. legalIdentity.js is a
 // dependency-free constants module that both sides must agree on: the storefront
@@ -20,6 +21,7 @@ import {
 // is still empty. Duplicating it would guarantee the two drift apart.
 import { LEGAL, legalComplete, LEGAL_ENV } from '../../../src/lib/legalIdentity.js';
 import { artStatus } from '../../../src/lib/shippedArt.js';
+import { sellerIdentity } from './sellerIdentityService.js';
 import { auditCatalog } from './catalogAuditService.js';
 import { appUrlVerdict } from './servedHostService.js';
 
@@ -74,6 +76,69 @@ export async function launchChecks() {
             ? `Stripe live — ${methods.join(', ')}${manual.length ? ` (manual fallback: ${manual.map((m) => m.label).join(', ')})` : ''}`
             : 'Stripe live. Could not read which payment methods are enabled — check '
               + 'dashboard.stripe.com → Settings → Payment methods shows iDEAL for a Dutch shop.');
+    }
+    /* Two things a key being present says nothing about, both of which fail
+       with the shop looking perfectly healthy. Asked of Stripe, in parallel,
+       and only when Stripe is the provider. */
+    const [account, hook] = await Promise.all([
+      stripeAccount().catch(() => null),
+      stripeWebhookStatus(config.appUrl).catch(() => null),
+    ]);
+
+    if (!account) {
+      add('stripe_account', 'Stripe account', 'warn',
+        'Could not ask Stripe about the account behind this key. If the key is a restricted '
+        + 'one, give it read access to the account; otherwise check dashboard.stripe.com '
+        + 'shows your account activated.');
+    } else if (!account.chargesEnabled) {
+      /* The one that takes a shop down on its opening day: keys work, checkout
+         builds a session, Stripe refuses the payment. */
+      add('stripe_account', 'Stripe account', 'fail',
+        `Stripe will not accept payments on this account yet${
+          account.disabledReason ? ` (${account.disabledReason})` : ''}. Every checkout will be `
+        + 'refused at Stripe. Finish the account form at dashboard.stripe.com'
+        + `${account.currentlyDue.length ? ` — still needed: ${account.currentlyDue.join(', ')}` : ''}.`);
+    } else if (!account.payoutsEnabled) {
+      /* Quieter and just as real: sales work, the bank stays empty. */
+      add('stripe_account', 'Stripe account', 'warn',
+        'Charges work, but payouts are not enabled — money will collect in your Stripe '
+        + 'balance and never reach your bank account. Add your bank details and finish '
+        + `verification${account.currentlyDue.length ? `: ${account.currentlyDue.join(', ')}` : ''}.`);
+    } else {
+      add('stripe_account', 'Stripe account', 'ok',
+        `Charges and payouts enabled${account.country ? ` (${account.country})` : ''}${
+          account.id ? ` · ${account.id}` : ''}.`);
+    }
+
+    if (!hook) {
+      add('stripe_hook', 'Stripe webhook endpoint', 'warn',
+        'Could not read the webhook endpoints from Stripe, so whether it is pointed at this '
+        + 'shop is unverified. Check dashboard.stripe.com → Developers → Webhooks lists '
+        + `${config.appUrl}/api/payments/stripe/webhook.`);
+    } else if (!hook.matching) {
+      add('stripe_hook', 'Stripe webhook endpoint', 'fail',
+        `Stripe has no enabled webhook pointing at ${hook.expected}. Buyers can pay and the `
+        + 'money arrives — no order is ever marked paid, because nothing tells the shop. '
+        + (hook.endpoints.length
+          ? `Stripe is currently sending to: ${hook.endpoints.map((e) => e.url).join(', ')}.`
+          : 'Stripe has no webhook endpoints at all.'));
+    } else if (hook.missingEvents.length) {
+      /* Named one by one, because each absence has its own consequence. */
+      add('stripe_hook', 'Stripe webhook endpoint', 'fail',
+        `The webhook at ${hook.expected} is not subscribed to ${hook.missingEvents.join(', ')}. `
+        + (hook.missingEvents.includes('checkout.session.completed')
+          ? 'Without checkout.session.completed no order is ever marked paid. '
+          : '')
+        + (hook.missingEvents.includes('charge.refunded')
+          ? 'Without charge.refunded a refund issued in Stripe never reaches the order. '
+          : '')
+        + (hook.missingEvents.includes('charge.dispute.created')
+          ? 'Without charge.dispute.created a chargeback arrives as a surprise on your bank statement. '
+          : '')
+        + 'Add them to the endpoint in Stripe → Developers → Webhooks.');
+    } else {
+      add('stripe_hook', 'Stripe webhook endpoint', 'ok',
+        `Stripe is sending ${WEBHOOK_EVENTS.length} events to ${hook.expected}.`);
     }
   } else if (mollieEnabled()) {
     // A test_ key is the expensive one. Checkout works, Mollie's sandbox marks
@@ -284,12 +349,21 @@ export async function launchChecks() {
   // placeholder, so the site is never wrong — but "not wrong" is not "compliant",
   // and nothing else on the site tells the owner this is still missing. Nobody
   // can fill it in for them: it is their own name and address.
-  if (legalComplete()) {
-    add('identity', 'Seller identity', LEGAL.kvk ? 'ok' : 'warn',
-      LEGAL.kvk
-        ? `${LEGAL.legalName} — KvK ${LEGAL.kvk}${LEGAL.vat ? `, BTW ${LEGAL.vat}` : ''}`
-        : `${LEGAL.legalName} — no KvK number yet. Fine while you are not a registered `
-          + 'business; set VITE_LEGAL_KVK (and VITE_LEGAL_VAT) after registering, then redeploy.');
+  /* The stored values, not only the build's. The owner can type these into
+     Admin → Analytics → Seller identity, and a check that reads environment
+     variables alone would keep failing a shop that filled them in ten minutes
+     ago — which is exactly the moment somebody would stop trusting this panel. */
+  const identity = await sellerIdentity().catch(() => null);
+  const seller = identity?.values || LEGAL;
+  const sellerComplete = identity ? identity.complete : legalComplete();
+
+  if (sellerComplete) {
+    add('identity', 'Seller identity', seller.kvk ? 'ok' : 'warn',
+      seller.kvk
+        ? `${seller.legalName} — KvK ${seller.kvk}${seller.vat ? `, BTW ${seller.vat}` : ''}`
+        : `${seller.legalName} — no KvK number yet. Fine while you are not a registered `
+          + 'business; fill it in under Analytics → Seller identity after registering '
+          + '(it is live immediately, no deploy).');
   } else {
     /* The variables are named, not just the file.
        This said "empty in src/lib/legalIdentity.js", which put a developer, a
@@ -297,14 +371,15 @@ export async function launchChecks() {
        on the one piece of information the law requires before a consumer may
        buy. They are environment variables now, so the answer to "what do I do
        with the KvK paperwork" is four values and a redeploy. */
-    const missing = Object.entries(LEGAL_ENV)
-      .filter(([field]) => ['legalName', 'address', 'postcode', 'city'].includes(field)
-        && !LEGAL[field])
-      .map(([, envName]) => envName);
+    const missing = (identity?.missingLabels || Object.keys(LEGAL_ENV)
+      .filter((field) => ['legalName', 'address', 'postcode', 'city'].includes(field)
+        && !LEGAL[field]));
     add('identity', 'Seller identity', 'fail',
       'The legal pages cannot say who is selling. Dutch law requires a name and a '
-      + 'geographic address before a consumer buys. Set '
-      + `${missing.join(', ')} in your hosting environment and redeploy.`);
+      + 'geographic address before a consumer buys. Fill in '
+      + `${missing.join(', ')} under Analytics → Seller identity — it takes effect `
+      + `immediately. (${Object.values(LEGAL_ENV).join(', ')} still work as a fallback `
+      + 'for a build.)');
   }
 
   /* 7b. The compliance audit, folded into the same dashboard.

@@ -19,6 +19,8 @@ import daily from './daily.js';
 import money from './money.js';
 import { asyncHandler } from '../../middleware/error.js';
 import { launchChecks } from '../../services/launchCheckService.js';
+import { sellerIdentity, setSellerIdentity, FIELDS }
+  from '../../services/sellerIdentityService.js';
 import { launchPlan } from '../../services/launchPlanService.js';
 import { launchCenter } from '../../services/launchCenterService.js';
 import { listAll as listAllDrops, createDrop, deleteDrop } from '../../services/dropService.js';
@@ -32,6 +34,26 @@ router.use(requireAuth, requireStaff);
 router.get('/launch-check', asyncHandler(async (_req, res) => {
   res.json(await launchChecks());
 }));
+
+/**
+ * Who is selling.
+ *
+ * Read is open to staff, like the rest of this router; writing is behind
+ * settings-level permission, because this is the block that appears on every
+ * invoice and in the terms a customer agreed to. The service audits both sides
+ * of the change.
+ */
+router.get('/legal-identity', asyncHandler(async (_req, res) => {
+  res.json(await sellerIdentity());
+}));
+
+router.put('/legal-identity', requirePermission('analytics.write'),
+  asyncHandler(async (req, res) => {
+    const body = z.object(Object.fromEntries(
+      Object.keys(FIELDS).map((k) => [k, z.string().max(200).nullish()]),
+    )).parse(req.body || {});
+    res.json(await setSellerIdentity(body, { actor: req.user }));
+  }));
 
 /**
  * The launch plan: what has to be true today, and what has to be true on the day.

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { TrendingUp, ShoppingCart, Percent, Users, Trophy, Rocket, CheckCircle2, AlertTriangle, XCircle, ChevronDown, MailCheck, Megaphone, EyeOff, Lock } from 'lucide-react';
 import { api } from '../../lib/api.js';
+import SellerIdentityCard from '../../components/admin/SellerIdentityCard.jsx';
 import AdPerformance from '../../components/admin/AdPerformance.jsx';
 import { money } from '../../lib/format.js';
 import { PageLoader } from '../../components/ui.jsx';
@@ -164,6 +165,10 @@ export default function Analytics() {
 
       <LaunchPhase />
       <LaunchChecklist />
+      {/* Directly under the check that fails without it: the panel above says
+          "the legal pages cannot say who is selling", and this is where that
+          gets fixed — without a deploy. */}
+      <SellerIdentityCard />
 
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
         {kpis.map(({ icon: Icon, label, value, sub }) => (

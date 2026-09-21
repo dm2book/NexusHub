@@ -2,6 +2,7 @@ import InfoShell from './InfoShell.jsx';
 import { useI18n } from '../lib/i18n.jsx';
 import { SUPPORT_EMAIL } from '../lib/support.js';
 import { LEGAL, legalComplete, legalAddressLine, vatStatement } from '../lib/legalIdentity.js';
+import { useConfig } from '../lib/useConfig.js';
 
 /**
  * Renders one legal document from src/content.
@@ -35,6 +36,11 @@ function RichText({ children }) {
  * worst possible place to do it.
  */
 function SellerIdentity({ nl }) {
+  /* The values are the admin's now, delivered with /api/config and merged into
+     LEGAL in place. Subscribing to the config is what makes this block render
+     again once they arrive — otherwise a shop that registered at the KvK this
+     morning would still be telling buyers it is a private individual. */
+  useConfig();
   if (!legalComplete()) {
     return (
       <div className="rounded-xl border border-amber-400/40 bg-amber-400/10 px-4 py-3.5 text-slate-300 text-[15px] leading-relaxed">

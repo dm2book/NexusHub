@@ -3,6 +3,7 @@ import { MapPin, Mail, MessageCircle, Building2 } from 'lucide-react';
 import { LEGAL, legalComplete, legalAddressLine } from '../../lib/legalIdentity.js';
 import { SUPPORT_EMAIL } from '../../lib/support.js';
 import { useI18n } from '../../lib/i18n.jsx';
+import { useConfig } from '../../lib/useConfig.js';
 
 /**
  * Who is selling, in one block, used wherever a buyer goes looking: the About
@@ -20,11 +21,15 @@ import { useI18n } from '../../lib/i18n.jsx';
  * Netherlands, not a registered company" reads as candour; a blank row or an
  * invented number reads as a scam.
  *
- * Fill the fields in src/lib/legalIdentity.js and this upgrades itself
- * everywhere at once — no other file needs touching.
+ * The values come from the admin (via /api/config) with the build's
+ * environment variables as the fallback, so registering at the KvK is a form
+ * the owner fills in, not a redeploy. useConfig is subscribed to for exactly
+ * that: LEGAL is updated in place when the config lands, and without a state
+ * change this block would keep showing whatever the build knew.
  */
 export default function SellerIdentity({ compact = false }) {
   const { t } = useI18n();
+  useConfig();
   const complete = legalComplete();
   const address = legalAddressLine();
 

@@ -21,6 +21,7 @@
 import { useEffect, useState } from 'react';
 import { api } from './api.js';
 import { withEarly } from './earlyFetch.js';
+import { applyLegal } from './legalIdentity.js';
 
 const EMPTY = {};
 let cache = null;
@@ -34,7 +35,14 @@ export function getConfig() {
        about 1.2 s before any effect can run. withEarly falls back to a normal
        request when it does not, so this is never the reason config is missing. */
     inflight = withEarly('config', () => api.get('/api/config'))
-      .then((c) => { cache = c && typeof c === 'object' ? c : EMPTY; return cache; })
+      .then((c) => {
+        cache = c && typeof c === 'object' ? c : EMPTY;
+        /* Who is selling is editable in the admin now, so the build's copy of
+           it can be out of date the moment the owner registers at the KvK. The
+           legal pages read the shared object; this is where it learns. */
+        applyLegal(cache.legal);
+        return cache;
+      })
       .catch(() => { cache = EMPTY; return cache; })
       .finally(() => { inflight = null; });
   }
