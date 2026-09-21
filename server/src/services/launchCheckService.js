@@ -12,13 +12,13 @@ import { alertRoute, configuredChannels, EVENTS as NOTIFY_EVENTS } from './notif
 import { isEnabled as mollieEnabled, isTestKey as mollieTestKey, SUPPORTED_METHODS as MOLLIE_METHODS } from './mollieService.js';
 import {
   isEnabled as stripeEnabled, isTestKey as stripeTestKey,
-  hasWebhookSecret as stripeWebhook, enabledMethods as stripeMethods,
+  hasWebhookSecret as stripeWebhook, enabledMethods as stripeMethods, WEBHOOK_EVENTS,
 } from './stripeService.js';
 // The only place the server reaches into the SPA tree. legalIdentity.js is a
 // dependency-free constants module that both sides must agree on: the storefront
 // renders it on every legal page, and this check is the owner's warning that it
 // is still empty. Duplicating it would guarantee the two drift apart.
-import { LEGAL, legalComplete } from '../../../src/lib/legalIdentity.js';
+import { LEGAL, legalComplete, LEGAL_ENV } from '../../../src/lib/legalIdentity.js';
 import { artStatus } from '../../../src/lib/shippedArt.js';
 import { auditCatalog } from './catalogAuditService.js';
 import { appUrlVerdict } from './servedHostService.js';
@@ -51,8 +51,8 @@ export async function launchChecks() {
         'STRIPE_SECRET_KEY is set but STRIPE_WEBHOOK_SECRET is not. Buyers can pay and the money '
         + 'arrives — and no order is ever marked paid, because the webhook cannot be verified and '
         + 'is rejected. Add the endpoint at dashboard.stripe.com → Developers → Webhooks, pointing '
-        + `at ${config.appUrl}/api/payments/stripe/webhook for checkout.session.completed, and put `
-        + 'its signing secret in Vercel as STRIPE_WEBHOOK_SECRET.');
+        + `at ${config.appUrl}/api/payments/stripe/webhook for ${WEBHOOK_EVENTS.join(', ')}, `
+        + 'and put its signing secret in Vercel as STRIPE_WEBHOOK_SECRET.');
     } else if (stripeTestKey()) {
       // The expensive one: everything works and no money ever moves.
       add('payments', 'Payment methods', 'fail',
@@ -288,10 +288,23 @@ export async function launchChecks() {
     add('identity', 'Seller identity', LEGAL.kvk ? 'ok' : 'warn',
       LEGAL.kvk
         ? `${LEGAL.legalName} — KvK ${LEGAL.kvk}${LEGAL.vat ? `, BTW ${LEGAL.vat}` : ''}`
-        : `${LEGAL.legalName} — no KvK number yet. Fine while you are not a registered business; add it (and the BTW number) in src/lib/legalIdentity.js after registering.`);
+        : `${LEGAL.legalName} — no KvK number yet. Fine while you are not a registered `
+          + 'business; set VITE_LEGAL_KVK (and VITE_LEGAL_VAT) after registering, then redeploy.');
   } else {
+    /* The variables are named, not just the file.
+       This said "empty in src/lib/legalIdentity.js", which put a developer, a
+       commit and a deploy between a legal obligation and the shop meeting it —
+       on the one piece of information the law requires before a consumer may
+       buy. They are environment variables now, so the answer to "what do I do
+       with the KvK paperwork" is four values and a redeploy. */
+    const missing = Object.entries(LEGAL_ENV)
+      .filter(([field]) => ['legalName', 'address', 'postcode', 'city'].includes(field)
+        && !LEGAL[field])
+      .map(([, envName]) => envName);
     add('identity', 'Seller identity', 'fail',
-      'The legal pages cannot say who is selling: legalName / address / postcode / city are empty in src/lib/legalIdentity.js. Dutch law requires a name and a geographic address before a consumer buys.');
+      'The legal pages cannot say who is selling. Dutch law requires a name and a '
+      + 'geographic address before a consumer buys. Set '
+      + `${missing.join(', ')} in your hosting environment and redeploy.`);
   }
 
   /* 7b. The compliance audit, folded into the same dashboard.

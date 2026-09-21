@@ -15,7 +15,7 @@ import { evaluateCoupon } from '../services/couponService.js';
 import { recommendationsFor } from '../services/recommendationService.js';
 import { pricedBundles } from '../services/bundleService.js';
 import { peekGiftCard } from '../services/giftCardService.js';
-import { createOrder, getOrderByNumber, getOrder, markPaymentReceived, getPspPayment } from '../services/orderService.js';
+import { createOrder, getOrderByNumber, getOrder, markPaymentReceived, getPspPayment, setPspPayment } from '../services/orderService.js';
 import { requestRefund, getRefundRequestForOrder } from '../services/supportService.js';
 import { CHAT_LANGS, answer } from '../services/assistantService.js';
 /* The landing pages, from the one place that declares them. Shared with the
@@ -539,6 +539,16 @@ router.post('/orders/:id/checkout', requireLaunched('Payment', { money: true }),
     await assertOwnsOrder(req, order, email);
     if (order.status !== 'pending') return res.json({ alreadyPaid: true });
     const session = await createCheckoutSession(order);
+    /* Remembered now, not when the money lands.
+       A refund and a dispute arrive against the PAYMENT and carry no order id of
+       ours, so without this the webhook has nothing to look the order up by —
+       which is how a card refunded in the Stripe dashboard left an order sitting
+       at `completed` with the buyer holding both the money and the code. It is
+       also what lets an abandoned checkout be resumed, the way Mollie's is. */
+    await setPspPayment(order.id, {
+      provider: 'stripe', paymentId: session.paymentIntentId || session.id,
+      status: 'created', checkoutUrl: session.url,
+    }).catch((e) => console.error('[stripe] could not record the payment:', e.message));
     res.json({ url: session.url });
   }));
 

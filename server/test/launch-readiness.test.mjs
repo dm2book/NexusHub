@@ -225,7 +225,15 @@ console.log('\n— The launch dashboard agrees with the checkout —');
   ok('an empty legal identity is a blocker, not a warning',
     legalComplete() ? by.identity.status !== 'fail' : by.identity.status === 'fail',
     `status=${by.identity?.status}`);
-  ok('…and it says which file to edit', /legalIdentity\.js/.test(by.identity?.detail || ''));
+  /* It used to name a source file, which put a developer between the KvK
+     paperwork and the shop publishing it. The thing that has to be true is that
+     the owner is told what to DO, and now that is four environment variables
+     and a redeploy. */
+  ok('…and it says what to set', /VITE_LEGAL_NAME/.test(by.identity?.detail || '')
+    || legalComplete(), by.identity?.detail);
+  ok('…without sending them into a source file',
+    legalComplete() || !/legalIdentity\.js/.test(by.identity?.detail || ''),
+    by.identity?.detail);
 
   // Owner alerts. A shop with none still sells, so this is a warning — but it
   // is the difference between answering a chargeback and finding out weeks

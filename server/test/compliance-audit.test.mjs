@@ -19,6 +19,7 @@ let pass = 0, fail = 0;
 const ok = (name, cond, extra = '') => { if (cond) { pass++; console.log(`  ✅ ${name}`); } else { fail++; console.log(`  ❌ ${name} ${extra}`); } };
 
 import fs from 'node:fs';
+import { LEGAL } from '../../src/lib/legalIdentity.js';
 import path from 'node:path';
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..', '..');
@@ -77,9 +78,15 @@ console.log('\n── The state this repository is actually in ─────�
   ok('the seller identity is still unpublished, and still blocking',
     by('identity.missing')?.level === 'FAIL',
     'legalName/address/postcode/city are empty in src/lib/legalIdentity.js');
+  /* The RULE, not one spelling of it.
+     This grepped the source for `legalName: ''`, which stopped being the
+     implementation when those values moved to the environment so the owner
+     could publish their KvK details without a code change. What has to stay
+     true is that an unset field comes back EMPTY — never a placeholder, never
+     a guess — and that is a property of the value, so it is asserted on the
+     value. */
   ok('no legal information has been invented',
-    /legalName: ''/.test(rd('src/lib/legalIdentity.js'))
-    && /address: ''/.test(rd('src/lib/legalIdentity.js')),
+    LEGAL.legalName === '' && LEGAL.address === '' && LEGAL.postcode === '' && LEGAL.city === '',
     'these fields belong to a person, and no audit may fill them in');
   ok('registration is asked of the owner, never assumed',
     by('tax.registration')?.level === 'OWNER');

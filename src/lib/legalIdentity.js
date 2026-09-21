@@ -13,21 +13,55 @@
  * then the page states honestly that ForgeMarket is run by a private individual
  * and not a registered company — claiming otherwise would be the one thing on
  * this page that could actually get the owner in trouble.
+ *
+ * ── WHY THESE COME FROM THE ENVIRONMENT ───────────────────────────────────
+ * They were constants in this file, which meant that the day the KvK paperwork
+ * came back, publishing it needed a code change, a commit and a deploy by
+ * somebody who can do all three. That is a bad shape for the one piece of
+ * information the law requires before a consumer may buy: it puts a developer
+ * between a legal obligation and the shop complying with it.
+ *
+ * Set them in the hosting environment and redeploy. Both readers below matter:
+ * Vite bakes VITE_* into the browser bundle at build time, and prerender.mjs
+ * imports this same file in plain Node to render the legal pages — so without
+ * the process.env half, the pre-rendered pages and the live app would disagree
+ * about who is selling, which is worse than neither of them knowing.
+ *
+ * The accesses are written out one by one on purpose: Vite only substitutes a
+ * LITERAL `import.meta.env.VITE_X`, so a loop over key names would silently
+ * come back empty in the browser and work everywhere it was tested.
  */
+
+/* eslint-disable prefer-template */
+const viteEnv = typeof import.meta !== 'undefined' ? (import.meta.env || {}) : {};
+const nodeEnv = typeof process !== 'undefined' && process.env ? process.env : {};
+const pick = (viteValue, name, fallback = '') =>
+  String(viteValue || nodeEnv[name] || fallback).trim();
+
 export const LEGAL = {
   /** Trading name shown to buyers. */
-  tradeName: 'ForgeMarket',
+  tradeName: pick(viteEnv.VITE_LEGAL_TRADE_NAME, 'VITE_LEGAL_TRADE_NAME', 'ForgeMarket'),
   /** Legal name of the person or company responsible. REQUIRED before launch. */
-  legalName: '',
+  legalName: pick(viteEnv.VITE_LEGAL_NAME, 'VITE_LEGAL_NAME'),
   /** Street address. Required by law; a PO box is not enough. */
-  address: '',
-  postcode: '',
-  city: '',
-  country: 'Nederland',
+  address: pick(viteEnv.VITE_LEGAL_ADDRESS, 'VITE_LEGAL_ADDRESS'),
+  postcode: pick(viteEnv.VITE_LEGAL_POSTCODE, 'VITE_LEGAL_POSTCODE'),
+  city: pick(viteEnv.VITE_LEGAL_CITY, 'VITE_LEGAL_CITY'),
+  country: pick(viteEnv.VITE_LEGAL_COUNTRY, 'VITE_LEGAL_COUNTRY', 'Nederland'),
   /** Kamer van Koophandel number — only after registering. */
-  kvk: '',
+  kvk: pick(viteEnv.VITE_LEGAL_KVK, 'VITE_LEGAL_KVK'),
   /** BTW-identificatienummer — only after registering. */
-  vat: '',
+  vat: pick(viteEnv.VITE_LEGAL_VAT, 'VITE_LEGAL_VAT'),
+};
+
+/** The environment variables that fill the block above, for the launch check. */
+export const LEGAL_ENV = {
+  legalName: 'VITE_LEGAL_NAME',
+  address: 'VITE_LEGAL_ADDRESS',
+  postcode: 'VITE_LEGAL_POSTCODE',
+  city: 'VITE_LEGAL_CITY',
+  kvk: 'VITE_LEGAL_KVK',
+  vat: 'VITE_LEGAL_VAT',
 };
 
 /** True once the law's minimum set is present. */

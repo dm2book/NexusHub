@@ -22,6 +22,7 @@ import {
 import { getOrder, markPaymentReceived, transitionOrder, setPspPayment } from '../services/orderService.js';
 import { audit } from '../services/auditService.js';
 import { recordChargeback } from '../services/chargebackService.js';
+import { settleAsRefunded } from '../services/refundSettlement.js';
 import { get } from '../db/index.js';
 import { alertOwner } from '../services/notifyService.js';
 
@@ -33,36 +34,8 @@ const webhookUrl = () => {
   return `${String(base).replace(/\/+$/, '')}/api/payments/mollie/webhook`;
 };
 
-/**
- * Move an order to `refunded`, retrying if it loses a race.
- *
- * `transitionOrder` guards its UPDATE on the status it observed, so a caller
- * that loses a race gets the order back unchanged rather than an error. That is
- * the right behaviour — it is what stops an order being dispensed or emailed
- * twice — but for a refund it is dangerous to ignore: the money really has gone
- * back, and this is the only thing that records it.
- *
- * A refund webhook arriving while auto-dispense is still completing the order is
- * exactly that race, and it is not hypothetical: it fires whenever a payment is
- * refunded seconds after it settled. Every status that can still reach
- * `refunded` is re-read and retried, so the loser of one race wins the next.
- */
-const REFUND_BACKOFF_MS = [0, 120, 350, 900];
-
-async function settleAsRefunded(orderId, reason) {
-  for (const wait of REFUND_BACKOFF_MS) {
-    // Retrying instantly loses to the same background step every time — the
-    // fulfilment pipeline is mid-flight, not finished. A short, widening pause
-    // lets it land so the refund can be applied on top of a settled order.
-    if (wait) await new Promise((r) => setTimeout(r, wait));
-    const result = await transitionOrder(orderId, 'refunded', { actorId: 'mollie', reason })
-      .catch((e) => { console.warn(`[mollie] refund transition: ${e.message}`); return null; });
-    if (result?.status === 'refunded') return true;
-    // A terminal status that can never reach refunded — retrying is pointless.
-    if (result && ['cancelled', 'failed'].includes(result.status)) return false;
-  }
-  return false;
-}
+/* The refund race, and the retry that wins it, now shared with Stripe —
+   see services/refundSettlement.js for why it is not two copies. */
 
 /**
  * The single place a payment's state is applied to an order.
@@ -125,7 +98,7 @@ export async function applyPayment(paymentId, ctx = {}) {
       }).catch((e) => console.error('[mollie] chargeback ledger:', e.message));
     }
     if (order.status === 'refunded') return { ok: true, effect, skipped: 'already refunded' };
-    const refunded = await settleAsRefunded(order.id, reason);
+    const refunded = await settleAsRefunded(order.id, reason, { actorId: 'mollie' });
     if (!refunded) {
       // Reported rather than swallowed: an order that Mollie has refunded but we
       // still show as live is a code we hand out for money we no longer have.

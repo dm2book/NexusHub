@@ -262,8 +262,12 @@ console.log('\n— Who is selling —');
   ok('the VAT number renders only when set', /LEGAL\.vat &&|LEGAL\.vat \?/.test(identity));
   ok('an unregistered seller says so in words rather than showing a blank row',
     /seller\.notRegistered/.test(identity));
+  /* Asserted on the values rather than on their spelling in the source: these
+     moved to the environment so the KvK paperwork can be published without a
+     code change, and what must stay true is that unset means EMPTY. */
+  const { LEGAL: L } = await import('../../src/lib/legalIdentity.js');
   ok('the identity fields ship empty, to be filled in — never invented',
-    /kvk:\s*''/.test(legal) && /vat:\s*''/.test(legal));
+    L.kvk === '' && L.vat === '', JSON.stringify({ kvk: L.kvk, vat: L.vat }));
 
   // It has to be reachable from where buyers actually look.
   const footer = readFileSync(join(ROOT, 'src', 'components', 'store', 'StoreFooter.jsx'), 'utf8');
