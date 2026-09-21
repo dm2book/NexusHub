@@ -9,6 +9,7 @@ import { getRewards, setRewards } from '../../services/mysteryBoxService.js';
 import { audit } from '../../services/auditService.js';
 import { assertSafeImageValue, resolveImageUrl } from '../../utils/imageUrl.js';
 import { normalizeImageValue } from '../../services/imageStoreService.js';
+import { backfillArt, proposedCategories } from '../../services/productFitService.js';
 
 const router = Router();
 
@@ -47,6 +48,25 @@ const storeUpload = async (metadata, productId = null) => {
  * Idempotent: images are addressed by content hash, so a second run finds the
  * rows the first one wrote and changes nothing.
  */
+/**
+ * Art for products that have none.
+ *
+ * Dry by default: `?apply=1` is the decision, a report is not. Matched art is
+ * the shop's own artwork for that exact product; a drawn tile is a placeholder
+ * that states the product's real name and amount rather than borrowing another
+ * product's artwork, which would print the wrong number on the card.
+ */
+router.post('/art/backfill', requirePermission('suppliers.manage'), asyncHandler(async (req, res) => {
+  const apply = String(req.query.apply || req.body?.apply || '') === '1'
+    || req.body?.apply === true;
+  res.json(await backfillArt({ apply, actor: req.user }));
+}));
+
+/** Which shelves the discovered products would need that the shop has not got. */
+router.get('/categories/proposed', requirePermission('orders.read'), asyncHandler(async (_req, res) => {
+  res.json({ proposed: await proposedCategories({ limit: 25 }) });
+}));
+
 router.post('/images/migrate', requirePermission('suppliers.manage'), asyncHandler(async (req, res) => {
   const dry = req.body?.dry === true;
   const rows = await listProducts();
