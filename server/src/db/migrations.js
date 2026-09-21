@@ -1653,4 +1653,48 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS lang TEXT;
         FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL;
     `,
   },
+  {
+    id: '042_supplier_offer_history',
+    /*
+     * What a supplier was asking, and when.
+     *
+     * supplier_products holds one row per (supplier, sku) and the sync
+     * OVERWRITES it — cost, stock and status are always "now". So the two
+     * questions an owner actually asks about a supplier could not be answered
+     * at all: has this got more expensive, and is this one running down?
+     *
+     * The shape is the one market_observations already uses in this codebase
+     * and for the same reason: a price is evidence with a timestamp, not a
+     * fact about the world, and there is deliberately no "previous cost"
+     * column — a trend is a query over history, and a query can say it has
+     * only one point.
+     *
+     * Written only when something CHANGES. A daily sync of forty unchanged
+     * SKUs is forty rows that say nothing, and the chart underneath them is a
+     * flat line drawn forty times.
+     *
+     * product_id is SET NULL rather than CASCADE: a product being delisted
+     * does not unhappen a supplier's price history, and that history is what
+     * tells you whether the supplier was the reason.
+     */
+    sql: `
+      CREATE TABLE IF NOT EXISTS supplier_offer_history (
+        id                  TEXT PRIMARY KEY,
+        supplier_id         TEXT NOT NULL REFERENCES suppliers(id) ON DELETE CASCADE,
+        supplier_product_id TEXT REFERENCES supplier_products(id) ON DELETE CASCADE,
+        product_id          TEXT REFERENCES products(id) ON DELETE SET NULL,
+        supplier_sku        TEXT NOT NULL,
+        cost                BIGINT,
+        available_stock     INTEGER,
+        supplier_status     TEXT,
+        observed_at         TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_supplier_hist_product
+        ON supplier_offer_history (product_id, observed_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_supplier_hist_supplier
+        ON supplier_offer_history (supplier_id, observed_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_supplier_hist_sku
+        ON supplier_offer_history (supplier_id, supplier_sku, observed_at DESC);
+    `,
+  },
 ];

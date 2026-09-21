@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Truck, Plus, RefreshCw, Plug, Link2, Search } from 'lucide-react';
+import { Truck, Plus, RefreshCw, Plug, Link2, Search, AlertTriangle } from 'lucide-react';
 import { api } from '../../lib/api.js';
 import { date, money } from '../../lib/format.js';
 import { PageLoader, EmptyState, Modal } from '../../components/ui.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
 import SupplyDashboard from '../../components/admin/SupplyDashboard.jsx';
 import CatalogScan from '../../components/admin/CatalogScan.jsx';
+import SupplierCostChart from '../../components/admin/SupplierCostChart.jsx';
 
 const KIND_HINT = {
   api: 'config: { baseUrl, auth:{type,token}, endpoints:{catalog,fulfill,status}, fieldMap }',
@@ -26,6 +27,166 @@ const KIND_HINT = {
 
 const fmtSecs = (s) => (s == null ? '—' : s < 60 ? `${s}s` : s < 3600 ? `${Math.round(s / 60)}m` : `${Math.round(s / 3600)}h`);
 const relColor = (r) => (r == null ? 'text-slate-400' : r >= 95 ? 'text-emerald-300' : r >= 80 ? 'text-amber-300' : 'text-red-300');
+
+/**
+ * Every supplier for a product, side by side, with the one you should be on.
+ *
+ * `best` is a recommendation; `routed` is what will really happen tonight —
+ * fulfilment picks on `priority`, a number somebody typed once. Where they
+ * disagree the row says so, because that gap is the reason to open this panel.
+ */
+function SupplierIntelligence() {
+  const [data, setData] = useState(null);
+  const [openProduct, setOpenProduct] = useState(null);
+  const [history, setHistory] = useState(null);
+
+  useEffect(() => {
+    api.get('/api/admin/suppliers/intelligence').then(setData).catch(() => setData({ products: [] }));
+  }, []);
+
+  const openHistory = async (productId) => {
+    if (openProduct === productId) { setOpenProduct(null); return; }
+    setOpenProduct(productId); setHistory(null);
+    setHistory(await api.get(`/api/admin/suppliers/history/${productId}`).catch(() => null));
+  };
+
+  if (!data) return null;
+
+  const SEV = {
+    critical: 'bg-rose-500/10 text-rose-300 border-rose-500/25',
+    warn: 'bg-amber-500/10 text-amber-300 border-amber-500/25',
+    info: 'bg-white/5 text-slate-400 border-white/10',
+  };
+
+  return (
+    <section className="card mb-8">
+      <header className="px-5 py-4 border-b border-white/5">
+        <h2 className="font-bold text-slate-200">Supplier comparison</h2>
+        <p className="text-[13px] text-slate-400 mt-0.5 max-w-3xl">
+          Every supplier mapped to a product, side by side. <strong className="text-slate-300">Best</strong> is
+          what the numbers say; <strong className="text-slate-300">routed</strong> is where orders actually go,
+          which follows the priority on the mapping. Nothing here changes either.
+        </p>
+      </header>
+
+      <div className="p-5">
+        {data.coverage?.blockers?.length > 0 && (
+          <ul className="mb-4 space-y-1.5">
+            {data.coverage.blockers.map((b, i) => (
+              <li key={i} className="flex gap-2 text-[12.5px] text-amber-300/90">
+                <AlertTriangle size={14} className="shrink-0 mt-0.5" /><span>{b}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {data.warnings?.length > 0 && (
+          <ul className="mb-5 space-y-1.5">
+            {data.warnings.slice(0, 8).map((w, i) => (
+              <li key={i} className={`rounded-lg border px-3 py-2 text-[12.5px] ${SEV[w.severity]}`}>
+                <span className="font-semibold">{w.name}</span> — {w.detail}
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {data.products?.length === 0
+          ? <p className="text-[13px] text-slate-400">No product has a supplier mapped yet.</p>
+          : data.products.map((row) => (
+            <div key={row.productId} className="border-t border-white/5 py-4 first:border-t-0 first:pt-0">
+              <div className="flex items-center justify-between gap-3 mb-2">
+                <div>
+                  <span className="text-slate-200 font-medium">{row.name}</span>
+                  <span className="text-slate-500 text-[12px] ml-2">
+                    sells at {row.priceCents == null ? '—' : `€${(row.priceCents / 100).toFixed(2)}`}
+                  </span>
+                </div>
+                <button onClick={() => openHistory(row.productId)}
+                  className="text-[12px] font-semibold text-violet-300 hover:text-violet-200">
+                  {openProduct === row.productId ? 'Hide history' : 'History'}
+                </button>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-[13px]">
+                  <thead className="text-slate-400 text-left">
+                    <tr>
+                      <th className="py-1.5 font-semibold">Supplier</th>
+                      <th className="font-semibold text-right">Buy price</th>
+                      <th className="font-semibold text-right">Stock</th>
+                      <th className="font-semibold text-right">Lead time</th>
+                      <th className="font-semibold text-right">Reliability</th>
+                      <th className="font-semibold text-right">Fulfilment</th>
+                      <th className="font-semibold text-right">Margin</th>
+                      <th className="font-semibold text-right">Profit / sale</th>
+                      <th className="font-semibold"> </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {row.offers.map((o) => (
+                      <tr key={o.supplierId} className="border-t border-white/5">
+                        <td className="py-1.5 text-slate-200">
+                          {o.supplierName}
+                          <span className="text-slate-500 text-[11.5px] ml-1.5">{o.kind}</span>
+                        </td>
+                        <td className="text-right tabular-nums text-slate-200">
+                          {o.costCents == null ? <span className="text-slate-500">—</span>
+                            : `€${(o.costCents / 100).toFixed(2)}`}
+                          {o.costChange && o.costChange.pct > 0 && (
+                            <span className="text-amber-300 text-[11.5px] ml-1">+{o.costChange.pct}%</span>
+                          )}
+                        </td>
+                        <td className="text-right tabular-nums text-slate-300">
+                          {o.stock == null ? <span className="text-slate-500" title="never reported">unknown</span> : o.stock}
+                        </td>
+                        <td className="text-right tabular-nums text-slate-300">{fmtSecs(o.leadSeconds)}</td>
+                        <td className="text-right tabular-nums text-slate-300">
+                          {o.reliabilityPct == null
+                            ? <span className="text-slate-500" title="no fulfilment history yet">—</span>
+                            : `${o.reliabilityPct}%`}
+                        </td>
+                        <td className="text-right tabular-nums text-slate-500 text-[12px]">
+                          {o.attempts ? `${o.fulfilled}/${o.attempts}` : '—'}
+                        </td>
+                        <td className="text-right tabular-nums text-slate-300">
+                          {o.marginPct == null ? <span className="text-slate-500">—</span> : `${o.marginPct}%`}
+                        </td>
+                        <td className="text-right tabular-nums text-slate-300">
+                          {o.profitPerSaleEur == null ? <span className="text-slate-500">—</span>
+                            : `€${o.profitPerSaleEur.toFixed(2)}`}
+                        </td>
+                        <td className="whitespace-nowrap">
+                          {o.supplierId === row.bestSupplierId && (
+                            <span className="inline-block rounded-full border border-emerald-500/25 bg-emerald-500/10
+                              px-2 py-0.5 text-[11px] font-semibold text-emerald-300">BEST</span>
+                          )}
+                          {o.supplierId === row.routedSupplierId && (
+                            <span className="inline-block rounded-full border border-sky-500/25 bg-sky-500/10
+                              px-2 py-0.5 text-[11px] font-semibold text-sky-300 ml-1">ROUTED</span>
+                          )}
+                          {!o.deliverable && (
+                            <span className="inline-block rounded-full border border-white/10 bg-white/5
+                              px-2 py-0.5 text-[11px] text-slate-400 ml-1">can't deliver</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="text-[11.5px] text-slate-500 mt-1.5">{row.bestReason}</p>
+
+              {openProduct === row.productId && (
+                <div className="mt-4 rounded-xl border border-white/5 bg-space-black/40 p-4">
+                  <SupplierCostChart history={history} />
+                </div>
+              )}
+            </div>
+          ))}
+      </div>
+    </section>
+  );
+}
 
 export default function Suppliers() {
   const toast = useToast();
@@ -154,6 +315,10 @@ export default function Suppliers() {
       {/* Supply, product-first: the view that shows a product NO supplier
           covers, which by definition appears on no supplier's card below. */}
       <SupplyDashboard />
+
+      {/* The comparison the two views above cannot make: for ONE product, what
+          every supplier is charging, holding and actually delivering. */}
+      <SupplierIntelligence />
 
       {/* Performance dashboard */}
       {metrics.length > 0 && (() => {
