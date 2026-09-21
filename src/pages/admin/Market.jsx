@@ -4,6 +4,7 @@ import {
   AlertTriangle, Clock, ExternalLink, Copy, PackageX, HelpCircle, Loader2, Plus, Package,
 } from 'lucide-react';
 import { api } from '../../lib/api.js';
+import CatalogueFit from '../../components/admin/CatalogueFit.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
 
 /**
@@ -259,6 +260,9 @@ export default function AdminMarket() {
           </div>
         </form>
       </Section>
+
+      {/* ── Shelves and pictures ─────────────────────────────────────────── */}
+      <CatalogueFit />
 
       {/* ── Discovery ───────────────────────────────────────────────────── */}
       {/* ── Products to Add ──────────────────────────────────────────────────

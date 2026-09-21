@@ -1,5 +1,6 @@
 /** Public storefront routes: browse catalog, place an order, track by number. */
 import { Router } from 'express';
+import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { config, manualPayMethods, commerceBlockers } from '../config/env.js';
 import { asyncHandler } from '../middleware/error.js';
@@ -33,6 +34,7 @@ import { recordPageView } from '../services/trackingService.js';
 import { recordVisit, recordEvent, attachOrder, adoptVisit } from '../services/attributionService.js';
 import { getCategoryLogos } from '../services/settingsService.js';
 import { sellerLegalBlock } from '../services/sellerIdentityService.js';
+import { renderTile } from '../services/productFitService.js';
 import { addReview, listReviews, addVerifiedReview } from '../services/reviewsService.js';
 import { verifyIngest, canonicalReview } from '../middleware/ingestSignature.js';
 import { audit } from '../services/auditService.js';
@@ -393,6 +395,34 @@ router.get('/products/trending', asyncHandler(async (_req, res) => {
     trendingCache = { at: Date.now(), data: rows.map((p) => productPayload(p, counts[p.id] || 0)) };
   }
   res.json({ products: trendingCache.data });
+}));
+
+/**
+ * The drawn tile for a product the repo has no artwork for.
+ *
+ * Rendered from the live row rather than stored, so a renamed product gets a
+ * corrected picture instead of keeping one of its old name — and so no base64
+ * image rides along inside every catalogue response.
+ *
+ * Every string on it goes through the same escaper the build's art uses, and
+ * the response is locked down anyway: an SVG served from your own origin is
+ * only safe while nothing else can get into it.
+ */
+router.get('/products/:id/tile.svg', asyncHandler(async (req, res) => {
+  const product = await getProduct(req.params.id);
+  if (!product) return res.status(404).type('text/plain').send('no such product');
+  const svg = renderTile(product);
+  /* A tile changes when the product's words change, and only then. */
+  const etag = `W/"${createHash('sha256').update(svg).digest('hex').slice(0, 16)}"`;
+  if (req.headers['if-none-match'] === etag) return res.status(304).end();
+  res.set({
+    'Content-Type': 'image/svg+xml; charset=utf-8',
+    'Cache-Control': 'public, max-age=300, stale-while-revalidate=86400',
+    ETag: etag,
+    'X-Content-Type-Options': 'nosniff',
+    'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'",
+  });
+  return res.send(svg);
 }));
 
 router.get('/products/:id', asyncHandler(async (req, res) => {

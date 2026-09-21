@@ -29,6 +29,7 @@ import { newId } from '../../utils/ids.js';
 import { parseTitle, nearMiss, canonicalKey } from './normalize.js';
 import { latestPerSource } from './observations.js';
 import { createProduct, getProduct } from '../productService.js';
+import { artFor, categoryFor } from '../productFitService.js';
 
 export const CANDIDATE_STATUS = {
   DISCOVERED: 'discovered',
@@ -233,9 +234,24 @@ export async function createProductFromCandidate(candidateId, { actor, category 
   const mp = await get(`SELECT * FROM market_products WHERE id=@id`, { id: c.market_product_id });
   if (!mp) throw new Error('the candidate has no market product behind it');
 
+  /* Where it belongs and what it looks like, decided here rather than left for
+     the owner to notice on the storefront. Without this a candidate landed on a
+     shelf named after a raw game slug, with no image at all — and the tile fell
+     back to a category icon that, for a game this shop has never sold, does not
+     exist either. */
+  const shelf = await categoryFor({ name: mp.title, game: mp.game, category });
+  const art = artFor({
+    sku: null, name: mp.title, category: shelf.category || mp.game,
+    denomination: mp.denomination == null ? null : Number(mp.denomination),
+    denomUnit: mp.denom_unit || null,
+  });
+  /* A drawn tile is served from the product's own path, and the product does
+     not have an id yet — so it is filled in after the row exists rather than
+     stored as a base64 picture the catalogue would carry around. */
+
   const product = await createProduct({
     name: mp.title,
-    category: category || mp.game,
+    category: shelf.category || mp.game,
     // No price. A price arrives through the recommendation path or not at all.
     price: 0,
     currency: 'EUR',
@@ -243,6 +259,13 @@ export async function createProductFromCandidate(candidateId, { actor, category 
     // Never announce a product nobody has priced yet.
     announce: false,
     metadata: {
+      image: art.image,
+      /* Why this picture is on this product, in words, so an owner who does not
+         like it knows whether it is the shop's own artwork or a placeholder. */
+      imageSource: art.source,
+      imageReason: art.reason,
+      categoryStatus: shelf.status,
+      categoryReason: shelf.reason,
       source: 'market-discovery',
       marketProductId: mp.id,
       canonicalKey: mp.canonical_key,
@@ -257,6 +280,16 @@ export async function createProductFromCandidate(candidateId, { actor, category 
       discoveredAt: nowIso(),
     },
   });
+
+  if (art.drawn) {
+    const { updateProduct } = await import('../productService.js');
+    const { tilePath } = await import('../productFitService.js');
+    await updateProduct(product.id, {
+      metadata: { ...product.metadata, image: tilePath(product.id) },
+    });
+    product.image = tilePath(product.id);
+    product.metadata.image = product.image;
+  }
 
   await decideCandidate(candidateId, CANDIDATE_STATUS.PRODUCT_CREATED, {
     actor, forgeProductId: product.id,
