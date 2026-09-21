@@ -1894,4 +1894,39 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS lang TEXT;
       );
     `,
   },
+  {
+    id: '047_points_buy_boosts',
+    /*
+     * Points become spendable — on giveaway entries, and on nothing else.
+     *
+     * They were a score with no outlet: a member could see 2,555 of them and do
+     * nothing at all. A giveaway boost is the one reward the shop can hand over
+     * without giving away margin — it costs an entry in a draw that runs
+     * anyway — so that is what points buy.
+     *
+     * `total_points` stays a lifetime total, because it is what the streak is
+     * worth and what the leaderboard ranks on; spending is tracked separately
+     * and the balance is the difference. One column, one subtraction, computed
+     * in one place — a second "balance" column would be a number that can
+     * disagree with the claims that produced it.
+     */
+    sql: `
+      ALTER TABLE daily_streaks
+        ADD COLUMN IF NOT EXISTS spent_points BIGINT NOT NULL DEFAULT 0;
+
+      /* What was spent and what came back for it. The boost ids are kept so a
+         member asking "where did my 1,000 points go" has an answer that points
+         at rows in giveaway_boosts rather than at a total. */
+      CREATE TABLE IF NOT EXISTS point_redemptions (
+        id          TEXT PRIMARY KEY,
+        user_id     TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        points      INTEGER NOT NULL,
+        boosts      INTEGER NOT NULL,
+        boost_ids   TEXT NOT NULL DEFAULT '[]',
+        created_at  TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_point_redemptions_user
+        ON point_redemptions (user_id, created_at DESC);
+    `,
+  },
 ];

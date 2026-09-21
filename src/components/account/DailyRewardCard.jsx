@@ -26,6 +26,7 @@ export default function DailyRewardCard() {
   const toast = useToast();
   const [d, setD] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [trading, setTrading] = useState(false);
 
   const load = () => api.get('/api/account/daily').then(setD).catch(() => setD(false));
   useEffect(() => { load(); }, []);
@@ -33,6 +34,19 @@ export default function DailyRewardCard() {
   const copy = (code) => {
     navigator.clipboard?.writeText(code);
     toast.success(`${code} copied.`);
+  };
+
+  /* One entry per click, deliberately. A quantity box on a strip this size
+     would be four more controls to explain the first time somebody reads it,
+     and clicking twice costs nothing. */
+  const trade = async () => {
+    setTrading(true);
+    try {
+      const out = await api.post('/api/account/daily/redeem', { boosts: 1 });
+      toast.success(`Traded ${out.pointsSpent} points for an extra giveaway entry 🎟️`);
+      await load();
+    } catch (e) { toast.error(e.message || 'Could not trade your points.'); }
+    finally { setTrading(false); }
   };
 
   const claim = async () => {
@@ -116,7 +130,11 @@ export default function DailyRewardCard() {
         <div className="lg:ml-auto flex flex-wrap items-center gap-5">
           <div>
             <div className="text-[11px] uppercase tracking-wider text-slate-500">Points</div>
-            <div className="text-slate-200 font-semibold tabular-nums">{d.totalPoints}</div>
+            {/* The balance, not the lifetime total: the number next to a button
+                that spends points has to be the number that gets spent. */}
+            <div className="text-slate-200 font-semibold tabular-nums">
+              {d.wallet ? d.wallet.balance : d.totalPoints}
+            </div>
           </div>
           <div className="min-w-0">
             <div className="text-[11px] uppercase tracking-wider text-slate-500">
@@ -151,6 +169,40 @@ export default function DailyRewardCard() {
                 ? ` · worth ${money(d.nextMilestone.value)}` : ''}
             </span>
           </span>
+        </div>
+      )}
+
+      {/* Points buy giveaway entries, and the strip says so whether or not one is
+          affordable yet — an exchange rate nobody can see is not an offer.
+          It also says "one per draw", because the giveaway consumes a single
+          boost per member per draw: holding four is four boosted giveaways, not
+          four tickets in one. Saying "you can trade for 4" without that reads
+          as a promise the draw does not keep. */}
+      {d.wallet && (
+        <div className="relative mt-2.5 flex flex-wrap items-center gap-3 rounded-xl
+          bg-space-black/40 px-4 py-2.5 text-[13px]">
+          <Ticket size={15} className="text-violet-300 shrink-0" />
+          <span className="text-slate-300">
+            <b className="text-slate-100">{d.wallet.perBoost} points</b> = one extra giveaway entry
+            <span className="text-slate-500">
+              {' — one is used per draw'}
+              {d.wallet.affordable > 0
+                ? `, and you can trade for ${d.wallet.affordable}`
+                : `. ${d.wallet.toNextBoost} points more for your first`}
+            </span>
+          </span>
+          {d.boosts > 0 && (
+            <span className="text-[12px] text-violet-300">
+              holding {d.boosts} — {d.boosts === 1 ? 'your next draw' : `your next ${d.boosts} draws`}
+            </span>
+          )}
+          <button onClick={trade} disabled={d.wallet.affordable < 1 || trading}
+            className={`ml-auto text-[12.5px] font-semibold rounded-lg px-3 py-1.5 transition
+              ${d.wallet.affordable > 0
+                ? 'bg-violet-500/20 text-violet-200 hover:bg-violet-500/30'
+                : 'bg-white/5 text-slate-600 cursor-not-allowed'}`}>
+            {trading ? '…' : 'Trade for an entry'}
+          </button>
         </div>
       )}
 
