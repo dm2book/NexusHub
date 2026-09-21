@@ -6,6 +6,7 @@ import { requirePermission } from '../../middleware/rbac.js';
 import * as suppliers from '../../services/supplier/supplierService.js';
 import { supplierMetrics } from '../../services/supplier/supplierMetricsService.js';
 import { supplierDashboard } from '../../services/supplier/supplierDashboardService.js';
+import { supplierIntelligence, offerHistory } from '../../services/supplier/supplierIntelligenceService.js';
 import { availableKinds, createConnector } from '../../services/supplier/registry.js';
 import { searchTermsFor } from '../../services/supplier/SupplierConnector.js';
 import { scanProducts, summarise } from '../../services/supplier/catalogScanService.js';
@@ -14,6 +15,23 @@ import { notFound } from '../../utils/errors.js';
 import { get, all } from '../../db/index.js';
 
 const router = Router();
+
+/**
+ * Every supplier for every product, side by side, with a recommendation.
+ *
+ * Read-only. Nothing here changes a mapping, a priority or a price — the page
+ * tells you which supplier you should be on and the mapping is still edited by
+ * hand, because moving a product's supply is not a thing to do by accident.
+ */
+router.get('/intelligence', requirePermission('suppliers.read'), asyncHandler(async (_req, res) => {
+  res.json(await supplierIntelligence());
+}));
+
+/** What each supplier has been asking for one product — the chart's data. */
+router.get('/history/:productId', requirePermission('suppliers.read'), asyncHandler(async (req, res) => {
+  const days = z.coerce.number().int().min(1).max(365).optional().parse(req.query?.days) || 90;
+  res.json(await offerHistory(req.params.productId, { days }));
+}));
 
 router.get('/connector-kinds', requirePermission('suppliers.read'), (_req, res) => {
   res.json({ kinds: availableKinds() });

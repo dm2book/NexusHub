@@ -74,6 +74,34 @@ export async function mapSupplierProduct({ supplierId, productId, supplierSku, s
              { s: supplierId, k: supplierSku });
 }
 
+/**
+ * One line in a supplier's price history.
+ *
+ * Best-effort on purpose: a sync that delivered fresh costs and then failed to
+ * write its own diary entry has still delivered fresh costs, and losing the run
+ * over the chart underneath it would be the wrong trade. Loud rather than
+ * silent, because a history with holes is worse than one that says so.
+ */
+export async function recordOffer({
+  supplierId, supplierProductId = null, productId = null, supplierSku,
+  cost = null, availableStock = null, supplierStatus = null, observedAt = null,
+} = {}) {
+  try {
+    await run(
+      `INSERT INTO supplier_offer_history
+         (id, supplier_id, supplier_product_id, product_id, supplier_sku,
+          cost, available_stock, supplier_status, observed_at)
+       VALUES (@id, @s, @sp, @p, @k, @c, @st, @status, @at)`,
+      { id: newId('soh'), s: supplierId, sp: supplierProductId, p: productId,
+        k: supplierSku, c: cost, st: availableStock, status: supplierStatus,
+        at: observedAt || nowIso() });
+    return true;
+  } catch (e) {
+    console.error('[supplier] offer history not written:', e.message);
+    return false;
+  }
+}
+
 /** All product mappings for a supplier, with our product name for the admin UI. */
 export function listSupplierProducts(supplierId) {
   return all(
@@ -120,12 +148,20 @@ export async function syncSupplier(id, syncType = 'full') {
         if (syncType === 'status' || syncType === 'full') fields.supplier_status = item.status;
 
         if (!existing) {
+          const sprdId = newId('sprd');
+          const seenAt = nowIso();
           await run(`INSERT INTO supplier_products
                 (id, supplier_id, supplier_sku, cost, available_stock, supplier_status, last_synced_at)
                VALUES (@id, @s, @k, @cost, @stock, @st, @at)`,
-              { id: newId('sprd'), s: id, k: item.supplierSku,
+              { id: sprdId, s: id, k: item.supplierSku,
                 cost: fields.cost ?? null, stock: fields.available_stock ?? null,
-                st: fields.supplier_status ?? null, at: nowIso() });
+                st: fields.supplier_status ?? null, at: seenAt });
+          await recordOffer({
+            supplierId: id, supplierProductId: sprdId, productId: null,
+            supplierSku: item.supplierSku, cost: fields.cost ?? null,
+            availableStock: fields.available_stock ?? null,
+            supplierStatus: fields.supplier_status ?? null, observedAt: seenAt,
+          });
           changed++;
         } else {
           const dirty = Object.entries(fields).some(([k, v]) => v != null && existing[k] !== v);
@@ -138,7 +174,19 @@ export async function syncSupplier(id, syncType = 'full') {
               { cost: fields.cost ?? null, stock: fields.available_stock ?? null,
                 st: fields.supplier_status ?? null, at: nowIso(), id: existing.id });
           if (existing.product_id) await propagateToProduct(existing.product_id, item, syncType);
-          if (dirty) changed++;
+          /* Only when something actually moved. A daily sync of forty unchanged
+             SKUs is forty history rows that say nothing, and a chart drawn
+             through them is a flat line drawn forty times. */
+          if (dirty) {
+            await recordOffer({
+              supplierId: id, supplierProductId: existing.id, productId: existing.product_id,
+              supplierSku: item.supplierSku,
+              cost: fields.cost ?? existing.cost ?? null,
+              availableStock: fields.available_stock ?? existing.available_stock ?? null,
+              supplierStatus: fields.supplier_status ?? existing.supplier_status ?? null,
+            });
+            changed++;
+          }
         }
       }
     });
