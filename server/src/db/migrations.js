@@ -1746,4 +1746,40 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS lang TEXT;
       CREATE INDEX IF NOT EXISTS idx_ad_spend_creative ON ad_spend (creative, day DESC);
     `,
   },
+  {
+    id: '044_webhook_events',
+    /*
+     * Every provider event, once.
+     *
+     * A payment provider retries a webhook until it gets a 2xx, and it will
+     * happily deliver the same event several times when the first response was
+     * slow. For "the payment succeeded" that is harmless — the order is already
+     * out of `pending` and the handler does nothing. For a REFUND or a DISPUTE
+     * it is not harmless at all: those write to the chargeback ledger and move
+     * money-bearing state, and applying one twice is the kind of error nobody
+     * notices until the numbers are reconciled.
+     *
+     * Mollie deduplicates chargebacks by payment id, which covers that one case
+     * and nothing else. This covers the general one: the provider's own event
+     * id is the key, so a replay is recognised as a replay whatever it carries.
+     *
+     * It doubles as the record of what the provider actually sent, which is the
+     * first thing anybody wants when an order and a dashboard disagree.
+     */
+    sql: `
+      CREATE TABLE IF NOT EXISTS webhook_events (
+        id           TEXT PRIMARY KEY,
+        provider     TEXT NOT NULL,          -- stripe | mollie
+        event_id     TEXT NOT NULL,          -- the provider's own id
+        event_type   TEXT NOT NULL,
+        order_id     TEXT REFERENCES orders(id) ON DELETE SET NULL,
+        outcome      TEXT,                   -- what we did about it
+        received_at  TEXT NOT NULL
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_webhook_events_once
+        ON webhook_events (provider, event_id);
+      CREATE INDEX IF NOT EXISTS idx_webhook_events_order
+        ON webhook_events (order_id, received_at DESC);
+    `,
+  },
 ];

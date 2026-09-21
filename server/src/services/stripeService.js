@@ -1,10 +1,16 @@
 /**
  * Stripe payments via hosted Checkout — we never touch card data.
  *
- * Flow: createCheckoutSession() builds a Session from the order's line items and
+ * Flow: createCheckoutSession() builds a Session from the order's total and
  * returns a redirect URL. Stripe redirects the buyer to success/cancel URLs and,
- * authoritatively, fires a `checkout.session.completed` webhook which we verify
- * and use to mark the order paid (see routes/payments.js).
+ * authoritatively, sends webhooks (routes/payments.js).
+ *
+ * `checkout.session.completed` is NOT on its own a statement that the money
+ * arrived: for every delayed-notification method it comes back with
+ * `payment_status: 'unpaid'` and settles later on
+ * `checkout.session.async_payment_succeeded`. The webhook reads that field
+ * rather than the event name, because a digital shop that marks an order paid on
+ * the event name gives the product away on a promise.
  *
  * Activated by setting STRIPE_SECRET_KEY; otherwise isEnabled() is false and the
  * storefront falls back to demo or pending payments.
@@ -103,11 +109,42 @@ export async function createCheckoutSession(order) {
         },
       },
     }],
+    /* The order id on the PAYMENT INTENT as well as on the session.
+       A refund or a dispute is raised against the payment, and the event Stripe
+       sends then carries the intent's metadata and not the session's — so
+       without this the only way back to the order is a database lookup that
+       depends on the intent having been recorded first. Both, because a webhook
+       that can identify its own order from the payload is the one that still
+       works when something else did not run. */
+    payment_intent_data: {
+      metadata: { orderId: order.id, orderNumber: order.number },
+      description: `ForgeMarket ${order.number}`,
+    },
+    /* The buyer is Dutch and the shop is in Dutch. Stripe otherwise picks from
+       the browser, which is right often enough to hide the times it is not. */
+    locale: 'nl',
     success_url: `${config.appUrl}/checkout/success?order=${order.id}&n=${encodeURIComponent(order.number)}&session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${config.appUrl}/cart?canceled=1`,
   });
-  return { id: session.id, url: session.url };
+  return { id: session.id, url: session.url, paymentIntentId: session.payment_intent || null };
 }
+
+/**
+ * The events this shop acts on, in one place.
+ *
+ * Named here rather than in the setup instruction, because the instruction and
+ * the handler drifting apart is silent and expensive: it said
+ * `checkout.session.completed` alone, which is the subscription somebody would
+ * actually create — and then a refund or a dispute never arrives, and the only
+ * symptom is an order that disagrees with the Stripe dashboard weeks later.
+ */
+export const WEBHOOK_EVENTS = [
+  'checkout.session.completed',
+  'checkout.session.async_payment_succeeded',
+  'checkout.session.async_payment_failed',
+  'charge.refunded',
+  'charge.dispute.created',
+];
 
 /** Verify a webhook payload (raw Buffer) and return the Stripe event. */
 export async function constructEvent(rawBody, signature) {
