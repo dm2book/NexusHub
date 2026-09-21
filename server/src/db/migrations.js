@@ -1697,4 +1697,53 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS lang TEXT;
         ON supplier_offer_history (supplier_id, supplier_sku, observed_at DESC);
     `,
   },
+  {
+    id: '043_ad_spend',
+    /*
+     * What the advert cost, and how many people saw it.
+     *
+     * ad_visits records arrivals — somebody clicked and the page loaded. That
+     * is everything this shop can observe by itself, and it is half of an ad
+     * report. Impressions happen on TikTok's servers, and the money leaves on
+     * TikTok's invoice; neither is derivable from anything in this database.
+     * Without them there is no CTR and no ROAS, which are the two numbers the
+     * whole question "is this advert working" comes down to.
+     *
+     * So they are entered, or imported from the platform's own export, and
+     * stored as EVIDENCE with a day against them — one row per creative per
+     * day per network, which is the grain every ad platform exports at.
+     *
+     * The shop's own measured landings stay separate from the platform's
+     * reported clicks and are never reconciled into one number. They disagree
+     * for real reasons — consent refusals, blocked scripts, people who leave
+     * before the page runs — and the SIZE of that gap is a fact worth seeing
+     * rather than an error to average away.
+     *
+     * Money is in cents, like everywhere else here.
+     */
+    sql: `
+      CREATE TABLE IF NOT EXISTS ad_spend (
+        id           TEXT PRIMARY KEY,
+        day          TEXT NOT NULL,            -- YYYY-MM-DD, the platform's grain
+        network      TEXT NOT NULL,            -- tiktok | instagram | facebook | youtube | discord | …
+        campaign     TEXT,
+        creative     TEXT,                     -- matches ad_visits.creative_id / content
+        impressions  BIGINT,
+        clicks       BIGINT,                   -- what the PLATFORM says it sent
+        spend_cents  BIGINT,
+        currency     TEXT NOT NULL DEFAULT 'EUR',
+        source       TEXT NOT NULL DEFAULT 'manual',  -- manual | import
+        note         TEXT,
+        created_at   TEXT NOT NULL,
+        updated_at   TEXT NOT NULL
+      );
+      /* One row per creative per day per network. Re-importing the same export
+         updates rather than doubling the spend — the failure that makes every
+         ROAS on the page half what it should be. */
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_ad_spend_grain
+        ON ad_spend (day, network, COALESCE(campaign, ''), COALESCE(creative, ''));
+      CREATE INDEX IF NOT EXISTS idx_ad_spend_day ON ad_spend (day DESC);
+      CREATE INDEX IF NOT EXISTS idx_ad_spend_creative ON ad_spend (creative, day DESC);
+    `,
+  },
 ];

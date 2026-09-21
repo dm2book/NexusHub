@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { TrendingUp, ShoppingCart, Percent, Users, Trophy, Rocket, CheckCircle2, AlertTriangle, XCircle, ChevronDown, MailCheck, Megaphone, EyeOff, Lock } from 'lucide-react';
 import { api } from '../../lib/api.js';
+import AdPerformance from '../../components/admin/AdPerformance.jsx';
 import { money } from '../../lib/format.js';
 import { PageLoader } from '../../components/ui.jsx';
 
@@ -238,6 +239,11 @@ export default function Analytics() {
 
       {/* Which advert sold something */}
       {attr && <AttributionCard attr={attr} />}
+
+      {/* The same arrivals, joined to what the platform charged for them —
+          which is the half of "is this advert working" that no query over this
+          database can answer on its own. */}
+      <AdPerformance />
 
       {/* Product performance */}
       <div className="card p-6 mt-6">
