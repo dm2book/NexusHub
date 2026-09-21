@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Coins, Ticket, Sparkles, Copy, Check, History } from 'lucide-react';
 import { api } from '../../lib/api.js';
 import { money, dateShort } from '../../lib/format.js';
@@ -35,36 +36,19 @@ export default function ForgeShop() {
 
   const ICON = { coupon: Ticket, boost: Sparkles };
 
-  /* The cheapest thing still out of reach — so the header can say what the
-     balance is FOR, not only what it is. Undefined once everything is
-     affordable, and the line disappears rather than congratulating anyone. */
-  const shop = [...(data?.shop || [])].sort((a, b) => a.cost - b.cost);
-  const balance = data?.balance ?? 0;
-  const next = shop.find((r) => r.cost > balance);
-
-  /* Lifetime, from the server's own SUMs. NOT from `history`, which is the last
-     twenty rows — adding those up is right for a new member and quietly wrong
-     for everybody else, in the flattering direction, because the oldest rows
-     drop off first. */
-  const earned = data?.totals?.earned ?? null;
-  const spent = data?.totals?.spent ?? null;
-
-  /* The earn rate comes from the payload. Writing "1 coin per €10" into this
-     page would be a second copy of a pricing decision that lives in one
-     constant, and it would go stale silently the day that constant changes. */
-  const perCoin = (data?.perCoinCents ?? 1000) / 100;
-
-  /* Which reward gives the most discount per coin. The €25 card's blurb claims
-     "best value" in prose; this works it out from cost and value, so the badge
-     cannot disagree with the numbers beside it — and it moves on its own if the
-     owner adds an item in the admin. Boosts have no euro value and are left
-     out of the comparison rather than counted as zero. */
-  const priced = shop.filter((r) => r.kind === 'coupon' && r.value > 0 && r.cost > 0);
-  const bestValueId = priced.length > 1
-    ? priced.reduce((a, b) => (b.value / b.cost > a.value / a.cost ? b : a)).id
-    : null;
-
-  /* What getting there actually takes, in the currency a shopper thinks in. */
+  /* Everything below is worked out by the SERVER now, in coinProgress(), and
+     read here. It was computed in this component last round — which made it a
+     second copy of the same arithmetic the moment /balance in Discord needed
+     the same answer, and the bot could not reach a React component. One
+     function, two surfaces, no drift. */
+  const shop = data.shop || [];
+  const balance = data.balance ?? 0;
+  const next = data.next;
+  const earned = data.totals?.earned ?? null;
+  const spent = data.totals?.spent ?? null;
+  const boosts = data.boosts ?? 0;
+  const bestValueId = data.bestValueId ?? null;
+  const perCoin = (data.perCoinCents ?? 1000) / 100;
   const spendToReach = (cost) => Math.max(0, cost - balance) * perCoin;
 
   return (
@@ -119,7 +103,7 @@ export default function ForgeShop() {
                     "€10 discount code" into "€10", so the line read "9 more for
                     €10" — which sounds like a price, not a reward. */}
                 {next
-                  ? <>{next.cost - balance}
+                  ? <>{next.coinsAway}
                       <span className="text-slate-500 font-normal"> → {next.label}</span></>
                   : <span className="text-emerald-300">everything unlocked</span>}
               </dd>
@@ -127,6 +111,29 @@ export default function ForgeShop() {
           </dl>
         </div>
       </div>
+
+      {/* A boost you have paid for and not yet used.
+          It had nowhere on this page at all: you spent eight coins, the toast
+          said "claim it in our Discord", and there was nothing in Discord to
+          claim — the draw kept entrants in a Set, so an extra entry could not
+          be represented. It is a held thing now, and it says what happens to
+          it, because "claim it somewhere" was the part that was not true. */}
+      {boosts > 0 && (
+        <div className="flex items-start gap-3 rounded-2xl border border-fuchsia-400/25
+          bg-fuchsia-500/[0.07] px-5 py-4">
+          <span className="w-10 h-10 rounded-xl bg-fuchsia-400/15 text-fuchsia-300
+            grid place-items-center shrink-0"><Sparkles size={18} /></span>
+          <div className="min-w-0">
+            <div className="text-slate-100 font-semibold text-sm">
+              {boosts} giveaway {boosts === 1 ? 'boost' : 'boosts'} ready
+            </div>
+            <p className="text-slate-400 text-[13px] mt-0.5">
+              {boosts === 1 ? 'It adds' : 'They add'} an extra entry to the next giveaway you
+              join in Discord. Nothing to claim — it happens when the winner is drawn.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Shop */}
       <div>
@@ -275,10 +282,18 @@ export default function ForgeShop() {
         )}
       </div>
 
-      <p className="text-slate-500 text-xs">
-        Redeemed a discount code? It stays in your <b className="text-slate-400">History</b> above —
-        copy it any time and use it at checkout. Codes are single-use.
-      </p>
+      {/* The page is about earning and had no way to go and earn. */}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl
+        border border-white/10 bg-elevated/40 px-5 py-4">
+        <p className="text-slate-400 text-[13px] max-w-xl">
+          Redeemed a code? It stays in your <b className="text-slate-300">History</b> above — copy
+          it any time and use it at checkout. Codes are single-use and never expire.
+        </p>
+        <Link to="/shop" className="btn-primary text-sm font-semibold rounded-xl px-4 py-2.5
+          whitespace-nowrap">
+          Browse the shop
+        </Link>
+      </div>
     </div>
   );
 }

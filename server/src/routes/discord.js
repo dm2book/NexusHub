@@ -8,7 +8,7 @@ import { config } from '../config/env.js';
 import { overview, topProducts } from '../services/analyticsService.js';
 import { all, get } from '../db/index.js';
 import { launchChecks } from '../services/launchCheckService.js';
-import { coinBalance } from '../services/forgeCoinService.js';
+import { coinBalance, coinProgress, claimBoosts } from '../services/forgeCoinService.js';
 import { balanceOf } from '../services/walletService.js';
 import { loyaltyFor } from '../services/loyaltyService.js';
 import { getOrderByNumber, setOrderPayLink } from '../services/orderService.js';
@@ -120,6 +120,49 @@ router.post('/pay-link',
 // Member balance for the bot's /saldo command: given a Discord user id, return
 // the linked account's Forge Coins, store credit and loyalty tier. The uid is
 // bound into the signature so a request can't be replayed for another member.
+/**
+ * Claim giveaway boosts for the people who entered one draw.
+ *
+ * The Forge Shop sells "+1 bonus entry in this week's giveaway (claim in
+ * Discord)" for 8 coins, and until now that bought nothing — no command, no
+ * notification, and a giveaway that stores entrants in a Set, where one extra
+ * entry cannot be represented even by a human trying to honour it by hand.
+ *
+ * The bot calls this as it draws. It consumes at most one boost per entrant and
+ * stamps each with the giveaway's message id, which is what makes a retry safe:
+ * a bot that reconnects mid-draw and asks again gets back what it already
+ * claimed for that giveaway rather than eating a second boost.
+ *
+ * The giveaway id is bound into the signature, so a captured request cannot be
+ * replayed against a different draw.
+ */
+export const canonicalBoosts = (b = {}) =>
+  `boosts:${b.giveawayId || ''}:${[...(b.uids || [])].sort().join(',')}`;
+router.post('/boosts/claim',
+  verifyIngest(canonicalBoosts)(config.discord.reviewIngestSecret),
+  asyncHandler(async (req, res) => {
+    const giveawayId = String(req.body?.giveawayId || '').trim();
+    const uids = [...new Set((req.body?.uids || []).map((u) => String(u).trim()).filter(Boolean))]
+      .slice(0, 500);
+    if (!giveawayId || !uids.length) return res.json({ boosts: {} });
+
+    /* Discord ids are not our user ids. Only entrants who have actually linked
+       an account can hold a boost, and the rest are simply absent rather than
+       an error — most entrants will not have one. */
+    const rows = await all(
+      `SELECT provider_uid AS uid, user_id FROM oauth_accounts
+        WHERE provider='discord' AND provider_uid = ANY(@uids)`, { uids });
+    if (!rows.length) return res.json({ boosts: {} });
+
+    const byUser = Object.fromEntries(rows.map((r) => [r.user_id, r.uid]));
+    const claimed = await claimBoosts(rows.map((r) => r.user_id), giveawayId);
+    const boosts = {};
+    for (const [userId, n] of Object.entries(claimed)) {
+      if (byUser[userId] && n > 0) boosts[byUser[userId]] = n;
+    }
+    res.json({ boosts });
+  }));
+
 export const canonicalBalance = (b = {}) => `balance:${b.uid || ''}`;
 router.post('/balance',
   verifyIngest(canonicalBalance)(config.discord.reviewIngestSecret),
@@ -129,12 +172,16 @@ router.post('/balance',
       ? await get(`SELECT user_id FROM oauth_accounts WHERE provider='discord' AND provider_uid=@uid LIMIT 1`, { uid })
       : null;
     if (!acct) return res.json({ linked: false });
-    const [coins, credit, loyalty] = await Promise.all([
-      coinBalance(acct.user_id), balanceOf(acct.user_id), loyaltyFor(acct.user_id),
+    const [progress, credit, loyalty] = await Promise.all([
+      coinProgress(acct.user_id), balanceOf(acct.user_id), loyaltyFor(acct.user_id),
     ]);
     res.json({
-      linked: true, coins, creditCents: credit,
+      linked: true, coins: progress.balance, creditCents: credit,
       tier: loyalty?.tierName || null, spentCents: loyalty?.xp ?? null,
+      /* The same answer the account page gets, from the same function — so the
+         bot and the website cannot tell a member two different things about how
+         far off their next reward is. */
+      next: progress.next, boosts: progress.boosts, earned: progress.totals.earned,
     });
   }));
 

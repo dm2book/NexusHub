@@ -117,15 +117,21 @@ console.log('\n— Best value is worked out, not claimed —');
      stop being right without the number changing too. */
   ok('the €25 code really is the best value per coin', best.id === 'coupon25',
     `${best.id} at ${(best.value / best.cost).toFixed(1)}c/coin`);
-  ok('the page derives it from cost and value',
-    /bestValueId/.test(pageSrc) && /value \/ b?\.?cost|value \/ a\.cost/.test(pageSrc),
-    'the badge must not be hardcoded to an id');
-  ok('…and no reward id is written into the badge',
+  /* The arithmetic moved to the server once /balance in Discord needed the
+     same answer — see coinProgress(). What the PAGE has to do is read it and
+     not have an opinion of its own. */
+  ok('the page reads the badge rather than working it out',
+    /data\.bestValueId/.test(pageSrc), 'the page must not recompute it');
+  ok('…and no reward id is written into it',
     !/coupon25['"]?\s*===|===\s*['"]coupon25/.test(pageSrc));
+
+  const svc = readFileSync(join(ROOT, 'server/src/services/forgeCoinService.js'), 'utf8');
+  ok('the server derives it from cost and value',
+    /bestValueId/.test(svc) && /b\.value \/ b\.cost > a\.value \/ a\.cost/.test(svc));
   /* A giveaway boost has no euro value. Counting it as 0 would make it the
      worst by arithmetic on a quantity it does not have. */
   ok('rewards with no euro value are left out, not scored zero',
-    /kind === 'coupon'/.test(pageSrc) && /r\.value > 0/.test(pageSrc));
+    /kind === 'coupon' && r\.value > 0/.test(svc), 'a boost must not be scored as zero value');
 }
 
 console.log('\n— The distance is stated in what it takes to close it —');

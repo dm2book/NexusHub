@@ -2588,7 +2588,24 @@ async function balanceCmd(i) {
     .addFields(
       { name: '🪙 Forge Coins', value: String(d.coins ?? 0), inline: true },
       { name: '💶 Store credit', value: money(d.creditCents || 0), inline: true },
-      { name: '🏅 Loyalty tier', value: d.tier || '—', inline: true })
+      { name: '🏅 Loyalty tier', value: d.tier || '—', inline: true },
+      /* The same answer the account page gives, from the same function on the
+         server. This used to be a bare number here while the website worked out
+         the next reward and the distance to it — one question, answered on one
+         surface and not the other. */
+      ...(d.next ? [{
+        name: '🎯 Next reward',
+        value: `**${d.next.coinsAway}** more for ${d.next.label}\n`
+          + `≈ ${money(d.next.spendAwayCents)} of spending away`,
+      }] : [{ name: '🎯 Next reward', value: 'Everything in the shop is unlocked 🎉' }]),
+      /* A boost you paid for and have not spent. It used to buy nothing at all
+         — no command, no record, and a draw that could not represent an extra
+         entry. Now it is a thing you are holding, so it is shown. */
+      ...((d.boosts || 0) > 0 ? [{
+        name: '🎟️ Giveaway boosts',
+        value: `${d.boosts} unused — ${d.boosts === 1 ? 'it adds' : 'they add'} an extra entry `
+          + 'to the next giveaway you join. Nothing to claim; it is automatic.',
+      }] : []))
     .setDescription(`Spend coins in the [Forge Shop](${STORE_URL}/account/forge-shop) — store credit applies automatically at checkout.`)
     .setFooter({ text: 'ForgeMarket · live from your account' }).setTimestamp()] });
 }
@@ -2852,21 +2869,77 @@ async function startGiveaway(i) {
   setTimeout(() => endGiveaway(i.guild, msg.id, msg), minutes * 60_000);
 }
 
+/**
+ * Bonus entries somebody paid coins for.
+ *
+ * The Forge Shop sells "+1 bonus entry in this week's giveaway" for 8 coins,
+ * and this draw kept its entrants in a Set — one per person, by construction —
+ * so the extra entry was not representable at all. Not by the bot, and not by
+ * a staff member trying to honour it by hand. The coins bought nothing.
+ *
+ * Asked for at draw time rather than at entry time, so a boost bought after
+ * entering still counts, and consumed against THIS giveaway's id so one
+ * purchase is one extra entry in one draw. Failure is not fatal: a draw that
+ * cannot reach the store runs unweighted and says so in the log rather than
+ * not happening.
+ */
+async function claimBoosts(entrantIds, giveawayId) {
+  if (!FORGEMARKET_API_URL || !REVIEW_INGEST_SECRET || !entrantIds.length) return {};
+  try {
+    const ts = String(Date.now());
+    const uids = [...entrantIds].sort();
+    const signature = createHmac('sha256', REVIEW_INGEST_SECRET)
+      .update(`${ts}.boosts:${giveawayId}:${uids.join(',')}`).digest('hex');
+    const res = await fetch(`${FORGEMARKET_API_URL.replace(/\/$/, '')}/api/discord/boosts/claim`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-timestamp': ts, 'x-signature': signature },
+      body: JSON.stringify({ giveawayId, uids: entrantIds }),
+    });
+    if (!res.ok) return {};
+    return (await res.json())?.boosts || {};
+  } catch (e) {
+    console.error('[giveaway] boosts unavailable, drawing unweighted:', e.message);
+    return {};
+  }
+}
+
 async function endGiveaway(guild, id, msg) {
   const gw = GIVEAWAYS.get(id);
   if (!gw) return;
   GIVEAWAYS.delete(id);
   saveGiveaways();
   const ids = [...gw.entries];
-  const pool = [...ids];
+
+  /* One ticket each, plus one per boost. The Set stays the record of WHO
+     entered; the pool is what the draw reaches into. */
+  const boosts = await claimBoosts(ids, id);
+  const pool = [];
+  for (const uid of ids) {
+    pool.push(uid);
+    for (let n = 0; n < (boosts[uid] || 0); n++) pool.push(uid);
+  }
+  const boosted = Object.keys(boosts).length;
+
+  /* Drawn without replacement per PERSON, not per ticket: a second ticket
+     belonging to somebody already picked must not win them a second prize. */
   const picks = [];
-  while (picks.length < (gw.winnersCount || 1) && pool.length) {
-    picks.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+  const remaining = [...pool];
+  while (picks.length < (gw.winnersCount || 1) && remaining.length) {
+    const taken = remaining.splice(Math.floor(Math.random() * remaining.length), 1)[0];
+    picks.push(taken);
+    for (let k = remaining.length - 1; k >= 0; k--) if (remaining[k] === taken) remaining.splice(k, 1);
   }
   ENDED.set(id, { prize: gw.prize, entries: ids, channelId: gw.channelId });
   setTimeout(() => ENDED.delete(id), 3_600_000); // keep 1h for /reroll
+  /* The entry count says what the draw actually reached into. Printing the
+     number of PEOPLE while drawing from a weighted pool would quietly misreport
+     everybody's odds. */
+  const tally = boosted
+    ? `${pool.length} entries from ${ids.length} member${ids.length === 1 ? '' : 's'} `
+      + `· ${boosted} bonus ${boosted === 1 ? 'entry' : 'entries'} from the Forge Shop`
+    : `${ids.length} entries`;
   const text = picks.length
-    ? `🏆 The **${gw.prize}** giveaway ${picks.length > 1 ? 'winners are' : 'winner is'} ${picks.map((w) => `<@${w}>`).join(', ')}! Congrats 🎉 (${ids.length} entries)\nOpen a ticket in #open-a-ticket to claim.`
+    ? `🏆 The **${gw.prize}** giveaway ${picks.length > 1 ? 'winners are' : 'winner is'} ${picks.map((w) => `<@${w}>`).join(', ')}! Congrats 🎉 (${tally})\nOpen a ticket in #open-a-ticket to claim.`
     : `The **${gw.prize}** giveaway ended with no entries 😢`;
   const winners = findChannel(guild, 'winners');
   if (winners) winners.send(text).catch(() => {});
