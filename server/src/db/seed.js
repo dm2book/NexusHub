@@ -22,6 +22,11 @@ const PERMISSIONS = {
   'fulfillment.manage': 'Manage fulfillment requests',
   'emails.manage': 'Edit email templates',
   'analytics.read': 'View analytics dashboards',
+  /* Recording what an advert cost is a WRITE. It sat behind analytics.read
+     because that was the permission the route file already had at hand, which
+     is how a reporting grant quietly becomes a way to enter figures that every
+     ROAS on the page is then computed from. */
+  'analytics.write': 'Record ad spend and other measured figures',
   'tickets.read': 'View support tickets',
   'tickets.manage': 'Respond to / resolve tickets',
   'users.read': 'View users',
@@ -42,7 +47,7 @@ const ROLES = {
     perms: [
       'orders.read', 'orders.update', 'orders.fulfill', 'orders.complete',
       'orders.refund', 'orders.contact', 'suppliers.read', 'suppliers.manage',
-      'suppliers.sync', 'fulfillment.manage', 'emails.manage', 'analytics.read',
+      'suppliers.sync', 'fulfillment.manage', 'emails.manage', 'analytics.read', 'analytics.write',
       'tickets.read', 'tickets.manage', 'users.read', 'users.manage', 'audit.read',
       'social.moderate', 'wallet.manage', 'monetization.manage',
     ],

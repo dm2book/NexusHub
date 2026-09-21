@@ -59,6 +59,11 @@ const NETWORK_CLICK_IDS = {
   gclid: 'google',
   gbraid: 'google',
   wbraid: 'google',
+  /* A Facebook click id cannot tell you WHICH Meta surface it came from — the
+     same parameter is appended on Instagram and on Facebook. So it stays
+     `meta`, and the finer answer has to come from utm_source, which the
+     advertiser controls. Guessing one of the two here would put real spend
+     against the wrong network. */
   fbclid: 'meta',
   msclkid: 'microsoft',
   twclid: 'twitter',
@@ -76,12 +81,19 @@ const SOURCE_NETWORKS = {
   google: 'google',
   googleads: 'google',
   adwords: 'google',
-  instagram: 'meta',
-  facebook: 'meta',
-  ig: 'meta',
-  fb: 'meta',
+  /* Instagram and Facebook are separate networks here, not one called `meta`.
+     They share an invoice and nothing else: a Reel and a Facebook feed post
+     reach different people, cost different amounts and convert differently, and
+     collapsing them means the report cannot answer the only question the money
+     turns on — which of the two to put the next euro into. `meta` stays
+     recognised so rows written before this, and sources that genuinely say
+     "meta", still parse. */
+  instagram: 'instagram',
+  ig: 'instagram',
+  reels: 'instagram',
+  facebook: 'facebook',
+  fb: 'facebook',
   meta: 'meta',
-  reels: 'meta',
   shorts: 'youtube',
   discord: 'discord',
   snapchat: 'snapchat',
