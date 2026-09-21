@@ -35,25 +35,55 @@ export default function ForgeShop() {
 
   const ICON = { coupon: Ticket, boost: Sparkles };
 
+  /* The cheapest thing still out of reach — so the header can say what the
+     balance is FOR, not only what it is. Undefined once everything is
+     affordable, and the line disappears rather than congratulating anyone. */
+  const next = (data?.shop || [])
+    .filter((r) => r.cost > (data?.balance ?? 0))
+    .sort((a, b) => a.cost - b.cost)[0];
+
   return (
-    <div className="max-w-3xl space-y-6">
-      {/* Balance header */}
-      <div className="rounded-2xl p-6 text-white shadow-lg shadow-amber-500/20 relative overflow-hidden"
-        style={{ backgroundImage: 'linear-gradient(120deg,#f59e0b,#f43f5e)' }}>
-        <div className="flex items-center gap-4">
-          <span className="w-14 h-14 rounded-2xl bg-white/15 grid place-items-center"><Coins size={28} /></span>
+    <div className="space-y-6">
+      {/* Balance header.
+          It was an orange-to-pink gradient, which is the loudest thing on the
+          page and belongs to no other surface in this product — the logo, the
+          active nav item and every primary button are indigo/violet. The gold
+          stays on the COINS, where it means something, and the panel joins the
+          rest of the shop. */}
+      <div className="rounded-2xl p-6 text-white relative overflow-hidden
+        border border-white/10 bg-elevated/60 shadow-lg shadow-primary/10">
+        <div className="orb w-72 h-72 bg-primary/20 -top-24 -right-16 pointer-events-none" />
+        <div className="relative flex flex-wrap items-center gap-5">
+          <span className="w-14 h-14 rounded-2xl grid place-items-center text-amber-300
+            bg-amber-400/10 ring-1 ring-amber-400/25">
+            <Coins size={28} />
+          </span>
           <div>
-            <div className="text-sm text-white/80">Your Forge Coins</div>
-            <div className="text-4xl font-extrabold leading-none">{data.balance}</div>
+            <div className="text-sm text-slate-400">Your Forge Coins</div>
+            <div className="text-4xl font-extrabold leading-none text-amber-300 tabular-nums">
+              {data.balance}
+            </div>
           </div>
+          {/* What the balance is worth right now, instead of only what it is. */}
+          {next && (
+            <div className="sm:ml-auto text-sm text-slate-400">
+              {next.cost - data.balance} more for <span className="text-slate-200">{next.label}</span>
+            </div>
+          )}
         </div>
-        <p className="text-white/85 text-sm mt-4">Earn <b>1 coin for every €10</b> you spend — automatically. Spend them below on discount codes and giveaway boosts.</p>
+        <p className="relative text-slate-400 text-sm mt-4 max-w-2xl">
+          Earn <b className="text-slate-200">1 coin for every €10</b> you spend — automatically.
+          Spend them below on discount codes and giveaway boosts.
+        </p>
       </div>
 
       {/* Shop */}
       <div>
         <h2 className="text-lg text-white font-bold mb-3">Forge Shop</h2>
-        <div className="grid sm:grid-cols-2 gap-4">
+        {/* Four across on a wide screen. The page was capped at max-w-3xl, so on
+            a 1400px window the content sat in 770px and the right half of the
+            screen was empty. */}
+        <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-4">
           {data.shop.map((r) => {
             const Icon = ICON[r.kind] || Ticket;
             const afford = data.balance >= r.cost;
@@ -64,11 +94,27 @@ export default function ForgeShop() {
                   <div className="font-semibold text-white">{r.label}</div>
                 </div>
                 <p className="text-slate-400 text-sm flex-1">{r.blurb}</p>
-                <div className="flex items-center justify-between mt-4">
-                  <span className="inline-flex items-center gap-1.5 text-amber-300 font-bold"><Coins size={15} /> {r.cost}</span>
+                {/* How close you are, not just that you are not there.
+                    "Need 15 more" on a dead grey button says the door is shut;
+                    the bar says how far along you already are, from numbers the
+                    page is holding anyway. */}
+                {!afford && (
+                  <div className="mt-4" aria-hidden="true">
+                    <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
+                      <div className="h-full rounded-full bg-gradient-to-r from-amber-500 to-amber-300
+                        transition-[width] duration-500"
+                        style={{ width: `${Math.min(100, Math.round((data.balance / r.cost) * 100))}%` }} />
+                    </div>
+                  </div>
+                )}
+                <div className="flex items-center justify-between gap-3 mt-4">
+                  <span className="inline-flex items-center gap-1.5 text-amber-300 font-bold tabular-nums">
+                    <Coins size={15} /> {r.cost}
+                  </span>
                   <button onClick={() => redeem(r)} disabled={!afford || busy === r.id}
-                    className={`text-sm font-semibold rounded-xl px-4 py-2 transition ${afford ? 'btn-primary' : 'bg-white/5 text-slate-500 cursor-not-allowed'}`}>
-                    {busy === r.id ? '…' : afford ? 'Redeem' : `Need ${r.cost - data.balance} more`}
+                    className={`text-sm font-semibold rounded-xl px-4 py-2 transition whitespace-nowrap
+                      ${afford ? 'btn-primary' : 'bg-white/5 text-slate-500 cursor-not-allowed'}`}>
+                    {busy === r.id ? '…' : afford ? 'Redeem' : `${r.cost - data.balance} to go`}
                   </button>
                 </div>
               </div>

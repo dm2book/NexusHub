@@ -54,7 +54,7 @@ function LaunchPhase() {
                   : 'The launch-day list is clear too.'}</>
               : (p.blockingOnTheDay
                 ? <span className="text-red-300">
-                  {p.blockingOnTheDay} thing(s) needed to serve a customer are wrong.
+                  {p.blockingOnTheDay} thing(s) on the launch-day plan are wrong.
                 </span>
                 : 'Payment, fulfilment, email and alerts all check out.')}
           </div>
@@ -94,7 +94,16 @@ function LaunchChecklist() {
           <div className="text-white font-semibold">
             {data.ready ? '🚀 Ready to sell' : '⛔ Not ready to sell yet'}
           </div>
-          <div className="text-slate-400 text-sm">{data.summary}{failing.length ? ` — ${failing.map((c) => c.label).join(', ')}` : ''}</div>
+          {/* Named, because the panel above counts a DIFFERENT list.
+              The two sat stacked, both red, both about "can this shop sell",
+              and they disagreed — 4 against 5 — with nothing on screen saying
+              why. They are the launch-day plan and the full readiness check,
+              and a reader who cannot tell them apart is left reconciling two
+              numbers that were never the same number. */}
+          <div className="text-slate-400 text-sm">
+            <span className="text-slate-500">Full readiness check — </span>
+            {data.summary}{failing.length ? ` — ${failing.map((c) => c.label).join(', ')}` : ''}
+          </div>
         </div>
         <ChevronDown size={18} className={`text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>

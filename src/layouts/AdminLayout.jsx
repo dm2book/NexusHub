@@ -94,7 +94,17 @@ export default function AdminLayout() {
   return (
     <div className="min-h-screen flex">
       {/* Desktop sidebar */}
-      <aside className="w-60 shrink-0 border-r border-white/5 bg-elevated/50 hidden lg:flex flex-col">
+      {/* Pinned, and exactly one viewport tall.
+          It had no height of its own, so as a stretched flex child it grew to
+          the height of the PAGE and scrolled away with it — which also meant
+          the `overflow-y-auto` on the nav inside had nothing to scroll within.
+          Measured on the analytics page: 3980px of content in a 900px window
+          put the Storefront link at y=3884, below the fold at the top of the
+          page and still out of reach at the bottom of it. There was no way back
+          to the shop from the admin except the browser's back button.
+          `self-start` matters: a stretched flex item cannot stick. */}
+      <aside className="w-60 shrink-0 border-r border-white/5 bg-elevated/50
+        hidden lg:flex flex-col sticky top-0 self-start h-screen">
         <Sidebar />
       </aside>
 
@@ -110,7 +120,11 @@ export default function AdminLayout() {
 
       <div className="flex-1 min-w-0 relative">
         <div className="orb w-96 h-96 bg-primary/10 -top-40 right-10 pointer-events-none" />
-        <header className="relative h-16 border-b border-white/5 flex items-center justify-between px-4 sm:px-6 backdrop-blur-sm">
+        {/* Sticky too, and opaque enough to sit over content.
+            On a phone the button that opens the navigation lives here, so a
+            header that scrolls away takes the only menu with it. */}
+        <header className="sticky top-0 z-30 h-16 border-b border-white/5 flex items-center
+          justify-between px-4 sm:px-6 bg-space-black/95 backdrop-blur-md">
           <div className="flex items-center gap-2 min-w-0">
             <button onClick={() => setOpen(true)} className="lg:hidden p-2 -ml-2 rounded-lg text-slate-200 hover:bg-white/5">
               <Menu size={20} />
