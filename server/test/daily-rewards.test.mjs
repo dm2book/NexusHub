@@ -25,6 +25,7 @@ const ok = (name, cond, extra = '') => {
   else { fail++; console.log(`  ❌ ${name} ${extra}`); }
 };
 
+const { readFileSync } = await import('node:fs');
 const { ensureReady } = await import('../src/app.js');
 await ensureReady();
 const svc = await import('../src/services/dailyRewardService.js');
@@ -256,6 +257,101 @@ console.log('\n— A reward the member can still find tomorrow —');
     JSON.stringify(real));
   const boost = earned.find((e) => e.kind === 'boost');
   ok('…and the boost is named without leaking its id', !!boost && boost.code === null);
+}
+
+console.log('\n— Points buy giveaway entries, and nothing else —');
+{
+  const u = await mkUser();
+  /* Ten days of turning up: 10+20+…+100 = 550 points. */
+  for (let d = 0; d < 10; d++) {
+    await claimOn(u, new Date(Date.UTC(2026, 2, 1 + d, 10)).toISOString());
+  }
+  const w0 = await svc.pointsWallet(u);
+  ok('points have a balance, not just a total', w0.earned === 550 && w0.balance === 550,
+    JSON.stringify(w0));
+  ok('…and an exchange rate the member can see', w0.perBoost === 500 && w0.affordable === 1,
+    JSON.stringify(w0));
+
+  const before = await openBoosts(u);
+  const out = await svc.redeemPointsForBoosts(u, 1);
+  ok('a trade hands over a real entry', (await openBoosts(u)) === before + 1);
+  ok('…and charges for exactly one', out.pointsSpent === 500);
+  const w1 = await svc.pointsWallet(u);
+  ok('…leaving the rest of the balance', w1.balance === 50, String(w1.balance));
+  /* The lifetime total is what the streak is worth and what the leaderboard
+     ranks on. Spending must not rewrite history. */
+  ok('…without touching what was earned', w1.earned === 550, String(w1.earned));
+
+  let poor = null;
+  try { await svc.redeemPointsForBoosts(u, 1); } catch (e) { poor = e.message; }
+  ok('a balance of 50 cannot buy a 500-point entry', /Not enough points/i.test(poor || ''), poor);
+  ok('…and says what it costs and what they have', /500/.test(poor || '') && /50/.test(poor || ''));
+
+  /* Two tabs on a balance of exactly one entry. A read-then-write would find
+     "enough" twice and hand over two entries for one lot of points. */
+  const racer = await mkUser();
+  for (let d = 0; d < 10; d++) {
+    await claimOn(racer, new Date(Date.UTC(2026, 3, 1 + d, 10)).toISOString());
+  }
+  const held = await openBoosts(racer);
+  const both = await Promise.allSettled([
+    svc.redeemPointsForBoosts(racer, 1),
+    svc.redeemPointsForBoosts(racer, 1),
+  ]);
+  const won = both.filter((r) => r.status === 'fulfilled').length;
+  ok('two tabs trading at once produce one entry', won === 1, JSON.stringify(both.map((r) => r.status)));
+  ok('…and one entry was actually created', (await openBoosts(racer)) === held + 1);
+  ok('…and only one lot of points left the balance',
+    (await svc.pointsWallet(racer)).balance === 50,
+    String((await svc.pointsWallet(racer)).balance));
+
+  /* The daily status is what the card reads; the rate has to be in it or the
+     button cannot say what it costs. */
+  const st = await svc.dailyStatus(racer, { now: new Date('2026-04-10T20:00:00Z') });
+  ok('the dashboard carries the wallet', st.wallet?.perBoost === 500 && st.wallet.balance === 50,
+    JSON.stringify(st.wallet));
+  ok('…and the entries already held', st.boosts >= 1, String(st.boosts));
+
+  /* An entry bought with points is the same thing as one bought with coins —
+     the draw cannot tell them apart, which is what makes it worth anything. */
+  const src = await all(
+    `SELECT source_ref FROM giveaway_boosts WHERE user_id=@u ORDER BY created_at DESC LIMIT 1`,
+    { u: racer });
+  ok('…and it is an ordinary boost the draw can claim', src[0]?.source_ref === 'points',
+    JSON.stringify(src[0]));
+
+  /* One boost per member per draw — which is what the card now says, and the
+     reason it says it. Holding four is four boosted giveaways, not four
+     tickets in one, and a strip promising otherwise would be the shop lying
+     about a draw it runs itself. */
+  const stacker = await mkUser();
+  for (let d = 0; d < 20; d++) {
+    await claimOn(stacker, new Date(Date.UTC(2026, 4, 1 + d, 10)).toISOString());
+  }
+  /* Twenty days includes day 7, so this member already holds the milestone
+     boost before trading anything — measured as a delta rather than assumed. */
+  const heldBefore = await openBoosts(stacker);
+  await svc.redeemPointsForBoosts(stacker, 3);
+  ok('three entries can be traded at once', (await openBoosts(stacker)) === heldBefore + 3,
+    String(await openBoosts(stacker)));
+  const { claimBoosts } = await import('../src/services/forgeCoinService.js');
+  const used = await claimBoosts([stacker], 'gw_test_1');
+  ok('…but one draw consumes exactly one', used[stacker] === 1, JSON.stringify(used));
+  ok('…leaving the rest for later draws', (await openBoosts(stacker)) === heldBefore + 2,
+    String(await openBoosts(stacker)));
+
+  const hist = await svc.redemptionHistory(racer);
+  ok('a trade is on the record', hist.length === 1 && hist[0].boosts === 1, JSON.stringify(hist));
+  const aud = await all(
+    `SELECT metadata FROM audit_logs WHERE action='daily.points_redeemed' AND target_id=@u`,
+    { u: racer });
+  ok('…and audited', aud.length === 1, String(aud.length));
+
+  /* Points buy giveaway entries and nothing else: no path from this feature to
+     the coin ledger, the wallet or a discount. */
+  const src2 = readFileSync(new URL('../src/services/dailyRewardService.js', import.meta.url), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  ok('no route from points to money', !/awardCoins|spendCoins|forge_coin_ledger|creditWallet/.test(src2));
 }
 
 console.log('\n— Admin: the curve, a reset, and the numbers —');

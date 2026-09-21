@@ -34,7 +34,7 @@ import { newId } from '../utils/ids.js';
 import { config } from '../config/env.js';
 import { badRequest } from '../utils/errors.js';
 import { audit } from './auditService.js';
-import { redeemBoostFor } from './forgeCoinService.js';
+import { redeemBoostFor, openBoosts } from './forgeCoinService.js';
 
 const TZ = () => config.timezone || 'Europe/Amsterdam';
 
@@ -112,6 +112,114 @@ export async function streakFor(userId) {
   };
 }
 
+/* ── Points buy giveaway entries, and nothing else ──────────────────────────
+ *
+ * The points were a score with no outlet: a member could look at 2,555 of them
+ * and do nothing at all. A giveaway boost is the one reward this shop can hand
+ * over without giving margin away — it is an extra entry in a draw that runs
+ * anyway — so it is what points buy, and the only thing they buy.
+ *
+ * 500 a boost, against a curve that pays 2,555 for a perfect month: five
+ * entries for thirty days of turning up. Cheap enough to be worth the click,
+ * dear enough that the draw does not fill with one person's tickets.
+ */
+export const POINTS_PER_BOOST = 500;
+export const MAX_BOOSTS_PER_REDEEM = 20;
+
+/**
+ * Earned, spent, and what is left.
+ *
+ * `total_points` stays the lifetime total — it is what the streak is worth and
+ * what the leaderboard ranks on. The balance is a subtraction done here, in one
+ * place, rather than a second column that can drift away from the claims that
+ * produced it.
+ */
+export async function pointsWallet(userId) {
+  const s = await streakFor(userId);
+  const earned = Number(s.total_points || 0);
+  const spent = Number(s.spent_points || 0);
+  const balance = Math.max(0, earned - spent);
+  return {
+    earned, spent, balance,
+    perBoost: POINTS_PER_BOOST,
+    affordable: Math.floor(balance / POINTS_PER_BOOST),
+    /* Stated so the card never has to do this sum itself and get it wrong. */
+    toNextBoost: (POINTS_PER_BOOST - (balance % POINTS_PER_BOOST)) % POINTS_PER_BOOST,
+  };
+}
+
+/**
+ * Spend points on giveaway entries.
+ *
+ * The debit is a single conditional UPDATE, not a read followed by a write: two
+ * tabs clicking together on a balance of 500 would both read "enough" and both
+ * be granted, and the shop would have handed over two entries for one lot of
+ * points. With the balance in the WHERE clause the loser updates no rows and is
+ * told so.
+ *
+ * If a boost then fails to mint, the points for the ones that did not arrive go
+ * back. A member who paid and received nothing must not also be out of pocket.
+ */
+export async function redeemPointsForBoosts(userId, count = 1, { actor = null, ip = null } = {}) {
+  const n = Math.round(Number(count));
+  if (!Number.isFinite(n) || n < 1) throw badRequest('Choose at least one entry.');
+  if (n > MAX_BOOSTS_PER_REDEEM) {
+    throw badRequest(`You can trade for at most ${MAX_BOOSTS_PER_REDEEM} entries at a time.`);
+  }
+  const cost = n * POINTS_PER_BOOST;
+
+  const debit = await run(
+    `UPDATE daily_streaks SET spent_points = spent_points + @c, updated_at = @at
+      WHERE user_id = @u AND (total_points - spent_points) >= @c`,
+    { u: userId, c: cost, at: nowIso() });
+  if (!debit.changes) {
+    const w = await pointsWallet(userId);
+    throw badRequest(`Not enough points — that costs ${cost} and you have ${w.balance}.`);
+  }
+
+  const ids = [];
+  let failed = 0;
+  for (let k = 0; k < n; k++) {
+    try {
+      const out = await redeemBoostFor(userId, 'points');
+      ids.push(out.boostId);
+    } catch { failed += 1; }
+  }
+
+  if (failed) {
+    const refund = failed * POINTS_PER_BOOST;
+    await run(
+      `UPDATE daily_streaks SET spent_points = GREATEST(0, spent_points - @r), updated_at = @at
+        WHERE user_id = @u`, { u: userId, r: refund, at: nowIso() });
+    await audit({ actor: actor || { id: userId }, action: 'daily.points_refunded',
+      targetType: 'user', targetId: userId, metadata: { refund, failed } });
+  }
+
+  if (ids.length) {
+    await run(
+      `INSERT INTO point_redemptions (id, user_id, points, boosts, boost_ids, created_at)
+       VALUES (@id, @u, @p, @b, @ids, @at)`,
+      { id: newId('prd'), u: userId, p: ids.length * POINTS_PER_BOOST, b: ids.length,
+        ids: JSON.stringify(ids), at: nowIso() });
+  }
+
+  await audit({ actor: actor || { id: userId }, action: 'daily.points_redeemed',
+    targetType: 'user', targetId: userId, ip,
+    metadata: { boosts: ids.length, points: ids.length * POINTS_PER_BOOST, failed } });
+
+  if (!ids.length) throw badRequest('That could not be completed — your points are untouched.');
+  return { boosts: ids.length, pointsSpent: ids.length * POINTS_PER_BOOST,
+    wallet: await pointsWallet(userId) };
+}
+
+/** What a member has traded points for, most recent first. */
+export async function redemptionHistory(userId, { limit = 10 } = {}) {
+  const rows = await all(
+    `SELECT points, boosts, created_at FROM point_redemptions
+      WHERE user_id = @u ORDER BY created_at DESC LIMIT @l`, { u: userId, l: limit }).catch(() => []);
+  return rows.map((r) => ({ points: Number(r.points), boosts: Number(r.boosts), at: r.created_at }));
+}
+
 /**
  * What this member has already won.
  *
@@ -152,10 +260,12 @@ export async function dailyStatus(userId, { now = new Date() } = {}) {
   const continues = s.last_claim_day === previousDay(today);
   const streakDay = (claimedToday || continues) ? Number(s.current_streak || 0) + 1 : 1;
 
-  const [reward, upcoming, earned] = await Promise.all([
+  const [reward, upcoming, earned, wallet, boosts] = await Promise.all([
     rewardFor(streakDay),
     nextMilestone(claimedToday ? Number(s.current_streak || 0) : streakDay - 1),
     earnedMilestones(userId),
+    pointsWallet(userId),
+    openBoosts(userId),
   ]);
 
   return {
@@ -175,6 +285,12 @@ export async function dailyStatus(userId, { now = new Date() } = {}) {
     nextReward: reward,
     nextMilestone: upcoming,
     earned,
+    /* What the points are actually worth, alongside the points themselves —
+       a balance shown without its exchange rate is a number nobody can act on. */
+    wallet,
+    /* Entries already held, from any source: bought with coins, won at day 7,
+       or traded for here. The card counts them in one place. */
+    boosts,
   };
 }
 
@@ -392,9 +508,18 @@ export async function dailyStats({ days = 30, now = new Date() } = {}) {
             COALESCE(AVG(NULLIF(current_streak, 0)), 0) AS avg_active
        FROM daily_streaks`).catch(() => null);
   const top = await all(
-    `SELECT s.user_id, u.email, s.current_streak, s.longest_streak, s.total_points
+    `SELECT s.user_id, u.email, s.current_streak, s.longest_streak, s.total_points,
+            s.spent_points
        FROM daily_streaks s JOIN users u ON u.id = s.user_id
       ORDER BY s.current_streak DESC, s.longest_streak DESC LIMIT 10`).catch(() => []);
+
+  /* What the points actually cost the shop, which is nothing in euros and some
+     dilution of the draw. Shown because "points are free" is only true while
+     somebody is watching how many entries they turn into. */
+  const traded = await get(
+    `SELECT COALESCE(SUM(boosts), 0) AS boosts, COALESCE(SUM(points), 0) AS points,
+            COUNT(DISTINCT user_id) AS members
+       FROM point_redemptions WHERE created_at >= @since`, { since }).catch(() => null);
 
   return {
     days,
@@ -406,11 +531,16 @@ export async function dailyStats({ days = 30, now = new Date() } = {}) {
     activeStreaks: Number(streaks?.active || 0),
     longestEver: Number(streaks?.longest || 0),
     averageActiveStreak: Math.round(Number(streaks?.avg_active || 0) * 10) / 10,
+    pointsTraded: Number(traded?.points || 0),
+    entriesTraded: Number(traded?.boosts || 0),
+    tradingMembers: Number(traded?.members || 0),
+    pointsPerBoost: POINTS_PER_BOOST,
     byDay: byDay.map((r) => ({ day: r.day, claims: Number(r.claims) })),
     top: top.map((r) => ({
       userId: r.user_id, email: r.email,
       currentStreak: Number(r.current_streak), longestStreak: Number(r.longest_streak),
       totalPoints: Number(r.total_points),
+      pointsLeft: Math.max(0, Number(r.total_points || 0) - Number(r.spent_points || 0)),
     })),
   };
 }

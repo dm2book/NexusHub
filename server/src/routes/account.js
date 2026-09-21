@@ -21,7 +21,8 @@ import { loyaltyFor } from '../services/loyaltyService.js';
 import { affiliateStats } from '../services/affiliateService.js';
 import { coinBalance, coinHistory, coinProgress, redeemReward, spendCoins }
   from '../services/forgeCoinService.js';
-import { dailyStatus, claimDaily } from '../services/dailyRewardService.js';
+import { dailyStatus, claimDaily, redeemPointsForBoosts, redemptionHistory }
+  from '../services/dailyRewardService.js';
 import { pullsForOrder, rerollPull } from '../services/mysteryBoxService.js';
 import { getMembership, grantMembership, FORGE_PLUS, MEMBERSHIP_DAYS } from '../services/membershipService.js';
 import { saveCart, getCart } from '../services/cartService.js';
@@ -337,6 +338,25 @@ router.post('/daily/claim',
       ip: req.ip, actor: { id: req.user.id, email: req.user.email },
     });
     res.json(out);
+  }));
+
+/**
+ * Trade points for giveaway entries.
+ *
+ * The same rate limit as the claim, for the same reason: the balance check that
+ * matters is in the UPDATE, so a burst of clicks costs the member nothing and
+ * the database a write each.
+ */
+router.post('/daily/redeem',
+  rateLimit({ bucket: 'daily', windowMs: 60_000, max: 10 }),
+  asyncHandler(async (req, res) => {
+    const { boosts } = z.object({
+      boosts: z.coerce.number().int().min(1).max(20).default(1),
+    }).parse(req.body || {});
+    const out = await redeemPointsForBoosts(req.user.id, boosts, {
+      ip: req.ip, actor: { id: req.user.id, email: req.user.email },
+    });
+    res.json({ ...out, history: await redemptionHistory(req.user.id) });
   }));
 
 // ── Forge Coins + Forge Shop ─────────────────────────────────────────────────

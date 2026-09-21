@@ -17,7 +17,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Flame, Users, Trophy, Gift, ShieldAlert, RotateCcw, Check, X, Undo2,
+  Flame, Users, Trophy, Gift, ShieldAlert, RotateCcw, Check, X, Undo2, Ticket,
 } from 'lucide-react';
 import { api } from '../../lib/api.js';
 import { money } from '../../lib/format.js';
@@ -118,9 +118,15 @@ function Stats({ stats }) {
     { icon: Gift, label: 'Milestones handed out', value: stats.milestonesHit,
       sub: `${stats.pointsAwarded.toLocaleString()} points awarded`,
       tone: 'text-violet-300 bg-violet-500/10' },
+    /* The only thing points can be spent on, and therefore the only place they
+       cost anything — not money, but weight in the draw. */
+    { icon: Ticket, label: 'Giveaway entries traded', value: stats.entriesTraded ?? 0,
+      sub: `${(stats.pointsTraded ?? 0).toLocaleString()} points spent`
+        + `${stats.pointsPerBoost ? ` · ${stats.pointsPerBoost} each` : ''}`,
+      tone: 'text-sky-300 bg-sky-500/10' },
   ];
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
       {cards.map((c) => (
         <div key={c.label} className="card p-4">
           <span className={`w-9 h-9 rounded-xl grid place-items-center mb-3 ${c.tone}`}><c.icon size={17} /></span>
@@ -170,6 +176,7 @@ function Leaderboard({ top, onReset, busy }) {
               <th className="text-right px-3 py-2 font-normal">Now</th>
               <th className="text-right px-3 py-2 font-normal">Best</th>
               <th className="text-right px-3 py-2 font-normal">Points</th>
+              <th className="text-right px-3 py-2 font-normal">Left</th>
               <th className="px-3 py-2" />
             </tr>
           </thead>
@@ -180,6 +187,12 @@ function Leaderboard({ top, onReset, busy }) {
                 <td className="px-3 py-2.5 text-right text-orange-300">{m.currentStreak}</td>
                 <td className="px-3 py-2.5 text-right text-slate-400">{m.longestStreak}</td>
                 <td className="px-3 py-2.5 text-right text-slate-300">{m.totalPoints.toLocaleString()}</td>
+                {/* Earned is the ranking; left is what they can still turn into
+                    entries, and the two stop being the same the moment anybody
+                    trades. */}
+                <td className="px-3 py-2.5 text-right text-slate-500">
+                  {(m.pointsLeft ?? m.totalPoints).toLocaleString()}
+                </td>
                 <td className="px-3 py-2.5 text-right">
                   <button title="Reset this streak" disabled={busy}
                     onClick={() => onReset(m.userId, m.email)}
