@@ -71,7 +71,11 @@ export const CATALOG = [
   { sku: 'APEX-1000', name: '1,000 Apex Coins', category: 'apex', price: 799,
     image: '/products/packs/apex-1000.svg', description: 'Apex Coins for skins, the Battle Pass and packs.' },
   { sku: 'APEX-2150', name: '2,150 Apex Coins', category: 'apex', price: 1599,
-    image: '/products/packs/apex-2150.svg', description: 'Apex Coins bundle.' },
+    /* "Apex Coins bundle." was 18 characters and said nothing a buyer did not
+       already know from the title — the catalogue audit flags it, and it is the
+       only product in the seed that trips that rule. */
+    image: '/products/packs/apex-2150.svg',
+    description: 'Apex Coins for skins, the Battle Pass and Apex Packs.' },
   { sku: 'APEX-4350', name: '4,350 Apex Coins', category: 'apex', price: 3099, featured: true,
     image: '/products/packs/apex-4350.svg', description: 'Great-value Apex Coins pack.' },
   { sku: 'APEX-11500', name: '11,500 Apex Coins', category: 'apex', price: 7499,
