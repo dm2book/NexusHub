@@ -3,6 +3,7 @@ import { TrendingUp, ShoppingCart, Percent, Users, Trophy, Rocket, CheckCircle2,
 import { api } from '../../lib/api.js';
 import SellerIdentityCard from '../../components/admin/SellerIdentityCard.jsx';
 import KeysCard from '../../components/admin/KeysCard.jsx';
+import BackupsCard from '../../components/admin/BackupsCard.jsx';
 import AdPerformance from '../../components/admin/AdPerformance.jsx';
 import { money } from '../../lib/format.js';
 import { PageLoader } from '../../components/ui.jsx';
@@ -173,6 +174,9 @@ export default function Analytics() {
       {/* The other half of "what is stopping this shop opening": the keys. Same
           place, same shape — nothing here needs a deploy either. */}
       <KeysCard />
+      {/* And the copies. Same place as the rest of "what is not in order",
+          because a backup nobody has ever downloaded belongs on that list. */}
+      <BackupsCard />
 
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
         {kpis.map(({ icon: Icon, label, value, sub }) => (

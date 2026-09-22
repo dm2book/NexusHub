@@ -154,5 +154,9 @@ export const api = {
   patch: (p, body) => request(p, { method: 'PATCH', body }),
   put: (p, body) => request(p, { method: 'PUT', body }),
   del: (p) => request(p, { method: 'DELETE' }),
+  /* The Response itself, for the one thing that is not JSON: a backup download
+     is megabytes of file, and it still needs the same bearer token and the same
+     one-shot refresh every other call gets. */
+  raw: (p) => request(p, { raw: true }),
   refresh,
 };

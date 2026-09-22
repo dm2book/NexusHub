@@ -24,6 +24,33 @@ const TTL_MS = 60_000;
 // the signed /api/discord/outbox endpoint and posts it — so Discord automation
 // works with ZERO Discord secrets in the hosting environment.
 
+/**
+ * Queue an owner alert for the bot to post.
+ *
+ * The point of this one is that it needs NO new credential. An owner running
+ * the community bot already has a live connection to their server; asking them
+ * to go and create a webhook as well is asking for a step that does not get
+ * done, and the consequence of not doing it is that a chargeback at 3am arrives
+ * by email. The bot's channel map falls back to #leads / #staff-announcements
+ * for a kind it does not recognise, so this reaches a staff channel even on a
+ * bot that was deployed before this existed.
+ *
+ * Refused when the bot has not been seen: a queue nobody drains looks
+ * configured and delivers nothing, which is worse than the email it replaced.
+ */
+export async function queueOwnerAlert({ title, lines = [], url = null, colour = 0x7c5cff }) {
+  if (!(await botSeenRecently(24))) return false;
+  return enqueueOutbox('alerts', {
+    embeds: [{
+      title: String(title || 'ForgeMarket'),
+      description: lines.join('\n').slice(0, 3800),
+      color: colour,
+      url: url || undefined,
+      timestamp: new Date().toISOString(),
+    }],
+  });
+}
+
 async function enqueueOutbox(channel, body) {
   try {
     await run(

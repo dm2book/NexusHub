@@ -1951,4 +1951,32 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS lang TEXT;
       );
     `,
   },
+  {
+    id: '049_backups',
+    /*
+     * Weekly snapshots of the rows nobody can reconstruct.
+     *
+     * Gzipped JSON in a column rather than a file store: a shop this size is a
+     * couple of megabytes compressed, and a file store means an upload
+     * credential, a second place to be down, and a bucket somebody forgets to
+     * pay for. What it buys is undoing a mistake — a bulk edit, a wrong delete
+     * — which is the loss a hosted database's own snapshots replicate for you.
+     *
+     * `downloaded_at` is the only evidence an OFF-SITE copy exists, because a
+     * backup living in the database it backs up is not one.
+     */
+    sql: `
+      CREATE TABLE IF NOT EXISTS backups (
+        id            TEXT PRIMARY KEY,
+        kind          TEXT NOT NULL DEFAULT 'shop',   -- shop | discord
+        byte_size     BIGINT NOT NULL DEFAULT 0,
+        counts        TEXT NOT NULL DEFAULT '{}',     -- rows per table, for the admin
+        payload       TEXT NOT NULL,                  -- gzip + base64 JSON
+        reason        TEXT NOT NULL DEFAULT 'scheduled',
+        created_at    TEXT NOT NULL,
+        downloaded_at TEXT
+      );
+      CREATE INDEX IF NOT EXISTS idx_backups_recent ON backups (kind, created_at DESC);
+    `,
+  },
 ];

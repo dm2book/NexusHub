@@ -68,6 +68,30 @@ const STATE_PREFIX = 'discord_bot_state:';
 // `category_logos` or any other setting sharing this table.
 const STATE_KEYS = new Set(['xp', 'giveaways', 'meta']);
 
+/**
+ * A copy of the Discord server's shape, sent by the bot.
+ *
+ * What is worth keeping is the structure, not the chat: the channels, the
+ * roles, their order and their permissions overwrites. That is the thing that
+ * takes an evening to rebuild after a deletion or a raid, and the thing nobody
+ * has written down. Messages are Discord's own and are not this shop's to hold.
+ *
+ * The snapshot itself is bound into the signature, so a captured request cannot
+ * be replayed with different contents.
+ */
+export const canonicalGuildBackup = (b = {}) =>
+  `guildbackup:${b.guildId || ''}:${b.takenAt || ''}`;
+router.post('/backup',
+  verifyIngest(canonicalGuildBackup)(config.discord.reviewIngestSecret),
+  asyncHandler(async (req, res) => {
+    const snapshot = req.body?.snapshot;
+    if (!snapshot || typeof snapshot !== 'object') {
+      return res.status(400).json({ error: 'no snapshot' });
+    }
+    const { storeGuildBackup } = await import('../services/backupService.js');
+    res.json(await storeGuildBackup(snapshot, { guildId: req.body?.guildId || null }));
+  }));
+
 export const canonicalStateGet = (b = {}) => `state:get:${b.key || ''}`;
 router.post('/state/get',
   verifyIngest(canonicalStateGet)(config.discord.reviewIngestSecret),
