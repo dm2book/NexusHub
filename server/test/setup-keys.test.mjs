@@ -132,6 +132,63 @@ console.log('\n— What is still missing, in the owner’s words —');
     !after.some((m) => m.id === 'stripe.webhookSecret'), JSON.stringify(after));
 }
 
+console.log('\n— A keyring is only worth its key —');
+{
+  /* The encryption key is derived from JWT_SECRET, whose built-in default is
+     published in this repository. A shop running on it stores a live Stripe key
+     under a string anybody can read — which is not encryption, it is the
+     appearance of encryption, and the appearance is the reason somebody pastes
+     a real key in. */
+  const { keyringStrength, DEV_SECRET_PREFIX } = store;
+  ok('a long random secret is a usable keyring', keyringStrength().safe === true,
+    JSON.stringify(keyringStrength()));
+
+  /* Each case in its own process: config reads process.env once, at import. */
+  const { spawnSync } = await import('node:child_process');
+  const runWith = (env, body) => {
+    const r = spawnSync(process.execPath, ['-e', `
+      const store = await import('${new URL('../src/services/secretStore.js', import.meta.url).pathname}');
+      ${body}
+    `, '--input-type=module'], { encoding: 'utf8', env: { ...process.env, ...env } });
+    return (r.stdout || '').trim().split('\n').pop() + (r.stderr && !r.stdout ? r.stderr.slice(0, 200) : '');
+  };
+
+  const weak = runWith({ JWT_SECRET: '' },
+    'console.log(JSON.stringify(store.keyringStrength()));');
+  const parsed = JSON.parse(weak);
+  ok('the published default is not', parsed.safe === false, weak);
+  ok('…and the reason says the string is in the repository',
+    /published in this repository/.test(parsed.reason), parsed.reason);
+  ok('…which is what the prefix names', DEV_SECRET_PREFIX === 'dev-only');
+
+  const short = JSON.parse(runWith({ JWT_SECRET: 'short' },
+    'console.log(JSON.stringify(store.keyringStrength()));'));
+  ok('a short secret is refused too', short.safe === false, JSON.stringify(short));
+  ok('…naming its length', /only 5 characters/.test(short.reason), short.reason);
+
+  /* Refused in production rather than performed badly. A developer on a laptop
+     is not the threat, so there it warns and proceeds. */
+  const prod = runWith({ JWT_SECRET: '', NODE_ENV: 'production' }, `
+    try { await store.setSecret('stripe.secretKey', 'sk_live_NOPE'); console.log('STORED'); }
+    catch (e) { console.log('REFUSED:' + e.message); }
+  `);
+  ok('production refuses to store a key under it', /^REFUSED:/.test(prod), prod.slice(0, 120));
+  ok('…and says what to do first', /long random JWT_SECRET/.test(prod), prod.slice(0, 160));
+
+  /* Clearing must never be blocked: taking a value out is not the unsafe
+     direction, and an owner locked out of clearing a key is stuck with it. */
+  const cleared = runWith({ JWT_SECRET: '', NODE_ENV: 'production' }, `
+    try { await store.setSecret('stripe.secretKey', ''); console.log('CLEARED'); }
+    catch (e) { console.log('REFUSED:' + e.message); }
+  `);
+  ok('…while clearing one is still allowed', /CLEARED/.test(cleared), cleared.slice(0, 120));
+
+  /* And the screen has to carry it, beside the box being pasted into. */
+  const status = await store.secretStatus();
+  ok('the status tells the screen whether the keyring is safe',
+    typeof status[0].keyringSafe === 'boolean', JSON.stringify(status[0].keyringSafe));
+}
+
 console.log('\n— How many orders can this shop actually serve? —');
 {
   /* Measured, not assumed: twelve orders driven through the real API against a

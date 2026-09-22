@@ -36,6 +36,40 @@ import { all, get, run, nowIso } from '../db/index.js';
 import { config } from '../config/env.js';
 import { audit } from './auditService.js';
 
+/**
+ * Whether the keyring is worth anything.
+ *
+ * The encryption key is derived from JWT_SECRET, and JWT_SECRET falls back to
+ * `dev-only-insecure-secret-change-me` — a string that is IN THIS REPOSITORY.
+ * A shop running on that default stores its live Stripe key encrypted under a
+ * value anybody can read, which is not encryption; it is the appearance of it,
+ * which is worse, because it is the reason somebody would paste a real key in.
+ *
+ * So it is named. In production a save is refused outright rather than
+ * performed badly; everywhere else it is allowed, because a developer typing a
+ * fake key into a laptop is not the threat, and loudly reported so nobody
+ * mistakes a laptop for a shop.
+ */
+export const DEV_SECRET_PREFIX = 'dev-only';
+export function keyringStrength() {
+  const secret = String(config.auth.jwtSecret || '');
+  if (!secret || secret.startsWith(DEV_SECRET_PREFIX)) {
+    return {
+      safe: false,
+      reason: 'JWT_SECRET is the built-in default, which is published in this repository. '
+        + 'Anything stored here would be encrypted with a key anyone can derive.',
+    };
+  }
+  if (secret.length < 24) {
+    return {
+      safe: false,
+      reason: `JWT_SECRET is only ${secret.length} characters. It is the key everything stored `
+        + 'here is encrypted with, so it needs to be long and random.',
+    };
+  }
+  return { safe: true, reason: null };
+}
+
 /* One derivation per process. scrypt is deliberately slow; doing it per read
    would put 100ms on every cold start that touches a key. */
 let KEY = null;
@@ -180,6 +214,7 @@ const last4 = (v) => (v && v.length > 4 ? `…${v.slice(-4)}` : (v ? '…' : '')
  */
 export async function secretStatus() {
   const stored = await storedSecrets();
+  const strength = keyringStrength();
   return SECRETS.map((s) => {
     const held = stored[s.id];
     const fromAdmin = !!(held?.readable && held.value);
@@ -194,6 +229,11 @@ export async function secretStatus() {
       source: fromAdmin ? 'admin' : (ENV_BASELINE[s.id] ? 'environment' : 'unset'),
       unreadable: !!(held && !held.readable),
       updatedAt: held?.updatedAt || null,
+      /* Carried per row so the screen can say it beside the box somebody is
+         about to paste a live key into, not only in a banner they scrolled
+         past. */
+      keyringSafe: strength.safe,
+      keyringReason: strength.reason,
     };
   });
 }
@@ -203,6 +243,21 @@ export async function setSecret(id, value, { actor = null } = {}) {
   if (!spec) { const e = new Error('Unknown setting.'); e.status = 400; throw e; }
   const v = String(value ?? '').trim();
   const at = nowIso();
+
+  /* Refused, not stored badly. A live Stripe key encrypted under a published
+     string is a key in plaintext with extra steps, and the owner would have
+     every reason to believe otherwise. Clearing is always allowed: taking a
+     value out is never the unsafe direction. */
+  const strength = keyringStrength();
+  if (v && !strength.safe && config.env === 'production') {
+    const err = new Error(`${strength.reason} Set a long random JWT_SECRET in your hosting `
+      + 'environment first — then save this again.');
+    err.status = 400;
+    throw err;
+  }
+  if (v && !strength.safe) {
+    console.warn(`[secrets] storing "${id}" under a weak keyring — ${strength.reason}`);
+  }
 
   if (!v) {
     await run(`DELETE FROM app_secrets WHERE key = @k`, { k: id });
