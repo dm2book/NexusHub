@@ -10,6 +10,7 @@ import { audit } from '../../services/auditService.js';
 import { assertSafeImageValue, resolveImageUrl } from '../../utils/imageUrl.js';
 import { normalizeImageValue } from '../../services/imageStoreService.js';
 import { backfillArt, proposedCategories } from '../../services/productFitService.js';
+import { importCosts } from '../../services/costImportService.js';
 
 const router = Router();
 
@@ -60,6 +61,21 @@ router.post('/art/backfill', requirePermission('suppliers.manage'), asyncHandler
   const apply = String(req.query.apply || req.body?.apply || '') === '1'
     || req.body?.apply === true;
   res.json(await backfillArt({ apply, actor: req.user }));
+}));
+
+/**
+ * Cost prices, pasted as a table.
+ *
+ * Dry unless `apply` is true, and the report is the same shape either way — so
+ * what the owner approves is what they already read. The numbers are theirs;
+ * the hour of clicking was not.
+ */
+router.post('/costs/import', requirePermission('suppliers.manage'), asyncHandler(async (req, res) => {
+  const { text, apply } = z.object({
+    text: z.string().max(200_000),
+    apply: z.boolean().optional(),
+  }).parse(req.body || {});
+  res.json(await importCosts(text, { apply: apply === true, actor: req.user }));
 }));
 
 /** Which shelves the discovered products would need that the shop has not got. */

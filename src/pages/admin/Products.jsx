@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Package, Plus, Pencil, Star, Eye, EyeOff, Search, Image as ImageIcon, Upload, Loader2, X, Scissors, Wand2 } from 'lucide-react';
+import { Package, Plus, Pencil, Star, Eye, EyeOff, Search, Image as ImageIcon, Upload, Loader2, X, Scissors, Wand2, Euro } from 'lucide-react';
 import { api } from '../../lib/api.js';
 import { money, categoryVisual, normalizeSearch } from '../../lib/catalog.js';
 import { fileToDataUrl, removeSolidBackground, imageLabel } from '../../lib/imageUpload.js';
 import { toArtboard, isOwnerUpload } from '../../lib/productArtboard.js';
+import CostImport from '../../components/admin/CostImport.jsx';
 import { PageLoader, EmptyState, Modal } from '../../components/ui.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
 
@@ -30,6 +31,7 @@ export default function AdminProducts() {
   const [stock, setStock] = useState(null); // { p, codes } or null
   const [rewards, setRewards] = useState(null); // mystery reward pool [{label,weight,creditEuro}]
   const [sel, setSel] = useState(() => new Set()); // selected product ids for bulk actions
+  const [costOpen, setCostOpen] = useState(false);
   const [q, setQ] = useState('');            // search / filter query
   const [bulkImg, setBulkImg] = useState(''); // image URL/upload to apply to the selection
   const [imgBusy, setImgBusy] = useState(false);   // uploading/resolving the form image
@@ -277,6 +279,24 @@ export default function AdminProducts() {
         </div>
       </div>
       <p className="text-slate-400 text-sm mb-4">Manage your catalog. Featured items get highlighted on the storefront.</p>
+
+      {/* Offered by name only while it would change something: a shop that has
+          priced everything does not need a panel telling it so. The count is
+          the reason — a margin cannot be computed without these. */}
+      {(() => {
+        const missing = products.filter((p) => p.costCents == null && p.cost == null
+          && !(p.metadata && (p.metadata.cost != null || p.metadata.costCents != null))).length;
+        if (!missing) return null;
+        return (
+          <div className="mb-4">
+            <button onClick={() => setCostOpen((v) => !v)}
+              className="btn-ghost text-sm whitespace-nowrap">
+              <Euro size={15} /> {costOpen ? 'Close' : `Import cost prices — ${missing} product(s) have none`}
+            </button>
+            {costOpen && <div className="mt-3"><CostImport onDone={load} /></div>}
+          </div>
+        );
+      })()}
 
       {/* Search + quick select-all-matches */}
       <div className="flex flex-wrap items-center gap-2 mb-4">
