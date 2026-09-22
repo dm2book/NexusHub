@@ -1929,4 +1929,26 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS lang TEXT;
         ON point_redemptions (user_id, created_at DESC);
     `,
   },
+  {
+    id: '048_app_secrets',
+    /*
+     * Keys the owner types in, instead of into a deploy.
+     *
+     * Encrypted with AES-256-GCM under a key derived from JWT_SECRET, which
+     * lives in the environment and therefore not in here: a dump of this table
+     * alone yields nothing usable. That is the property being bought, and it is
+     * not a claim that this is a vault.
+     *
+     * No value is ever read back out to a browser, and none is ever written to
+     * the audit log — that a key changed, by whom and when is the record.
+     */
+    sql: `
+      CREATE TABLE IF NOT EXISTS app_secrets (
+        key        TEXT PRIMARY KEY,
+        value      TEXT NOT NULL,        -- v1.<iv>.<tag>.<ciphertext>, base64url
+        updated_at TEXT NOT NULL,
+        updated_by TEXT
+      );
+    `,
+  },
 ];

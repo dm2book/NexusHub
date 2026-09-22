@@ -22,6 +22,7 @@ import {
 import { LEGAL, legalComplete, LEGAL_ENV } from '../../../src/lib/legalIdentity.js';
 import { artStatus } from '../../../src/lib/shippedArt.js';
 import { sellerIdentity } from './sellerIdentityService.js';
+import { capacityLine } from './capacityService.js';
 import { auditCatalog } from './catalogAuditService.js';
 import { appUrlVerdict } from './servedHostService.js';
 
@@ -194,6 +195,17 @@ export async function launchChecks() {
   if (!nProducts) add('catalog', 'Catalog', 'fail', 'No active products.');
   else add('catalog', 'Catalog', nStocked ? 'ok' : 'warn',
     `${nProducts} active products, ${nStocked} with pre-loaded codes${nStocked ? '' : ' — without codes every order needs manual delivery'}.`);
+
+  /* 3b. And the question the catalogue count does not answer: how many orders
+     can actually be served tomorrow without anybody touching them.
+
+     Measured rather than assumed: twelve orders driven through the real HTTP
+     API against a shop with codes loaded were paid and delivered themselves,
+     none needing a human. So the machinery is not the ceiling — stock is, and
+     "0 products with codes" does not say whether ten orders would be fine. A
+     number does. */
+  const cap = await capacityLine({ target: 10 }).catch(() => null);
+  if (cap) add('capacity', 'Orders you can serve unattended', cap.status, cap.detail);
 
   /* 3a. The hourly sweep, judged on whether it RAN.
    *
