@@ -77,6 +77,22 @@ export default function KeysCard() {
 
       {open && (
         <div className="px-5 pb-5 space-y-6">
+          {/* Before anything else, because it is the reason not to paste a live
+              key at all. The encryption key is derived from JWT_SECRET, and the
+              built-in default is published in the repository — storing a Stripe
+              key under it is plaintext with extra steps. */}
+          {data.keys[0] && data.keys[0].keyringSafe === false && (
+            <div className="rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3">
+              <div className="text-red-200 text-[13px] font-semibold">
+                Do not paste a live key yet.
+              </div>
+              <div className="text-red-200/90 text-[12.5px] mt-1">
+                {data.keys[0].keyringReason} Set a long random <code>JWT_SECRET</code> in Vercel,
+                redeploy, and then come back — saving is refused in production until you do.
+              </div>
+            </div>
+          )}
+
           {/* A key encrypted under a JWT_SECRET that has since changed cannot be
               read back. Saying "not set" would send the owner looking for a
               setting that is there. */}
