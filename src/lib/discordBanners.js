@@ -33,6 +33,15 @@ export const BANNER_VERSION = {
   giveaways: 'e9aa014e',
   support: '4e29c726',
   vouches: 'e9958175',
+  'start-here': '228db0c3',
+  'how-to-buy': '12f79c27',
+  announcements: '9d36d003',
+  proof: '5f01c449',
+  links: '228b0ba5',
+  'report-a-scam': 'dc5fb25a',
+  partners: '0f124302',
+  roles: '7f8984bf',
+  suggestions: '9a0f115b',
 };
 
 /** The file name on disk, under public/discord/. */
