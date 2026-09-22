@@ -41,10 +41,26 @@ const read = (p) => {
   try { return fs.readFileSync(path.join(ROOT, p), 'utf8'); } catch { return null; }
 };
 
-/** Loaded from source rather than imported: this runs in the API, which has no JSX. */
+/**
+ * Who is selling, as the SHOP publishes it — not as the build was made.
+ *
+ * LEGAL starts from the environment variables this build was compiled with, and
+ * the owner can now override them from the admin. The stored values have to be
+ * applied first or this audit reads a shop that no longer exists: filled in on
+ * the 15th, live on the site, and still reported here as "cannot say who is
+ * selling" — from the very command the readiness panel tells the owner to run.
+ * Two screens disagreeing about one fact, on the day it matters most.
+ *
+ * Swallowed on failure: run without a database (a laptop, a CI box) this falls
+ * back to the build's values, which is what it always did.
+ */
 async function sellerIdentity() {
   try {
     const mod = await import(path.join(ROOT, 'src/lib/legalIdentity.js'));
+    try {
+      const { applyStoredIdentity } = await import('./sellerIdentityService.js');
+      await applyStoredIdentity();
+    } catch { /* no database here — the build's values stand */ }
     return mod.LEGAL;
   } catch {
     return null;
@@ -81,7 +97,11 @@ export async function auditCompliance() {
       `Missing: ${missing.join(', ')}. Dutch and EU law require a name and a geographic `
       + 'address before a consumer is bound by the order — a footer that omits them is not a '
       + 'formality, it is the disclosure the rest of the terms hang off.',
-      'Fill in legalName, address, postcode and city in src/lib/legalIdentity.js.');
+      /* Where it is actually filled in now. Sending an owner to edit a source
+         file means a commit, a deploy, and somebody who can do both — for the
+         one disclosure the law requires before a consumer may buy. */
+      'Fill in Legal name, Street and number, Postcode and City under '
+      + 'Admin → Analytics → Seller identity. It takes effect immediately, without a deploy.');
   } else {
     add('identity', 'identity.present', 'PASS', 'Seller identity is published',
       `${LEGAL.legalName}, ${[LEGAL.address, LEGAL.postcode, LEGAL.city].filter(Boolean).join(' ')}.`);

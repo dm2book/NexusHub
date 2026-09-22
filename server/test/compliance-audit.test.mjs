@@ -25,6 +25,11 @@ import path from 'node:path';
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..', '..');
 const rd = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
 
+/* This file audits SOURCE, so it never needed a database — until it started
+   checking that a seller identity typed into the admin is read back. That half
+   writes a row, so the schema has to exist for it. */
+const { migrate } = await import('../src/db/migrate.js');
+await migrate();
 const { auditCompliance } = await import('../src/services/complianceCheckService.js');
 const result = await auditCompliance();
 const { checks, summary } = result;
@@ -88,6 +93,31 @@ console.log('\n── The state this repository is actually in ─────�
   ok('no legal information has been invented',
     LEGAL.legalName === '' && LEGAL.address === '' && LEGAL.postcode === '' && LEGAL.city === '',
     'these fields belong to a person, and no audit may fill them in');
+
+  /* And the other half of the same rule: once the owner HAS filled it in — in
+     the admin, which is where it lives now — this audit must see it.
+     It did not. The values were read from the build alone, so a shop that
+     published its details on the 15th was told by the very command the
+     readiness panel recommends that it "cannot say who is selling", and sent to
+     edit a source file. Two screens disagreeing about one fact, on the day that
+     fact finally exists. */
+  const { setSellerIdentity } = await import('../src/services/sellerIdentityService.js');
+  await setSellerIdentity({
+    legalName: 'A Registered Person', address: 'Ergensstraat 2',
+    postcode: '5678 CD', city: 'Utrecht',
+  }, { actor: { id: 'test' } });
+
+  const after = await auditCompliance();
+  const byAfter = (id) => after.checks.find((c) => c.id === id);
+  ok('…and once it is filled in, the audit sees it',
+    byAfter('identity.present')?.level === 'PASS' && !byAfter('identity.missing'),
+    JSON.stringify(byAfter('identity.missing') || byAfter('identity.present')));
+  ok('…naming the seller it read', /A Registered Person/.test(byAfter('identity.present')?.detail || ''),
+    byAfter('identity.present')?.detail);
+
+  /* Put it back, so the rest of this file audits the repository as shipped. */
+  await setSellerIdentity({ legalName: '', address: '', postcode: '', city: '' },
+    { actor: { id: 'test' } });
   ok('registration is asked of the owner, never assumed',
     by('tax.registration')?.level === 'OWNER');
   ok('the processing agreements are asked of the owner, never assumed',
