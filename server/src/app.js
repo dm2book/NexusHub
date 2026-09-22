@@ -118,6 +118,10 @@ export function ensureReady() {
         get('SELECT COUNT(*) AS n FROM products WHERE active = 1').catch(() => ({ n: 1 })),
         import('./services/sellerIdentityService.js')
           .then((m) => m.applyStoredIdentity()).catch(() => {}),
+        /* And the keys. A Stripe key typed into the admin is worth nothing
+           until the config the checkout reads actually holds it. */
+        import('./services/secretStore.js')
+          .then((m) => m.applyStoredSecrets()).catch(() => {}),
       ]);
       if (!seeded) await (await import('./db/seed.js')).seed(); // empty DB needs roles/permissions/templates first
       // Zero-config: an empty shop must have products before we serve it, else

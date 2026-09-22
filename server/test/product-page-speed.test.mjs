@@ -111,7 +111,19 @@ if (built) {
      the same read that wrote the title. */
   const shell = html.match(/<div id="fm-shell"[\s\S]*?<\/div>\s*<\/div>/)?.[0] || '';
   const cents = (product.price / 100).toFixed(2);
-  ok('the shell states no price', !shell.includes(cents) && !/€/.test(shell), shell.slice(0, 120));
+  /* The product's NAME is allowed to contain anything — "App Store & iTunes
+     €25" is a name, not a price the shell decided to state. Checking the whole
+     shell failed on that product and passed on the one next to it, which made
+     this assertion a lottery decided by which product happened to be newest
+     when the mystery box had not been seeded yet. What is being asserted is
+     that nothing beyond the name is painted, so the name comes out first. */
+  /* Escaped, because that is how the name appears in the HTML: an ampersand is
+     written &amp;, so splitting on the raw name removes nothing. */
+  const inHtml = (t) => String(t)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const beyondTheName = shell.split(inHtml(product.name)).join('');
+  ok('the shell states no price',
+    !beyondTheName.includes(cents) && !/€/.test(beyondTheName), beyondTheName.slice(0, 120));
   ok('the shell makes no stock or delivery claim',
     !/in stock|instant|voorraad|direct/i.test(shell), shell.slice(0, 120));
 }
@@ -143,7 +155,15 @@ console.log('\n— Art the hero draws differently keeps the grey shell —');
 console.log('\n— Nothing was traded away for it —');
 if (built) {
   // The whole point of rendering this route server-side was the crawler.
-  ok('the title is still this product', new RegExp(`<title>[^<]*${product.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`).test(html));
+  /* Compared against the ESCAPED name: the title goes through HTML escaping, so
+     a product called "App Store & iTunes €25" appears as "&amp; iTunes" and a
+     raw-name regex can never match it. The assertion was right about the rule
+     and wrong about the string. */
+  const escapedName = product.name
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  ok('the title is still this product',
+    new RegExp(`<title>[^<]*${escapedName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`).test(html),
+    (html.match(/<title>[^<]*<\/title>/) || [''])[0]);
   ok('the canonical is still there', /<link rel="canonical"/.test(html));
   ok('the Product JSON-LD is still there', /"@type":"Product"/.test(html));
   ok('there is exactly one og:title', (html.match(/property="og:title"/g) || []).length === 1);

@@ -21,6 +21,7 @@ import { asyncHandler } from '../../middleware/error.js';
 import { launchChecks } from '../../services/launchCheckService.js';
 import { sellerIdentity, setSellerIdentity, FIELDS }
   from '../../services/sellerIdentityService.js';
+import { secretStatus, setSecret, missingEssentials } from '../../services/secretStore.js';
 import { launchPlan } from '../../services/launchPlanService.js';
 import { launchCenter } from '../../services/launchCenterService.js';
 import { listAll as listAllDrops, createDrop, deleteDrop } from '../../services/dropService.js';
@@ -53,6 +54,24 @@ router.put('/legal-identity', requirePermission('analytics.write'),
       Object.keys(FIELDS).map((k) => [k, z.string().max(200).nullish()]),
     )).parse(req.body || {});
     res.json(await setSellerIdentity(body, { actor: req.user }));
+  }));
+
+/**
+ * The keys the shop runs on.
+ *
+ * Read gives status only — set or not, from the admin or from the build, and
+ * the last four characters. A value is never sent to a browser, because a
+ * screen that can show a Stripe key is a screen that can leak one.
+ */
+router.get('/settings/keys', requirePermission('analytics.read'), asyncHandler(async (_req, res) => {
+  res.json({ keys: await secretStatus(), missing: await missingEssentials() });
+}));
+
+router.put('/settings/keys/:id', requirePermission('analytics.write'),
+  asyncHandler(async (req, res) => {
+    const { value } = z.object({ value: z.string().max(4000).nullish() }).parse(req.body || {});
+    res.json({ keys: await setSecret(req.params.id, value ?? '', { actor: req.user }),
+      missing: await missingEssentials() });
   }));
 
 /**
