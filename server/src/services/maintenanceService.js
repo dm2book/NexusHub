@@ -14,7 +14,7 @@ import { pruneOutbox } from './discordService.js';
 import { getSetting, setSetting, migrateCategoryLogos } from './settingsService.js';
 import { sendLaunchAnnouncements } from './newsletterService.js';
 import { pruneAttribution } from './attributionService.js';
-import { sweepAlerts, pruneAlerts } from './notifyService.js';
+import { sweepAlerts, pruneAlerts, alertOwner } from './notifyService.js';
 
 const HOURS = (n) => new Date(Date.now() - n * 3_600_000).toISOString();
 const DAYS = (n) => new Date(Date.now() - n * 86_400_000).toISOString();
@@ -316,6 +316,40 @@ export async function runMaintenance() {
       summary.categoryLogoBytesFreed = logos.freedBytes;
     }
   } catch (e) { summary.categoryLogoError = e.message; }
+
+  /* 14. A copy of everything that cannot be re-derived, once a week.
+   *
+   *     Not because the database has no backups — a hosted Postgres keeps its
+   *     own — but because those replicate a mistake faithfully. A bulk edit
+   *     that wiped forty descriptions, a product deleted by the wrong click, a
+   *     batch of codes emptied by somebody who reached the admin: the provider's
+   *     snapshot has the same damage, taken a second later.
+   *
+   *     Scheduled on the same "has it been long enough" key the market jobs use,
+   *     so it costs one small read on the runs where it is not due. */
+  try {
+    const { getSetting: getS, setSetting: setS } = await import('./settingsService.js');
+    const everyDays = Number(process.env.BACKUP_INTERVAL_DAYS || 7);
+    const lastAt = await getS('backup_last_at', null);
+    const due = !lastAt || Date.now() - Date.parse(lastAt) > everyDays * 86_400_000;
+    if (due) {
+      const { takeBackup } = await import('./backupService.js');
+      const b = await takeBackup({ reason: 'scheduled' });
+      await setS('backup_last_at', nowIso());
+      summary.backupBytes = b.bytes;
+      summary.backupRows = Object.values(b.counts).reduce((a, n) => a + Number(n || 0), 0);
+      /* Worth telling the owner about, because the copy that matters is the one
+         they download and this is the reminder that there is one to download. */
+      await alertOwner('backup.taken', {
+        key: `backup:${b.id}`,
+        title: 'Weekly backup taken',
+        lines: [
+          `${summary.backupRows} rows, ${(b.bytes / 1024).toFixed(0)} KB.`,
+          'Download it from Admin → Analytics — a copy inside the database is not a copy of the database.',
+        ],
+      }).catch(() => {});
+    }
+  } catch (e) { summary.backupError = e.message; }
 
   /* Leave a trace that this actually happened.
      Everything above is fire-and-forget: it runs on a schedule nobody watches,

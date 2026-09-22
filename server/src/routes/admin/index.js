@@ -22,6 +22,8 @@ import { launchChecks } from '../../services/launchCheckService.js';
 import { sellerIdentity, setSellerIdentity, FIELDS }
   from '../../services/sellerIdentityService.js';
 import { secretStatus, setSecret, missingEssentials } from '../../services/secretStore.js';
+import { listBackups, takeBackup, readBackup, backupStatus }
+  from '../../services/backupService.js';
 import { launchPlan } from '../../services/launchPlanService.js';
 import { launchCenter } from '../../services/launchCenterService.js';
 import { listAll as listAllDrops, createDrop, deleteDrop } from '../../services/dropService.js';
@@ -72,6 +74,36 @@ router.put('/settings/keys/:id', requirePermission('analytics.write'),
     const { value } = z.object({ value: z.string().max(4000).nullish() }).parse(req.body || {});
     res.json({ keys: await setSecret(req.params.id, value ?? '', { actor: req.user }),
       missing: await missingEssentials() });
+  }));
+
+/**
+ * Snapshots of everything that cannot be re-derived.
+ *
+ * The list and the status never carry a payload — a snapshot is megabytes and
+ * this endpoint is polled by a dashboard. The download is its own request, and
+ * it records that it happened, because whether an off-site copy exists is the
+ * one thing nobody else can know.
+ */
+router.get('/backups', requirePermission('analytics.read'), asyncHandler(async (_req, res) => {
+  res.json({ backups: await listBackups({ limit: 10 }), status: await backupStatus() });
+}));
+
+router.post('/backups', requirePermission('analytics.write'), asyncHandler(async (req, res) => {
+  res.json({ backup: await takeBackup({ actor: req.user, reason: 'manual' }),
+    status: await backupStatus() });
+}));
+
+router.get('/backups/:id/download', requirePermission('analytics.write'),
+  asyncHandler(async (req, res) => {
+    const b = await readBackup(req.params.id, { actor: req.user });
+    if (!b) return res.status(404).json({ error: { message: 'No such backup.' } });
+    const name = `forgemarket-${b.kind}-${String(b.createdAt).slice(0, 19).replace(/[:T]/g, '')}.json`;
+    res.set({
+      'Content-Type': 'application/json; charset=utf-8',
+      'Content-Disposition': `attachment; filename="${name}"`,
+      'Cache-Control': 'no-store',
+    });
+    return res.send(b.json);
   }));
 
 /**

@@ -93,6 +93,10 @@ export const EVENTS = {
   'webhook.failed':     { emoji: '🔌', color: 0xdc2626, priority: 1, label: 'Payment webhook failed' },
   'email.failed':       { emoji: '📧', color: 0xf59e0b, priority: 0, label: 'Email delivery failed' },
   'system.error':       { emoji: '🚨', color: 0xef4444, priority: 1, label: 'System error' },
+  /* Not an emergency — the opposite. It is the weekly reminder that a copy
+     exists and is still sitting in the same database it copied, which is the
+     part owners forget until the week they need it somewhere else. */
+  'backup.taken':       { emoji: '💾', color: 0x64748b, priority: -1, label: 'Backup taken' },
 
   /* Market intelligence. All of these are decisions to make, not fires to put
      out, so none of them is priority 1 — a pricing observation that wakes
@@ -237,6 +241,23 @@ function discord(event, { title, lines, url }) {
   }, ms));
 }
 
+/**
+ * The community bot, for an owner who never set a webhook up.
+ *
+ * Only when there is no webhook: with both, the same alert lands twice in the
+ * same Discord server, which is how people learn to ignore a channel. The
+ * queue refuses itself when the bot has not been seen in a day, so this is
+ * never the reason an alert quietly went nowhere.
+ */
+function bot(event, { title, lines, url }) {
+  if (discordTarget()) return null;
+  const meta = EVENTS[event];
+  return (async () => {
+    const { queueOwnerAlert } = await import('./discordService.js');
+    return queueOwnerAlert({ title: `${meta.emoji} ${title}`, lines, url, colour: meta.color });
+  })();
+}
+
 /** Telegram renders a subset of HTML; anything from an order has to be escaped. */
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
@@ -350,7 +371,7 @@ export async function notifyOwner(event, message) {
     console.error(`[notify] unknown event "${event}"`);
     return { sent: [], failed: [], configured: 0 };
   }
-  const channels = { discord, telegram, pushover, email };
+  const channels = { discord, bot, telegram, pushover, email };
   const started = Object.entries(channels)
     .map(([name, fn]) => {
       let p = null;

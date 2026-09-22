@@ -913,6 +913,12 @@ client.once(Events.ClientReady, (c) => {
   setInterval(() => pollOutbox(c), 60_000);
   setTimeout(() => pollOutbox(c), 10_000);
 
+  /* A copy of the server's shape, weekly, plus one shortly after boot so a
+     fresh deployment has something on file rather than waiting seven days for
+     its first copy. */
+  setTimeout(() => sendGuildBackup(c), 60_000);
+  setInterval(() => sendGuildBackup(c), 7 * 24 * 60 * 60_000);
+
   // Keep a never-expiring invite alive + mirrored on the site (re-checked daily
   // so even a manually-deleted invite heals itself within a day).
   const invites = () => c.guilds.cache.forEach((g) => ensurePermanentInvite(g));
@@ -1840,6 +1846,12 @@ const OUTBOX_CHANNEL = {
   // Public delivery proof. Falls back to #reviews so a server built before this
   // channel existed still shows them rather than silently dropping the event.
   proof: ['proof-of-delivery', 'reviews', 'vouches'],
+  /* Owner alerts from the shop — a chargeback, a failed delivery, a supplier
+     that stopped answering. Staff-only by intent, and listed here so they land
+     in an alerts channel when one exists; without this entry they still reach
+     #leads through the fallback below, which is why an owner running an older
+     bot is not silently missing them. */
+  alerts: ['alerts', 'staff-announcements', 'leads'],
 };
 /** Notification roles the bot may ping when relaying a store event. */
 const OUTBOX_PING = { deals: ['Deals', 'Drops & Restocks'] };
@@ -2447,6 +2459,56 @@ async function checkSiteHealth(guild) {
     ch?.send({ embeds: [new EmbedBuilder().setColor(0x10b981).setTitle('🟢 Store API recovered')
       .setDescription('Health checks are passing again.').setTimestamp()] }).catch(() => {});
   }
+}
+
+/**
+ * A weekly copy of the server's SHAPE, sent to the shop.
+ *
+ * What is worth keeping after a deletion or a raid is the structure, not the
+ * chat: which channels exist, in which categories, in what order, with which
+ * roles able to see them. That is the evening of work nobody has written down.
+ * Messages are deliberately not sent — they are the community's, they are
+ * enormous, and a shop has no business holding them.
+ *
+ * Runs on the same schedule the shop asks for its own snapshot, and refuses
+ * quietly when the ingest secret is missing: this is bookkeeping, not an
+ * operation worth waking anyone over.
+ */
+async function sendGuildBackup(c) {
+  if (!FORGEMARKET_API_URL || !REVIEW_INGEST_SECRET) return false;
+  const guild = c.guilds.cache.first();
+  if (!guild) return false;
+  try {
+    const snapshot = {
+      name: guild.name,
+      channels: [...guild.channels.cache.values()].map((ch) => ({
+        id: ch.id, name: ch.name, type: ch.type, parentId: ch.parentId ?? null,
+        position: ch.rawPosition ?? null, topic: ch.topic ?? null, nsfw: ch.nsfw ?? false,
+        /* Who can see it. The half of a rebuild that is impossible to
+           reconstruct from memory. */
+        overwrites: [...(ch.permissionOverwrites?.cache?.values?.() || [])].map((o) => ({
+          id: o.id, type: o.type, allow: String(o.allow?.bitfield ?? ''), deny: String(o.deny?.bitfield ?? ''),
+        })),
+      })),
+      roles: [...guild.roles.cache.values()].map((r) => ({
+        id: r.id, name: r.name, color: r.color, hoist: r.hoist, position: r.position,
+        mentionable: r.mentionable, permissions: String(r.permissions?.bitfield ?? ''),
+      })),
+    };
+    const takenAt = new Date().toISOString();
+    const ts = String(Date.now());
+    const canonical = `guildbackup:${guild.id}:${takenAt}`;
+    const signature = createHmac('sha256', REVIEW_INGEST_SECRET).update(`${ts}.${canonical}`).digest('hex');
+    const res = await fetch(`${FORGEMARKET_API_URL.replace(/\/$/, '')}/api/discord/backup`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-timestamp': ts, 'x-signature': signature },
+      body: JSON.stringify({ guildId: guild.id, takenAt, snapshot }),
+    });
+    if (!res.ok) throw new Error(`backup ${res.status}`);
+    const out = await res.json();
+    log(`[backup] server shape stored: ${out?.counts?.channels ?? '?'} channels, ${out?.counts?.roles ?? '?'} roles`);
+    return true;
+  } catch (e) { console.error('[backup]', e.message); return false; }
 }
 
 // ── Staff digest: live store numbers via the signed digest endpoint ──────────
