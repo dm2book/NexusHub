@@ -271,6 +271,15 @@ export const BANNER_VERSION = {
   giveaways: 'e9aa014e',
   support: '4e29c726',
   vouches: 'e9958175',
+  'start-here': '228db0c3',
+  'how-to-buy': '12f79c27',
+  announcements: '9d36d003',
+  proof: '5f01c449',
+  links: '228b0ba5',
+  'report-a-scam': 'dc5fb25a',
+  partners: '0f124302',
+  roles: '7f8984bf',
+  suggestions: '9a0f115b',
 };
 
 /** The banner URL for a channel, with {STORE_URL} still to be substituted. */
@@ -307,6 +316,8 @@ export const MESSAGES = {
       "_Breaking the rules can result in a timeout, kick or ban._",
   },
   startHere: {
+    image: bannerImage('start-here'),
+    color: 0xa855f7,
     title: '🚀 Start Here',
     description:
       "**What is ForgeMarket?** Game currency and gift cards — Robux, V-Bucks, Valorant, Steam and more.\n\n" +
@@ -352,6 +363,8 @@ export const MESSAGES = {
       "👇 Tap **Browse the shop** to see live prices.",
   },
   howToBuy: {
+    image: bannerImage('how-to-buy'),
+    color: 0x38bdf8,
     title: '💳 How to buy',
     description:
       "**1.** Open the shop and pick your pack — no account needed.\n" +
@@ -372,6 +385,8 @@ export const MESSAGES = {
       "💜 **VIP Customers** get early access and extra discounts.",
   },
   announcement: {
+    image: bannerImage('announcements'),
+    color: 0x6366f1,
     title: '📢 Welcome to ForgeMarket — we’re live!',
     description:
       "Top up your favourite games without the hassle. ⚡\n\n" +
@@ -408,6 +423,8 @@ export const MESSAGES = {
         : ''),
   }),
   proofIntro: {
+    image: bannerImage('proof'),
+    color: 0x34d399,
     title: '📸 Proof of delivery',
     description: "Real screenshots of completed deliveries. Transparency builds trust. 🔒",
   },
@@ -422,6 +439,7 @@ export const MESSAGES = {
       "• Winners are announced in <#winners>.\n\nGood luck! 🍀",
   },
   staffIntro: {
+    color: 0x64748b,
     title: '🛠️ Staff HQ',
     description:
       "Internal area. Tickets log to <#ticket-logs>, moderation to <#mod-log>, and the bot posts joins, " +
@@ -433,6 +451,8 @@ export const MESSAGES = {
   // because a link to a profile that doesn't exist is exactly what the panel
   // warns against.
   links: ({ trustpilotUrl = '' } = {}) => ({
+    image: bannerImage('links'),
+    color: 0x818cf8,
     title: '🔗 Official ForgeMarket links',
     description:
       "Only trust links posted here or by staff.\n\n" +
@@ -445,6 +465,7 @@ export const MESSAGES = {
       "Buttons below take you straight there 👇",
   }),
   status: {
+    color: 0x22c55e,
     title: '🟢 Store status',
     // No standing "all systems operational" claim: this panel is pinned once and
     // would keep saying it during an outage. It explains the channel instead.
@@ -484,6 +505,8 @@ export const MESSAGES = {
       "💜 **VIP Customers** get exclusive codes.\n🔔 Turn on notifications so you never miss one.",
   },
   reportScam: {
+    image: bannerImage('report-a-scam'),
+    color: 0xf87171,
     title: '🚨 Report a scam',
     description:
       "**Staff will NEVER DM you first** and will never ask for your password or codes.\n\n" +
@@ -491,6 +514,8 @@ export const MESSAGES = {
       "<#open-a-ticket> and report them. We keep this community safe. 🛡️",
   },
   partnersIntro: {
+    image: bannerImage('partners'),
+    color: 0xa855f7,
     title: '🤝 Earn from ForgeMarket',
     description:
       /* This panel advertised an application-only partner programme and said
@@ -511,6 +536,8 @@ export const MESSAGES = {
       "who you are and where your audience is. We reply to every application.",
   },
   rolesPanel: {
+    image: bannerImage('roles'),
+    color: 0x22d3ee,
     title: '🎮 Pick your roles',
     description:
       "Tap the games you play and the alerts you want — get pinged only for what you care about.\n\n" +
@@ -518,6 +545,8 @@ export const MESSAGES = {
       "Tap again to remove a role.",
   },
   suggestionsIntro: {
+    image: bannerImage('suggestions'),
+    color: 0x34d399,
     title: '💡 Suggestions',
     description:
       "Help shape ForgeMarket! Use **/suggest** `your idea` and it gets posted here with " +
@@ -526,6 +555,7 @@ export const MESSAGES = {
       "and you get a DM when a decision lands. Good ideas get built. 🚀",
   },
   starboardIntro: {
+    color: 0xf59e0b,
     title: '⭐ Starboard',
     description:
       "React to any message with ⭐ and once it hits **3 stars** it lands here — a hall of fame " +

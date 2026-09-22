@@ -42,6 +42,13 @@ const PHRASES = {
     reviewAskBody: 'Een korte review op Trustpilot kost twintig seconden en helpt de volgende koper meer dan wat wij over onszelf kunnen zeggen — wij kunnen er niets aan veranderen of weghalen.',
     reviewAskCta: 'Schrijf een review op Trustpilot',
     payHow: (number) => `Betaal via een van de methoden hieronder en zet je bestelnummer <strong>${number}</strong> erbij als kenmerk. Je bestelling is bevestigd zodra we hem binnen hebben.`,
+    /* When an order is completed with nothing recorded to show — the normal
+       path for a product delivered by hand. The mail says "alles hieronder is
+       van jou", so there has to BE something below, and it has to be true. */
+    byHandTitle: '✅ Met de hand geleverd',
+    byHandSub: 'Deze bestelling is door ons persoonlijk afgehandeld — er staat geen code in dit overzicht.',
+    byHandCheck: 'Kijk in je game of in de inbox waar we je eerder over deze bestelling schreven.',
+    byHandMissing: 'Niets ontvangen? Beantwoord deze mail met je bestelnummer en we zoeken het meteen uit.',
   },
   en: {
     redeemAt: 'Redeem at',
@@ -65,6 +72,10 @@ const PHRASES = {
     reviewAskBody: 'A short review on Trustpilot takes twenty seconds and helps the next buyer more than anything we can say about ourselves — we cannot edit or remove a word of it.',
     reviewAskCta: 'Leave a review on Trustpilot',
     payHow: (number) => `Pay using one of the methods below and put your order number <strong>${number}</strong> as the reference. Your order is confirmed as soon as we receive it.`,
+    byHandTitle: '✅ Delivered by hand',
+    byHandSub: 'We handled this order personally — there is no code to show in this summary.',
+    byHandCheck: 'Check the game itself, or the inbox we last wrote to you about this order on.',
+    byHandMissing: 'Nothing arrived? Reply to this email with your order number and we will sort it straight away.',
   },
   de: {
     redeemAt: 'Einlösen auf',
@@ -88,6 +99,10 @@ const PHRASES = {
     reviewAskBody: 'Eine kurze Bewertung auf Trustpilot dauert zwanzig Sekunden und hilft dem nächsten Käufer mehr als alles, was wir über uns selbst sagen können — wir können dort kein Wort ändern oder löschen.',
     reviewAskCta: 'Bewertung auf Trustpilot schreiben',
     payHow: (number) => `Zahl über eine der Methoden unten und gib deine Bestellnummer <strong>${number}</strong> als Verwendungszweck an. Deine Bestellung ist bestätigt, sobald wir sie haben.`,
+    byHandTitle: '✅ Von Hand geliefert',
+    byHandSub: 'Diese Bestellung haben wir persönlich bearbeitet — in dieser Übersicht steht kein Code.',
+    byHandCheck: 'Schau im Spiel selbst nach, oder in dem Postfach, an das wir zuletzt zu dieser Bestellung geschrieben haben.',
+    byHandMissing: 'Nichts angekommen? Antworte auf diese Mail mit deiner Bestellnummer und wir klären es sofort.',
   },
   fr: {
     redeemAt: 'À utiliser sur',
@@ -111,6 +126,10 @@ const PHRASES = {
     reviewAskBody: 'Un court avis sur Trustpilot prend vingt secondes et aide le prochain acheteur bien plus que tout ce que nous pouvons dire de nous-mêmes — nous ne pouvons y modifier ni supprimer un mot.',
     reviewAskCta: 'Laisser un avis sur Trustpilot',
     payHow: (number) => `Paie avec un des moyens ci-dessous et mets ton numéro de commande <strong>${number}</strong> en référence. Ta commande est confirmée dès que nous le recevons.`,
+    byHandTitle: '✅ Livré à la main',
+    byHandSub: 'Nous avons traité cette commande personnellement — aucun code ne figure dans ce récapitulatif.',
+    byHandCheck: 'Regarde dans le jeu, ou dans la boîte mail à laquelle nous avons écrit au sujet de cette commande.',
+    byHandMissing: 'Rien reçu ? Réponds à cet e-mail avec ton numéro de commande et nous réglons ça tout de suite.',
   },
 };
 

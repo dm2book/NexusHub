@@ -239,6 +239,59 @@ console.log('\n— Every template renders, on a phone, without a token hole —'
   }
 }
 
+console.log('\n— The delivery mail never promises something it does not show —');
+{
+  /* "Je loot staat klaar — alles hieronder is van jou" sat above an EMPTY
+     block whenever an order was completed with no delivery row. That is not a
+     rare shape on this shop: 70 of its 72 products are delivered by hand, and
+     every one of those completes without a code recorded here, so this was the
+     common path. A buyer read that the shop had sent something, and saw
+     nothing. */
+  const { emailCopy } = await import('../src/services/emailCopy.js');
+  const src = (await import('node:fs'))
+    .readFileSync(new URL('../src/services/orderService.js', import.meta.url), 'utf8');
+
+  /* Scoped to deliveryHtml. The same early return lives in redeemHtml, where
+     empty is CORRECT — an order with no codes has nothing to redeem — so a
+     file-wide search would fail on the one place that is right. */
+  const body = src.slice(src.indexOf('function deliveryHtml'),
+    src.indexOf('function summaryHtml'));
+  ok('an order with nothing to show no longer renders an empty block',
+    !/if \(!order\.deliveries\?\.length\) return '';/.test(body), body.slice(0, 120));
+  ok('…it renders the by-hand card instead', /byHandTitle/.test(body));
+
+  /* And what it says instead has to be true in every language the shop mails
+     in — a phrase that exists in one and not the others is how a German buyer
+     gets a blank card. */
+  for (const lang of ['nl', 'en', 'de', 'fr']) {
+    const c = emailCopy(lang);
+    ok(`${lang}: says it was delivered by hand`, !!c.byHandTitle && !!c.byHandSub,
+      JSON.stringify({ t: c.byHandTitle, s: c.byHandSub }));
+    ok(`${lang}: …and tells the buyer what to do if nothing arrived`,
+      !!c.byHandMissing && /\?|\bnichts\b|\bniets\b|\brien\b/i.test(c.byHandMissing),
+      c.byHandMissing);
+  }
+
+  /* Rendered for a real order that completed with no deliveries. */
+  const { getOrder, transitionOrder } = await import('../src/services/orderService.js');
+  const byHand = await get(
+    `SELECT id FROM orders WHERE status <> 'completed' ORDER BY created_at DESC LIMIT 1`);
+  if (byHand) {
+    await transitionOrder(byHand.id, 'completed', { actorId: 'staff', reason: 'delivered by hand' })
+      .catch(() => {});
+    const row = await get(
+      `SELECT body_html FROM email_log WHERE template='order_completed' AND to_email IS NOT NULL
+        ORDER BY created_at DESC LIMIT 1`).catch(() => null);
+    if (row?.body_html) {
+      ok('the sent mail carries the by-hand card rather than a gap',
+        /Met de hand geleverd|Delivered by hand/.test(row.body_html),
+        String(row.body_html).slice(0, 120));
+    } else {
+      console.log('  ⏭  no order_completed body on file — the rendered check is covered above');
+    }
+  }
+}
+
 srv.close(); sink.close();
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -307,6 +307,92 @@ export const SOCIAL = [
     sub: 'Every vouch here is tied to a real order number',
     pills: ['Proof of delivery', 'Posted by buyers', 'Money back if we cannot deliver'],
   },
+
+  /* ── The eleven channels that had nothing ────────────────────────────────
+   *
+   * Counted on the built server: thirteen panels carried a banner and a colour
+   * and eleven carried neither — so half the channels a member scrolls past
+   * were a full-bleed branded header and half were a bare grey embed with no
+   * colour bar at all. Nothing was broken; it read as unfinished, which on a
+   * shop that has never taken an order is the same thing.
+   *
+   * Same system, same emblem set, same honesty rule this file was written for:
+   * no "instant", no 24/7, no claim the shop cannot keep. Where a channel has
+   * nothing true and interesting to promise, the subtitle says what the channel
+   * IS rather than inventing a benefit.
+   */
+  {
+    id: 'start-here', file: 'public/discord/banner-start-here.jpg',
+    where: 'the Discord start-here channel',
+    accent: '#a855f7', accent2: '#38bdf8', emblem: 'bolt',
+    chip: 'NEW HERE?', title: 'START HERE',
+    sub: 'What this shop is, and how an order actually works',
+    pills: ['No account needed', 'Pay by reference', 'Track any time'],
+  },
+  {
+    id: 'how-to-buy', file: 'public/discord/banner-how-to-buy.jpg',
+    where: 'the Discord how-to-buy channel',
+    accent: '#38bdf8', accent2: '#a855f7', emblem: 'cart',
+    chip: 'FOUR STEPS', title: 'HOW TO BUY',
+    sub: 'Order, pay with your order number, get your code',
+    pills: ['Pick a pack', 'Pay by reference', 'We confirm', 'Code by email'],
+  },
+  {
+    id: 'announcements', file: 'public/discord/banner-announcements.jpg',
+    where: 'the Discord announcements channel',
+    accent: '#6366f1', accent2: '#ec4899', emblem: 'bolt',
+    chip: 'FROM THE OWNER', title: 'ANNOUNCEMENTS',
+    sub: 'New products, restocks and anything that changes',
+    pills: ['New products', 'Restocks', 'Downtime'],
+  },
+  {
+    id: 'proof', file: 'public/discord/banner-proof.jpg',
+    where: 'the Discord proof-of-delivery channel',
+    accent: '#34d399', accent2: '#38bdf8', emblem: 'parcel',
+    chip: 'RECEIPTS', title: 'PROOF OF DELIVERY',
+    sub: 'Real orders, posted the moment they are delivered',
+    pills: ['Order numbers', 'Timestamps', 'Posted automatically'],
+  },
+  {
+    id: 'links', file: 'public/discord/banner-links.jpg',
+    where: 'the Discord links channel',
+    accent: '#818cf8', accent2: '#22d3ee', emblem: 'badge',
+    chip: 'OFFICIAL ONLY', title: 'OUR LINKS',
+    sub: 'Every address that is really ours — anything else is not',
+    pills: ['The shop', 'This server', 'Support'],
+  },
+  {
+    id: 'report-a-scam', file: 'public/discord/banner-report-a-scam.jpg',
+    where: 'the Discord report-a-scam channel',
+    accent: '#f87171', accent2: '#f59e0b', emblem: 'shield',
+    chip: 'STAY SAFE', title: 'REPORT A SCAM',
+    sub: 'Staff never DM you first. Report anyone who does',
+    pills: ['Screenshot it', 'Do not pay', 'Tell us here'],
+  },
+  {
+    id: 'partners', file: 'public/discord/banner-partners.jpg',
+    where: 'the Discord partners channel',
+    accent: '#a855f7', accent2: '#f59e0b', emblem: 'tag',
+    chip: 'WORK WITH US', title: 'PARTNERS',
+    sub: 'Creators and servers we actually work with',
+    pills: ['Affiliate links', 'Server partners', 'Open a ticket'],
+  },
+  {
+    id: 'roles', file: 'public/discord/banner-roles.jpg',
+    where: 'the Discord roles channel',
+    accent: '#22d3ee', accent2: '#6366f1', emblem: 'badge',
+    chip: 'PICK YOURS', title: 'ROLES',
+    sub: 'Choose what you are pinged about — and what you are not',
+    pills: ['Your games', 'Drops & restocks', 'Deals'],
+  },
+  {
+    id: 'suggestions', file: 'public/discord/banner-suggestions.jpg',
+    where: 'the Discord suggestions channel',
+    accent: '#34d399', accent2: '#6366f1', emblem: 'gift',
+    chip: 'TELL US', title: 'SUGGESTIONS',
+    sub: 'Missing a game? Ask for it here',
+    pills: ['Request a product', 'Vote with a reaction', 'We read all of it'],
+  },
 ];
 
 /** The link-preview card is its own shape, so it is its own spec. */

@@ -1375,8 +1375,23 @@ function deliveryHtml(order, lang) {
         <div style="font:700 18px/1.3 'Courier New',monospace;color:#eafff6;background:#0a1712;border:1px solid #1f5140;border-radius:10px;padding:12px 16px;word-break:break-all">${target}</div>
       </td></tr></table>`;
   }
+  /* Nothing recorded to show — and the mail around this block says "everything
+     below is yours". Returning an empty string put that sentence above a gap.
+     It is not an edge case on this shop: 70 of 72 products are delivered by
+     hand, and every one of those is completed with no delivery row, so this
+     was the COMMON path. A buyer reading "je loot staat klaar" over blank
+     space has been told the shop sent something it did not show them. */
+  if (!order.deliveries?.length) {
+    return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 8px">
+      <tr><td style="background:#101827;border:1px solid #2c3b52;border-radius:16px;padding:20px 22px">
+        <div style="font:800 15px/1.3 'Segoe UI',Arial,sans-serif;color:#7dd3fc">${escapeHtml(c.byHandTitle)}</div>
+        <div style="font:400 13.5px/1.6 'Segoe UI',Arial,sans-serif;color:#9fb0c4;margin:6px 0 10px">${escapeHtml(c.byHandSub)}</div>
+        <div style="font:400 13.5px/1.6 'Segoe UI',Arial,sans-serif;color:#9fb0c4">${escapeHtml(c.byHandCheck)}</div>
+        <div style="font:600 13px/1.6 'Segoe UI',Arial,sans-serif;color:#cbd5e1;margin-top:12px">${escapeHtml(c.byHandMissing)}</div>
+      </td></tr></table>`;
+  }
+
   // Gift-code / key delivery → one premium card per delivered item.
-  if (!order.deliveries?.length) return '';
   return order.deliveries.map((d) => {
     const label = escapeHtml((d.type || 'code').toUpperCase());
     const value = d.content ? escapeHtml(d.content) : (d.filename ? escapeHtml(d.filename) : '—');
