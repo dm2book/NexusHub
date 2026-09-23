@@ -30,7 +30,13 @@ const CHANNELS = [
   { group: 'MARKETPLACE', icon: ShoppingBag, items: ['products', 'price-list', 'how-to-buy', 'deals', 'ask-the-bot'] },
   { group: 'REVIEWS & TRUST', icon: Star, items: ['reviews', 'vouches', 'proof-of-delivery', 'discount-codes'] },
   { group: 'SUPPORT', icon: Ticket, items: ['open-a-ticket', 'faq', 'support-info', 'report-a-scam'] },
-  { group: 'COMMUNITY', icon: Users, items: ['general', 'media', 'suggestions', 'starboard', 'giveaways'] },
+  /* Four generals, one per language. They are gated on the language role a
+     member picks in #roles, so nobody sees four rooms — but the page names
+     all four, because "do they speak my language?" is a reason to join and
+     a question this page exists to answer. */
+  { group: 'COMMUNITY', icon: Users,
+    items: ['general-nl', 'general-en', 'general-de', 'general-fr', 'media',
+      'suggestions', 'starboard', 'giveaways'] },
 ];
 
 const roles = (t) => [

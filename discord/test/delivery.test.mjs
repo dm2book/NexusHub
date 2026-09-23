@@ -129,7 +129,14 @@ console.log('\n— /price answers in one language, not one and a half —');
   ok('…and its field names come from the table, not a literal',
     /name: P\.when/.test(bot) && /name: P\.how/.test(bot),
     'an English heading over a translated sentence is the defect this replaced');
-  ok('/delivery reads the member\'s locale', /const lang = botLang\(i\.locale\);/.test(bot));
+  /* This read `botLang(i.locale)` — the locale the member's Discord client
+     happens to be set to, which is a good guess and only a guess. Members can
+     now pick a language in #roles, and a guess must lose to an answer. */
+  ok('/delivery answers in the language the member picked',
+    /const lang = memberLang\(i\.member, i\.locale\);/.test(bot));
+  ok('…and no reply anywhere still goes by the client locale alone',
+    !/\bbotLang\(/.test(bot),
+    'a call site reads the locale directly, so a picked language would not reach it');
   ok('…and no longer guesses with a five-entry keyword map',
     !/const map = \{ robux: 'robux', roblox: 'robux'/.test(bot));
 }

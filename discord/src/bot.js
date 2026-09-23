@@ -20,11 +20,14 @@ import {
 } from 'discord.js';
 import Anthropic from '@anthropic-ai/sdk';
 import { FAQ, GAME_ROLES, NOTIFY_ROLES, LEVEL_ROLES, CATEGORY_GAME_ROLE,
-  bannerImage,
+  LANGUAGE_ROLES, bannerImage,
 } from './config.js';
-import { orderStatusView, botLang, say, ORDER_UI } from './orderStatus.js';
+import { orderStatusView, pickedLang, say, ORDER_UI } from './orderStatus.js';
 import { deliveryFor, DELIVERY_CATEGORIES, DELIVERY_FIELD } from './generated/delivery.js';
-import { buildPanels, panelNeedsUpdate, panelFooterIsStale, PANEL_FOOTER, isPanelFooter } from './panels.js';
+import {
+  buildPanels, panelNeedsUpdate, panelFooterIsStale, PANEL_FOOTER, isPanelFooter,
+  rolesPanelComponents, languagePickerRow, hasLanguagePicker, LANGUAGE_PICKER_ID,
+} from './panels.js';
 import { log, reportEnv, startHealthServer, loginWithRetry } from './runtime.js';
 import { scamReason } from './scamGuard.js';
 
@@ -421,7 +424,7 @@ async function ensurePermanentInvite(guild) {
     } catch { /* no Manage Server perm — we'll create our own below */ }
     if (!invite) {
       // Create one on the most public channel the bot can invite from.
-      const chans = ['welcome', 'rules', 'general'];
+      const chans = ['welcome', 'rules', 'general-nl', 'general'];
       const target = chans.map((n) => findChannel(guild, n)).find((ch) =>
         ch?.isTextBased?.() && ch.permissionsFor(guild.members.me)?.has(P.CreateInstantInvite))
         || guild.channels.cache.find((ch) =>
@@ -488,6 +491,28 @@ const starred = {
 // ── helpers ──────────────────────────────────────────────────────────────
 const findRole = (g, name) => g.roles.cache.find((r) => r.name === name);
 const findChannel = (g, name) => g.channels.cache.find((c) => c.name === name);
+
+/** Which of the four languages to answer this member in. */
+const memberLang = (member, locale) =>
+  pickedLang([...(member?.roles?.cache?.values?.() || [])].map((r) => r.name), locale);
+
+/** The language room a member picked, if any. */
+const langRoleOf = (member) => LANGUAGE_ROLES.find(
+  (l) => member?.roles?.cache?.some?.((r) => r.name === l.label));
+
+/**
+ * The room a community-wide post belongs in.
+ *
+ * #general split into four language rooms, three of which are hidden from most
+ * members — so a level-up, a boost or the weekly leaderboard posted to all
+ * four would be one post and three empty-room echoes. They go to the house
+ * room, which every verified member can read. The bare 'general' fallback is
+ * for a server that has not had setup re-run since the split.
+ */
+const houseChannel = (g) => findChannel(g, 'general-nl') || findChannel(g, 'general');
+
+/** Is this one of the four language rooms? */
+const isLanguageRoom = (ch) => !!ch?.name && LANGUAGE_ROLES.some((l) => l.room === ch.name);
 
 let catalogCache = { at: 0, items: [] };
 async function getProducts() {
@@ -790,6 +815,35 @@ async function syncPanelCopy(guild) {
   return edited;
 }
 
+/**
+ * Put the language picker on a #roles panel that predates it.
+ *
+ * setup.js posts that panel exactly once — `postOnce` answers "exists" on
+ * every later run — so a server built before the picker existed would have
+ * kept its row of game buttons and no way to choose a language at all. The
+ * picker would have shipped to new servers only, which is to say to nobody.
+ *
+ * This is the components half of what syncPanelCopy does for the text, and it
+ * runs once: after the edit the panel carries the picker and the check below
+ * is false forever.
+ */
+async function syncRolesControls(guild) {
+  try {
+    const ch = findChannel(guild, 'roles');
+    if (typeof ch?.messages?.fetch !== 'function') return false;
+    const msgs = await ch.messages.fetch({ limit: 30 }).catch(() => null);
+    const mine = msgs?.find((m) => m.author.id === client.user.id
+      && isPanelFooter(m.embeds[0]?.footer?.text));
+    if (!mine || hasLanguagePicker(mine.components)) return false;
+    await mine.edit({ components: rolesPanelComponents() });
+    console.log('  · [panel-controls] #roles: language picker added');
+    return true;
+  } catch (e) {
+    console.error('[panel-controls]', e.message);
+    return false;
+  }
+}
+
 // Startup self-check: are the brand banners actually reachable AND actually
 // images? A stale/misconfigured site deploy answers /discord/banner-*.jpg with
 // the SPA's index.html (HTTP 200, but text/html) — Discord then shows a blank
@@ -905,8 +959,10 @@ client.once(Events.ClientReady, (c) => {
     // the images are unreachable.
     c.guilds.cache.forEach((g) => syncPanelCopy(g));
   });
+  // The picker under #roles, for servers built before it existed.
+  c.guilds.cache.forEach((g) => syncRolesControls(g));
 
-  // Daily vouch spotlight → #general (checked hourly, posts once a day).
+  // Daily vouch spotlight → the house room (checked hourly, posts once a day).
   setInterval(() => c.guilds.cache.forEach((g) => maybeVouchSpotlight(g)), 60 * 60_000);
 
   // Relay the store's queued Discord events (sales, drops, alerts, DMs).
@@ -967,11 +1023,12 @@ client.on(Events.GuildMemberAdd, async (member) => {
   checkImpersonation(member); // scam guard: flag staff-lookalike names on join
   trackJoinForRaid(member.guild); // raid guard: alert staff on join spikes
   celebrateMilestone(member.guild); // 🎉 every 100 members
-  // Public greeting — skipped during join spikes so a raid can't flood #general.
+  // Public greeting — skipped during join spikes so a raid can't flood the server.
   if (recentJoins.length < 5) {
-    // #welcome, not #general: an unverified member cannot see #general, so the
-    // one message meant to greet them was posted where they could never read it.
-    const ch = findChannel(member.guild, 'welcome') || findChannel(member.guild, 'general');
+    // #welcome, not a general room: an unverified member cannot see any of
+    // them, so the one message meant to greet them was posted where they could
+    // never read it.
+    const ch = findChannel(member.guild, 'welcome') || houseChannel(member.guild);
     const verifyCh = findChannel(member.guild, 'verify');
     const hello = `👋 Welcome <@${member.id}>! Verify in ${verifyCh ? `<#${verifyCh.id}>` : '#verify'} to unlock everything, and say hi 💜`;
     if (dmDelivered) {
@@ -1003,6 +1060,9 @@ client.on(Events.InteractionCreate, async (i) => {
     // tell apart do not fit in a row of five buttons.
     if (i.isStringSelectMenu?.() && i.customId === 'ticket:pick') {
       return await openTicketModal(i, i.values?.[0] || 'general');
+    }
+    if (i.isStringSelectMenu?.() && i.customId === LANGUAGE_PICKER_ID) {
+      return await setLanguage(i, i.values?.[0]);
     }
     if (i.isModalSubmit() && i.customId.startsWith('tmodal:')) {
       return await openTicket(i, i.customId.split(':')[1], {
@@ -1076,17 +1136,26 @@ async function handleButton(i) {
        buttons are the same ones the rest of the server uses, and they say what
        the site will actually do today. */
     const cta = await shopCta(null, 'verify');
+    /* The picker, here, rather than only in #roles — this is the one second a
+       new member is certainly looking, and their chat room depends on it.
+       Skipped for anyone who already has a language, because re-asking a
+       settled question is how a control starts getting ignored. */
+    const needsLang = !langRoleOf(i.member);
     return i.update({
       content: `\u2705 **Verified!** Welcome in \u2014 the full server is now unlocked.\n`
         + `${cta.note ? `${cta.note}\n` : ''}`
         + `Ask me anything in ${chanRef(i.guild, 'ask-the-bot')}, or browse `
         + `${chanRef(i.guild, 'products')} and pick your games in ${chanRef(i.guild, 'roles')} `
-        + 'so you hear about restocks first. \u{1F3AE}',
+        + 'so you hear about restocks first. \u{1F3AE}'
+        + (needsLang ? '\n\nPick your language below and your chat room opens.' : ''),
       embeds: [],
-      components: [new ActionRowBuilder().addComponents(
-        await shopButton(null, 'verify'),
-        new ButtonBuilder().setLabel('\u{1F4E6} Track an order')
-          .setStyle(ButtonStyle.Link).setURL(tagged(`${STORE_URL}/track`, 'verify')))],
+      components: [
+        ...(needsLang ? [languagePickerRow()] : []),
+        new ActionRowBuilder().addComponents(
+          await shopButton(null, 'verify'),
+          new ButtonBuilder().setLabel('\u{1F4E6} Track an order')
+            .setStyle(ButtonStyle.Link).setURL(tagged(`${STORE_URL}/track`, 'verify'))),
+      ],
     }).catch(() => {});
   }
 
@@ -1142,6 +1211,50 @@ async function toggleRole(i, key) {
   const has = i.member.roles.cache.has(role.id);
   await (has ? i.member.roles.remove(role) : i.member.roles.add(role)).catch(() => {});
   return i.reply({ content: `${has ? '➖ Removed' : '➕ Added'} **${def.label}**`, ephemeral: true });
+}
+
+/**
+ * Set a member's language: one role on, the other three off.
+ *
+ * Exclusive on purpose. The four general rooms are gated on exactly these
+ * roles, so a member holding two of them would see two generals — which is
+ * the thing the gate exists to prevent.
+ *
+ * Confirmed in the language just chosen. Answering a member who picked
+ * Français in English would tell them, in the one message whose entire job
+ * is to prove the picker works, that it does not.
+ */
+async function setLanguage(i, key) {
+  const def = LANGUAGE_ROLES.find((l) => l.key === key);
+  if (!def) return i.reply({ content: 'Unknown language.', ephemeral: true });
+  const role = findRole(i.guild, def.label);
+  if (!role) {
+    return i.reply({ content: `The **${def.label}** role is missing — ask an admin to run setup.`, ephemeral: true });
+  }
+  const others = LANGUAGE_ROLES
+    .filter((l) => l.key !== key)
+    .map((l) => findRole(i.guild, l.label))
+    .filter((r) => r && i.member.roles.cache.has(r.id));
+  /* Never claim a room opened that did not. If the bot's own role sits below
+     these, Discord refuses the grant — and swallowing that would tell a member
+     their language was set while they still saw the same room. */
+  try {
+    if (others.length) await i.member.roles.remove(others);
+    if (!i.member.roles.cache.has(role.id)) await i.member.roles.add(role);
+  } catch (e) {
+    console.error('[lang] role change failed:', e.message);
+    leadLog(i.guild, `⚠️ Language change FAILED for <@${i.user.id}>: ${e.message} — drag my role above **${def.label}**.`);
+    return i.reply({
+      content: '⚠️ I couldn\u2019t change your language role — my own role is ranked below it, so Discord blocked me. '
+        + 'This is on us, not you: an admin has been notified. Try again after that.',
+      ephemeral: true,
+    });
+  }
+  const room = findChannel(i.guild, def.room);
+  return i.reply({
+    content: def.confirm.replace('{room}', room ? `<#${room.id}>` : `#${def.room}`),
+    ephemeral: true,
+  });
 }
 
 async function claimTicket(i) {
@@ -1276,8 +1389,9 @@ async function openTicket(i, type, { orderNumber = '', details = '' } = {}) {
   // Order number in the form? Post the live status right away, before staff arrive.
   const num = orderNumber.match(ORDER_RE)?.[0]?.toUpperCase();
   if (num) {
-    /* A ticket is opened from a modal, which carries the member's locale too. */
-    orderStatusEmbed(num, botLang(i.locale)).then((e) => { if (e) channel.send({ embeds: [e] }).catch(() => {}); });
+    /* A ticket is opened from a modal, which carries the member's locale too —
+       and their picked language overrides it, same as everywhere else. */
+    orderStatusEmbed(num, memberLang(i.member, i.locale)).then((e) => { if (e) channel.send({ embeds: [e] }).catch(() => {}); });
   }
   leadLog(i.guild, `🎫 Ticket opened by <@${i.user.id}> — **${label}** → <#${channel.id}>`);
   return i.editReply(`✅ Your ticket is ready: <#${channel.id}>`);
@@ -1569,7 +1683,7 @@ async function handleCommand(i) {
        without this a German member asking for a Robux recommendation got an
        English answer every time — there was nothing German left in the prompt
        for the model to take a hint from. */
-    const answer = await askAI(q, products, botLang(i.locale));
+    const answer = await askAI(q, products, memberLang(i.member, i.locale));
     if (BUY_INTENT.test(q)) leadLog(i.guild, `💡 Buying intent from <@${i.user.id}>: "${q.slice(0, 120)}"`);
     return i.editReply(answer.slice(0, 1900));
   }
@@ -1682,9 +1796,9 @@ client.on(Events.MessageCreate, async (m) => {
   await m.channel.sendTyping().catch(() => {});
   const products = await getProducts();
   /* A message carries no locale, but it carries the question itself — and the
-     rule above tells the model to follow the language it is written in. The
-     server's own language is the default for anything ambiguous. */
-  const answer = await askAI(m.content, products, botLang(m.guild?.preferredLocale));
+     rule above tells the model to follow the language it is written in. For
+     anything ambiguous: the language this member picked, then the server's. */
+  const answer = await askAI(m.content, products, memberLang(m.member, m.guild?.preferredLocale));
   if (BUY_INTENT.test(m.content)) leadLog(m.guild, `💡 Buying intent from <@${m.author.id}>: "${m.content.slice(0, 120)}"`);
   m.reply(answer.slice(0, 1900)).catch(() => {});
 });
@@ -1760,7 +1874,10 @@ async function syncLevelRoles(member, lvl) {
 
 async function announceLevelUp(guild, user, member, lvl, fallbackCh) {
   const unlocked = await syncLevelRoles(member, lvl);
-  const ch = findChannel(guild, 'general') || fallbackCh;
+  /* Announced where the XP was earned when that is a language room, so a
+     member who levels up chatting in French is congratulated in the room they
+     are actually looking at rather than in one they cannot see. */
+  const ch = isLanguageRoom(fallbackCh) ? fallbackCh : (houseChannel(guild) || fallbackCh);
   ch?.send({ embeds: [new EmbedBuilder().setColor(0xf5b324)
     .setAuthor({ name: user.username, iconURL: user.displayAvatarURL() })
     .setDescription(`🎉 GG <@${user.id}> — you reached **Level ${lvl}**!` +
@@ -1987,10 +2104,11 @@ async function orderStatusEmbed(num, lang = 'en') {
 async function lookupOrder(i) {
   await i.deferReply({ ephemeral: true });
   const num = i.options.getString('number').trim();
-  /* Discord already knows which language this member reads it in, and the
-     answer to "where is my order" is only worth giving in a language they
-     understand. Nobody has to set anything. */
-  const lang = botLang(i.locale);
+  /* The answer to "where is my order" is only worth giving in a language the
+     member reads. Discord's own locale is the default, so nobody HAS to set
+     anything — and a language picked in #roles beats it, because a guess
+     must lose to an answer. */
+  const lang = memberLang(i.member, i.locale);
   if (!FORGEMARKET_API_URL) return i.editReply(say(ORDER_UI.notConfigured, lang));
   const e = await orderStatusEmbed(num, lang);
   if (!e) return i.editReply(say(ORDER_UI.notFound, lang).replace('%s', num));
@@ -2092,7 +2210,7 @@ async function priceCmd(i) {
   }
   const top = scored.slice(0, 5);
   const best = top[0].p;
-  const lang = botLang(i.locale);
+  const lang = memberLang(i.member, i.locale);
   const P = PRICE_UI[lang] || PRICE_UI.en;
   const d = deliveryFor(best.category, lang);
   const cta = await shopLink(`${STORE_URL}/product/${best.id}`);
@@ -2189,7 +2307,7 @@ const CATEGORY_LABEL = {
 
 async function deliveryCmd(i) {
   await i.deferReply({ ephemeral: true });
-  const lang = botLang(i.locale);
+  const lang = memberLang(i.member, i.locale);
   const q = (i.options.getString('product') || '').toLowerCase().trim();
   const T = DELIVERY_UI[lang] || DELIVERY_UI.en;
 
@@ -2336,7 +2454,7 @@ function trackJoinForRaid(guild) {
 // ── Boost thank-you + member milestones ──────────────────────────────────────
 client.on(Events.GuildMemberUpdate, (oldM, newM) => {
   if (!oldM.premiumSince && newM.premiumSince) {
-    const ch = findChannel(newM.guild, 'general') || findChannel(newM.guild, 'announcements');
+    const ch = houseChannel(newM.guild) || findChannel(newM.guild, 'announcements');
     ch?.send({ embeds: [new EmbedBuilder().setColor(0xf47fff)
       .setDescription(`💎 **<@${newM.id}> just boosted the server!** Thank you — enjoy the extra love from the team. 💜`)] })
       .catch(() => {});
@@ -2347,7 +2465,7 @@ client.on(Events.GuildMemberUpdate, (oldM, newM) => {
 function celebrateMilestone(guild) {
   const n = guild.memberCount;
   if (n > 0 && n % 100 === 0) {
-    const ch = findChannel(guild, 'general') || findChannel(guild, 'announcements');
+    const ch = houseChannel(guild) || findChannel(guild, 'announcements');
     ch?.send({ embeds: [new EmbedBuilder().setColor(0xf5b324)
       .setTitle(`🎉 ${n} members!`)
       .setImage(BANNER('welcome'))
@@ -2374,7 +2492,7 @@ function maybePostWeeklyLeaderboard(guild) {
   if (!top.length) return;
   META.lastWeeklyPost = week;
   saveMeta();
-  const ch = findChannel(guild, 'general');
+  const ch = houseChannel(guild);
   if (!ch) return;
   const lines = top.map(([id, r], n) =>
     `**${['🥇', '🥈', '🥉'][n] || `${n + 1}.`}** <@${id}> — Level ${r.lvl} · ${r.xp} XP`).join('\n');
@@ -2717,7 +2835,7 @@ async function maybeVouchSpotlight(guild) {
     const hour = new Date().getUTCHours();
     if (hour < 15) return; // afternoon post (17:00 NL)
     const src = findChannel(guild, 'vouches') || findChannel(guild, 'vouchers');
-    const dst = findChannel(guild, 'general');
+    const dst = houseChannel(guild);
     if (!src || !dst) return;
     const msgs = await src.messages.fetch({ limit: 50 }).catch(() => null);
     if (!msgs) return;
@@ -2751,7 +2869,7 @@ client.on(Events.MessageCreate, async (m) => {
     if (m.channel.topic?.startsWith('ticket-owner:')) {
       /* A plain message carries no locale of its own, so the server's own
          language is the best available guess for who is reading this channel. */
-      const e = await orderStatusEmbed(match[0].toUpperCase(), botLang(m.guild?.preferredLocale));
+      const e = await orderStatusEmbed(match[0].toUpperCase(), memberLang(m.member, m.guild?.preferredLocale));
       if (e) await m.reply({ embeds: [e] });
       return;
     }

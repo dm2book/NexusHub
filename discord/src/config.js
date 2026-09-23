@@ -138,12 +138,29 @@ export const CATEGORIES = [
     ],
   },
   {
-    // One conversation, not seven. With a small server every extra chat channel
-    // is an empty room, and an empty room reads as an abandoned store.
+    /* One conversation, not seven — but one per language rather than one
+       for everybody.
+
+       The rule that keeps this from becoming four empty rooms is `lang`: a
+       language room is invisible until you pick that language in #roles, so a
+       member sees exactly one general, not three abandoned ones beside it.
+       #general-nl carries `house` as well, which keeps it readable for every
+       verified member — it is the shop's own language, and it is the floor
+       nobody falls through if they never open the picker.
+
+       general-nl adopts the old #general by `aka`, so the conversation that is
+       already there moves with the name instead of being left beside it. */
     name: '💬 COMMUNITY', access: 'verified',
     channels: [
-      { name: 'roles', type: 'text', readOnly: true, topic: 'Pick your games & notifications to get the right pings.' },
-      { name: 'general', type: 'text', topic: 'General chat for the ForgeMarket community — say hi 👋' },
+      { name: 'roles', type: 'text', readOnly: true, topic: 'Pick your language, your games and the alerts you want.' },
+      { name: 'general-nl', aka: ['general'], type: 'text', lang: 'nl', house: true,
+        topic: 'Nederlandse chat — de hoofdkamer van ForgeMarket. Zeg even hallo 👋' },
+      { name: 'general-en', type: 'text', lang: 'en',
+        topic: 'English chat. Pick English in #roles and this room stays with you.' },
+      { name: 'general-de', type: 'text', lang: 'de',
+        topic: 'Deutscher Chat. Wähle in #roles Deutsch, dann bleibt dir dieser Raum.' },
+      { name: 'general-fr', type: 'text', lang: 'fr',
+        topic: 'Salon francophone. Choisis Français dans #roles et ce salon reste chez toi.' },
       { name: 'media', aka: ['clips', 'screenshots-media', 'memes'], type: 'text', topic: 'Clips, screenshots and memes.' },
       { name: 'suggestions', type: 'text', topic: 'Got an idea? Use /suggest — the community votes and staff respond.' },
       { name: 'starboard', type: 'text', readOnly: true, topic: 'The best messages, starred by the community ⭐ (react with ⭐).' },
@@ -190,6 +207,43 @@ export const CATEGORIES = [
 ];
 
 export { STAFF, MEMBERS };
+
+/**
+ * The four languages this server is spoken in, and the room each one opens.
+ *
+ * A picker rather than four buttons, because unlike a game you have exactly one
+ * of these: picking Deutsch takes Nederlands off you, so nobody ends up holding
+ * all four and seeing every room. That is also why `key` is the ISO code — it
+ * matches the storefront's own locales (nl/en/de/fr), which is what the
+ * delivery mail is already written in.
+ *
+ * `room` is the channel this role unlocks; permissions.js gates that channel on
+ * this role and nothing else, so adding a fifth language here is a config line
+ * and a channel, not a permission rewrite.
+ *
+ * `confirm` is written in the language it confirms. A member who picks
+ * Français and is answered in English has been told the picker does not
+ * really work, in the one message whose whole job is to prove that it does.
+ * {room} is substituted with the real channel mention.
+ *
+ * No colour, deliberately. These sit at the bottom of the role list so a colour
+ * here would lose to every game and level role anyway — it would be a badge
+ * that shows up for nobody, and a language is not a badge.
+ */
+export const LANGUAGE_ROLES = [
+  { key: 'nl', label: 'Nederlands', emoji: '🇳🇱', room: 'general-nl',
+    blurb: 'Nederlandse chat — de hoofdkamer',
+    confirm: 'Je taal staat nu op **Nederlands**. Je kamer is {room}.' },
+  { key: 'en', label: 'English', emoji: '🇬🇧', room: 'general-en',
+    blurb: 'English chat',
+    confirm: 'Your language is set to **English**. Your room is {room}.' },
+  { key: 'de', label: 'Deutsch', emoji: '🇩🇪', room: 'general-de',
+    blurb: 'Deutscher Chat',
+    confirm: 'Deine Sprache steht jetzt auf **Deutsch**. Dein Raum ist {room}.' },
+  { key: 'fr', label: 'Français', emoji: '🇫🇷', room: 'general-fr',
+    blurb: 'Salon francophone',
+    confirm: 'Ta langue est maintenant **Français**. Ton salon est {room}.' },
+];
 
 // Self-assignable roles (created by setup, toggled by buttons in #roles).
 export const GAME_ROLES = [
@@ -540,9 +594,15 @@ export const MESSAGES = {
     color: 0x22d3ee,
     title: '🎮 Pick your roles',
     description:
-      "Tap the games you play and the alerts you want — get pinged only for what you care about.\n\n" +
-      "**Games** give you a colour + access to LFG pings.\n**Alerts** notify you about drops, deals & giveaways.\n\n" +
-      "Tap again to remove a role.",
+      "Three things to pick, and you keep only what you want.\n\n" +
+      "🌍 **Language** — Nederlands, English, Deutsch or Français. "
+      + "Your chat room opens when you pick one, and you only see that one.\n"
+      /* "LFG pings" until this line was rewritten — there is no LFG channel and
+         never was. What a game role actually does is decide which restock
+         pings reach you, which is CATEGORY_GAME_ROLE above. */
+      + "🎮 **Games** — a colour, and a ping only when the thing you actually buy is back in stock.\n"
+      + "🔔 **Alerts** — drops, deals and giveaways.\n\n"
+      + "Games and alerts toggle — tap again to drop one. Language is one at a time.",
   },
   suggestionsIntro: {
     image: bannerImage('suggestions'),

@@ -7,7 +7,8 @@
  * so a gated category is not a gate. These checks pin the blueprint that
  * setup.js applies per channel.
  */
-import { ROLES, CATEGORIES, GAME_ROLES, NOTIFY_ROLES, LEVEL_ROLES, STAFF, MEMBERS, MESSAGES, FAQ } from '../src/config.js';
+import { ROLES, CATEGORIES, GAME_ROLES, NOTIFY_ROLES, LEVEL_ROLES, LANGUAGE_ROLES,
+  STAFF, MEMBERS, MESSAGES, FAQ } from '../src/config.js';
 
 let pass = 0, fail = 0;
 const ok = (name, cond, extra = '') => { if (cond) { pass++; console.log(`  ✅ ${name}`); } else { fail++; console.log(`  ❌ ${name} ${extra}`); } };
@@ -56,8 +57,18 @@ console.log('\n— Channels —');
   ok('no duplicate channel names', new Set(channels.map((c) => c.name)).size === channels.length,
     channels.map((c) => c.name).filter((n, i, a) => a.indexOf(n) !== i).join(', '));
 
-  // Every room a visitor can enter and find empty reads as an abandoned shop.
-  ok('the server stays small enough to feel alive at launch', channels.length <= 40, `${channels.length} channels`);
+  /* Every room a visitor can enter and find empty reads as an abandoned shop —
+     so what this counts is rooms a member sees WITHOUT asking for them. The
+     language rooms are invisible until somebody picks that language, which is
+     the entire reason four generals are not four empty rooms; counting them
+     here would have made the guard fire at exactly the design that satisfies
+     it. A hidden room still costs nothing and is still bounded below. */
+  const openByDefault = channels.filter((c) => !c.lang || c.house);
+  ok('the server stays small enough to feel alive at launch', openByDefault.length <= 40,
+    `${openByDefault.length} rooms open by default, ${channels.length} in total`);
+  ok('…and the hidden rooms really are hidden',
+    channels.filter((c) => c.lang && !c.house).every((c) => !c.public),
+    channels.filter((c) => c.lang && !c.house && c.public).map((c) => c.name).join(', '));
 
   const staffChannels = channels.filter((c) => c.access === 'staff');
   ok('staff channels are never marked public', !staffChannels.some((c) => c.public),
@@ -84,6 +95,41 @@ console.log('\n— Channels —');
   ok('exactly one AFK channel', channels.filter((c) => c.afk).length === 1);
   ok('voice channels carry no topic (Discord drops it)',
     !channels.some((c) => c.type === 'voice' && c.topic));
+}
+
+console.log('\n— Languages —');
+{
+  const keys = LANGUAGE_ROLES.map((l) => l.key);
+  ok('four languages, no duplicates', new Set(keys).size === 4, keys.join(', '));
+  /* The same four the storefront writes its emails and its order status in.
+     A fifth language here would be a room nobody can be answered in. */
+  ok('they are the shop\u2019s own four', JSON.stringify([...keys].sort()) === JSON.stringify(['de', 'en', 'fr', 'nl']),
+    keys.join(', '));
+  ok('each one opens a different room', new Set(LANGUAGE_ROLES.map((l) => l.room)).size === 4);
+  ok('no two share a flag', new Set(LANGUAGE_ROLES.map((l) => l.emoji)).size === 4);
+
+  // A language role sharing a name with a game role would hand out the wrong one.
+  const selfLabels = [...GAME_ROLES, ...NOTIFY_ROLES, ...LEVEL_ROLES].map((r) => r.label || r.name);
+  const clashes = LANGUAGE_ROLES.filter((l) => selfLabels.includes(l.label)).map((l) => l.label);
+  ok('no language role name collides with another self-role', clashes.length === 0, clashes.join(', '));
+
+  /* Each confirmation is written in the language it confirms. Four identical
+     English sentences would pass every other check on this page and still tell
+     a French member, in the one message that proves the picker works, that it
+     does not. Sameness is the thing a future copy-paste would introduce. */
+  ok('every confirmation is a different sentence',
+    new Set(LANGUAGE_ROLES.map((l) => l.confirm)).size === 4);
+  ok('…and every one of them names the room',
+    LANGUAGE_ROLES.every((l) => l.confirm.includes('{room}')),
+    LANGUAGE_ROLES.filter((l) => !l.confirm.includes('{room}')).map((l) => l.key).join(', '));
+  ok('…and the picker shows a blurb for each',
+    LANGUAGE_ROLES.every((l) => l.blurb && l.blurb.length <= 100));
+
+  // The house room is the fallback, so it has to be the shop's own language.
+  const house = channels.find((c) => c.house);
+  ok('the house room is the Dutch one', house?.name === 'general-nl', house?.name || 'none');
+  ok('…and it adopts the old #general instead of leaving it beside itself',
+    (house?.aka || []).includes('general'), (house?.aka || []).join(', '));
 }
 
 console.log('\n— Promises —');

@@ -3,11 +3,13 @@
  * only way to correct one was to delete and re-pin every panel by hand.
  * These checks cover what that costs when it goes wrong.
  */
+import { readFileSync } from 'node:fs';
 import {
   buildPanels, panelNeedsUpdate, linkChannels,
   PANEL_FOOTER, isPanelFooter, panelFooterIsStale,
+  rolesPanelComponents, languagePickerRow, hasLanguagePicker, LANGUAGE_PICKER_ID,
 } from '../src/panels.js';
-import { CATEGORIES, FAQ } from '../src/config.js';
+import { CATEGORIES, FAQ, LANGUAGE_ROLES, GAME_ROLES, NOTIFY_ROLES } from '../src/config.js';
 
 let pass = 0, fail = 0;
 const ok = (name, cond, extra = '') => { if (cond) { pass++; console.log(`  ✅ ${name}`); } else { fail++; console.log(`  ❌ ${name} ${extra}`); } };
@@ -144,6 +146,89 @@ console.log('\n— What the panels are signed with —');
     !panelNeedsUpdate(old, { title: 'T', description: 'D' }));
   ok('…and once rewritten it is left alone',
     !panelFooterIsStale({ ...old, footer: { text: PANEL_FOOTER } }));
+}
+
+/**
+ * The controls under #roles.
+ *
+ * These are raw Discord component objects rather than discord.js builders, so
+ * nothing in the library is checking the shape for us. That is the trade this
+ * module makes to stay testable, and this is the other half of it: the shape
+ * is asserted here, and round-tripped through discord.js itself when it is
+ * installed.
+ */
+console.log('\n— The #roles controls —');
+{
+  const rows = rolesPanelComponents();
+  ok('Discord takes at most five rows', rows.length <= 5, `${rows.length} rows`);
+  ok('every row is an action row', rows.every((r) => r.type === 1));
+  ok('no row holds more than five buttons',
+    rows.every((r) => r.components.length <= 5),
+    rows.map((r) => r.components.length).join(', '));
+
+  const select = rows[0].components[0];
+  ok('the language picker comes first', select.type === 3 && select.custom_id === LANGUAGE_PICKER_ID);
+  ok('…and offers exactly the four languages',
+    JSON.stringify(select.options.map((o) => o.value)) === JSON.stringify(LANGUAGE_ROLES.map((l) => l.key)),
+    select.options.map((o) => o.value).join(', '));
+  /* One at a time. max_values: 2 would hand somebody two rooms, which is the
+     one thing the gate in permissions.js exists to prevent. */
+  ok('…and lets you pick exactly one',
+    select.min_values === 1 && select.max_values === 1);
+  ok('…and every option fits Discord\u2019s limits',
+    select.options.every((o) => o.label.length <= 100 && (o.description || '').length <= 100
+      && o.emoji?.name));
+  /* The picker is read by people who do not read Dutch. */
+  ok('the placeholder is not in one language only', /taal[\s\S]*language/i.test(select.placeholder),
+    select.placeholder);
+
+  const buttons = rows.slice(1).flatMap((r) => r.components);
+  const keys = [...GAME_ROLES, ...NOTIFY_ROLES].map((r) => r.key);
+  ok('every toggle is still there', buttons.length === keys.length, `${buttons.length} of ${keys.length}`);
+  ok('…and each one carries a real role key',
+    buttons.every((b) => keys.includes(String(b.custom_id).replace('role:', ''))),
+    buttons.map((b) => b.custom_id).join(', '));
+}
+
+console.log('\n— Repairing a panel that predates the picker —');
+{
+  ok('a freshly built panel already has it', hasLanguagePicker(rolesPanelComponents()));
+  /* The shape a message fetched from Discord arrives in: discord.js wraps each
+     component and renames custom_id. Reading only one of the two spellings is
+     how the repair either never fires or fires on every boot forever. */
+  ok('…and so does one read back through discord.js\u2019s own field name',
+    hasLanguagePicker([{ components: [{ customId: LANGUAGE_PICKER_ID }] }]));
+  ok('…and through a builder\u2019s .data', hasLanguagePicker([{ components: [{ data: { custom_id: LANGUAGE_PICKER_ID } }] }]));
+  // The panel as it stands on a server built before any of this existed.
+  ok('the old button-only panel is seen as needing it',
+    !hasLanguagePicker([{ components: [{ customId: 'role:robux' }, { customId: 'role:deals' }] }]));
+  ok('an empty message is handled', !hasLanguagePicker([]) && !hasLanguagePicker());
+}
+
+console.log('\n— Something answers the picker —');
+{
+  /* A picker posted with nothing listening is a control that greys out and
+     says "interaction failed" — worse than not offering it. */
+  const bot = readFileSync(new URL('../src/bot.js', import.meta.url), 'utf8');
+  ok('bot.js routes the picker\u2019s id', bot.includes('LANGUAGE_PICKER_ID'));
+  ok('…to a handler that exists', /async function setLanguage\(/.test(bot));
+  ok('…and repairs the panel at boot', /syncRolesControls\(g\)/.test(bot));
+}
+
+console.log('\n— discord.js accepts the shape —');
+{
+  let ActionRowBuilder = null;
+  try { ({ ActionRowBuilder } = await import('discord.js')); } catch { /* not installed */ }
+  if (!ActionRowBuilder) {
+    console.log('  ⏭  discord.js not installed — skipping the round-trip');
+  } else {
+    let threw = '';
+    try {
+      for (const r of rolesPanelComponents()) ActionRowBuilder.from(r).toJSON();
+      ActionRowBuilder.from(languagePickerRow()).toJSON();
+    } catch (e) { threw = e.message; }
+    ok('every row survives discord.js\u2019s own builder', threw === '', threw);
+  }
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
