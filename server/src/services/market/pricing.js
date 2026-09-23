@@ -31,6 +31,20 @@
  */
 import { config } from '../../config/env.js';
 import { evaluateFormula } from './formula.js';
+import { vatRate } from '../vatService.js';
+
+/**
+ * The BTW percentage this engine prices with.
+ *
+ * An explicit `vatPercent` (VAT_PERCENT, or a test's cfg) wins. Unset, it is
+ * whatever the shop has published: vatService answers that for the profit page
+ * too, so the margin a price is SET with and the margin it is later REPORTED
+ * with cannot disagree about whether 17.4% of it belongs to the tax office.
+ */
+export function vatPercentFor(cfg = config.market) {
+  if (cfg.vatPercent != null) return Number(cfg.vatPercent) || 0;
+  return Math.round(vatRate() * 1000) / 10;
+}
 
 const round2 = (n) => Math.round(n * 100) / 100;
 const eur = (cents) => cents / 100;
@@ -104,7 +118,8 @@ export function minimumProfitablePrice(costEur, cfg = config.market) {
   const srcPct = cfg.sourceCostPercent / 100;
   const denom = 1 - feePct - srcPct;
   if (denom <= 0) throw new Error('payment + source fees consume the whole price — check PAYMENT_FEE_PERCENT / SOURCE_COST_PERCENT');
-  const vat = cfg.vatPercent > 0 && cfg.pricesIncludeVat ? 1 + cfg.vatPercent / 100 : 1;
+  const vatPct = vatPercentFor(cfg);
+  const vat = vatPct > 0 && cfg.pricesIncludeVat ? 1 + vatPct / 100 : 1;
 
   // The euro floor: cost, costs and the minimum profit, grossed back up.
   const byAmount = ((Number(costEur) + cfg.fulfillmentCostEur + cfg.paymentFixedFee
@@ -130,7 +145,8 @@ export function minimumProfitablePrice(costEur, cfg = config.market) {
 /** The margin and profit a given price actually yields, after every deduction. */
 export function marginAt(priceEur, costEur, cfg = config.market) {
   const p = Number(priceEur);
-  const exVat = cfg.vatPercent > 0 && cfg.pricesIncludeVat ? p / (1 + cfg.vatPercent / 100) : p;
+  const vatPct = vatPercentFor(cfg);
+  const exVat = vatPct > 0 && cfg.pricesIncludeVat ? p / (1 + vatPct / 100) : p;
   const fees = exVat * (cfg.paymentFeePercent / 100) + cfg.paymentFixedFee
     + exVat * (cfg.sourceCostPercent / 100);
   const profit = exVat - Number(costEur) - cfg.fulfillmentCostEur - fees;
@@ -234,7 +250,7 @@ export function recommend({ stats, costEur, currentPriceEur = null, identityConf
       payment_fee_percent: cfg.paymentFeePercent,
       payment_fixed_fee: cfg.paymentFixedFee,
       fulfillment_cost: cfg.fulfillmentCostEur,
-      vat_percent: cfg.vatPercent,
+      vat_percent: vatPercentFor(cfg),
       competitor_count: stats.competitorCount,
     };
     try {

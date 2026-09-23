@@ -433,10 +433,20 @@ export const config = {
     },
 
     // ── VAT ─────────────────────────────────────────────────────────────────
-    // Off by default and it stays off: this shop publishes no VAT number, and a
-    // pricing engine that quietly adds 21% to every price would be inventing a
-    // tax position the business has not taken. See legalIdentity / compliance.
-    vatPercent: num(env.VAT_PERCENT, 0),
+    /* Unset by default, which means: follow the shop's own registration.
+       pricing.vatPercentFor() then asks vatService, the same place the profit
+       page asks, and that answers 21% once a btw-identificatienummer is
+       published and 0 before — so the engine still never invents a tax
+       position the business has not taken.
+
+       This used to be `num(env.VAT_PERCENT, 0)` on its own. The profit page
+       and the pricing engine then held two separate answers to one question,
+       and the day a seller entered their btw-nummer the profit page started
+       taking 21% out while the engine went on recommending prices as if none
+       were owed — prices that lose money on every sale, from the component
+       whose whole job is to stop that. Setting VAT_PERCENT still overrides. */
+    vatPercent: env.VAT_PERCENT != null && String(env.VAT_PERCENT).trim() !== ''
+      ? num(env.VAT_PERCENT, 0) : null,
     pricesIncludeVat: env.PRICES_INCLUDE_VAT !== 'false',
 
     // ── Safety: when NOT to publish ─────────────────────────────────────────
