@@ -25,6 +25,9 @@
  *            product with no number at all (a plain "Spotify Premium") cannot
  *            be checked this way and goes to a person, because 1 month and 12
  *            months are the same words.
+ *   what     not a game ACCOUNT, and not locked to a platform (Xbox,
+ *            PlayStation, Nintendo, Google Play, Apple) that our product
+ *            does not name — a buyer on another platform cannot redeem it.
  *   region   when the supplier states one, it has to be sellable to a Dutch
  *            buyer: region-free, global, Europe or the Netherlands. "RoW" is
  *            Rest of World and usually EXCLUDES Europe, so it is not in the
@@ -90,6 +93,29 @@ export function amountsIn(text) {
 const SELLABLE_REGION = /region\s*free|global|worldwide|\bworld\b|europe|\beu\b|netherlands|\bnl\b|benelux/i;
 
 /**
+ * Platforms a code can be LOCKED to. A listing that names one is for that
+ * platform only; if our product does not name it too, the buyer may be on
+ * another one and the code will not redeem. Found on a live scan: "1,000 Apex
+ * Coins" matched "Apex Legends — 1000 Apex Coins XBOX One CD Key" on amount and
+ * region, and nothing else was looking.
+ *
+ * Deliberately not here: "Epic Games" (every V-Bucks listing says it and it
+ * locks nothing) and "PC" (a catch-all on most key sites).
+ */
+const PLATFORMS = [
+  { name: 'Xbox', re: /xbox/i },
+  { name: 'PlayStation', re: /playstation|\bpsn\b|\bps[345]\b/i },
+  { name: 'Nintendo', re: /nintendo|\bswitch\b|\beshop\b/i },
+  { name: 'Google Play', re: /google\s*play|android/i },
+  { name: 'Apple', re: /app\s*store|itunes|\bios\b/i },
+];
+
+/* A game ACCOUNT is a different product from a code, and usually one the
+   game's own terms forbid selling. Seen on the same scan: "Fortnite — 1000
+   V-Bucks Epic Games Account". */
+const ACCOUNT = /\baccounts?\b/i;
+
+/**
  * Can this listing be mapped to this product without a person looking?
  * Returns { safe, reasons[], notes[] } — reasons block, notes do not.
  */
@@ -105,6 +131,17 @@ export function matchCheck(productName, candidate) {
     const missing = [...ours].filter((n) => !theirs.has(n));
     if (missing.length) {
       reasons.push(`the listing does not mention ${missing.map((n) => n.toLocaleString('en-US')).join(' or ')}`);
+    }
+  }
+
+  const title = String(candidate?.name || '');
+  if (ACCOUNT.test(title) && !ACCOUNT.test(String(productName || ''))) {
+    reasons.push('the listing sells a game account, not a code');
+  }
+  const where = `${title} ${candidate?.platform || ''}`;
+  for (const p of PLATFORMS) {
+    if (p.re.test(where) && !p.re.test(String(productName || ''))) {
+      reasons.push(`the listing is for ${p.name} only`);
     }
   }
 

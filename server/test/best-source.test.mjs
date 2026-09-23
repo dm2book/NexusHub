@@ -193,6 +193,26 @@ console.log('\n— The amount check itself —');
     && best.matchCheck('1,000 Robux', { name: '1000 Robux' }).notes.length === 1);
 }
 
+console.log('\n— The right amount, but not the right product —');
+{
+  /* Both from a live scan against Kinguin: the amount and the region matched,
+     and each would have been mapped the day either was cheap enough. */
+  const apex = best.matchCheck('1,000 Apex Coins',
+    { name: 'Apex Legends - 1000 Apex Coins XBOX One CD Key', region: 'REGION FREE' });
+  ok('an Xbox-only code does not map to a product that names no platform',
+    !apex.safe && apex.reasons.some((r) => /Xbox only/.test(r)), JSON.stringify(apex.reasons));
+  const acct = best.matchCheck('1,000 V-Bucks',
+    { name: 'Fortnite - 1000 V-Bucks Epic Games Account', region: 'REGION FREE' });
+  ok('a game account is not a code', !acct.safe && acct.reasons.some((r) => /account/.test(r)),
+    JSON.stringify(acct.reasons));
+  ok('…while a V-Bucks CODE that says "Epic Games" is fine',
+    best.matchCheck('1,000 V-Bucks', { name: 'Fortnite 1000 V-Bucks Epic Games Key', region: 'Global' }).safe);
+  ok('a platform in the supplier\'s own field counts too',
+    !best.matchCheck('1,000 Apex Coins', { name: 'Apex 1000 Coins', region: 'Global', platform: 'Xbox One' }).safe);
+  ok('…and a PlayStation card maps to a PSN product',
+    best.matchCheck('PSN €20', { name: 'PlayStation Network Card 20 EUR', region: 'Europe' }).safe);
+}
+
 console.log('\n— A price list that says 8.00 means eight euros —');
 {
   /* Found by looking at this screen with a real price list in it: every cost
