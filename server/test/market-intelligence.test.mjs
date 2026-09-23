@@ -196,7 +196,26 @@ console.log('\n━━ 4. Margin calculation ━━');
   ok('VAT raises the floor only when the shop is configured to charge it',
     vatFloor > floor && Math.abs(vatFloor - floor * 1.21) < 0.02, `${floor} → ${vatFloor}`);
   ok('and VAT is off by default, because this shop publishes no VAT number',
-    config.market.vatPercent === 0);
+    P.vatPercentFor(config.market) === 0, String(P.vatPercentFor(config.market)));
+
+  /* The day the seller enters a btw-nummer. The profit page starts taking 21%
+     out on its own; the engine used to need a second, separate VAT_PERCENT
+     setting nobody would know to change, and went on pricing as if no tax were
+     owed. It follows the same published fact now. */
+  const { LEGAL } = await import('../../src/lib/legalIdentity.js');
+  const was = LEGAL.vat;
+  LEGAL.vat = 'NL000000000B01';
+  try {
+    ok('a published btw-nummer puts the engine on 21% by itself',
+      P.vatPercentFor(config.market) === 21, String(P.vatPercentFor(config.market)));
+    ok('…so the floor it prices from rises with it',
+      Math.abs(P.minimumProfitablePrice(8.2) - vatFloor) < 0.02,
+      `${P.minimumProfitablePrice(8.2)} vs ${vatFloor}`);
+    /* €10 with a €9 cost: 10% before BTW, a loss after it. */
+    ok('…and a price that only looked profitable before BTW is shown as a loss',
+      P.marginAt(10, 9).profitEur < 0, JSON.stringify(P.marginAt(10, 9)));
+    ok('an explicit VAT_PERCENT still wins', P.vatPercentFor({ ...config.market, vatPercent: 9 }) === 9);
+  } finally { LEGAL.vat = was; }
 }
 
 console.log('\n━━ 5. Stale data ━━');
