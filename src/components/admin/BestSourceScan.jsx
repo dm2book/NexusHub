@@ -191,7 +191,10 @@ export default function BestSourceScan({ onMapped }) {
                             that a "Robux" search found a gift card. */}
                         <span className="text-slate-300">{b.supplierName}</span> → {b.title}
                         {b.region && ` · ${b.region}`} · {money(b.cost, 'EUR')}
-                        {b.profitCents != null && (
+                        {/* Not on a "check" row: that listing is probably a different
+                            product, and "+€3.60 (55%)" beside a €2.50 card for a
+                            1,000 VP product reads as an opportunity it is not. */}
+                        {b.profitCents != null && r.verdict !== 'check' && (
                           <span className={s.cls}> · {b.profitCents >= 0 ? '+' : ''}{money(b.profitCents, 'EUR')} ({Math.round(b.marginPct)}%)</span>
                         )}
                         {r.fallback && (
