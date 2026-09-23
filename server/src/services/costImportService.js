@@ -25,56 +25,20 @@
 import { all } from '../db/index.js';
 import { audit } from './auditService.js';
 import { costCentsFromMetadata } from './costService.js';
-import { vatContext, netCents, NL_STANDARD_RATE } from './vatService.js';
+import { netCents, planningVat } from './vatService.js';
 
-/**
- * The BTW rate a margin in this preview is measured after.
- *
- * Once a btw-identificatienummer is published the shop's own rate is the
- * answer, the same one the profit page uses. Before that the shop has no rate
- * — and this is exactly the screen an owner fills in BEFORE registering,
- * setting prices they will keep. A margin shown before BTW would be the
- * number they plan with and not the number they will earn: at 21% the first
- * 17.4% of every price is the Belastingdienst's, so a product that looks like
- * 15% profit here loses money on every sale. So the preview measures against
- * the standard rate and says so in its heading; a seller who stays under the
- * KOR can read the column as the pessimistic case it then is.
- */
-function previewVat() {
-  const vat = vatContext();
-  const rate = vat.registered ? vat.rate : NL_STANDARD_RATE;
-  return { rate, pct: Math.round(rate * 1000) / 10, registered: vat.registered };
-}
+/* Margins here are PLANNED margins — this is the screen an owner fills in
+   before registering for BTW, setting prices they will keep — so they are
+   measured after the rate the shop will charge. vatService.planningVat()
+   states that rule for every screen that sets prices. */
+const previewVat = planningVat;
 
-/**
- * A money string as cents.
- *
- * Accepts what people actually paste: "€1,23", "1.23", "1,23", " 12 ", "1.234,56"
- * and "1,234.56". The last two are the ambiguous ones, and they are decided by
- * which separator comes LAST — that is the decimal one in both conventions.
- * Anything else returns null rather than a number that looks plausible.
- */
-export function parseMoney(raw) {
-  let s = String(raw ?? '').trim()
-    .replace(/[€$£\s]/g, '')
-    .replace(/^"+|"+$/g, '');
-  if (!s) return null;
-  const lastComma = s.lastIndexOf(',');
-  const lastDot = s.lastIndexOf('.');
-  if (lastComma > -1 && lastDot > -1) {
-    /* Whichever is last is the decimal separator; the other groups thousands. */
-    if (lastComma > lastDot) s = s.replace(/\./g, '').replace(',', '.');
-    else s = s.replace(/,/g, '');
-  } else if (lastComma > -1) {
-    /* A lone comma is a decimal separator here, unless it is grouping three
-       digits at the end ("1,234") — in which case reading it as 1.234 would
-       turn twelve hundred into one. */
-    s = /,\d{3}$/.test(s) ? s.replace(/,/g, '') : s.replace(',', '.');
-  }
-  const n = Number(s);
-  if (!Number.isFinite(n) || n < 0) return null;
-  return Math.round(n * 100);
-}
+/* parseMoney lives in utils/money.js now — the supplier price-list reader
+   needs the same rules, and two readers of "8,00" is how one of them came to
+   read it as eight cents. Re-exported so existing callers keep working. */
+import { parseMoney } from '../utils/money.js';
+
+export { parseMoney };
 
 /**
  * One pasted line as { sku, cents } — or a reason it is not one.

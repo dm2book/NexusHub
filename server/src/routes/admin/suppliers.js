@@ -10,6 +10,7 @@ import { supplierIntelligence, offerHistory } from '../../services/supplier/supp
 import { availableKinds, createConnector } from '../../services/supplier/registry.js';
 import { searchTermsFor } from '../../services/supplier/SupplierConnector.js';
 import { scanProducts, summarise } from '../../services/supplier/catalogScanService.js';
+import { scanBest, scanSources, mapBest } from '../../services/supplier/bestSourceService.js';
 import { audit } from '../../services/auditService.js';
 import { notFound } from '../../utils/errors.js';
 import { get, all } from '../../db/index.js';
@@ -51,6 +52,57 @@ router.get('/metrics', requirePermission('suppliers.read'), asyncHandler(async (
    route below it is read as a supplier whose id is the word "dashboard". */
 router.get('/dashboard', requirePermission('suppliers.read'), asyncHandler(async (_req, res) => {
   res.json(await supplierDashboard());
+}));
+
+/* —— Best source across every supplier —————————————————————————————
+   Declared above `/:id` for the reason /dashboard is: Express would read
+   "best" as a supplier id. */
+
+/** What there is to scan, and who there is to ask. */
+router.get('/best/targets', requirePermission('suppliers.read'), asyncHandler(async (_req, res) => {
+  const products = await all(`SELECT id, name, price FROM products WHERE active = 1 ORDER BY name ASC`);
+  const sources = await scanSources();
+  res.json({
+    products: products.map((p) => ({ id: p.id, name: p.name, priceCents: Number(p.price) })),
+    suppliers: sources.map(({ supplier, connector }) => ({
+      id: supplier.id, name: supplier.name, kind: supplier.connector_kind,
+      /* Whether it searches at the supplier or filters a list it downloaded —
+         the second finds only what that list holds. */
+      serverSide: !!connector.supportsSearch,
+    })),
+  });
+}));
+
+/**
+ * One small batch against every active supplier. Batched by the client for
+ * the reason the per-supplier scan is: products × suppliers × search terms is
+ * hundreds of calls to other people's APIs, and one request that dies at the
+ * function timeout leaves nothing. Four products a request stays inside it.
+ *
+ * READS ONLY. Proposes; mapping is the route below.
+ */
+router.post('/best/scan', requirePermission('suppliers.read'), asyncHandler(async (req, res) => {
+  const { productIds } = z.object({ productIds: z.array(z.string()).min(1).max(4) }).parse(req.body || {});
+  res.set('Cache-Control', 'no-store');
+  res.json(await scanBest(productIds));
+}));
+
+/**
+ * Map what the owner confirmed. Each pick is the best listing a scan found,
+ * with an optional fallback from another supplier. Products that already have
+ * a mapping are skipped unless `replace` is set, so "map all" can never move a
+ * product somebody mapped by hand.
+ */
+const bestPick = z.object({
+  supplierId: z.string(), supplierSku: z.string().min(1),
+  supplierUrl: z.string().url().max(500).nullish(), cost: z.number().int().min(0),
+});
+router.post('/best/map', requirePermission('suppliers.manage'), asyncHandler(async (req, res) => {
+  const body = z.object({
+    picks: z.array(bestPick.extend({ productId: z.string(), fallback: bestPick.nullish() })).min(1).max(200),
+    replace: z.boolean().optional(),
+  }).parse(req.body || {});
+  res.json(await mapBest(body.picks, { replace: !!body.replace, actor: req.user }));
 }));
 
 router.get('/:id', requirePermission('suppliers.read'), asyncHandler(async (req, res) => {
