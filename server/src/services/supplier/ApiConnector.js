@@ -15,6 +15,7 @@
  * for flexibility a literal token in config is also supported.
  */
 import { SupplierConnector } from './SupplierConnector.js';
+import { parseMoney } from '../../utils/money.js';
 
 export class ApiConnector extends SupplierConnector {
   static kind = 'api';
@@ -65,8 +66,8 @@ export class ApiConnector extends SupplierConnector {
     return {
       supplierSku: String(pick('sku', 'sku')),
       name: pick('name', 'name'),
-      cost: toMinor(pick('cost', 'cost')),
-      price: toMinor(pick('price', 'price')),
+      cost: toMinor(pick('cost', 'cost'), this.config),
+      price: toMinor(pick('price', 'price'), this.config),
       availableStock: numOrNull(pick('stock', 'stock')),
       status: this.#mapStatus(rawStatus, pick('stock', 'stock')),
     };
@@ -143,10 +144,27 @@ export class ApiConnector extends SupplierConnector {
 }
 
 const numOrNull = (v) => (v == null || v === '' ? null : Number(v));
-const toMinor = (v) => {
+/**
+ * An amount as cents.
+ *
+ * A JSON NUMBER cannot say whether 8 is euros or cents — 8.00 and 8 are the
+ * same number by the time it is parsed — so numbers keep the old rule:
+ * whole means cents, fractional means euros, unless the config says
+ * `amounts: "major"`.
+ *
+ * A STRING can say, and used to be thrown away: `Number("8.00")` is 8, a whole
+ * number, so a feed that sends prices as text ("8.00", "€8") was read as
+ * eight cents. Text with a decimal separator or a currency sign is euros and is
+ * read with the shared parser, the same as the CSV connector.
+ */
+const toMinor = (v, { amounts = 'minor' } = {}) => {
   if (v == null || v === '') return null;
+  if (typeof v === 'string') {
+    const text = v.trim();
+    if (/\d[.,]\d/.test(text) || /[€$£]/.test(text)) return parseMoney(text);
+  }
   const n = Number(v);
   if (Number.isNaN(n)) return null;
-  // Heuristic: integers already in minor units stay; decimals are major units.
-  return Number.isInteger(n) ? n : Math.round(n * 100);
+  if (!Number.isInteger(n)) return Math.round(n * 100);
+  return amounts === 'major' ? n * 100 : n;
 };

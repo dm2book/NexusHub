@@ -6,6 +6,7 @@ import { PageLoader, EmptyState, Modal } from '../../components/ui.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
 import SupplyDashboard from '../../components/admin/SupplyDashboard.jsx';
 import CatalogScan from '../../components/admin/CatalogScan.jsx';
+import BestSourceScan from '../../components/admin/BestSourceScan.jsx';
 import SupplierCostChart from '../../components/admin/SupplierCostChart.jsx';
 
 const KIND_HINT = {
@@ -311,6 +312,11 @@ export default function Suppliers() {
       <p className="text-slate-400 text-sm mb-6">
         Connector-based integration layer — API, CSV, Eldorado and manual suppliers. No suppliers are hardcoded.
       </p>
+
+      {/* The question an owner actually has: for every product, where is it
+          cheapest, and can the shop just map all of it? Above everything else
+          because it is the one that does the work. */}
+      <BestSourceScan onMapped={load} />
 
       {/* Supply, product-first: the view that shows a product NO supplier
           covers, which by definition appears on no supplier's card below. */}

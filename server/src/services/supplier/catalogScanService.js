@@ -75,14 +75,15 @@ export function marginOf(best, priceCents) {
 }
 
 /**
- * One product against one supplier.
+ * One product against one supplier: the raw candidates, before any judging.
+ * Shared by this per-supplier scan and the all-supplier best-source scan, so
+ * both search with the same terms in the same order.
  *
  * Search terms are tried shortest-last and it stops at the first that finds
  * anything — a shop writes "1,000 Robux" and a supplier lists "1000 Robux",
  * and without the fallback the whole catalogue reads as "not carried".
  */
-export async function scanProduct(connector, product, { limit = 25 } = {}) {
-  const priceCents = Number(product.price) || 0;
+export async function searchCandidates(connector, product, { limit = 25 } = {}) {
   const terms = searchTermsFor(product.name);
   const tried = [];
   let candidates = [];
@@ -95,6 +96,13 @@ export async function scanProduct(connector, product, { limit = 25 } = {}) {
     candidates = await connector.searchCatalog(term, { limit }).catch(() => []);
     if (candidates.length) { searchedFor = term; break; }
   }
+  return { candidates, searchedFor, tried };
+}
+
+/** One product against one supplier, judged. */
+export async function scanProduct(connector, product, opts = {}) {
+  const priceCents = Number(product.price) || 0;
+  const { candidates, searchedFor, tried } = await searchCandidates(connector, product, opts);
 
   const { best, verdict } = judge(candidates, priceCents);
   return {

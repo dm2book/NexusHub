@@ -81,3 +81,24 @@ export function vatContext(opts = {}) {
     estimate: true,
   };
 }
+
+/**
+ * The rate a margin should be PLANNED against, before and after registration.
+ *
+ * vatRate() answers "what is owed on sales today", which is 0 until a
+ * btw-identificatienummer is published — correct for the profit page, which
+ * reports what happened. The screens where an owner sets prices and picks
+ * suppliers ask a different question: what will this earn once I charge BTW?
+ * Answering that with 0 shows a product at 15% profit that loses money on
+ * every sale the day registration arrives. So those screens plan against the
+ * shop's own rate once it has one and against the 21% standard rate before,
+ * and they say which one in their headings.
+ *
+ * One function because it is read in two places (the cost import and the
+ * best-source scan), and a rule restated in two places is a rule that drifts.
+ */
+export function planningVat(opts = {}) {
+  const vat = vatContext(opts);
+  const rate = vat.registered ? vat.rate : NL_STANDARD_RATE;
+  return { rate, pct: Math.round(rate * 1000) / 10, registered: vat.registered };
+}

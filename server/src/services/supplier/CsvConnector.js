@@ -6,6 +6,7 @@
  *   source: { type: 'url'|'inline', url, content },
  *   delimiter: ',', hasHeader: true,
  *   columns: { sku, name, cost, price, stock, status },  // header name OR index
+ *   amounts: 'minor' | 'major',   // how a WHOLE number is read; "8.00" is always euros
  *   statusMap: { ... }
  * }
  *
@@ -13,6 +14,7 @@
  * workflow (handled by the fulfillment service when supportsFulfillment=false).
  */
 import { SupplierConnector } from './SupplierConnector.js';
+import { parseMoney } from '../../utils/money.js';
 
 export class CsvConnector extends SupplierConnector {
   static kind = 'csv';
@@ -54,8 +56,8 @@ export class CsvConnector extends SupplierConnector {
       return {
         supplierSku: String(cell('sku') ?? '').trim(),
         name: cell('name'),
-        cost: toMinor(cell('cost')),
-        price: toMinor(cell('price')),
+        cost: toMinor(cell('cost'), this.config),
+        price: toMinor(cell('price'), this.config),
         availableStock: stock == null || stock === '' ? null : Number(stock),
         status: this.#mapStatus(cell('status'), stock),
       };
@@ -106,9 +108,28 @@ export function parseCsv(text, delimiter = ',', hasHeader = true) {
   });
 }
 
-const toMinor = (v) => {
+/**
+ * A cell as cents.
+ *
+ * This used to be `Number(text)`, then "integers are already cents, decimals
+ * are euros". The trouble is that `Number("8.00")` IS an integer: every price
+ * a supplier wrote with ",00" or ".00" was read as that many CENTS — a €8
+ * card cost the shop 8 cents, every margin built on it was ninety-odd percent,
+ * and the margin guard waved through any purchase at all.
+ *
+ * So the decision is made on the TEXT. A decimal separator means the value is
+ * written in euros — so does a currency sign — and it is read with the same parser the cost import uses
+ * ("12,50", "€8,00", "1.234,56"). A bare whole number is genuinely ambiguous
+ * — "800" in a machine feed is usually cents, "8" in a hand-made list is
+ * usually euros — so it keeps the old meaning (cents) unless the supplier's
+ * config says `amounts: "major"`.
+ */
+const toMinor = (v, { amounts = 'minor' } = {}) => {
   if (v == null || v === '') return null;
-  const n = Number(String(v).replace(/[^0-9.\-]/g, ''));
-  if (Number.isNaN(n)) return null;
-  return Number.isInteger(n) ? n : Math.round(n * 100);
+  const text = String(v).trim();
+  /* A decimal separator or a currency sign both say "this is written in euros". */
+  if (/\d[.,]\d/.test(text) || /[€$£]/.test(text)) return parseMoney(text);
+  const n = Number(text.replace(/[^0-9\-]/g, ''));
+  if (!text || Number.isNaN(n)) return null;
+  return amounts === 'major' ? n * 100 : n;
 };
