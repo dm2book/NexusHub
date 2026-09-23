@@ -13,7 +13,7 @@
  *
  * No discord.js import on purpose: this stays pure so it can be tested.
  */
-import { MESSAGES, FAQ } from './config.js';
+import { MESSAGES, FAQ, LANGUAGE_ROLES, GAME_ROLES, NOTIFY_ROLES } from './config.js';
 
 /**
  * The footer under every pinned panel.
@@ -118,3 +118,71 @@ export function panelNeedsUpdate(existingEmbed, panel) {
   return norm(existingEmbed.title) !== norm(panel.title)
     || norm(existingEmbed.description) !== norm(panel.description);
 }
+
+
+/* —— The controls under the #roles panel ——————————————————————————— */
+
+/** Discord's component type numbers, so the rows below read as what they are. */
+const ROW = 1, BUTTON = 2, SELECT = 3, SECONDARY = 2;
+
+/** The one custom_id the language picker answers to, in both files that use it. */
+export const LANGUAGE_PICKER_ID = 'lang:set';
+
+/**
+ * Every control under the #roles panel, as raw Discord component JSON.
+ *
+ * Raw JSON rather than discord.js builders for the same reason the copy above
+ * is plain data: this module stays importable without a Discord client, so the
+ * shape can be asserted in a test instead of on a live server. discord.js
+ * accepts API component objects wherever it accepts builders, and the test
+ * round-trips these through ActionRowBuilder to prove the shape is one Discord
+ * will take.
+ *
+ * It lives here because setup.js posts these once and then never again
+ * (`postOnce` answers "exists" on every later run). A picker added only in
+ * setup.js would therefore never appear on a server that was already built —
+ * the exact failure this module was created to end for panel COPY. bot.js
+ * repairs the row at boot from this same function.
+ */
+/** Just the picker, on its own row — also shown the moment somebody verifies. */
+export const languagePickerRow = () => ({
+  type: ROW,
+  components: [{
+    type: SELECT,
+    custom_id: LANGUAGE_PICKER_ID,
+    /* Both languages in the placeholder on purpose: a Dutch-only prompt is
+       unreadable to exactly the members this picker exists for. */
+    placeholder: '🌍 Kies je taal — choose your language',
+    min_values: 1,
+    max_values: 1,
+    options: LANGUAGE_ROLES.map((l) => ({
+      value: l.key, label: l.label, description: l.blurb, emoji: { name: l.emoji },
+    })),
+  }],
+});
+
+export function rolesPanelComponents() {
+  const button = (r) => ({
+    type: BUTTON, style: SECONDARY, custom_id: `role:${r.key}`,
+    label: r.label, emoji: { name: r.emoji },
+  });
+  const rows = [languagePickerRow()];
+  for (let i = 0; i < GAME_ROLES.length; i += 5) {
+    rows.push({ type: ROW, components: GAME_ROLES.slice(i, i + 5).map(button) });
+  }
+  rows.push({ type: ROW, components: NOTIFY_ROLES.map(button) });
+  return rows;
+}
+
+/**
+ * Does a message already carry the language picker?
+ *
+ * Reads both shapes a component can arrive in — discord.js's wrapper
+ * (`customId`) and the raw API object (`custom_id`) — because a message
+ * fetched from the gateway and one built here are not the same object, and
+ * checking only one of them is how the repair either never runs or runs on
+ * every boot forever.
+ */
+export const hasLanguagePicker = (components = []) =>
+  (components || []).some((rowData) => (rowData?.components || []).some(
+    (c) => (c?.customId ?? c?.custom_id ?? c?.data?.custom_id) === LANGUAGE_PICKER_ID));

@@ -12,7 +12,7 @@
  * the ones that make a ticket private, so the bot's own least-privilege set is
  * pinned here too.
  */
-import { CATEGORIES, ROLES, GAME_ROLES, NOTIFY_ROLES, LEVEL_ROLES } from '../src/config.js';
+import { CATEGORIES, ROLES, GAME_ROLES, NOTIFY_ROLES, LEVEL_ROLES, LANGUAGE_ROLES } from '../src/config.js';
 import {
   resolveOverwrites, canView, FLAGS, BOT_PERMISSIONS, DANGEROUS_FOR_BOT,
   botPermissionBits, botInviteUrl,
@@ -31,9 +31,10 @@ const BOT = 'id-bot';
 const roleIds = Object.fromEntries(
   [...new Set([...MEMBER_KEYS, ...ROLES.map((r) => r.key)])].map((k) => [k, `id-${k}`]));
 const botOverwrite = { id: BOT, allow: [FLAGS.ViewChannel, FLAGS.SendMessages] };
+const langRoleIds = Object.fromEntries(LANGUAGE_ROLES.map((l) => [l.key, `id-lang-${l.key}`]));
 
 const resolve = (category, channel) => resolveOverwrites({
-  category, channel, everyoneId: EVERYONE, roleIds, botOverwrite,
+  category, channel, everyoneId: EVERYONE, roleIds, langRoleIds, botOverwrite,
   staffKeys: STAFF_KEYS, memberKeys: MEMBER_KEYS,
 });
 
@@ -85,6 +86,56 @@ console.log('\n— An unverified visitor sees only what is meant to be public �
     JSON.stringify([...visible].sort()) === JSON.stringify([...intended].sort()),
     `visible=${visible.sort()} intended=${intended.sort()}`);
   ok('and that set is not empty', visible.length > 0);
+}
+
+console.log('\n— Four generals, and nobody is in four of them —');
+{
+  const langChannels = everyChannel.filter(({ ch }) => ch.lang);
+  ok('there is one room per language', langChannels.length === LANGUAGE_ROLES.length,
+    `${langChannels.length} rooms for ${LANGUAGE_ROLES.length} languages`);
+  ok('every language role names a room that exists',
+    LANGUAGE_ROLES.every((l) => langChannels.some(({ ch }) => ch.name === l.room && ch.lang === l.key)),
+    LANGUAGE_ROLES.filter((l) => !langChannels.some(({ ch }) => ch.name === l.room)).map((l) => l.room).join(', '));
+
+  // The whole point: picking Deutsch opens one room, not two and not four.
+  for (const { cat, ch } of langChannels) {
+    const ow = resolve(cat, ch);
+    const opens = LANGUAGE_ROLES.filter((l) => canView(ow, langRoleIds[l.key], EVERYONE)).map((l) => l.key);
+    ok(`#${ch.name} opens for ${ch.lang} and for no other language`,
+      JSON.stringify(opens) === JSON.stringify([ch.lang]), opens.join(', ') || 'nobody');
+  }
+
+  /* The floor nobody falls through. A member who never opens the picker still
+     has somewhere to talk — and still does not see the other three. */
+  const house = langChannels.filter(({ ch }) => ch.house);
+  ok('exactly one room is the house room', house.length === 1,
+    house.map(({ ch }) => ch.name).join(', '));
+  ok('…and a verified member with no language at all can read it',
+    canView(resolve(house[0].cat, house[0].ch), roleIds.verified, EVERYONE));
+  const strays = langChannels
+    .filter(({ cat, ch }) => !ch.house && canView(resolve(cat, ch), roleIds.verified, EVERYONE))
+    .map(({ ch }) => ch.name);
+  ok('…and sees none of the others', strays.length === 0, strays.join(', '));
+
+  // A room staff cannot read is a room nobody moderates.
+  const unmoderated = [];
+  for (const { cat, ch } of langChannels) {
+    for (const k of STAFF_KEYS) {
+      if (!canView(resolve(cat, ch), roleIds[k], EVERYONE)) unmoderated.push(`${k} ✕ #${ch.name}`);
+    }
+  }
+  ok('staff can read all four', unmoderated.length === 0, unmoderated.join(', '));
+
+  /* The failure that matters: setup has not created the language roles yet, or
+     creating one failed. The room has to come out shut rather than open — a
+     room nobody can see is a nuisance, a room everybody can see is the bug. */
+  const gated = langChannels.find(({ ch }) => !ch.house);
+  const bare = resolveOverwrites({
+    category: gated.cat, channel: gated.ch, everyoneId: EVERYONE, roleIds,
+    botOverwrite, staffKeys: STAFF_KEYS, memberKeys: MEMBER_KEYS,
+  });
+  ok('a room whose language role does not exist yet stays shut, not open',
+    !canView(bare, roleIds.verified, EVERYONE) && !canView(bare, EVERYONE, EVERYONE));
 }
 
 console.log('\n— A read-only channel is read-only for members, not for staff —');

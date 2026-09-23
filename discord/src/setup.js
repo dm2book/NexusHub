@@ -21,8 +21,9 @@ import {
   EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle,
   StringSelectMenuBuilder, StringSelectMenuOptionBuilder,
 } from 'discord.js';
-import { ROLES, CATEGORIES, STAFF, MEMBERS, GAME_ROLES, NOTIFY_ROLES, LEVEL_ROLES } from './config.js';
-import { buildPanels, PANEL_FOOTER, isPanelFooter } from './panels.js';
+import { ROLES, CATEGORIES, STAFF, MEMBERS, GAME_ROLES, NOTIFY_ROLES, LEVEL_ROLES,
+  LANGUAGE_ROLES } from './config.js';
+import { buildPanels, PANEL_FOOTER, isPanelFooter, rolesPanelComponents } from './panels.js';
 import { resolveOverwrites, DANGEROUS_FOR_BOT, botInviteUrl } from './permissions.js';
 import { TICKET_TYPES } from './tickets.js';
 
@@ -134,18 +135,25 @@ client.once(Events.ClientReady, async () => {
     // NOT mentionable: the bot pings these roles itself (flash sales, drops,
     // giveaways) through allowedMentions, which works regardless. Leaving them
     // mentionable let any member notify everyone who opted in.
-    for (const r of [...GAME_ROLES, ...NOTIFY_ROLES]) {
+    //
+    // The language roles come first because every language room's overwrites
+    // are gated on their ids, and the channels are built further down: a room
+    // whose role does not exist yet is created staff-only, which is quiet but
+    // still a room nobody can see.
+    const langRoleIds = {};
+    for (const r of [...LANGUAGE_ROLES, ...GAME_ROLES, ...NOTIFY_ROLES]) {
       try {
-        const existing = guild.roles.cache.find((x) => x.name === r.label);
-        if (!existing) {
+        let role = guild.roles.cache.find((x) => x.name === r.label);
+        if (!role) {
           // permissions: [] — otherwise Discord copies @everyone's set into a
           // role handed out by a button any member can press.
-          await guild.roles.create({ name: r.label, colors: roleColors(r.color), mentionable: false, permissions: [], reason: 'ForgeMarket self-roles' });
+          role = await guild.roles.create({ name: r.label, colors: roleColors(r.color), mentionable: false, permissions: [], reason: 'ForgeMarket self-roles' });
           console.log(`  + self-role ${r.label}`);
-        } else if (existing.mentionable && existing.editable) {
-          await existing.edit({ mentionable: false }).catch(() => {});
+        } else if (role.mentionable && role.editable) {
+          await role.edit({ mentionable: false }).catch(() => {});
           console.log(`  · self-role ${r.label}: mention spam disabled`);
         }
+        if (r.room) langRoleIds[r.key] = role.id;
       } catch (e) { console.log(`  ! self-role ${r.label} failed: ${e.message}`); }
     }
 
@@ -169,6 +177,7 @@ client.once(Events.ClientReady, async () => {
         ...LEVEL_ROLES.map((r) => r.name).reverse(), // Level 30 above Level 5
         ...GAME_ROLES.map((r) => r.label),
         ...NOTIFY_ROLES.map((r) => r.label),
+        ...LANGUAGE_ROLES.map((r) => r.label),
       ];
       const movable = order
         .map((n) => guild.roles.cache.find((x) => x.name === n))
@@ -195,7 +204,7 @@ client.once(Events.ClientReady, async () => {
     // the two used to be written out separately, and a rule fixed in one of them
     // was a rule still broken in the other.
     const categoryOverwrites = (access) => resolveOverwrites({
-      category: { access }, channel: {}, everyoneId: everyone, roleIds,
+      category: { access }, channel: {}, everyoneId: everyone, roleIds, langRoleIds,
       botOverwrite: botOW, staffKeys: STAFF, memberKeys: MEMBERS, P,
     });
 
@@ -218,8 +227,8 @@ client.once(Events.ClientReady, async () => {
     // over the blueprint and asserts no customer-tier role can view a staff
     // channel. It was a closure here, where nothing could reach it.
     const channelOverwrites = (cat, ch) => resolveOverwrites({
-      category: cat, channel: ch, everyoneId: everyone, roleIds, botOverwrite: botOW,
-      staffKeys: STAFF, memberKeys: MEMBERS, P,
+      category: cat, channel: ch, everyoneId: everyone, roleIds, langRoleIds,
+      botOverwrite: botOW, staffKeys: STAFF, memberKeys: MEMBERS, P,
     });
 
     // 2) Categories + channels ────────────────────────────────────────────────
@@ -402,14 +411,12 @@ client.once(Events.ClientReady, async () => {
       } catch (e) { console.log(`  ! #${name} FAILED: ${e.message}`); }
     }
 
-    // Self-roles panel (#roles) — multiple button rows.
+    /* Self-roles panel (#roles) — the language picker and the toggle rows.
+       Built in panels.js so the bot can repair this same row on a server that
+       was set up before the picker existed; postOnce never touches a panel
+       twice, so setup.js alone would have shipped it only to new servers. */
     try {
-      const mkBtn = (r) => new ButtonBuilder().setCustomId(`role:${r.key}`).setLabel(r.label)
-        .setEmoji(r.emoji).setStyle(ButtonStyle.Secondary);
-      const rows = [];
-      for (let i = 0; i < GAME_ROLES.length; i += 5) rows.push(row(...GAME_ROLES.slice(i, i + 5).map(mkBtn)));
-      rows.push(row(...NOTIFY_ROLES.map(mkBtn)));
-      const status = await postOnce(channelByName['roles'], embed(PANEL_COPY.roles), rows);
+      const status = await postOnce(channelByName['roles'], embed(PANEL_COPY.roles), rolesPanelComponents());
       if (status === 'posted') posted++;
       console.log(`  · #roles: ${status}`);
     } catch (e) { console.log(`  ! #roles FAILED: ${e.message}`); }

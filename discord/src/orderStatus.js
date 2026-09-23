@@ -13,8 +13,12 @@
  * is Dutch and sells across the border; the storefront, the emails and the
  * assistant all speak the buyer's language, and this — the place a worried
  * buyer goes when the email has not arrived — was the last English-only stop.
- * Discord already knows which language they use it in, so nobody has to pick.
+ * Discord already knows which language they use it in, so nobody HAS to pick;
+ * and since #roles now lets them, pickedLang() puts that choice above the
+ * guess.
  */
+
+import { LANGUAGE_ROLES } from './config.js';
 
 /** The languages this file writes. Matches the storefront's set exactly. */
 export const BOT_LANGS = ['nl', 'en', 'de', 'fr'];
@@ -29,6 +33,23 @@ export const BOT_LANGS = ['nl', 'en', 'de', 'fr'];
 export const botLang = (locale) => {
   const base = String(locale || '').toLowerCase().split('-')[0];
   return BOT_LANGS.includes(base) ? base : 'en';
+};
+
+/**
+ * The language a member actually chose, falling back to the one Discord guesses.
+ *
+ * botLang() reads the locale the member's Discord client happens to be set to,
+ * which is a good guess and only a guess: plenty of people run an English
+ * client and do not want to be spoken to in English. Once somebody has picked
+ * a language in #roles, that is not a guess any more, and it wins.
+ *
+ * Takes role NAMES rather than a member object so this module stays pure and
+ * testable — bot.js hands it the names it already has.
+ */
+export const pickedLang = (roleNames = [], locale) => {
+  const names = new Set((roleNames || []).map((n) => String(n)));
+  const chosen = LANGUAGE_ROLES.find((l) => names.has(l.label));
+  return chosen ? chosen.key : botLang(locale);
 };
 
 export const ORDER_STATE = {

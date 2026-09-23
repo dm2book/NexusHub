@@ -2,7 +2,8 @@
  * /order tells a buyer what is happening and whether they need to act.
  * Runs without Postgres or a Discord token — pure payload → view.
  */
-import { orderStatusView, ORDER_STATE, ORDER_UI, BOT_LANGS, botLang, say } from '../src/orderStatus.js';
+import { orderStatusView, ORDER_STATE, ORDER_UI, BOT_LANGS, botLang, pickedLang, say } from '../src/orderStatus.js';
+import { LANGUAGE_ROLES } from '../src/config.js';
 
 let pass = 0, fail = 0;
 const ok = (name, cond, extra = '') => { if (cond) { pass++; console.log(`  ✅ ${name}`); } else { fail++; console.log(`  ❌ ${name} ${extra}`); } };
@@ -120,6 +121,30 @@ console.log('\n— …and it is readable by the member who asked —');
     tables.every((t) => BOT_LANGS.every((l) => typeof t[l] === 'string' && t[l].length > 0)),
     'a missing language shows nothing at all');
   ok('…and an unknown language still says something', say(ORDER_UI.total, 'xx') === ORDER_UI.total.en);
+}
+
+console.log('\n— …or in the language they actually chose —');
+{
+  /* The locale above is a good guess and only a guess: plenty of people run an
+     English client and do not want to be answered in English. Once somebody
+     picks a language in #roles that stops being a guess, and a guess must not
+     beat an answer. */
+  for (const l of LANGUAGE_ROLES) {
+    ok(`the ${l.label} role wins over an English client`,
+      pickedLang(['Verified Customer', l.label], 'en-US') === l.key,
+      pickedLang(['Verified Customer', l.label], 'en-US'));
+  }
+  ok('nobody who picked nothing is treated as having picked',
+    pickedLang(['Verified Customer', 'Roblox'], 'de') === 'de');
+  ok('…and the locale still decides for them',
+    pickedLang([], 'fr') === 'fr' && pickedLang([], 'pt-BR') === 'en');
+  /* Called with a member the bot could not read roles for — a DM, a member
+     that is not cached — which must fall back rather than throw. */
+  ok('a member with no roles at all is handled',
+    pickedLang(undefined, 'nl') === 'nl' && pickedLang(null, undefined) === 'en');
+  ok('every picker key is a language this file can write',
+    LANGUAGE_ROLES.every((l) => BOT_LANGS.includes(l.key)),
+    LANGUAGE_ROLES.map((l) => l.key).join(', '));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

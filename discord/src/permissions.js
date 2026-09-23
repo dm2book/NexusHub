@@ -115,7 +115,8 @@ export const DANGEROUS_FOR_BOT = [
  * be read by someone still deciding whether to trust us.
  */
 export function resolveOverwrites({
-  category, channel, everyoneId, roleIds, botOverwrite, staffKeys, memberKeys, P = FLAGS,
+  category, channel, everyoneId, roleIds, langRoleIds = {},
+  botOverwrite, staffKeys, memberKeys, P = FLAGS,
 }) {
   const viewers = (access) => (access === 'staff' ? staffKeys
     : access === 'vip' ? ['vip', ...staffKeys] : memberKeys);
@@ -142,13 +143,41 @@ export function resolveOverwrites({
     byId.set(ow.id, cur);
   };
 
-  const access = channel.public ? 'public' : category.access;
-  forAccess(access).forEach(put);
-  // A public channel inside a gated category still needs every gated role to
-  // keep its Connect/Speak grants; harmless for text channels.
-  if (channel.public && category.access !== 'public') {
-    viewers(category.access).filter((k) => roleIds[k])
-      .forEach((k) => put({ id: roleIds[k], allow: [P.ViewChannel, P.Connect, P.Speak] }));
+  /**
+   * A language room is gated on its language role, and on nothing else.
+   *
+   * Deliberately NOT built on top of forAccess(): that grants ViewChannel to
+   * every member-tier role, which is exactly what must not happen here. Four
+   * general channels visible to everybody would be three empty rooms beside
+   * the one being used, on a server whose whole problem is looking alive. So
+   * everyone is denied, and the single language role is let back in.
+   *
+   * `house` is the exception — the shop's own language stays readable for
+   * every verified member, so somebody who never opens the picker still has
+   * somewhere to talk.
+   *
+   * Staff see all four, because a room staff cannot read is a room nobody
+   * moderates. And if the language role is missing (setup has not run, or
+   * creating it failed) the room stays invisible rather than falling open:
+   * the safe end of that failure is the quiet one.
+   */
+  if (channel.lang) {
+    put({ id: everyoneId, deny: [P.ViewChannel] });
+    put(botOverwrite);
+    for (const k of staffKeys) if (roleIds[k]) put({ id: roleIds[k], allow: [P.ViewChannel] });
+    if (channel.house) {
+      for (const k of memberKeys) if (roleIds[k]) put({ id: roleIds[k], allow: [P.ViewChannel] });
+    }
+    if (langRoleIds[channel.lang]) put({ id: langRoleIds[channel.lang], allow: [P.ViewChannel] });
+  } else {
+    const access = channel.public ? 'public' : category.access;
+    forAccess(access).forEach(put);
+    // A public channel inside a gated category still needs every gated role to
+    // keep its Connect/Speak grants; harmless for text channels.
+    if (channel.public && category.access !== 'public') {
+      viewers(category.access).filter((k) => roleIds[k])
+        .forEach((k) => put({ id: roleIds[k], allow: [P.ViewChannel, P.Connect, P.Speak] }));
+    }
   }
   if (channel.readOnly) {
     put({ id: everyoneId, deny: [P.SendMessages, P.SendMessagesInThreads, P.CreatePublicThreads] });
