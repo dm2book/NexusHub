@@ -135,6 +135,36 @@ console.log('\n— A cost above the price is flagged, not refused —');
     JSON.stringify(r.rows[0]));
 }
 
+console.log('\n— A margin that is only there before BTW —');
+{
+  /* The case this screen used to show in green. €10.00 is the price, €9.00 the
+     cost: 10% margin on the face of it. At 21% BTW €8.26 of that €10.00 is the
+     seller's, so every sale loses 74 cents — and nothing about the row said so,
+     because the cost is below the price and that was the only thing checked. */
+  const stamp = Date.now();
+  const e = await createProduct({ name: 'Cost Test E', sku: `COSTE-${stamp}`, category: 'robux',
+    price: 1000, currency: 'EUR', active: true, announce: false, metadata: {} });
+  const r = await imp.importCosts(`${e.sku}\t9.00`, { apply: false });
+  const row = r.rows[0];
+  ok('the price after BTW is what the seller keeps', row.netPrice === 826, String(row.netPrice));
+  ok('…so the margin is negative, not 10%', row.netMarginPct < 0, String(row.netMarginPct));
+  ok('…and the row says it loses money, with the numbers',
+    /loses money after 21% BTW/.test(row.warning || '') && /€8\.26/.test(row.warning || ''),
+    String(row.warning));
+
+  /* A healthy product is not flagged by the same rule. */
+  const f = await createProduct({ name: 'Cost Test F', sku: `COSTF-${stamp}`, category: 'robux',
+    price: 1000, currency: 'EUR', active: true, announce: false, metadata: {} });
+  const ok2 = await imp.importCosts(`${f.sku}\t6.00`, { apply: false });
+  ok('a cost well under the net price is not flagged', ok2.rows[0].warning == null
+    && ok2.rows[0].netMarginPct > 20, JSON.stringify(ok2.rows[0]));
+
+  /* Before a btw-nummer exists the shop has no rate of its own; the preview
+     still measures after the standard one, and says that it does. */
+  ok('the report names the rate it measured after', r.vat?.pct === 21 && r.vat.registered === false,
+    JSON.stringify(r.vat));
+}
+
 console.log('\n— The same SKU twice in one paste —');
 {
   const stamp = Date.now();

@@ -103,12 +103,16 @@ export default function CostImport({ onDone }) {
                     <th className="text-right px-3 py-1.5 font-normal">Sells for</th>
                     <th className="text-right px-3 py-1.5 font-normal">Cost now</th>
                     <th className="text-right px-3 py-1.5 font-normal">Cost after</th>
-                    <th className="text-right px-3 py-1.5 font-normal">Margin</th>
+                    {/* After BTW, and labelled so: the gross margin is the number an owner
+                        plans with and not the number they earn. */}
+                    <th className="text-right px-3 py-1.5 font-normal">
+                      Margin after {report.vat?.pct ?? 21}% BTW
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
                   {report.rows.map((r) => (
-                    <tr key={r.id} className={r.warning ? 'bg-amber-500/10' : ''}>
+                    <tr key={r.id} className={r.warning ? 'bg-amber-500/10' : ''} title={r.warning || undefined}>
                       <td className="px-3 py-1.5 font-mono text-slate-300">{r.sku}</td>
                       <td className="px-3 py-1.5 text-right text-slate-400">{money(r.price)}</td>
                       <td className="px-3 py-1.5 text-right text-slate-500">
@@ -116,14 +120,36 @@ export default function CostImport({ onDone }) {
                       </td>
                       <td className="px-3 py-1.5 text-right text-white">{money(r.after)}</td>
                       {/* The reason anybody is doing this at all. */}
-                      <td className={`px-3 py-1.5 text-right ${r.warning ? 'text-amber-300' : 'text-emerald-300'}`}>
-                        {r.price > 0 ? `${Math.round(((r.price - r.after) / r.price) * 100)}%` : '—'}
+                      <td className={`px-3 py-1.5 text-right ${r.warning ? 'text-amber-300' : 'text-emerald-300'}`}
+                        title={`${money(r.netPrice)} of ${money(r.price)} is yours after BTW`}>
+                        {r.netMarginPct == null ? '—' : `${Math.round(r.netMarginPct)}%`}
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
+          )}
+
+          {/* A coloured row says something is wrong; this says what. A cost that
+              clears the price and still loses money after BTW looks fine in
+              every other column. */}
+          {report.rows?.some((r) => r.warning) && (
+            <ul className="space-y-1">
+              {report.rows.filter((r) => r.warning).map((r) => (
+                <li key={r.id} className="text-[12px] text-amber-300/90 flex gap-2">
+                  <AlertTriangle size={13} className="shrink-0 mt-0.5" />
+                  <span><span className="font-mono">{r.sku}</span> — {r.warning}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {report.vat && !report.vat.registered && (
+            <p className="text-[11.5px] text-slate-500">
+              Margins are shown after {report.vat.pct}% BTW, the rate you will charge once you are
+              registered. Until your btw-nummer is entered the profit page still counts the full price.
+            </p>
           )}
 
           {report.applied && (
