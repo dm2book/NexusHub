@@ -25,6 +25,26 @@
 import { all } from '../db/index.js';
 import { audit } from './auditService.js';
 import { costCentsFromMetadata } from './costService.js';
+import { vatContext, netCents, NL_STANDARD_RATE } from './vatService.js';
+
+/**
+ * The BTW rate a margin in this preview is measured after.
+ *
+ * Once a btw-identificatienummer is published the shop's own rate is the
+ * answer, the same one the profit page uses. Before that the shop has no rate
+ * — and this is exactly the screen an owner fills in BEFORE registering,
+ * setting prices they will keep. A margin shown before BTW would be the
+ * number they plan with and not the number they will earn: at 21% the first
+ * 17.4% of every price is the Belastingdienst's, so a product that looks like
+ * 15% profit here loses money on every sale. So the preview measures against
+ * the standard rate and says so in its heading; a seller who stays under the
+ * KOR can read the column as the pessimistic case it then is.
+ */
+function previewVat() {
+  const vat = vatContext();
+  const rate = vat.registered ? vat.rate : NL_STANDARD_RATE;
+  return { rate, pct: Math.round(rate * 1000) / 10, registered: vat.registered };
+}
 
 /**
  * A money string as cents.
@@ -108,6 +128,7 @@ export async function importCosts(text, { apply = false, actor = null } = {}) {
   const rows = [];
   const bad = [];
   const seen = new Set();
+  const vat = previewVat();
 
   for (const line of String(text || '').split(/\r?\n/)) {
     const parsed = parseLine(line);
@@ -132,16 +153,27 @@ export async function importCosts(text, { apply = false, actor = null } = {}) {
     catch { meta = {}; }
     const before = costCentsFromMetadata(meta);
     const price = Number(product.price || 0);
+    const netPrice = netCents(price, vat.rate);
+    const eur = (c) => `€${(c / 100).toFixed(2)}`;
 
     rows.push({
       id: product.id, sku: product.sku, name: product.name,
       price, before, after: parsed.cents,
+      /* What of the price is the seller's once BTW comes out, and the margin
+         on THAT — the one that decides whether a sale earns anything. */
+      netPrice,
+      netMarginPct: netPrice > 0 ? Math.round(((netPrice - parsed.cents) / netPrice) * 1000) / 10 : null,
       changed: before !== parsed.cents,
       /* Applied, not refused — an owner may be pricing a loss leader on
-         purpose — but never quietly. */
+         purpose — but never quietly. The second case is the one nobody
+         sees coming: a cost that sits comfortably under the price and still
+         loses money on every order once the BTW is paid over. */
       warning: parsed.cents >= price && price > 0
-        ? `cost is not below the €${(price / 100).toFixed(2)} sell price`
-        : null,
+        ? `cost is not below the ${eur(price)} sell price`
+        : parsed.cents >= netPrice && price > 0
+          ? `loses money after ${vat.pct}% BTW: ${eur(netPrice)} of the ${eur(price)} price is yours, `
+            + `and it costs ${eur(parsed.cents)}`
+          : null,
     });
   }
 
@@ -184,6 +216,9 @@ export async function importCosts(text, { apply = false, actor = null } = {}) {
     /* Where the catalogue stands, so the owner sees the gap close rather than
        counting rows themselves. */
     catalogue: { total: products.length, withCost },
+    /* Which rate the margins above were measured after, so the screen can
+       say it rather than leave a reader to assume gross. */
+    vat,
     rows: rows.slice(0, 200),
     problems: bad.slice(0, 50),
   };
