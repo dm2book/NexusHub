@@ -69,6 +69,7 @@ export class ApiConnector extends SupplierConnector {
       cost: toMinor(pick('cost', 'cost'), this.config),
       price: toMinor(pick('price', 'price'), this.config),
       availableStock: numOrNull(pick('stock', 'stock')),
+      image: pick('image', 'image') || null,
       status: this.#mapStatus(rawStatus, pick('stock', 'stock')),
     };
   }

@@ -9,7 +9,8 @@ import { getRewards, setRewards } from '../../services/mysteryBoxService.js';
 import { audit } from '../../services/auditService.js';
 import { assertSafeImageValue, resolveImageUrl } from '../../utils/imageUrl.js';
 import { normalizeImageValue } from '../../services/imageStoreService.js';
-import { backfillArt, proposedCategories } from '../../services/productFitService.js';
+import { backfillArt, proposedCategories, artFor } from '../../services/productFitService.js';
+import { findPhotos, photoQueue, photoGap } from '../../services/supplier/supplierImageService.js';
 import { importCosts } from '../../services/costImportService.js';
 
 const router = Router();
@@ -61,6 +62,29 @@ router.post('/art/backfill', requirePermission('suppliers.manage'), asyncHandler
   const apply = String(req.query.apply || req.body?.apply || '') === '1'
     || req.body?.apply === true;
   res.json(await backfillArt({ apply, actor: req.user }));
+}));
+
+/**
+ * Real photos, from the suppliers' own listings.
+ *
+ * `queue` lists every active product still showing a placeholder or nothing
+ * (without the nightly sweep's two-week back-off: a person pressing the button
+ * wants all of them), and the page walks it four at a time, because each
+ * product is a search at every supplier and a request that dies at the
+ * function timeout leaves nothing. See supplierImageService for which listing
+ * a picture may come from and what it never replaces.
+ */
+router.get('/images/queue', requirePermission('suppliers.manage'), asyncHandler(async (_req, res) => {
+  res.json({ ...(await photoGap()), ids: await photoQueue({ limit: 1000, ignoreBackoff: true }) });
+}));
+
+router.post('/images/find', requirePermission('suppliers.manage'), asyncHandler(async (req, res) => {
+  const { productIds, apply } = z.object({
+    productIds: z.array(z.string()).min(1).max(4),
+    apply: z.boolean().optional(),
+  }).parse(req.body || {});
+  res.set('Cache-Control', 'no-store');
+  res.json(await findPhotos(productIds, { apply: apply === true, actor: req.user }));
 }));
 
 /**
@@ -143,7 +167,20 @@ router.post('/', requirePermission('suppliers.manage'), asyncHandler(async (req,
   const body = productSchema.parse(req.body);
   guardImage(body.metadata);
   if (body.metadata) body.metadata = await storeUpload(body.metadata);
-  const product = await createProduct(body);
+  let product = await createProduct(body);
+  /* Never a blank tile. A product added by hand with no picture used to show
+     its category's icon, and nothing at all for a category without one. It
+     now gets the shop's own artwork for that exact product when one exists,
+     and a drawn tile with its real name and amount when not — which the
+     nightly sweep then upgrades to the supplier's photo where one fits. */
+  if (!product.image) {
+    const art = artFor(product);
+    if (art.image) {
+      product = await updateProduct(product.id, { metadata: {
+        ...product.metadata, image: art.image, imageSource: art.source, imageReason: art.reason,
+      } }) || product;
+    }
+  }
   await audit({ actor: req.user, action: 'product.create', targetType: 'product',
     targetId: product.id, req });
   res.status(201).json({ product });

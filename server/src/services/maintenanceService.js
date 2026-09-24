@@ -351,6 +351,38 @@ export async function runMaintenance() {
     }
   } catch (e) { summary.backupError = e.message; }
 
+  /* 15. Real photos for products still showing a placeholder.
+   *
+   *     Once a day, on its own "has it been long enough" key like the backup:
+   *     runMaintenance also fires off live traffic up to once an hour, and each
+   *     product here is a search at every supplier — eight an hour would be a
+   *     steady stream of calls to somebody else's API for pictures.
+   *
+   *     Skipped outright while no supplier is active, and without touching the
+   *     key: otherwise every product would be marked "looked for, nothing
+   *     found" before a supplier existed, and the two-week back-off
+   *     (supplierImageService.RETRY_AFTER_DAYS) would then hold them back for a
+   *     fortnight after the owner connected one. */
+  try {
+    const { getSetting: getS, setSetting: setS } = await import('./settingsService.js');
+    const lastAt = await getS('photo_sweep_last_at', null);
+    const due = !lastAt || Date.now() - Date.parse(lastAt) > 20 * 3_600_000;
+    if (due) {
+      const { photoQueue, findPhotos } = await import('./supplier/supplierImageService.js');
+      const { scanSources } = await import('./supplier/bestSourceService.js');
+      const sources = await scanSources();
+      if (sources.length) {
+        const ids = await photoQueue({ limit: Number(process.env.PHOTO_SWEEP_LIMIT || 8) });
+        if (ids.length) {
+          const out = await findPhotos(ids, { apply: true, sources });
+          summary.photosLooked = ids.length;
+          summary.photosApplied = out.applied;
+        }
+        await setS('photo_sweep_last_at', nowIso());
+      }
+    }
+  } catch (e) { summary.photosError = e.message; }
+
   /* Leave a trace that this actually happened.
      Everything above is fire-and-forget: it runs on a schedule nobody watches,
      and every failure mode is silent. The health check could only report

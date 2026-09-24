@@ -5,6 +5,7 @@ import { money, categoryVisual, normalizeSearch } from '../../lib/catalog.js';
 import { fileToDataUrl, removeSolidBackground, imageLabel } from '../../lib/imageUpload.js';
 import { toArtboard, isOwnerUpload } from '../../lib/productArtboard.js';
 import CostImport from '../../components/admin/CostImport.jsx';
+import SupplierPhotos from '../../components/admin/SupplierPhotos.jsx';
 import { PageLoader, EmptyState, Modal } from '../../components/ui.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
 
@@ -279,6 +280,8 @@ export default function AdminProducts() {
         </div>
       </div>
       <p className="text-slate-400 text-sm mb-4">Manage your catalog. Featured items get highlighted on the storefront.</p>
+
+      <SupplierPhotos onDone={load} />
 
       {/* Offered by name only while it would change something: a shop that has
           priced everything does not need a panel telling it so. The count is
