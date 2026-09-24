@@ -5,7 +5,7 @@
  * config = {
  *   source: { type: 'url'|'inline', url, content },
  *   delimiter: ',', hasHeader: true,
- *   columns: { sku, name, cost, price, stock, status },  // header name OR index
+ *   columns: { sku, name, cost, price, stock, status, image },  // header name OR index
  *   amounts: 'minor' | 'major',   // how a WHOLE number is read; "8.00" is always euros
  *   statusMap: { ... }
  * }
@@ -59,6 +59,9 @@ export class CsvConnector extends SupplierConnector {
         cost: toMinor(cell('cost'), this.config),
         price: toMinor(cell('price'), this.config),
         availableStock: stock == null || stock === '' ? null : Number(stock),
+        /* Optional `image` column: a price list that links a product photo lets
+           the shop use it instead of a drawn placeholder. */
+        image: cell('image') ? String(cell('image')).trim() : null,
         status: this.#mapStatus(cell('status'), stock),
       };
     }).filter((i) => i.supplierSku);

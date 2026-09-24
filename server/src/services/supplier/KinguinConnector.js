@@ -77,6 +77,10 @@ export class KinguinConnector extends SupplierConnector {
          picking the wrong one means selling something that will not redeem. */
       platform: p.platform || null,
       region: p.regionalLimitations || p.regionId || null,
+      /* The cover Kinguin publishes with the listing. Several shapes, because
+         the API has carried it as images.cover.url and, in older responses,
+         as coverImageOriginal / coverImage. Anything else is no picture. */
+      image: p.images?.cover?.url || p.coverImageOriginal || p.coverImage || null,
       url: p.kinguinId ? `https://www.kinguin.net/category/${p.kinguinId}` : null,
     };
   }
