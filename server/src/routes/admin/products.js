@@ -10,7 +10,7 @@ import { audit } from '../../services/auditService.js';
 import { assertSafeImageValue, resolveImageUrl } from '../../utils/imageUrl.js';
 import { normalizeImageValue } from '../../services/imageStoreService.js';
 import { backfillArt, proposedCategories, artFor } from '../../services/productFitService.js';
-import { findPhotos, photoQueue, photoGap } from '../../services/supplier/supplierImageService.js';
+import { findPhotos, photoQueue, photoGap, photoScope, setPhotoScope, restoreArtwork, SCOPES } from '../../services/supplier/supplierImageService.js';
 import { importCosts } from '../../services/costImportService.js';
 
 const router = Router();
@@ -75,7 +75,19 @@ router.post('/art/backfill', requirePermission('suppliers.manage'), asyncHandler
  * a picture may come from and what it never replaces.
  */
 router.get('/images/queue', requirePermission('suppliers.manage'), asyncHandler(async (_req, res) => {
-  res.json({ ...(await photoGap()), ids: await photoQueue({ limit: 1000, ignoreBackoff: true }) });
+  const scope = await photoScope();
+  res.json({ ...(await photoGap({ scope })),
+    ids: await photoQueue({ limit: 1000, ignoreBackoff: true, scope }) });
+}));
+
+/* Placeholders only, or the shop's artwork too. Stored, because the nightly
+   sweep follows it: an owner who chose "all" means every product, not only
+   the ones found the one time they pressed the button. */
+router.post('/images/scope', requirePermission('suppliers.manage'), asyncHandler(async (req, res) => {
+  const { scope } = z.object({ scope: z.enum(SCOPES) }).parse(req.body || {});
+  await setPhotoScope(scope);
+  await audit({ actor: req.user, action: 'catalog.photo_scope', metadata: { scope }, req });
+  res.json({ scope });
 }));
 
 router.post('/images/find', requirePermission('suppliers.manage'), asyncHandler(async (req, res) => {
@@ -84,7 +96,12 @@ router.post('/images/find', requirePermission('suppliers.manage'), asyncHandler(
     apply: z.boolean().optional(),
   }).parse(req.body || {});
   res.set('Cache-Control', 'no-store');
-  res.json(await findPhotos(productIds, { apply: apply === true, actor: req.user }));
+  res.json(await findPhotos(productIds, { apply: apply === true, actor: req.user, scope: await photoScope() }));
+}));
+
+/** Every supplier photo that replaced artwork goes back to the artwork. */
+router.post('/images/restore-artwork', requirePermission('suppliers.manage'), asyncHandler(async (req, res) => {
+  res.json(await restoreArtwork({ actor: req.user }));
 }));
 
 /**

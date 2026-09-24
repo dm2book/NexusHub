@@ -129,6 +129,47 @@ console.log('\n— Against the catalogue —');
     (await photos.photoQueue({ limit: 1000, now: Date.now() + 15 * 86_400_000 })).includes(lonely.id));
 }
 
+console.log('\n— "All products": the shop\'s artwork too, and a way back —');
+{
+  ok('by default the artwork stays', !photos.needsPhoto({ metadata: { image: '/products/packs/robux-1000.svg' } }));
+  ok('with "all" the artwork may be replaced',
+    photos.needsPhoto({ metadata: { image: '/products/packs/robux-1000.svg' } }, { scope: 'all' }));
+  ok('…but never an upload, even with "all"',
+    !photos.needsPhoto({ metadata: { image: '/api/images/abc.png' } }, { scope: 'all' }));
+  ok('…and never a photo that already came from a supplier',
+    !photos.needsPhoto({ metadata: { image: '/api/images/abc.png', imageSource: 'supplier' } }, { scope: 'all' }));
+
+  const stamp = Date.now();
+  const art = await createProduct({ name: '4,500 Robux', sku: `PH-ART-${stamp}`, category: 'robux',
+    price: 3999, currency: 'EUR', active: true, announce: false,
+    metadata: { image: '/products/packs/robux-4500.svg' } });
+  const connector = { supportsSearch: true, searchCatalog: async () => [
+    { name: 'Roblox 4500 Robux Gift Card', image: 'https://cdn.test/4500.png', status: 'in_stock' }] };
+  const sources = [{ supplier: { id: 'sup_y', name: 'Kinguin' }, connector }];
+  const fetchImpl = async () => response(PNG, 'image/png');
+
+  const kept = await photos.findPhotos([art.id], { apply: true, sources, fetchImpl });
+  ok('with the default scope the artwork product is left alone', kept.rows[0].status === 'kept'
+    && (await getProduct(art.id)).image === '/products/packs/robux-4500.svg');
+
+  await photos.setPhotoScope('all');
+  ok('the scope is stored for the nightly sweep', (await photos.photoScope()) === 'all');
+  const swapped = await photos.findPhotos([art.id], { apply: true, sources, fetchImpl, scope: 'all' });
+  const after = await getProduct(art.id);
+  ok('with "all" the supplier photo replaces the artwork', swapped.rows[0].status === 'applied'
+    && /^\/api\/images\//.test(after.image || ''), String(after.image));
+  ok('…and the artwork is kept on the product', after.metadata.imagePrevious === '/products/packs/robux-4500.svg');
+  ok('the admin can see how many could go back', (await photos.photoGap({ scope: 'all' })).restorable >= 1);
+
+  const back = await photos.restoreArtwork();
+  const restored = await getProduct(art.id);
+  ok('"put the artwork back" puts it back', back.restored >= 1 && restored.image === '/products/packs/robux-4500.svg',
+    String(restored.image));
+  /* Otherwise tonight's sweep, still on "all", undoes the restore. */
+  ok('…and turns the sweep back to placeholders only', (await photos.photoScope()) === 'placeholders');
+  ok('…so the restored product is not looked for again', !photos.needsPhoto(restored, { scope: await photos.photoScope() }));
+}
+
 console.log('\n— The nightly sweep, before and after a supplier exists —');
 {
   const stamp = Date.now();

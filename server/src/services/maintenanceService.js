@@ -368,13 +368,15 @@ export async function runMaintenance() {
     const lastAt = await getS('photo_sweep_last_at', null);
     const due = !lastAt || Date.now() - Date.parse(lastAt) > 20 * 3_600_000;
     if (due) {
-      const { photoQueue, findPhotos } = await import('./supplier/supplierImageService.js');
+      const { photoQueue, findPhotos, photoScope } = await import('./supplier/supplierImageService.js');
       const { scanSources } = await import('./supplier/bestSourceService.js');
       const sources = await scanSources();
       if (sources.length) {
-        const ids = await photoQueue({ limit: Number(process.env.PHOTO_SWEEP_LIMIT || 8) });
+        /* The owner's choice: placeholders only, or the artwork too. */
+        const scope = await photoScope();
+        const ids = await photoQueue({ limit: Number(process.env.PHOTO_SWEEP_LIMIT || 8), scope });
         if (ids.length) {
-          const out = await findPhotos(ids, { apply: true, sources });
+          const out = await findPhotos(ids, { apply: true, sources, scope });
           summary.photosLooked = ids.length;
           summary.photosApplied = out.applied;
         }
