@@ -43,16 +43,44 @@ export const RETRY_AFTER_DAYS = 14;
 const REPLACEABLE_SOURCES = new Set(['generated']);
 const TILE = /^\/api\/products\/[^/]+\/tile\.svg$/;
 
+/** The shop's own shipped artwork: files in the repo, or art matched to a product. */
+export const isArtwork = (image, meta = {}) =>
+  String(image || '').startsWith('/products/') || meta.imageSource === 'matched-art';
+
 /**
- * Does this product still need a real picture?
- * Empty, or the drawn tile the shop makes when it has nothing better.
+ * Which pictures a search may replace.
+ *
+ *   'placeholders'  an empty image or the drawn tile — the default
+ *   'all'           also the shop's own artwork, for an owner who would rather
+ *                   show the supplier's real product photo everywhere
+ *
+ * Never, in either: a picture the owner uploaded or linked, and a photo that
+ * already came from a supplier. Those are decisions, not gaps.
  */
-export function needsPhoto(product) {
+export const SCOPES = ['placeholders', 'all'];
+
+export function needsPhoto(product, { scope = 'placeholders' } = {}) {
   const meta = product?.metadata || {};
   const image = product?.image ?? meta.image;
   if (!image) return true;
+  if (meta.imageSource === 'supplier') return false;
   if (TILE.test(String(image))) return true;
-  return REPLACEABLE_SOURCES.has(meta.imageSource);
+  if (REPLACEABLE_SOURCES.has(meta.imageSource)) return true;
+  return scope === 'all' && isArtwork(image, meta);
+}
+
+/** The scope the shop is set to; the nightly sweep follows it. */
+export async function photoScope() {
+  const { getSetting } = await import('../settingsService.js');
+  const v = await getSetting('supplier_photos_scope', 'placeholders').catch(() => 'placeholders');
+  return SCOPES.includes(v) ? v : 'placeholders';
+}
+
+export async function setPhotoScope(scope) {
+  if (!SCOPES.includes(scope)) throw new Error(`scope must be one of ${SCOPES.join(', ')}`);
+  const { setSetting } = await import('../settingsService.js');
+  await setSetting('supplier_photos_scope', scope);
+  return scope;
 }
 
 /**
@@ -109,7 +137,7 @@ export async function downloadImage(url, { fetchImpl = fetch } = {}) {
  * (nothing carried, carried but not the right product, carried with no image)
  * and only one of them is fixed by waiting.
  */
-export async function findPhotos(productIds, { apply = false, actor = null, sources = null, fetchImpl = fetch } = {}) {
+export async function findPhotos(productIds, { apply = false, actor = null, sources = null, fetchImpl = fetch, scope = 'placeholders' } = {}) {
   const { getProduct, updateProduct } = await import('../productService.js');
   const srcs = sources || await scanSources();
   const rows = [];
@@ -120,7 +148,7 @@ export async function findPhotos(productIds, { apply = false, actor = null, sour
     if (!product) continue;
     const base = { productId: id, name: product.name };
 
-    if (!needsPhoto(product)) {
+    if (!needsPhoto(product, { scope })) {
       rows.push({ ...base, status: 'kept', detail: 'already has its own picture' });
       continue;
     }
@@ -150,10 +178,14 @@ export async function findPhotos(productIds, { apply = false, actor = null, sour
         const { mime, bytes } = await downloadImage(photo.url, { fetchImpl });
         // eslint-disable-next-line no-await-in-loop
         const stored = await storeImage(mime, bytes, { productId: id, source: `supplier:${photo.supplierName}` });
+        /* The artwork it replaces is kept on the product, so "put the artwork
+           back" is one button rather than a restore from backup. */
+        const previous = isArtwork(product.image, product.metadata) ? product.image : null;
         // eslint-disable-next-line no-await-in-loop
         await updateProduct(id, { metadata: {
           ...product.metadata, image: stored.url,
           imageSource: 'supplier', imageFrom: photo.supplierName, imageTitle: photo.title,
+          ...(previous ? { imagePrevious: previous } : {}),
         } });
         rows.push({ ...base, status: 'applied', image: stored.url, from: photo.supplierName, title: photo.title });
       } catch (e) {
@@ -176,7 +208,7 @@ export async function findPhotos(productIds, { apply = false, actor = null, sour
   const applied = rows.filter((r) => r.status === 'applied').length;
   if (apply && applied) {
     await audit({ actor, action: 'catalog.supplier_photos', targetType: 'products',
-      targetId: String(applied), metadata: { applied, looked: rows.length } });
+      targetId: String(applied), metadata: { applied, looked: rows.length, scope } });
   }
   return { rows, applied, found: rows.filter((r) => r.status === 'found').length };
 }
@@ -187,12 +219,12 @@ export async function findPhotos(productIds, { apply = false, actor = null, sour
  * looked for within RETRY_AFTER_DAYS, so a product nobody carries is not asked
  * about every night.
  */
-export async function photoQueue({ limit = 8, now = Date.now(), ignoreBackoff = false } = {}) {
+export async function photoQueue({ limit = 8, now = Date.now(), ignoreBackoff = false, scope = 'placeholders' } = {}) {
   const { listProducts } = await import('../productService.js');
   const products = await listProducts({ activeOnly: true });
   const cutoff = now - RETRY_AFTER_DAYS * 86_400_000;
   return products
-    .filter(needsPhoto)
+    .filter((p) => needsPhoto(p, { scope }))
     .filter((p) => {
       if (ignoreBackoff) return true;
       const at = Date.parse(p.metadata?.imageSearchAt || '');
@@ -203,14 +235,45 @@ export async function photoQueue({ limit = 8, now = Date.now(), ignoreBackoff = 
     .map((p) => p.id);
 }
 
-/** How many active products still show a placeholder or nothing. */
-export async function photoGap() {
+/** How many active products a search at this scope would still look for. */
+export async function photoGap({ scope = 'placeholders' } = {}) {
   const rows = await all(`SELECT id, metadata FROM products WHERE active = 1`).catch(() => []);
   let waiting = 0;
+  let restorable = 0;
   for (const r of rows) {
     let meta = {};
     try { meta = typeof r.metadata === 'string' ? JSON.parse(r.metadata || '{}') : (r.metadata || {}); } catch { meta = {}; }
-    if (needsPhoto({ metadata: meta })) waiting += 1;
+    if (needsPhoto({ metadata: meta }, { scope })) waiting += 1;
+    if (meta.imageSource === 'supplier' && meta.imagePrevious) restorable += 1;
   }
-  return { total: rows.length, waiting };
+  return { total: rows.length, waiting, restorable, scope };
+}
+
+/**
+ * Put the shop's artwork back on every product whose artwork a supplier
+ * photo replaced. The supplier photo stays in the image store (it is
+ * addressed by content and costs nothing to keep); only the product's pointer
+ * moves back.
+ */
+export async function restoreArtwork({ actor = null } = {}) {
+  const { listProducts, updateProduct } = await import('../productService.js');
+  const products = await listProducts();
+  let restored = 0;
+  for (const p of products) {
+    const meta = p.metadata || {};
+    if (meta.imageSource !== 'supplier' || !meta.imagePrevious) continue;
+    const { imageFrom, imageTitle, imagePrevious, ...rest } = meta;
+    // eslint-disable-next-line no-await-in-loop
+    await updateProduct(p.id, { metadata: { ...rest, image: imagePrevious, imageSource: 'artwork' } });
+    restored += 1;
+  }
+  /* Back to placeholders-only as well. Otherwise, with the shop still set to
+     "all", tonight's sweep would put the supplier photos straight back on
+     every product this just restored. */
+  await setPhotoScope('placeholders');
+  if (restored) {
+    await audit({ actor, action: 'catalog.artwork_restored', targetType: 'products',
+      targetId: String(restored), metadata: { restored } });
+  }
+  return { restored };
 }

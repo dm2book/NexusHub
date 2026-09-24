@@ -66,6 +66,28 @@ export default function SupplierPhotos({ onDone }) {
     } catch (e) { toast.error(e.message); setPhase('found'); }
   };
 
+  /* The choice is stored on the shop, not the page: the nightly sweep follows
+     it, so "all" means every product over the coming nights too. */
+  const setScope = async (scope) => {
+    try {
+      await api.post('/api/admin/products/images/scope', { scope });
+      setRows([]); setPhase('idle');
+      loadQueue();
+    } catch (e) { toast.error(e.message); }
+  };
+
+  const restore = async () => {
+    if (!window.confirm(`Put the shop's own artwork back on ${queue.restorable} product(s)?\n\n`
+      + 'The supplier photos are kept, and the nightly search goes back to placeholders only.')) return;
+    try {
+      const r = await api.post('/api/admin/products/images/restore-artwork', {});
+      toast.success(`Artwork restored on ${r.restored} product(s).`);
+      setRows([]); setPhase('idle');
+      loadQueue();
+      onDone?.();
+    } catch (e) { toast.error(e.message); }
+  };
+
   if (!queue) return null;
 
   const found = rows.filter((r) => r.status === 'found');
@@ -80,13 +102,24 @@ export default function SupplierPhotos({ onDone }) {
             <ImageIcon size={15} className="text-violet-300" /> Product photos from your suppliers
           </h3>
           <p className="text-slate-400 text-xs mt-1 max-w-2xl">
-            {queue.waiting
-              ? `${queue.waiting} of ${queue.total} products still show a placeholder. `
-              : 'Every product has a picture. '}
+            {queue.scope === 'all'
+              ? `${queue.waiting} of ${queue.total} products can still get a supplier photo. `
+              : queue.waiting
+                ? `${queue.waiting} of ${queue.total} products still show a placeholder. `
+                : 'Every product has a picture. '}
             Photos come from your suppliers&rsquo; own listings, only when the listing is certainly the
-            same product. Your own uploads and artwork are never replaced. This also runs a few
-            products every night.
+            same product. Your own uploads are never replaced. This also runs a few products every night.
           </p>
+          <label className="flex items-center gap-2 mt-2 text-xs text-slate-300 cursor-pointer w-fit">
+            <input type="checkbox" checked={queue.scope === 'all'} disabled={busy}
+              onChange={(e) => setScope(e.target.checked ? 'all' : 'placeholders')} />
+            Replace the shop&rsquo;s artwork with supplier photos too
+          </label>
+          {queue.restorable > 0 && (
+            <button onClick={restore} disabled={busy} className="text-xs text-slate-400 hover:text-white underline mt-1">
+              Put the artwork back on {queue.restorable} product(s)
+            </button>
+          )}
         </div>
         {phase === 'found' && found.length > 0 ? (
           <button onClick={apply} className="btn-primary text-xs">Use {found.length} photo(s)</button>
@@ -112,6 +145,19 @@ export default function SupplierPhotos({ onDone }) {
             {rows.filter((r) => r.status === 'none').length > 0 && ` · ${rows.filter((r) => r.status === 'none').length} without a matching photo`}
             {rows.filter((r) => r.status === 'failed').length > 0 && ` · ${rows.filter((r) => r.status === 'failed').length} could not be downloaded`}
           </p>
+          {/* The ones without a photo, by NAME. "1 without a matching photo" on
+              its own left the owner to find which of 71 products that was. */}
+          {rows.some((r) => !r.image && r.status !== 'kept') && (
+            <ul className="mt-2 space-y-1">
+              {rows.filter((r) => !r.image && r.status !== 'kept').map((r) => (
+                <li key={r.productId} className="text-[12px] text-slate-400 flex gap-2">
+                  <AlertTriangle size={13} className="shrink-0 mt-0.5 text-amber-300/80" />
+                  <span><span className="text-slate-200">{r.name}</span> — {r.detail}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+
           {/* The pictures themselves: a grid of what will go on the storefront. */}
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3 mt-3 max-h-[26rem] overflow-y-auto">
             {rows.filter((r) => r.image).map((r) => (
