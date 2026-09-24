@@ -94,9 +94,11 @@ console.log('\n— A drawn tile is honest, and fits the card —');
   ok('a region tag is not mistaken for a unit', fit.unitFrom('1,000 Robux (EU)') === 'Robux');
   ok('…nor a platform', fit.unitFrom('2,800 V-Bucks Xbox') === 'Bucks');
 
-  /* Third-party marks are composited from the official file by the build, never
-     redrawn. A tile made at runtime cannot reach those files, so it must not
-     pretend: no logo shapes, no <image>, no external reference. */
+  /* Third-party marks are composited from the official file, never redrawn.
+     renderTile is the FALLBACK, used only when the art renderer fails, and it
+     has no marks to hand — so it must not pretend: no logo shapes, no <image>,
+     no external reference. The tile actually served is renderTileArt, which
+     inlines the repo's own files; art-assets.test.mjs holds it to that. */
   ok('no third-party mark is invented',
     !/<image\b/.test(svg) && !/href=/.test(svg), svg.slice(0, 120));
 

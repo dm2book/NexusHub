@@ -34,7 +34,7 @@ import { recordPageView } from '../services/trackingService.js';
 import { recordVisit, recordEvent, attachOrder, adoptVisit } from '../services/attributionService.js';
 import { getCategoryLogos } from '../services/settingsService.js';
 import { sellerLegalBlock } from '../services/sellerIdentityService.js';
-import { renderTile } from '../services/productFitService.js';
+import { renderTileArt } from '../services/productFitService.js';
 import { addReview, listReviews, addVerifiedReview } from '../services/reviewsService.js';
 import { verifyIngest, canonicalReview } from '../middleware/ingestSignature.js';
 import { audit } from '../services/auditService.js';
@@ -411,7 +411,7 @@ router.get('/products/trending', asyncHandler(async (_req, res) => {
 router.get('/products/:id/tile.svg', asyncHandler(async (req, res) => {
   const product = await getProduct(req.params.id);
   if (!product) return res.status(404).type('text/plain').send('no such product');
-  const svg = renderTile(product);
+  const svg = await renderTileArt(product);
   /* A tile changes when the product's words change, and only then. */
   const etag = `W/"${createHash('sha256').update(svg).digest('hex').slice(0, 16)}"`;
   if (req.headers['if-none-match'] === etag) return res.status(304).end();
@@ -420,7 +420,10 @@ router.get('/products/:id/tile.svg', asyncHandler(async (req, res) => {
     'Cache-Control': 'public, max-age=300, stale-while-revalidate=86400',
     ETag: etag,
     'X-Content-Type-Options': 'nosniff',
-    'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'",
+    /* img-src data: because two marks are raster (the real Xbox and
+       PlayStation logos) and are inlined as data URIs; nothing else is
+       allowed in, and nothing can run. */
+    'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; img-src data:",
   });
   return res.send(svg);
 }));

@@ -19,8 +19,16 @@ import { BRAND, accentFor, CATEGORY_LABEL, esc, headline, fitSize } from './desi
 /* Which marks are raster is decided once, in src/lib/brandMarks.js — the
    storefront and the seed read the same list. */
 import { RASTER_ICONS as RASTER, markPath } from '../../src/lib/brandMarks.js';
+/* The same marks, bundled as a module for where public/ is not on disk — the
+   API on Vercel, which renders tiles for products the build never drew. Disk
+   wins whenever it has the file, so the shipped boards come out byte-for-byte
+   as before. Kept current by scripts/gen-art-assets.mjs and its --check. */
+import { ASSETS as BUNDLED, INK as BUNDLED_INK } from '../../server/src/generated/artAssets.js';
 
 const PUBLIC = path.join(process.cwd(), 'public');
+
+const onDisk = (src) => fs.existsSync(path.join(PUBLIC, String(src).replace(/^\/+/, '')));
+const hasAsset = (src) => onDisk(src) || !!BUNDLED[src];
 
 
 /** Gift cards share one category but keep their own brand mark. */
@@ -56,9 +64,9 @@ export function markFor(product) {
   const slug = BRAND_BY_SKU[product.sku] || product.category;
   if (!slug) return null;
   const candidate = markPath(slug);
-  if (fs.existsSync(path.join(PUBLIC, candidate.slice(1)))) return candidate;
+  if (hasAsset(candidate)) return candidate;
   const svg = `/products/icons/${slug}.svg`;
-  return fs.existsSync(path.join(PUBLIC, svg.slice(1))) ? svg : null;
+  return hasAsset(svg) ? svg : null;
 }
 
 /**
@@ -83,7 +91,7 @@ const MARK_SPAN = 0.74;
 /** Ink boxes, measured by scripts/art/measure-marks.mjs. Absent → fit by canvas. */
 const INK = (() => {
   try { return JSON.parse(fs.readFileSync(path.join(PUBLIC, 'products/icons/_ink.json'), 'utf8')); }
-  catch { return {}; }
+  catch { return BUNDLED_INK || {}; }
 })();
 
 /**
@@ -93,11 +101,13 @@ const INK = (() => {
 export function inlineMark(src, { x, y, w, h }) {
   if (!src) return null;
   const file = path.join(PUBLIC, String(src).replace(/^\/+/, ''));
-  if (!fs.existsSync(file)) return null;
+  const bundled = BUNDLED[String(src)];
+  const disk = fs.existsSync(file);
+  if (!disk && !bundled) return null;
   const ink = INK[path.basename(file)];
 
   if (file.endsWith('.svg')) {
-    const raw = fs.readFileSync(file, 'utf8');
+    const raw = disk ? fs.readFileSync(file, 'utf8') : bundled.text;
     const vb = raw.match(/viewBox="([^"]+)"/);
     const viewBox = vb ? vb[1] : '0 0 512 512';
     // Everything between the outer <svg …> and </svg>, minus any XML prologue.
@@ -115,7 +125,7 @@ export function inlineMark(src, { x, y, w, h }) {
       + `preserveAspectRatio="xMidYMid meet" overflow="visible">${inner}</svg>`;
   }
 
-  const b64 = fs.readFileSync(file).toString('base64');
+  const b64 = disk ? fs.readFileSync(file).toString('base64') : bundled.b64;
   const mime = file.endsWith('.webp') ? 'image/webp'
     : file.endsWith('.png') ? 'image/png' : 'image/jpeg';
   /* A raster cannot be re-cropped by a viewBox, so instead the whole image is
@@ -217,11 +227,16 @@ function ground(id, w, h, lit) {
  * now, so "IN-GAME CASH" does not run the width of the tile the way a five-letter
  * "COINS" comfortably does.
  */
-export function mainSvg(product, { lit = false } = {}) {
+export function mainSvg(product, { lit = false, unit = null } = {}) {
   const W = 700, H = 600, id = 'a';
   const accent = accentFor(product.category);
   const label = CATEGORY_LABEL[product.category] || String(product.category || '').toUpperCase();
-  const hl = headline(product.name, product.description);
+  /* `unit` is only passed for a tile drawn at runtime, for a product whose
+     name headline() has no word for ("2,000 Tokens"). The build never passes
+     it, so no shipped board changes. */
+  const hl0 = headline(product.name, product.description);
+  const hl = hl0 && !hl0.small && unit && !String(hl0.big).startsWith('€')
+    ? { ...hl0, small: String(unit).toUpperCase() } : hl0;
   const mark = inlineMark(markFor(product), { x: 262, y: 150, w: 176, h: 176 });
 
   const bigSize = hl ? fitSize(hl.big, 7, 112, 62) : 0;
