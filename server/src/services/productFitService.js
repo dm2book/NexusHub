@@ -219,6 +219,37 @@ export function renderTile(product) {
  * that gets renamed gets a corrected tile instead of keeping a frozen picture
  * of its old name.
  */
+/**
+ * The tile a product gets when nobody has a picture of it — drawn by the SAME
+ * renderer as the shop's shipped artwork.
+ *
+ * renderTile() above draws a number on a gradient, because at runtime it could
+ * not reach the mark files the build composites. scripts/gen-art-assets.mjs
+ * now bundles those files into the server, so a product added next month gets
+ * the same stage every shipped board has: its category's mark in the ring,
+ * the amount, the unit. The mark is the repo's own file, inlined byte for byte
+ * — nothing is redrawn or approximated, which is the rule renderTile kept by
+ * drawing none at all.
+ *
+ * Loaded on first use rather than at import: the bundled marks are a few
+ * hundred KB, and the storefront's other routes should not pay for them on a
+ * cold start. Any failure falls back to renderTile, so a tile is never a 500.
+ */
+export async function renderTileArt(product) {
+  try {
+    const { mainSvg } = await import('../../../scripts/art/render.mjs');
+    /* Without its image. A product that gets this tile HAS the tile as its
+       image, and markFor() takes a product's own picture as the mark first —
+       so the tile would try to draw itself inside its own ring, find nothing,
+       and leave the ring empty. */
+    return mainSvg({ ...product, image: null, imageLegacy: null },
+      { unit: unitFrom(product?.name) });
+  } catch (e) {
+    console.error('[tile] art renderer failed, drawing the plain tile:', e.message);
+    return renderTile(product);
+  }
+}
+
 export const tilePath = (productId) => `/api/products/${productId}/tile.svg`;
 
 /** The tile as a data URI — for previewing one, never for storing one. */
