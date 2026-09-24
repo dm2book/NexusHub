@@ -60,6 +60,7 @@ export async function lastMaintenanceRun({ now = Date.now(), staleAfterHours = D
     stale: !at || ms > staleAfterHours * 3_600_000,
     staleAfterHours,
     errors: rec?.errors || [],
+    errorDetail: rec?.errorDetail || {},
   };
 }
 
@@ -111,13 +112,21 @@ export async function runMaintenance() {
         WHERE column_name = 'ip' AND table_schema = 'public'`);
     const have = new Set(present.map((r) => r.table_name));
     let cleared = 0;
+    /* Each table on its own. This was one loop in one try, so the first table
+       that threw — a timeout on a big audit log, a lock — left every table
+       after it keeping its addresses, and the error said "ipForgetError" and
+       nothing about which one. Seen live on 24 September 2026. */
+    const failed = [];
     for (const [table, days] of Object.entries(WINDOWS)) {
       if (!have.has(table)) continue;
-      const r = await run(
-        `UPDATE ${table} SET ip = NULL WHERE ip IS NOT NULL AND created_at < @cut`, { cut: DAYS(days) });
-      cleared += r?.changes ?? 0;
+      try {
+        const r = await run(
+          `UPDATE ${table} SET ip = NULL WHERE ip IS NOT NULL AND created_at < @cut`, { cut: DAYS(days) });
+        cleared += r?.changes ?? 0;
+      } catch (e) { failed.push(`${table}: ${e.message}`); }
     }
     summary.ipsForgotten = cleared;
+    if (failed.length) summary.ipForgetError = failed.join('; ');
   } catch (e) { summary.ipForgetError = e.message; }
 
   // 2. Mark expired refresh sessions revoked so they drop out of "active sessions".
@@ -403,6 +412,13 @@ export async function runMaintenance() {
       /* Which steps failed, if any. A sweep that ran and threw in four places
          is not the same as a healthy one, and "it ran" would hide that. */
       errors: Object.keys(summary).filter((k) => /Error$/.test(k)),
+      /* And WHAT they threw. The runtime log has it for an hour on the plan
+         this shop is on; the key alone told the owner a step failed and left
+         nothing to find out why. Kept here, shown only in the admin — a public
+         health check has no business printing SQL errors and table names. */
+      errorDetail: Object.fromEntries(Object.entries(summary)
+        .filter(([k]) => /Error$/.test(k))
+        .map(([k, v]) => [k, String(v).slice(0, 300)])),
     });
   } catch { /* never let bookkeeping break the work it is recording */ }
 

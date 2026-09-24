@@ -243,8 +243,12 @@ export async function launchChecks() {
       + 'CRON_SECRET is not set, so the hourly Vercel Cron call is refused with a 403. '
       + 'Set it so the sweep does not depend on somebody visiting the site.');
   } else if (sweep.errors.length) {
+    /* With what they threw, when it was recorded: a key on its own sends the
+       owner to a log that no longer exists. */
+    const detail = Object.entries(sweep.errorDetail || {}).map(([k, v]) => `${k} — ${v}`).join(' | ');
     add('maintenance', 'Background sweep', 'warn',
-      `Runs on schedule, but ${sweep.errors.length} step(s) threw last time: ${sweep.errors.join(', ')}.`);
+      `Runs on schedule, but ${sweep.errors.length} step(s) threw last time: ${sweep.errors.join(', ')}.`
+      + (detail ? ` ${detail}` : ''));
   } else {
     add('maintenance', 'Background sweep', 'ok',
       `Ran ${sweep.ageMinutes} min ago with no errors.`);
