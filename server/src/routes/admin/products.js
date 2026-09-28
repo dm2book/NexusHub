@@ -12,6 +12,7 @@ import { normalizeImageValue } from '../../services/imageStoreService.js';
 import { backfillArt, proposedCategories, artFor } from '../../services/productFitService.js';
 import { findPhotos, photoQueue, photoGap, photoScope, setPhotoScope, restoreArtwork, SCOPES } from '../../services/supplier/supplierImageService.js';
 import { importCosts } from '../../services/costImportService.js';
+import { lossReport, applyFloor } from '../../services/lossPriceService.js';
 
 const router = Router();
 
@@ -102,6 +103,23 @@ router.post('/images/find', requirePermission('suppliers.manage'), asyncHandler(
 /** Every supplier photo that replaced artwork goes back to the artwork. */
 router.post('/images/restore-artwork', requirePermission('suppliers.manage'), asyncHandler(async (req, res) => {
   res.json(await restoreArtwork({ actor: req.user }));
+}));
+
+/**
+ * Products that lose money on every sale after BTW and fees, with the lowest
+ * price that stops it. Read-only here; the POST applies it — or hides the
+ * product, for the ones no buyer would pay the floor price for.
+ */
+router.get('/pricing/loss', requirePermission('suppliers.manage'), asyncHandler(async (_req, res) => {
+  res.json(await lossReport());
+}));
+
+router.post('/pricing/loss', requirePermission('suppliers.manage'), asyncHandler(async (req, res) => {
+  const { ids, action } = z.object({
+    ids: z.array(z.string()).min(1).max(500),
+    action: z.enum(['reprice', 'hide']).optional(),
+  }).parse(req.body || {});
+  res.json(await applyFloor(ids, { action: action || 'reprice', actor: req.user }));
 }));
 
 /**

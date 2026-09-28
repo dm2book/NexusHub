@@ -6,6 +6,7 @@ import { fileToDataUrl, removeSolidBackground, imageLabel } from '../../lib/imag
 import { toArtboard, isOwnerUpload } from '../../lib/productArtboard.js';
 import CostImport from '../../components/admin/CostImport.jsx';
 import SupplierPhotos from '../../components/admin/SupplierPhotos.jsx';
+import LossPrices from '../../components/admin/LossPrices.jsx';
 import { PageLoader, EmptyState, Modal } from '../../components/ui.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
 
@@ -281,6 +282,8 @@ export default function AdminProducts() {
       </div>
       <p className="text-slate-400 text-sm mb-4">Manage your catalog. Featured items get highlighted on the storefront.</p>
 
+      {/* First: money going out of the door beats pictures. */}
+      <LossPrices onDone={load} />
       <SupplierPhotos onDone={load} />
 
       {/* Offered by name only while it would change something: a shop that has
