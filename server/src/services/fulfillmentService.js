@@ -19,6 +19,14 @@ import { getOrder, transitionOrder, canTransition, autoDispenseFromStock, insert
 import { notify } from './notificationService.js';
 import { alertOwner } from './notifyService.js';
 import { config } from '../config/env.js';
+import { marginAt } from './market/pricing.js';
+import { planningVat } from './vatService.js';
+
+/** Profit in cents on one unit, after BTW and the payment fee. */
+function profitAfterCosts(revenueCents, costCents) {
+  const m = marginAt(revenueCents / 100, costCents / 100, { ...config.market, vatPercent: planningVat().pct });
+  return Math.round(m.profitEur * 100);
+}
 
 const parse = (s) => { try { return JSON.parse(s || 'null'); } catch { return null; } };
 
@@ -372,7 +380,7 @@ export async function sweepUnfulfilledPaidOrders({ limit = 50 } = {}) {
  * `supportsFulfillment`; otherwise it leaves the order for manual staff
  * fulfilment (unchanged behaviour). Safety rails:
  *   - idempotent: skips if the order already has fulfillment_requests;
- *   - margin guard: never auto-buys an item where supplier cost ≥ our price;
+ *   - margin guard: never auto-buys an item that loses money after BTW and fees;
  *   - a supplier configured with autoDeliver:false won't resolve (shadow/off).
  * Returns true if supplier fulfilment was kicked off.
  */
@@ -401,10 +409,21 @@ export async function autoFulfillFromSuppliers(orderId, ctx = {}) {
     // treated as "don't auto-buy" — we never fire an uncapped purchase blind.
     const cost = resolved.supplierProduct?.cost;
     const effectiveUnit = Math.round(Number(item.unit_price) * revenueRatio);
-    if (cost == null || cost >= effectiveUnit) {
+    /* And after BTW and the payment fee, not only against the price. This
+       compared cost to the gross amount the buyer paid, so a €10 sale bought
+       in at €9 was auto-bought and delivered — and at 21% BTW €8.26 of that
+       €10 is the shop's, so the order lost money the moment it went out.
+       Measured against the rate the shop will charge (planningVat): BTW is owed
+       from the registration date, not from the day the number is typed into the
+       admin. A shop under the KOR is only ever sent to the manual queue by this
+       — the safe direction to be wrong in. */
+    const unitProfit = cost == null ? null : profitAfterCosts(effectiveUnit, cost);
+    if (cost == null || cost >= effectiveUnit || unitProfit <= 0) {
       await logFulfillment('skipped', { orderId, actor: 'system',
-        detail: { reason: cost == null ? 'supplier cost unknown' : 'supplier cost >= effective revenue',
-          item: item.id, cost, listPrice: item.unit_price, effectiveUnit } });
+        detail: { reason: cost == null ? 'supplier cost unknown'
+          : cost >= effectiveUnit ? 'supplier cost >= effective revenue'
+            : 'loses money after BTW and payment fees',
+          item: item.id, cost, listPrice: item.unit_price, effectiveUnit, unitProfit } });
       // Don't leave the order invisible: put it in the manual queue so the
       // owner reviews it (buy anyway / refund) — and so the serial drain stops
       // re-picking it every run (it now has a fulfillment request).

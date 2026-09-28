@@ -84,6 +84,23 @@ ok((await getOrder(o3.id)).status !== 'completed', 'unmapped order not auto-comp
 const fr3 = await get(`SELECT mode FROM fulfillment_requests WHERE order_id=@o LIMIT 1`, { o: o3.id });
 ok(fr3?.mode === 'manual', 'unmapped paid order surfaced as a MANUAL request (semi-auto queue)', JSON.stringify(fr3));
 
+console.log('\n— Margin guard after BTW: cost under the price, and still a loss —');
+{
+  /* €10.00 bought in at €9.00. The old guard compared cost to the price and
+     bought it: at 21% BTW €8.26 of the €10 is the shop's, so every one of
+     these orders was delivered at a loss. */
+  const p = await createProduct({ name: 'BTW Loss Product', category: 'robux', price: 1000, announce: false });
+  await mapSupplierProduct({ supplierId: sup.id, productId: p.id, supplierSku: 'SKU-BTW', cost: 900, priority: 10 });
+  const o = await paidOrder(p.id);
+  await sleep(1500);
+  ok((await getOrder(o.id)).status !== 'completed', 'a sale that loses money after BTW is not auto-bought',
+    (await getOrder(o.id)).status);
+  const log = await get(`SELECT detail FROM fulfillment_logs WHERE order_id=@o AND action='skipped' LIMIT 1`, { o: o.id });
+  ok(/after BTW/.test(String(log?.detail)), '…and the log says why', String(log?.detail).slice(0, 160));
+  const fr = await get(`SELECT mode FROM fulfillment_requests WHERE order_id=@o LIMIT 1`, { o: o.id });
+  ok(fr?.mode === 'manual', '…it goes to the owner instead', JSON.stringify(fr));
+}
+
 console.log('\n— Async supplier: in_progress → re-poll completes it —');
 const supA = await createSupplier({ name: 'AsyncSup', connectorKind: 'test_async', config: {} });
 const prod4 = await createProduct({ name: 'Async Product', category: 'robux', price: 3000, announce: false });
