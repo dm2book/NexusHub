@@ -159,7 +159,10 @@ console.log('\n— Trustpilot in the review request —');
   await run('UPDATE email_templates SET body_html=@b WHERE id=@i',
     { b: LEGACY_TEMPLATE_BODIES.review_request[0], i: 'review_request' });
   await syncEmailTemplates();
-  const upgraded = await get("SELECT body_html FROM email_templates WHERE id='review_request'");
+  /* The Dutch row: the upgrade path is Dutch-only (seed.js), and without the
+     language this read whichever of the four rows the database returned
+     first — which changed the day another template's rows were added. */
+  const upgraded = await get("SELECT body_html FROM email_templates WHERE id='review_request' AND lang='nl'");
   ok('an untouched review mail gains the Trustpilot slot on boot',
     /\{\{review\.trustpilotHtml\}\}/.test(upgraded.body_html));
 

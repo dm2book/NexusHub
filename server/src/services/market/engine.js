@@ -312,6 +312,12 @@ export async function publishRecommendation(recommendationId, { actor } = {}) {
 
   await run(`UPDATE products SET price=@price, updated_at=@at WHERE id=@id`,
     { price: r.recommended_cents, at: nowIso(), id: product.id });
+  /* The price chart and everybody who saved the product hear about it the
+     same way an edit in the admin is heard about. */
+  if (Number(r.recommended_cents) !== Number(product.price)) {
+    const { priceChanged } = await import('../productService.js');
+    await priceChanged(product.id, Number(product.price), Number(r.recommended_cents));
+  }
   await run(`UPDATE market_price_recommendations SET status='published', decided_by=@by, decided_at=@at WHERE id=@id`,
     { by: actor, at: nowIso(), id: recommendationId });
   await run(`INSERT INTO market_price_history (id, market_product_id, forge_product_id, old_cents, new_cents,

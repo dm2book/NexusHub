@@ -171,6 +171,28 @@ export const DEFAULT_TEMPLATES = [
       Beantwoord deze mail of open een ticket in onze Discord.</p>`,
   },
   {
+    id: 'price_drop',
+    name: 'Price Drop (wishlist)',
+    subject: '{{product.name}} is nu {{price.current}} \u{1F4C9}',
+    /* Sent only when somebody saved the product AND turned the alert on, and
+       only when the price is below what they last knew. Every one carries the
+       link that turns alerts off without signing in. */
+    body_html: `
+      <div class="badge">\u{1F4C9}</div>
+      <h1 style="text-align:center">Prijsdaling op je verlanglijst</h1>
+      <p style="text-align:center;max-width:420px;margin-left:auto;margin-right:auto">Hoi {{user.name}},
+      <strong>{{product.name}}</strong> is goedkoper geworden.</p>
+      <p style="text-align:center;font-size:15px;margin:18px 0 4px">
+        <span style="color:#8b93a7;text-decoration:line-through">{{price.previous}}</span>
+        &nbsp;\u2192&nbsp;<strong style="font-size:22px">{{price.current}}</strong></p>
+      <p style="text-align:center;margin:0 0 18px"><span class="pill-note">{{price.diff}} goedkoper</span></p>
+      <p style="text-align:center"><a class="btn" href="{{product.url}}">Bekijk het product</a></p>
+      <p style="text-align:center;color:#8b93a7;font-size:13px">Je bewaarde dit product voor {{price.saved}}.
+      <a href="{{wishlist.url}}" style="color:#8b93a7">Naar je verlanglijst</a></p>
+      <p style="text-align:center;color:#8b93a7;font-size:12px;margin-top:22px">Je krijgt dit omdat je een prijsalert
+      aanzette. <a href="{{wishlist.alertsOffUrl}}" style="color:#8b93a7">Alle prijsalerts uitzetten</a></p>`,
+  },
+  {
     id: 'review_request',
     name: 'Review Request',
     subject: 'Hoe was je bestelling {{order.number}}? ⭐',
