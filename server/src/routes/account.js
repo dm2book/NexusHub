@@ -37,6 +37,7 @@ import * as notif from '../services/notificationService.js';
 import * as billing from '../services/billingService.js';
 import * as support from '../services/supportService.js';
 import { audit } from '../services/auditService.js';
+import * as wishlist from '../services/wishlistService.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -481,6 +482,43 @@ router.post('/billing', asyncHandler(async (req, res) => {
 }));
 router.delete('/billing/:id', asyncHandler(async (req, res) => {
   await billing.deleteBilling(req.user.id, req.params.id); res.json({ ok: true });
+}));
+
+// ── Wishlist & price alerts ────────────────────────────────────────────────
+/* On the account rather than in the browser, so it follows the shopper to
+   another device and the shop can tell them when something they saved gets
+   cheaper. A guest still has the browser list; it is imported at sign-in. */
+router.get('/wishlist', asyncHandler(async (req, res) => {
+  res.json({ items: await wishlist.listItems(req.user.id) });
+}));
+
+router.post('/wishlist', asyncHandler(async (req, res) => {
+  const { productId } = z.object({ productId: z.string().min(1).max(64) }).parse(req.body || {});
+  const item = await wishlist.addItem(req.user.id, productId);
+  if (!item) throw notFound('Product not found');
+  res.status(201).json({ items: await wishlist.listItems(req.user.id) });
+}));
+
+router.post('/wishlist/import', asyncHandler(async (req, res) => {
+  const { productIds } = z.object({ productIds: z.array(z.string().max(64)).max(200) }).parse(req.body || {});
+  const added = await wishlist.importItems(req.user.id, productIds);
+  res.json({ added, items: await wishlist.listItems(req.user.id) });
+}));
+
+router.delete('/wishlist/:productId', asyncHandler(async (req, res) => {
+  await wishlist.removeItem(req.user.id, req.params.productId);
+  res.json({ items: await wishlist.listItems(req.user.id) });
+}));
+
+router.patch('/wishlist/:productId/alert', asyncHandler(async (req, res) => {
+  const { enabled, targetPrice } = z.object({
+    enabled: z.boolean(),
+    /* In cents. Optional: without one, any drop below what they saved at counts. */
+    targetPrice: z.number().int().min(0).max(10_000_000).nullable().optional(),
+  }).parse(req.body || {});
+  const item = await wishlist.setAlert(req.user.id, req.params.productId, { enabled, targetPrice: targetPrice ?? null });
+  if (!item) throw notFound('Product not found');
+  res.json({ items: await wishlist.listItems(req.user.id) });
 }));
 
 // ── Profile & settings ─────────────────────────────────────────────────────

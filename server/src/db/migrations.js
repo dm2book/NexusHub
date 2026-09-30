@@ -1979,4 +1979,44 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS lang TEXT;
       CREATE INDEX IF NOT EXISTS idx_backups_recent ON backups (kind, created_at DESC);
     `,
   },
+  {
+    id: '050_wishlist',
+    /*
+     * The wishlist, on the account, with price alerts.
+     *
+     * It lived only in the browser (localStorage), so it was gone on another
+     * device and invisible to the shop — which is the one party that could
+     * tell somebody the thing they saved just got cheaper.
+     *
+     * `saved_price` is what the product cost when it was saved: the number a
+     * shopper compares against. `last_notified_price` is the price the last
+     * alert announced, so the same drop is never announced twice and a price
+     * that went up and came back down is not sold as news.
+     *
+     * `pending_from` / `pending_at` mark a drop waiting to be sent. The alert
+     * is armed where the price changes and sent by a bounded sender (and the
+     * maintenance sweep for the rest), so repricing a product watched by a
+     * thousand people is not a thousand emails inside one admin request.
+     */
+    sql: `
+      CREATE TABLE IF NOT EXISTS wishlist_items (
+        id                  TEXT PRIMARY KEY,
+        user_id             TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        product_id          TEXT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+        saved_price         INTEGER NOT NULL,
+        alert_enabled       INTEGER NOT NULL DEFAULT 0,
+        target_price        INTEGER,
+        last_notified_price INTEGER,
+        last_notified_at    TEXT,
+        pending_from        INTEGER,
+        pending_at          TEXT,
+        created_at          TEXT NOT NULL,
+        updated_at          TEXT NOT NULL,
+        UNIQUE (user_id, product_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_wishlist_user ON wishlist_items (user_id, created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_wishlist_alerts ON wishlist_items (product_id) WHERE alert_enabled = 1;
+      CREATE INDEX IF NOT EXISTS idx_wishlist_pending ON wishlist_items (pending_at) WHERE pending_at IS NOT NULL;
+    `,
+  },
 ];

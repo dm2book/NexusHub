@@ -403,7 +403,7 @@ export const LEGAL_DOCS = {
         {
           h: 'Cookies',
           body: [
-            'Wij gebruiken één functionele cookie om je ingelogd te houden, en verder geen enkele. Je winkelwagen, je taalkeuze en je verlanglijst staan in je eigen browser en verlaten die pas als je bestelt.',
+            'Wij gebruiken één functionele cookie om je ingelogd te houden, en verder geen enkele. Je winkelwagen en je taalkeuze staan in je eigen browser en verlaten die pas als je bestelt. Je verlanglijst ook, tot je inlogt: dan bewaren we hem op je account, zodat hij op elk apparaat hetzelfde is. Zet je bij een product een prijsalert aan, dan sturen we je een e-mail — en een Discord-DM als je Discord hebt gekoppeld — wanneer de prijs daalt. Elke alert-mail heeft een link om alle alerts uit te zetten.',
             'Omdat wij geen advertentie- of trackingcookies plaatsen, heeft deze site geen cookiebanner die om toestemming vraagt. De volledige uitleg staat in ons cookiebeleid.',
           ],
         },
@@ -531,7 +531,7 @@ export const LEGAL_DOCS = {
         {
           h: 'Cookies',
           body: [
-            'We use one functional cookie to keep you signed in, and none besides. Your cart, your language choice and your wishlist live in your own browser and do not leave it until you place an order.',
+            'We use one functional cookie to keep you signed in, and none besides. Your cart and your language choice live in your own browser and do not leave it until you place an order. So does your wishlist, until you sign in: then we keep it on your account, so it is the same on every device. If you turn on a price alert for a product, we email you — and send a Discord DM if you linked Discord — when its price drops. Every alert email has a link that turns all alerts off.',
             'Because we set no advertising or tracking cookies, this site has no cookie banner asking for consent. The full explanation is in our cookie policy.',
           ],
         },

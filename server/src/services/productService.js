@@ -148,8 +148,34 @@ export async function updateProduct(id, patch = {}) {
   });
   // Snapshot the new price whenever it actually changed.
   const newPrice = patch.price != null ? Math.round(patch.price) : cur.price;
-  if (newPrice !== cur.price) await recordPricePoint(id, newPrice, patch.currency ?? cur.currency);
+  if (newPrice !== cur.price) await priceChanged(id, cur.price, newPrice, patch.currency ?? cur.currency);
   return getProduct(id);
+}
+
+/**
+ * Everything that follows from a product's price changing, in one place.
+ *
+ * Two code paths write products.price — this file and the pricing engine's
+ * publish — and the engine's never recorded a price point, so the chart on
+ * the product page silently missed every price it set. Both now come through
+ * here: the history row, and the price alerts of everybody who saved it.
+ */
+export async function priceChanged(productId, oldPrice, newPrice, currency = 'EUR') {
+  /* The price it had until now, first, when the history does not already end
+     on it. The seeded catalogue was created without a history row, so its
+     first change recorded only the NEW price — and "what did it cost
+     before" had no answer: the wishlist's previous price was blank and the
+     chart started at the change. Stamped a millisecond before the new one. */
+  const last = await get(
+    `SELECT price FROM price_history WHERE product_id = @p ORDER BY created_at DESC LIMIT 1`,
+    { p: productId }).catch(() => null);
+  const now = Date.now();
+  if (!last || Number(last.price) !== Number(oldPrice)) {
+    await recordPricePoint(productId, Number(oldPrice), currency, new Date(now - 1).toISOString());
+  }
+  await recordPricePoint(productId, newPrice, currency, new Date(now).toISOString());
+  const { onPriceChanged } = await import('./wishlistService.js');
+  await onPriceChanged(productId, oldPrice, newPrice);
 }
 
 /** Append a price snapshot (best-effort; never blocks a product write). */

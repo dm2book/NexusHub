@@ -104,6 +104,14 @@ export const EMAIL_THEMES = {
       { nl: '🛒 Geen account nodig', en: '🛒 No account needed', de: '🛒 Kein Konto nötig', fr: '🛒 Pas besoin de compte' },
       { nl: '💸 Geen verborgen kosten', en: '💸 No hidden fees', de: '💸 Keine versteckten Kosten', fr: '💸 Aucun frais caché' },
     ] },
+  /* Only what the mail can back up: it is sent because the shopper asked for
+     it, and every one carries the way to stop them. No "limited time" — a
+     price drop in this shop has no deadline anybody set. */
+  price_drop: { accent: '#22c55e', accent2: '#14b8a6',
+    eyebrow: { nl: 'Prijsdaling', en: 'Price drop', de: 'Preissenkung', fr: 'Baisse de prix' },
+    pills: [
+      { nl: '\u{1F514} Je vroeg om deze alert', en: '\u{1F514} You asked for this alert', de: '\u{1F514} Du hast diesen Alarm eingeschaltet', fr: '\u{1F514} Tu as demandé cette alerte' },
+    ] },
   review_request: { accent: '#f59e0b', accent2: '#f97316',
     eyebrow: { nl: 'Hoe deden we het?', en: 'How did we do?', de: 'Wie haben wir das gemacht?', fr: 'Comment avons-nous fait ?' },
     pills: [

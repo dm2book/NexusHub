@@ -131,7 +131,7 @@ console.log('\n— A Dutch shop sends Dutch email —');
      would be a fabricated "previous body" in a list whose whole purpose is to
      recognise bodies that actually existed. Listed explicitly rather than
      inferred, so adding a template is a conscious decision either way. */
-  const BORN_DUTCH = new Set(['launch_announcement']);
+  const BORN_DUTCH = new Set(['launch_announcement', 'price_drop']);
   const needLegacy = DEFAULT_TEMPLATES.filter((t) => !BORN_DUTCH.has(t.id));
   ok('every template that was rewritten has its English body registered as legacy',
     needLegacy.every((t) => (LEGACY_TEMPLATE_BODIES[t.id] || []).length > 0),

@@ -360,6 +360,14 @@ export async function runMaintenance() {
     }
   } catch (e) { summary.backupError = e.message; }
 
+  /* 14b. Price alerts that a price change armed but did not send — the
+   *      overflow past its first batch, and any held back by the cooldown. */
+  try {
+    const { sendPendingAlerts } = await import('./wishlistService.js');
+    const out = await sendPendingAlerts({ limit: 200 });
+    if (out.sent) summary.priceAlertsSent = out.sent;
+  } catch (e) { summary.priceAlertError = e.message; }
+
   /* 15. Real photos for products still showing a placeholder.
    *
    *     Once a day, on its own "has it been long enough" key like the backup:

@@ -160,6 +160,22 @@ export const TEMPLATE_TRANSLATIONS = {
       <p style="text-align:center;color:#8b93a7;font-size:13px">No account needed, no hidden fees. Questions? Just reply
       to this email or open a ticket in our Discord.</p>`,
     },
+    price_drop: {
+      subject: '{{product.name}} is now {{price.current}} \u{1F4C9}',
+      body_html: `
+      <div class="badge">\u{1F4C9}</div>
+      <h1 style="text-align:center">Price drop on your wishlist</h1>
+      <p style="text-align:center;max-width:420px;margin-left:auto;margin-right:auto">Hi {{user.name}}, <strong>{{product.name}}</strong> just got cheaper.</p>
+      <p style="text-align:center;font-size:15px;margin:18px 0 4px">
+        <span style="color:#8b93a7;text-decoration:line-through">{{price.previous}}</span>
+        &nbsp;\u2192&nbsp;<strong style="font-size:22px">{{price.current}}</strong></p>
+      <p style="text-align:center;margin:0 0 18px"><span class="pill-note">{{price.diff}} cheaper</span></p>
+      <p style="text-align:center"><a class="btn" href="{{product.url}}">View the product</a></p>
+      <p style="text-align:center;color:#8b93a7;font-size:13px">You saved this at {{price.saved}}.
+      <a href="{{wishlist.url}}" style="color:#8b93a7">Go to your wishlist</a></p>
+      <p style="text-align:center;color:#8b93a7;font-size:12px;margin-top:22px">You are getting this because you turned on a price alert.
+      <a href="{{wishlist.alertsOffUrl}}" style="color:#8b93a7">Turn off all price alerts</a></p>`,
+    },
     review_request: {
       subject: 'How was your order {{order.number}}? ⭐',
       body_html: `
@@ -363,6 +379,22 @@ export const TEMPLATE_TRANSLATIONS = {
       <p style="text-align:center"><a class="btn" href="{{cart.url}}">Bestellung abschließen</a></p>
       <p style="text-align:center;color:#8b93a7;font-size:13px">Kein Konto nötig, keine versteckten
       Kosten. Fragen? Antworte auf diese Mail oder öffne ein Ticket auf unserem Discord.</p>`,
+    },
+    price_drop: {
+      subject: '{{product.name}} kostet jetzt {{price.current}} \u{1F4C9}',
+      body_html: `
+      <div class="badge">\u{1F4C9}</div>
+      <h1 style="text-align:center">Preissenkung auf deiner Wunschliste</h1>
+      <p style="text-align:center;max-width:420px;margin-left:auto;margin-right:auto">Hallo {{user.name}}, <strong>{{product.name}}</strong> ist günstiger geworden.</p>
+      <p style="text-align:center;font-size:15px;margin:18px 0 4px">
+        <span style="color:#8b93a7;text-decoration:line-through">{{price.previous}}</span>
+        &nbsp;\u2192&nbsp;<strong style="font-size:22px">{{price.current}}</strong></p>
+      <p style="text-align:center;margin:0 0 18px"><span class="pill-note">{{price.diff}} günstiger</span></p>
+      <p style="text-align:center"><a class="btn" href="{{product.url}}">Zum Produkt</a></p>
+      <p style="text-align:center;color:#8b93a7;font-size:13px">Du hast dieses Produkt für {{price.saved}} gespeichert.
+      <a href="{{wishlist.url}}" style="color:#8b93a7">Zu deiner Wunschliste</a></p>
+      <p style="text-align:center;color:#8b93a7;font-size:12px;margin-top:22px">Du bekommst diese E-Mail, weil du einen Preisalarm eingeschaltet hast.
+      <a href="{{wishlist.alertsOffUrl}}" style="color:#8b93a7">Alle Preisalarme ausschalten</a></p>`,
     },
     review_request: {
       subject: 'Wie war deine Bestellung {{order.number}}? ⭐',
@@ -568,6 +600,22 @@ export const TEMPLATE_TRANSLATIONS = {
       <p style="text-align:center"><a class="btn" href="{{cart.url}}">Terminer ma commande</a></p>
       <p style="text-align:center;color:#8b93a7;font-size:13px">Pas besoin de compte, aucun frais caché.
       Des questions ? Réponds à cet e-mail ou ouvre un ticket sur notre Discord.</p>`,
+    },
+    price_drop: {
+      subject: '{{product.name}} est maintenant à {{price.current}} \u{1F4C9}',
+      body_html: `
+      <div class="badge">\u{1F4C9}</div>
+      <h1 style="text-align:center">Baisse de prix dans ta liste de souhaits</h1>
+      <p style="text-align:center;max-width:420px;margin-left:auto;margin-right:auto">Salut {{user.name}}, <strong>{{product.name}}</strong> est moins cher.</p>
+      <p style="text-align:center;font-size:15px;margin:18px 0 4px">
+        <span style="color:#8b93a7;text-decoration:line-through">{{price.previous}}</span>
+        &nbsp;\u2192&nbsp;<strong style="font-size:22px">{{price.current}}</strong></p>
+      <p style="text-align:center;margin:0 0 18px"><span class="pill-note">{{price.diff}} de moins</span></p>
+      <p style="text-align:center"><a class="btn" href="{{product.url}}">Voir le produit</a></p>
+      <p style="text-align:center;color:#8b93a7;font-size:13px">Tu l’avais enregistré à {{price.saved}}.
+      <a href="{{wishlist.url}}" style="color:#8b93a7">Voir ta liste de souhaits</a></p>
+      <p style="text-align:center;color:#8b93a7;font-size:12px;margin-top:22px">Tu reçois cet e-mail parce que tu as activé une alerte de prix.
+      <a href="{{wishlist.alertsOffUrl}}" style="color:#8b93a7">Désactiver toutes les alertes de prix</a></p>`,
     },
     review_request: {
       subject: 'Comment s’est passée ta commande {{order.number}} ? ⭐',

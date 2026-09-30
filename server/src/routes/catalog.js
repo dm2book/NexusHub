@@ -242,6 +242,19 @@ router.get('/newsletter/unsubscribe', asyncHandler(async (req, res) => {
     + 'Je bent uitgeschreven. Je krijgt geen mail meer van ons.\n');
 }));
 
+/* The link in every price alert. Same shape as the newsletter's: an HMAC of
+   the account, so it works forever for the person who got it and cannot be
+   guessed for anybody else — and it answers the same thing either way, so it
+   is not a way to find out which accounts exist. */
+router.get('/wishlist/alerts/off', asyncHandler(async (req, res) => {
+  const { u, t } = z.object({ u: z.string().max(64), t: z.string().max(64) }).parse(req.query || {});
+  const { disableAllAlerts } = await import('../services/wishlistService.js');
+  await disableAllAlerts(u, t);
+  res.type('text/plain; charset=utf-8').send(
+    'Price alerts are off. Your wishlist is still there.\n\n'
+    + 'Prijsalerts staan uit. Je verlanglijst blijft bewaard.\n');
+}));
+
 router.post('/newsletter',
   rateLimit({ bucket: 'newsletter', windowMs: 60_000, max: 5, shared: true }),
   asyncHandler(async (req, res) => {
