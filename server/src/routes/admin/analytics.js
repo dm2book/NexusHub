@@ -4,6 +4,7 @@ import { asyncHandler } from '../../middleware/error.js';
 import { requirePermission } from '../../middleware/rbac.js';
 import * as analytics from '../../services/analyticsService.js';
 import * as profit from '../../services/profitService.js';
+import { topCustomers, SORT_KEYS, SEGMENT_KEYS, STATUS_KEYS } from '../../services/customerValueService.js';
 import * as attribution from '../../services/attributionService.js';
 import * as adPerf from '../../services/adPerformanceService.js';
 import { z } from 'zod';
@@ -11,6 +12,20 @@ import { audit } from '../../services/auditService.js';
 
 const router = Router();
 router.use(requirePermission('analytics.read'));
+
+/* Growth → Top Customers: lifetime value, retention and VIP score per customer.
+   Under analytics.read like the rest of this file — it is the same money, per
+   person — and it lists e-mail addresses, so it is not public in any form. */
+router.get('/customers', asyncHandler(async (req, res) => {
+  const q = z.object({
+    sort: z.enum(SORT_KEYS).catch('ltv').default('ltv'),
+    segment: z.enum(SEGMENT_KEYS).optional().catch(undefined),
+    status: z.enum(STATUS_KEYS).optional().catch(undefined),
+    q: z.string().max(100).optional().catch(undefined),
+    limit: z.coerce.number().int().min(1).max(200).catch(50).default(50),
+  }).parse(req.query || {});
+  res.json(await topCustomers(q));
+}));
 
 /* Profit, which is a different question from revenue.
    Its own endpoint rather than more fields on /overview: it carries three

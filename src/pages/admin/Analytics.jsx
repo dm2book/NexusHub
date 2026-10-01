@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { TrendingUp, ShoppingCart, Percent, Users, Trophy, Rocket, CheckCircle2, AlertTriangle, XCircle, ChevronDown, MailCheck, Megaphone, EyeOff, Lock } from 'lucide-react';
 import { api } from '../../lib/api.js';
@@ -286,7 +287,10 @@ export default function Analytics() {
       </div>
 
       <div className="card p-6 mt-6">
-        <h3 className="text-white mb-4">Top customers by lifetime value</h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-white">Top customers by lifetime value</h3>
+          <Link to="/admin/growth/customers" className="text-violet-400 text-sm hover:underline">Profit, retention &amp; VIP →</Link>
+        </div>
         <div className="space-y-2">
           {(clv?.top || []).length === 0 && <p className="text-slate-500 text-sm">No customers yet.</p>}
           {(clv?.top || []).map((c) => (
