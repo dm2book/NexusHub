@@ -240,12 +240,13 @@ export async function createOrder(input, ctx = {}) {
   await tx(async () => {
     await run(`INSERT INTO orders
           (id, number, user_id, email, status, currency, subtotal, total, billing,
-           consent_at, consent_text, ip, created_at, updated_at)
+           consent_at, consent_text, ip, country, created_at, updated_at)
          VALUES (@id, @num, @uid, @email, 'pending', @cur, @sub, @tot, @bill,
-           @consentAt, @consentText, @ip, @at, @at)`,
+           @consentAt, @consentText, @ip, @country, @at, @at)`,
         { id: orderId, num: number, uid: input.userId || null, email,
           cur: currency, sub: subtotal, tot: total,
           bill: JSON.stringify(billing), ip: ctx.ip || null,
+          country: /^[A-Z]{2}$/.test(ctx.country || '') ? ctx.country : null,
           consentAt: at, consentText: consentText || null, at });
     for (const it of lineItems) {
       await run(`INSERT INTO order_items (id, order_id, product_id, name, quantity, unit_price, metadata)
@@ -554,6 +555,11 @@ export async function transitionOrder(orderId, to, ctx = {}) {
   if (to === 'refunded' || to === 'cancelled' || to === 'failed') {
     await reverseOrderCommission(updated.id, to).catch((e) =>
       console.error('[order] commission reversal', e.message));
+    /* A sale that was undone is no longer a sale. The public feeds only show
+       orders that are still completed, so this one drops out on its own —
+       but not until their caches expire, which would leave a refunded order
+       announced as "sold" for another minute. */
+    bustSocialCaches();
   }
 
   if ((to === 'refunded' || to === 'cancelled') && updated.userId && updated.billing?.creditApplied > 0) {

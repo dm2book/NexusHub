@@ -303,6 +303,24 @@ export const PAGES = {
       description: 'Les prochains drops, réassorts et offres. Vois ce qui revient en stock avant que ça reparte.',
     },
   },
+  '/sales': {
+    nl: {
+      title: 'Recente verkopen — echte orders',
+      description: 'Wat er net verkocht is bij ForgeMarket: alleen echte, betaalde en geleverde orders. Product, tijd, land en categorie — geen namen.',
+    },
+    en: {
+      title: 'Recent sales — real orders',
+      description: 'What just sold at ForgeMarket: only real, paid and delivered orders. Product, time, country and category — no names.',
+    },
+    de: {
+      title: 'Letzte Verkäufe — echte Bestellungen',
+      description: 'Was gerade bei ForgeMarket verkauft wurde: nur echte, bezahlte und gelieferte Bestellungen. Produkt, Zeit, Land und Kategorie — keine Namen.',
+    },
+    fr: {
+      title: 'Ventes récentes — de vraies commandes',
+      description: 'Ce qui vient de se vendre chez ForgeMarket : uniquement de vraies commandes payées et livrées. Produit, heure, pays et catégorie — aucun nom.',
+    },
+  },
   '/terms': {
     nl: { title: 'Algemene voorwaarden', description: 'De voorwaarden die gelden bij elke bestelling: betaling, levering, herroepingsrecht en terugbetaling.' },
     en: { title: 'Terms and conditions', description: 'The terms that apply to every order: payment, delivery, right of withdrawal and refunds.' },

@@ -6,7 +6,7 @@
 import { Router } from 'express';
 import { asyncHandler } from '../middleware/error.js';
 import { publicCache } from '../utils/httpCache.js';
-import { liveFeed, trustStats } from '../services/socialProofService.js';
+import { liveFeed, trustStats, salesFeed, SALES_PERIODS } from '../services/socialProofService.js';
 
 const router = Router();
 
@@ -30,6 +30,26 @@ router.get('/feed', asyncHandler(async (_req, res) => {
     feedCache = { at: Date.now(), data: await liveFeed({ limit: 12 }) };
   }
   res.json({ feed: feedCache.data });
+}));
+
+/**
+ * The real sales feed, filterable: ?category=giftcard&country=NL&period=24h.
+ *
+ * A filter value that is not one of ours is ignored rather than refused — a
+ * stale link should still show the feed — but it is never passed to SQL as
+ * anything other than a bound, shape-checked parameter. No in-process cache:
+ * the answers vary by filter, and the edge cache keys on the query string.
+ */
+router.get('/sales', asyncHandler(async (req, res) => {
+  /* Short, and a short stale window: a refunded order must leave the feed
+     within a minute or so, not linger for the default ten. */
+  publicCache(res, 30, 60);
+  const q = req.query || {};
+  const category = /^[a-z0-9][a-z0-9-]{0,39}$/.test(String(q.category || '')) ? String(q.category) : null;
+  const country = /^[A-Za-z]{2}$/.test(String(q.country || '')) ? String(q.country).toUpperCase() : null;
+  const period = Object.hasOwn(SALES_PERIODS, String(q.period || '')) ? String(q.period) : 'all';
+  const limit = Math.min(50, Math.max(1, parseInt(q.limit, 10) || 30));
+  res.json(await salesFeed({ category, country, period, limit }));
 }));
 
 /** Real trust statistics (orders delivered, avg/fastest delivery, reviews…). */

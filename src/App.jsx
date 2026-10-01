@@ -52,6 +52,7 @@ const HowItWorks = lazy(() => import('./pages/info/HowItWorks.jsx'));
 const Refunds = lazy(() => import('./pages/info/Refunds.jsx'));
 const Reviews = lazy(() => import('./pages/info/Reviews.jsx'));
 const Drops = lazy(() => import('./pages/info/Drops.jsx'));
+const Sales = lazy(() => import('./pages/info/Sales.jsx'));
 const Legal = lazy(() => import('./pages/info/Legal.jsx'));
 const NotFound = lazy(() => import('./pages/NotFound.jsx'));
 const Wishlist = lazy(() => import('./pages/Wishlist.jsx'));
@@ -144,6 +145,7 @@ export default function App() {
           <Route path="/refunds" element={<Refunds />} />
           <Route path="/reviews" element={<Reviews />} />
           <Route path="/drops" element={<Drops />} />
+          <Route path="/sales" element={<Sales />} />
           <Route path="/trust" element={<Trust />} />
           <Route path="/terms" element={<Legal kind="terms" />} />
           <Route path="/privacy" element={<Legal kind="privacy" />} />

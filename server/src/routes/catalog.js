@@ -712,6 +712,7 @@ router.get('/sitemap.xml', asyncHandler(async (_req, res) => {
     ['/contact', '0.6', 'monthly'],
     ['/trust', '0.6', 'monthly'],
     ['/drops', '0.5', 'weekly'],
+    ['/sales', '0.5', 'daily'],
     ['/discord', '0.5', 'monthly'],
     // The pages a buyer checks before trusting a shop they have never heard of,
     // and the ones a search engine reads to decide this is a real business.

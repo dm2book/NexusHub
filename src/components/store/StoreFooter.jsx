@@ -70,6 +70,7 @@ export default function StoreFooter() {
       [t('footer.how', 'How it works'), '/how-it-works'],
       [t('footer.trust', 'Trust Center'), '/trust'],
       [t('footer.reviews', 'Reviews'), '/reviews'],
+      [t('footer.sales', 'Recent sales'), '/sales'],
       [t('footer.contact', 'Contact'), '/contact']] },
     { title: t('footer.help', 'Help & Legal'), links: [
       [t('footer.faq', 'FAQ'), '/faq'],
