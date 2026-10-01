@@ -84,6 +84,7 @@ const AdminMarket = lazy(() => import('./pages/admin/Market.jsx'));
 const AdminOpportunities = lazy(() => import('./pages/admin/ProductOpportunities.jsx'));
 const AdminTopCustomers = lazy(() => import('./pages/admin/TopCustomers.jsx'));
 const AdminAdIntelligence = lazy(() => import('./pages/admin/AdIntelligence.jsx'));
+const AdminProfitCenter = lazy(() => import('./pages/admin/SupplierProfitCenter.jsx'));
 const AdminProfit = lazy(() => import('./pages/admin/Profit.jsx'));
 const AdminLive = lazy(() => import('./pages/admin/Live.jsx'));
 const AdminFulfillment = lazy(() => import('./pages/admin/Fulfillment.jsx'));
@@ -196,6 +197,7 @@ export default function App() {
           <Route path="/admin/growth/opportunities" element={<AdminOpportunities />} />
           <Route path="/admin/growth/customers" element={<AdminTopCustomers />} />
           <Route path="/admin/growth/ads" element={<AdminAdIntelligence />} />
+          <Route path="/admin/profit-center" element={<AdminProfitCenter />} />
           <Route path="/admin/profit" element={<AdminProfit />} />
           <Route path="/admin/live" element={<AdminLive />} />
           <Route path="/admin/fulfillment" element={<AdminFulfillment />} />

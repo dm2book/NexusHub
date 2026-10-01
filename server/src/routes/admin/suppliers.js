@@ -12,6 +12,7 @@ import { searchTermsFor } from '../../services/supplier/SupplierConnector.js';
 import { scanProducts, summarise } from '../../services/supplier/catalogScanService.js';
 import { scanBest, scanSources, mapBest } from '../../services/supplier/bestSourceService.js';
 import { listSwitches, sweepFailover } from '../../services/supplier/supplierFailoverService.js';
+import { supplierProfitCenter } from '../../services/supplier/supplierProfitService.js';
 import { audit } from '../../services/auditService.js';
 import { notFound } from '../../utils/errors.js';
 import { get, all } from '../../db/index.js';
@@ -109,6 +110,21 @@ router.post('/best/map', requirePermission('suppliers.manage'), asyncHandler(asy
 /* —— Failover —— declared above `/:id`, like the rest of the fixed paths.
    Every automatic supplier switch, newest first: when, which product, from
    which supplier to which, and why. */
+/**
+ * Supplier Profit Center: per product, Kinguin / G2A / Eneba / Eldorado side
+ * by side — winst, marge, BTW, Stripe, netto winst — and BEST PROFIT, BEST
+ * PRICE and BEST STOCK. Read-only; switching stays with the failover rules
+ * and the best-source scan.
+ */
+router.get('/profit-center', requirePermission('suppliers.read'), asyncHandler(async (req, res) => {
+  const q = z.object({
+    q: z.string().max(100).optional().catch(undefined),
+    only: z.enum(['gain', 'loss', 'priced']).optional().catch(undefined),
+    limit: z.coerce.number().int().min(1).max(1000).catch(500).default(500),
+  }).parse(req.query || {});
+  res.json(await supplierProfitCenter(q));
+}));
+
 router.get('/failover/switches', requirePermission('suppliers.read'), asyncHandler(async (req, res) => {
   const limit = Math.min(500, Math.max(1, Number(req.query.limit) || 100));
   res.json({ switches: await listSwitches({ limit }) });

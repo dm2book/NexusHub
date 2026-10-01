@@ -116,14 +116,18 @@ export function summarise(observations, { now = Date.now() } = {}) {
 export function minimumProfitablePrice(costEur, cfg = config.market) {
   const feePct = cfg.paymentFeePercent / 100;
   const srcPct = cfg.sourceCostPercent / 100;
-  const denom = 1 - feePct - srcPct;
-  if (denom <= 0) throw new Error('payment + source fees consume the whole price — check PAYMENT_FEE_PERCENT / SOURCE_COST_PERCENT');
   const vatPct = vatPercentFor(cfg);
   const vat = vatPct > 0 && cfg.pricesIncludeVat ? 1 + vatPct / 100 : 1;
+  /* Per euro of PRICE (what the buyer pays): 1/vat of it is ours before
+     costs, the payment fee takes feePct of all of it — the processor charges
+     on the amount it moved, BTW included — and the source cost takes srcPct
+     of our part. */
+  const denom = 1 / vat - feePct - srcPct / vat;
+  if (denom <= 0) throw new Error('payment + source fees consume the whole price — check PAYMENT_FEE_PERCENT / SOURCE_COST_PERCENT');
 
   // The euro floor: cost, costs and the minimum profit, grossed back up.
-  const byAmount = ((Number(costEur) + cfg.fulfillmentCostEur + cfg.paymentFixedFee
-    + cfg.minimumProfitEur) / denom) * vat;
+  const byAmount = (Number(costEur) + cfg.fulfillmentCostEur + cfg.paymentFixedFee
+    + cfg.minimumProfitEur) / denom;
 
   /* The percentage floor, which is the one that scales.
    *
@@ -133,9 +137,9 @@ export function minimumProfitablePrice(costEur, cfg = config.market) {
    * A minimum profit in EUROS protects a €4.49 top-up and does nothing for a
    * €174.99 subscription — 50 cents is 11% of one and 0.3% of the other. */
   const m = Math.max(0, Number(cfg.minimumMarginPercent ?? 0)) / 100;
-  const marginDenom = denom - m;
+  const marginDenom = denom - m / vat;
   const byMargin = marginDenom > 0
-    ? ((Number(costEur) + cfg.fulfillmentCostEur + cfg.paymentFixedFee) / marginDenom) * vat
+    ? (Number(costEur) + cfg.fulfillmentCostEur + cfg.paymentFixedFee) / marginDenom
     : Infinity;
 
   // Whichever floor binds. Both are floors; neither is a preference.
@@ -147,7 +151,10 @@ export function marginAt(priceEur, costEur, cfg = config.market) {
   const p = Number(priceEur);
   const vatPct = vatPercentFor(cfg);
   const exVat = vatPct > 0 && cfg.pricesIncludeVat ? p / (1 + vatPct / 100) : p;
-  const fees = exVat * (cfg.paymentFeePercent / 100) + cfg.paymentFixedFee
+  /* The payment fee is charged on what the processor moved — the full price,
+     BTW included. Taking it off the ex-BTW amount undercounted it by the fee
+     rate times the BTW: about 10 cents on a €20 sale at 21%, on every sale. */
+  const fees = p * (cfg.paymentFeePercent / 100) + cfg.paymentFixedFee
     + exVat * (cfg.sourceCostPercent / 100);
   const profit = exVat - Number(costEur) - cfg.fulfillmentCostEur - fees;
   return { profitEur: round2(profit), marginPct: exVat > 0 ? round2((profit / exVat) * 100) : null };
