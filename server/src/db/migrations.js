@@ -2019,4 +2019,34 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS lang TEXT;
       CREATE INDEX IF NOT EXISTS idx_wishlist_pending ON wishlist_items (pending_at) WHERE pending_at IS NOT NULL;
     `,
   },
+  {
+    id: '051_supplier_switches',
+    /*
+     * Every time the shop moves a product to another supplier on its own.
+     *
+     * A switch changes who gets paid for the next order, so it is never silent:
+     * one row per switch, with the supplier it left, the one it moved to, the
+     * reason in a word (out_of_stock | offline | errors | too_expensive) and in
+     * a sentence, and the numbers it decided on. `trigger` says what noticed:
+     * an order, a failed delivery, or the sweep after a supplier sync.
+     */
+    sql: `
+      CREATE TABLE IF NOT EXISTS supplier_switches (
+        id                TEXT PRIMARY KEY,
+        product_id        TEXT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+        from_supplier_id  TEXT,
+        to_supplier_id    TEXT NOT NULL,
+        from_mapping_id   TEXT,
+        to_mapping_id     TEXT NOT NULL,
+        reason_code       TEXT NOT NULL,
+        reason            TEXT NOT NULL,
+        detail            TEXT NOT NULL DEFAULT '{}',
+        trigger           TEXT NOT NULL,
+        order_id          TEXT,
+        created_at        TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_supplier_switches_recent ON supplier_switches (created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_supplier_switches_product ON supplier_switches (product_id, created_at DESC);
+    `,
+  },
 ];

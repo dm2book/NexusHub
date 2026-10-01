@@ -368,6 +368,15 @@ export async function runMaintenance() {
     if (out.sent) summary.priceAlertsSent = out.sent;
   } catch (e) { summary.priceAlertError = e.message; }
 
+  /* 14c. Supplier failover: move any product whose supplier went offline, out
+   *      of stock, started failing or became too dear since the last look —
+   *      before the next order finds out the hard way. Database only. */
+  try {
+    const { sweepFailover } = await import('./supplier/supplierFailoverService.js');
+    const out = await sweepFailover();
+    if (out.switched) summary.suppliersSwitched = out.switched;
+  } catch (e) { summary.failoverError = e.message; }
+
   /* 15. Real photos for products still showing a placeholder.
    *
    *     Once a day, on its own "has it been long enough" key like the backup:

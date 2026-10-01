@@ -61,7 +61,7 @@ export async function fulfillOrder(orderId, ctx = {}) {
 
   const summary = { auto: 0, manual: 0, requests: [] };
   for (const item of order.items) {
-    const resolved = item.product_id ? await resolveFulfillmentSupplier(item.product_id) : null;
+    const resolved = item.product_id ? await resolveFulfillmentSupplier(item.product_id, { orderId: order.id }) : null;
     if (resolved) {
       summary.requests.push(await runAutoFulfillment(order, item, resolved, ctx));
       summary.auto++;
@@ -104,11 +104,30 @@ async function runAutoFulfillment(order, item, { supplier, supplierProduct }, ct
     await persistResult(reqId, order, item, result);
     await logFulfillment('result', { requestId: reqId, orderId: order.id, actor: supplier.id,
       detail: { status: result.status, deliveries: result.deliveries?.length || 0 } });
+    /* A supplier that ANSWERS "failed" has failed this delivery just as surely
+       as one that threw — same path, so it gets the same failover. */
+    if (result.status === 'failed') throw new Error(result.error || 'the supplier reported the delivery as failed');
   } catch (err) {
     await run(`UPDATE fulfillment_requests SET status='failed', result=@r, updated_at=@at WHERE id=@id`,
         { r: JSON.stringify({ error: err.message }), at: nowIso(), id: reqId });
     await logFulfillment('error', { requestId: reqId, orderId: order.id, actor: supplier.id,
       detail: { error: err.message } });
+
+    /* Failover: try the next best supplier for this item before the owner has
+       to. Bounded — at most two hops — and the suppliers that already failed
+       this order are excluded, so it cannot loop. The switch itself is logged
+       by the failover service with the reason "errors". */
+    const excluded = [...(ctx.excluded || []), supplier.id];
+    const depth = ctx.failoverDepth || 0;
+    if (item.product_id && depth < 2) {
+      const { resolveFulfillmentSupplier: next } = await import('./supplier/supplierService.js');
+      const alt = await next(item.product_id, { orderId: order.id, exclude: excluded }).catch(() => null);
+      if (alt && !excluded.includes(alt.supplier.id)) {
+        await logFulfillment('failover', { requestId: reqId, orderId: order.id, actor: 'system',
+          detail: { from: supplier.id, to: alt.supplier.id, error: err.message } });
+        return runAutoFulfillment(order, item, alt, { ...ctx, excluded, failoverDepth: depth + 1 });
+      }
+    }
 
     /* Tell the owner, because nobody else will.
 
@@ -208,9 +227,19 @@ export async function refreshFulfillment(requestId, ctx = {}) {
 
 /** If every fulfillment request for an order is fulfilled, complete the order. */
 async function maybeCompleteOrder(orderId, ctx) {
-  const reqs = await all('SELECT status FROM fulfillment_requests WHERE order_id=@id', { id: orderId });
+  const reqs = await all('SELECT order_item_id, status FROM fulfillment_requests WHERE order_id=@id', { id: orderId });
   if (!reqs.length) return;
-  const allDone = reqs.every((r) => r.status === 'fulfilled');
+  /* Per ITEM, not per request. Since failover, an item can carry a failed
+     attempt at one supplier beside the delivery that worked at the next; the
+     check that every REQUEST was fulfilled then left a delivered order waiting
+     forever — the buyer had the code and the order never completed. An item is
+     done when any of its requests is fulfilled. */
+  const byItem = new Map();
+  for (const r of reqs) {
+    const key = r.order_item_id || '';
+    byItem.set(key, byItem.get(key) || r.status === 'fulfilled');
+  }
+  const allDone = [...byItem.values()].every(Boolean);
   const order = await getOrder(orderId);
   if (allDone && canTransition(order.status, 'completed')) {
     await transitionOrder(orderId, 'completed',
@@ -401,7 +430,7 @@ export async function autoFulfillFromSuppliers(orderId, ctx = {}) {
 
   let anySupplier = false;
   for (const item of order.items) {
-    const resolved = item.product_id ? await resolveFulfillmentSupplier(item.product_id) : null;
+    const resolved = item.product_id ? await resolveFulfillmentSupplier(item.product_id, { orderId: order.id }) : null;
     if (!resolved) continue;
     anySupplier = true;
     // Margin guard: refuse to auto-source at a loss. Effective per-unit revenue
