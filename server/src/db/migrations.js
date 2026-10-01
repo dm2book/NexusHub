@@ -2049,4 +2049,26 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS lang TEXT;
       CREATE INDEX IF NOT EXISTS idx_supplier_switches_product ON supplier_switches (product_id, created_at DESC);
     `,
   },
+  {
+    id: '052_sales_feed',
+    /*
+     * The public sales feed: product, how long ago, country, category.
+     *
+     * `orders.country` is the two-letter country the checkout request came
+     * from, as the platform reports it (Vercel's edge header). It was already
+     * read for fraud scoring and then dropped; without it the feed could only
+     * show a country the buyer happened to type, which the checkout never asks.
+     * Null when the platform did not say — the feed then shows no country,
+     * never a guess.
+     *
+     * `social_events.test` marks a delivery paid while the shop ran on a
+     * payment provider's TEST key. That is a rehearsal, not a sale, and it is
+     * the one fake notification this shop could otherwise publish by accident.
+     */
+    sql: `
+      ALTER TABLE orders ADD COLUMN IF NOT EXISTS country TEXT;
+      ALTER TABLE social_events ADD COLUMN IF NOT EXISTS test INTEGER NOT NULL DEFAULT 0;
+      CREATE INDEX IF NOT EXISTS idx_social_events_recent ON social_events (created_at DESC) WHERE status = 'visible';
+    `,
+  },
 ];
