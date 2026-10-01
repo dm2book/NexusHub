@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Outlet, NavLink, Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   Zap, BarChart3, ShoppingCart, Truck, PackageCheck, Package,
-  Mail, ShieldAlert, LogOut, Store, LifeBuoy, Menu, X, Users, ShieldCheck, Activity, Gauge, Tag, LayoutGrid, TrendingUp, Euro, Percent, Radio, Rocket } from 'lucide-react';
+  Mail, ShieldAlert, LogOut, Store, LifeBuoy, Menu, X, Users, ShieldCheck, Activity, Gauge, Tag, LayoutGrid, TrendingUp, Euro, Percent, Radio, Rocket, Crown } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { api } from '../lib/api.js';
 
@@ -26,6 +26,7 @@ const NAV = [
   /* Growth: what to sell next, rather than how the shop is doing. */
   { heading: 'Growth' },
   { to: '/admin/growth/opportunities', icon: Rocket, label: 'Product Opportunities', perm: 'products.read' },
+  { to: '/admin/growth/customers', icon: Crown, label: 'Top Customers', perm: 'analytics.read' },
   { heading: 'Shop' },
   { to: '/admin/support', icon: LifeBuoy, label: 'Support', perm: 'tickets.read', badge: 'tickets' },
   { to: '/admin/social', icon: Activity, label: 'Social proof', perm: 'social.moderate' },
