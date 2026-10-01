@@ -159,12 +159,12 @@ export default function SupplierPhotos({ onDone }) {
           )}
 
           {/* The pictures themselves: a grid of what will go on the storefront. */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3 mt-3 max-h-[26rem] overflow-y-auto">
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3 mt-3 max-h-[28rem] overflow-y-auto">
             {rows.filter((r) => r.image).map((r) => (
               <div key={r.productId} className="rounded-xl border border-white/10 overflow-hidden bg-white/5">
                 <div className="aspect-[7/6] bg-black/30 grid place-items-center">
                   <img src={r.image} alt="" loading="lazy" referrerPolicy="no-referrer"
-                    className="max-w-full max-h-full object-contain" />
+                    className="w-full h-full object-contain" />
                 </div>
                 <div className="p-2">
                   <div className="text-[11.5px] text-slate-200 truncate" title={r.name}>{r.name}</div>

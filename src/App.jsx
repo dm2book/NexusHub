@@ -80,6 +80,7 @@ const AdminUsers = lazy(() => import('./pages/admin/Users.jsx'));
 const AdminPayments = lazy(() => import('./pages/admin/Payments.jsx'));
 const AdminSuppliers = lazy(() => import('./pages/admin/Suppliers.jsx'));
 const AdminMarket = lazy(() => import('./pages/admin/Market.jsx'));
+const AdminOpportunities = lazy(() => import('./pages/admin/ProductOpportunities.jsx'));
 const AdminProfit = lazy(() => import('./pages/admin/Profit.jsx'));
 const AdminLive = lazy(() => import('./pages/admin/Live.jsx'));
 const AdminFulfillment = lazy(() => import('./pages/admin/Fulfillment.jsx'));
@@ -188,6 +189,7 @@ export default function App() {
           <Route path="/admin/users" element={<AdminUsers />} />
           <Route path="/admin/suppliers" element={<AdminSuppliers />} />
           <Route path="/admin/market" element={<AdminMarket />} />
+          <Route path="/admin/growth/opportunities" element={<AdminOpportunities />} />
           <Route path="/admin/profit" element={<AdminProfit />} />
           <Route path="/admin/live" element={<AdminLive />} />
           <Route path="/admin/fulfillment" element={<AdminFulfillment />} />

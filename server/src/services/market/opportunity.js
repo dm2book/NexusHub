@@ -48,7 +48,7 @@ import { config } from '../../config/env.js';
 import { summarise, marginAt } from './pricing.js';
 import { latestPerSource } from './observations.js';
 import { costCentsFromMetadata } from '../costService.js';
-import { parseTitle } from './normalize.js';
+import { parseTitle, GAMES } from './normalize.js';
 
 const round2 = (n) => Math.round(n * 100) / 100;
 const eur = (cents) => (cents == null ? null : cents / 100);
@@ -106,13 +106,74 @@ export function competitionPressure(stats, cfg = config.market) {
 }
 
 /**
+ * Can one of the shop's OWN suppliers deliver this, and at what price?
+ *
+ * Three of the four marketplaces this scans — Kinguin, G2A, Eldorado — are
+ * also suppliers the shop can buy from, through the same connector kinds. When
+ * a marketplace the owner has connected AS A SUPPLIER was observed holding the
+ * product in stock, its price there is not a market estimate: it is what the
+ * shop would pay. That is the strongest cost basis there is, stronger than a
+ * ratio derived from other products and far stronger than an assumption.
+ *
+ * In stock only. A listing observed out of stock is a price nobody can pay.
+ *
+ * `suppliers` is [{ kind, name }] for ACTIVE suppliers; pure, no database.
+ */
+export function supplierOffer(observations = [], suppliers = []) {
+  const byKind = new Map(suppliers.map((sp) => [sp.kind, sp.name]));
+  if (!byKind.size) {
+    return { available: false, reason: 'no supplier connected yet' };
+  }
+  const mine = observations.filter((o) => byKind.has(o.source_key));
+  const buyable = mine.filter((o) => o.availability === 'in_stock' && Number(o.price_eur_cents) > 0)
+    .sort((a, b) => Number(a.price_eur_cents) - Number(b.price_eur_cents));
+  if (buyable.length) {
+    const best = buyable[0];
+    return {
+      available: true,
+      supplierKind: best.source_key,
+      supplierName: byKind.get(best.source_key),
+      costEur: eur(Number(best.price_eur_cents)),
+      observedAt: best.observed_at,
+      url: best.url,
+      reason: `in stock at ${byKind.get(best.source_key)}, your supplier`,
+    };
+  }
+  return {
+    available: false,
+    reason: mine.length
+      ? `your supplier ${[...new Set(mine.map((o) => byKind.get(o.source_key)))].join(', ')} lists it, but not in stock`
+      : `none of your suppliers (${[...byKind.values()].join(', ')}) was seen carrying it`,
+  };
+}
+
+/** The readable name of a market game key. */
+export function categoryLabelFor(game) {
+  if (!game) return null;
+  if (String(game).startsWith('unknown')) return 'Not recognised';
+  return GAMES.find((g) => g.key === game)?.label || game;
+}
+
+/** Which of the scanned marketplaces carry the product at all. */
+export const marketplacesOf = (observations = []) =>
+  [...new Set(observations.filter((o) => !o.is_official).map((o) => o.source_key))].sort();
+
+/**
  * What it would cost this shop to stock one, and how sure we are.
  *
  * `catalogueRatios` are cost/market-low ratios taken from products this shop
  * already sells where BOTH numbers are known. Nothing is derived from a single
  * product — one mapping is an anecdote — so a basis needs at least two.
  */
-export function costBasisFor(stats, { catalogueRatios = [], cfg = config.market } = {}) {
+export function costBasisFor(stats, { catalogueRatios = [], cfg = config.market, supplier = null } = {}) {
+  /* What the shop's own supplier charges, when it has one — see supplierOffer. */
+  if (supplier?.available && supplier.costEur > 0) {
+    return {
+      costEur: supplier.costEur,
+      basis: 'supplier',
+      reason: `what ${supplier.supplierName} charges for it, observed in stock`,
+    };
+  }
   const lowEur = eur(stats.lowCents);
   if (lowEur == null) {
     return { costEur: null, basis: 'none', reason: 'no observed price to work from' };
@@ -281,11 +342,12 @@ export function gradeOpportunity({ margin, competition, revenue, stats, cfg = co
  */
 export function assessOpportunity({
   candidate, observations = [], catalogueRatios = [], categoryUnitsPerMonth = null,
-  now = Date.now(), cfg = config.market,
+  suppliers = [], now = Date.now(), cfg = config.market,
 } = {}) {
   const stats = summarise(observations, { now });
   const competition = competitionPressure(stats, cfg);
-  const cost = costBasisFor(stats, { catalogueRatios, cfg });
+  const supplier = supplierOffer(observations, suppliers);
+  const cost = costBasisFor(stats, { catalogueRatios, cfg, supplier });
   const price = likelyPrice(stats, cfg);
 
   let margin = { marginPct: null, profitEur: null, basis: cost.basis, reason: cost.reason };
@@ -306,6 +368,9 @@ export function assessOpportunity({
     marketProductId: candidate?.market_product_id ?? null,
     name: candidate?.title ?? null,
     category: candidate?.game ?? null,
+    /* What a person reads: the game's name, or plainly "not recognised" —
+       never an internal key like "unknown-honkai-star-rail-oneiric". */
+    categoryLabel: categoryLabelFor(candidate?.game),
     platform: candidate?.platform ?? null,
     region: candidate?.region ?? null,
     productType: candidate?.product_type ?? null,
@@ -318,6 +383,8 @@ export function assessOpportunity({
 
     offerCount: stats.competitorCount,
     sourceCount: stats.sourceCount,
+    marketplaces: marketplacesOf(observations),
+    supplier,
     inStockCount: stats.inStockCount,
     observedAt: stats.freshestAt,
     ageHours: stats.ageHours,
@@ -433,6 +500,14 @@ export async function productsToAdd({
 
   const ratios = await catalogueCostRatios();
   const demand = await categoryDemandPerMonth();
+  /* The suppliers the shop can actually buy from, by connector kind. */
+  const suppliers = (await all(
+    `SELECT connector_kind AS kind, name FROM suppliers WHERE status = 'active'`).catch(() => []));
+  /* Margins after the BTW the shop will charge, like every other screen that
+     decides what to sell — a product judged before BTW is judged on 17.4% of
+     its price that is not the shop's. */
+  const { planningVat } = await import('../vatService.js');
+  const cfg = { ...config.market, vatPercent: planningVat().pct };
 
   const assessed = [];
   for (const row of rows) {
@@ -442,6 +517,8 @@ export async function productsToAdd({
       observations,
       catalogueRatios: ratios.get(row.game) || [],
       categoryUnitsPerMonth: demand.has(row.game) ? demand.get(row.game) : null,
+      suppliers,
+      cfg,
     }));
   }
 
@@ -503,10 +580,20 @@ export async function evidenceState() {
   if (Number(obs?.n || 0) === 0) {
     blockers.push('No prices have been observed yet, so there is nothing to compare.');
   }
-  if (withCost === 0) {
-    blockers.push(`None of the ${products.length} active products has a cost price, so no margin `
-      + 'can be estimated and nothing can be graded HIGH. Enter cost prices, or set '
-      + 'MARKET_ASSUMED_COST_RATIO to work from a stated assumption.');
+  /* With a supplier connected, a product it carries has a real cost even when
+     the catalogue has none — saying "nothing can be graded HIGH" above a list
+     with HIGH rows in it is the screen contradicting itself. */
+  const suppliers = await get(`SELECT COUNT(*) AS n FROM suppliers WHERE status = 'active'
+    AND connector_kind IN ('kinguin','g2a','eldorado','eneba')`).catch(() => ({ n: 0 }));
+  const hasSupplier = Number(suppliers?.n || 0) > 0;
+  if (withCost === 0 && !hasSupplier) {
+    blockers.push(`None of the ${products.length} active products has a cost price and no marketplace `
+      + 'is connected as a supplier, so no margin can be estimated and nothing can be graded HIGH. '
+      + 'Connect a supplier, enter cost prices, or set MARKET_ASSUMED_COST_RATIO to work from a stated assumption.');
+  } else if (withCost === 0) {
+    blockers.push('Margins are known only where one of your suppliers was seen carrying the product; '
+      + 'everything else shows its margin as unknown. Cost prices on your own products would let the '
+      + 'shop estimate the rest.');
   }
   if (Number(orders?.n || 0) === 0) {
     blockers.push('No completed orders, so there is no demand evidence — opportunity scores '

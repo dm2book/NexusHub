@@ -174,9 +174,14 @@ export function renderTile(product) {
   const big = denom == null ? name : denom.toLocaleString('en-US');
   /* A unit under the number, the way every shipped board does it — never the
      whole product name, which the card prints again immediately below. */
+  /* The parser's unit is the game's canonical one ("genesis-crystals"); the
+     product may say something else ("640 Genshin Crystals"). It is used only
+     when the title actually says it — otherwise the tile would print a word
+     that is not on the product. */
+  const titleSays = unit && name.toLowerCase().includes(unit.toLowerCase().replace(/-/g, ' '));
   const small = (denom == null
     ? (product.category || '')
-    : (unit || unitFrom(name) || product.category || '')).toUpperCase();
+    : ((titleSays ? unit : '') || unitFrom(name) || unit || product.category || '')).toUpperCase();
 
   const bigSize = fitSize(big, 12, 128, 52);
   const smallSize = fitSize(small, 14, 34, 20);

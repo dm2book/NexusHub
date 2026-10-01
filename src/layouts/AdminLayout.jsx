@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Outlet, NavLink, Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   Zap, BarChart3, ShoppingCart, Truck, PackageCheck, Package,
-  Mail, ShieldAlert, LogOut, Store, LifeBuoy, Menu, X, Users, ShieldCheck, Activity, Gauge, Tag, LayoutGrid, TrendingUp, Euro, Percent, Radio } from 'lucide-react';
+  Mail, ShieldAlert, LogOut, Store, LifeBuoy, Menu, X, Users, ShieldCheck, Activity, Gauge, Tag, LayoutGrid, TrendingUp, Euro, Percent, Radio, Rocket } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { api } from '../lib/api.js';
 
@@ -23,6 +23,10 @@ const NAV = [
   { to: '/admin/suppliers', icon: Truck, label: 'Suppliers', perm: 'suppliers.read' },
   { to: '/admin/market', icon: TrendingUp, label: 'Market', perm: 'orders.read' },
   { to: '/admin/profit', icon: Percent, label: 'Profit', perm: 'analytics.read' },
+  /* Growth: what to sell next, rather than how the shop is doing. */
+  { heading: 'Growth' },
+  { to: '/admin/growth/opportunities', icon: Rocket, label: 'Product Opportunities', perm: 'products.read' },
+  { heading: 'Shop' },
   { to: '/admin/support', icon: LifeBuoy, label: 'Support', perm: 'tickets.read', badge: 'tickets' },
   { to: '/admin/social', icon: Activity, label: 'Social proof', perm: 'social.moderate' },
   { to: '/admin/monetization', icon: Tag, label: 'Monetization', perm: 'monetization.manage' },
@@ -37,7 +41,11 @@ export default function AdminLayout() {
   const [open, setOpen] = useState(false);
   const [counts, setCounts] = useState({});
   const close = () => setOpen(false);
-  const items = NAV.filter((n) => !n.perm || hasPermission(n.perm));
+  /* A heading is kept only when something under it is visible, so a role
+     without access to Growth does not see an empty "Growth" label. */
+  const visible = NAV.filter((n) => n.heading || !n.perm || hasPermission(n.perm));
+  const items = visible.filter((n, i) => !n.heading
+    || (visible[i + 1] && !visible[i + 1].heading));
 
   // Poll action-item counts (open tickets, pending payments, orders to fulfil)
   // so the sidebar badges are always current — refetched on every navigation
@@ -63,7 +71,14 @@ export default function AdminLayout() {
         </div>
       </Link>
       <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-        {items.map(({ to, icon: Icon, label, end, badge }) => {
+        {items.map(({ to, icon: Icon, label, end, badge, heading }) => {
+          if (heading) {
+            return (
+              <div key={`h-${heading}`} className="px-3 pt-4 pb-1 text-[10px] uppercase tracking-widest text-slate-500 font-rajdhani">
+                {heading}
+              </div>
+            );
+          }
           const count = badge ? counts[badge] : 0;
           return (
             <NavLink key={to} to={to} end={end} onClick={onNavigate}

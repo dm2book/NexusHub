@@ -174,7 +174,7 @@ export default function BestSourceScan({ onMapped }) {
             </p>
           )}
 
-          <div className="rounded-xl border border-white/10 mt-3 max-h-[30rem] overflow-y-auto divide-y divide-white/5">
+          <div className="rounded-xl border border-white/10 mt-3 max-h-[28rem] overflow-y-auto divide-y divide-white/5">
             {rows.map((r) => {
               const s = STYLE[r.verdict] || STYLE.not_found;
               const b = r.best;

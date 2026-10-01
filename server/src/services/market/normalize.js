@@ -51,6 +51,26 @@ export const GAMES = [
     patterns: [/\bbrawl\s*stars\b/i] },
   { key: 'clash-of-clans', label: 'Clash of Clans', unit: 'gems',
     patterns: [/\bclash\s*of\s*clans\b/i] },
+  /* The rest of what this shop sells. Without them every Apex, Genshin or Free
+     Fire listing parsed as game "unknown" — named "unknown 2,150" on the
+     opportunity page, and merged with any other unknown product of the same
+     amount into one key and one set of prices. */
+  { key: 'clash-royale', label: 'Clash Royale', unit: 'gems',
+    patterns: [/\bclash\s*royale\b/i] },
+  { key: 'apex-legends', label: 'Apex Legends', unit: 'coins',
+    patterns: [/\bapex\s*legends\b/i, /\bapex\s*coins?\b/i] },
+  { key: 'genshin-impact', label: 'Genshin Impact', unit: 'genesis-crystals',
+    patterns: [/\bgenshin\b/i, /\bgenesis\s*crystals?\b/i] },
+  { key: 'free-fire', label: 'Free Fire', unit: 'diamonds',
+    patterns: [/\bfree\s*fire\b/i] },
+  { key: 'pubg-mobile', label: 'PUBG Mobile', unit: 'uc',
+    patterns: [/\bpubg\b/i] },
+  { key: 'mobile-legends', label: 'Mobile Legends', unit: 'diamonds',
+    patterns: [/\bmobile\s*legends\b/i, /\bmlbb\b/i] },
+  { key: 'league-of-legends', label: 'League of Legends', unit: 'rp',
+    patterns: [/\bleague\s*of\s*legends\b/i, /\briot\s*points?\b/i] },
+  { key: 'gta-online', label: 'GTA Online', unit: 'cash',
+    patterns: [/\bgta\b/i, /\bshark\s*card\b/i] },
   { key: 'discord', label: 'Discord', unit: 'months',
     patterns: [/\bdiscord\s*nitro\b/i] },
   { key: 'steam', label: 'Steam', unit: 'EUR', patterns: [/\bsteam\b/i] },
@@ -158,6 +178,14 @@ export function parseTitle(rawTitle, hints = {}) {
 
   const game = hints.game || first(GAMES, t);
   if (!game) unknown.push('game');
+  /* An unrecognised game is still A game, and not the same one as every other
+     unrecognised game. "unknown" in the key made "Marvel Rivals 2150 Lattice"
+     and "Some Other Game 2150 Gems" one product with one price list. The
+     words of the title (numbers removed) keep them apart; the price parts of
+     the key are unchanged. */
+  const unknownGame = game ? null
+    : `unknown-${t.toLowerCase().replace(/[0-9.,€$£]+/g, ' ').replace(/[^a-z]+/g, '-')
+      .split('-').filter(Boolean).slice(0, 4).join('-') || 'untitled'}`;
 
   const platformRaw = hints.platformRaw || (t.match(/\bps[45]\b|\bseries\s*[xs]\b/i)?.[0] || '');
   const platform = hints.platform || first(PLATFORMS, t);
@@ -187,7 +215,7 @@ export function parseTitle(rawTitle, hints = {}) {
 
   const model = {
     productType: productType || 'unknown',
-    game: game || 'unknown',
+    game: game || unknownGame,
     edition: edition || '',
     platform: platform || 'unknown',
     platformRaw,
@@ -226,6 +254,9 @@ export function canonicalKey(m) {
 
 /** A name a human would recognise, built from the model rather than the title. */
 export function readableTitle(m) {
+  /* A game this parser does not know is named by the seller's own title —
+     the only honest name it has — rather than "unknown 2,150". */
+  if (String(m.game || '').startsWith('unknown') && m.rawTitle) return String(m.rawTitle).slice(0, 120);
   const gameLabel = GAMES.find((g) => g.key === m.game)?.label || m.game;
   const unit = m.denomUnit && m.denomUnit !== 'EUR' ? ` ${m.denomUnit}` : '';
   const amount = m.denomination == null ? ''

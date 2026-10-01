@@ -107,7 +107,7 @@ function PricePanel({ row, t, onAlert }) {
         </div>
         <div>
           <div className="text-slate-400 text-[11px]">{t('wish.previous', 'Previous')}</div>
-          <div className="text-slate-500 line-through decoration-slate-300">
+          <div className="text-slate-500 line-through">
             {row.previousPrice == null ? '—' : money(row.previousPrice)}
           </div>
         </div>
@@ -142,7 +142,7 @@ function PricePanel({ row, t, onAlert }) {
           <span className="whitespace-nowrap">{t('wish.target', 'Only below €')}</span>
           <input value={target} onChange={(e) => setTarget(e.target.value)} onBlur={saveTarget}
             inputMode="decimal" placeholder={t('wish.anyDrop', 'any drop')}
-            className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1 text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-200" />
+            className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1 text-slate-800" />
         </label>
       )}
     </div>
