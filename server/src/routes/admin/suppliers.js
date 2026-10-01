@@ -11,6 +11,7 @@ import { availableKinds, createConnector } from '../../services/supplier/registr
 import { searchTermsFor } from '../../services/supplier/SupplierConnector.js';
 import { scanProducts, summarise } from '../../services/supplier/catalogScanService.js';
 import { scanBest, scanSources, mapBest } from '../../services/supplier/bestSourceService.js';
+import { listSwitches, sweepFailover } from '../../services/supplier/supplierFailoverService.js';
 import { audit } from '../../services/auditService.js';
 import { notFound } from '../../utils/errors.js';
 import { get, all } from '../../db/index.js';
@@ -103,6 +104,21 @@ router.post('/best/map', requirePermission('suppliers.manage'), asyncHandler(asy
     replace: z.boolean().optional(),
   }).parse(req.body || {});
   res.json(await mapBest(body.picks, { replace: !!body.replace, actor: req.user }));
+}));
+
+/* —— Failover —— declared above `/:id`, like the rest of the fixed paths.
+   Every automatic supplier switch, newest first: when, which product, from
+   which supplier to which, and why. */
+router.get('/failover/switches', requirePermission('suppliers.read'), asyncHandler(async (req, res) => {
+  const limit = Math.min(500, Math.max(1, Number(req.query.limit) || 100));
+  res.json({ switches: await listSwitches({ limit }) });
+}));
+
+/* Look at every mapped product now rather than at the next sweep. */
+router.post('/failover/run', requirePermission('suppliers.manage'), asyncHandler(async (req, res) => {
+  const out = await sweepFailover();
+  await audit({ actor: req.user, action: 'supplier.failover_run', metadata: out, req });
+  res.json(out);
 }));
 
 router.get('/:id', requirePermission('suppliers.read'), asyncHandler(async (req, res) => {

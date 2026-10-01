@@ -7,6 +7,7 @@ import { useToast } from '../../context/ToastContext.jsx';
 import SupplyDashboard from '../../components/admin/SupplyDashboard.jsx';
 import CatalogScan from '../../components/admin/CatalogScan.jsx';
 import BestSourceScan from '../../components/admin/BestSourceScan.jsx';
+import SupplierSwitches from '../../components/admin/SupplierSwitches.jsx';
 import SupplierCostChart from '../../components/admin/SupplierCostChart.jsx';
 
 const KIND_HINT = {
@@ -317,6 +318,9 @@ export default function Suppliers() {
           cheapest, and can the shop just map all of it? Above everything else
           because it is the one that does the work. */}
       <BestSourceScan onMapped={load} />
+
+      {/* What the shop decided on its own when a supplier let it down. */}
+      <SupplierSwitches />
 
       {/* Supply, product-first: the view that shows a product NO supplier
           covers, which by definition appears on no supplier's card below. */}

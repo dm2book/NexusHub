@@ -227,27 +227,40 @@ export function listSyncRuns(supplierId, limit = 25) {
 }
 
 /**
- * Choose the best supplier able to fulfill a product, honouring priority and
- * stock/status. Returns { supplier, supplierProduct } or null (=> manual).
+ * The supplier the next order for this product goes to, or null (=> manual).
+ *
+ * It walked the mappings in `priority` order and skipped one with no stock;
+ * it now asks supplierFailoverService first, which moves the product to the
+ * best usable supplier when the current one is offline, failing, out of stock
+ * or too dear — and logs the move. Then, as before, the first usable mapping
+ * whose connector can actually place an order wins.
+ *
+ * `exclude` is the supplier(s) that just failed this delivery: the failover in
+ * fulfillmentService passes it, so a failed order is never handed straight back.
  */
-export async function resolveFulfillmentSupplier(productId) {
-  const rows = await all(
-    `SELECT sp.* FROM supplier_products sp
-       JOIN suppliers s ON s.id = sp.supplier_id
-      WHERE sp.product_id = @p AND s.status = 'active'
-      ORDER BY sp.priority ASC`, { p: productId });
+export async function resolveFulfillmentSupplier(productId, { orderId = null, exclude = [] } = {}) {
+  const { evaluateProduct, mappingsFor, rankCandidates } = await import('./supplierFailoverService.js');
+  const out = await evaluateProduct(productId, {
+    trigger: exclude.length ? 'failure' : 'order', orderId, exclude,
+  });
+  if (!out.route) return null;
 
-  for (const sp of rows) {
-    const okStatus = !sp.supplier_status || sp.supplier_status === 'in_stock';
-    const okStock = sp.available_stock == null || sp.available_stock > 0;
-    if (okStatus && okStock) {
-      const supplier = await getSupplier(sp.supplier_id);
-      // A supplier row with an unknown/removed connector kind must not abort the
-      // whole queue for every order — skip it and try the next mapping.
-      let connector;
-      try { connector = createConnector(supplier); }
-      catch (e) { console.error('[supplier] unusable connector', supplier?.connector_kind, e.message); continue; }
-      if (connector.supportsFulfillment) return { supplier, supplierProduct: sp };
+  const product = await get('SELECT price FROM products WHERE id=@p', { p: productId });
+  const others = (await mappingsFor(productId))
+    .filter((m) => m.id !== out.route.id && !exclude.includes(m.supplier_id));
+  const order = [out.route, ...rankCandidates(others, { priceCents: product ? Number(product.price) : null })];
+
+  for (const m of order) {
+    if (exclude.includes(m.supplier_id)) continue;
+    const supplier = await getSupplier(m.supplier_id);
+    // A supplier row with an unknown/removed connector kind must not abort the
+    // whole queue for every order — skip it and try the next mapping.
+    let connector;
+    try { connector = createConnector(supplier); }
+    catch (e) { console.error('[supplier] unusable connector', supplier?.connector_kind, e.message); continue; }
+    if (connector.supportsFulfillment) {
+      const supplierProduct = await get('SELECT * FROM supplier_products WHERE id=@id', { id: m.id });
+      return { supplier, supplierProduct };
     }
   }
   return null;

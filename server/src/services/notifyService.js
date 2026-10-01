@@ -90,6 +90,9 @@ export const EVENTS = {
      usually the address and not the mailer — it becomes loud through the storm
      rules instead, when it turns out to be all of them. */
   'fulfillment.failed': { emoji: '📦', color: 0xdc2626, priority: 1, label: 'Fulfilment failed' },
+  /* The shop moved a product to another supplier by itself. Worth knowing, not
+     worth waking anyone: the order still goes out. */
+  'supplier.switched':  { emoji: '🔀', color: 0x6366f1, priority: 0, label: 'Supplier switched' },
   'webhook.failed':     { emoji: '🔌', color: 0xdc2626, priority: 1, label: 'Payment webhook failed' },
   'email.failed':       { emoji: '📧', color: 0xf59e0b, priority: 0, label: 'Email delivery failed' },
   'system.error':       { emoji: '🚨', color: 0xef4444, priority: 1, label: 'System error' },
