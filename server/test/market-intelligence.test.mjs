@@ -194,7 +194,12 @@ console.log('\n━━ 4. Margin calculation ━━');
   const vatCfg = { ...config.market, vatPercent: 21, pricesIncludeVat: true };
   const vatFloor = P.minimumProfitablePrice(8.2, vatCfg);
   ok('VAT raises the floor only when the shop is configured to charge it',
-    vatFloor > floor && Math.abs(vatFloor - floor * 1.21) < 0.02, `${floor} → ${vatFloor}`);
+    vatFloor > floor * 1.21, `${floor} → ${vatFloor}`);
+  /* Not exactly ×1.21: the payment fee is charged on the BTW too, so the
+     floor has to cover that as well. At the floor the profit still holds. */
+  ok('…and at that floor the minimum profit still holds after BTW and a fee on the full price',
+    P.marginAt(vatFloor, 8.2, vatCfg).profitEur >= config.market.minimumProfitEur - 0.01,
+    String(P.marginAt(vatFloor, 8.2, vatCfg).profitEur));
   ok('and VAT is off by default, because this shop publishes no VAT number',
     P.vatPercentFor(config.market) === 0, String(P.vatPercentFor(config.market)));
 
