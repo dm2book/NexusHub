@@ -5,7 +5,6 @@ import { api } from '../../lib/api.js';
 import SellerIdentityCard from '../../components/admin/SellerIdentityCard.jsx';
 import KeysCard from '../../components/admin/KeysCard.jsx';
 import BackupsCard from '../../components/admin/BackupsCard.jsx';
-import AdPerformance from '../../components/admin/AdPerformance.jsx';
 import { money } from '../../lib/format.js';
 import { PageLoader } from '../../components/ui.jsx';
 
@@ -263,10 +262,15 @@ export default function Analytics() {
       {/* Which advert sold something */}
       {attr && <AttributionCard attr={attr} />}
 
-      {/* The same arrivals, joined to what the platform charged for them —
-          which is the half of "is this advert working" that no query over this
-          database can answer on its own. */}
-      <AdPerformance />
+      {/* The per-advert report — CTR, ROAS, profit, winners and losers, per
+          platform and with charts — lives on its own page now. */}
+      <div className="card p-5 mb-8 flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <h2 className="font-bold text-slate-200">Ad performance</h2>
+          <p className="text-[13px] text-slate-400 mt-0.5">Per advert and per platform, with winner, loser, CTR, revenue and profit.</p>
+        </div>
+        <Link to="/admin/growth/ads" className="text-violet-400 text-sm hover:underline">Open Ad Intelligence →</Link>
+      </div>
 
       {/* Product performance */}
       <div className="card p-6 mt-6">

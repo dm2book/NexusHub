@@ -38,6 +38,8 @@
 import { all, get, run, nowIso } from '../db/index.js';
 import { newId } from '../utils/ids.js';
 import { creativePerformance } from './attributionService.js';
+import { costCentsForMany } from './costService.js';
+import { netCents, planningVat } from './vatService.js';
 
 const n = (v) => (v == null ? null : Number(v));
 const round1 = (x) => (x == null ? null : Math.round(x * 10) / 10);
@@ -100,6 +102,70 @@ export async function recordSpend({
     { day, net: network, camp: campaign, cre: creative });
 }
 
+/* The same statuses every revenue figure here counts as a sale. */
+const PAID = "o.status IN ('payment_received','processing','awaiting_fulfillment','completed')";
+
+/**
+ * Every paid order an advert brought in, with what it left the shop BEFORE the
+ * advert's own cost: the price net of BTW (planning rate, 21% until the shop's
+ * registration says otherwise), minus what the goods cost, minus the referral
+ * commission it paid out. Null when any item on it has no cost entered — an
+ * unknown cost is unknown, never zero, and an advert's profit built on a free
+ * product would be the most flattering number on the page.
+ *
+ * Keyed the way creativePerformance() groups, and windowed on the VISIT time
+ * the same way, so a creative's profit is over exactly the purchases its row
+ * counts.
+ */
+export async function orderContributions({ days = 30 } = {}) {
+  const since = new Date(Date.now() - days * 86_400_000).toISOString();
+  const orders = await all(
+    `SELECT o.id, o.total, SUBSTRING(o.created_at, 1, 10) AS day,
+            COALESCE(v.creative_id, v.content, '—')  AS creative,
+            COALESCE(v.campaign, v.campaign_id, '—') AS campaign,
+            v.network
+       FROM orders o JOIN ad_visits v ON v.id = o.ad_visit_id
+      WHERE o.ad_visit_id IS NOT NULL AND ${PAID} AND v.created_at > @since`, { since }).catch(() => []);
+  if (!orders.length) return [];
+  const ids = orders.map((o) => o.id);
+  const [lines, commissions] = await Promise.all([
+    all(`SELECT order_id, product_id AS pid, quantity AS qty FROM order_items WHERE order_id = ANY(@ids)`, { ids }),
+    all(`SELECT order_id, commission FROM referral_events
+          WHERE kind = 'order' AND status <> 'reversed' AND order_id = ANY(@ids)`, { ids }).catch(() => []),
+  ]);
+  const costMap = await costCentsForMany([...new Set(lines.map((l) => l.pid).filter(Boolean))]);
+  const cost = new Map();
+  for (const l of lines) {
+    if (cost.get(l.order_id) === null) continue;
+    const unit = costMap[l.pid];
+    cost.set(l.order_id, unit == null ? null : (cost.get(l.order_id) || 0) + unit * (Number(l.qty) || 0));
+  }
+  const commission = new Map();
+  for (const c of commissions) commission.set(c.order_id, (commission.get(c.order_id) || 0) + Number(c.commission || 0));
+  const vat = planningVat();
+  return orders.map((o) => {
+    const c = cost.has(o.id) ? cost.get(o.id) : null;
+    return {
+      orderId: o.id, day: o.day, creative: o.creative, campaign: o.campaign, network: o.network || null,
+      revenue: Number(o.total) || 0,
+      contribution: c == null ? null : netCents(Number(o.total) || 0, vat.rate) - c - (commission.get(o.id) || 0),
+    };
+  });
+}
+
+/** Contribution per creative: the sum, and how many of its purchases it covers. */
+export async function contributionByCreative({ days = 30 } = {}) {
+  const map = new Map();
+  for (const o of await orderContributions({ days })) {
+    const k = key(o.network, o.campaign, o.creative);
+    const c = map.get(k) || { orders: 0, costed: 0, contribution: 0 };
+    c.orders += 1;
+    if (o.contribution != null) { c.costed += 1; c.contribution += o.contribution; }
+    map.set(k, c);
+  }
+  return map;
+}
+
 /** Platform numbers per creative over a window. */
 export async function spendByCreative({ days = 30 } = {}) {
   const since = new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
@@ -128,7 +194,7 @@ export async function spendByCreative({ days = 30 } = {}) {
  * `visits` is what this shop measured. `clicks` is what the platform says it
  * sent. Both are present; neither is called "clicks" on its own.
  */
-export function creativeRow(perf, platform = null) {
+export function creativeRow(perf, platform = null, contrib = null) {
   const visits = Number(perf.visits || 0);
   const purchases = Number(perf.purchases || 0);
   const revenue = Number(perf.revenue || 0);
@@ -144,6 +210,12 @@ export function creativeRow(perf, platform = null) {
      is normal; a gap of 80% is a tracking problem, not an audience problem, and
      nothing else on this page would show it. */
   const trackedPct = clicks ? round1((visits / clicks) * 100) : null;
+
+  /* What the purchases left after BTW, goods and commission — known only when
+     every one of them was costed. An advert with no purchases contributed
+     exactly nothing, which is a known zero. */
+  const contribution = purchases === 0 ? 0
+    : (contrib && contrib.costed === contrib.orders && contrib.orders >= purchases ? contrib.contribution : null);
 
   return {
     creative: perf.creative,
@@ -171,7 +243,15 @@ export function creativeRow(perf, platform = null) {
     spendCents,
     roas,
     roasBasis: spendCents == null ? 'no spend recorded — enter it or import the platform export' : null,
-    profitCents: spendCents == null ? null : revenue - spendCents,
+    /* Profit is what the advert left after EVERYTHING, its own cost included.
+       Revenue minus spend is not it: a €10 sale keeps €8.26 after BTW and
+       then pays for the goods, and calling the other €1.74 and the goods
+       "profit" is how an advert that loses money gets a bigger budget. */
+    contributionCents: contribution,
+    profitCents: spendCents == null || contribution == null ? null : contribution - spendCents,
+    profitBasis: contribution == null
+      ? `${contrib ? contrib.orders - contrib.costed : purchases} of ${purchases} purchase(s) include a product with no cost entered`
+      : (spendCents == null ? 'no spend recorded — enter it (€0 for an unpaid post) to see profit' : null),
   };
 }
 
@@ -290,8 +370,9 @@ export function gradeCreatives(rows, {
 
 /** The whole report. */
 export async function adPerformance({ days = 30, limit = 100, minVisits = 30 } = {}) {
-  const perf = await creativePerformance({ days, limit });
-  const platform = await spendByCreative({ days });
+  const [perf, platform, contrib] = await Promise.all([
+    creativePerformance({ days, limit }), spendByCreative({ days }), contributionByCreative({ days }),
+  ]);
 
   const rows = perf.map((p) => {
     /* Matched on the creative the advert was tagged with. A spend row entered
@@ -301,7 +382,7 @@ export async function adPerformance({ days = 30, limit = 100, minVisits = 30 } =
     const exact = platform.get(key(p.network, p.campaign, p.creative))
       || platform.get(key(p.network, null, p.creative))
       || null;
-    return creativeRow(p, exact);
+    return creativeRow(p, exact, contrib.get(key(p.network, p.campaign, p.creative)) || null);
   });
 
   const graded = gradeCreatives(rows, { minVisits });

@@ -88,7 +88,12 @@ console.log('\n— With the platform numbers in —');
   ok('CTR is platform clicks over impressions', r.ctr === 0.24, String(r.ctr));
   ok('…and says so', /platform clicks over impressions/.test(r.ctrBasis));
   ok('ROAS is revenue over spend', r.roas === 2, String(r.roas));
-  ok('profit is the difference', r.profitCents === 5000);
+  /* Revenue minus spend is not profit: BTW and the goods come out first. */
+  ok('revenue minus spend is not called profit', r.profitCents === null && /no cost entered/.test(r.profitBasis),
+    String(r.profitBasis));
+  const costed = creativeRow(perf(), { impressions: 50000, clicks: 120, spendCents: 5000 },
+    { orders: 10, costed: 10, contribution: 6000 });
+  ok('profit is what the sales left, minus the spend', costed.profitCents === 1000 && costed.contributionCents === 6000);
 
   /* Two kinds of click, never reconciled. The gap is the signal. */
   ok('the platform’s clicks and the shop’s landings are both kept',

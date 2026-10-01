@@ -7,6 +7,7 @@ import * as profit from '../../services/profitService.js';
 import { topCustomers, SORT_KEYS, SEGMENT_KEYS, STATUS_KEYS } from '../../services/customerValueService.js';
 import * as attribution from '../../services/attributionService.js';
 import * as adPerf from '../../services/adPerformanceService.js';
+import { adIntelligence } from '../../services/adIntelligenceService.js';
 import { z } from 'zod';
 import { audit } from '../../services/auditService.js';
 
@@ -104,6 +105,18 @@ router.get('/ads', asyncHandler(async (req, res) => {
   const days = Math.min(Number(req.query.days) || 30, 365);
   const minVisits = Math.max(1, Math.min(Number(req.query.minVisits) || 30, 10_000));
   res.json(await adPerf.adPerformance({ days, minVisits }));
+}));
+
+/**
+ * Growth → Ad Intelligence: the same report per advert and per platform, with
+ * the winner, the loser and the highest CTR, revenue and profit picked out.
+ */
+router.get('/ads/intelligence', asyncHandler(async (req, res) => {
+  const { days, minVisits } = z.object({
+    days: z.coerce.number().int().min(1).max(365).catch(30).default(30),
+    minVisits: z.coerce.number().int().min(1).max(10_000).catch(30).default(30),
+  }).parse(req.query || {});
+  res.json(await adIntelligence({ days, minVisits }));
 }));
 
 /** One measure per day per creative, for the chart. */

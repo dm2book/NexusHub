@@ -17,7 +17,7 @@ import { api } from '../../lib/api.js';
 import { useToast } from '../../context/ToastContext.jsx';
 import TimeSeriesPlot, { SeriesLegend, SERIES_COLOURS } from './TimeSeriesPlot.jsx';
 
-const money = (cents) => (cents == null ? '—' : `€${(cents / 100).toFixed(2)}`);
+const money = (cents) => (cents == null ? '—' : `${cents < 0 ? '−' : ''}€${(Math.abs(cents) / 100).toFixed(2)}`);
 const pct = (v) => (v == null ? '—' : `${v}%`);
 const nfmt = (v) => (v == null ? '—' : Number(v).toLocaleString('en-US'));
 
@@ -40,7 +40,7 @@ const METRICS = [
   { key: 'revenue', label: 'Revenue', format: money },
 ];
 
-export default function AdPerformance() {
+export default function AdPerformance({ days = 30 }) {
   const toast = useToast();
   const [report, setReport] = useState(null);
   const [metric, setMetric] = useState('roas');
@@ -51,13 +51,13 @@ export default function AdPerformance() {
     campaign: '', creative: '', impressions: '', clicks: '', spendEuro: '',
   });
 
-  const load = () => api.get('/api/admin/analytics/ads?days=30')
+  const load = () => api.get(`/api/admin/analytics/ads?days=${days}`)
     .then(setReport).catch(() => setReport({ creatives: [] }));
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [days]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    api.get(`/api/admin/analytics/ads/timeseries?metric=${metric}&days=30`)
+    api.get(`/api/admin/analytics/ads/timeseries?metric=${metric}&days=${days}`)
       .then(setChart).catch(() => setChart(null));
-  }, [metric]);
+  }, [metric, days]);
 
   const submit = async (e) => {
     e.preventDefault();
@@ -87,7 +87,7 @@ export default function AdPerformance() {
     <section className="card mb-8">
       <header className="flex items-start justify-between gap-4 px-5 py-4 border-b border-white/5">
         <div>
-          <h2 className="font-bold text-slate-200">Ad performance</h2>
+          <h2 className="font-bold text-slate-200">Per advert</h2>
           <p className="text-[13px] text-slate-400 mt-0.5 max-w-3xl">
             Arrivals, checkouts, purchases and revenue are measured here. Impressions and
             spend are not — those happen on the ad platform, so CTR and ROAS stay blank
@@ -189,8 +189,11 @@ export default function AdPerformance() {
         )}
 
         <div className="overflow-x-auto">
-          <table className="w-full text-[13px]">
-            <thead className="text-slate-400 text-left">
+          {/* Eleven columns: below this width they ran into each other, so the
+              table scrolls instead. Inline, not a new utility class — the CSS
+              budget is spent. */}
+          <table className="w-full text-[13px]" style={{ minWidth: 1040, borderSpacing: '10px 0', borderCollapse: 'separate' }}>
+            <thead className="text-slate-400 text-left whitespace-nowrap">
               <tr>
                 <th className="py-2 font-semibold">Advert</th>
                 <th className="font-semibold text-right">Views</th>
@@ -201,12 +204,13 @@ export default function AdPerformance() {
                 <th className="font-semibold text-right">Conv.</th>
                 <th className="font-semibold text-right">Revenue</th>
                 <th className="font-semibold text-right">ROAS</th>
+                <th className="font-semibold text-right">Profit</th>
                 <th className="font-semibold">Verdict</th>
               </tr>
             </thead>
             <tbody>
               {report.creatives?.length === 0 && (
-                <tr><td colSpan={10} className="py-3 text-slate-400">
+                <tr><td colSpan={11} className="py-3 text-slate-400">
                   No tagged arrivals in this window.
                 </td></tr>
               )}
@@ -236,6 +240,11 @@ export default function AdPerformance() {
                   <td className="text-right tabular-nums text-slate-200">{money(c.revenueCents)}</td>
                   <td className="text-right tabular-nums text-slate-200" title={c.roasBasis || ''}>
                     {c.roas == null ? <span className="text-slate-500">—</span> : `${c.roas}×`}
+                  </td>
+                  {/* After BTW, the goods, commission and the advert's own spend. */}
+                  <td className="text-right tabular-nums" title={c.profitBasis || ''}>
+                    {c.profitCents == null ? <span className="text-slate-500">—</span>
+                      : <span className={c.profitCents < 0 ? 'text-rose-300' : 'text-emerald-300'}>{money(c.profitCents)}</span>}
                   </td>
                   <td>
                     <span className={`inline-block rounded-full border px-2 py-0.5 text-[11px]
