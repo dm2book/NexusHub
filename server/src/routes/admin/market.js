@@ -107,6 +107,38 @@ router.get('/opportunities', requirePermission('products.read'), asyncHandler(as
   }));
 }));
 
+/**
+ * Growth → Product Opportunities.
+ *
+ * The same assessment as /opportunities, shaped for one screen: products the
+ * shop does not sell yet, grouped HIGH / MEDIUM / LOW, with the four
+ * marketplaces it is scanned on and whether each could actually be read. A
+ * marketplace without credentials is shown as unavailable rather than quietly
+ * missing — "nobody sells it" and "we could not look" are different answers.
+ *
+ * UNRATED rows (too few observations to judge) are counted, not mixed into
+ * LOW: a product the shop knows nothing about is not a bad product.
+ */
+const SCANNED = ['kinguin', 'g2a', 'eneba', 'eldorado'];
+router.get('/opportunity-scan', requirePermission('products.read'), asyncHandler(async (_req, res) => {
+  const [assessed, statuses] = await Promise.all([
+    productsToAdd({ sort: 'opportunity', limit: 500 }),
+    sourceStatuses(),
+  ]);
+  const group = (g) => assessed.products.filter((p) => p.grade === g);
+  res.set('Cache-Control', 'no-store');
+  res.json({
+    marketplaces: SCANNED.map((k) => {
+      const st = statuses.find((x) => x.key === k) || {};
+      return { key: k, label: st.label || k, status: st.status || 'unavailable', reason: st.statusReason || null };
+    }),
+    counts: assessed.counts,
+    groups: { high: group('high'), medium: group('medium'), low: group('low') },
+    unrated: assessed.counts.unrated,
+    evidence: assessed.evidence,
+  });
+}));
+
 router.post('/discovery/run', requirePermission('products.write'), asyncHandler(async (req, res) => {
   // `classifyOnly` re-runs the matching against our catalogue without asking any
   // external source — useful right after adding a product, and free.

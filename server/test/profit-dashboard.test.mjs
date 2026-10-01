@@ -246,8 +246,13 @@ console.log('\n— End to end, against real orders —');
   const bad = await product('Costed loser', 500, 700);
   const unknown = await product('Uncosted', 1000, null);
 
-  const today = new Date().toISOString();
-  const earlierThisMonth = new Date(Date.now() - 5 * 86_400_000).toISOString();
+  /* A fixed "now" in the middle of the month. This used real time and "five
+     days ago" for the earlier order, which is LAST month on the 1st to the 5th
+     of every month — the test failed five days a month whatever the code did.
+     Found on 1 October. */
+  const NOW = (() => { const t = new Date(); t.setUTCDate(15); t.setUTCHours(12, 0, 0, 0); return t.getTime(); })();
+  const today = new Date(NOW).toISOString();
+  const earlierThisMonth = new Date(NOW - 5 * 86_400_000).toISOString();
 
   await order([{ pid: good, name: 'Costed winner', qty: 2, unit: 1200 }], { createdAt: today });
   await order([{ pid: bad, name: 'Costed loser', qty: 1, unit: 500 }], { createdAt: today });
@@ -257,7 +262,7 @@ console.log('\n— End to end, against real orders —');
   await order([{ pid: good, name: 'Costed winner', qty: 9, unit: 1200 }],
     { createdAt: today, status: 'pending' });
 
-  const d = await profitDashboard();
+  const d = await profitDashboard({ now: NOW });
 
   ok('today counts today’s paid orders only',
     d.periods.today.revenue === 2400 + 500 + 1000, String(d.periods.today.revenue));
