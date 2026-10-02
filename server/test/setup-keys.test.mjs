@@ -149,7 +149,7 @@ console.log('\n— A keyring is only worth its key —');
     const r = spawnSync(process.execPath, ['-e', `
       const store = await import('${new URL('../src/services/secretStore.js', import.meta.url).pathname}');
       ${body}
-    `, '--input-type=module'], { encoding: 'utf8', env: { ...process.env, ...env } });
+    `, '--input-type=module'], { encoding: 'utf8', env: { ...process.env, DATABASE_SSL_INSECURE: 'true', ...env } });  // local DB: self-signed cert
     return (r.stdout || '').trim().split('\n').pop() + (r.stderr && !r.stdout ? r.stderr.slice(0, 200) : '');
   };
 

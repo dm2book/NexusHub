@@ -25,6 +25,32 @@ pg.types.setTypeParser(1700, (v) => (v === null ? null : Number(v))); // numeric
 // like /api/config keep working) instead of crashing the whole function at
 // cold-start with an opaque "A server error has occurred".
 let _pool = null;
+
+/**
+ * The connection string, with its TLS mode stated rather than implied.
+ *
+ * Neon's URLs say `sslmode=require`. pg 8 reads that as verify-full — the
+ * certificate IS checked — and warns that pg 9 will read it the libpq way,
+ * where `require` encrypts without checking who is on the other end. Seen in
+ * the production logs 390 times a week. Writing `verify-full` keeps exactly
+ * today's behaviour, silences the warning, and means the library upgrade
+ * cannot quietly weaken the connection. A URL that already chose
+ * (`verify-full`, `disable`, or libpq compatibility) is left alone.
+ */
+export function pgConnectionString(url) {
+  if (!url) return url;
+  try {
+    const u = new URL(url);
+    const mode = u.searchParams.get('sslmode');
+    if (u.searchParams.get('uselibpqcompat') === 'true') return url;
+    if (['prefer', 'require', 'verify-ca'].includes(mode)) {
+      u.searchParams.set('sslmode', 'verify-full');
+      return u.toString();
+    }
+    return url;
+  } catch { return url; }
+}
+
 function getPool() {
   if (_pool) return _pool;
   const connectionString = config.db.url;
@@ -33,10 +59,15 @@ function getPool() {
       'database in the Storage tab and redeploy (sets DATABASE_URL).');
   }
   _pool = new pg.Pool({
-    connectionString,
+    connectionString: pgConnectionString(connectionString),
     // Vercel/Neon poolers terminate idle connections; keep the pool small.
     max: Number(process.env.PG_POOL_MAX || 5),
-    ssl: config.db.ssl ? { rejectUnauthorized: false } : undefined,
+    /* For a URL that names no sslmode. This used to skip the certificate check
+       (rejectUnauthorized: false) — encrypted, but to whoever answered. The
+       hosted databases this runs on present publicly trusted certificates, so
+       checking costs nothing; DATABASE_SSL_INSECURE=true is the way back for a
+       self-signed one, and it has to be asked for. */
+    ssl: config.db.ssl ? { rejectUnauthorized: process.env.DATABASE_SSL_INSECURE !== 'true' } : undefined,
     // Never let a stuck connection or query burn the whole 30s serverless
     // budget (→ a 504 "An error occurred", non-JSON). Fail fast with a clean
     // error so the request can still respond normally.
