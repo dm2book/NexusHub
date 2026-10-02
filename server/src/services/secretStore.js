@@ -130,6 +130,18 @@ export const SECRETS = [
     path: ['payments', 'manual', 'paypal'], group: 'Payments', secret: false,
     why: 'A third manual fallback.' },
 
+  { id: 'tts.elevenlabsKey', label: 'ElevenLabs API key', env: 'ELEVENLABS_API_KEY',
+    path: ['tts', 'elevenlabsKey'], group: 'Ad Studio',
+    why: 'Optional. The most natural voice for video ads; without it Ad Studio uses a free voice in your browser.',
+    hint: 'From elevenlabs.io → Profile → API keys. Billed by ElevenLabs per character.' },
+  { id: 'tts.elevenlabsVoice', label: 'ElevenLabs voice ID', env: 'ELEVENLABS_VOICE_ID',
+    path: ['tts', 'elevenlabsVoice'], group: 'Ad Studio', secret: false,
+    why: 'Optional. Which ElevenLabs voice speaks the ads (Voice Library → ID).' },
+  { id: 'tts.openaiKey', label: 'OpenAI API key (voice)', env: 'OPENAI_API_KEY',
+    path: ['tts', 'openaiKey'], group: 'Ad Studio',
+    why: 'Optional. A second premium voice option for Ad Studio.',
+    hint: 'sk-… — from platform.openai.com. Billed by OpenAI.' },
+
   { id: 'email.resendApiKey', label: 'Resend API key', env: 'RESEND_API_KEY',
     path: ['email', 'resendApiKey'], group: 'Email',
     why: 'Without it a delivered code is written to a table and never reaches the buyer.',

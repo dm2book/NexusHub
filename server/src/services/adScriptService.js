@@ -145,6 +145,8 @@ export async function factsFor(productId, { now = Date.now() } = {}) {
     pack,
     amountText: pack ? `${nl(pack.n)} ${pack.unit}` : null,
     perThousand: pack && pack.n >= 100 ? eur(Math.round((price / pack.n) * 1000)) : null,
+    /* The same numbers unformatted, for anything that animates or speaks them. */
+    perThousandCents: pack && pack.n >= 100 ? Math.round((price / pack.n) * 1000) : null,
     region: (REGION.exec(p.name) || [])[1] || null,
     codeByMail: !accountField,
     accountField,
@@ -163,7 +165,8 @@ export async function factsFor(productId, { now = Date.now() } = {}) {
       : (market ? { cheaper: false, source: SOURCE[market.source_key] || market.source_key } : null),
     sibling: sibling ? { name: sibling.name, price: eur(sibling.price), amountText: `${nl(sibling.pack.n)} ${sibling.pack.unit}`,
       perThousand: eur(sibling.per), diff: eur(Math.abs(sibling.per - Math.round((price / pack.n) * 1000))),
-      cheaperPerUnit: sibling.per < Math.round((price / pack.n) * 1000) } : null,
+      cheaperPerUnit: sibling.per < Math.round((price / pack.n) * 1000),
+      priceCents: Number(sibling.price), n: sibling.pack.n, perCents: sibling.per, id: sibling.id } : null,
     stats: { rating: stats.rating ?? null, reviews: stats.reviews ?? 0, customers: stats.customers ?? 0, delivered: stats.delivered ?? 0 },
   };
 }
