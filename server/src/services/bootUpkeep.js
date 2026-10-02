@@ -39,3 +39,22 @@ export async function releaseUpkeep(key) {
   if (!key) return;
   await run(`DELETE FROM kv WHERE key = @k AND value = @v`, { k: KEY, v: JSON.stringify(key) });
 }
+
+/**
+ * At most once per `everyMs` across EVERY instance, not once per instance.
+ *
+ * The traffic-driven sweep counted its hour in a variable inside each warm
+ * instance, so five instances ran five sweeps — side by side, on one small
+ * connection pool. The last run time lives in `kv` now, and taking the slot is
+ * one statement, so two instances asking at once cannot both get it.
+ */
+export async function claimInterval(name, everyMs, { now = Date.now() } = {}) {
+  const at = new Date(now).toISOString();
+  const row = await get(
+    `INSERT INTO kv (key, value, updated_at) VALUES (@k, @v, @at)
+     ON CONFLICT (key) DO UPDATE SET value = @v, updated_at = @at
+       WHERE kv.updated_at < @cut
+     RETURNING key`,
+    { k: `interval:${name}`, v: JSON.stringify(at), at, cut: new Date(now - everyMs).toISOString() });
+  return !!row;
+}

@@ -53,6 +53,30 @@ console.log('\n— 1. Upkeep once per deploy —');
     /claimUpkeep\(deploy\)/.test(app) && /releaseUpkeep\(deploy\)/.test(app) && app.indexOf('claimUpkeep(deploy)') < app.indexOf('syncCatalogImages'));
 }
 
+console.log('\n— 1b. Background work is kept alive, and runs once for the whole shop —');
+{
+  /* Read live: "Query read timeout" on random tables, empty ones too, all
+     from [maintenance:auto] — work left running after the response, frozen
+     with the function, timing out on the thaw; and one sweep per instance. */
+  await run(`DELETE FROM kv WHERE key = 'interval:test_sweep'`);
+  const t0 = Date.now();
+  ok('the first instance in an hour gets the sweep', await boot.claimInterval('test_sweep', 3_600_000, { now: t0 }));
+  ok('…another one ten minutes later does not', !(await boot.claimInterval('test_sweep', 3_600_000, { now: t0 + 600_000 })));
+  ok('…an hour later one does again', await boot.claimInterval('test_sweep', 3_600_000, { now: t0 + 3_700_000 }));
+  const race = await Promise.all([1, 2, 3, 4].map(() => boot.claimInterval('test_sweep', 3_600_000, { now: t0 + 7_400_000 })));
+  ok('four instances at once: exactly one runs it', race.filter(Boolean).length === 1, JSON.stringify(race));
+
+  const app = read('src/app.js');
+  const sweep = app.slice(app.indexOf('let lastMaintenanceAt'), app.indexOf('// Structured request logging'));
+  ok('the traffic sweep is wrapped in waitUntil', /waitUntil\(/.test(sweep) && /runMaintenance\(\)/.test(sweep));
+  ok('…and claims its hour in the database first', sweep.indexOf("claimInterval('maintenance_auto'") < sweep.indexOf('runMaintenance()'));
+  ok('the boot upkeep is kept alive too', /waitUntil\(Promise\.resolve\(\)\.then\(async/.test(app));
+  ok('waitUntil comes from Vercel\'s own package, a dependency of the deployed bundle',
+    /from '@vercel\/functions'/.test(app) && /"@vercel\/functions"/.test(read('../package.json')));
+  const { waitUntil } = await import('@vercel/functions');
+  ok('…and is harmless off Vercel', waitUntil(Promise.resolve()) === undefined);
+}
+
 console.log('\n— 2. TLS to the database —');
 {
   const U = 'postgres://u:p@ep-x.eu-central-1.aws.neon.tech/db';

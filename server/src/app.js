@@ -7,6 +7,7 @@
  * serverless cold starts where there's no separate deploy step.
  */
 import express from 'express';
+import { waitUntil } from '@vercel/functions';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import { config } from './config/env.js';
@@ -49,7 +50,9 @@ let upkeepStarted = false;
 function startBackgroundUpkeep(wasSeeded) {
   if (upkeepStarted) return;
   upkeepStarted = true;
-  Promise.resolve().then(async () => {
+  /* waitUntil: see the self-scheduling sweep below — work left running after
+     the response is frozen with the function, and times out on the thaw. */
+  waitUntil(Promise.resolve().then(async () => {
     const t = Date.now();
     /* Once per deploy — see services/bootUpkeep.js for why. */
     const { deployKey, claimUpkeep, releaseUpkeep } = await import('./services/bootUpkeep.js');
@@ -69,7 +72,7 @@ function startBackgroundUpkeep(wasSeeded) {
       await releaseUpkeep(deploy).catch(() => {});
     }
     await logReadiness();
-  });
+  }));
 }
 
 /**
@@ -209,17 +212,31 @@ export function createApp({ lazyReady = false } = {}) {
 
   // Self-scheduling maintenance: piggyback on live traffic so OTP purges,
   // stale-order cleanup and payment reminders run WITHOUT any external cron
-  // or CRON_SECRET setup. At most once per hour per warm instance, fired
-  // after the schema is ready and never blocking the request. Vercel Cron
-  // (when configured) still works as a belt-and-braces backup.
+  // or CRON_SECRET setup. Never blocking the request. Vercel Cron still works
+  // as a belt-and-braces backup.
+  //
+  // Two things were wrong with how this ran, both read out of the production
+  // logs as "Query read timeout" on random tables — empty ones included:
+  //
+  //   it was fire-and-forget. The response went out, Vercel froze the
+  //   function with the sweep's queries in flight, and they timed out when the
+  //   instance thawed for the next request. waitUntil keeps the function alive
+  //   until the sweep settles (within the function's own time limit);
+  //
+  //   "once per hour" was per warm instance, so every instance ran its own,
+  //   side by side on one small pool. The hour is claimed in the database now
+  //   (claimInterval), once for the whole shop. The in-process check stays as
+  //   a cheap filter so a busy instance does not ask the database per request.
   let lastMaintenanceAt = 0;
   app.use((_req, _res, next) => {
     const now = Date.now();
     if (now - lastMaintenanceAt > 3_600_000) {
       lastMaintenanceAt = now;
-      runMaintenance()
-        .then((s) => console.log('[maintenance:auto]', JSON.stringify(s)))
-        .catch((e) => console.error('[maintenance:auto]', e.message));
+      waitUntil(import('./services/bootUpkeep.js')
+        .then(({ claimInterval }) => claimInterval('maintenance_auto', 3_600_000))
+        .then((mine) => (mine ? runMaintenance()
+          .then((s) => console.log('[maintenance:auto]', JSON.stringify(s))) : null))
+        .catch((e) => console.error('[maintenance:auto]', e.message)));
     }
     next();
   });
