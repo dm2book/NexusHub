@@ -11,7 +11,7 @@ import { sha256, safeEqual, randomToken } from '../utils/crypto.js';
 import { badRequest, unauthorized, tooMany } from '../utils/errors.js';
 import { sendEmailAsync } from './emailService.js';
 import { upsertUserByEmail, upsertUserByPhone, touchLogin, getUserPermissions } from './userService.js';
-import { sendSms, isValidPhone, normalizePhone, smsAvailable } from './smsService.js';
+import { sendSms, isValidPhone, normalizePhone, smsAvailable, otpSmsText, langForPhone } from './smsService.js';
 import { audit } from './auditService.js';
 
 /** Human-readable device label from a User-Agent string (best-effort). */
@@ -186,7 +186,11 @@ export async function requestPhoneOtp(phone, ctx = {}) {
       { id: newId('sms'), p, h: sha256(code), ip, exp: expires, at: nowIso() });
   await audit({ action: 'auth.sms_request', targetType: 'phone', targetId: p, metadata: { ip }, req: ctx.req });
 
-  const r = await sendSms(p, `Your ${config.email.fromName} code is ${code}. It expires in ${config.auth.otpTtlMinutes} min.`);
+  /* In the reader's language: the page's, else the one on their account, else
+     the one their number's country speaks. It was English to everyone. */
+  const known = await get('SELECT lang FROM users WHERE phone = @p', { p }).catch(() => null);
+  const lang = ctx.lang || known?.lang || langForPhone(p);
+  const r = await sendSms(p, otpSmsText(code, { lang }));
   return { sent: true, delivered: r.sent, expiresAt: expires, cooldownSeconds: 30 };
 }
 

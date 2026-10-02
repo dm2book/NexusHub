@@ -137,8 +137,36 @@ export async function pruneOutbox({ days = OUTBOX_MAX_AGE_DAYS } = {}) {
   return r?.changes ?? 0;
 }
 
+/**
+ * How long each kind of event is still worth posting, in hours.
+ *
+ * Thirty days is the right age for DELETING a row, and the wrong one for
+ * SENDING it. A bot started for the first time — or after a week offline —
+ * would post every queued drop, restock, "delivered" proof and review of the
+ * past month in one burst, pinging the Drops & Deals roles for products long
+ * sold out. The public channels' first impression would be a wall of stale
+ * news. So an event past its kind's age is retired unsent:
+ *
+ *   deals    a drop or restock is news for a day
+ *   proof    "an order just landed" is only proof while it is recent
+ *   reviews  a week is still current in a reviews channel
+ *   dm       a price alert or delivery note is stale after three days — the
+ *            buyer had the email the same minute
+ *   alerts   staff alerts: a week
+ *   leads    staff order pings keep the full thirty days: a paid order is
+ *            worth hearing about late rather than not at all
+ */
+export const OUTBOX_FRESH_HOURS = { deals: 24, proof: 48, reviews: 168, dm: 72, alerts: 168, leads: OUTBOX_MAX_AGE_DAYS * 24 };
+
 export async function claimOutbox(limit = 20) {
   const staleBefore = new Date(Date.now() - LEASE_MS).toISOString();
+  /* Retire what is too old to send, before choosing what to send. */
+  for (const [kind, hours] of Object.entries(OUTBOX_FRESH_HOURS)) {
+    const r = await run(
+      `DELETE FROM discord_outbox WHERE delivered_at IS NULL AND kind = @k AND created_at < @cut`,
+      { k: kind, cut: new Date(Date.now() - hours * 3_600_000).toISOString() }).catch(() => null);
+    if (r?.changes) console.log(`[discord] ${r.changes} ${kind} event(s) too old to post — retired unsent`);
+  }
   const rows = await all(
     `SELECT id, kind, payload FROM discord_outbox
       WHERE delivered_at IS NULL AND (claimed_at IS NULL OR claimed_at < @stale)

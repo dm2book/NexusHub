@@ -176,7 +176,8 @@ router.post('/phone/request', asyncHandler(async (req, res) => {
   if (!isValidPhone(p)) throw badRequest('Enter a valid phone number (e.g. +31612345678)');
   const taken = await get('SELECT id FROM users WHERE phone=@p AND phone_verified=1 AND id<>@me', { p, me: req.user.id });
   if (taken) throw badRequest('That phone number is already in use.');
-  const r = await requestPhoneOtp(p, { ip: req.ip, userAgent: req.get('user-agent'), req });
+  const lang = ['nl', 'en', 'de', 'fr'].includes(req.get('x-lang')) ? req.get('x-lang') : null;
+  const r = await requestPhoneOtp(p, { ip: req.ip, userAgent: req.get('user-agent'), req, lang });
   res.json({ sent: true, cooldownSeconds: r.cooldownSeconds });
 }));
 
