@@ -4,6 +4,7 @@ import { api, getAccessToken } from '../../lib/api.js';
 import { useToast } from '../../context/ToastContext.jsx';
 import { PageLoader } from '../../components/ui.jsx';
 import { loadAssets, layout, drawFrame, play } from '../../lib/adStudio/engine.js';
+import { forVoice } from '../../lib/adStudio/speak.js';
 
 /**
  * Growth → Ad Studio.
@@ -99,7 +100,9 @@ export default function AdStudio() {
           setState({ phase: 'building', note: `Stem ${i + 1}/${b.scenes.length}${['elevenlabs', 'openai'].includes(f.voice) ? '' : ' (de eerste keer laadt je browser het stemmodel, ±60 MB)'}…` });
           const blob = ['elevenlabs', 'openai'].includes(f.voice)
             ? await premiumVoice(s.voice, f.voice, b.lang)
-            : await browserVoice(s.voice, f.voice);
+            /* English brand words respelt so a Dutch voice says them in English
+               ("ForgeMarket", "V-Bucks", "Link in bio"); the caption keeps the spelling. */
+            : await browserVoice(forVoice(s.voice, b.lang, 'respell'), f.voice);
           const buf = await decode.decodeAudioData(await blob.arrayBuffer());
           vbuf[s.id] = buf; durs[s.id] = buf.duration;
         }

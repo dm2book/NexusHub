@@ -74,3 +74,44 @@ export const countText = (n, lang = 'nl') => Number(n).toLocaleString(lang === '
 
 /** The shop's address, spoken. */
 export const domain = (lang = 'nl') => (lang === 'nl' ? 'forgemarket punt n l' : 'forgemarket dot n l');
+
+/* ── English words in a Dutch voice-over ──────────────────────────────────
+   A Dutch voice reads "ForgeMarket" with a Dutch G (fˈɔrɣə…) and "V-Bucks"
+   as "vee-buks". Each brand word here has its English pronunciation twice:
+     ipa      exact English phonemes, for engines that take [[ phonemes ]]
+              (Piper on a server); measured with espeak en-us
+     respell  a Dutch spelling that a Dutch phonemizer turns into nearly the
+              same sounds, for engines that only take text (Piper in the
+              browser); each checked against espeak nl
+   Premium voices (ElevenLabs, OpenAI) are multilingual and get the text as is. */
+export const ENGLISH_TERMS = [
+  { re: /\bforge\s?market\b/gi, ipa: 'fˈɔːɹdʒ mˈɑːɹkɪt', respell: 'Fordsjmarkit' },
+  { re: /\blink in bio\b/gi, ipa: 'lˈɪŋk ɪn bˈaɪoʊ', respell: 'Link in bai-oo' },
+  { re: /\bgift ?card\b/gi, ipa: 'ɡˈɪft kˈɑːɹd', respell: 'Gift kaard' },
+  { re: /\bv-?bucks\b/gi, ipa: 'vˈiː bˈʌks', respell: 'Viebaks' },
+  { re: /\broblox\b/gi, ipa: 'ɹˈoʊblɑːks', respell: 'Rooblaks' },
+  { re: /\brobux\b/gi, ipa: 'ɹˈoʊbʌks', respell: 'Roobaks' },
+  { re: /\bsteam\b/gi, ipa: 'stˈiːm', respell: 'Stiem' },
+  { re: /\bwallet\b/gi, ipa: 'wˈɔlɪt', respell: 'Wollit' },
+  { re: /\bdiscord\b/gi, ipa: 'dˈɪskɔːɹd', respell: 'Diskord' },
+  { re: /\bnitro\b/gi, ipa: 'nˈaɪtɹoʊ', respell: 'Naitro' },
+  { re: /\bfortnite\b/gi, ipa: 'fˈɔːɹtnaɪt', respell: 'Fortnait' },
+  { re: /\bminecraft\b/gi, ipa: 'mˈaɪŋkɹæft', respell: 'Mainkraft' },
+  { re: /\bgems\b/gi, ipa: 'dʒˈɛmz', respell: 'Djems' },
+  { re: /\bcoins\b/gi, ipa: 'kˈɔɪnz', respell: 'Kojns' },
+  { re: /\bpoints\b/gi, ipa: 'pˈɔɪnts', respell: 'Pojnts' },
+  { re: /\bdiamonds\b/gi, ipa: 'dˈaɪəməndz', respell: 'Daajmonds' },
+];
+
+/**
+ * The text a voice engine should be given for `text`.
+ *   mode 'phonemes'  English words as [[ IPA ]] (Piper with phoneme input)
+ *   mode 'respell'   English words respelt for a Dutch phonemizer
+ *   mode 'plain'     unchanged (multilingual premium voices, English voices)
+ */
+export function forVoice(text, lang = 'nl', mode = 'plain') {
+  if (lang !== 'nl' || mode === 'plain') return String(text || '');
+  let out = String(text || '');
+  for (const t of ENGLISH_TERMS) out = out.replace(t.re, mode === 'phonemes' ? `[[ ${t.ipa} ]]` : t.respell);
+  return out;
+}

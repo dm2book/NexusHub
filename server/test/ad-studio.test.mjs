@@ -148,6 +148,21 @@ console.log('\n— The engine\'s timeline —');
   ok('cues are in time order', cues.every((c, i) => !i || cues[i - 1][1] <= c[1]));
 }
 
+console.log('\n— English words in a Dutch voice —');
+{
+  const line = 'Bij ForgeMarket geef je alleen je Roblox-gebruikersnaam. Duizend V-Bucks. Link in bio.';
+  const ph = speak.forVoice(line, 'nl', 'phonemes');
+  ok('as exact English phonemes for engines that take them', ph.includes('[[ fˈɔːɹdʒ mˈɑːɹkɪt ]]') && ph.includes('[[ vˈiː bˈʌks ]]')
+    && ph.includes('[[ ɹˈoʊblɑːks ]]-gebruikersnaam') && ph.includes('[[ lˈɪŋk ɪn bˈaɪoʊ ]]'), ph);
+  const rs = speak.forVoice(line, 'nl', 'respell');
+  ok('as a Dutch respelling for engines that only take text', /Fordsjmarkit/.test(rs) && /Viebaks/.test(rs) && /Link in bai-oo/.test(rs) && !/ForgeMarket/.test(rs), rs);
+  ok('lower-case "forgemarket punt n l" is caught too', /Fordsjmarkit punt/.test(speak.forVoice('forgemarket punt n l', 'nl', 'respell')));
+  ok('plain for multilingual voices, and for English', speak.forVoice(line, 'nl', 'plain') === line && speak.forVoice(line, 'en', 'phonemes') === line);
+  const page = (await import('node:fs')).readFileSync(new URL('../../src/pages/admin/AdStudio.jsx', import.meta.url), 'utf8');
+  ok('the free browser voice gets the respelling, the caption keeps the spelling',
+    /browserVoice\(forVoice\(s\.voice, b\.lang, 'respell'\)/.test(page));
+}
+
 console.log('\n— The routes —');
 const owner = newId('usr');
 await run(`INSERT INTO users (id, email, display_name, created_at, updated_at) VALUES (@id, @e, 'O', @at, @at)`, { id: owner, e: `o-${stamp}@x.dev`, at: nowIso() });
