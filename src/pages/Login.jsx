@@ -287,7 +287,7 @@ export default function Login() {
               </p>
             </div>
 
-            <OtpInput key={otpKey} onComplete={verify} disabled={busy} />
+            <OtpInput key={otpKey} onComplete={verify} disabled={busy} sms={channel === 'sms'} />
 
             {error && <p className="text-sm text-red-300 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2 text-center">{error}</p>}
 
@@ -342,7 +342,7 @@ export default function Login() {
 }
 
 /** 6 OTP boxes with auto-focus, auto-advance, backspace and full paste support. */
-function OtpInput({ onComplete, disabled }) {
+function OtpInput({ onComplete, disabled, sms = false }) {
   const [vals, setVals] = useState(Array(OTP_LEN).fill(''));
   const refs = useRef([]);
 
@@ -381,6 +381,20 @@ function OtpInput({ onComplete, disabled }) {
     refs.current[last >= 0 ? last : 0]?.focus();
     submitIfComplete(next);
   };
+
+  /* Android/Chrome: read the code straight from the SMS (WebOTP). The SMS ends
+     in "@www.forgemarket.nl #123456", so the browser hands it to this page and
+     to no other — the buyer taps "Allow" instead of switching apps to copy six
+     digits. Elsewhere the API is absent and nothing happens; iPhone offers the
+     same code above the keyboard through autocomplete="one-time-code". */
+  useEffect(() => {
+    if (!sms || typeof window === 'undefined' || !('OTPCredential' in window)) return undefined;
+    const ac = new AbortController();
+    navigator.credentials.get({ otp: { transport: ['sms'] }, signal: ac.signal })
+      .then((otp) => { if (otp?.code) onPaste(otp.code); })
+      .catch(() => { /* dismissed, timed out or aborted — typing still works */ });
+    return () => ac.abort();
+  }, [sms]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="flex justify-center gap-2"
