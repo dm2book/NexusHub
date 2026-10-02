@@ -9,6 +9,7 @@ import * as attribution from '../../services/attributionService.js';
 import * as adPerf from '../../services/adPerformanceService.js';
 import { adIntelligence } from '../../services/adIntelligenceService.js';
 import { generateAdScripts, adScriptProducts } from '../../services/adScriptService.js';
+import { studioOptions, buildStoryboard, synthesizePremium, ANGLES, PLATFORMS, LENGTHS, LANGS, VOICE_PROVIDERS } from '../../services/adStudioService.js';
 import { notFound } from '../../utils/errors.js';
 import { z } from 'zod';
 import { audit } from '../../services/auditService.js';
@@ -132,6 +133,42 @@ router.get('/ad-scripts/:productId', asyncHandler(async (req, res) => {
   const out = await generateAdScripts(String(req.params.productId).slice(0, 64));
   if (!out) throw notFound('Product not found');
   res.json(out);
+}));
+
+/**
+ * Growth → Ad Studio: the storyboard of a video ad the browser renders.
+ * Choose a product, what the ad is for, the platform, length and language.
+ */
+router.get('/ad-studio/options', asyncHandler(async (_req, res) => {
+  res.json(await studioOptions());
+}));
+router.post('/ad-studio/storyboard', asyncHandler(async (req, res) => {
+  const body = z.object({
+    productId: z.string().min(1).max(64),
+    angles: z.array(z.enum(Object.keys(ANGLES))).max(6).optional().default([]),
+    platform: z.enum(Object.keys(PLATFORMS)).catch('tiktok').default('tiktok'),
+    length: z.coerce.number().int().refine((n) => LENGTHS.includes(n)).catch(30).default(30),
+    lang: z.enum(LANGS).catch('nl').default('nl'),
+  }).parse(req.body || {});
+  const board = await buildStoryboard(body);
+  if (!board) throw notFound('Product not found');
+  res.json(board);
+}));
+/* A premium voice line, with the owner's own ElevenLabs or OpenAI key. It costs
+   money per character, so it needs write access, and the text is gated. */
+router.post('/ad-studio/voice', requirePermission('analytics.write'), asyncHandler(async (req, res) => {
+  const body = z.object({
+    text: z.string().min(1).max(600),
+    provider: z.enum(VOICE_PROVIDERS),
+    lang: z.enum(LANGS).catch('nl').default('nl'),
+    voice: z.string().max(80).nullish(),
+  }).parse(req.body || {});
+  try {
+    const audio = await synthesizePremium(body);
+    res.set('Content-Type', 'audio/mpeg').set('Cache-Control', 'no-store').send(audio);
+  } catch (e) {
+    res.status(e.status || 500).json({ error: { message: e.message } });
+  }
 }));
 
 /** One measure per day per creative, for the chart. */

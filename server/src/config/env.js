@@ -138,6 +138,13 @@ export const config = {
 
   // SMS / phone OTP via Twilio. Without credentials, phone codes are logged to
   // the server console in non-prod (so the flow is testable) and disabled in prod.
+  /* Premium voice for Ad Studio. Optional: without a key the studio uses a
+     free voice that runs in the owner's own browser. */
+  tts: {
+    elevenlabsKey: (env.ELEVENLABS_API_KEY || '').trim(),
+    elevenlabsVoice: (env.ELEVENLABS_VOICE_ID || '').trim(),
+    openaiKey: (env.OPENAI_API_KEY || '').trim(),
+  },
   sms: {
     accountSid: env.TWILIO_ACCOUNT_SID || '',
     authToken: env.TWILIO_AUTH_TOKEN || '',
