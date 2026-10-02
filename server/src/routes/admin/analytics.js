@@ -8,6 +8,8 @@ import { topCustomers, SORT_KEYS, SEGMENT_KEYS, STATUS_KEYS } from '../../servic
 import * as attribution from '../../services/attributionService.js';
 import * as adPerf from '../../services/adPerformanceService.js';
 import { adIntelligence } from '../../services/adIntelligenceService.js';
+import { generateAdScripts, adScriptProducts } from '../../services/adScriptService.js';
+import { notFound } from '../../utils/errors.js';
 import { z } from 'zod';
 import { audit } from '../../services/auditService.js';
 
@@ -117,6 +119,19 @@ router.get('/ads/intelligence', asyncHandler(async (req, res) => {
     minVisits: z.coerce.number().int().min(1).max(10_000).catch(30).default(30),
   }).parse(req.query || {});
   res.json(await adIntelligence({ days, minVisits }));
+}));
+
+/**
+ * Growth → Ad Scripts: 10 hooks, scripts and CTAs per product, built only from
+ * the product, its real orders, measured deliveries and observed prices.
+ */
+router.get('/ad-scripts', asyncHandler(async (_req, res) => {
+  res.json({ products: await adScriptProducts() });
+}));
+router.get('/ad-scripts/:productId', asyncHandler(async (req, res) => {
+  const out = await generateAdScripts(String(req.params.productId).slice(0, 64));
+  if (!out) throw notFound('Product not found');
+  res.json(out);
 }));
 
 /** One measure per day per creative, for the chart. */
