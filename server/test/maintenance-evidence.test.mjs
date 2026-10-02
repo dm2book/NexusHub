@@ -67,7 +67,9 @@ const checkUnder = (env) => {
     process.exit(0);
   `, '--input-type=module'], {
     encoding: 'utf8',
-    env: { ...process.env, CRON_SECRET: '', NODE_ENV: 'development', ...env },
+    /* The local test database presents a self-signed certificate, which a
+       "production" pool now rightly refuses; this is the explicit opt-out. */
+    env: { ...process.env, CRON_SECRET: '', NODE_ENV: 'development', DATABASE_SSL_INSECURE: 'true', ...env },
   });
   try { return JSON.parse((r.stdout || '').trim().split('\n').pop()); }
   catch { return { status: '?', detail: r.stderr }; }

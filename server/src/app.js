@@ -51,6 +51,11 @@ function startBackgroundUpkeep(wasSeeded) {
   upkeepStarted = true;
   Promise.resolve().then(async () => {
     const t = Date.now();
+    /* Once per deploy — see services/bootUpkeep.js for why. */
+    const { deployKey, claimUpkeep, releaseUpkeep } = await import('./services/bootUpkeep.js');
+    const deploy = deployKey();
+    const mine = await claimUpkeep(deploy).catch(() => true);
+    if (!mine) { await logReadiness(); return; }
     try {
       // Upgrade improved default email templates on already-seeded databases.
       // (A brand-new DB already got them synchronously via seed().)
@@ -59,7 +64,10 @@ function startBackgroundUpkeep(wasSeeded) {
       await (await import('./db/starterContent.js')).seedStarterContent();
       await (await import('./db/demoSeed.js')).syncCatalogImages();
       console.log('[boot] background upkeep done in', Date.now() - t, 'ms');
-    } catch (e) { console.error('[boot] background upkeep:', e.message); }
+    } catch (e) {
+      console.error('[boot] background upkeep:', e.message);
+      await releaseUpkeep(deploy).catch(() => {});
+    }
     await logReadiness();
   });
 }
