@@ -13,6 +13,7 @@
   },
   "//": "Backend deps live here too so a single Vercel install covers both the SPA build and the api/ serverless function (which imports server/src).",
   "dependencies": {
+    "@vercel/functions": "^3.9.9",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",

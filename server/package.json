@@ -15,15 +15,16 @@
     "test": "node test/run-all.mjs"
   },
   "dependencies": {
+    "@vercel/functions": "^3.9.9",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "jsonwebtoken": "^9.0.2",
     "nanoid": "^5.0.9",
     "nodemailer": "^6.10.0",
     "pg": "^8.13.1",
     "stripe": "^17.5.0",
-    "zod": "^3.24.1",
-    "dotenv": "^16.4.7"
+    "zod": "^3.24.1"
   }
 }
