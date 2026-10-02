@@ -412,7 +412,27 @@ default.
 3. Add the same environment variables → Create. (Use a paid instance type; the
    free tier sleeps and the bot would drop offline.)
 
-### Option C — Any VPS / Docker
+### Option C — A VPS, in one command (no Railway needed)
+For when Railway will not take your card: any Ubuntu 22.04/24.04 or Debian 12
+VPS works — pick a provider whose checkout accepts a payment method you have
+(iDEAL, PayPal, …). The smallest plan is plenty: 1 vCPU, 1 GB RAM.
+
+1. Put this `discord` folder on the server (from the zip, or `git clone`).
+2. Run, from inside it:
+   ```bash
+   sudo bash deploy/install-vps.sh
+   ```
+3. Answer the questions once: bot token, application ID, server ID and the
+   `REVIEW_INGEST_SECRET` from Vercel. They go to `/etc/forgemarket-bot.env`,
+   readable only by root and the bot.
+
+The bot then starts at boot, is restarted within seconds if it stops, and a
+watchdog restarts it when it is running but no longer connected to Discord.
+To update: put the new folder on the server and run the same command — the
+settings and the live XP and giveaways are kept.
+Logs: `sudo journalctl -u forgemarket-bot -f`.
+
+### Option D — Docker by hand
 ```bash
 # On the server, after cloning:
 cd discord
