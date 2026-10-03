@@ -130,7 +130,7 @@ const H = { authorization: `Bearer ${accessToken}`, 'content-type': 'application
   const r = await fetch(`${base}/ugc/storyboard`, { method: 'POST', headers: H, body: JSON.stringify({ scriptId: 'ugc-01', platform: 'reels' }) });
   const b = await r.json();
   ok('a storyboard: four beats in order', r.status === 200 && b.scenes.map((s) => s.type).join() === 'ugc-hook,ugc-problem,ugc-solution,ugc-cta', JSON.stringify(b).slice(0, 300));
-  ok('…14 seconds of minimum, a tight tail after each line', b.scenes.reduce((a, s) => a + s.minDur, 0) === 14 && b.scenes.every((s) => s.tail === 0.3));
+  ok('…14 seconds of minimum, a tight tail after each line', b.scenes.reduce((a, s) => a + s.minDur, 0) === 14 && b.scenes.every((s) => s.tail === 0.15));
   ok('…the picture under each line: fake login, then the checkout field', b.scenes[1].data.prop.kind === 'scam' && b.scenes[2].data.prop.kind === 'username');
   ok('…the end card is the product with its real price', b.scenes[3].data.product.price === '€9,99' && b.scenes[3].data.product.name === '1.000 Robux');
   ok('…a tracking link per script and platform', /utm_source=instagram&utm_campaign=ugc&utm_content=ugc-01$/.test(b.link), b.link);
@@ -144,7 +144,7 @@ const H = { authorization: `Bearer ${accessToken}`, 'content-type': 'application
 
   console.log('\n— The engine —');
   const tl = engine.layout(b, { '1-hook': 2.6, '2-problem': 1.0 });
-  ok('a beat lasts as long as its line plus a short tail, or its window', Math.abs(tl.scenes[0].dur - (engine.VOICE_AT + 2.6 + 0.3)) < 1e-9 && tl.scenes[1].dur === 3);
+  ok('a beat lasts as long as its line plus a short tail, or its window', Math.abs(tl.scenes[0].dur - (engine.VOICE_AT + 2.6 + 0.15)) < 1e-9 && tl.scenes[1].dur === 3);
   const cues = engine.cuesOf(tl).map((c) => c[0]);
   ok('every beat has its sound: the impact, the error buzz, the check, the riser into the end card',
     ['impact', 'buzz', 'check', 'riser', 'ding'].every((k) => cues.includes(k)), cues.join(','));
