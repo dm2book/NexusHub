@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Film, Play, Square, Download, Wand2, Info, Copy, Mic } from 'lucide-react';
+import { Film, Play, Square, Download, Wand2, Info, Copy, Mic, Video, MessageSquareQuote } from 'lucide-react';
 import { api, getAccessToken } from '../../lib/api.js';
 import { useToast } from '../../context/ToastContext.jsx';
 import { PageLoader } from '../../components/ui.jsx';
@@ -18,6 +18,10 @@ import { forVoice } from '../../lib/adStudio/speak.js';
  *
  * Every word on screen and spoken comes from the product and catalogue and has
  * passed the shop's claim gate on the server.
+ *
+ * Two ways in: a product ad (choose the product and what the ad is for), or
+ * one of the fifty UGC scripts — four beats of 10–15 seconds, with today's
+ * prices read from the catalogue, optionally over a clip you filmed yourself.
  *
  * Voices: free ones run IN this browser (Piper, open voices) — the engine and
  * the voice model are fetched from a CDN the first time, nothing is installed;
@@ -44,6 +48,9 @@ const sel = 'rounded-xl bg-white/5 border border-white/10 text-slate-200 text-sm
 export default function AdStudio() {
   const toast = useToast();
   const [opts, setOpts] = useState(null);
+  const [mode, setMode] = useState('ugc');                          // ugc | product
+  const [ugc, setUgc] = useState(null);
+  const [u, setU] = useState({ scriptId: 'ugc-01', theme: '', footage: null, footageName: '', footageAudio: false });
   const [f, setF] = useState({ productId: '', angles: [], platform: 'tiktok', length: 30, lang: 'nl', voice: 'nl_BE-rdh-medium', captions: true, music: true });
   const [board, setBoard] = useState(null);
   const [state, setState] = useState({ phase: 'idle', note: '' });   // idle | building | ready | playing | recording
@@ -57,17 +64,22 @@ export default function AdStudio() {
       const first = o.products.find((p) => /robux/i.test(p.name)) || o.products[0];
       if (first) setF((x) => ({ ...x, productId: first.id, angles: first.angles.slice(0, 3) }));
     }).catch(() => setOpts(false));
+    api.get('/api/admin/analytics/ad-studio/ugc').then(setUgc).catch(() => setUgc(false));
   }, []);
+  /* A picked clip lives only in this browser (an object URL); nothing is uploaded. */
+  useEffect(() => () => { if (u.footage) URL.revokeObjectURL(u.footage); }, [u.footage]);
+  const script = ugc?.scripts?.find((x) => x.id === u.scriptId);
+  const scripts = (ugc?.scripts || []).filter((x) => !u.theme || x.theme === u.theme);
 
   const product = opts?.products?.find((p) => p.id === f.productId);
   const voices = useMemo(() => {
     if (!opts) return [];
     const list = [{ id: 'none', label: 'Geen stem' }];
-    for (const v of opts.voices.browser.filter((x) => x.lang === f.lang)) list.push({ id: v.id, label: v.label });
+    for (const v of opts.voices.browser.filter((x) => x.lang === (mode === 'ugc' ? 'nl' : f.lang))) list.push({ id: v.id, label: v.label });
     if (opts.voices.premium.elevenlabs) list.push({ id: 'elevenlabs', label: 'ElevenLabs (premium, je eigen sleutel)' });
     if (opts.voices.premium.openai) list.push({ id: 'openai', label: 'OpenAI (premium, je eigen sleutel)' });
     return list;
-  }, [opts, f.lang]);
+  }, [opts, f.lang, mode]);
 
   const set = (k) => (e) => setF((x) => ({ ...x, [k]: e.target.type === 'checkbox' ? e.target.checked : e.target.value }));
   const toggleAngle = (a) => setF((x) => ({ ...x, angles: x.angles.includes(a) ? x.angles.filter((y) => y !== a) : [...x.angles, a] }));
@@ -79,6 +91,15 @@ export default function AdStudio() {
   const draw = (time) => {
     const m = media.current;
     if (!m.timeline || !canvas.current) return;
+    /* Scrubbing over your own clip: seek it, then draw once the frame is there. */
+    const clip = m.assets?.footage;
+    if (clip && clip.paused && clip.duration) {
+      const want = time % clip.duration;
+      if (Math.abs(clip.currentTime - want) > 0.04) {
+        clip.onseeked = () => { clip.onseeked = null; drawFrame(canvas.current.getContext('2d'), m.timeline, m.assets, Math.min(time, m.timeline.total - 1e-3), { captions: f.captions }); };
+        clip.currentTime = want;
+      }
+    }
     drawFrame(canvas.current.getContext('2d'), m.timeline, m.assets, Math.min(time, m.timeline.total - 1e-3), { captions: f.captions });
   };
 
@@ -86,12 +107,21 @@ export default function AdStudio() {
     media.current.player?.stop();
     setState({ phase: 'building', note: 'Storyboard…' });
     try {
-      const b = await api.post('/api/admin/analytics/ad-studio/storyboard',
-        { productId: f.productId, angles: f.angles, platform: f.platform, length: Number(f.length), lang: f.lang });
+      const b = mode === 'ugc'
+        ? await api.post('/api/admin/analytics/ad-studio/ugc/storyboard', { scriptId: u.scriptId, platform: f.platform })
+        : await api.post('/api/admin/analytics/ad-studio/storyboard',
+          { productId: f.productId, angles: f.angles, platform: f.platform, length: Number(f.length), lang: f.lang });
       setBoard(b);
       canvas.current.width = b.platform.w; canvas.current.height = b.platform.h;
       setState({ phase: 'building', note: 'Fonts en beelden…' });
       const assets = await loadAssets(b);
+      if (mode === 'ugc' && u.footage) {
+        setState({ phase: 'building', note: 'Je eigen video…' });
+        const v = document.createElement('video');
+        v.src = u.footage; v.muted = true; v.playsInline = true; v.preload = 'auto';
+        await new Promise((ok, no) => { v.onloadeddata = ok; v.onerror = () => no(new Error('Kon je video niet openen')); });
+        assets.footage = v;
+      }
       const decode = new (window.AudioContext || window.webkitAudioContext)();
       const vbuf = {}, durs = {};
       if (f.voice !== 'none') {
@@ -121,14 +151,16 @@ export default function AdStudio() {
     const m = media.current;
     if (!m.timeline) return;
     setState({ phase: record ? 'recording' : 'playing', note: record ? 'Opnemen in echte tijd — laat dit tabblad open…' : '' });
-    const p = play(canvas.current, m.timeline, m.assets, m.voices, { record, music: f.music, captions: f.captions, onTime: setT });
+    const p = play(canvas.current, m.timeline, m.assets, m.voices, { record, music: f.music, captions: f.captions, footageAudio: mode === 'ugc' && u.footageAudio, onTime: setT });
     m.player = p;
     const blob = await p.done;
     m.player = null;
     setState({ phase: 'ready', note: '' });
     if (record && blob) {
       const ext = blob.type.includes('mp4') ? 'mp4' : 'webm';
-      const name = `forgemarket-${(board.product.name || 'ad').toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${board.platform.id}-${Math.round(m.timeline.total)}s.${ext}`;
+      const name = board.kind === 'ugc'
+        ? `forgemarket-${board.script.id}-${board.platform.id}-${Math.round(m.timeline.total)}s.${ext}`
+        : `forgemarket-${(board.product.name || 'ad').toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${board.platform.id}-${Math.round(m.timeline.total)}s.${ext}`;
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob); a.download = name; a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 60_000);
@@ -152,6 +184,56 @@ export default function AdStudio() {
 
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="card p-5 space-y-4">
+          <div className="grid grid-cols-2 gap-2" role="tablist">
+            {[['ugc', 'UGC-scripts', MessageSquareQuote], ['product', 'Product-ad', Film]].map(([k, l, Icon]) => (
+              <button key={k} type="button" role="tab" aria-selected={mode === k} onClick={() => setMode(k)} data-testid={`mode-${k}`}
+                className={`rounded-xl border px-3 py-2 text-sm inline-flex items-center justify-center gap-2 transition
+                  ${mode === k ? 'bg-violet-500/15 border-violet-500/40 text-violet-200' : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'}`}>
+                <Icon size={14} /> {l}{k === 'ugc' && ugc ? ` (${ugc.scripts.length})` : ''}
+              </button>
+            ))}
+          </div>
+
+          {mode === 'ugc' && (ugc === false ? <p className="text-sm text-amber-300/90">Kon de UGC-scripts niet laden.</p> : ugc && (
+            <div className="space-y-3">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="text-xs text-slate-400">Thema
+                  <select value={u.theme} onChange={(e) => setU((x) => ({ ...x, theme: e.target.value }))} className={`${sel} mt-1`} name="theme">
+                    <option value="">Alle thema's</option>
+                    {Object.entries(ugc.themes).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                  </select>
+                </label>
+                <label className="text-xs text-slate-400">Script
+                  <select value={u.scriptId} onChange={(e) => setU((x) => ({ ...x, scriptId: e.target.value }))} className={`${sel} mt-1`} name="script">
+                    {scripts.map((x) => <option key={x.id} value={x.id} disabled={!x.available}>{x.id.slice(4)}. {x.title}{x.available ? '' : ' — niet beschikbaar'}</option>)}
+                  </select>
+                </label>
+              </div>
+              {script && (script.available ? (
+                <ol className="rounded-xl border border-white/10 divide-y divide-white/5 text-[13px]" data-testid="ugc-lines">
+                  {[['hook', 'Hook', '0–2s'], ['problem', 'Probleem', '2–5s'], ['solution', 'Oplossing', '5–10s'], ['cta', 'CTA', '10–15s']].map(([k, l, w]) => (
+                    <li key={k} className="px-3 py-2 flex gap-3">
+                      <span className="text-slate-500 w-24 shrink-0">{l} <span className="tabular-nums">{w}</span></span>
+                      <span className="text-slate-200">{script.lines[k]}</span>
+                    </li>
+                  ))}
+                </ol>
+              ) : <p className="text-sm text-amber-300/90 flex gap-2"><Info size={13} className="shrink-0 mt-0.5" />{script.reason}</p>)}
+              <label className="block text-xs text-slate-400"><span className="inline-flex items-center gap-1"><Video size={12} /> Eigen video eronder (optioneel)</span>
+                <input type="file" accept="video/*" name="footage" className="block mt-1 text-sm text-slate-300"
+                  onChange={(e) => { const file = e.target.files?.[0]; setU((x) => ({ ...x, footage: file ? URL.createObjectURL(file) : null, footageName: file?.name || '' })); }} />
+              </label>
+              {u.footage && (
+                <div className="flex items-center gap-4 text-sm text-slate-300">
+                  <span className="truncate text-slate-400">{u.footageName}</span>
+                  <label className="inline-flex items-center gap-2 shrink-0"><input type="checkbox" checked={u.footageAudio} onChange={(e) => setU((x) => ({ ...x, footageAudio: e.target.checked }))} /> Geluid van mijn video</label>
+                  <button type="button" className="btn-ghost text-xs shrink-0" onClick={() => setU((x) => ({ ...x, footage: null, footageName: '', footageAudio: false }))}>Weg</button>
+                </div>
+              )}
+            </div>
+          ))}
+
+          {mode === 'product' && (<>
           <label className="block text-xs text-slate-400">Product
             <select value={f.productId} onChange={set('productId')} className={`${sel} mt-1`} name="product">
               {opts.products.map((p) => <option key={p.id} value={p.id}>{p.name} — €{(p.price / 100).toFixed(2).replace('.', ',')}</option>)}
@@ -176,12 +258,15 @@ export default function AdStudio() {
             </div>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-3">
+          </>)}
+
+          <div className={`grid gap-3 ${mode === 'product' ? 'sm:grid-cols-3' : ''}`}>
             <label className="text-xs text-slate-400">Platform
               <select value={f.platform} onChange={set('platform')} className={`${sel} mt-1`} name="platform">
                 {Object.entries(opts.platforms).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
               </select>
             </label>
+            {mode === 'product' && <>
             <label className="text-xs text-slate-400">Lengte
               <select value={f.length} onChange={set('length')} className={`${sel} mt-1`} name="length">
                 {opts.lengths.map((l) => <option key={l} value={l}>tot {l} sec</option>)}
@@ -192,6 +277,7 @@ export default function AdStudio() {
                 <option value="nl">Nederlands</option><option value="en">English</option>
               </select>
             </label>
+            </>}
           </div>
 
           <label className="block text-xs text-slate-400"><span className="inline-flex items-center gap-1"><Mic size={12} /> Stem</span>
@@ -204,12 +290,13 @@ export default function AdStudio() {
             <label className="inline-flex items-center gap-2"><input type="checkbox" checked={f.music} onChange={set('music')} /> Beat</label>
           </div>
 
-          <button onClick={build} disabled={busy || !f.productId} className="btn-primary w-full disabled:opacity-40" data-testid="build">
+          <button onClick={build} disabled={busy || (mode === 'product' ? !f.productId : !script?.available)} className="btn-primary w-full disabled:opacity-40" data-testid="build">
             <Wand2 size={16} /> {state.phase === 'building' ? state.note : 'Maak de ad'}
           </button>
 
           {board && (
             <div className="text-[12.5px] space-y-2">
+              {board.kind === 'ugc' && <p className="text-slate-400">Script {board.script.id.slice(4)} · {board.product.name} · {Math.round(media.current.timeline?.total || board.estimatedSeconds)} sec</p>}
               {board.angles.skipped.map((s) => (
                 <p key={s.angle} className="text-amber-300/90 flex gap-2"><Info size={13} className="shrink-0 mt-0.5" />{opts.angles[s.angle]?.[f.lang]}: {s.reason}</p>
               ))}
