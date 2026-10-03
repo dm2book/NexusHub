@@ -39,12 +39,17 @@ export function makeUgcScenes(h) {
     return ws.map((w, i) => { const t = VOICE_AT + (acc / total) * scene.voiceDur; acc += weights[i]; return { w, t }; });
   }
 
+  /* The words a viewer's eye should land on: the frustration and the money.
+     Marked yellow in the caption box, the way creators mark them by hand. */
+  const KEY = /^(gratis|nooit|niks|nep|fout\w*|wachtwoord\w*|account\w*|angst|bang|kwijt|verkeerde?|duur|zonde|teveel|te|veel|n\u00f3g|\u00e9cht|weg|pech|alleen|gebruikersnaam\w*|gast|geld|terug|scheelt|elke|steeds)[.,!?\u2026:"]*$/i;
+  const isMoney = (w) => /\u20ac\s?\d/.test(w);   // €, escaped: survives any charset
+
   /**
    * White rounded boxes with black type, one per line, growing as each word
    * is spoken; the newest word pops. `all` shows the whole line at once (the
    * hook: the first frame is the thumbnail).
    */
-  function boxed(ctx, G, scene, text, y, { u, px = 70, all = false, center = true, maxW = G.width, accentLast = null } = {}) {
+  function boxed(ctx, G, scene, text, y, { u, px = 78, all = false, center = true, maxW = G.width, accentLast = null, A: A0 = { accent: '#22c55e' } } = {}) {
     const times = wordTimes(text, scene);
     const size = px * G.u;
     ctx.save();
@@ -81,7 +86,12 @@ export function makeUgcScenes(h) {
         ctx.save();
         /* Grows from its left edge, so a popping word never eats the space before the next. */
         ctx.translate(x, ly - size * 0.32); ctx.scale(pop, pop);
-        ctx.fillStyle = accentLast && last ? accentLast : INK;
+        const money = isMoney(v.w), key = !money && KEY.test(v.w) && v.w.length > 3;
+        if (money || key) {
+          roundRect(ctx, -8 * G.u, -size * 0.66, v.ww + 16 * G.u, size * 1.08, 10 * G.u);
+          ctx.fillStyle = money ? A0.accent : '#facc15'; ctx.fill();
+        }
+        ctx.fillStyle = money ? '#ffffff' : accentLast && last ? accentLast : INK;
         ctx.fillText(v.w, 0, size * 0.32);
         ctx.restore();
         x += v.ww + space;
@@ -89,6 +99,28 @@ export function makeUgcScenes(h) {
     });
     ctx.restore();
     return { lines: lines.length, bottom: y + (lines.length - 1) * lh + size * 0.3 + padY };
+  }
+
+  /**
+   * A slow wall of the product's own icon behind the picture: faint copies
+   * drifting upward at their own speeds, so the frame is never an empty
+   * gradient.
+   */
+  const WALL = [[0.08, 0.10, 210, 0.9], [0.84, 0.18, 170, 1.3], [0.22, 0.52, 150, 1.1], [0.92, 0.58, 230, 0.8],
+    [0.10, 0.86, 190, 1.2], [0.70, 0.92, 160, 1.0], [0.50, 0.30, 130, 1.4]];
+  function wall(ctx, G, A, img) {
+    if (!img || A.footage) return;
+    ctx.save();
+    for (const [fx, fy, size, sp] of WALL) {
+      const yy = ((fy - A.t * 0.018 * sp) % 1 + 1) % 1;
+      const sz = size * G.u;
+      ctx.globalAlpha = 0.07 + 0.03 * Math.sin(A.t * sp + fx * 7);
+      ctx.save();
+      ctx.translate(G.W * fx, -sz + yy * (G.H + 2 * sz)); ctx.rotate(Math.sin(A.t * 0.4 * sp + fy * 5) * 0.35);
+      ctx.drawImage(img, -sz / 2, -sz / 2, sz, sz);
+      ctx.restore();
+    }
+    ctx.restore();
   }
 
   /** The top of a picture `hh` tall, centred in the space under the spoken line. */
@@ -391,9 +423,44 @@ export function makeUgcScenes(h) {
     packs(ctx, G, d, u, A) {
       const items = d.packs || [];
       const hh = (items.length <= 2 ? 250 : 200) * G.u, gap = 40 * G.u;
-      const y0 = top(G, items.length * hh + (items.length - 1) * gap);
+      const first = items[0], last = items[items.length - 1];
+      /* When the row is a real comparison, the sum itself, big, under the tiles:
+         the dearest price per 1.000 struck through, the better one lit. */
+      const sum = d.highlight && first?.per && last?.per && first !== last;
+      const blockH = items.length * hh + (items.length - 1) * gap + (sum ? 300 * G.u : 0);
+      const y0 = top(G, blockH);
       items.forEach((it, i) => tile(ctx, G, A, G.left, y0 + i * (hh + gap), G.width, hh, it,
         { u, p0: 0.1 + i * 0.28, strong: d.highlight && i === items.length - 1 }));
+      if (!sum) return;
+      const t0 = 0.3 + items.length * 0.28;
+      const p = at(u, t0, 0.4);
+      if (p <= 0) return;
+      const yy = y0 + items.length * (hh + gap) + 150 * G.u;
+      ctx.save();
+      ctx.globalAlpha *= eo(p);
+      ctx.textBaseline = 'alphabetic';
+      ctx.font = fontOf(120 * G.u);
+      const a1 = first.per, a2 = last.per, arrow = '  \u2192  ';
+      const w1 = ctx.measureText(a1).width, wa = ctx.measureText(arrow).width, w2 = ctx.measureText(a2).width;
+      const k = Math.min(1, G.width / (w1 + wa + w2));
+      ctx.translate(G.W / 2, yy); ctx.scale(k, k);
+      let x = -(w1 + wa + w2) / 2;
+      ctx.fillStyle = '#a9a3c9'; ctx.fillText(a1, x, 0);
+      const strike = eio(at(u, t0 + 0.3, 0.25));
+      ctx.fillStyle = '#f43f5e'; ctx.fillRect(x - 6 * G.u, -44 * G.u, (w1 + 12 * G.u) * strike, 12 * G.u);
+      x += w1;
+      ctx.fillStyle = '#ffffff'; ctx.fillText(arrow, x, 0); x += wa;
+      const pop = 1 + 0.3 * (1 - back(at(u, t0 + 0.55, 0.3)));
+      ctx.save(); ctx.translate(x + w2 / 2, -40 * G.u); ctx.scale(pop, pop);
+      ctx.fillStyle = A.accent; ctx.shadowColor = `${A.accent}aa`; ctx.shadowBlur = 40 * G.u;
+      ctx.textAlign = 'center'; ctx.fillText(a2, 0, 40 * G.u); ctx.restore();
+      ctx.restore();
+      ctx.save();
+      ctx.globalAlpha *= eo(p);
+      ctx.font = fontOf(42 * G.u, 'Raj', '600'); ctx.letterSpacing = `${6 * G.u}px`;
+      ctx.fillStyle = '#ffffff'; ctx.textAlign = 'center';
+      ctx.fillText('PER 1.000', G.W / 2, yy + 80 * G.u);
+      ctx.restore();
     },
     /* The code, in your inbox. */
     mailcode(ctx, G, d, u, A) {
@@ -522,6 +589,7 @@ export function makeUgcScenes(h) {
 
   return {
     'ugc-hook'(ctx, G, d, u, A, scene) {
+      wall(ctx, G, A, A.img(d.image));
       if (!A.footage) {
         /* The thing it is about, huge and faint behind everything, drifting. */
         if (d.word) {
@@ -534,22 +602,26 @@ export function makeUgcScenes(h) {
         }
         hero(ctx, G, A.img(d.image), G.W / 2, Y(G, 0.80), 420, { u: u + 10, accent: A.accent, t: A.t });
       }
-      /* On screen from frame 0, and punching in. */
+      /* On screen from frame 0, punching in with a short shake. */
       const s = 1 + 0.12 * (1 - eo(u / 0.35));
+      const shake = u < 0.3 ? Math.sin(u * 95) * 9 * G.u * (1 - u / 0.3) : 0;
       ctx.save();
-      ctx.translate(G.W / 2, Y(G, 0.42)); ctx.scale(s, s); ctx.translate(-G.W / 2, -Y(G, 0.42));
-      boxed(ctx, G, scene, d.text, A.footage ? Y(G, 0.18) : Y(G, 0.26), { u, px: 84, all: true });
+      ctx.translate(G.W / 2 + shake, Y(G, 0.42)); ctx.scale(s, s); ctx.translate(-G.W / 2, -Y(G, 0.42));
+      boxed(ctx, G, scene, d.text, A.footage ? Y(G, 0.18) : Y(G, 0.24), { u, px: 96, all: true, A });
       ctx.restore();
     },
     'ugc-problem'(ctx, G, d, u, A, scene) {
+      wall(ctx, G, A, A.img(d.image));
       (PROBLEM[d.prop?.kind] || PROBLEM.text)(ctx, G, { ...d.prop, image: d.image, product: d.product }, u, A);
-      boxed(ctx, G, scene, d.text, textTop(G), { u });
+      boxed(ctx, G, scene, d.text, textTop(G), { u, A });
     },
     'ugc-solution'(ctx, G, d, u, A, scene) {
+      wall(ctx, G, A, A.img(d.image));
       (SOLUTION[d.prop?.kind] || SOLUTION.text)(ctx, G, { ...d.prop, image: d.image, product: d.product }, u, A);
-      boxed(ctx, G, scene, d.text, textTop(G), { u });
+      boxed(ctx, G, scene, d.text, textTop(G), { u, A });
     },
     'ugc-cta'(ctx, G, d, u, A, scene) {
+      wall(ctx, G, A, A.img(d.image));
       const it = d.product || {};
       const x = G.left + 40 * G.u, w = G.width - 80 * G.u, y = Y(G, 0.27), hh = 640 * G.u;
       ctx.save();
@@ -593,7 +665,7 @@ export function makeUgcScenes(h) {
         ctx.restore();
         sweep(ctx, bx, by, bw, bh, u, 1.1, bh / 2);
       }
-      boxed(ctx, G, scene, d.text, textTop(G), { u });
+      boxed(ctx, G, scene, d.text, textTop(G), { u, A });
     },
   };
 }

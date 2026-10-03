@@ -158,7 +158,7 @@ export async function buildUgcBoard({ scriptId, platform = 'tiktok' } = {}) {
     },
     voice: r.lines[b].voice,
     minDur: BEAT_DUR[b],
-    tail: 0.3,
+    tail: 0.15,
   }));
   const base = (config.appUrl || 'https://www.forgemarket.nl').replace(/\/$/, '');
   return {
