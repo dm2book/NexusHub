@@ -621,6 +621,17 @@ export function commerceBlockers() {
     if (/^test_/.test(config.payments.mollie.apiKey)) {
       reasons.push('MOLLIE_API_KEY is a test key, so no payment would be real (use the live key)');
     }
+    /* The same for Stripe — but only once the shop is open: before the launch
+       date a test key is how the owner tries the checkout on the real site. */
+    const launched = !config.launch.date || Date.now() >= new Date(config.launch.date).getTime();
+    if (launched && /^sk_test_/.test(config.payments.stripe.secretKey)) {
+      reasons.push('STRIPE_SECRET_KEY is a test key, so no payment would be real (use the live sk_live_ key)');
+    }
+  }
+  /* A Stripe key without its webhook secret takes the money and never hears
+     about it: every webhook is refused, so no order is ever marked paid. */
+  if (config.payments.stripe.secretKey && !config.payments.stripe.webhookSecret) {
+    reasons.push('STRIPE_WEBHOOK_SECRET is missing, so paid orders would never be marked paid');
   }
   return reasons;
 }

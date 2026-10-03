@@ -33,7 +33,7 @@ import { memberDiscountPercent } from './membershipService.js';
 import { recordOrderCommission, reverseOrderCommission } from './affiliateService.js';
 import { recordPurchaseEvent } from './socialProofService.js';
 import { bustSocialCaches } from '../routes/social.js';
-import { balanceOf, debit, credit, hasOrderEntry } from './walletService.js';
+import { balanceOf, debit, credit, hasOrderEntry, spentOnOrder } from './walletService.js';
 import { grantTierRewards } from './loyaltyService.js';
 import { awardCoinsForOrder } from './forgeCoinService.js';
 import { settleMysteryForOrder } from './mysteryBoxService.js';
@@ -108,7 +108,9 @@ export async function createOrder(input, ctx = {}) {
   const number = newOrderNumber();
   const at = nowIso();
   let subtotal = 0;
-  const currency = input.currency || 'EUR';
+  /* Every price in the catalogue is in euro cents. The currency is never the
+     buyer's to choose: an order in KRW would charge 5000 won for a €50 card. */
+  const currency = 'EUR';
   const lineItems = [];
   /* What this order still needs from the buyer before it can be delivered —
      "Roblox-gebruikersnaam" and the like. Collected while walking the items so
@@ -197,7 +199,13 @@ export async function createOrder(input, ctx = {}) {
     creditApplied = Math.max(0, Math.min(Math.round(Number(input.useCredit) || 0), bal, afterDiscount));
   }
   const total = Math.max(0, afterDiscount - creditApplied);
-  const billing = { ...(input.billing || {}) };
+  /* Only what the buyer may tell us. Every money field on `billing` (credit,
+     discounts, coupon) is set by the server below; copying the client's object
+     whole let a buyer write `creditApplied` and be paid it back on cancel. */
+  const BUYER_FIELDS = ['full_name', 'city', 'lang', 'deliveryMethod', 'deliveryDetails', 'deliveryLabel'];
+  const billing = Object.fromEntries(BUYER_FIELDS
+    .filter((k) => input.billing?.[k] != null && typeof input.billing[k] !== 'object')
+    .map((k) => [k, input.billing[k]]));
   // Bound the free-text billing fields (they flow into emails and admin views).
   if (billing.full_name) billing.full_name = String(billing.full_name).trim().slice(0, 80);
   if (billing.city) billing.city = String(billing.city).trim().slice(0, 80);
@@ -562,9 +570,12 @@ export async function transitionOrder(orderId, to, ctx = {}) {
     bustSocialCaches();
   }
 
-  if ((to === 'refunded' || to === 'cancelled') && updated.userId && updated.billing?.creditApplied > 0) {
-    if (!(await hasOrderEntry(orderId, 'refund').catch(() => true))) {
-      await credit(updated.userId, updated.billing.creditApplied, 'refund',
+  /* Give back exactly what the ledger shows this order took from the wallet —
+     never a number stored on the order, which is only a copy. */
+  if ((to === 'refunded' || to === 'cancelled') && updated.userId) {
+    const spent = await spentOnOrder(orderId).catch(() => 0);
+    if (spent > 0 && !(await hasOrderEntry(orderId, 'refund').catch(() => true))) {
+      await credit(updated.userId, spent, 'refund',
         `Store credit returned · order ${updated.number}`, { orderId }).catch((e) => console.error('[wallet refund]', e.message));
     }
   }

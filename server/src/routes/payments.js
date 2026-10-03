@@ -30,13 +30,15 @@
  * by the provider's own id first, and a repeat is recognised as a repeat.
  */
 import { Router } from 'express';
-import { constructEvent } from '../services/stripeService.js';
+import { constructEvent, isTestKey } from '../services/stripeService.js';
 import { getOrder, markPaymentReceived, setPspPayment } from '../services/orderService.js';
 import { settleAsRefunded } from '../services/refundSettlement.js';
 import { recordChargeback } from '../services/chargebackService.js';
 import { audit } from '../services/auditService.js';
 import { run, get, nowIso } from '../db/index.js';
 import { newId } from '../utils/ids.js';
+import { alertOwner } from '../services/notifyService.js';
+import { config } from '../config/env.js';
 
 const router = Router();
 
@@ -50,9 +52,20 @@ const router = Router();
  */
 async function claim(provider, event) {
   const existing = await get(
-    `SELECT id, outcome FROM webhook_events WHERE provider=@p AND event_id=@e`,
+    `SELECT id, outcome, received_at FROM webhook_events WHERE provider=@p AND event_id=@e`,
     { p: provider, e: event.id });
-  if (existing) return { fresh: false, outcome: existing.outcome };
+  if (existing) {
+    /* A claim is only final once the work behind it finished. An event whose
+       handler failed, or whose run was killed half-way (a function timeout
+       leaves the outcome empty), is taken again by the provider's retry —
+       answering "duplicate" there is how a paid order stays pending forever. */
+    const stale = !existing.outcome && Date.now() - new Date(existing.received_at).getTime() > 60_000;
+    if (stale || /^error/.test(existing.outcome || '')) {
+      await run(`UPDATE webhook_events SET outcome=NULL, received_at=@at WHERE id=@id`, { id: existing.id, at: nowIso() });
+      return { fresh: true };
+    }
+    return { fresh: false, outcome: existing.outcome };
+  }
   try {
     await run(
       `INSERT INTO webhook_events (id, provider, event_id, event_type, received_at)
@@ -87,9 +100,40 @@ async function orderFor({ metadata, client_reference_id: ref, payment_intent: pi
   return null;
 }
 
-async function markPaid(order, session, why) {
+/**
+ * Paid — but only for the amount, the currency and the mode this order was
+ * sold in. A session paid in another currency, for another amount, or a test
+ * payment arriving at a live shop is not this order's payment.
+ */
+async function markPaid(order, session, why, event) {
   if (!order) return 'order not found';
-  if (order.status !== 'pending') return 'already settled';
+  const mismatch = [];
+  if (session.amount_total != null && Number(session.amount_total) !== Number(order.total)) mismatch.push(`amount ${session.amount_total} ≠ ${order.total}`);
+  if (session.currency && String(session.currency).toUpperCase() !== String(order.currency || 'EUR').toUpperCase()) mismatch.push(`currency ${session.currency} ≠ ${order.currency}`);
+  if (event && typeof event.livemode === 'boolean' && event.livemode === isTestKey()) mismatch.push(`livemode ${event.livemode} with a ${isTestKey() ? 'test' : 'live'} key`);
+  if (mismatch.length) {
+    alertOwner('webhook.failed', {
+      title: `Stripe payment does not match order ${order.number}`,
+      lines: [...mismatch, 'The order was NOT marked paid. Check the payment in Stripe.'],
+      url: `${config.appUrl}/admin/orders`, key: `mismatch-${session.id}`,
+    }).catch(() => {});
+    return `not paid: ${mismatch.join('; ')}`;
+  }
+  if (order.status !== 'pending') {
+    /* A second payment for an order that is already settled — a second
+       checkout session, or one that settled after the order was cancelled.
+       The money arrived; someone has to give it back. */
+    const ref = session.payment_intent || session.id;
+    if (ref && order.paymentRef && ref !== order.paymentRef) {
+      alertOwner('webhook.failed', {
+        title: `Second payment for order ${order.number}`,
+        lines: [`Order status: ${order.status}`, `Payment ${ref} is not the one on the order (${order.paymentRef}).`, 'Refund it in Stripe.'],
+        url: `${config.appUrl}/admin/orders`, key: `double-${ref}`,
+      }).catch(() => {});
+      return 'extra payment on a settled order — owner alerted';
+    }
+    return 'already settled';
+  }
   await markPaymentReceived(order.id, session.payment_intent || session.id,
     { actorId: 'stripe', reason: why });
   await audit({ actor: { id: 'stripe', email: 'stripe' }, action: 'order.payment_received',
@@ -125,7 +169,7 @@ router.post('/stripe/webhook', async (req, res) => {
            this is 'unpaid' here and becomes 'paid' minutes to days later, on
            checkout.session.async_payment_succeeded. */
         if (obj.payment_status === 'paid') {
-          outcome = await markPaid(order, obj, 'Stripe payment confirmed');
+          outcome = await markPaid(order, obj, 'Stripe payment confirmed', event);
         } else {
           outcome = `awaiting settlement (${obj.payment_status})`;
           if (order) {
@@ -139,7 +183,7 @@ router.post('/stripe/webhook', async (req, res) => {
       case 'checkout.session.async_payment_succeeded': {
         const order = await orderFor(obj);
         orderId = order?.id ?? null;
-        outcome = await markPaid(order, obj, 'Stripe payment settled');
+        outcome = await markPaid(order, obj, 'Stripe payment settled', event);
         break;
       }
 
@@ -200,8 +244,16 @@ router.post('/stripe/webhook', async (req, res) => {
     }
   } catch (err) {
     console.error('[stripe] handler error:', err.message);
-    outcome = `error: ${err.message}`;
-    // 200 anyway so Stripe doesn't retry a non-retryable app error indefinitely.
+    /* Recorded as an error, which claim() hands back to the next delivery,
+       and answered 500 so Stripe makes that delivery. Answering 200 here left
+       a paid order pending with the retry dismissed as a duplicate. */
+    await finish('stripe', event, `error: ${String(err.message).slice(0, 200)}`, orderId);
+    alertOwner('webhook.failed', {
+      title: `Stripe webhook failed: ${event.type}`,
+      lines: [`Error: ${String(err.message || 'unknown').slice(0, 200)}`, 'Stripe will retry; we answered 500 so that it does.'],
+      url: `${config.appUrl}/admin/payments`, key: event.id,
+    }).catch(() => {});
+    return res.status(500).json({ received: false });
   }
 
   await finish('stripe', event, outcome, orderId);
