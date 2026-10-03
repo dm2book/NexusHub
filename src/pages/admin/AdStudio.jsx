@@ -43,6 +43,10 @@ async function premiumVoice(text, provider, lang) {
   return r.blob();
 }
 
+/* The UGC ads' languages, and the free in-browser voice for each. */
+const UGC_LANGS = [['nl', 'Nederlands'], ['en', 'English'], ['de', 'Deutsch'], ['fr', 'Français']];
+const FREE_VOICE = { nl: 'nl_BE-rdh-medium', en: 'en_US-ryan-medium', de: 'de_DE-thorsten-medium', fr: 'fr_FR-siwis-medium' };
+
 const sel = 'rounded-xl bg-white/5 border border-white/10 text-slate-200 text-sm h-10 px-3 w-full';
 
 export default function AdStudio() {
@@ -50,7 +54,7 @@ export default function AdStudio() {
   const [opts, setOpts] = useState(null);
   const [mode, setMode] = useState('ugc');                          // ugc | product
   const [ugc, setUgc] = useState(null);
-  const [u, setU] = useState({ scriptId: 'ugc-01', theme: '', footage: null, footageName: '', footageAudio: false });
+  const [u, setU] = useState({ scriptId: 'ugc-01', theme: '', lang: 'nl', voice: 'free', footage: null, footageName: '', footageAudio: false });
   const [f, setF] = useState({ productId: '', angles: [], platform: 'tiktok', length: 30, lang: 'nl', voice: 'nl_BE-rdh-medium', captions: true, music: true });
   const [board, setBoard] = useState(null);
   const [state, setState] = useState({ phase: 'idle', note: '' });   // idle | building | ready | playing | recording
@@ -64,8 +68,12 @@ export default function AdStudio() {
       const first = o.products.find((p) => /robux/i.test(p.name)) || o.products[0];
       if (first) setF((x) => ({ ...x, productId: first.id, angles: first.angles.slice(0, 3) }));
     }).catch(() => setOpts(false));
-    api.get('/api/admin/analytics/ad-studio/ugc').then(setUgc).catch(() => setUgc(false));
   }, []);
+  /* The scripts as they read in the chosen language ("all" previews Dutch). */
+  const listLang = u.lang === 'all' ? 'nl' : u.lang;
+  useEffect(() => {
+    api.get(`/api/admin/analytics/ad-studio/ugc?lang=${listLang}`).then(setUgc).catch(() => setUgc(false));
+  }, [listLang]);
   /* A picked clip lives only in this browser (an object URL); nothing is uploaded. */
   useEffect(() => () => { if (u.footage) URL.revokeObjectURL(u.footage); }, [u.footage]);
   const script = ugc?.scripts?.find((x) => x.id === u.scriptId);
@@ -103,12 +111,18 @@ export default function AdStudio() {
     drawFrame(canvas.current.getContext('2d'), m.timeline, m.assets, Math.min(time, m.timeline.total - 1e-3), { captions: f.captions });
   };
 
-  const build = async () => {
+  /* Build one ad and get it ready to play. A UGC ad is built in `lang`; its
+     voice is the free one for that language unless a premium one was chosen.
+     Returns the storyboard, or null when it failed (and said why). */
+  const build = async (lang) => {
     media.current.player?.stop();
-    setState({ phase: 'building', note: 'Storyboard…' });
+    const L = lang || listLang;
+    const tag = mode === 'ugc' && u.lang === 'all' ? `${L.toUpperCase()} · ` : '';
+    const voiceId = mode === 'ugc' ? (u.voice === 'free' ? FREE_VOICE[L] : u.voice) : f.voice;
+    setState({ phase: 'building', note: `${tag}Storyboard…` });
     try {
       const b = mode === 'ugc'
-        ? await api.post('/api/admin/analytics/ad-studio/ugc/storyboard', { scriptId: u.scriptId, platform: f.platform })
+        ? await api.post('/api/admin/analytics/ad-studio/ugc/storyboard', { scriptId: u.scriptId, platform: f.platform, lang: L })
         : await api.post('/api/admin/analytics/ad-studio/storyboard',
           { productId: f.productId, angles: f.angles, platform: f.platform, length: Number(f.length), lang: f.lang });
       setBoard(b);
@@ -124,15 +138,15 @@ export default function AdStudio() {
       }
       const decode = new (window.AudioContext || window.webkitAudioContext)();
       const vbuf = {}, durs = {};
-      if (f.voice !== 'none') {
+      if (voiceId !== 'none') {
         for (const [i, s] of b.scenes.entries()) {
           if (!s.voice) continue;
-          setState({ phase: 'building', note: `Stem ${i + 1}/${b.scenes.length}${['elevenlabs', 'openai'].includes(f.voice) ? '' : ' (de eerste keer laadt je browser het stemmodel, ±60 MB)'}…` });
-          const blob = ['elevenlabs', 'openai'].includes(f.voice)
-            ? await premiumVoice(s.voice, f.voice, b.lang)
+          setState({ phase: 'building', note: `${tag}Stem ${i + 1}/${b.scenes.length}${['elevenlabs', 'openai'].includes(voiceId) ? '' : ' (de eerste keer per taal laadt je browser het stemmodel, ±60 MB)'}…` });
+          const blob = ['elevenlabs', 'openai'].includes(voiceId)
+            ? await premiumVoice(s.voice, voiceId, b.lang)
             /* English brand words respelt so a Dutch voice says them in English
                ("ForgeMarket", "V-Bucks", "Link in bio"); the caption keeps the spelling. */
-            : await browserVoice(forVoice(s.voice, b.lang, 'respell'), f.voice);
+            : await browserVoice(forVoice(s.voice, b.lang, 'respell'), voiceId);
           const buf = await decode.decodeAudioData(await blob.arrayBuffer());
           vbuf[s.id] = buf; durs[s.id] = buf.duration;
         }
@@ -141,13 +155,28 @@ export default function AdStudio() {
       media.current = { assets, voices: vbuf, timeline: layout(b, durs), player: null };
       setT(0); draw(0.6);
       setState({ phase: 'ready', note: '' });
+      return b;
     } catch (e) {
       setState({ phase: 'idle', note: '' });
-      toast.error(e.message || 'Kon de ad niet maken');
+      toast.error(`${tag}${e.message || 'Kon de ad niet maken'}`);
+      return null;
     }
   };
 
-  const run = async (record) => {
+  /* "All languages": build and record the same script in each, one after the
+     other, each downloaded as its own file. Recording is real time. */
+  const makeAll = async () => {
+    let done = 0;
+    for (const [L] of UGC_LANGS) {
+      const b = await build(L);
+      if (!b) continue;
+      await run(true, b);
+      done++;
+    }
+    toast.success(`${done} van ${UGC_LANGS.length} video's gedownload.`);
+  };
+
+  const run = async (record, b = board) => {
     const m = media.current;
     if (!m.timeline) return;
     setState({ phase: record ? 'recording' : 'playing', note: record ? 'Opnemen in echte tijd — laat dit tabblad open…' : '' });
@@ -158,9 +187,9 @@ export default function AdStudio() {
     setState({ phase: 'ready', note: '' });
     if (record && blob) {
       const ext = blob.type.includes('mp4') ? 'mp4' : 'webm';
-      const name = board.kind === 'ugc'
-        ? `forgemarket-${board.script.id}-${board.platform.id}-${Math.round(m.timeline.total)}s.${ext}`
-        : `forgemarket-${(board.product.name || 'ad').toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${board.platform.id}-${Math.round(m.timeline.total)}s.${ext}`;
+      const name = b.kind === 'ugc'
+        ? `forgemarket-${b.script.id}-${b.lang}-${b.platform.id}-${Math.round(m.timeline.total)}s.${ext}`
+        : `forgemarket-${(b.product.name || 'ad').toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${b.platform.id}-${Math.round(m.timeline.total)}s.${ext}`;
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob); a.download = name; a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 60_000);
@@ -206,6 +235,22 @@ export default function AdStudio() {
                 <label className="text-xs text-slate-400">Script
                   <select value={u.scriptId} onChange={(e) => setU((x) => ({ ...x, scriptId: e.target.value }))} className={`${sel} mt-1`} name="script">
                     {scripts.map((x) => <option key={x.id} value={x.id} disabled={!x.available}>{x.id.slice(4)}. {x.title}{x.available ? '' : ' — niet beschikbaar'}</option>)}
+                  </select>
+                </label>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="text-xs text-slate-400">Taal
+                  <select value={u.lang} onChange={(e) => setU((x) => ({ ...x, lang: e.target.value }))} className={`${sel} mt-1`} name="ugc-lang">
+                    {UGC_LANGS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+                    <option value="all">Alle 4 talen (4 video's)</option>
+                  </select>
+                </label>
+                <label className="text-xs text-slate-400"><span className="inline-flex items-center gap-1"><Mic size={12} /> Stem</span>
+                  <select value={u.voice} onChange={(e) => setU((x) => ({ ...x, voice: e.target.value }))} className={`${sel} mt-1`} name="ugc-voice">
+                    <option value="free">Gratis stem (per taal)</option>
+                    {opts.voices.premium.elevenlabs && <option value="elevenlabs">ElevenLabs (premium)</option>}
+                    {opts.voices.premium.openai && <option value="openai">OpenAI (premium)</option>}
+                    <option value="none">Geen stem</option>
                   </select>
                 </label>
               </div>
@@ -280,19 +325,25 @@ export default function AdStudio() {
             </>}
           </div>
 
-          <label className="block text-xs text-slate-400"><span className="inline-flex items-center gap-1"><Mic size={12} /> Stem</span>
+          {mode === 'product' && <label className="block text-xs text-slate-400"><span className="inline-flex items-center gap-1"><Mic size={12} /> Stem</span>
             <select value={f.voice} onChange={set('voice')} className={`${sel} mt-1`} name="voice">
               {voices.map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
             </select>
-          </label>
+          </label>}
           <div className="flex gap-5 text-sm text-slate-300">
             <label className="inline-flex items-center gap-2"><input type="checkbox" checked={f.captions} onChange={set('captions')} /> Ondertiteling</label>
             <label className="inline-flex items-center gap-2"><input type="checkbox" checked={f.music} onChange={set('music')} /> Beat</label>
           </div>
 
-          <button onClick={build} disabled={busy || (mode === 'product' ? !f.productId : !script?.available)} className="btn-primary w-full disabled:opacity-40" data-testid="build">
-            <Wand2 size={16} /> {state.phase === 'building' ? state.note : 'Maak de ad'}
-          </button>
+          {mode === 'ugc' && u.lang === 'all' ? (
+            <button onClick={makeAll} disabled={busy || !script?.available} className="btn-primary w-full disabled:opacity-40" data-testid="build-all">
+              <Wand2 size={16} /> {state.phase === 'building' || state.phase === 'recording' ? state.note || 'Opnemen…' : "Maak en download 4 video's (NL, EN, DE, FR)"}
+            </button>
+          ) : (
+            <button onClick={() => build()} disabled={busy || (mode === 'product' ? !f.productId : !script?.available)} className="btn-primary w-full disabled:opacity-40" data-testid="build">
+              <Wand2 size={16} /> {state.phase === 'building' ? state.note : 'Maak de ad'}
+            </button>
+          )}
 
           {board && (
             <div className="text-[12.5px] space-y-2">

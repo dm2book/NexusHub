@@ -114,6 +114,52 @@ console.log('\n— A price changes —');
   await run(`UPDATE products SET active=1 WHERE sku='NITRO-1Y'`);
 }
 
+console.log('\n— Four languages —');
+{
+  const speak = await import('../../src/lib/adStudio/speak.js');
+  ok('German numbers: einundzwanzig, dreizehntausendfünfhundert', speak.deNumber(21) === 'einundzwanzig' && speak.deNumber(13500) === 'dreizehntausendfünfhundert');
+  ok('French numbers: soixante-et-onze, quatre-vingts, quatre-vingt-dix-neuf, deux cent un, treize mille cinq cents',
+    speak.frNumber(71) === 'soixante-et-onze' && speak.frNumber(80) === 'quatre-vingts' && speak.frNumber(99) === 'quatre-vingt-dix-neuf'
+    && speak.frNumber(201) === 'deux cent un' && speak.frNumber(13500) === 'treize mille cinq cents');
+  ok('a price, spoken: neun Euro neunundneunzig / neuf euros quatre-vingt-dix-neuf / un euro',
+    speak.price(999, 'de') === 'neun Euro neunundneunzig' && speak.price(999, 'fr') === 'neuf euros quatre-vingt-dix-neuf' && speak.price(100, 'fr') === 'un euro');
+  ok('a price, written the local way: €9,99 · €9.99 · 9,99 € · 9,99 € (one word, no-break space)',
+    speak.priceText(999, 'nl') === '€9,99' && speak.priceText(999, 'en') === '€9.99' && speak.priceText(999, 'de') === '9,99 €' && speak.priceText(999, 'fr') === '9,99 €');
+  ok('addresses spoken per language: punt · dot · Punkt · point',
+    ['nl', 'en', 'de', 'fr'].map((l) => speak.spokenSite('forgemarket.nl', l)).join('|') === 'forgemarket punt n l|forgemarket dot n l|forgemarket Punkt n l|forgemarket point n l');
+  ok('English brand words get their phonemes in any voice, the Dutch respelling only in Dutch',
+    speak.forVoice('Robux', 'de', 'phonemes').includes('[[') && speak.forVoice('Robux', 'de', 'respell') === 'Robux');
+
+  const files = { en: (await import('../src/services/ugcScripts.en.js')).default, de: (await import('../src/services/ugcScripts.de.js')).default, fr: (await import('../src/services/ugcScripts.fr.js')).default };
+  for (const [L, w] of Object.entries(files)) {
+    ok(`${L}: all fifty scripts, four beats each, a checklist wherever the Dutch has one`,
+      UGC_SCRIPTS.every((s) => w[s.id] && BEATS.every((b) => typeof w[s.id][b] === 'function') && (!s.checklist || typeof w[s.id].checklist === 'function')));
+  }
+  const cat = await ugc.catalogue();
+  const bad = [], digits = [];
+  for (const L of ugc.UGC_LANGS) {
+    for (const s of UGC_SCRIPTS) {
+      const r = ugc.resolveScript(s, cat, L);
+      if (!r.ok) { bad.push(`${L}/${s.id}: ${r.reason}`); continue; }
+      const all = [...BEATS.flatMap((b) => [r.lines[b].text, r.lines[b].voice]), ...(r.props.solution.checklist || [])];
+      for (const t of all) if (!validateText(t).ok || GENERIC.some((g) => g.re.test(t)) || ugc.localRefusals([t], L).length) bad.push(`${L}/${s.id}: ${t}`);
+      for (const b of BEATS) if (/[€\d]/.test(r.lines[b].voice)) digits.push(`${L}/${s.id}: ${r.lines[b].voice}`);
+    }
+  }
+  ok('all fifty run in all four languages, and every line passes the gate and the language\'s own list', !bad.length, bad.slice(0, 5).join(' | '));
+  ok('in every language the voice says numbers in words', !digits.length, digits.slice(0, 5).join(' | '));
+  ok('a refused German or French claim is caught', ugc.localRefusals(['Sofort geliefert!'], 'de').length === 1 && ugc.localRefusals(['Le moins cher du web'], 'fr').length === 1);
+  const de1 = ugc.resolveScript(UGC_SCRIPTS[0], cat, 'de');
+  ok('German: "deinen Roblox-Benutzernamen" — the accusative, not the dictionary form', /deinen Roblox-Benutzernamen an/.test(de1.lines.solution.text), de1.lines.solution.text);
+  ok('…the price written 9,99 €, the tile "1.000 Robux"', de1.lines.cta.text.includes('9,99 €') && de1.product.name === '1.000 Robux');
+  const fr11 = ugc.resolveScript(UGC_SCRIPTS[10], cat, 'fr');
+  ok('French: "1 000 Robux", a no-break space before ":" and "?"', fr11.product.name === '10 000 Robux'
+    && !/ [:?!]/.test(Object.values(fr11.lines).map((l) => l.text).join(' ')), JSON.stringify(fr11.lines.solution));
+  const en1 = ugc.resolveScript(UGC_SCRIPTS[0], cat, 'en');
+  ok('English: "FREE ROBUX" on the fake generator, French "ROBUX GRATUITS"', en1.props.problem.title === 'FREE ROBUX'
+    && ugc.resolveScript(UGC_SCRIPTS[0], cat, 'fr').props.problem.title === 'ROBUX GRATUITS');
+}
+
 console.log('\n— The routes —');
 const owner = newId('usr');
 const stamp = Date.now();
@@ -135,6 +181,15 @@ const H = { authorization: `Bearer ${accessToken}`, 'content-type': 'application
   ok('…the end card is the product with its real price', b.scenes[3].data.product.price === '€9,99' && b.scenes[3].data.product.name === '1.000 Robux');
   ok('…a tracking link per script and platform', /utm_source=instagram&utm_campaign=ugc&utm_content=ugc-01$/.test(b.link), b.link);
   ok('…the brand disclaimer on the last card', /niet gelieerd/.test(b.disclaimer || ''));
+  for (const L of ['en', 'de', 'fr']) {
+    const rl = await fetch(`${base}/ugc/storyboard`, { method: 'POST', headers: H, body: JSON.stringify({ scriptId: 'ugc-01', lang: L }) });
+    const bl = await rl.json();
+    ok(`a ${L} storyboard: its language, its disclaimer, its own tracking tag`, rl.status === 200 && bl.lang === L
+      && new RegExp(`utm_content=ugc-01-${L}$`).test(bl.link) && !!bl.disclaimer && bl.disclaimer !== b.disclaimer, bl.link);
+  }
+  const listDe = await (await fetch(`${base}/ugc?lang=de`, { headers: H })).json();
+  ok('the list in German', listDe.lang === 'de' && /Ich dachte echt/.test(listDe.scripts[0].lines.hook));
+  ok('an unknown language falls back to Dutch', (await (await fetch(`${base}/ugc?lang=xx`, { headers: H })).json()).lang === 'nl');
   ok('unknown script → 404', (await fetch(`${base}/ugc/storyboard`, { method: 'POST', headers: H, body: JSON.stringify({ scriptId: 'ugc-99' }) })).status === 404);
   ok('not a script id → 400', (await fetch(`${base}/ugc/storyboard`, { method: 'POST', headers: H, body: JSON.stringify({ scriptId: '../x' }) })).status === 400);
   await run(`UPDATE products SET active=0 WHERE sku='ROBUX-1000'`);
@@ -157,6 +212,9 @@ console.log('\n— The page —');
   ok('Ad Studio opens on the UGC scripts, with the product ad one tab away', /useState\('ugc'\)/.test(page) && /mode-\$\{k\}/.test(page));
   ok('your own clip stays in your browser — an object URL, never uploaded', /URL\.createObjectURL\(file\)/.test(page) && !/FormData/.test(page));
   ok('the four beats are shown with their windows before you render', /0–2s/.test(page) && /10–15s/.test(page));
+  ok('a language per ad, or all four in one go — each downloaded as its own file', /value="all"/.test(page) && /makeAll/.test(page)
+    && /\$\{b\.lang\}/.test(page));
+  ok('a free voice for each language', /de_DE-thorsten-medium/.test(page) && /fr_FR-siwis-medium/.test(page));
 }
 
 console.log(`\n${fail ? '❌' : '✅'} ugc-scripts: ${pass} passed, ${fail} failed`);

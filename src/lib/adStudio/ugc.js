@@ -27,11 +27,44 @@ export function makeUgcScenes(h) {
   const { cl, eo, eio, back, at, fit, fontOf, roundRect, sweep, hero, Y, VOICE_AT } = h;
   const INK = '#0b0a12';
 
+  /* Every word drawn inside a picture, per language. */
+  const UI = {
+    nl: { user: 'Gebruikersnaam', pass: 'Wachtwoord', fake: 'NEP', no: 'NEE', signup: 'Account aanmaken',
+      fields: ['E-mail', 'Wachtwoord', 'Herhaal wachtwoord', 'Geboortedatum'], news: '☑  Ja, stuur mij de nieuwsbrief',
+      myOrder: 'Mijn bestelling', paid: 'Betaald', andNow: 'En nu…?', yours: 'Jouw account', notYours: 'Niet jouw account',
+      checkout: 'Afrekenen', notNeeded: 'Niet nodig', pay: 'Betalen', per: 'per 1.000', PER: 'PER 1.000',
+      yourCode: 'Je code', redeem: 'Zelf inwisselen, wanneer jij wilt', login: 'Inloggen', guest: 'Afrekenen als gast',
+      policy: 'Terugbetaalbeleid', refund: 'Niet geleverd? Geld terug.', track: 'Bestelling volgen', orderNo: 'Bestelnummer',
+      steps: ['Besteld', 'Betaald', 'Onderweg'], ask: 'Hoe werkt de levering?' },
+    en: { user: 'Username', pass: 'Password', fake: 'FAKE', no: 'NOPE', signup: 'Create account',
+      fields: ['Email', 'Password', 'Repeat password', 'Date of birth'], news: '☑  Yes, send me the newsletter',
+      myOrder: 'My order', paid: 'Paid', andNow: 'And now…?', yours: 'Your account', notYours: 'Not your account',
+      checkout: 'Checkout', notNeeded: 'Not needed', pay: 'Pay', per: 'per 1,000', PER: 'PER 1,000',
+      yourCode: 'Your code', redeem: 'Redeem it yourself, whenever you like', login: 'Log in', guest: 'Check out as guest',
+      policy: 'Refund policy', refund: 'Not delivered? Money back.', track: 'Track order', orderNo: 'Order number',
+      steps: ['Ordered', 'Paid', 'On its way'], ask: 'How does delivery work?' },
+    de: { user: 'Benutzername', pass: 'Passwort', fake: 'FAKE', no: 'NEIN', signup: 'Konto erstellen',
+      fields: ['E-Mail', 'Passwort', 'Passwort wiederholen', 'Geburtsdatum'], news: '☑  Ja, schickt mir den Newsletter',
+      myOrder: 'Meine Bestellung', paid: 'Bezahlt', andNow: 'Und jetzt…?', yours: 'Dein Account', notYours: 'Nicht dein Account',
+      checkout: 'Kasse', notNeeded: 'Nicht nötig', pay: 'Bezahlen', per: 'pro 1.000', PER: 'PRO 1.000',
+      yourCode: 'Dein Code', redeem: 'Selbst einlösen, wann du willst', login: 'Einloggen', guest: 'Als Gast bezahlen',
+      policy: 'Rückerstattung', refund: 'Nicht geliefert? Geld zurück.', track: 'Bestellung verfolgen', orderNo: 'Bestellnummer',
+      steps: ['Bestellt', 'Bezahlt', 'Unterwegs'], ask: 'Wie läuft die Lieferung?' },
+    fr: { user: 'Pseudo', pass: 'Mot de passe', fake: 'ARNAQUE', no: 'NON', signup: 'Créer un compte',
+      fields: ['E-mail', 'Mot de passe', 'Répéter le mot de passe', 'Date de naissance'], news: '☑  Oui, envoyez-moi la newsletter',
+      myOrder: 'Ma commande', paid: 'Payé', andNow: 'Et maintenant… ?', yours: 'Ton compte', notYours: 'Pas ton compte',
+      checkout: 'Paiement', notNeeded: 'Pas besoin', pay: 'Payer', per: 'les 1 000', PER: 'LES 1 000',
+      yourCode: 'Ton code', redeem: 'À utiliser quand tu veux', login: 'Se connecter', guest: 'Payer en invité',
+      policy: 'Remboursement', refund: 'Pas livré ? Remboursé.', track: 'Suivre ma commande', orderNo: 'Numéro de commande',
+      steps: ['Commandé', 'Payé', 'En route'], ask: 'Comment marche la livraison ?' },
+  };
+  const S = (A) => UI[A.lang] || UI.nl;
+
   /* ── The spoken line, in TikTok caption boxes ───────────────────────── */
 
   /** When each word is said: by its share of the letters, across the line. */
   function wordTimes(text, scene) {
-    const ws = String(text).split(/\s+/).filter(Boolean);
+    const ws = String(text).split(/[ \t\n]+/).filter(Boolean);   // not on no-break spaces: a price stays one word
     if (!scene.voiceDur) return ws.map((w, i) => ({ w, t: 0.08 + i * 0.06 }));
     const weights = ws.map((w) => w.length + 2);
     const total = weights.reduce((a, b) => a + b, 0);
@@ -41,15 +74,21 @@ export function makeUgcScenes(h) {
 
   /* The words a viewer's eye should land on: the frustration and the money.
      Marked yellow in the caption box, the way creators mark them by hand. */
-  const KEY = /^(gratis|nooit|niks|nep|fout\w*|wachtwoord\w*|account\w*|angst|bang|kwijt|verkeerde?|duur|zonde|teveel|te|veel|n\u00f3g|\u00e9cht|weg|pech|alleen|gebruikersnaam\w*|gast|geld|terug|scheelt|elke|steeds)[.,!?\u2026:"]*$/i;
-  const isMoney = (w) => /\u20ac\s?\d/.test(w);   // €, escaped: survives any charset
+  const TAIL = '[.,!?…:;"»“”]*$';
+  const KEY = {
+    nl: new RegExp(`^(gratis|nooit|niks|nep|fout\\w*|wachtwoord\\w*|account\\w*|angst|bang|kwijt|verkeerde?|duur|zonde|teveel|veel|nóg|écht|weg|pech|alleen|gebruikersnaam\\w*|gast|geld|terug|scheelt|elke|steeds)${TAIL}`, 'i'),
+    en: new RegExp(`^(free|never|nothing|fake|mistake|password\\w*|account\\w*|fear|lost|wrong|expensive|waste|overpaid|another|gone|only|username|guest|money|back|less|every|again|kept)${TAIL}`, 'i'),
+    de: new RegExp(`^(gratis|nie|nichts|fake|fehler|passwörter|passwort|account\\w*|angst|verloren|falschen?|teurer?|zu|viel|noch|weg|pech|nur|benutzername\\w*|gast|geld|zurück|weniger|jede|immer)${TAIL}`, 'i'),
+    fr: new RegExp(`^(gratuits?|jamais|rien|arnaque|erreur|mot|passe|compte|peur|perdu|mauvais|cher|trop|encore|juste|invité|remboursé|moins|chaque|toujours)${TAIL}`, 'i'),
+  };
+  const isMoney = (w) => /\u20ac\s?\d|\d\s?\u20ac/.test(w);   // €, escaped: survives any charset
 
   /**
    * White rounded boxes with black type, one per line, growing as each word
    * is spoken; the newest word pops. `all` shows the whole line at once (the
    * hook: the first frame is the thumbnail).
    */
-  function boxed(ctx, G, scene, text, y, { u, px = 78, all = false, center = true, maxW = G.width, accentLast = null, A: A0 = { accent: '#22c55e' } } = {}) {
+  function boxed(ctx, G, scene, text, y, { u, px = 78, all = false, center = true, maxW = G.width, accentLast = null, A: A0 = { accent: '#22c55e', lang: 'nl' } } = {}) {
     const times = wordTimes(text, scene);
     const size = px * G.u;
     ctx.save();
@@ -86,7 +125,7 @@ export function makeUgcScenes(h) {
         ctx.save();
         /* Grows from its left edge, so a popping word never eats the space before the next. */
         ctx.translate(x, ly - size * 0.32); ctx.scale(pop, pop);
-        const money = isMoney(v.w), key = !money && KEY.test(v.w) && v.w.length > 3;
+        const money = isMoney(v.w), key = !money && (KEY[A0.lang] || KEY.nl).test(v.w) && v.w.length > 3;
         if (money || key) {
           roundRect(ctx, -8 * G.u, -size * 0.66, v.ww + 16 * G.u, size * 1.08, 10 * G.u);
           ctx.fillStyle = money ? A0.accent : '#facc15'; ctx.fill();
@@ -266,7 +305,7 @@ export function makeUgcScenes(h) {
     ctx.fillText(item.name, tx, y + hh / 2 - (item.per ? 6 : -14) * G.u);
     if (item.per) {
       ctx.font = fontOf(34 * G.u, 'Inter', '600'); ctx.fillStyle = strong ? A.accent : '#a9a3c9';
-      ctx.fillText(`${item.per} per 1.000`, tx, y + hh / 2 + 44 * G.u);
+      ctx.fillText(`${item.per} ${S(A).per}`, tx, y + hh / 2 + 44 * G.u);
     }
     const px = x + w - pillW - 28 * G.u, ph = 96 * G.u, py = y + hh / 2 - ph / 2;
     roundRect(ctx, px, py, pillW, ph, ph / 2);
@@ -290,11 +329,11 @@ export function makeUgcScenes(h) {
         ctx.fillStyle = g; ctx.fillRect(x, y, w, 130 * G.u); ctx.restore();
         ctx.font = fontOf(fit(ctx, d.title, 64 * G.u, w - 80 * G.u)); ctx.fillStyle = INK; ctx.textBaseline = 'middle';
         ctx.fillText(d.title, x + 40 * G.u, y + 68 * G.u); ctx.textBaseline = 'alphabetic';
-        const b1 = input(ctx, G, x + 40 * G.u, y + 200 * G.u, w - 80 * G.u, 'Gebruikersnaam', 'speler123', { u, t0: 0.4, t1: 0.8, light: true });
-        input(ctx, G, x + 40 * G.u, b1 + 60 * G.u, w - 80 * G.u, 'Wachtwoord', 'xxxxxxxxxx', { u, t0: 0.9, t1: 1.4, light: true, mask: true });
+        const b1 = input(ctx, G, x + 40 * G.u, y + 200 * G.u, w - 80 * G.u, S(A).user, 'speler123', { u, t0: 0.4, t1: 0.8, light: true });
+        input(ctx, G, x + 40 * G.u, b1 + 60 * G.u, w - 80 * G.u, S(A).pass, 'xxxxxxxxxx', { u, t0: 0.9, t1: 1.4, light: true, mask: true });
       }
       ctx.restore();
-      stamp(ctx, G, G.W / 2, y + hh / 2, u, 1.6, { word: 'NEP' });
+      stamp(ctx, G, G.W / 2, y + hh / 2, u, 1.6, { word: S(A).fake });
     },
     /* The same small top-up, over and over. */
     receipts(ctx, G, d, u, A) {
@@ -323,8 +362,8 @@ export function makeUgcScenes(h) {
       const x = G.left, w = G.width, hh = 760 * G.u, y = top(G, hh);
       ctx.save();
       if (card(ctx, G, x, y, w, hh, { u, p0: 0.05, light: true, tilt: 0.05 }) > 0) {
-        ctx.font = fontOf(56 * G.u); ctx.fillStyle = INK; ctx.fillText('Account aanmaken', x + 40 * G.u, y + 92 * G.u);
-        const fields = ['E-mail', 'Wachtwoord', 'Herhaal wachtwoord', 'Geboortedatum'];
+        ctx.font = fontOf(56 * G.u); ctx.fillStyle = INK; ctx.fillText(S(A).signup, x + 40 * G.u, y + 92 * G.u);
+        const fields = S(A).fields;
         fields.forEach((f, i) => {
           const fy = y + 150 * G.u + i * 140 * G.u;
           ctx.font = fontOf(32 * G.u, 'Inter', '600'); ctx.fillStyle = '#5b5675'; ctx.fillText(f, x + 40 * G.u, fy);
@@ -332,17 +371,17 @@ export function makeUgcScenes(h) {
           ctx.strokeStyle = '#d9d6e6'; ctx.lineWidth = 2 * G.u; ctx.stroke();
         });
         ctx.font = fontOf(30 * G.u, 'Inter', '600'); ctx.fillStyle = '#5b5675';
-        ctx.fillText('☑  Ja, stuur mij de nieuwsbrief', x + 40 * G.u, y + hh - 50 * G.u);
+        ctx.fillText(S(A).news, x + 40 * G.u, y + hh - 50 * G.u);
       }
       ctx.restore();
-      stamp(ctx, G, G.W / 2, y + hh / 2, u, 1.5, { word: 'NEE', cross: false });
+      stamp(ctx, G, G.W / 2, y + hh / 2, u, 1.5, { word: S(A).no, cross: false });
     },
     /* Paid — and then nothing to see. */
     worry(ctx, G, d, u, A) {
       const x = G.left, w = G.width, hh = 520 * G.u, y = top(G, hh);
       ctx.save();
       if (card(ctx, G, x, y, w, hh, { u, p0: 0.05 }) > 0) {
-        ctx.font = fontOf(54 * G.u); ctx.fillStyle = '#fff'; ctx.fillText('Mijn bestelling', x + 44 * G.u, y + 100 * G.u);
+        ctx.font = fontOf(54 * G.u); ctx.fillStyle = '#fff'; ctx.fillText(S(A).myOrder, x + 44 * G.u, y + 100 * G.u);
         const row = (ry, name, done) => {
           ctx.font = fontOf(44 * G.u, 'Inter', '600'); ctx.fillStyle = '#d9d4f2'; ctx.fillText(name, x + 140 * G.u, ry + 14 * G.u);
           if (done) tick(ctx, G, x + 84 * G.u, ry, 34 * G.u, u, 0.35);
@@ -352,8 +391,8 @@ export function makeUgcScenes(h) {
             ctx.beginPath(); ctx.arc(0, 0, 28 * G.u, 0, Math.PI * 1.4); ctx.stroke(); ctx.restore();
           }
         };
-        row(y + 210 * G.u, 'Betaald', true);
-        row(y + 330 * G.u, 'En nu…?', false);
+        row(y + 210 * G.u, S(A).paid, true);
+        row(y + 330 * G.u, S(A).andNow, false);
       }
       ctx.restore();
       [[0.88, 0.18, 1.0], [0.78, 0.72, 1.3], [0.55, 1.08, 1.6]].forEach(([fx, fy, t]) => {
@@ -368,7 +407,7 @@ export function makeUgcScenes(h) {
     /* Two accounts; the wrong one gets picked. */
     wrong(ctx, G, d, u, A) {
       const x = G.left, w = G.width, hh = 170 * G.u, y = top(G, hh * 2 + 40 * G.u);
-      const accounts = [['speler123', 'Jouw account'], ['broertje_07', 'Niet jouw account']];
+      const accounts = [['speler123', S(A).yours], ['broertje_07', S(A).notYours]];
       accounts.forEach(([name, sub], i) => {
         ctx.save();
         const yy = y + i * (hh + 40 * G.u);
@@ -399,22 +438,22 @@ export function makeUgcScenes(h) {
       const x = G.left, w = G.width, hh = 640 * G.u, y = top(G, hh);
       ctx.save();
       if (card(ctx, G, x, y, w, hh, { u, p0: 0.05, accent: A.accent }) > 0) {
-        ctx.font = fontOf(56 * G.u); ctx.fillStyle = '#fff'; ctx.fillText('Afrekenen', x + 44 * G.u, y + 100 * G.u);
-        const b = input(ctx, G, x + 44 * G.u, y + 180 * G.u, w - 88 * G.u, d.field || 'Gebruikersnaam', 'speler123', { u, t0: 0.45, t1: 1.0, accent: A.accent, focus: true });
+        ctx.font = fontOf(56 * G.u); ctx.fillStyle = '#fff'; ctx.fillText(S(A).checkout, x + 44 * G.u, y + 100 * G.u);
+        const b = input(ctx, G, x + 44 * G.u, y + 180 * G.u, w - 88 * G.u, d.field || S(A).user, 'speler123', { u, t0: 0.45, t1: 1.0, accent: A.accent, focus: true });
         const ry = b + 70 * G.u;
         ctx.font = fontOf(44 * G.u, 'Inter', '600'); ctx.fillStyle = '#d9d4f2';
-        ctx.fillText('Wachtwoord', x + 44 * G.u, ry + 14 * G.u);
+        ctx.fillText(S(A).pass, x + 44 * G.u, ry + 14 * G.u);
         const p = at(u, 1.25, 0.3);
         if (p > 0) {
           ctx.save(); ctx.globalAlpha *= eo(p);
           const pw = 330 * G.u, ph = 80 * G.u, px = x + w - 44 * G.u - pw;
           roundRect(ctx, px, ry - ph / 2, pw, ph, ph / 2); ctx.fillStyle = '#22c55e26'; ctx.fill();
           ctx.font = fontOf(38 * G.u, 'Inter', '700'); ctx.fillStyle = '#4ade80'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-          ctx.fillText('Niet nodig', px + pw / 2, ry + 2 * G.u);
+          ctx.fillText(S(A).notNeeded, px + pw / 2, ry + 2 * G.u);
           ctx.restore();
         }
         tick(ctx, G, x + w - 44 * G.u - 370 * G.u, ry, 30 * G.u, u, 1.3);
-        button(ctx, G, x + 44 * G.u, y + hh - 150 * G.u, w - 88 * G.u, 110 * G.u, 'Betalen', { fill: A.accent, press: (u - 1.7) / 0.25 });
+        button(ctx, G, x + 44 * G.u, y + hh - 150 * G.u, w - 88 * G.u, 110 * G.u, S(A).pay, { fill: A.accent, press: (u - 1.7) / 0.25 });
       }
       ctx.restore();
       tap(ctx, G, G.W / 2 + 160 * G.u, y + hh - 95 * G.u, u, 1.7);
@@ -459,7 +498,7 @@ export function makeUgcScenes(h) {
       ctx.globalAlpha *= eo(p);
       ctx.font = fontOf(42 * G.u, 'Raj', '600'); ctx.letterSpacing = `${6 * G.u}px`;
       ctx.fillStyle = '#ffffff'; ctx.textAlign = 'center';
-      ctx.fillText('PER 1.000', G.W / 2, yy + 80 * G.u);
+      ctx.fillText(S(A).PER, G.W / 2, yy + 80 * G.u);
       ctx.restore();
     },
     /* The code, in your inbox. */
@@ -472,7 +511,7 @@ export function makeUgcScenes(h) {
         ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
         ctx.font = fontOf(42 * G.u, 'Inter', '700'); ctx.fillStyle = INK; ctx.fillText('ForgeMarket', x + 160 * G.u, y + 92 * G.u);
         ctx.font = fontOf(32 * G.u, 'Inter', '600'); ctx.fillStyle = '#5b5675';
-        ctx.fillText(`Je code: ${d.product?.name || ''}`.slice(0, 40), x + 160 * G.u, y + 140 * G.u);
+        ctx.fillText(`${S(A).yourCode}: ${d.product?.name || ''}`.slice(0, 40), x + 160 * G.u, y + 140 * G.u);
         const code = 'XXXX-XXXX-XXXX';
         const n = Math.floor(cl((u - 0.5) / 0.7) * code.length);
         const cy = y + 230 * G.u, ch = 170 * G.u;
@@ -483,7 +522,7 @@ export function makeUgcScenes(h) {
         ctx.fillText(code.slice(0, n).replace(/X/g, '•') + code.slice(n).replace(/[X-]/g, ' '), x + w / 2, cy + ch / 2 + 4 * G.u);
         ctx.letterSpacing = '0px';
         ctx.font = fontOf(32 * G.u, 'Inter', '600'); ctx.fillStyle = '#5b5675';
-        ctx.fillText('Zelf inwisselen, wanneer jij wilt', x + w / 2, y + hh - 70 * G.u);
+        ctx.fillText(S(A).redeem, x + w / 2, y + hh - 70 * G.u);
       }
       ctx.restore();
       if (u > 1.3) sweep(ctx, x, y + 230 * G.u, w, 170 * G.u, u, 1.3, 26 * G.u);
@@ -493,9 +532,9 @@ export function makeUgcScenes(h) {
       const x = G.left, w = G.width, hh = 520 * G.u, y = top(G, hh);
       ctx.save();
       if (card(ctx, G, x, y, w, hh, { u, p0: 0.05, accent: A.accent }) > 0) {
-        ctx.font = fontOf(56 * G.u); ctx.fillStyle = '#fff'; ctx.fillText('Afrekenen', x + 44 * G.u, y + 100 * G.u);
-        button(ctx, G, x + 44 * G.u, y + 170 * G.u, w - 88 * G.u, 110 * G.u, 'Inloggen', { outline: true, color: '#a9a3c9' });
-        button(ctx, G, x + 44 * G.u, y + 320 * G.u, w - 88 * G.u, 120 * G.u, 'Afrekenen als gast', { fill: A.accent, press: (u - 0.9) / 0.25 });
+        ctx.font = fontOf(56 * G.u); ctx.fillStyle = '#fff'; ctx.fillText(S(A).checkout, x + 44 * G.u, y + 100 * G.u);
+        button(ctx, G, x + 44 * G.u, y + 170 * G.u, w - 88 * G.u, 110 * G.u, S(A).login, { outline: true, color: '#a9a3c9' });
+        button(ctx, G, x + 44 * G.u, y + 320 * G.u, w - 88 * G.u, 120 * G.u, S(A).guest, { fill: A.accent, press: (u - 0.9) / 0.25 });
       }
       ctx.restore();
       tap(ctx, G, G.W / 2 + 120 * G.u, y + 380 * G.u, u, 0.9);
@@ -506,13 +545,13 @@ export function makeUgcScenes(h) {
       const x = G.left, w = G.width, hh = 640 * G.u, y = top(G, hh);
       ctx.save();
       if (card(ctx, G, x, y, w, hh, { u, p0: 0.05, light: true }) > 0) {
-        ctx.font = fontOf(54 * G.u); ctx.fillStyle = INK; ctx.fillText('Terugbetaalbeleid', x + 44 * G.u, y + 100 * G.u);
+        ctx.font = fontOf(54 * G.u); ctx.fillStyle = INK; ctx.fillText(S(A).policy, x + 44 * G.u, y + 100 * G.u);
         [0, 1, 3, 4].forEach((i) => {
           roundRect(ctx, x + 44 * G.u, y + 170 * G.u + i * 80 * G.u, (w - 88 * G.u) * (i % 2 ? 0.7 : 0.9), 26 * G.u, 13 * G.u);
           ctx.fillStyle = '#e6e3f0'; ctx.fill();
         });
         const ly = y + 170 * G.u + 2 * 80 * G.u + 16 * G.u;
-        const line = 'Niet geleverd? Geld terug.';
+        const line = S(A).refund;
         ctx.font = fontOf(fit(ctx, line, 54 * G.u, w - 88 * G.u, 'Inter', '700'), 'Inter', '700');
         const lw = ctx.measureText(line).width;
         const k = eio(at(u, 0.7, 0.5));
@@ -528,9 +567,9 @@ export function makeUgcScenes(h) {
       const x = G.left, w = G.width, hh = 660 * G.u, y = top(G, hh);
       ctx.save();
       if (card(ctx, G, x, y, w, hh, { u, p0: 0.05, accent: A.accent }) > 0) {
-        ctx.font = fontOf(56 * G.u); ctx.fillStyle = '#fff'; ctx.fillText('Bestelling volgen', x + 44 * G.u, y + 100 * G.u);
-        const b = input(ctx, G, x + 44 * G.u, y + 175 * G.u, w - 88 * G.u, 'Bestelnummer', 'FM-1234', { u, t0: 0.35, t1: 0.75, accent: A.accent, focus: true });
-        ['Besteld', 'Betaald', 'Onderweg'].forEach((s, i) => {
+        ctx.font = fontOf(56 * G.u); ctx.fillStyle = '#fff'; ctx.fillText(S(A).track, x + 44 * G.u, y + 100 * G.u);
+        const b = input(ctx, G, x + 44 * G.u, y + 175 * G.u, w - 88 * G.u, S(A).orderNo, 'FM-1234', { u, t0: 0.35, t1: 0.75, accent: A.accent, focus: true });
+        S(A).steps.forEach((s, i) => {
           const sy = b + 90 * G.u + i * 92 * G.u;
           tick(ctx, G, x + 84 * G.u, sy, 30 * G.u, u, 1.0 + i * 0.25, i < 2 ? '#22c55e' : A.accent);
           const p = at(u, 1.0 + i * 0.25, 0.3);
@@ -550,8 +589,8 @@ export function makeUgcScenes(h) {
           ctx.save(); ctx.globalAlpha *= eo(p); ctx.translate(0, (1 - eo(p)) * 30 * G.u);
           ctx.fillStyle = '#5865f2'; ctx.beginPath(); ctx.arc(x + 90 * G.u, y + 200 * G.u, 40 * G.u, 0, Math.PI * 2); ctx.fill();
           roundRect(ctx, x + 150 * G.u, y + 150 * G.u, w - 194 * G.u, 110 * G.u, 26 * G.u); ctx.fillStyle = 'rgba(255,255,255,0.08)'; ctx.fill();
-          ctx.font = fontOf(fit(ctx, 'Hoe werkt de levering?', 44 * G.u, w - 250 * G.u, 'Inter', '600'), 'Inter', '600'); ctx.fillStyle = '#fff';
-          ctx.fillText('Hoe werkt de levering?', x + 184 * G.u, y + 220 * G.u);
+          ctx.font = fontOf(fit(ctx, S(A).ask, 44 * G.u, w - 250 * G.u, 'Inter', '600'), 'Inter', '600'); ctx.fillStyle = '#fff';
+          ctx.fillText(S(A).ask, x + 184 * G.u, y + 220 * G.u);
           ctx.restore();
         }
         if (u > 1.0) {
