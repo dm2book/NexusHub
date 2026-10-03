@@ -32,11 +32,11 @@ export const REFUND_BACKOFF_MS = [0, 120, 350, 900];
 const TERMINAL = ['cancelled', 'failed'];
 
 export async function settleAsRefunded(orderId, reason, {
-  actorId = 'psp', backoff = REFUND_BACKOFF_MS, sleep = (ms) => new Promise((r) => setTimeout(r, ms)),
+  actorId = 'psp', backoff = REFUND_BACKOFF_MS, sleep = (ms) => new Promise((r) => setTimeout(r, ms)), silent = false,
 } = {}) {
   for (const wait of backoff) {
     if (wait) await sleep(wait);
-    const result = await transitionOrder(orderId, 'refunded', { actorId, reason })
+    const result = await transitionOrder(orderId, 'refunded', { actorId, reason, silent })
       .catch((e) => { console.warn(`[${actorId}] refund transition: ${e.message}`); return null; });
     if (result?.status === 'refunded') return true;
     if (result && TERMINAL.includes(result.status)) return false;

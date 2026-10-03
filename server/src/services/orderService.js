@@ -585,6 +585,10 @@ export async function transitionOrder(orderId, to, ctx = {}) {
   if (to === 'processing' && await recentlyMailed(updated, ['payment_confirmed', 'order_on_hold'], 5)) {
     emailEvent = null;
   }
+  /* A chargeback moves the order to refunded, but the buyer did not get a
+     refund from us — they took the money back through their bank. Telling
+     them "refund issued" is untrue and weakens the shop's side of the dispute. */
+  if (ctx.silent) emailEvent = null;
   if (emailEvent) {
     await sendEmailAsync(emailEvent, updated.email, emailContext(updated, ctx));
   }

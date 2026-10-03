@@ -98,7 +98,8 @@ export async function applyPayment(paymentId, ctx = {}) {
       }).catch((e) => console.error('[mollie] chargeback ledger:', e.message));
     }
     if (order.status === 'refunded') return { ok: true, effect, skipped: 'already refunded' };
-    const refunded = await settleAsRefunded(order.id, reason, { actorId: 'mollie' });
+    // A chargeback is not a refund from us: no "refund issued" mail for it.
+    const refunded = await settleAsRefunded(order.id, reason, { actorId: 'mollie', silent: effect === 'chargeback' });
     if (!refunded) {
       // Reported rather than swallowed: an order that Mollie has refunded but we
       // still show as live is a code we hand out for money we no longer have.

@@ -234,7 +234,7 @@ router.post('/stripe/webhook', async (req, res) => {
           reason: obj.reason || null, source: 'psp',
         }).catch((e) => console.error('[stripe] chargeback ledger:', e.message));
         const done = await settleAsRefunded(order.id, `Chargeback: ${obj.reason || 'disputed'}`,
-          { actorId: 'stripe' });
+          { actorId: 'stripe', silent: true });
         outcome = done ? 'chargeback recorded and order refunded' : 'chargeback recorded';
         break;
       }

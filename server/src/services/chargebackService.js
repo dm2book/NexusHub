@@ -53,7 +53,9 @@ export async function recordChargeback({
     metadata: { amount, currency, provider, paymentId, reason, source },
   }).catch(() => {});
 
-  console.warn(`[chargeback] ${order?.number || '(no order)'} · ${email} · ${amount} ${currency} · ${reason || source}`);
+  /* Logs outlive their purpose and are read by more people than the admin:
+     the order number identifies the case, the address stays out. */
+  console.warn(`[chargeback] ${order?.number || '(no order)'} · ${amount} ${currency} · ${reason || source}`);
 
   /* The loud one, and the reason this feature exists.
      A chargeback has a deadline — the bank wants the evidence within days, and

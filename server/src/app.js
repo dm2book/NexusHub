@@ -270,6 +270,10 @@ export function createApp({ lazyReady = false } = {}) {
   // a busy hour can never turn a payment confirmation into a 429; the route
   // carries its own, far more generous, limiter.
   app.use('/api/payments', mollieWebhook);
+  /* Stripe's webhook too (it is the only route in paymentRoutes): a 429 on a
+     payment confirmation is a paid order left pending. Signed, so the general
+     limiter adds nothing but risk. */
+  app.use('/api/payments', paymentRoutes);
 
   app.use(attachUser);
   app.use('/api', rateLimit({ bucket: 'api' }));
@@ -279,7 +283,6 @@ export function createApp({ lazyReady = false } = {}) {
   app.use('/api/auth', authRoutes);
   app.use('/api/account', accountRoutes);
   app.use('/api/discord', discordRoutes);
-  app.use('/api/payments', paymentRoutes);
   app.use('/api/social', socialRoutes);
   app.use('/api/images', imageRoutes);
   app.use('/api', mollieApi);

@@ -121,6 +121,14 @@ const fresh = (i) => createOrder({ email: `wh-${i}@example.test`, items: [{ prod
 
   const row = await get(`SELECT outcome FROM webhook_events WHERE event_id=@e`, { e: evt });
   ok('the event ends with a real outcome', row?.outcome === 'paid', row?.outcome);
+
+  /* A chargeback on the paid order: refunded in our books, but no "we
+     refunded you" mail — the buyer's bank took the money back, not us. */
+  await send('charge.dispute.created', { id: 'dp_d', object: 'dispute', amount: 5000, currency: 'eur',
+    payment_intent: 'pi_d', reason: 'fraudulent', metadata: { orderId: d.id } });
+  const after = await getOrder(d.id);
+  const mail = await get(`SELECT 1 FROM email_log WHERE template_id='refund_issued' AND to_email=@e LIMIT 1`, { e: after.email }).catch(() => null);
+  ok('a chargeback refunds the order without a "refund issued" mail', after.status === 'refunded' && !mail, `${after.status} ${!!mail}`);
 }
 
 console.log('\n— Stock and the hand-delivery queue —');
