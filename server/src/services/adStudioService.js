@@ -245,6 +245,8 @@ export async function studioOptions() {
         { id: 'nl_BE-rdh-medium', label: 'Rdh — Vlaams, man (gratis, CC0)', lang: 'nl' },
         { id: 'nl_NL-mls-medium', label: 'MLS — Nederlands (gratis, CC BY 4.0)', lang: 'nl' },
         { id: 'en_US-ryan-medium', label: 'Ryan — English (free)', lang: 'en' },
+        { id: 'de_DE-thorsten-medium', label: 'Thorsten — Deutsch (kostenlos, CC0)', lang: 'de' },
+        { id: 'fr_FR-siwis-medium', label: 'Siwis — Français (gratuit, CC BY 4.0)', lang: 'fr' },
       ],
       premium: {
         elevenlabs: !!config.tts?.elevenlabsKey,
@@ -257,6 +259,13 @@ export async function studioOptions() {
 /* ── Premium voice ─────────────────────────────────────────────────────── */
 
 export const VOICE_PROVIDERS = ['elevenlabs', 'openai'];
+/* How the voice should sound, said in the language it speaks. */
+const VOICE_STYLE = {
+  nl: 'Spreek Nederlands, energiek en duidelijk, als een TikTok-voice-over.',
+  en: 'Energetic, clear, like a TikTok voice-over.',
+  de: 'Sprich Deutsch, energisch und deutlich, wie ein TikTok-Voice-over.',
+  fr: 'Parle français, avec énergie et clarté, comme une voix off TikTok.',
+};
 
 /**
  * A spoken line from ElevenLabs or OpenAI, with the owner's own key. The text
@@ -285,7 +294,7 @@ export async function synthesizePremium({ text, provider, lang = 'nl', voice = n
       method: 'POST',
       headers: { authorization: `Bearer ${tts.openaiKey}`, 'content-type': 'application/json' },
       body: JSON.stringify({ model: 'gpt-4o-mini-tts', voice: voice || 'onyx', input: t, response_format: 'mp3',
-        instructions: lang === 'nl' ? 'Spreek Nederlands, energiek en duidelijk, als een TikTok-voice-over.' : 'Energetic, clear, like a TikTok voice-over.' }),
+        instructions: VOICE_STYLE[lang] || VOICE_STYLE.en }),
     });
     if (!r.ok) { const e = new Error(`OpenAI ${r.status}`); e.status = 502; throw e; }
     return Buffer.from(await r.arrayBuffer());

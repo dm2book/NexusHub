@@ -9,7 +9,7 @@ import * as attribution from '../../services/attributionService.js';
 import * as adPerf from '../../services/adPerformanceService.js';
 import { adIntelligence } from '../../services/adIntelligenceService.js';
 import { generateAdScripts, adScriptProducts } from '../../services/adScriptService.js';
-import { ugcOptions, buildUgcBoard } from '../../services/ugcStudioService.js';
+import { ugcOptions, buildUgcBoard, UGC_LANGS } from '../../services/ugcStudioService.js';
 import { studioOptions, buildStoryboard, synthesizePremium, ANGLES, PLATFORMS, LENGTHS, LANGS, VOICE_PROVIDERS } from '../../services/adStudioService.js';
 import { notFound } from '../../utils/errors.js';
 import { z } from 'zod';
@@ -156,13 +156,15 @@ router.post('/ad-studio/storyboard', asyncHandler(async (req, res) => {
   res.json(board);
 }));
 /* The fifty UGC scripts, read against today's catalogue, and one as a storyboard. */
-router.get('/ad-studio/ugc', asyncHandler(async (_req, res) => {
-  res.json(await ugcOptions());
+router.get('/ad-studio/ugc', asyncHandler(async (req, res) => {
+  const { lang } = z.object({ lang: z.enum(UGC_LANGS).catch('nl').default('nl') }).parse(req.query || {});
+  res.json(await ugcOptions({ lang }));
 }));
 router.post('/ad-studio/ugc/storyboard', asyncHandler(async (req, res) => {
   const body = z.object({
     scriptId: z.string().regex(/^ugc-\d{2}$/),
     platform: z.enum(Object.keys(PLATFORMS)).catch('tiktok').default('tiktok'),
+    lang: z.enum(UGC_LANGS).catch('nl').default('nl'),
   }).parse(req.body || {});
   const board = await buildUgcBoard(body);
   if (!board) throw notFound('Script not found');
@@ -175,7 +177,7 @@ router.post('/ad-studio/voice', requirePermission('analytics.write'), asyncHandl
   const body = z.object({
     text: z.string().min(1).max(600),
     provider: z.enum(VOICE_PROVIDERS),
-    lang: z.enum(LANGS).catch('nl').default('nl'),
+    lang: z.enum(UGC_LANGS).catch('nl').default('nl'),
     voice: z.string().max(80).nullish(),
   }).parse(req.body || {});
   try {
