@@ -22,6 +22,8 @@
  *   glass cards with an accent edge; a light sweep across every price.
  */
 
+import { makeUgcScenes, UGC_CUES, UGC_TYPES } from './ugc.js';
+
 /* ── Easing ────────────────────────────────────────────────────────────── */
 const cl = (x) => Math.max(0, Math.min(1, x));
 const eo = (x) => 1 - Math.pow(1 - cl(x), 3);
@@ -91,7 +93,7 @@ export function layout(board, voiceDurations = {}) {
   let t = 0;
   const scenes = board.scenes.map((s) => {
     const v = voiceDurations[s.id] || 0;
-    const dur = Math.max(s.minDur, v ? VOICE_AT + v + TAIL : 0);
+    const dur = Math.max(s.minDur, v ? VOICE_AT + v + (s.tail ?? TAIL) : 0);
     const out = { ...s, start: t, dur, voiceDur: v };
     t += dur;
     return out;
@@ -409,6 +411,9 @@ const SCENES = {
   },
 };
 
+/* The UGC beats (see ugc.js), drawn with the helpers above. */
+Object.assign(SCENES, makeUgcScenes({ cl, eo, eio, back, at, fit, fontOf, roundRect, sweep, hero, Y, VOICE_AT }));
+
 /* ── Captions ──────────────────────────────────────────────────────────── */
 /** Word-by-word caption for the voice line, the spoken word lit — no box, an outline. */
 function captions(ctx, G, scene, u, accent) {
@@ -480,17 +485,37 @@ function background(ctx, G, t, accent, grain, frame) {
   }
 }
 
+/* ── Your own footage ─────────────────────────────────────────────────── */
+/**
+ * A clip the owner filmed, full-bleed under everything (cover, centred), with
+ * a dark wash top and bottom so white boxes and cards read on any picture.
+ * The video element's current frame is drawn: during playback it plays in
+ * step; when scrubbing, the studio seeks it first.
+ */
+function footageLayer(ctx, G, video, accent) {
+  const { W, H } = G;
+  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+  const vw = video.videoWidth || W, vh = video.videoHeight || H;
+  const s = Math.max(W / vw, H / vh);
+  try { ctx.drawImage(video, (W - vw * s) / 2, (H - vh * s) / 2, vw * s, vh * s); } catch { /* not ready yet */ }
+  const g = ctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, 'rgba(0,0,0,0.45)'); g.addColorStop(0.3, 'rgba(0,0,0,0.12)');
+  g.addColorStop(0.7, 'rgba(0,0,0,0.25)'); g.addColorStop(1, 'rgba(0,0,0,0.6)');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = `${accent}14`; ctx.fillRect(0, 0, W, H);
+}
+
 /* ── The frame ─────────────────────────────────────────────────────────── */
 const money = (lang) => (c) => `€${(c / 100).toFixed(2).replace('.', lang === 'nl' ? ',' : '.')}`;
 
 function drawScene(ctx, G, timeline, assets, scene, u, t) {
   const A = {
-    accent: scene.accent || '#a855f7', t, lang: timeline.lang,
+    accent: scene.accent || '#a855f7', t, lang: timeline.lang, footage: !!assets.footage,
     img: (url) => assets.images?.[url] || null,
     money: money(timeline.lang),
     count: (n) => Number(n).toLocaleString(timeline.lang === 'nl' ? 'nl-NL' : 'en-GB'),
   };
-  (SCENES[scene.type] || SCENES.trust)(ctx, G, scene.data, u, A);
+  (SCENES[scene.type] || SCENES.trust)(ctx, G, scene.data, u, A, scene);
 }
 
 /** Draw the frame at t seconds. Pure: depends only on (timeline, assets, t, opts). */
@@ -502,11 +527,13 @@ export function drawFrame(ctx, timeline, assets, t, { captions: showCaptions = t
   const accent = scene.accent || '#a855f7';
   ctx.save();
   ctx.letterSpacing = '0px';
-  background(ctx, G, t, accent, assets.grain, Math.round(t * 30));
+  if (assets.footage) footageLayer(ctx, G, assets.footage, accent);
+  else background(ctx, G, t, accent, assets.grain, Math.round(t * 30));
 
   /* Hand-over: the last scene zooms past and blurs out while this one
      settles in out of a blur. */
-  const k = i > 0 ? eio(u / XFADE) : 1;
+  const xf = UGC_TYPES.includes(scene.type) ? 0.2 : XFADE;
+  const k = i > 0 ? eio(u / xf) : 1;
   if (i > 0 && k < 1) {
     const prev = timeline.scenes[i - 1];
     ctx.save();
@@ -533,7 +560,8 @@ export function drawFrame(ctx, timeline, assets, t, { captions: showCaptions = t
     ctx.fillStyle = '#ffffff'; ctx.fillText('FORGE', 84 * G.k, 76 * G.k);
     ctx.fillStyle = accent; ctx.fillText('MARKET', 84 * G.k + ctx.measureText('FORGE').width, 76 * G.k);
     ctx.restore();
-  } else if (timeline.disclaimer) {
+  }
+  if ((scene.type === 'end' || scene.type === 'ugc-cta') && timeline.disclaimer) {
     ctx.save();
     ctx.globalAlpha = eo(at(u, 1.2, 0.5)) * 0.5;
     const size = fit(ctx, timeline.disclaimer, 22 * G.u, W - 170 * G.k, 'Inter', '400');
@@ -542,7 +570,8 @@ export function drawFrame(ctx, timeline, assets, t, { captions: showCaptions = t
     ctx.restore();
   }
 
-  if (showCaptions && scene.type !== 'end') captions(ctx, G, scene, u, accent);
+  /* UGC beats carry their own line in caption boxes, in step with the voice. */
+  if (showCaptions && scene.type !== 'end' && !UGC_TYPES.includes(scene.type)) captions(ctx, G, scene, u, accent);
   ctx.restore();
 }
 
@@ -564,8 +593,8 @@ export function cuesOf(timeline) {
   const out = [];
   for (const s of timeline.scenes) {
     if (s.start > 0) out.push(['whoosh', s.start]);
-    if (s.type === 'end') out.push(['riser', Math.max(0, s.start - 0.9)]);
-    for (const [kind, rel] of CUES[s.type] || []) if (rel < s.dur) out.push([kind, s.start + rel]);
+    if (s.type === 'end' || s.type === 'ugc-cta') out.push(['riser', Math.max(0, s.start - 0.9)]);
+    for (const [kind, rel] of CUES[s.type] || UGC_CUES[s.type] || []) if (rel < s.dur) out.push([kind, s.start + rel]);
   }
   return out.sort((a, b) => a[1] - b[1]);
 }
@@ -610,6 +639,9 @@ const SFX = {
   pop(ctx, out, t) { tone(ctx, out, t, { f0: 420, f1: 980, peak: 0.12, decay: 0.1 }); },
   shine(ctx, out, t) { [2093, 2637, 3136].forEach((f, i) => tone(ctx, out, t + i * 0.045, { f0: f, peak: 0.05, decay: 0.5 })); },
   ding(ctx, out, t) { tone(ctx, out, t, { f0: 1318, peak: 0.12, decay: 0.9 }); tone(ctx, out, t + 0.05, { f0: 1976, peak: 0.08, decay: 1.0 }); },
+  buzz(ctx, out, t) { tone(ctx, out, t, { f0: 110, f1: 92, type: 'square', peak: 0.12, decay: 0.32 }); tone(ctx, out, t, { f0: 116, f1: 96, type: 'square', peak: 0.08, decay: 0.32 }); },
+  type(ctx, out, t) { for (let i = 0; i < 6; i++) noiseHit(ctx, out, t + i * 0.075, { f0: 3800, f1: 2600, q: 2, peak: 0.05, attack: 0.001, decay: 0.03 }); },
+  check(ctx, out, t) { tone(ctx, out, t, { f0: 880, peak: 0.1, decay: 0.12 }); tone(ctx, out, t + 0.09, { f0: 1320, peak: 0.1, decay: 0.3 }); },
   riser(ctx, out, t) { noiseHit(ctx, out, t, { type: 'highpass', f0: 400, f1: 7000, peak: 0.16, attack: 0.85, decay: 0.06 }); },
 };
 
@@ -724,7 +756,7 @@ export function recorderType() {
  * Resolves with the recorded Blob (or null). `onTime` reports progress;
  * calling the returned `stop` ends early.
  */
-export function play(canvas, timeline, assets, voices, { record = false, monitor = true, music = true, captions: showCaptions = true, onTime } = {}) {
+export function play(canvas, timeline, assets, voices, { record = false, monitor = true, music = true, captions: showCaptions = true, footageAudio = false, onTime } = {}) {
   const ctx2d = canvas.getContext('2d');
   const AC = window.AudioContext || window.webkitAudioContext;
   const ac = new AC();
@@ -734,6 +766,22 @@ export function play(canvas, timeline, assets, voices, { record = false, monitor
   if (monitor) out.connect(ac.destination);
   const t0 = ac.currentTime + 0.25;
   scheduleAudio(ac, out, timeline, voices, t0, { music });
+  /* Your own clip plays in step from the first frame; its sound (your own
+     voice) joins the mix when asked for. */
+  const clip = assets.footage;
+  if (clip) {
+    clip.pause(); clip.currentTime = 0; clip.loop = true;
+    /* The element plays its own sound to the speakers; a capture of it goes
+       only into the recording, so you do not hear it twice. */
+    clip.muted = !footageAudio;
+    if (footageAudio && record) {
+      try {
+        const st = (clip.captureStream || clip.mozCaptureStream)?.call(clip);
+        if (st?.getAudioTracks().length) ac.createMediaStreamSource(st).connect(dest);
+      } catch { /* no sound from this clip */ }
+    }
+    setTimeout(() => { clip.play().catch(() => {}); }, 250);
+  }
   let recorder = null; const chunks = [];
   const type = recorderType();
   if (record) {
@@ -747,6 +795,7 @@ export function play(canvas, timeline, assets, voices, { record = false, monitor
   const finish = () => {
     if (stopped) return; stopped = true;
     cancelAnimationFrame(raf);
+    assets.footage?.pause();
     const close = () => ac.close().catch(() => {});
     if (recorder && recorder.state !== 'inactive') {
       recorder.onstop = () => { close(); resolveDone(new Blob(chunks, { type: type.split(';')[0] || 'video/webm' })); };

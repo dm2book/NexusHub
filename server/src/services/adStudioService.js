@@ -136,7 +136,7 @@ function words(f, lang, extra) {
   };
 }
 
-const DISCLAIMER = {
+export const DISCLAIMER = {
   nl: 'Alle merknamen zijn van hun eigenaars. ForgeMarket is niet gelieerd aan de uitgevers van deze games of diensten.',
   en: 'All brand names belong to their owners. ForgeMarket is not affiliated with the publishers of these games or services.',
   de: 'Alle Markennamen gehören ihren Eigentümern. ForgeMarket ist nicht mit den Herausgebern dieser Spiele oder Dienste verbunden.',
