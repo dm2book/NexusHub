@@ -10,6 +10,10 @@
  * customer notification + branded email.
  */
 import { run, get, all, nowIso, tx } from '../db/index.js';
+import { waitUntil } from '@vercel/functions';
+
+/* Keep the function alive for work that outlives the response (a no-op off Vercel). */
+const keepAlive = (p) => { try { waitUntil(p); } catch { /* not in a request */ } return p; };
 import { newId, newOrderNumber } from '../utils/ids.js';
 import { formatMoney } from '../utils/money.js';
 import { config, manualPayMethods } from '../config/env.js';
@@ -653,7 +657,10 @@ export async function transitionOrder(orderId, to, ctx = {}) {
   // supplier integration actually covers an item — otherwise the order waits in
   // the manual queue exactly as before.
   if (to === 'payment_received') {
-    autoDispenseFromStock(orderId, ctx)
+    /* Not awaited — the webhook must answer Stripe quickly — but handed to
+       waitUntil: on Vercel a function is frozen the moment its response is
+       sent, and delivery left running then waited for the next sweep. */
+    keepAlive(autoDispenseFromStock(orderId, ctx)
       .then(async (delivered) => {
         if (delivered) return;
         // Not in local stock → hand off to the serial supplier queue, which
@@ -670,7 +677,7 @@ export async function transitionOrder(orderId, to, ctx = {}) {
         // Queue it for hand delivery so it never sits invisible.
         await ensureManualFulfillment(orderId, ctx);
       })
-      .catch((e) => console.error('[autodispense]', e.message));
+      .catch((e) => console.error('[autodispense]', e.message)));
     // Paid spend may push the buyer into a new loyalty tier → grant its bonus.
     if (updated.userId) grantTierRewards(updated.userId).catch((e) => console.error('[loyalty]', e.message));
     // Earn Forge Coins (€10 = 1 coin), idempotent per order.
