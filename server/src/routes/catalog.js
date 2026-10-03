@@ -25,7 +25,7 @@ import { LANDING } from '../../../src/content/seo.js';
 import { productPayload, stockLeftFor, instantFor } from '../services/productPayload.js';
 import { submitProof, getOrderProof } from '../services/paymentProofService.js';
 import { listEnabledProviders } from '../services/oauthService.js';
-import { isEnabled as stripeEnabled, createCheckoutSession } from '../services/stripeService.js';
+import { isEnabled as stripeEnabled, createCheckoutSession, openSession } from '../services/stripeService.js';
 import { isEnabled as mollieEnabled, SUPPORTED_METHODS as MOLLIE_METHODS } from '../services/mollieService.js';
 import { countryOf } from '../utils/netRisk.js';
 import { holdMessage } from '../services/fraudService.js';
@@ -588,6 +588,13 @@ router.post('/orders/:id/checkout', requireLaunched('Payment', { money: true }),
     const { email } = z.object({ email: z.string().email().optional() }).parse(req.body || {});
     await assertOwnsOrder(req, order, email);
     if (order.status !== 'pending') return res.json({ alreadyPaid: true });
+    /* The session already made for this order, if it is still open: pressing
+       "pay" twice must not open two ways to pay one order. */
+    const prev = await getPspPayment(order.id).catch(() => null);
+    if (prev?.provider === 'stripe') {
+      const open = await openSession(prev.paymentId);
+      if (open) return res.json({ url: open.url });
+    }
     const session = await createCheckoutSession(order);
     /* Remembered now, not when the money lands.
        A refund and a dispute arrive against the PAYMENT and carry no order id of

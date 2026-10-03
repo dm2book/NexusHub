@@ -117,7 +117,16 @@ export async function createOrder(input, ctx = {}) {
      a mixed order names each thing once. */
   const missingTargets = new Set();
 
+  /* One line per product. Two lines of the same product claimed codes for the
+     same order twice, got the same code back, and delivered one of two paid. */
+  const merged = new Map();
   for (const li of input.items) {
+    const q = Math.max(1, Math.round(Number(li.quantity) || 1));
+    const prev = merged.get(li.productId);
+    if (prev) prev.quantity += q;
+    else merged.set(li.productId, { ...li, quantity: q });
+  }
+  for (const li of merged.values()) {
     const product = await getProduct(li.productId);
     if (!product) throw badRequest(`Unknown product: ${li.productId}`);
     if (!product.active) throw conflict(`Product not available: ${product.name}`);
@@ -568,6 +577,14 @@ export async function transitionOrder(orderId, to, ctx = {}) {
        but not until their caches expire, which would leave a refunded order
        announced as "sold" for another minute. */
     bustSocialCaches();
+  }
+
+  /* An order that will not be delivered any more leaves the hand-delivery
+     queue: nobody should top up an account for a refunded order. */
+  if (['refunded', 'cancelled', 'failed'].includes(to)) {
+    await run(`UPDATE fulfillment_requests SET status='cancelled', updated_at=@at
+                WHERE order_id=@id AND status IN ('pending','in_progress','requested')`, { id: orderId, at: nowIso() })
+      .catch((e) => console.error('[fulfillment] close on undo:', e.message));
   }
 
   /* Give back exactly what the ledger shows this order took from the wallet —

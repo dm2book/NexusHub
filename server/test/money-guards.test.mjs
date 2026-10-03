@@ -123,6 +123,29 @@ const fresh = (i) => createOrder({ email: `wh-${i}@example.test`, items: [{ prod
   ok('the event ends with a real outcome', row?.outcome === 'paid', row?.outcome);
 }
 
+console.log('\n— Stock and the hand-delivery queue —');
+{
+  const { addProductCodes } = await import('../src/services/codeStockService.js');
+  const { listManualQueue, completeManualFulfillment } = await import('../src/services/fulfillmentService.js');
+  const coded = await createProduct({ name: 'Guard Code Card', category: 'giftcard', price: 1000, announce: false });
+  ok('the same code uploaded twice is in stock once', (await addProductCodes(coded.id, ['SAME-0001', 'SAME-0001'])) === 1
+    && (await addProductCodes(coded.id, ['SAME-0001', 'OTHER-0002'])) === 1);
+  const two = await createOrder({ email: 'lines@example.test', items: [{ productId: coded.id, quantity: 1 }, { productId: coded.id, quantity: 1 }], ...consent });
+  ok('two lines of one product become one line of two', two.items.length === 1 && two.items[0].quantity === 2 && two.total === 2000,
+    JSON.stringify(two.items.map((i) => i.quantity)));
+
+  const o = await createOrder({ email: 'queue@example.test', items: [{ productId: product.id, quantity: 1 }], ...consent });
+  await run(`UPDATE orders SET status='payment_received' WHERE id=@id`, { id: o.id });
+  const rid = newId('ful');
+  await run(`INSERT INTO fulfillment_requests (id, order_id, order_item_id, mode, status, created_at, updated_at)
+             VALUES (@id, @o, @i, 'manual', 'pending', @at, @at)`, { id: rid, o: o.id, i: o.items[0].id, at: nowIso() });
+  ok('a paid order is in the queue', (await listManualQueue()).some((r) => r.id === rid));
+  await transitionOrder(o.id, 'refunded', { actorId: 'test' });
+  ok('…refunded, it leaves the queue', !(await listManualQueue()).some((r) => r.id === rid));
+  const done = await completeManualFulfillment(rid, { deliveries: [{ type: 'code', content: 'X' }] }).then(() => 'delivered', (e) => e.message);
+  ok('…and cannot be delivered any more', /no longer be delivered/.test(done), done);
+}
+
 console.log('\n— The launch blockers —');
 {
   const { config, commerceBlockers } = await import('../src/config/env.js');

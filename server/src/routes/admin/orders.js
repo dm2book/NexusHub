@@ -12,6 +12,7 @@ import {
   exportOrdersCsv, orderUrlFor, setOrderPayLink, clearOrderPayLink, getPspPayment,
 } from '../../services/orderService.js';
 import { refundPayment, isEnabled as mollieEnabled } from '../../services/mollieService.js';
+import { refundPaymentIntent, isEnabled as stripeEnabled } from '../../services/stripeService.js';
 import { PayLinkError } from '../../utils/payLink.js';
 import { fulfillOrder, listFulfillment, listFulfillmentLogs } from '../../services/fulfillmentService.js';
 import * as analytics from '../../services/analyticsService.js';
@@ -165,6 +166,17 @@ router.post('/:id/refund', requirePermission('orders.refund'),
         await audit({ actor: req.user, action: 'order.refund_failed', targetType: 'order',
           targetId: existing.id, metadata: { paymentId: psp.paymentId, error: e.message }, req });
         throw badRequest(`Mollie refused the refund: ${e.message}`);
+      }
+    }
+    /* The same for Stripe, which this branch did not have: the order went to
+       `refunded`, the buyer was told so, and the money stayed with the shop. */
+    if (psp?.provider === 'stripe' && stripeEnabled()) {
+      try {
+        refund = await refundPaymentIntent(existing.paymentRef || psp.paymentId, { cents: existing.total, orderId: existing.id });
+      } catch (e) {
+        await audit({ actor: req.user, action: 'order.refund_failed', targetType: 'order',
+          targetId: existing.id, metadata: { paymentId: psp.paymentId, error: e.message }, req });
+        throw badRequest(`Stripe refused the refund: ${e.message}`);
       }
     }
 

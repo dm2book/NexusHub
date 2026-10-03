@@ -17,10 +17,14 @@ export async function addProductCodes(productId, codes = []) {
   let added = 0;
   await tx(async () => {
     for (const code of clean) {
-      await run(`INSERT INTO product_codes (id, product_id, code, status, created_at)
-           VALUES (@id, @p, @c, 'available', @at)`,
+      /* A code already in stock — this upload or an earlier one — is skipped:
+         two rows of one code is one code sold twice. */
+      const known = await get(`SELECT 1 FROM product_codes WHERE product_id=@p AND md5(code)=md5(@c) LIMIT 1`, { p: productId, c: code });
+      if (known) continue;
+      const r = await run(`INSERT INTO product_codes (id, product_id, code, status, created_at)
+           VALUES (@id, @p, @c, 'available', @at) ON CONFLICT DO NOTHING`,
           { id: newId('pcd'), p: productId, c: code, at });
-      added++;
+      if (r?.changes !== 0) added++;
     }
   });
   if (added > 0) {

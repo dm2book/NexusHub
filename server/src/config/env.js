@@ -342,6 +342,11 @@ export const config = {
     stripe: {
       secretKey: env.STRIPE_SECRET_KEY || '',
       webhookSecret: env.STRIPE_WEBHOOK_SECRET || '',
+      /* Which methods Checkout offers. Pinned, because Stripe otherwise offers
+         every method switched on in the dashboard — SEPA Direct Debit among
+         them, which the payer can reverse for eight weeks with no reason
+         given, after the code was already redeemed. */
+      methods: (env.STRIPE_PAYMENT_METHODS || 'card,ideal,bancontact').split(',').map((m) => m.trim()).filter(Boolean),
     },
     // Mollie: hosted checkout for iDEAL, Bancontact, Apple Pay, card and PayPal.
     // One key switches it on. There is no webhook secret to configure — Mollie

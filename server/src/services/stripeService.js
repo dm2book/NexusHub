@@ -82,8 +82,16 @@ export async function createCheckoutSession(order) {
   const s = await stripe();
   if (!s) throw new Error('Stripe is not configured');
 
-  const session = await s.checkout.sessions.create({
+  const params = {
     mode: 'payment',
+    payment_method_types: config.payments.stripe.methods,
+    /* Ask the bank for 3-D Secure on every card: a digital code cannot be
+       taken back, and an authenticated payment moves a fraud chargeback's
+       liability to the card issuer. */
+    payment_method_options: { card: { request_three_d_secure: 'any' } },
+    /* A session lives 30 minutes (Stripe's minimum), so an old tab cannot pay
+       an order a second time long after a new session was made for it. */
+    expires_at: Math.floor(Date.now() / 1000) + 30 * 60,
     // Reuse the customer email so receipts and dashboards line up.
     customer_email: order.email,
     client_reference_id: order.id,
@@ -125,8 +133,41 @@ export async function createCheckoutSession(order) {
     locale: 'nl',
     success_url: `${config.appUrl}/checkout/success?order=${order.id}&n=${encodeURIComponent(order.number)}&session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${config.appUrl}/cart?canceled=1`,
-  });
+  };
+  let session;
+  try {
+    session = await s.checkout.sessions.create(params);
+  } catch (e) {
+    /* A method that is not switched on in the Stripe dashboard (iDEAL before
+       it is approved) refuses the whole session. Card still works: sell with
+       card rather than not at all, and say so loudly. */
+    if (!/payment_method_types|payment method type/i.test(e.message)) throw e;
+    console.error('[stripe] payment methods refused, falling back to card only:', e.message);
+    session = await s.checkout.sessions.create({ ...params, payment_method_types: ['card'] });
+  }
   return { id: session.id, url: session.url, paymentIntentId: session.payment_intent || null };
+}
+
+/** A Checkout session that is still open, by id — or null. */
+export async function openSession(id) {
+  const s = await stripe();
+  if (!s || !/^cs_/.test(String(id || ''))) return null;
+  const session = await s.checkout.sessions.retrieve(id).catch(() => null);
+  return session?.status === 'open' ? { id: session.id, url: session.url } : null;
+}
+
+/**
+ * Give a payment back in Stripe. `cents` omitted refunds the rest of the
+ * payment. One refund per order and amount: a double click creates nothing new.
+ */
+export async function refundPaymentIntent(ref, { cents, orderId } = {}) {
+  const s = await stripe();
+  if (!s) throw new Error('Stripe is not configured');
+  let pi = ref;
+  if (/^cs_/.test(String(ref))) pi = (await s.checkout.sessions.retrieve(ref)).payment_intent;
+  if (!/^pi_/.test(String(pi || ''))) throw new Error('No Stripe payment to refund on this order');
+  return s.refunds.create({ payment_intent: pi, ...(cents ? { amount: cents } : {}) },
+    { idempotencyKey: `refund-${orderId || pi}-${cents || 'all'}` });
 }
 
 /**

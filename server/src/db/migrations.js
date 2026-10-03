@@ -2071,4 +2071,26 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS lang TEXT;
       CREATE INDEX IF NOT EXISTS idx_social_events_recent ON social_events (created_at DESC) WHERE status = 'visible';
     `,
   },
+  {
+    id: '053_product_code_unique',
+    /*
+     * A code may be in stock once. The importer only de-duplicated within one
+     * paste, so the same code uploaded twice became two available rows and
+     * was sold to two buyers. Spare copies still on the shelf are removed
+     * (the oldest row is kept); then a unique index makes a second copy
+     * impossible. Should two copies of one code both have been SOLD already,
+     * the index is skipped rather than failing the deploy — that is a case for
+     * a human, and the importer's ON CONFLICT still refuses new duplicates.
+     */
+    sql: `
+      DELETE FROM product_codes pc USING product_codes keep
+       WHERE pc.status = 'available' AND keep.product_id = pc.product_id AND keep.code = pc.code
+         AND (keep.created_at, keep.id) < (pc.created_at, pc.id);
+      DO $$ BEGIN
+        CREATE UNIQUE INDEX IF NOT EXISTS uq_product_codes_code ON product_codes (product_id, md5(code));
+      EXCEPTION WHEN unique_violation THEN
+        RAISE NOTICE 'product_codes: sold duplicates exist, unique index not created';
+      END $$;
+    `,
+  },
 ];

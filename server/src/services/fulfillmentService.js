@@ -181,6 +181,9 @@ async function openManualFulfillment(order, item, ctx) {
   return get('SELECT * FROM fulfillment_requests WHERE id=@id', { id: reqId });
 }
 
+/* The statuses in which an order may still receive what it bought. */
+const DELIVERABLE = ['payment_received', 'processing', 'awaiting_fulfillment'];
+
 /**
  * Complete a manual fulfillment request: a staff member records the delivery
  * (code/file/message). Logged and may auto-complete the order.
@@ -189,6 +192,14 @@ export async function completeManualFulfillment(requestId, { deliveries = [], no
   const req = await get('SELECT * FROM fulfillment_requests WHERE id=@id', { id: requestId });
   if (!req) throw notFound('Fulfillment request not found');
   if (req.mode !== 'manual') throw badRequest('Not a manual fulfillment request');
+  /* Only an order that is paid, not refunded or charged back, and not held for
+     review may be delivered. The queue used to keep showing a refunded order,
+     and one click wrote its Robux onto it anyway. */
+  const order = await get('SELECT status, fraud_hold FROM orders WHERE id=@id', { id: req.order_id });
+  if (!order || !DELIVERABLE.includes(order.status) || order.fraud_hold) {
+    throw badRequest(order?.fraud_hold ? 'This order is held for review — release it first'
+      : `This order is ${order?.status || 'gone'} and can no longer be delivered`);
+  }
 
   /* The staff "deliver" button is one click, and one click is easy to make
      twice. Same writer as every other door into an order's deliveries, so a
@@ -276,6 +287,8 @@ export async function listManualQueue() {
                 JOIN orders o ON o.id = fr.order_id
                 LEFT JOIN order_items oi ON oi.id = fr.order_item_id
                WHERE fr.mode='manual' AND fr.status IN ('pending','in_progress')
+                 AND o.status IN ('payment_received','processing','awaiting_fulfillment')
+                 AND COALESCE(o.fraud_hold, 0) = 0
                ORDER BY fr.created_at ASC`);
   // Surface everything the owner needs to fulfil by hand in one glance: the
   // exact listing to buy from, how many, and where to send it (the buyer's
