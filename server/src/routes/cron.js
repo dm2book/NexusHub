@@ -11,6 +11,10 @@ const router = Router();
 // Health & diagnostics: { database, email, sms, storage, queue }.
 // ?deep=1 also runs a read/write/update/delete DB self-test.
 router.get('/health', asyncHandler(async (req, res) => {
+  /* The plain check is public (the footer dot, uptime monitors). The deep one
+     writes to the database on every call, and `tables` lists row counts of
+     users and sessions — both only for whoever holds the cron secret. */
+  if (req.query.deep || req.query.tables) assertCron(req);
   const h = await healthSummary({ deep: req.query.deep === '1', tables: req.query.tables === '1' });
   /* The storefront footer polls this on every page view to decide whether to
      show "systems normal". Thirty seconds of edge caching turns that from an

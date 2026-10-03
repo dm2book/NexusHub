@@ -431,10 +431,16 @@ router.get('/tickets', asyncHandler(async (req, res) => {
 
 router.post('/tickets', asyncHandler(async (req, res) => {
   const body = z.object({
-    subject: z.string().min(3), message: z.string().min(1),
+    subject: z.string().min(3).max(150), message: z.string().min(1).max(5000),
     category: z.enum(['general', 'refund', 'delivery', 'billing']).optional(),
-    orderId: z.string().optional(),
+    orderId: z.string().max(64).optional(),
   }).parse(req.body);
+  /* A ticket may name only the buyer's own order. */
+  if (body.orderId) {
+    const own = await get(`SELECT 1 FROM orders WHERE id=@o AND (user_id=@u OR lower(email)=lower(@e))`,
+      { o: body.orderId, u: req.user.id, e: req.user.email || '' });
+    if (!own) delete body.orderId;
+  }
   const ticket = await support.openTicket({ ...body, userId: req.user.id });
   res.status(201).json({ ticket });
 }));
@@ -448,7 +454,7 @@ router.get('/tickets/:id', asyncHandler(async (req, res) => {
 router.post('/tickets/:id/reply', asyncHandler(async (req, res) => {
   const t = await support.getTicket(req.params.id);
   if (!t || t.user_id !== req.user.id) throw notFound('Ticket not found');
-  const { body } = z.object({ body: z.string().min(1) }).parse(req.body);
+  const { body } = z.object({ body: z.string().min(1).max(5000) }).parse(req.body);
   res.json({ ticket: await support.replyTicket(req.params.id,
     { authorId: req.user.id, authorKind: 'customer', body }) });
 }));

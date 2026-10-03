@@ -148,7 +148,8 @@ export const SECRETS = [
     hint: 're_… — from resend.com → API Keys.' },
 
   { id: 'notify.discordWebhookUrl', label: 'Discord alert webhook', env: 'NOTIFY_DISCORD_WEBHOOK_URL',
-    path: ['notify', 'discordWebhookUrl'], group: 'Alerts', secret: false,
+    /* Secret: whoever holds the URL can post as the shop. */
+    path: ['notify', 'discordWebhookUrl'], group: 'Alerts', secret: true,
     why: 'Where a chargeback or a failed delivery reaches you in seconds instead of by email.' },
   { id: 'notify.telegram.botToken', label: 'Telegram bot token', env: 'TELEGRAM_BOT_TOKEN',
     path: ['notify', 'telegram', 'botToken'], group: 'Alerts',

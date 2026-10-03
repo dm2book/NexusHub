@@ -636,7 +636,9 @@ export async function transitionOrder(orderId, to, ctx = {}) {
 
   /* Give back exactly what the ledger shows this order took from the wallet —
      never a number stored on the order, which is only a copy. */
-  if ((to === 'refunded' || to === 'cancelled') && updated.userId) {
+  /* `failed` too: an order the fraud engine blocks took the buyer's credit and
+     never gave it back. */
+  if (['refunded', 'cancelled', 'failed'].includes(to) && updated.userId) {
     const spent = await spentOnOrder(orderId).catch(() => 0);
     if (spent > 0 && !(await hasOrderEntry(orderId, 'refund').catch(() => true))) {
       await credit(updated.userId, spent, 'refund',

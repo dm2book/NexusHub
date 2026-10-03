@@ -153,6 +153,7 @@ export function ensureReady() {
 export function createApp({ lazyReady = false } = {}) {
   const app = express();
   app.set('trust proxy', 1);
+  app.disable('x-powered-by');   // no need to tell every scanner which framework to try
 
   // CORS: allow the storefront origin. Same-origin deploys don't need it but it
   // is harmless and supports split frontend/api domains.

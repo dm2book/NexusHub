@@ -71,7 +71,9 @@ const ctxOf = (req) => ({
  */
 export const HINT_COOKIE = 'fm_session_hint';
 function setSessionHint(res, on) {
-  const opts = { httpOnly: false, secure: config.isProd, sameSite: config.isProd ? 'none' : 'lax', path: '/' };
+  /* Lax: the shop and its API share one origin, so no cross-site request ever
+     needs these cookies — and a cross-site POST should not carry them. */
+  const opts = { httpOnly: false, secure: config.isProd, sameSite: 'lax', path: '/' };
   if (on) res.cookie(HINT_COOKIE, '1', { ...opts, maxAge: 60 * 86_400_000 });
   else res.clearCookie(HINT_COOKIE, { path: '/' });
 }
@@ -85,7 +87,7 @@ function setSessionCookie(res, refreshToken) {
     // frontend + separate API host). 'none' lets the browser send the session
     // cookie on those cross-site refresh requests so people stay logged in;
     // it requires secure:true, which we always set in prod. Dev stays 'lax'.
-    sameSite: config.isProd ? 'none' : 'lax',
+    sameSite: 'lax',
     maxAge: config.auth.refreshTtlDays * 86_400_000,
     path: '/api/auth',
   });
@@ -94,7 +96,7 @@ function setSessionCookie(res, refreshToken) {
 function setDeviceCookie(res, token) {
   setSessionHint(res, true);
   res.cookie(DEVICE_COOKIE, token, {
-    httpOnly: true, secure: config.isProd, sameSite: config.isProd ? 'none' : 'lax',
+    httpOnly: true, secure: config.isProd, sameSite: 'lax',
     maxAge: 60 * 86_400_000, path: '/api/auth',
   });
 }
