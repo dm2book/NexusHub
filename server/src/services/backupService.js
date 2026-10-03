@@ -54,7 +54,9 @@ export const TABLES = [
   { name: 'categories_note', skip: true },
   { name: 'orders' },
   { name: 'order_items' },
-  { name: 'users' },
+  /* The authenticator secret is a second factor, not data worth restoring:
+     whoever holds a backup must not also hold everyone's 2FA. */
+  { name: 'users', redact: ['totp_secret'] },
   { name: 'coupons' },
   { name: 'gift_cards' },
   { name: 'bundles' },

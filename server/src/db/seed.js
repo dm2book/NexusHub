@@ -55,7 +55,9 @@ const ROLES = {
   support: {
     name: 'Support',
     rank: 40,
-    perms: ['orders.read', 'orders.contact', 'orders.refund', 'tickets.read',
+    /* No refunds: a refund now sends real money back through Stripe or
+       Mollie, with no ceiling. Support raises it; an admin or owner issues it. */
+    perms: ['orders.read', 'orders.contact', 'tickets.read',
             'tickets.manage', 'users.read'],
   },
   fulfillment_manager: {

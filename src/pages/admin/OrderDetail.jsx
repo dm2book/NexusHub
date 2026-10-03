@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Truck, CheckCircle2, RotateCcw, AlertTriangle } from 'lucide-react';
 import { api } from '../../lib/api.js';
-import { money, date } from '../../lib/format.js';
+import { money, date, confirmRefund } from '../../lib/format.js';
 import { PageLoader, StatusBadge, STATUS_META, Modal } from '../../components/ui.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
@@ -59,7 +59,7 @@ export default function AdminOrderDetail() {
             <button onClick={() => act('fulfill')} disabled={busy} className="btn-ghost text-sm"><Truck size={16} /> Fulfill</button>
           )}
           {hasPermission('orders.refund') && order.status !== 'refunded' && order.status !== 'cancelled' && (
-            <button onClick={() => act('refund')} disabled={busy} className="btn-ghost text-sm"><RotateCcw size={16} /> Refund</button>
+            <button onClick={() => confirmRefund(order) && act('refund')} disabled={busy} className="btn-ghost text-sm"><RotateCcw size={16} /> Refund</button>
           )}
         </div>
       </div>

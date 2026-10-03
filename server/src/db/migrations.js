@@ -2093,4 +2093,9 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS lang TEXT;
       END $$;
     `,
   },
+  {
+    id: '053b_support_cannot_refund',
+    /* Support loses orders.refund (see seed.js): a refund moves real money. */
+    sql: `DELETE FROM role_permissions WHERE role_id = 'support' AND permission_id = 'orders.refund';`,
+  },
 ];

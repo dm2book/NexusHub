@@ -213,11 +213,24 @@ router.get('/users/:id', requirePermission('users.read'), asyncHandler(async (re
 // Assign roles. Only owners may grant the owner role.
 router.put('/users/:id/roles', requirePermission('users.manage'),
   asyncHandler(async (req, res) => {
-    const { roles } = z.object({ roles: z.array(z.string()).min(1) }).parse(req.body);
+    const { roles } = z.object({ roles: z.array(z.string()).min(1).max(10) }).parse(req.body);
     if (!(await getUserById(req.params.id))) throw notFound('User not found');
-    if (roles.includes('owner') && !(req.user.roles || []).includes('owner')) {
-      throw badRequest('Only an Owner can grant the Owner role');
+    const known = new Set((await all('SELECT id FROM roles')).map((r) => r.id));
+    const unknown = roles.filter((r) => !known.has(r));
+    if (unknown.length) throw badRequest(`Unknown role: ${unknown.join(', ')}`);
+    const actorIsOwner = (req.user.roles || []).includes('owner');
+    const current = (await all('SELECT role_id FROM user_roles WHERE user_id=@u', { u: req.params.id })).map((r) => r.role_id);
+    /* Granting owner was guarded; taking it away was not — an admin could set
+       the owner to plain customer. Only an owner changes an owner, and the
+       last owner cannot be removed. */
+    if ((roles.includes('owner') || current.includes('owner')) && !actorIsOwner) {
+      throw badRequest('Only an Owner can grant or remove the Owner role');
     }
+    if (current.includes('owner') && !roles.includes('owner')) {
+      const owners = await all(`SELECT DISTINCT user_id FROM user_roles WHERE role_id='owner'`);
+      if (owners.length <= 1) throw badRequest('This is the last Owner — add another Owner first');
+    }
+    if (req.params.id === req.user.id && !actorIsOwner) throw badRequest('You cannot change your own roles');
     await setUserRoles(req.params.id, roles, req.user.id);
     await audit({ actor: req.user, action: 'user.roles_update', targetType: 'user',
       targetId: req.params.id, metadata: { roles }, req });
@@ -254,15 +267,25 @@ router.get('/users/:id/wallet', requirePermission('wallet.manage'),
     res.json(await walletSummary(req.params.id));
   }));
 
+/* The most one grant may give: €100 for staff, €1,000 for an owner (env STAFF_CREDIT_MAX_CENTS). */
+const MAX_GRANT = 100_000;
+const staffGrantCap = () => Number(process.env.STAFF_CREDIT_MAX_CENTS || 10_000);
+
 // Grant or deduct store credit for a user (e.g. goodwill, manual payout).
 router.post('/users/:id/credit', requirePermission('wallet.manage'),
   asyncHandler(async (req, res) => {
     const { amount, description } = z.object({
-      amount: z.number().int(),            // cents, positive = grant, negative = deduct
+      /* Cents, positive = grant, negative = deduct. Capped: a typo — or an
+         admin crediting themselves €999,999 — is not a goodwill gesture. */
+      amount: z.number().int().min(-50_000).max(MAX_GRANT),
       description: z.string().max(200).optional(),
     }).parse(req.body || {});
     if (!(await getUserById(req.params.id))) throw notFound('User not found');
     if (amount === 0) throw badRequest('Amount cannot be zero');
+    if (req.params.id === req.user.id && amount > 0) throw badRequest('You cannot grant store credit to yourself');
+    if (amount > staffGrantCap() && !(req.user.roles || []).includes('owner')) {
+      throw badRequest(`Grants above €${(staffGrantCap() / 100).toFixed(2)} need the Owner`);
+    }
     const entry = await addEntry({
       userId: req.params.id, amount, type: amount > 0 ? 'grant' : 'adjustment',
       description: description || (amount > 0 ? 'Store credit granted' : 'Store credit adjustment'),
