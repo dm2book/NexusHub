@@ -27,7 +27,7 @@ export async function attachUser(req, _res, next) {
        then throw away: one wasted read on a rare path, against a saved round
        trip on the common one. */
     const [sessionOk, user] = await Promise.all([
-      claims.sid ? isSessionActive(claims.sid) : true,
+      isSessionActive(claims.sid),
       publicUser(claims.sub),
     ]);
     if (!sessionOk) return next();

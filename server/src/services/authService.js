@@ -126,10 +126,18 @@ export async function verifyEmailOtp(email, code, ctx = {}) {
   const live = rows.filter((r) => new Date(r.expires_at) >= new Date());
   if (!live.length) throw badRequest('Code expired. Request a new one.');
 
+  /* The limit is checked BEFORE the code, and across every live code for this
+     address: checked after, a correct guess still signed in once the "too
+     many attempts" answer had been given — and spread over IPs, the 6 digits
+     could be walked. Hitting it burns all live codes. */
+  const tried = live.reduce((a, r) => a + Number(r.attempts || 0), 0);
+  if (tried >= config.auth.otpMaxAttempts) {
+    await run(`UPDATE otp_codes SET consumed_at = @at WHERE email = @e AND consumed_at IS NULL`, { at: nowIso(), e });
+    throw tooMany('Too many attempts. Request a new code.');
+  }
   const match = live.find((r) => safeEqual(r.code_hash, supplied));
   if (!match) {
-    // Wrong code: count the attempt against the newest live code, and lock out
-    // only once that one has burned through its attempts.
+    // Wrong code: counted against the newest live code.
     const newest = live[0];
     await audit({ action: 'auth.otp_verify_fail', actor: { email: e }, targetType: 'email', targetId: e,
       metadata: { ip: ctx.ip, attempts: newest.attempts + 1 }, req: ctx.req });
@@ -203,10 +211,14 @@ export async function verifyPhoneOtp(phone, code, ctx = {}) {
   if (!rows.length) throw badRequest('No active code. Request a new one.');
   const live = rows.filter((r) => new Date(r.expires_at) >= new Date());
   if (!live.length) throw badRequest('Code expired. Request a new one.');
+  const tried = live.reduce((a, r) => a + Number(r.attempts || 0), 0);
+  if (tried >= config.auth.otpMaxAttempts) {
+    await run(`UPDATE sms_verifications SET consumed_at=@at WHERE phone=@p AND consumed_at IS NULL`, { at: nowIso(), p });
+    throw tooMany('Too many attempts. Request a new code.');
+  }
   const match = live.find((r) => safeEqual(r.code_hash, supplied));
   if (!match) {
     const newest = live[0];
-    if (newest.attempts >= config.auth.otpMaxAttempts) throw tooMany('Too many attempts. Request a new code.');
     await run('UPDATE sms_verifications SET attempts = attempts + 1 WHERE id=@id', { id: newest.id });
     throw badRequest('Incorrect code');
   }
@@ -222,14 +234,16 @@ export async function verifyPhoneOtp(phone, code, ctx = {}) {
 
 /** Short-lived proof that the first factor (email/phone OTP) succeeded. */
 export function issueTotpTicket(user) {
-  return jwt.sign({ sub: user.id, purpose: 'totp' }, config.auth.jwtSecret, { expiresIn: '5m' });
+  /* Its own audience: the ticket proves the FIRST factor only, and must never
+     be accepted where a signed-in session is (verifyAccess refuses it). */
+  return jwt.sign({ sub: user.id, purpose: 'totp' }, config.auth.jwtSecret, { expiresIn: '5m', audience: 'totp-ticket' });
 }
 
 /** Validate a challenge ticket → the user row it belongs to (or throws). */
 export async function resolveTotpTicket(ticket) {
   let payload;
   try {
-    payload = jwt.verify(ticket, config.auth.jwtSecret);
+    payload = jwt.verify(ticket, config.auth.jwtSecret, { audience: 'totp-ticket' });
   } catch {
     throw unauthorized('Your login expired — sign in again.');
   }
@@ -266,11 +280,17 @@ async function signAccess(user, sessionId) {
 }
 
 export function verifyAccess(token) {
+  let claims;
   try {
-    return jwt.verify(token, config.auth.jwtSecret);
+    claims = jwt.verify(token, config.auth.jwtSecret);
   } catch {
     throw unauthorized('Session expired. Please sign in again.');
   }
+  /* An access token belongs to a session and has no purpose. The 2FA ticket is
+     signed with the same secret; accepted here, it let a stolen first factor
+     skip the authenticator code entirely. */
+  if (claims.purpose || claims.aud || !claims.sid) throw unauthorized('Session expired. Please sign in again.');
+  return claims;
 }
 
 /**

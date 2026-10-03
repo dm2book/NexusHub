@@ -390,6 +390,10 @@ router.get('/oauth/:provider/callback', asyncHandler(async (req, res) => {
     // that is something the buyer can read from a JSON body.
     return oauthFail(res, 'oauth_failed', provider);
   }
+  if (session.totpRequired) {
+    /* Not signed in yet: the SPA asks for the authenticator code. */
+    return res.redirect(`${config.appUrl}/auth/callback#totp=${encodeURIComponent(session.ticket)}`);
+  }
   await audit({ actor: { id: session.user.id, email: session.user.email },
     action: 'auth.login', metadata: { method: provider }, req });
   setSessionCookie(res, session.refreshToken);

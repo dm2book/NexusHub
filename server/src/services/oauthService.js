@@ -10,7 +10,7 @@ import { run, get, nowIso } from '../db/index.js';
 import { newId } from '../utils/ids.js';
 import { badRequest } from '../utils/errors.js';
 import { getUserByEmail, upsertUserByEmail } from './userService.js';
-import { finalizeLogin } from './authService.js';
+import { finalizeLogin, issueTotpTicket } from './authService.js';
 
 const redirectUri = (provider) => `${config.apiUrl}/api/auth/oauth/${provider}/callback`;
 
@@ -98,6 +98,10 @@ export async function handleOAuthCallback(providerId, code, ctx = {}) {
   if (!infoRes.ok) throw badRequest('Failed to load provider profile');
   const profile = p.mapProfile(await infoRes.json());
   if (!profile.email) throw badRequest('Provider did not return an email address');
+  /* An address the provider has not verified proves nothing: Discord lets
+     anyone type any email. Linked by email, it signed a stranger in as
+     whoever owned that address — the owner included. */
+  if (!profile.emailVerified) throw badRequest('Provider email is not verified');
 
   // Link by stable provider uid first, then fall back to email.
   const existingLink = await get(
@@ -108,6 +112,11 @@ export async function handleOAuthCallback(providerId, code, ctx = {}) {
   if (existingLink) {
     userId = existingLink.user_id;
   } else {
+    /* Staff accounts are never linked by email: a provider account becomes a
+       way into the admin only when its owner links it while signed in. */
+    const byEmail = await get(`SELECT u.id FROM users u JOIN user_roles ur ON ur.user_id = u.id
+                                WHERE lower(u.email) = lower(@e) AND ur.role_id <> 'customer' LIMIT 1`, { e: profile.email });
+    if (byEmail) throw badRequest('Sign in with your email code and link this account from your settings');
     const { user } = await upsertUserByEmail(profile.email, {
       email_verified: profile.emailVerified,
       display_name: profile.displayName,
@@ -121,5 +130,10 @@ export async function handleOAuthCallback(providerId, code, ctx = {}) {
   }
 
   const user = await get('SELECT * FROM users WHERE id = @id', { id: userId });
+  /* The same second factor as the email-code login: a provider sign-in is a
+     first factor, not a way around the authenticator app. */
+  if (user.totp_secret && user.totp_enabled_at) {
+    return { totpRequired: true, ticket: issueTotpTicket(user), user };
+  }
   return finalizeLogin(user, ctx, { provider: providerId });
 }
