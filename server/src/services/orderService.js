@@ -12,6 +12,8 @@
 import { run, get, all, nowIso, tx } from '../db/index.js';
 import { waitUntil } from '@vercel/functions';
 
+const ROBLOX_USERNAME = /^(?=.{3,20}$)[A-Za-z0-9]+(?:_[A-Za-z0-9]+)?$/;
+
 /* Keep the function alive for work that outlives the response (a no-op off Vercel). */
 const keepAlive = (p) => { try { waitUntil(p); } catch { /* not in a request */ } return p; };
 import { newId, newOrderNumber } from '../utils/ids.js';
@@ -41,11 +43,12 @@ import { balanceOf, debit, credit, hasOrderEntry, spentOnOrder } from './walletS
 import { grantTierRewards } from './loyaltyService.js';
 import { awardCoinsForOrder } from './forgeCoinService.js';
 import { settleMysteryForOrder } from './mysteryBoxService.js';
-import { evaluateCoupon, recordCouponRedemption } from './couponService.js';
+import { evaluateCoupon, recordCouponRedemption, releaseCouponRedemption } from './couponService.js';
 /* The one detail a category needs from the buyer, from the same module the
    product page and the checkout read. */
 import { deliveryField as deliveryFieldFor } from '../../../src/lib/deliveryInfo.js';
-import { emailCopy, redeemSteps, redeemFallback } from './emailCopy.js';
+import { emailCopy, redeemSteps, redeemFallback, localStamp, UNPAID_CANCEL_DAYS } from './emailCopy.js';
+import { vatRate, vatCents } from './vatService.js';
 import { bestBundleDiscount } from './bundleService.js';
 
 export const STATUSES = [
@@ -69,7 +72,13 @@ const STATUS_EMAIL = {
   processing: 'order_processing',
   completed: 'order_completed',
   refunded: 'refund_issued',
+  /* A cancelled order was silent: the auto-cancel after the unpaid period, a
+     staff cancel — the buyer found out, if at all, from a dead track page. */
+  cancelled: 'order_cancelled',
 };
+
+/** Re-exported for the maintenance sweep: the number the reminder mail promises. */
+export { UNPAID_CANCEL_DAYS };
 
 const parse = (s) => { try { return JSON.parse(s || '{}'); } catch { return {}; } };
 
@@ -166,6 +175,13 @@ export async function createOrder(input, ctx = {}) {
     if (needsTarget && !String(input.billing?.deliveryDetails || '').trim()) {
       missingTargets.add(needsTarget);
     }
+    /* A Roblox username that cannot exist would be delivered to nobody — or,
+       one typo off, to a stranger. Roblox's own rules: 3–20 letters, digits
+       and at most one underscore, not first or last. */
+    const target = String(input.billing?.deliveryDetails || '').trim();
+    if (String(product.category).toLowerCase() === 'robux' && target && !ROBLOX_USERNAME.test(target)) {
+      throw badRequest('Dit is geen geldige Roblox-gebruikersnaam (3–20 letters of cijfers, hooguit één _ in het midden).');
+    }
     const qty = Math.max(1, Number(li.quantity || 1));
     const unit = product.price;
     subtotal += unit * qty;
@@ -181,6 +197,11 @@ export async function createOrder(input, ctx = {}) {
   // Apply a discount coupon if one was supplied and is valid (DB-backed; server
   // is authoritative — the discount is recomputed here, never trusted from client).
   const couponEval = await evaluateCoupon(input.coupon, { subtotal, userId: input.userId, email });
+  /* A code the buyer typed and saw accepted, then refused here, used to be
+     dropped without a word — and the full price charged. Say so instead. */
+  if (String(input.coupon || '').trim() && !couponEval.ok) {
+    throw conflict(`Kortingscode niet toegepast: ${couponEval.reason || 'ongeldig'}. Er is niets afgeschreven.`);
+  }
   const couponCode = couponEval.ok ? couponEval.code : null;
   const couponDiscount = couponEval.ok ? couponEval.discount : 0;
   // Forge+ members get a standing discount on top (stacked with any coupon).
@@ -280,6 +301,10 @@ export async function createOrder(input, ctx = {}) {
       await debit(input.userId, creditApplied, 'spend',
         `Applied to order ${number}`, { orderId, createdBy: input.userId });
     }
+    /* In the same transaction: a code that has run out refuses the order. */
+    if (couponCode) {
+      await recordCouponRedemption({ code: couponCode, userId: input.userId, email, orderId, ip: ctx.ip });
+    }
     await appendHistory(orderId, null, 'pending', ctx.actorId || 'system', 'Order created');
   });
 
@@ -293,11 +318,6 @@ export async function createOrder(input, ctx = {}) {
       .catch((e) => console.warn('[order] could not store buyer language:', e.message));
   }
 
-  // Record the coupon redemption (per-user limits + usage counter). Best-effort.
-  if (couponCode) {
-    await recordCouponRedemption({ code: couponCode, userId: input.userId, email, orderId, ip: ctx.ip })
-      .catch((e) => console.error('[coupon] redemption', e.message));
-  }
 
   // ── Fraud screening ────────────────────────────────────────────────────
   // The score used to be written here and then never read again: an order could
@@ -380,9 +400,10 @@ export async function createOrder(input, ctx = {}) {
     key: `placed:${fresh.id}`,
   }).catch(() => {});
   if (input.userId) {
+    const n = emailCopy(fresh.billing?.lang).notice;
     await notify(input.userId, {
-      type: 'order_update', title: `Order ${number} received`,
-      body: 'We have received your order and it is pending payment.',
+      type: 'order_update', title: n.received(number),
+      body: n.receivedBody,
       link: `/account/orders/${orderId}`,
     });
   }
@@ -467,8 +488,9 @@ export async function deliverOrder(orderId, deliveries = [], ctx = {}) {
     const current = await getOrder(orderId);
     await sendEmailAsync('order_completed', current.email, emailContext(current, ctx));
     if (current.userId) {
-      await notify(current.userId, { type: 'delivery', title: `Order ${current.number}: new delivery`,
-        body: 'A new code was added to your order — check your email and dashboard.',
+      const n = emailCopy(current.billing?.lang).notice;
+      await notify(current.userId, { type: 'delivery', title: n.newDelivery(current.number),
+        body: n.newDeliveryBody,
         link: `/account/orders/${orderId}` }).catch(() => {});
     }
     return current;
@@ -552,7 +574,17 @@ export async function transitionOrder(orderId, to, ctx = {}) {
   if (!moved) return getOrder(orderId); // another transition already moved this order
 
   const updated = await getOrder(orderId);
-  const emailEvent = STATUS_EMAIL[to];
+  let emailEvent = STATUS_EMAIL[to];
+  /* A paid order that is held for review gets a neutral "payment received,
+     one more check" instead of a confirmation that promises delivery the hold
+     is about to stop. */
+  if (to === 'payment_received' && updated.fraudHold) emailEvent = 'order_on_hold';
+  /* Two mails five minutes apart saying "paid, preparing it" and "we are
+     preparing it" is one mail too many; the second only adds something when
+     time has passed. */
+  if (to === 'processing' && await recentlyMailed(updated, ['payment_confirmed', 'order_on_hold'], 5)) {
+    emailEvent = null;
+  }
   if (emailEvent) {
     await sendEmailAsync(emailEvent, updated.email, emailContext(updated, ctx));
   }
@@ -581,6 +613,13 @@ export async function transitionOrder(orderId, to, ctx = {}) {
        but not until their caches expire, which would leave a refunded order
        announced as "sold" for another minute. */
     bustSocialCaches();
+  }
+
+  /* An order cancelled or failed before it was ever paid did not use its
+     coupon: the use goes back, or one abandoned cart burns a one-time code. */
+  if (['cancelled', 'failed'].includes(to)) {
+    const paid = await get(`SELECT 1 FROM order_status_history WHERE order_id=@id AND to_status='payment_received' LIMIT 1`, { id: orderId }).catch(() => null);
+    if (!paid) await releaseCouponRedemption(orderId).catch((e) => console.error('[coupon] release:', e.message));
   }
 
   /* An order that will not be delivered any more leaves the hand-delivery
@@ -645,10 +684,11 @@ export async function transitionOrder(orderId, to, ctx = {}) {
       .catch((e) => console.error('[discord] role sync:', e.message));
   }
   if (updated.userId) {
+    const n = emailCopy(updated.billing?.lang).notice;
     await notify(updated.userId, {
       type: 'order_update',
-      title: `Order ${updated.number}: ${labelFor(to)}`,
-      body: statusBlurb(to),
+      title: n.status(updated.number, n.labels[to] || labelFor(to)),
+      body: n.blurbs[to] || statusBlurb(to),
       link: `/account/orders/${orderId}`,
     });
   }
@@ -804,9 +844,10 @@ export async function sendPaymentReminders({ afterMinutes = 60, maxAgeHours = 72
     if (!order) continue;
     await sendEmailAsync('payment_reminder', order.email, emailContext(order));
     if (order.userId) {
+      const n = emailCopy(order.billing?.lang).notice;
       await notify(order.userId, {
-        type: 'order_update', title: `Order ${order.number} is waiting for payment`,
-        body: 'Complete your payment to receive your items — they are still reserved for you.',
+        type: 'order_update', title: n.reminder(order.number),
+        body: n.reminderBody(UNPAID_CANCEL_DAYS),
         link: `/account/orders/${order.id}`,
       }).catch(() => {});
       /* And in Discord. This is revenue the shop has ALREADY won — an order
@@ -833,6 +874,9 @@ export async function sendPaymentReminders({ afterMinutes = 60, maxAgeHours = 72
  * it. Runs from maintenance. The link lands the buyer straight on the review
  * widget for their order (works for guests too).
  */
+/** How many review-request mails one address receives, across all its orders. */
+export const REVIEW_ASKS_PER_ADDRESS = 2;
+
 export async function sendReviewRequests({ afterHours = 24, limit = 25 } = {}) {
   const cutoff = new Date(Date.now() - afterHours * 3_600_000).toISOString();
   const rows = await all(
@@ -854,7 +898,19 @@ export async function sendReviewRequests({ afterHours = 24, limit = 25 } = {}) {
     if (!r?.changes) continue;
     const order = await getOrder(row.id);
     if (!order?.email) continue;
+    /* Asked at most twice per address, ever. A regular buyer with twenty
+       orders otherwise gets twenty "how did we do?" mails, which stops being a
+       question and starts being the reason they unsubscribe. The stamp above
+       stays: this order has been handled, it just was not asked about. */
+    const asked = await get(
+      `SELECT COUNT(*) AS n FROM orders
+        WHERE email = @e AND id <> @id AND review_request_sent_at IS NOT NULL`,
+      { e: order.email, id: order.id });
+    if (Number(asked?.n || 0) >= REVIEW_ASKS_PER_ADDRESS) continue;
+    const lang = order.billing?.lang || 'nl';
+    const tp = config.shop.trustpilotReviewUrl;
     await sendEmailAsync('review_request', order.email, {
+      lang,
       user: { name: order.billing?.full_name || order.email.split('@')[0] },
       order: { number: order.number },
       review: {
@@ -865,10 +921,12 @@ export async function sendReviewRequests({ afterHours = 24, limit = 25 } = {}) {
         //
         // Points at the FORM, not the profile: this mail is an ask, and a
         // profile page makes them hunt for the button before they can start.
-        trustpilotHtml: config.shop.trustpilotReviewUrl
-          ? `<p style="text-align:center;color:#8b93a7;font-size:13px;margin-top:-6px">or leave it on
-             <a href="${config.shop.trustpilotReviewUrl}" style="color:#f59e0b;font-weight:600">Trustpilot</a>
-             — that one is public and we can't edit it.</p>`
+        // The sentence is the buyer's language, like the rest of the mail —
+        // it was the one English line inside a Dutch one.
+        trustpilotHtml: tp
+          ? `<p style="text-align:center;color:#8b93a7;font-size:13px;margin-top:-6px">${
+            emailCopy(lang).reviewTrustpilot(
+              `<a href="${escapeHtml(tp)}" style="color:#f59e0b;font-weight:600">Trustpilot</a>`)}</p>`
           : '',
       },
     });
@@ -918,9 +976,10 @@ export async function setOrderPayLink(orderId, rawUrl, ctx = {}) {
   // The buyer may be sitting on the status page right now — it polls, so this
   // arrives without them doing anything.
   if (order.userId) {
+    const n = emailCopy(order.billing?.lang).notice;
     await notify(order.userId, {
-      type: 'order_update', title: `Payment link ready for ${order.number}`,
-      body: 'Your payment link with the exact amount is ready.',
+      type: 'order_update', title: n.payLink(order.number),
+      body: n.payLinkBody,
       link: `/account/orders/${orderId}`,
     }).catch(() => {});
   }
@@ -1262,8 +1321,8 @@ function statusBlurb(status) {
 function consentHtml(order, lang) {
   const c = emailCopy(lang);
   if (!order.consentAt) return '';
-  const when = new Date(order.consentAt);
-  const stamp = Number.isNaN(when.getTime()) ? '' : when.toISOString().replace('T', ' ').slice(0, 16) + ' UTC';
+  // In Amsterdam time, named — the clock the buyer looked at when they ticked it.
+  const stamp = localStamp(order.consentAt, lang);
   const sentence = String(order.consentText || '').trim();
   const escaped = sentence
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -1313,17 +1372,54 @@ function reviewAskHtml(order, lang) {
  */
 function needsFromBuyerHtml(order, lang) {
   const c = emailCopy(lang);
-  const need = String(order.billing?.needsFromBuyer || '').trim();
-  if (!need) return '';
+  if (!String(order.billing?.needsFromBuyer || '').trim()) return '';
   const settled = ['completed', 'refunded', 'cancelled'].includes(order.status);
   if (settled) return '';
+  /* The label in the reader's language. The order stores what was missing as
+     the Dutch field name (it is what the fulfilment queue shows the owner), so
+     a German mail asked for a "Roblox-gebruikersnaam". Worked out again from
+     the items' categories; the stored text is only the fallback for an order
+     whose items no longer say. */
+  const cats = [...new Set((order.items || [])
+    .map((i) => String(i.metadata?.category || '').toLowerCase()).filter(Boolean))];
+  const labels = [...new Set(cats.map((cat) => deliveryFieldFor(cat, lang)).filter(Boolean))];
+  const need = labels.length ? labels.join(' / ') : String(order.billing.needsFromBuyer).trim();
+  /* Robux: 2FA is a Roblox requirement for the payout, and Roblox caps one
+     account at 5,000 R$ a day (deliveryInfo.js says the same on the product
+     page) — a bigger order arrives over several days, and saying so here is
+     what stops "only half arrived" tickets. */
+  const extras = [];
+  if (cats.includes('robux')) {
+    extras.push(c.need2fa);
+    const robux = robuxInOrder(order);
+    if (robux > ROBUX_DAILY_CAP) {
+      extras.push(c.needSplit(robux.toLocaleString(lang === 'en' ? 'en-IE' : `${lang}-${lang.toUpperCase()}`),
+        Math.ceil(robux / ROBUX_DAILY_CAP)));
+    }
+  }
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:18px 0 4px">
-    <tr><td style="background-color:#241d09;border:1px solid #6b5115;border-radius:14px;padding:16px 18px">
+    <tr><td bgcolor="#241d09" style="background-color:#241d09;border:1px solid #6b5115;border-radius:14px;padding:16px 18px">
       <div style="font:700 14px/1.35 'Segoe UI',Arial,sans-serif;color:#fbbf24">${escapeHtml(c.needTitle)}</div>
       <div style="font:400 13.5px/1.6 'Segoe UI',Arial,sans-serif;color:#d8c9a3;padding-top:6px">
         ${c.needBody(escapeHtml(need))}
       </div>
+      ${extras.map((x) => `<div style="font:400 13.5px/1.6 'Segoe UI',Arial,sans-serif;color:#d8c9a3;padding-top:6px">${escapeHtml(x)}</div>`).join('')}
     </td></tr></table>`;
+}
+
+/** Roblox's per-account daily payout cap, as stated in deliveryInfo.js. */
+const ROBUX_DAILY_CAP = 5000;
+
+/** How many Robux an order adds up to, read from the pack names ("10,000 Robux"). */
+function robuxInOrder(order) {
+  let total = 0;
+  for (const i of order.items || []) {
+    if (String(i.metadata?.category || '').toLowerCase() !== 'robux') continue;
+    const m = String(i.name || '').match(/([\d][\d.,\s]*)\s*(?:Robux|R\$)/i);
+    const per = m ? Number(m[1].replace(/[^\d]/g, '')) : 0;
+    total += per * Math.max(1, Number(i.quantity || 1));
+  }
+  return total;
 }
 
 /** Manual-payment instructions block for the order-received email (Tikkie/Revolut/PayPal). */
@@ -1336,7 +1432,7 @@ function paymentInstructionsHtml(order, lang) {
   // generic method is configured, which is exactly the case while the owner is
   // between payment providers.
   if (!methods.length && !order.payLink) return '';
-  const amt = formatMoney(order.total, order.currency);
+  const amt = formatMoney(order.total, order.currency, lang);
 
   // A payment request the owner made for THIS order already carries the amount
   // and needs no reference — so it goes first, and the generic methods below
@@ -1409,11 +1505,11 @@ function deliveryHtml(order, lang) {
     const label = escapeHtml(order.billing.deliveryLabel || c.yourAccount);
     const target = escapeHtml(order.billing.deliveryDetails);
     return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 8px">
-      <tr><td style="background:#0e1f19;border:1px solid #1f5140;border-radius:16px;padding:20px 22px">
+      <tr><td bgcolor="#0e1f19" style="background-color:#0e1f19;border:1px solid #1f5140;border-radius:16px;padding:20px 22px">
         <div style="font:800 15px/1.3 'Segoe UI',Arial,sans-serif;color:#34d399">${escapeHtml(c.deliveredTitle)}</div>
         <div style="font:400 13.5px/1.6 'Segoe UI',Arial,sans-serif;color:#9fb8ad;margin:6px 0 12px">${escapeHtml(c.deliveredSub)}</div>
         <div style="font:600 11px/1 Arial,sans-serif;color:#6f8f83;text-transform:uppercase;letter-spacing:1.2px;margin:0 0 5px">${label}</div>
-        <div style="font:700 18px/1.3 'Courier New',monospace;color:#eafff6;background:#0a1712;border:1px solid #1f5140;border-radius:10px;padding:12px 16px;word-break:break-all">${target}</div>
+        <div style="font:700 18px/1.3 'Courier New',monospace;color:#eafff6;background-color:#0a1712;border:1px solid #1f5140;border-radius:10px;padding:12px 16px;word-break:break-all">${target}</div>
       </td></tr></table>`;
   }
   /* Nothing recorded to show — and the mail around this block says "everything
@@ -1424,7 +1520,7 @@ function deliveryHtml(order, lang) {
      space has been told the shop sent something it did not show them. */
   if (!order.deliveries?.length) {
     return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 8px">
-      <tr><td style="background:#101827;border:1px solid #2c3b52;border-radius:16px;padding:20px 22px">
+      <tr><td bgcolor="#101827" style="background-color:#101827;border:1px solid #2c3b52;border-radius:16px;padding:20px 22px">
         <div style="font:800 15px/1.3 'Segoe UI',Arial,sans-serif;color:#7dd3fc">${escapeHtml(c.byHandTitle)}</div>
         <div style="font:400 13.5px/1.6 'Segoe UI',Arial,sans-serif;color:#9fb0c4;margin:6px 0 10px">${escapeHtml(c.byHandSub)}</div>
         <div style="font:400 13.5px/1.6 'Segoe UI',Arial,sans-serif;color:#9fb0c4">${escapeHtml(c.byHandCheck)}</div>
@@ -1434,11 +1530,13 @@ function deliveryHtml(order, lang) {
 
   // Gift-code / key delivery → one premium card per delivered item.
   return order.deliveries.map((d) => {
-    const label = escapeHtml((d.type || 'code').toUpperCase());
+    // CODE / KEY / FILE in the reader's language, not the database's type name.
+    const type = String(d.type || 'code').toLowerCase();
+    const label = escapeHtml((c.deliveryLabels[type] || c.deliveryLabels.code).toUpperCase());
     const value = d.content ? escapeHtml(d.content) : (d.filename ? escapeHtml(d.filename) : '—');
     return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 10px">
-      <tr><td style="height:4px;background:linear-gradient(90deg,#7c5cff,#d946ef);border-radius:14px 14px 0 0;font-size:0;line-height:0">&nbsp;</td></tr>
-      <tr><td style="background:#17172a;border:1px solid #34345a;border-top:0;border-radius:0 0 14px 14px;padding:16px 18px 18px">
+      <tr><td bgcolor="#7c5cff" style="height:4px;background-color:#7c5cff;background-image:linear-gradient(90deg,#7c5cff,#d946ef);border-radius:14px 14px 0 0;font-size:0;line-height:0">&nbsp;</td></tr>
+      <tr><td bgcolor="#17172a" style="background-color:#17172a;border:1px solid #34345a;border-top:0;border-radius:0 0 14px 14px;padding:16px 18px 18px">
         <div style="font:700 11px/1 Arial,sans-serif;color:#8b8fa3;text-transform:uppercase;letter-spacing:1.4px;margin:0 0 9px">${label}</div>
         <div style="font:800 24px/1.25 'Courier New',monospace;letter-spacing:4px;color:#ffffff;word-break:break-all">${value}</div>
       </td></tr></table>`;
@@ -1452,10 +1550,19 @@ function summaryHtml(order, lang) {
   const c = emailCopy(lang);
   const cur = order.currency;
   const b = order.billing || {};
-  const money = (c) => escapeHtml(formatMoney(c, cur));
+  const money = (cents) => escapeHtml(formatMoney(cents, cur, lang));
+  /* BTW, stated the way a Dutch receipt states it — but only once the seller
+     is registered (vatRate is 0 until a btw-id is published, and a VAT line
+     from an unregistered seller would be a false statement). A gift card for
+     another store (Steam, App Store, …) is a multi-purpose voucher: no VAT is
+     due when it is sold, so it is labelled and kept out of the VAT amount. */
+  const rate = vatRate();
+  const isVoucher = (i) => String(i.metadata?.category || '').toLowerCase() === 'giftcard';
   const rows = [];
   for (const i of order.items || []) {
-    rows.push(`<tr><td style="padding:9px 0;border-bottom:1px solid #24243a;color:#cbd1de;font-size:14px">${escapeHtml(i.name)} <span style="color:#8b8fa3">× ${i.quantity}</span></td>` +
+    const mpv = rate > 0 && isVoucher(i)
+      ? `<br><span style="color:#8b8fa3;font-size:12px">${escapeHtml(c.vatMpv)}</span>` : '';
+    rows.push(`<tr><td style="padding:9px 0;border-bottom:1px solid #24243a;color:#cbd1de;font-size:14px">${escapeHtml(i.name)} <span style="color:#8b8fa3">× ${i.quantity}</span>${mpv}</td>` +
       `<td style="padding:9px 0;border-bottom:1px solid #24243a;color:#fff;font-size:14px;text-align:right;white-space:nowrap">${money(i.unit_price * i.quantity)}</td></tr>`);
   }
   const line = (label, cents, neg = false) => `<tr><td style="padding:8px 0;border-bottom:1px solid #24243a;color:#9aa3b8;font-size:13.5px">${label}</td>` +
@@ -1472,10 +1579,24 @@ function summaryHtml(order, lang) {
     if (bundleDiscount) extras.push(line(`${c.bundle}${b.bundle ? ` (${escapeHtml(b.bundle)})` : ''}`, bundleDiscount, true));
     if (credit) extras.push(line(c.credit, credit, true));
   }
+  let vatRow = '';
+  if (rate > 0 && Number(order.total) > 0) {
+    // Discounts and credit spread pro rata over the lines, vouchers taken out.
+    const gross = (order.items || []).reduce((n, i) => n + i.unit_price * i.quantity, 0);
+    const taxable = (order.items || []).filter((i) => !isVoucher(i))
+      .reduce((n, i) => n + i.unit_price * i.quantity, 0);
+    const base = gross > 0 ? Math.round(Number(order.total) * taxable / gross) : Number(order.total);
+    const vat = vatCents(base, rate);
+    if (vat > 0) {
+      vatRow = `<tr><td colspan="2" style="padding:6px 0 0;color:#8b8fa3;font-size:12.5px;text-align:right">${
+        escapeHtml(c.vatIncl(formatMoney(vat, cur, lang), Math.round(rate * 1000) / 10))}</td></tr>`;
+    }
+  }
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:2px 0 20px">` +
     `<tbody>${rows.join('')}${extras.join('')}` +
     `<tr><td style="padding:13px 0 0;border-top:2px solid #34345a;color:#fff;font-weight:800;font-size:15px">${escapeHtml(c.total)}</td>` +
     `<td style="padding:13px 0 0;border-top:2px solid #34345a;color:#fff;font-weight:800;font-size:15px;text-align:right;white-space:nowrap">${money(order.total)}</td></tr>` +
+    vatRow +
     `</tbody></table>`;
 }
 
@@ -1499,6 +1620,70 @@ export function orderUrlFor(order) {
     : `${config.appUrl}/track?number=${encodeURIComponent(order?.number || '')}`;
 }
 
+/**
+ * What came back, how, and what is left — for the refund mail.
+ *
+ * It used to say "a bank transfer usually lands within 1–3 working days" to
+ * everyone, including people who paid by card through Mollie or entirely with
+ * store credit, and it never said whether the refund was all of the order or
+ * part of it.
+ */
+function refundDetailsHtml(order, lang, refundCents) {
+  const c = emailCopy(lang);
+  const cur = order.currency;
+  const total = Number(order.total || 0);
+  const refunded = refundCents != null ? Number(refundCents) : total;
+  const remaining = Math.max(0, total - refunded);
+  const credit = Number(order.billing?.creditApplied || 0);
+  const method = String(order.billing?.paymentMethod || '').toLowerCase();
+  const kind = order.pspProvider ? 'card'
+    : /bank|transfer|overboeking|sepa/.test(method) ? 'bank'
+      : total > 0 ? 'manual' : 'credit';
+  const row = (label, value) => `<tr><td style="padding:6px 0;color:#9aa3b8;font-size:13.5px">${escapeHtml(label)}</td>`
+    + `<td style="padding:6px 0;color:#ffffff;font-size:13.5px;text-align:right">${escapeHtml(value)}</td></tr>`;
+  const rows = [
+    row(c.refundRefunded, formatMoney(refunded, cur, lang)),
+    ...(remaining > 0 && refundCents != null ? [row(c.refundRemaining, formatMoney(remaining, cur, lang))] : []),
+    ...(total > 0 ? [row(c.refundVia, c.refundMethods[kind])] : []),
+  ];
+  const timing = [total > 0 ? c.refundTiming[kind] : '', credit > 0 ? c.refundTiming.credit : '']
+    .filter(Boolean).map((t) => `<p>${escapeHtml(t)}</p>`).join('');
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:0 0 14px">${rows.join('')}</table>${timing}`;
+}
+
+/** Why an order was cancelled, when we know — the unpaid sweep in particular. */
+function cancelReasonHtml(order, lang, reason) {
+  const c = emailCopy(lang);
+  const auto = /^auto-cancelled/i.test(String(reason || ''));
+  const credit = Number(order.billing?.creditApplied || 0);
+  const lines = [auto ? c.cancelAuto(UNPAID_CANCEL_DAYS) : c.cancelOther];
+  if (credit > 0 && order.userId) lines.push(c.cancelCredit(formatMoney(credit, order.currency, lang)));
+  return lines.map((l) => `<p>${escapeHtml(l)}</p>`).join('');
+}
+
+/** Where the invoice is. The invoice route needs an account (it checks the
+    order is the caller's), so a guest order gets no line rather than a link
+    that ends at a login wall. */
+function invoiceHtml(order, lang) {
+  if (!order.userId) return '';
+  const c = emailCopy(lang);
+  return `<p style="color:#8b93a7;font-size:13px;text-align:center"><a href="${orderUrlFor(order)}" style="color:#a78bfa">${escapeHtml(c.invoiceLine)}</a></p>`;
+}
+
+/** Was one of these mails sent to this order's buyer in the last `minutes`? */
+async function recentlyMailed(order, templates, minutes) {
+  const since = new Date(Date.now() - minutes * 60_000).toISOString();
+  const row = await get(
+    `SELECT 1 AS x FROM email_log
+      WHERE to_email = @to AND status IN ('sent', 'recorded') AND created_at > @since
+        AND template_id IN (${templates.map((_, i) => `@t${i}`).join(',')})
+        AND context LIKE @oid
+      LIMIT 1`,
+    { to: order.email, since, oid: `%${order.id}%`,
+      ...Object.fromEntries(templates.map((t, i) => [`t${i}`, t])) }).catch(() => null);
+  return !!row;
+}
+
 function emailContext(order, ctx = {}) {
   /* The language this buyer read the shop in, recorded at checkout. Resolved
      once here and handed to every generated block, so the prose in a German
@@ -1508,12 +1693,21 @@ function emailContext(order, ctx = {}) {
   const lang = order.billing?.lang || 'nl';
   return {
     lang,
+    /* What the mail log keeps instead of the rendered blocks below: enough to
+       rebuild this exact mail from the order on a retry, and nothing (no
+       delivered code) that is worth stealing from a log. */
+    orderId: order.id,
+    orderOpts: {
+      ...(ctx.refundAmount != null ? { refundAmount: ctx.refundAmount } : {}),
+      ...(ctx.reason ? { reason: String(ctx.reason).slice(0, 200) } : {}),
+    },
     user: { name: order.billing?.full_name || order.email.split('@')[0] },
     order: {
       lang,
       number: order.number,
-      total: order.totalFormatted,
+      total: formatMoney(order.total, order.currency, lang),
       status: order.statusLabel,
+      openDays: UNPAID_CANCEL_DAYS,
       // `itemsHtml` now renders the FULL breakdown (subtotal, discounts, credit,
       // total) so the line-item price and the final total never look mismatched.
       itemsHtml: summaryHtml(order, lang),
@@ -1525,12 +1719,21 @@ function emailContext(order, ctx = {}) {
       consentHtml: consentHtml(order, lang),
       needsFromBuyerHtml: needsFromBuyerHtml(order, lang),
       reviewAskHtml: reviewAskHtml(order, lang),
+      invoiceHtml: invoiceHtml(order, lang),
       url: orderUrlFor(order),
     },
-    refund: ctx.refundAmount != null
-      ? { amount: formatMoney(ctx.refundAmount, order.currency) }
-      : { amount: order.totalFormatted },
+    refund: {
+      amount: formatMoney(ctx.refundAmount != null ? ctx.refundAmount : order.total, order.currency, lang),
+      detailsHtml: refundDetailsHtml(order, lang, ctx.refundAmount),
+    },
+    cancel: { reasonHtml: cancelReasonHtml(order, lang, ctx.reason) },
   };
+}
+
+/** The same context from an order id — what the mail retry rebuilds from. */
+export async function orderEmailContextById(orderId, opts = {}) {
+  const order = await getOrder(orderId);
+  return order ? emailContext(order, opts) : null;
 }
 
 /** Render a transactional order email to { subject, html } — used by previews

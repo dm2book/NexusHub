@@ -23,6 +23,8 @@
 import { createHash } from 'node:crypto';
 import { SupplierConnector } from './SupplierConnector.js';
 
+const SUPPLIER_TIMEOUT_MS = Number(process.env.SUPPLIER_TIMEOUT_MS || 15_000);
+
 // Base host only — every request path below already carries its /v3 prefix, so
 // keeping /v3 here too would double it (https://api.g2a.com/v3/v3/order → 404).
 const DEFAULT_BASE = 'https://api.g2a.com';
@@ -52,6 +54,9 @@ export class G2AConnector extends SupplierConnector {
     if (!this.#configured) throw new Error('G2A: apiHash, email and apiKey are required');
     const res = await fetch(`${this.#base}${path}`, {
       method,
+      /* A supplier that never answers must not hold a paid order — or the
+         function — until the platform kills it mid-purchase. */
+      signal: AbortSignal.timeout(SUPPLIER_TIMEOUT_MS),
       headers: {
         'Authorization': this.#authHeader(),
         'Content-Type': 'application/json',

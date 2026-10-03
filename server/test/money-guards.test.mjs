@@ -146,6 +146,40 @@ console.log('\n— Stock and the hand-delivery queue —');
   ok('…and cannot be delivered any more', /no longer be delivered/.test(done), done);
 }
 
+console.log('\n— Coupons and Roblox names —');
+{
+  const { createCoupon } = await import('../src/services/couponService.js');
+  const code = `ONCE${Date.now() % 100000}`;
+  await createCoupon({ code, kind: 'percent', value: 10, maxRedemptions: 1, announce: false }, 'test');
+  const tries = await Promise.all(Array.from({ length: 6 }, (_, i) => createOrder({ email: `c${i}@example.test`, coupon: code,
+    items: [{ productId: product.id, quantity: 1 }], ...consent }).then(() => 'ok', (e) => e.status)));
+  ok('a one-time code is used once, even by six orders at the same moment', tries.filter((t) => t === 'ok').length === 1, tries.join(','));
+  const bad = await createOrder({ email: 'bad@example.test', coupon: 'NOPE-NOT-A-CODE', items: [{ productId: product.id, quantity: 1 }], ...consent })
+    .then(() => 'charged full price', (e) => e.status);
+  ok('a code that does not apply is refused with a reason, not dropped silently', bad === 409, String(bad));
+  const per = `PER${Date.now() % 100000}`;
+  await createCoupon({ code: per, kind: 'percent', value: 10, perUserLimit: 1, announce: false }, 'test');
+  await createOrder({ email: 'same.person@gmail.com', coupon: per, items: [{ productId: product.id, quantity: 1 }], ...consent });
+  const alias = await createOrder({ email: 'sameperson+2@gmail.com', coupon: per, items: [{ productId: product.id, quantity: 1 }], ...consent })
+    .then(() => 'used again', (e) => e.status);
+  ok('…and a plus-alias of the same gmail is the same person', alias === 409, String(alias));
+  const once2 = `UNDO${Date.now() % 100000}`;
+  await createCoupon({ code: once2, kind: 'percent', value: 10, maxRedemptions: 1, announce: false }, 'test');
+  const first = await createOrder({ email: 'undo@example.test', coupon: once2, items: [{ productId: product.id, quantity: 1 }], ...consent });
+  await transitionOrder(first.id, 'cancelled', { actorId: 'test', reason: 'unpaid' });
+  const second = await createOrder({ email: 'undo2@example.test', coupon: once2, items: [{ productId: product.id, quantity: 1 }], ...consent })
+    .then(() => 'ok', (e) => e.status);
+  ok('an unpaid order that is cancelled gives its use back', second === 'ok', String(second));
+
+  const rbx = await createProduct({ name: '1,000 Robux', category: 'robux', price: 999, announce: false });
+  const invalid = await createOrder({ email: 'r@example.test', billing: { deliveryMethod: 'account', deliveryDetails: 'not a valid name!! <>' },
+    items: [{ productId: rbx.id, quantity: 1 }], ...consent }).then(() => 'accepted', (e) => e.status);
+  ok('a Roblox name that cannot exist is refused', invalid === 400, String(invalid));
+  const valid = await createOrder({ email: 'r2@example.test', billing: { deliveryMethod: 'account', deliveryDetails: 'Speler_123' },
+    items: [{ productId: rbx.id, quantity: 1 }], ...consent }).then(() => 'accepted', (e) => e.message);
+  ok('…a real one is accepted', valid === 'accepted', valid);
+}
+
 console.log('\n— The launch blockers —');
 {
   const { config, commerceBlockers } = await import('../src/config/env.js');

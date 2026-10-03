@@ -25,7 +25,7 @@ export class CsvConnector extends SupplierConnector {
     const src = this.config.source || {};
     if (src.type === 'inline') return src.content || '';
     if (src.type === 'url' || src.url) {
-      const res = await fetch(src.url, { headers: this.config.headers || {} });
+      const res = await fetch(src.url, { headers: this.config.headers || {}, signal: AbortSignal.timeout(30_000) });
       if (!res.ok) throw new Error(`CSV fetch failed: HTTP ${res.status}`);
       return res.text();
     }

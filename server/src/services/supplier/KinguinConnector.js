@@ -22,6 +22,8 @@
  */
 import { SupplierConnector } from './SupplierConnector.js';
 
+const SUPPLIER_TIMEOUT_MS = Number(process.env.SUPPLIER_TIMEOUT_MS || 15_000);
+
 const DEFAULT_BASE = 'https://gateway.kinguin.net/esa/api';
 const safeJson = (t) => { try { return JSON.parse(t); } catch { return null; } };
 
@@ -37,6 +39,9 @@ export class KinguinConnector extends SupplierConnector {
     if (!this.config.apiKey) throw new Error('Kinguin: no apiKey configured');
     const res = await fetch(`${this.#base}${path}`, {
       method,
+      /* A supplier that never answers must not hold a paid order — or the
+         function — until the platform kills it mid-purchase. */
+      signal: AbortSignal.timeout(SUPPLIER_TIMEOUT_MS),
       headers: {
         'X-Api-Key': this.config.apiKey,
         'Content-Type': 'application/json',
