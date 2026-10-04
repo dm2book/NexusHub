@@ -19,6 +19,8 @@ const GLOW = {
 const glowFor = (cat) => GLOW[cat] || '#7c5cff';
 
 /** Light-theme product card matching the storefront design. */
+const TREND = { hot: ['🔥', 'Hot'], trending: ['📈', 'Trending'], popular: ['⭐', 'Popular'], new: ['✨', 'New'] };
+
 function LightProductCard({ product, onAdd, priority = false }) {
   const { t, lang } = useI18n();
   const desc = productDescription(product, lang);
@@ -103,9 +105,11 @@ function LightProductCard({ product, onAdd, priority = false }) {
             {product.stockLeft === 1 ? t('card.lastOne', 'Last one!') : t('card.onlyLeft', 'Only {n} left', { n: product.stockLeft })}
           </span>
         )}
-        {product.sold > 20 && (
+        {/* The label the trending engine earned for it — from sales, revenue,
+            conversion and age; nothing on this card is picked by hand. */}
+        {TREND[product.trend] && (
           <span className="absolute bottom-2.5 left-2.5 z-10 text-[10px] font-semibold text-orange-600 bg-orange-50 rounded-full px-2 py-0.5">
-            🔥 {t('card.highDemand', 'High demand')}
+            {TREND[product.trend][0]} {t(`trend.${product.trend}`, TREND[product.trend][1])}
           </span>
         )}
         {/* This badge used to read "Instant" on every card, unconditionally —

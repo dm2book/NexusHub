@@ -11,6 +11,9 @@ import { assertSafeImageValue, resolveImageUrl } from '../../utils/imageUrl.js';
 import { normalizeImageValue } from '../../services/imageStoreService.js';
 import { backfillArt, proposedCategories, artFor } from '../../services/productFitService.js';
 import { mediaReport, enrichMedia, enrichmentQueue, setOfficial } from '../../services/productMediaService.js';
+import { contentReport, applyContent, generateAll } from '../../services/productContentService.js';
+import { trustReport } from '../../services/productTrustService.js';
+import { trendingSnapshot } from '../../services/trendingService.js';
 import { findPhotos, photoQueue, photoGap, photoScope, setPhotoScope, restoreArtwork, SCOPES } from '../../services/supplier/supplierImageService.js';
 import { importCosts } from '../../services/costImportService.js';
 import { lossReport, applyFloor } from '../../services/lossPriceService.js';
@@ -123,6 +126,36 @@ router.post('/:id/media/official', requirePermission('suppliers.manage'), asyncH
   } catch (e) {
     res.status(e.status || 500).json({ error: { message: e.message } });
   }
+}));
+
+/* ── Product content: descriptions, FAQ and SEO from what the shop knows ──
+   See productContentService. Preview never writes; apply writes the Dutch long
+   description and keeps every language in metadata.content. */
+router.get('/content', requirePermission('suppliers.read'), asyncHandler(async (_req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json(await contentReport());
+}));
+router.get('/:id/content/preview', requirePermission('suppliers.read'), asyncHandler(async (req, res) => {
+  const product = await getProduct(req.params.id);
+  if (!product) return res.status(404).json({ error: { message: 'Product not found' } });
+  res.json(generateAll(product));
+}));
+router.post('/content/apply', requirePermission('suppliers.manage'), asyncHandler(async (req, res) => {
+  const { productIds, onlyMissing } = z.object({ productIds: z.array(z.string()).min(1).max(200), onlyMissing: z.boolean().optional() }).parse(req.body || {});
+  res.json(await applyContent(productIds, { actor: req.user, onlyMissing: onlyMissing === true }));
+}));
+
+/* ── Trust: per-product facts and score from real orders (productTrustService). */
+router.get('/trust', requirePermission('orders.read'), asyncHandler(async (_req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json(await trustReport());
+}));
+
+/* ── Trending: the engine's numbers and lists (trendingService). Read-only:
+   there is nothing to pick by hand. */
+router.get('/trending', requirePermission('orders.read'), asyncHandler(async (_req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json(await trendingSnapshot({ fresh: true }));
 }));
 
 router.post('/images/restore-artwork', requirePermission('suppliers.manage'), asyncHandler(async (req, res) => {

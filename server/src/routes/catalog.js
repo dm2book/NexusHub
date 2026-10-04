@@ -9,7 +9,7 @@ import { requireLaunched, launchAtIso } from '../services/launchGateService.js';
 import { subscribe, unsubscribe, tokenMatches } from '../services/newsletterService.js';
 import { unsubscribeTokenOk, applyUnsubscribe, UNSUBSCRIBE_SCOPES } from '../services/emailService.js';
 import { rateLimit } from '../middleware/rateLimit.js';
-import { listProducts, getProduct, trendingProducts, priceHistory } from '../services/productService.js';
+import { listProducts, getProduct, priceHistory } from '../services/productService.js';
 import { availableCounts, availableCount } from '../services/codeStockService.js';
 import { getRewards as getMysteryRewards } from '../services/mysteryBoxService.js';
 import { listUpcoming as listUpcomingDrops } from '../services/dropService.js';
@@ -31,6 +31,8 @@ import { isEnabled as mollieEnabled, SUPPORTED_METHODS as MOLLIE_METHODS } from 
 import { countryOf } from '../utils/netRisk.js';
 import { holdMessage } from '../services/fraudService.js';
 import { publicStats } from '../services/publicStatsService.js';
+import { productTrust } from '../services/productTrustService.js';
+import { trendingRail, recordView } from '../services/trendingService.js';
 import { recordPageView } from '../services/trackingService.js';
 import { recordVisit, recordEvent, attachOrder, adoptVisit } from '../services/attributionService.js';
 import { getCategoryLogos } from '../services/settingsService.js';
@@ -463,16 +465,32 @@ router.get('/products', asyncHandler(async (_req, res) => {
 // reason: the two rails now agree, and they should also stop agreeing at the
 // same time rather than one of them carrying a sold-out promise four minutes
 // longer than the other.
+/* The trending rail: Hot, Trending, Popular and New, earned from sales,
+   revenue, conversion and age — never picked by hand (trendingService). Each
+   product carries the label it earned. The engine caches for a minute; the
+   product payload (stock, copy) is rebuilt with it. */
 let trendingCache = { at: 0, data: null };
 router.get('/products/trending', asyncHandler(async (_req, res) => {
   publicCache(res, 60);
   if (!trendingCache.data || Date.now() - trendingCache.at > 60_000) {
-    const rows = await trendingProducts({ days: 14, limit: 8 });
-    const counts = await availableCounts(rows.map((p) => p.id));
-    trendingCache = { at: Date.now(), data: rows.map((p) => productPayload(p, counts[p.id] || 0)) };
+    const rail = await trendingRail({ limit: 8 });
+    const products = (await Promise.all(rail.map((r) => getProduct(r.id)))).filter((p) => p?.active);
+    const counts = await availableCounts(products.map((p) => p.id));
+    const label = new Map(rail.map((r) => [r.id, r.label]));
+    trendingCache = { at: Date.now(), data: products.map((p) => ({ ...productPayload(p, counts[p.id] || 0), trend: label.get(p.id) || null })) };
   }
   res.json({ products: trendingCache.data });
 }));
+
+/* One product-page view, for the conversion rate. An anonymous daily total —
+   see trendingService.recordView. */
+router.post('/products/:id/view',
+  rateLimit({ bucket: 'pview', windowMs: 60_000, max: 60 }),
+  asyncHandler(async (req, res) => {
+    const p = await getProduct(req.params.id);
+    if (p?.active) await recordView(p.id).catch(() => {});
+    res.status(204).end();
+  }));
 
 /**
  * The drawn tile for a product the repo has no artwork for.
@@ -511,6 +529,16 @@ router.get('/products/:id', asyncHandler(async (req, res) => {
   if (!p || !p.active) throw new ApiError(404, 'Product not found');
   const count = await availableCount(p.id);
   res.json({ product: productPayload(p, count) });
+}));
+
+/* The trust layer: stock, last delivery, successful orders, fulfilment and
+   refund rates, measured delivery time and a score — from this shop's own
+   orders, and only the fields that have data (productTrustService). */
+router.get('/products/:id/trust', asyncHandler(async (req, res) => {
+  publicCache(res, 300);
+  const p = await getProduct(req.params.id);
+  if (!p || !p.active) throw new ApiError(404, 'Product not found');
+  res.json({ trust: await productTrust(p, await availableCount(p.id)) });
 }));
 
 // Price history for the product-page chart.

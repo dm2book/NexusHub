@@ -2120,4 +2120,20 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS lang TEXT;
           OR context LIKE '%"otp"%' OR context LIKE '%deliveryHtml%' OR context LIKE '%codeHtml%';
     `,
   },
+  {
+    id: '055_product_view_counts',
+    /*
+     * Product-page views per product per day, for the trending engine's
+     * conversion rate. A total and nothing else: no visitor id, no session,
+     * no IP — so it needs no consent and holds nothing to erase.
+     */
+    sql: `
+      CREATE TABLE IF NOT EXISTS product_view_counts (
+        product_id  TEXT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+        day         TEXT NOT NULL,
+        views       INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (product_id, day)
+      );
+    `,
+  },
 ];

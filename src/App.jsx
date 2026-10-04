@@ -88,6 +88,9 @@ const AdminProfitCenter = lazy(() => import('./pages/admin/SupplierProfitCenter.
 const AdminAdScripts = lazy(() => import('./pages/admin/AdScripts.jsx'));
 const AdminAdStudio = lazy(() => import('./pages/admin/AdStudio.jsx'));
 const AdminProductMedia = lazy(() => import('./pages/admin/ProductMedia.jsx'));
+const AdminProductContent = lazy(() => import('./pages/admin/ProductContent.jsx'));
+const AdminProductTrust = lazy(() => import('./pages/admin/ProductTrustAdmin.jsx'));
+const AdminTrending = lazy(() => import('./pages/admin/Trending.jsx'));
 const AdminProfit = lazy(() => import('./pages/admin/Profit.jsx'));
 const AdminLive = lazy(() => import('./pages/admin/Live.jsx'));
 const AdminFulfillment = lazy(() => import('./pages/admin/Fulfillment.jsx'));
@@ -204,6 +207,9 @@ export default function App() {
           <Route path="/admin/growth/ad-scripts" element={<AdminAdScripts />} />
           <Route path="/admin/growth/ad-studio" element={<AdminAdStudio />} />
           <Route path="/admin/products/media" element={<AdminProductMedia />} />
+          <Route path="/admin/products/content" element={<AdminProductContent />} />
+          <Route path="/admin/products/trust" element={<AdminProductTrust />} />
+          <Route path="/admin/products/trending" element={<AdminTrending />} />
           <Route path="/admin/profit" element={<AdminProfit />} />
           <Route path="/admin/live" element={<AdminLive />} />
           <Route path="/admin/fulfillment" element={<AdminFulfillment />} />
