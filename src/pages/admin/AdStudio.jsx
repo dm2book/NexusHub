@@ -27,11 +27,29 @@ import { forVoice } from '../../lib/adStudio/speak.js';
  * the voice model are fetched from a CDN the first time, nothing is installed;
  * premium ones (ElevenLabs, OpenAI) use your own key from Keys and connections.
  */
-const PIPER = 'https://cdn.jsdelivr.net/npm/@mintplex-labs/piper-tts-web@1.0.5/+esm';
+/* The free voice runs in this browser: piper-tts-web plus onnxruntime-web,
+   both bundled (and loaded only on this page) so their versions are pinned by
+   the lockfile. The library's default fetched the runtime's wasm from cdnjs at
+   1.18.0 while the CDN build it was imported from pulled the latest runtime —
+   which asks for a file 1.18.0 does not have ("no available backend found").
+   The wasm now comes from the exact version that is bundled. */
 
 async function browserVoice(text, voiceId, onProgress) {
-  const tts = await import(/* @vite-ignore */ PIPER);
-  return tts.predict({ text, voiceId }, (p) => onProgress?.(p));
+  const { TtsSession, WASM_BASE } = await import('@mintplex-labs/piper-tts-web');
+  /* The library keeps ONE session and silently reuses it with the first voice's
+     model — four languages would all be spoken by the first voice. A different
+     voice gets a fresh session. */
+  if (TtsSession._instance && TtsSession._instance.voiceId !== voiceId) TtsSession._instance = undefined;
+  const session = await TtsSession.create({
+    voiceId,
+    progress: (p) => onProgress?.(p),
+    /* onnxWasm left unset: the bundled runtime then finds its own .wasm, which
+       the build emits next to it and serves from our origin — always the
+       version that is bundled. The library's default (cdnjs 1.18.0) is what
+       broke. */
+    wasmPaths: { onnxWasm: undefined, piperData: `${WASM_BASE}.data`, piperWasm: `${WASM_BASE}.wasm` },
+  });
+  return session.predict(text);
 }
 async function premiumVoice(text, provider, lang) {
   const r = await fetch('/api/admin/analytics/ad-studio/voice', {

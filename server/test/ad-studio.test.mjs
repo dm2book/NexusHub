@@ -209,7 +209,14 @@ console.log('\n— The page —');
   const page = read('src/pages/admin/AdStudio.jsx');
   ok('Growth → Ad Studio is in the menu and routed', /growth\/ad-studio.*Ad Studio/.test(read('src/layouts/AdminLayout.jsx'))
     && /path="\/admin\/growth\/ad-studio"/.test(read('src/App.jsx')));
-  ok('the free voice is loaded at a pinned version, only on this page', /piper-tts-web@1\.0\.5/.test(page) && !/piper-tts-web/.test(read('package.json')));
+  /* Bundled, pinned by the lockfile and loaded only on this page (a dynamic
+     import). The CDN build pulled the latest onnxruntime while the library
+     fetched the 1.18.0 wasm, which broke the voice ("no available backend"). */
+  const pkg = JSON.parse(read('package.json'));
+  ok('the free voice is bundled at pinned versions and loaded only on this page',
+    /await import\('@mintplex-labs\/piper-tts-web'\)/.test(page) && /^\d+\.\d+\.\d+$/.test(pkg.dependencies['onnxruntime-web'] || '')
+    && !/import\(\s*\/\* @vite-ignore \*\/ PIPER\)/.test(page));
+  ok('…a different voice gets its own session, not the first voice again', /TtsSession\._instance = undefined/.test(page));
   const eng = read('src/lib/adStudio/engine.js');
   ok('MP4 with H.264 is tried before anything else', eng.indexOf("'video/mp4;codecs=avc1.640028") < eng.indexOf("'video/webm"));
 }
