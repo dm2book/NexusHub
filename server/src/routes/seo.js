@@ -372,8 +372,10 @@ router.get('/product/:id', asyncHandler(async (req, res, next) => {
   // a handful of times a day.
   res.set('Cache-Control', 'public, max-age=0, s-maxage=300, stale-while-revalidate=86400');
   res.type('html').send(withHead(withProductShell(html, product), {
-    title: `${product.name} kopen · ${config.email.fromName}`,
-    description: describe(product, inStock),
+    /* Generated SEO copy (productContentService, claim-gated) when the owner
+       applied it; otherwise the title and description built here. */
+    title: product.metadata?.content?.nl?.seoTitle || `${product.name} kopen · ${config.email.fromName}`,
+    description: product.metadata?.content?.nl?.seoDescription || describe(product, inStock),
     canonical,
     image,
     imageSize,
