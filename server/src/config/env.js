@@ -461,6 +461,10 @@ export const config = {
         apiHash: env.G2A_API_HASH || '', apiKey: env.G2A_API_KEY || '',
         email: env.G2A_EMAIL || '', baseUrl: env.G2A_BASE_URL || '',
       },
+      /* Brave Search API (search results only: which products exist, never a
+         price or a picture). The key exists for this alone, so having it set
+         is the switch — see enabledByKey in sources.js. */
+      brave: { apiKey: env.BRAVE_SEARCH_API_KEY || '' },
     },
 
     // ── VAT ─────────────────────────────────────────────────────────────────

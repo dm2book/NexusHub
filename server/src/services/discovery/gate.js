@@ -147,11 +147,13 @@ export function suggestPrice({ costCents, marketMedianCents = null, floorPrice, 
  * input: { model, presence, sources, inStockSources, freshObservations,
  *          sourceErrors, supplier: pickBest result | null, categoryStatus,
  *          image: imageConfidence result | null, requiresSupplier = true,
- *          extraReasons: [] — anything else that must stop an automatic add }
+ *          extraReasons: [] — anything else that must stop an automatic add,
+ *          mentionDomains: websites naming it in search results (searchSource) }
  */
 export function gate(input) {
   const { model, presence = {}, sources = [], inStockSources = [], freshObservations = 0,
-    sourceErrors = [], supplier = null, categoryStatus = 'unknown', image = null, requiresSupplier = true, extraReasons = [] } = input;
+    sourceErrors = [], supplier = null, categoryStatus = 'unknown', image = null, requiresSupplier = true, extraReasons = [],
+    mentionDomains = 0 } = input;
   const reasons = [...extraReasons];
   const match = matchConfidence(model, sources);
   const img = image?.mismatch ? 0 : Number(image?.score || 0);
@@ -169,7 +171,12 @@ export function gate(input) {
     return out(GATE.UNSAFE_MATCH, [`every supplier listing conflicts: ${(supplier.best?.reasons || []).join('; ') || 'amount, platform or region'}`]);
   }
   const supplierInStock = supplier && ['ready', 'thin', 'loss'].includes(supplier.verdict);
-  if (!inStockSources.length && !supplierInStock) {
+  /* Found only in search results: proof it exists, not that anyone has it.
+     Two websites or more → a person reviews it; one → not enough. */
+  if (!inStockSources.length && !supplierInStock && mentionDomains > 0) {
+    if (mentionDomains < 2 && !freshObservations) return out(GATE.UNAVAILABLE, ['seen on only one website — not enough evidence that it exists']);
+    reasons.push(`found only in search results (${mentionDomains} websites) — price and stock unknown`);
+  } else if (!inStockSources.length && !supplierInStock) {
     const why = sourceErrors.length && !freshObservations ? `the sources could not be asked (${sourceErrors.join('; ')})`
       : !freshObservations ? `no observation in the last ${STALE_HOURS / 24} days — the data is stale`
         : 'nobody has it in stock';

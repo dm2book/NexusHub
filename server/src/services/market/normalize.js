@@ -34,7 +34,7 @@
 /** Games this parser recognises, with the ways the market writes them. */
 export const GAMES = [
   { key: 'ea-fc', label: 'EA Sports FC', unit: 'points',
-    patterns: [/\bea\s*(sports\s*)?fc\b/i, /\bfc\s*points?\b/i, /\bfifa\b/i, /\bfut\b/i] },
+    patterns: [/\bea\s*(sports\s*)?fc\b/i, /\bfc\s*points?\b/i, /\bfc\s*2\d\b/i, /\bfifa\b/i, /\bfut\b/i] },
   { key: 'roblox', label: 'Roblox', unit: 'robux', defaultPlatform: 'any',
     patterns: [/\broblox\b/i, /\brobux\b/i] },
   { key: 'fortnite', label: 'Fortnite', unit: 'v-bucks',

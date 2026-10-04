@@ -239,6 +239,25 @@ export const SOURCES = [
     },
   },
 
+  {
+    key: 'brave',
+    label: 'Brave Search API (zoekresultaten)',
+    kind: 'search',
+    requiresCredentials: true,
+    /* A key that exists only for this: setting it is switching it on. */
+    enabledByKey: true,
+    legalBasis:
+      'Brave publishes a paid Search API with its own key and terms. The API answer is the '
+      + 'permission; no search engine page and no shop page is fetched. Results say which products '
+      + 'exist and where — never a price, stock or a picture the shop may use.',
+    termsUrl: 'https://api-dashboard.search.brave.com/terms-of-service',
+    robotsUrl: null,
+    available: (creds) => (creds?.apiKey
+      ? { ok: true, reason: 'Brave Search API key configured' }
+      : { ok: false, reason: 'no Brave Search API key (BRAVE_SEARCH_API_KEY).' }),
+    fetchOffers: async () => [], // search results are mentions, not offers — see discovery/searchSource.js
+  },
+
   /* ── Publisher reference prices ──────────────────────────────────────────
      Defined so an official RRP has a home in the data model, and marked as
      never-automated so nobody later mistakes the absence of a fetcher for an
@@ -320,7 +339,7 @@ export async function sourceStatuses({ checkRobots = false } = {}) {
     let reason = avail.reason;
 
     if (!avail.ok) status = 'unavailable';
-    else if (s.requiresCredentials && !enabled.has(s.key)) {
+    else if (s.requiresCredentials && !s.enabledByKey && !enabled.has(s.key)) {
       status = 'disabled';
       reason = `credentials are present but ${s.key} is not in MARKET_SOURCES — switch it on deliberately`;
     } else status = 'available';
@@ -377,7 +396,7 @@ export async function fetchFromSource(key, query, { fetchImpl = fetch } = {}) {
   const creds = src.requiresCredentials ? await credentialsFor(key) : null;
   const avail = src.available(creds);
   if (!avail.ok) throw new SourceUnavailable(key, avail.reason);
-  if (src.requiresCredentials && !config.market.enabledSources.includes(key)) {
+  if (src.requiresCredentials && !src.enabledByKey && !config.market.enabledSources.includes(key)) {
     throw new SourceUnavailable(key, `not listed in MARKET_SOURCES`);
   }
   return src.fetchOffers({ creds: creds || {}, query, fetchImpl });

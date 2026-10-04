@@ -39,6 +39,7 @@ import { pickBest } from '../supplier/bestSourceService.js';
 import { searchCandidates } from '../supplier/catalogScanService.js';
 import { catalogueModels } from './catalogAuditService.js';
 import { productTitle } from './names.js';
+import { collectMentions, mentionsFor } from './searchSource.js';
 import { GATE, PRESENCE, STALE_HOURS, catalogMatch, gate, imageConfidence, skuFor, suggestPrice } from './gate.js';
 
 export const LIMITS = {
@@ -183,6 +184,8 @@ export async function evaluateCandidate(candidateId, deps = {}) {
   const euros = obs.filter((o) => o.availability === 'in_stock' && o.price_eur_cents != null).map((o) => Number(o.price_eur_cents)).sort((a, b) => a - b);
   const median = euros.length ? euros[Math.floor(euros.length / 2)] : null;
 
+  const mentioned = await mentionsFor(mp.id, { sinceHours: STALE_HOURS });
+  if (mentioned.domains.length) sources.push('search');
   const title = edits.title || productTitle(model);
   let supplier = null, supplierImage = null, sourceErrors = [];
   if (presence.status === PRESENCE.MISSING_PRODUCT && !presence.near) {
@@ -229,12 +232,13 @@ export async function evaluateCandidate(candidateId, deps = {}) {
 
   const verdict = gate({
     model, presence, sources, inStockSources: inStock, freshObservations: obs.length, sourceErrors,
-    supplier, categoryStatus: edits.category ? 'existing' : shelf.status,
+    supplier, categoryStatus: edits.category ? 'existing' : shelf.status, mentionDomains: mentioned.domains.length,
     image: img.image ? { score: img.image.confidence, reasons: img.image.reasons } : (img.rejected[0] || null), extraReasons,
   });
   const best = supplier?.best || null;
   const margin = supplier?.suggested && best?.cost != null ? profitAt(supplier.suggested, best.cost).marginPct : null;
-  const found = [...new Set([...obs.map((o) => o.source_key), ...(deps.supplierSources || []).map((s) => s.supplier.name), ...(best ? [best.supplierName] : [])])];
+  const found = [...new Set([...obs.map((o) => o.source_key), ...(deps.supplierSources || []).map((s) => s.supplier.name), ...(best ? [best.supplierName] : []),
+    ...(mentioned.domains.length ? [`zoekresultaten: ${mentioned.domains.slice(0, 4).join(', ')}${mentioned.domains.length > 4 ? ` +${mentioned.domains.length - 4}` : ''}`] : [])])];
 
   await run(`UPDATE market_candidates SET gate_status=@g, gate_reasons=@r, match_confidence=@m, image_confidence=@i, image=@img,
                supplier=@sup, sources_found=@src, suggested_price_cents=@p, supplier_cost_cents=@cost, expected_margin_pct=@mg,
@@ -388,11 +392,13 @@ export async function queriesFor(categories = null, { cap = LIMITS.maxQueries } 
 export async function scanCategories({ categories = null, fetchImpl = fetch, autoAdd = autoAddEnabled(), ...deps } = {}) {
   const { collectFromSources } = await import('../market/engine.js');
   const queries = await queriesFor(categories);
-  const collected = await collectFromSources(queries, { fetchImpl: throttledFetch(fetchImpl) });
+  const f = throttledFetch(fetchImpl);
+  const collected = await collectFromSources(queries, { fetchImpl: f });
+  const searched = await collectMentions(queries, { fetchImpl: f, credentials: deps.searchCredentials });
   const classified = await runDiscovery();
   const evaluated = await evaluateCandidates(deps);
   const added = autoAdd ? await addAllSafe() : { added: 0, results: [] };
-  return { queries: queries.length, collected, classified, evaluated: evaluated.length, added: added.added,
+  return { queries: queries.length, collected, searched, classified, evaluated: evaluated.length, added: added.added,
     byGate: Object.fromEntries(Object.values(GATE).map((g) => [g, evaluated.filter((e) => e.status === g).length])) };
 }
 
@@ -402,7 +408,9 @@ export async function rescanCandidate(candidateId, { fetchImpl = fetch, ...deps 
   if (!c) throw Object.assign(new Error('no such candidate'), { status: 404 });
   const { collectFromSources } = await import('../market/engine.js');
   const label = GAMES.find((g) => g.key === c.game)?.label;
-  const collected = label ? await collectFromSources([label], { fetchImpl: throttledFetch(fetchImpl) }) : null;
+  const f = throttledFetch(fetchImpl);
+  const collected = label ? await collectFromSources([label], { fetchImpl: f }) : null;
+  if (label) await collectMentions([label], { fetchImpl: f, credentials: deps.searchCredentials });
   await runDiscovery();
   return { collected, result: await evaluateCandidate(candidateId, deps) };
 }
@@ -436,7 +444,10 @@ export async function discoveryList({ gate: g = null, limit = 300 } = {}) {
 
 /* ── Scheduling ────────────────────────────────────────────────────────── */
 
-const JOBS = { refresh: 24, images: 168 };
+/* "Nightly" means once a day: maintenance also runs hourly (on the first
+   request of an hour), and the category batch asks partner and search APIs
+   that are rate-limited and, for Brave, paid per query. */
+const JOBS = { categories: 24, refresh: 24, images: 168 };
 export const BATCH = Number(process.env.DISCOVERY_NIGHTLY_QUERIES || 6);
 async function due(job, hours, now) {
   const row = await get(`SELECT value FROM kv WHERE key=@k`, { k: `discovery.job.${job}` }).catch(() => null);
@@ -462,21 +473,26 @@ export async function nightlyCategoryBatch({ size = BATCH, fetchImpl = fetch } =
   const from = (Number(row?.value) || 0) % queries.length;
   const batch = [...queries, ...queries].slice(from, from + Math.min(size, queries.length));
   const { collectFromSources } = await import('../market/engine.js');
-  const collected = await collectFromSources(batch, { fetchImpl: throttledFetch(fetchImpl) });
+  const f = throttledFetch(fetchImpl);
+  const collected = await collectFromSources(batch, { fetchImpl: f });
+  const searched = await collectMentions(batch, { fetchImpl: f }).catch(() => ({ mentions: 0 }));
   await kvSet('discovery.cursor', (from + batch.length) % queries.length);
   await runDiscovery();
-  return { queries: batch, recorded: collected.recorded, unavailable: collected.unavailable.length, errors: collected.errors.length };
+  return { queries: batch, recorded: collected.recorded, mentions: searched.mentions || 0, unavailable: collected.unavailable.length, errors: collected.errors.length };
 }
 
 /**
  * From the nightly maintenance run, inside its time budget (`deadline`):
- *   categories  every night, the next few search terms (a full pass a week)
+ *   categories  once a day, the next few search terms (a full pass a week)
  *   refresh     daily  — re-evaluate open candidates (stock, cost, price), add what became safe
  *   images      weekly — refresh stale or weak official product pictures
  */
 export async function scheduledDiscovery({ now = Date.now(), deadline = Date.now() + 20_000, fetchImpl = fetch, ...deps } = {}) {
   const out = {};
-  out.categories = await nightlyCategoryBatch({ fetchImpl }).catch((e) => ({ error: e.message }));
+  if (await due('categories', JOBS.categories, now)) {
+    out.categories = await nightlyCategoryBatch({ fetchImpl }).catch((e) => ({ error: e.message }));
+    await mark('categories', now);
+  }
   if (Date.now() < deadline && await due('refresh', JOBS.refresh, now)) {
     const ev = await evaluateCandidates({ ...deps, limit: 8, deadline }).catch(() => []);
     out.refresh = { evaluated: ev.length, added: autoAddEnabled() ? (await addAllSafe().catch(() => ({ added: 0 }))).added : 0 };
@@ -589,7 +605,11 @@ export async function fullScanStep({ budgetMs = 20_000, fetchImpl = fetch, autoA
     while (st.qi < st.queries.length && left()) {
       // eslint-disable-next-line no-await-in-loop
       const r = await collectFromSources([st.queries[st.qi]], { fetchImpl: f });
-      st.recorded += r.recorded; st.errors += r.errors.length;
+      // eslint-disable-next-line no-await-in-loop
+      const m = await collectMentions([st.queries[st.qi]], { fetchImpl: f, credentials: deps.searchCredentials });
+      st.recorded += r.recorded; st.errors += r.errors.length + m.errors.length;
+      st.mentions = (st.mentions || 0) + m.mentions;
+      if (m.skipped && !st.unavailable.some((x) => x.source === 'brave')) st.unavailable.push({ source: 'brave', reason: m.skipped });
       /* Reference prices (official:*) and the manual source are typed in by
          hand on purpose; they are not "unavailable". */
       for (const u of r.unavailable) {

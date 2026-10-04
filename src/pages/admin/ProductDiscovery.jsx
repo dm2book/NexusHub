@@ -126,9 +126,10 @@ export default function ProductDiscovery() {
       {!available.length ? (
         <div className="rounded-xl border p-4 mb-4 text-sm" style={chip('#fcd34d')} data-testid="no-sources">
           <div className="text-white mb-1">De scan kan nu niets vinden: er is geen enkele automatische bron.</div>
-          Kinguin, G2A, Eldorado en Eneba werken alleen met jouw partner-API-sleutel (Admin → Market → bronnen, of in
-          Vercel bijv. KINGUIN_API_KEY). Een scan zonder bron vindt 0 producten — dat betekent niet dat er niets ontbreekt.
-          Tot die tijd kun je hieronder de officiële pakketten invoeren die je op de winkel van de uitgever ziet.
+          Snelste route: een Brave Search API-sleutel (api-dashboard.search.brave.com) als BRAVE_SEARCH_API_KEY in Vercel —
+          dan vindt de scan via zoekresultaten welke pakketten er bestaan (zonder prijs of voorraad, dus altijd naar review).
+          Met inkoopprijs en voorraad: Kinguin, G2A, Eldorado of Eneba met jouw partner-API-sleutel. Een scan zonder bron
+          vindt 0 producten — dat betekent niet dat er niets ontbreekt. Je kunt ook hieronder de officiële pakketten invoeren.
         </div>
       ) : (
         <div className="text-xs text-slate-400 mb-4">
@@ -228,7 +229,7 @@ export default function ProductDiscovery() {
                 {{ collect: 'Bronnen raadplegen', classify: 'Vergelijken met de catalogus', evaluate: 'Kandidaten beoordelen', add: 'Veilige producten toevoegen', done: 'Klaar' }[full.phase]}
                 {' · '}zoektermen {full.qi}/{full.totalQueries}
                 {full.totalCandidates != null && <> · kandidaten {full.ei}/{full.totalCandidates}</>}
-                {' · '}{full.recorded} observaties
+                {' · '}{full.recorded} observaties{full.mentions ? ` · ${full.mentions} vermeldingen in zoekresultaten` : ''}
                 {full.phase === 'done' && <> · {full.added} toegevoegd · klaar {date(full.finishedAt)}</>}
                 {full.unavailable?.length > 0 && <div style={{ color: '#fcd34d' }}>Niet beschikbaar: {full.unavailable.map((u) => u.source).join(', ')}</div>}
               </div>

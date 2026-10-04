@@ -277,6 +277,45 @@ console.log('\n— End to end —');
   const badGame = await P.addReferenceDenominations({ game: 'nope', amounts: [{ denomination: 100, priceCents: 99 }], sourceUrl: fcSrc }).then(() => 'ok', (e) => e.status);
   ok('an entry needs the official https page and a game the parser knows', badUrl === 400 && badGame === 400);
 
+  /* Search results (Brave Search API): which packs exist — never a price, stock or picture. */
+  const S = await import('../src/services/discovery/searchSource.js');
+  ok('a pack counts only next to the game\'s own unit — not a year, price or "FC 26"',
+    S.extractMentions('EA SPORTS FC 26 – 2800 FC Points PS5, was €24.99', 'ea-fc').map((m) => m.denomination).join() === '2800'
+    && S.extractMentions('FC 26 Points 18500 PlayStation', 'ea-fc').map((m) => m.denomination).join() === '18500');
+  ok('one console named → that console; several or none → unknown, never a guess',
+    S.extractMentions('5900 FC Points PS5', 'ea-fc')[0].platform === 'playstation'
+    && S.extractMentions('5900 FC Points PS5 Xbox PC', 'ea-fc')[0].platform === 'unknown'
+    && S.extractMentions('5900 FC Points', 'ea-fc')[0].platform === 'unknown');
+  ok('gift cards read €-amounts, subscriptions months and years', S.extractMentions('Google Play €15 en 50 euro', 'google-play').map((m) => m.denomination).join() === '15,50'
+    && S.extractMentions('Nitro 3 months or 1 Year', 'discord').map((m) => m.denomination).join() === '3,12');
+  const braveCalls = [];
+  const brave = async (url, opts) => {
+    braveCalls.push({ url, key: opts?.headers?.['X-Subscription-Token'] });
+    const q = decodeURIComponent(new URL(url).searchParams.get('q'));
+    if (/Robux/i.test(q)) return new Response('', { status: 429 });
+    const results = /EA FC/.test(q) ? [
+      { title: 'EA SPORTS FC 26 – 18500 FC Points <strong>PS5</strong>', url: 'https://shop-a.test/fc-18500-ps5', description: 'Buy 18,500 FC Points' },
+      { title: 'FC 26 Points 18500 PlayStation', url: 'https://shop-b.test/p/18500', description: 'PS5 code' },
+      { title: 'EA FC 26 – 250 FC Points PS5', url: 'https://shop-c.test/250', description: '' },
+      { title: 'Win 99999 FC Points!', url: 'https://www.forgemarket.nl/blog', description: 'EA FC' },
+      { title: 'Best gaming deals', url: 'https://shop-d.test/deals', description: 'EA FC 7777 FC Points PS5' },
+    ] : [];
+    return new Response(JSON.stringify({ web: { results } }), { status: 200, headers: { 'content-type': 'application/json' } });
+  };
+  const m1 = await S.collectMentions(['EA Sports FC', 'Roblox'], { fetchImpl: brave, credentials: { apiKey: 'test-key' } });
+  ok('Brave is asked through its API with the key in X-Subscription-Token', braveCalls.length === 2 && braveCalls.every((a) => a.key === 'test-key' && a.url.startsWith('https://api.search.brave.com/res/v1/web/search')));
+  ok('a rate-limited search (429) is an error with a reason, not "nothing found"', m1.errors.some((e) => /429/.test(e)));
+  ok('without a key nothing is asked', (await S.collectMentions(['EA Sports FC'], { fetchImpl: async () => { throw new Error('asked'); }, credentials: {} })).skipped === 'no Brave Search API key');
+  await runDiscovery();
+  const fcm = async (d) => get(`SELECT p.id FROM market_products p WHERE p.game='ea-fc' AND p.denomination=@d AND p.platform='playstation'`, { d });
+  ok('our own pages are never evidence, and the game must be in the result\'s title', !(await fcm(99999)) && !(await fcm(7777)));
+  const ev18500 = await P.evaluateCandidates({ ids: [(await get(`SELECT id FROM market_candidates WHERE market_product_id=@p`, { p: (await fcm(18500)).id })).id], supplierSources: [], imageFetch });
+  ok('18,500 FC Points on two websites: REVIEW_REQUIRED, "found only in search results"', ev18500[0].status === 'REVIEW_REQUIRED'
+    && ev18500[0].reasons.some((r) => /found only in search results \(2 websites\)/.test(r)), JSON.stringify(ev18500[0].reasons));
+  const ev250 = await P.evaluateCandidates({ ids: [(await get(`SELECT id FROM market_candidates WHERE market_product_id=@p`, { p: (await fcm(250)).id })).id], supplierSources: [], imageFetch });
+  ok('250 FC Points on one website only: UNAVAILABLE — not enough evidence', ev250[0].status === 'UNAVAILABLE' && /only one website/.test(ev250[0].reasons[0]));
+  ok('search results alone never reach auto-approve', ev18500[0].matchConfidence < G.AUTO_MATCH);
+
   /* The complete scan: as long as it takes, in steps that each fit a server function. */
   await obs('Roblox 1200 Robux Global');
   const start = await P.startFullScan({ actor: 'owner@test' });
@@ -295,6 +334,14 @@ console.log('\n— End to end —');
   ok('…the new 1,200 Robux was found and judged', !!(await byDen(1200))?.gate_status);
   ok('…and sources it may not ask are listed, not worked around', st.unavailable.some((u) => u.source === 'kinguin'));
   ok('…when done, a new scan can start', (await P.startFullScan({ actor: 'x' })).id !== start.id);
+
+  /* Maintenance runs hourly; the category batch must not. */
+  await run(`DELETE FROM kv WHERE key LIKE 'discovery.job.%'`);
+  const first = await P.scheduledDiscovery({ now: Date.now(), deadline: Date.now() + 5000, supplierSources: [], imageFetch });
+  const hourLater = await P.scheduledDiscovery({ now: Date.now() + 3_600_000, deadline: Date.now() + 5000, supplierSources: [], imageFetch });
+  const dayLater = await P.scheduledDiscovery({ now: Date.now() + 25 * 3_600_000, deadline: Date.now() + 5000, supplierSources: [], imageFetch });
+  ok('the scheduled category batch runs once a day, not every hourly maintenance run',
+    !!first.categories && !hourLater.categories && !!dayLater.categories, JSON.stringify({ first: !!first.categories, hourLater: !!hourLater.categories, dayLater: !!dayLater.categories }));
 
   const fs = await import('node:fs');
   const page = fs.readFileSync(new URL('../../src/pages/admin/ProductDiscovery.jsx', import.meta.url), 'utf8');

@@ -2163,4 +2163,27 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS lang TEXT;
       CREATE INDEX IF NOT EXISTS idx_market_candidates_gate ON market_candidates (gate_status, updated_at DESC);
     `,
   },
+  {
+    id: '057_market_mentions',
+    /*
+     * A product named in a search result (discovery/searchSource.js): which
+     * canonical product, which page, which query, when. Evidence that a
+     * product exists — never a price or stock, so it is kept apart from
+     * market_observations, which require both.
+     */
+    sql: `
+      CREATE TABLE IF NOT EXISTS market_mentions (
+        id                TEXT PRIMARY KEY,
+        market_product_id TEXT NOT NULL REFERENCES market_products(id) ON DELETE CASCADE,
+        source_key        TEXT NOT NULL,
+        query             TEXT,
+        title             TEXT NOT NULL,
+        url               TEXT NOT NULL,
+        domain            TEXT NOT NULL,
+        seen_at           TEXT NOT NULL,
+        UNIQUE (market_product_id, url)
+      );
+      CREATE INDEX IF NOT EXISTS idx_market_mentions_product ON market_mentions (market_product_id, seen_at DESC);
+    `,
+  },
 ];

@@ -130,7 +130,11 @@ export async function runDiscovery() {
     if (existing && decided.includes(existing.status)) continue;
 
     if (existing) {
-      await run(`UPDATE market_candidates SET status=@s, reason=@r, forge_product_id=@f,
+      /* COALESCE: a link a person made (resolving a needs_review by hand) is
+         kept when this run's parser finds no match of its own. Overwriting it
+         with NULL quietly undid the admin's work on the next run — and with
+         maintenance running hourly, within the hour. */
+      await run(`UPDATE market_candidates SET status=@s, reason=@r, forge_product_id=COALESCE(@f, forge_product_id),
                    duplicate_of=@d, match_confidence=@c, updated_at=@at WHERE id=@id`,
         { s: verdict.status, r: verdict.reason, f: verdict.forgeProductId || null,
           d: verdict.duplicateOf || null, c: verdict.confidence, at, id: existing.id });
