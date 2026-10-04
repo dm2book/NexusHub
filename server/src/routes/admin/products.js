@@ -10,6 +10,7 @@ import { audit } from '../../services/auditService.js';
 import { assertSafeImageValue, resolveImageUrl } from '../../utils/imageUrl.js';
 import { normalizeImageValue } from '../../services/imageStoreService.js';
 import { backfillArt, proposedCategories, artFor } from '../../services/productFitService.js';
+import { mediaReport, enrichMedia, enrichmentQueue, setOfficial } from '../../services/productMediaService.js';
 import { findPhotos, photoQueue, photoGap, photoScope, setPhotoScope, restoreArtwork, SCOPES } from '../../services/supplier/supplierImageService.js';
 import { importCosts } from '../../services/costImportService.js';
 import { lossReport, applyFloor } from '../../services/lossPriceService.js';
@@ -101,6 +102,29 @@ router.post('/images/find', requirePermission('suppliers.manage'), asyncHandler(
 }));
 
 /** Every supplier photo that replaced artwork goes back to the artwork. */
+/* ── Product media: official pictures, their source, age and quality ─────
+   See productMediaService. The report reads only the database; enrich asks the
+   suppliers' own APIs, a few products per call (each is a search everywhere). */
+router.get('/media', requirePermission('suppliers.read'), asyncHandler(async (_req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json(await mediaReport());
+}));
+router.post('/media/enrich', requirePermission('suppliers.manage'), asyncHandler(async (req, res) => {
+  const { productIds } = z.object({ productIds: z.array(z.string()).max(4).optional() }).parse(req.body || {});
+  const ids = productIds?.length ? productIds : await enrichmentQueue({ limit: 4 });
+  if (!ids.length) return res.json({ rows: [], applied: 0, done: true });
+  res.set('Cache-Control', 'no-store');
+  res.json({ ...(await enrichMedia(ids, { actor: req.user })), done: false });
+}));
+router.post('/:id/media/official', requirePermission('suppliers.manage'), asyncHandler(async (req, res) => {
+  const { official, sourceUrl } = z.object({ official: z.boolean(), sourceUrl: z.string().url().max(500).optional() }).parse(req.body || {});
+  try {
+    res.json(await setOfficial(req.params.id, official, { actor: req.user, sourceUrl }));
+  } catch (e) {
+    res.status(e.status || 500).json({ error: { message: e.message } });
+  }
+}));
+
 router.post('/images/restore-artwork', requirePermission('suppliers.manage'), asyncHandler(async (req, res) => {
   res.json(await restoreArtwork({ actor: req.user }));
 }));

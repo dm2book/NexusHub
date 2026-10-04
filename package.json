@@ -13,6 +13,7 @@
   },
   "//": "Backend deps live here too so a single Vercel install covers both the SPA build and the api/ serverless function (which imports server/src).",
   "dependencies": {
+    "@mintplex-labs/piper-tts-web": "^1.0.5",
     "@vercel/functions": "^3.9.9",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
@@ -22,6 +23,7 @@
     "lucide-react": "^0.309.0",
     "nanoid": "^5.0.9",
     "nodemailer": "^10.0.14",
+    "onnxruntime-web": "1.30.0",
     "pg": "^8.13.1",
     "qrcode-generator": "^2.0.4",
     "react": "^18.2.0",

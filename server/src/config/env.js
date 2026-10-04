@@ -173,7 +173,10 @@ export const config = {
     // Default to Resend's shared sender, which delivers WITHOUT verifying a
     // custom domain — so login codes work the moment SMTP_URL is set. Switch to
     // your own address (e.g. no-reply@yourdomain) once that domain is verified.
-    fromAddress: env.EMAIL_FROM_ADDRESS || 'onboarding@resend.dev',
+    /* The shop's own verified Resend domain in production (the owner confirmed
+       forgemarket.nl is verified there). resend.dev only delivers to the
+       account owner, so it stays the development default. */
+    fromAddress: env.EMAIL_FROM_ADDRESS || (isProd ? 'orders@forgemarket.nl' : 'onboarding@resend.dev'),
     brandColor: env.EMAIL_BRAND_COLOR || '#6366f1',
     logoUrl: env.EMAIL_LOGO_URL || '',
     /**
@@ -219,7 +222,11 @@ export const config = {
        moment, and one whose fix is another deploy. Set LAUNCH_DATE to open the
        gate's mouth: `LAUNCH_DATE=2026-10-24T00:00:00Z`. Blank means "we are
        open", which is the only safe thing for a value nobody has set yet. */
-    date: env.LAUNCH_DATE || '',
+    /* Production opens on 24 October 2026 at 00:00 Amsterdam time unless
+       LAUNCH_DATE says otherwise (or LAUNCH_MODE=open forces it open). The
+       owner asked for the date to live here, so the checkout cannot open
+       early because a variable was never set. Development stays open. */
+    date: env.LAUNCH_DATE ?? (isProd ? '2026-10-23T22:00:00Z' : ''),
     /* A deliberate override, in either direction.
        `open` sells whatever the date says; `prelaunch` refuses whatever it
        says. Neither is a default — the default is worked out from evidence in

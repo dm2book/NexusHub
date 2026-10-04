@@ -387,9 +387,16 @@ export async function runMaintenance() {
       if (sources.length) {
         /* The owner's choice: placeholders only, or the artwork too. */
         const scope = await photoScope();
-        const ids = await photoQueue({ limit: Number(process.env.PHOTO_SWEEP_LIMIT || 8), scope });
+        const missing = await photoQueue({ limit: Number(process.env.PHOTO_SWEEP_LIMIT || 8), scope });
+        /* Plus a few supplier photos that went stale or were weak: store
+           artwork changes with seasons, and a refresh is a cheap search. */
+        const { mediaReport } = await import('./productMediaService.js');
+        const stale = (await mediaReport()).items
+          .filter((i) => i.source === 'supplier' && ['outdated', 'low_quality'].includes(i.status))
+          .slice(0, 4).map((i) => i.id);
+        const ids = [...new Set([...missing, ...stale])];
         if (ids.length) {
-          const out = await findPhotos(ids, { apply: true, sources, scope });
+          const out = await findPhotos(ids, { apply: true, sources, scope, refresh: true });
           summary.photosLooked = ids.length;
           summary.photosApplied = out.applied;
         }
