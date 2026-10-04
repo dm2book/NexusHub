@@ -105,7 +105,7 @@ export default function ProductContent() {
       )}
 
       <div className="card overflow-x-auto">
-        <table className="w-full text-sm min-w-[640px]">
+        <table className="w-full text-sm" style={{ minWidth: 640 }}>
           <thead className="text-left text-slate-400 border-b border-white/5">
             <tr><th className="px-4 py-3">Product</th><th className="px-4 py-3">Score</th><th className="px-4 py-3">Vlaggen</th><th className="px-4 py-3" /></tr>
           </thead>

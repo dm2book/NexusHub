@@ -13,6 +13,7 @@ import { backfillArt, proposedCategories, artFor } from '../../services/productF
 import { mediaReport, enrichMedia, enrichmentQueue, setOfficial } from '../../services/productMediaService.js';
 import { contentReport, applyContent, generateAll } from '../../services/productContentService.js';
 import { trustReport } from '../../services/productTrustService.js';
+import { trendingSnapshot } from '../../services/trendingService.js';
 import { findPhotos, photoQueue, photoGap, photoScope, setPhotoScope, restoreArtwork, SCOPES } from '../../services/supplier/supplierImageService.js';
 import { importCosts } from '../../services/costImportService.js';
 import { lossReport, applyFloor } from '../../services/lossPriceService.js';
@@ -148,6 +149,13 @@ router.post('/content/apply', requirePermission('suppliers.manage'), asyncHandle
 router.get('/trust', requirePermission('orders.read'), asyncHandler(async (_req, res) => {
   res.set('Cache-Control', 'no-store');
   res.json(await trustReport());
+}));
+
+/* ── Trending: the engine's numbers and lists (trendingService). Read-only:
+   there is nothing to pick by hand. */
+router.get('/trending', requirePermission('orders.read'), asyncHandler(async (_req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json(await trendingSnapshot({ fresh: true }));
 }));
 
 router.post('/images/restore-artwork', requirePermission('suppliers.manage'), asyncHandler(async (req, res) => {

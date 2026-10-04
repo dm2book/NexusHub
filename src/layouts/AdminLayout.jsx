@@ -20,6 +20,7 @@ const NAV = [
   { to: '/admin/products/media', icon: ImageIcon, label: 'Product media', perm: 'suppliers.read' },
   { to: '/admin/products/content', icon: FileText, label: 'Product content', perm: 'suppliers.read' },
   { to: '/admin/products/trust', icon: BadgeCheck, label: 'Product trust', perm: 'orders.read' },
+  { to: '/admin/products/trending', icon: TrendingUp, label: 'Trending', perm: 'orders.read' },
   { to: '/admin/categories', icon: LayoutGrid, label: 'Categories', perm: 'orders.read' },
   { to: '/admin/users', icon: Users, label: 'Users', perm: 'users.read' },
   { to: '/admin/fulfillment', icon: PackageCheck, label: 'Fulfillment', perm: 'fulfillment.manage', badge: 'fulfillment' },

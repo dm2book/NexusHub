@@ -273,6 +273,13 @@ export default function ProductDetail() {
        excluded for the same reason they are excluded above: they are the
        offline placeholder catalogue, not something anyone can buy. */
     reportStep('product_view', product.id);
+    /* One anonymous view for the trending engine's conversion rate — once per
+       product per tab, so a reload is not a second visitor. Nothing about the
+       visitor is sent. */
+    try {
+      const k = `fm-pv-${product.id}`;
+      if (!sessionStorage.getItem(k)) { sessionStorage.setItem(k, '1'); api.post(`/api/products/${product.id}/view`, {}).catch(() => {}); }
+    } catch { /* storage blocked: skip, rather than count every reload */ }
   },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [product?.id, product?.sample]);
