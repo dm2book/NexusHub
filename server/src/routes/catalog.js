@@ -201,13 +201,16 @@ router.get('/stats', asyncHandler(async (_req, res) => {
  * dispenses without anyone reading a bank app. A manual link means the buyer
  * waits for a human — worth having as a fallback, not worth preferring.
  *
- * Then manual, then Stripe, then demo.
+ * Order: Stripe (the shop's choice), then Mollie, then manual, then demo.
  */
 const manual = manualPayMethods();
+/* Stripe first: it is the provider the shop chose, it confirms itself through
+   its webhook like Mollie does, and with a live key it should win over any
+   payment link left configured from before. */
 const paymentProvider = () =>
-  mollieEnabled() ? 'mollie'
-    : manual.length ? 'manual'
-      : stripeEnabled() ? 'stripe'
+  stripeEnabled() ? 'stripe'
+    : mollieEnabled() ? 'mollie'
+      : manual.length ? 'manual'
         : config.payments.demoMode ? 'demo' : 'none';
 
 // Public runtime config the SPA can read (feature flags, enabled providers).

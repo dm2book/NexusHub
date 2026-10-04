@@ -79,9 +79,9 @@ export const LEGAL_DOCS = {
         {
           h: 'Artikel 5 — Betaling',
           body: [
-            'Je betaalt direct bij het afrekenen via onze betaaldienstverlener **Mollie**. Je kunt kiezen uit iDEAL, Bancontact, Apple Pay, creditcard en PayPal. Welke methodes je precies ziet, hangt af van het bedrag en van je apparaat.',
-            'Je betaalgegevens worden verwerkt door Mollie en komen niet bij ons binnen. Wij zien alleen dát een betaling is geslaagd, voor welk bedrag en met welke methode.',
-            'Je bestelling wordt automatisch bevestigd zodra Mollie de betaling bevestigt — bij iDEAL is dat doorgaans binnen enkele seconden. Betaal je niet, dan wordt de bestelling automatisch geannuleerd na de termijn die op je bestelpagina staat, en wordt er niets afgeschreven.',
+            'Je betaalt direct bij het afrekenen via onze betaaldienstverlener **Stripe**. Je kunt kiezen uit iDEAL, Bancontact en betaalkaart (Visa, Mastercard). Je bank kan om een extra bevestiging vragen (3-D Secure).',
+            'Je betaalgegevens worden verwerkt door Stripe en komen niet bij ons binnen. Wij zien alleen dát een betaling is geslaagd, voor welk bedrag en met welke methode.',
+            'Je bestelling wordt automatisch bevestigd zodra Stripe de betaling bevestigt — bij iDEAL is dat doorgaans binnen enkele seconden. Betaal je niet, dan wordt de bestelling automatisch geannuleerd na de termijn die op je bestelpagina staat, en wordt er niets afgeschreven.',
             'Betaal je bij uitzondering handmatig via een betaalverzoek, dan is je bestelnummer de betalingsreferentie. Zonder die referentie moeten we je betaling met de hand opzoeken, wat je levering vertraagt.',
           ],
         },
@@ -214,9 +214,9 @@ export const LEGAL_DOCS = {
         {
           h: 'Article 5 — Payment',
           body: [
-            'You pay at checkout through our payment provider **Mollie**, using iDEAL, Bancontact, Apple Pay, credit card or PayPal. Which methods you see depends on the amount and on your device.',
-            'Your payment details are processed by Mollie and never reach us. We only see that a payment succeeded, for what amount, and by which method.',
-            'Your order is confirmed automatically as soon as Mollie confirms the payment — with iDEAL that is usually a matter of seconds. If you do not pay, the order is cancelled automatically after the period stated on your order page, and nothing is charged.',
+            'You pay at checkout through our payment provider **Stripe**, using iDEAL, Bancontact or a payment card (Visa, Mastercard). Your bank may ask for an extra confirmation (3-D Secure).',
+            'Your payment details are processed by Stripe and never reach us. We only see that a payment succeeded, for what amount, and by which method.',
+            'Your order is confirmed automatically as soon as Stripe confirms the payment — with iDEAL that is usually a matter of seconds. If you do not pay, the order is cancelled automatically after the period stated on your order page, and nothing is charged.',
             'If you exceptionally pay by a manual payment request, your order number is the payment reference. Without it we have to find your payment by hand, which delays your delivery.',
           ],
         },
@@ -342,7 +342,7 @@ export const LEGAL_DOCS = {
                 '**Een betaalbewijs** — alleen als je zelf een screenshot uploadt, en alleen tot je betaling bevestigd is.',
               ],
             },
-            'Wij verwerken **geen betaalgegevens**. Je betaalt bij Mollie; wij zien alleen dát een betaling geslaagd is, voor welk bedrag en met welke methode. Je kaartnummer of rekeningnummer bereikt onze systemen niet.',
+            'Wij verwerken **geen betaalgegevens**. Je betaalt bij Stripe; wij zien alleen dát een betaling geslaagd is, voor welk bedrag en met welke methode. Je kaartnummer of rekeningnummer bereikt onze systemen niet.',
           ],
         },
         {
@@ -372,10 +372,13 @@ export const LEGAL_DOCS = {
             'Wij gebruiken een klein aantal dienstverleners, die je gegevens uitsluitend in onze opdracht verwerken. Met elk van hen is een verwerkersovereenkomst gesloten.',
             {
               table: [
-                ['Mollie B.V. (Nederland)', 'Betalingen. Verwerkt je betaalgegevens als zelfstandig verwerkingsverantwoordelijke.'],
+                ['Stripe Payments Europe Ltd. (Ierland)', 'Betalingen. Verwerkt je betaalgegevens als zelfstandig verwerkingsverantwoordelijke; wij zien nooit je kaartgegevens.'],
                 ['Vercel Inc. (VS)', 'Hosting van de website en de API.'],
                 ['Neon Inc. (EU-regio)', 'De database waarin je account en bestellingen staan.'],
                 ['Resend (VS)', 'Verzending van je inlogcodes en bestelmails.'],
+                ['Twilio Inc. (VS)', 'Alleen als je inlogt met je telefoonnummer: verzending van de sms-code.'],
+                ['Google LLC (VS)', 'Alleen als je kiest voor inloggen met Google.'],
+                ['Anthropic PBC (VS)', 'Alleen als je in onze Discord een vraag aan de assistent stelt: de tekst van je vraag.'],
                 ['Discord Inc. (VS)', 'Alleen als je ons daar benadert of je account koppelt.'],
               ],
             },
@@ -394,7 +397,10 @@ export const LEGAL_DOCS = {
                 ['Chargebackregister (incl. IP)', '18 maanden — een chargeback kan tot ~120 dagen na de betaling binnenkomen'],
                 ['Inlogcodes', 'Automatisch verwijderd kort nadat ze verlopen of gebruikt zijn'],
                 ['Sessies', 'Tot ze verlopen of je uitlogt; je kunt ze zelf intrekken in je account'],
-                ['Betaalbewijzen (screenshots)', 'Verwijderd zodra je betaling bevestigd is'],
+                ['Betaalbewijzen (screenshots)', 'Verwijderd zodra je betaling is beoordeeld'],
+                ['Verzonden e-mails (logboek)', 'Wie, wat en wanneer; de inhoud van inlogcodes en geleverde codes wordt niet bewaard'],
+                ['Back-ups', 'De laatste 5, daarna automatisch verwijderd; zonder 2FA-geheimen'],
+                ['Apparaatherkenning (fm_device)', '60 dagen'],
               ],
             },
             'Bij het verstrijken van een bewaartermijn voor een IP-adres blijft de onderliggende regel bestaan — je bestelhistorie en het auditspoor houden hun vorm — en wordt uitsluitend het adres eruit gewist.',
@@ -403,8 +409,8 @@ export const LEGAL_DOCS = {
         {
           h: 'Cookies',
           body: [
-            'Wij gebruiken één functionele cookie om je ingelogd te houden, en verder geen enkele. Je winkelwagen en je taalkeuze staan in je eigen browser en verlaten die pas als je bestelt. Je verlanglijst ook, tot je inlogt: dan bewaren we hem op je account, zodat hij op elk apparaat hetzelfde is. Zet je bij een product een prijsalert aan, dan sturen we je een e-mail — en een Discord-DM als je Discord hebt gekoppeld — wanneer de prijs daalt. Elke alert-mail heeft een link om alle alerts uit te zetten.',
-            'Omdat wij geen advertentie- of trackingcookies plaatsen, heeft deze site geen cookiebanner die om toestemming vraagt. De volledige uitleg staat in ons cookiebeleid.',
+            'Wij gebruiken alleen cookies die nodig zijn om in te loggen en je account te beveiligen (zie het cookiebeleid). Je winkelwagen en je taalkeuze staan in je eigen browser en verlaten die pas als je bestelt. Je verlanglijst ook, tot je inlogt: dan bewaren we hem op je account, zodat hij op elk apparaat hetzelfde is. Zet je bij een product een prijsalert aan, dan sturen we je een e-mail — en een Discord-DM als je Discord hebt gekoppeld — wanneer de prijs daalt. Elke alert-mail heeft een link om alle alerts uit te zetten.',
+            'Wij plaatsen geen advertentie- of trackingcookies van derden. Voor onze eigen bezoekersteller en advertentiemeting vragen wij eerst toestemming, in de balk die je bij je eerste bezoek ziet. De volledige uitleg staat in ons cookiebeleid.',
           ],
         },
         {
@@ -470,7 +476,7 @@ export const LEGAL_DOCS = {
                 '**A payment screenshot** — only if you upload one, and only until your payment is confirmed.',
               ],
             },
-            'We process **no payment details**. You pay at Mollie; we only see that a payment succeeded, for what amount and by which method. Your card or account number never reaches our systems.',
+            'We process **no payment details**. You pay at Stripe; we only see that a payment succeeded, for what amount and by which method. Your card or account number never reaches our systems.',
           ],
         },
         {
@@ -500,10 +506,13 @@ export const LEGAL_DOCS = {
             'We use a small number of providers, who process your data solely on our instructions. A data processing agreement is in place with each of them.',
             {
               table: [
-                ['Mollie B.V. (Netherlands)', 'Payments. Processes your payment details as an independent controller.'],
+                ['Stripe Payments Europe Ltd. (Ireland)', 'Payments. Processes your payment details as an independent controller; we never see your card details.'],
                 ['Vercel Inc. (US)', 'Hosting for the website and the API.'],
                 ['Neon Inc. (EU region)', 'The database holding your account and orders.'],
                 ['Resend (US)', 'Sending your login codes and order emails.'],
+                ['Twilio Inc. (US)', 'Only if you sign in with your phone number: sending the SMS code.'],
+                ['Google LLC (US)', 'Only if you choose to sign in with Google.'],
+                ['Anthropic PBC (US)', 'Only if you ask the assistant a question in our Discord: the text of your question.'],
                 ['Discord Inc. (US)', 'Only if you contact us there or link your account.'],
               ],
             },
@@ -522,7 +531,10 @@ export const LEGAL_DOCS = {
                 ['Chargeback register (incl. IP)', '18 months — a chargeback can arrive up to ~120 days after payment'],
                 ['Login codes', 'Deleted automatically shortly after they expire or are used'],
                 ['Sessions', 'Until they expire or you sign out; you can revoke them yourself'],
-                ['Payment screenshots', 'Removed once your payment is confirmed'],
+                ['Payment screenshots', 'Deleted once your payment has been reviewed'],
+                ['Sent emails (log)', 'Who, what and when; the content of login codes and delivered codes is not kept'],
+                ['Backups', 'The latest 5, then deleted automatically; without 2FA secrets'],
+                ['Device recognition (fm_device)', '60 days'],
               ],
             },
             'When a retention period for an IP address expires the underlying row stays — your order history and the audit trail keep their shape — and only the address is erased from it.',
@@ -531,8 +543,8 @@ export const LEGAL_DOCS = {
         {
           h: 'Cookies',
           body: [
-            'We use one functional cookie to keep you signed in, and none besides. Your cart and your language choice live in your own browser and do not leave it until you place an order. So does your wishlist, until you sign in: then we keep it on your account, so it is the same on every device. If you turn on a price alert for a product, we email you — and send a Discord DM if you linked Discord — when its price drops. Every alert email has a link that turns all alerts off.',
-            'Because we set no advertising or tracking cookies, this site has no cookie banner asking for consent. The full explanation is in our cookie policy.',
+            'We only use cookies needed to sign you in and keep your account secure (see the cookie policy). Your cart and your language choice live in your own browser and do not leave it until you place an order. So does your wishlist, until you sign in: then we keep it on your account, so it is the same on every device. If you turn on a price alert for a product, we email you — and send a Discord DM if you linked Discord — when its price drops. Every alert email has a link that turns all alerts off.',
+            'We set no third-party advertising or tracking cookies. For our own visitor counter and advert measurement we ask permission first, in the bar you see on your first visit. The full explanation is in our cookie policy.',
           ],
         },
         {
@@ -573,31 +585,29 @@ export const LEGAL_DOCS = {
     nl: {
       eyebrow: 'Juridisch',
       title: 'Cookiebeleid',
-      subtitle: 'Eén cookie om je ingelogd te houden. Verder niets — en daarom ook geen cookiebanner.',
-      meta: 'Welke cookies ForgeMarket plaatst, wat er in je eigen browser wordt opgeslagen, en waarom deze site geen cookiebanner heeft.',
+      subtitle: 'Alleen cookies om in te loggen en je account te beveiligen. Voor statistieken vragen we eerst toestemming.',
+      meta: 'Welke cookies ForgeMarket plaatst, wat er in je eigen browser wordt opgeslagen, en waarvoor we toestemming vragen.',
       sections: [
         {
           body: [
-            'De meeste webshops openen met een banner die om toestemming vraagt voor tientallen cookies. Deze niet, en dat is geen nalatigheid.',
-            'Wij plaatsen **één** cookie, en die is strikt noodzakelijk om je ingelogd te houden. Voor zulke cookies is volgens artikel 11.7a van de Telecommunicatiewet geen toestemming vereist.',
+            'De meeste webshops vragen toestemming voor tientallen cookies. Wij plaatsen er alleen een paar, en die zijn allemaal nodig om in te loggen en je account te beveiligen.',
+            'Die cookies zijn **strikt noodzakelijk**: zonder kun je niet ingelogd blijven of je account niet beschermen. Voor zulke cookies is volgens artikel 11.7a van de Telecommunicatiewet geen toestemming vereist. Bestel je als gast, dan worden ze niet geplaatst.',
             'Wij plaatsen geen advertentiecookies van derden, geen analytics van derden en geen trackers die je over andere websites volgen. Wél bewaren wij twee dingen in je eigen browser die niet strikt noodzakelijk zijn: een bezoekersteller en, als je via een van onze advertenties binnenkomt, een advertentiekenmerk. Daar vragen wij toestemming voor — dat is de balk die je bij je eerste bezoek ziet, en je kunt je keuze op elk moment wijzigen.',
-            'Daarom heeft deze site **geen cookiebanner**. Niet omdat wij de regels omzeilen, maar omdat er niets is waarvoor wij die toestemming nodig hebben.',
+            'Zeg je nee in die balk, dan werkt de winkel precies hetzelfde.',
           ],
         },
         {
-          h: 'De cookie die wij plaatsen',
+          h: 'De cookies die wij plaatsen',
           body: [
+            'Allemaal van ForgeMarket zelf (first-party), alleen via een versleutelde verbinding, en alleen als je inlogt.',
             {
               table: [
-                ['Naam', 'fm_session'],
-                ['Doel', 'Je ingelogd houden tussen bezoeken'],
-                ['Type', 'Functioneel — strikt noodzakelijk'],
-                ['Bewaartermijn', '30 dagen, of tot je uitlogt'],
-                ['Geplaatst door', 'ForgeMarket zelf (first-party)'],
-                ['Eigenschappen', 'HttpOnly en Secure — niet leesbaar door JavaScript, alleen via een versleutelde verbinding'],
+                ['fm_session', 'Houdt je ingelogd tussen bezoeken. 30 dagen, of tot je uitlogt. Niet leesbaar door JavaScript.'],
+                ['fm_session_hint', 'Zegt alleen dát er een sessie is, zodat de site weet dat hij je kan inloggen. Bevat niets over jou. 60 dagen.'],
+                ['fm_device', 'Herkent een apparaat waarop je eerder inlogde, zodat een inlog vanaf een onbekend apparaat opvalt. 60 dagen. Niet leesbaar door JavaScript.'],
+                ['oauth_state_…', 'Alleen tijdens inloggen met Discord of Google: beveiligt die stap tegen misbruik. 10 minuten.'],
               ],
             },
-            'Bestel je zonder account, dan wordt deze cookie helemaal niet geplaatst.',
           ],
         },
         {
@@ -622,7 +632,7 @@ export const LEGAL_DOCS = {
             'Twee uitzonderingen die alleen ontstaan door iets wat jij doet:',
             {
               ul: [
-                '**Mollie** — zodra je op betalen klikt, ga je naar de betaalpagina van Mollie. Daar gelden de cookies en het privacybeleid van Mollie. Wij hebben daar geen invloed op en ontvangen er geen gegevens uit.',
+                '**Stripe** — zodra je op betalen klikt, ga je naar de beveiligde betaalpagina van Stripe. Daar gelden de cookies en het privacybeleid van Stripe. Wij ontvangen daaruit alleen of en hoeveel er betaald is — nooit je kaartgegevens.',
                 '**Discord** — klik je door naar onze Discord-server, dan gelden vanaf dat moment de cookies van Discord.',
               ],
             },
@@ -663,32 +673,30 @@ export const LEGAL_DOCS = {
     en: {
       eyebrow: 'Legal',
       title: 'Cookie policy',
-      subtitle: 'One cookie to keep you signed in. Nothing else — which is why there is no cookie banner.',
-      meta: 'Which cookies ForgeMarket sets, what is stored in your own browser, and why this site has no cookie banner.',
+      subtitle: 'Only cookies to sign you in and keep your account secure. For statistics we ask first.',
+      meta: 'Which cookies ForgeMarket sets, what is stored in your own browser, and what we ask permission for.',
       sections: [
         {
           body: [
-            'Most webshops open with a banner asking consent for dozens of cookies. This one does not, and that is not an oversight.',
-            'We set **one** cookie, and it is strictly necessary to keep you signed in. Under Article 11.7a of the Dutch Telecommunications Act, no consent is required for such cookies.',
+            'Most webshops ask consent for dozens of cookies. We set only a few, and all of them are needed to sign you in and protect your account.',
+            'Those cookies are **strictly necessary**: without them you cannot stay signed in or have your account protected. Under Article 11.7a of the Dutch Telecommunications Act, no consent is required for such cookies. If you order as a guest, they are not set.',
             'We set no third-party advertising cookies, no third-party analytics and no trackers that follow you across other websites. We do keep two things in your own browser that are not strictly necessary: a visitor counter and, if you arrive through one of our adverts, an advertising label. We ask permission for those — that is the bar you see on your first visit, and you can change your answer at any time.',
-            'That is why this site has **no cookie banner**. Not because we are working around the rules, but because there is nothing we need your consent for.',
+            'If you say no in that bar, the shop works exactly the same.',
             { note: 'Dutch is the authoritative version of this policy. This English translation is provided for convenience.' },
           ],
         },
         {
-          h: 'The cookie we set',
+          h: 'The cookies we set',
           body: [
+            'All set by ForgeMarket itself (first-party), only over an encrypted connection, and only when you sign in.',
             {
               table: [
-                ['Name', 'fm_session'],
-                ['Purpose', 'Keeping you signed in between visits'],
-                ['Type', 'Functional — strictly necessary'],
-                ['Retention', '30 days, or until you sign out'],
-                ['Set by', 'ForgeMarket itself (first-party)'],
-                ['Properties', 'HttpOnly and Secure — not readable by JavaScript, sent only over an encrypted connection'],
+                ['fm_session', 'Keeps you signed in between visits. 30 days, or until you sign out. Not readable by JavaScript.'],
+                ['fm_session_hint', 'Only says that a session exists, so the site knows it can sign you in. Holds nothing about you. 60 days.'],
+                ['fm_device', 'Recognises a device you signed in on before, so a sign-in from an unknown device stands out. 60 days. Not readable by JavaScript.'],
+                ['oauth_state_…', 'Only while signing in with Discord or Google: protects that step against abuse. 10 minutes.'],
               ],
             },
-            'If you order without an account, this cookie is never set at all.',
           ],
         },
         {
@@ -713,7 +721,7 @@ export const LEGAL_DOCS = {
             'Two exceptions, both of which only arise from something you do:',
             {
               ul: [
-                '**Mollie** — as soon as you click to pay you go to Mollie’s payment page, where Mollie’s cookies and privacy policy apply. We have no influence there and receive no data from it.',
+                '**Stripe** — as soon as you click to pay you go to Stripe’s secure payment page, where Stripe’s cookies and privacy policy apply. We only learn whether and how much was paid — never your card details. We have no influence there and receive no data from it.',
                 '**Discord** — if you follow a link to our Discord server, Discord’s cookies apply from that point.',
               ],
             },
