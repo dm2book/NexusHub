@@ -34,10 +34,31 @@ export default function ProductDiscovery() {
   const [filter, setFilter] = useState('');
   const [busy, setBusy] = useState('');
   const [edit, setEdit] = useState(null);
+  const [full, setFull] = useState(null);
+  const [running, setRunning] = useState(false);
 
   const load = () => api.get('/api/admin/discovery').then(setData).catch((e) => { toast.error(e.message); setData(false); });
   const loadAudit = () => api.get('/api/admin/discovery/audit').then(setAudit).catch((e) => toast.error(e.message));
-  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); api.get('/api/admin/discovery/full').then(setFull).catch(() => {}); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* The complete scan runs in steps of under 20 seconds (a server function
+     lives 30). This keeps asking for the next step until it says done; the
+     progress is saved on the server, so leaving the page pauses it and
+     "Doorgaan" resumes where it was. */
+  const runFull = async (restart = false) => {
+    setRunning(true);
+    try {
+      let st = await api.post('/api/admin/discovery/full/start', restart ? { restart: true } : {});
+      setFull(st);
+      for (let i = 0; i < 10_000 && st.phase !== 'done' && st.phase !== 'idle'; i++) {
+        // eslint-disable-next-line no-await-in-loop
+        st = await api.post('/api/admin/discovery/full/step', {});
+        setFull(st);
+      }
+      if (st.phase === 'done') toast.success(`Volledige scan klaar: ${st.added || 0} toegevoegd.`);
+    } catch (e) { toast.error(e.message); }
+    finally { setRunning(false); load(); }
+  };
   useEffect(() => { if (tab === 'audit' && !auditData) loadAudit(); }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const act = async (key, fn, ok) => {
@@ -92,6 +113,27 @@ export default function ProductDiscovery() {
                 <div className="text-xl text-white tabular-nums">{data.counts[k] || 0}</div>
               </button>
             ))}
+          </div>
+          <div className="card p-3 mb-4 text-sm">
+            <div className="flex flex-wrap items-center gap-2">
+              <button type="button" className="btn-primary text-sm" disabled={running || !!busy} onClick={() => runFull(full?.phase === 'done')}>
+                <RefreshCw size={14} /> {running ? 'Volledige scan loopt…' : full && !['done', 'idle'].includes(full.phase) ? 'Volledige scan doorgaan' : 'Volledige scan starten'}
+              </button>
+              {full && !['done', 'idle'].includes(full.phase) && !running && (
+                <button type="button" className="btn-ghost text-xs" onClick={() => runFull(true)}>Opnieuw beginnen</button>
+              )}
+              <span className="text-xs text-slate-400">Alle categorieën, alle zoektermen, alle kandidaten — duurt zo lang als nodig. Laat deze pagina open.</span>
+            </div>
+            {full && full.phase !== 'idle' && (
+              <div className="text-xs text-slate-400 mt-2" data-testid="full-scan">
+                {{ collect: 'Bronnen raadplegen', classify: 'Vergelijken met de catalogus', evaluate: 'Kandidaten beoordelen', add: 'Veilige producten toevoegen', done: 'Klaar' }[full.phase]}
+                {' · '}zoektermen {full.qi}/{full.totalQueries}
+                {full.totalCandidates != null && <> · kandidaten {full.ei}/{full.totalCandidates}</>}
+                {' · '}{full.recorded} observaties
+                {full.phase === 'done' && <> · {full.added} toegevoegd · klaar {date(full.finishedAt)}</>}
+                {full.unavailable?.length > 0 && <div style={{ color: '#fcd34d' }}>Niet beschikbaar: {full.unavailable.map((u) => u.source).join(', ')}</div>}
+              </div>
+            )}
           </div>
           <div className="flex flex-wrap items-center gap-2 mb-4">
             <button type="button" className="btn-primary text-sm" disabled={!!busy || !data.counts.AUTO_APPROVE}

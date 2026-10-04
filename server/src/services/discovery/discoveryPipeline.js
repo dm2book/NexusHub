@@ -370,12 +370,12 @@ export async function editCandidate(candidateId, { title, category, priceCents }
 /* ── Scans ─────────────────────────────────────────────────────────────── */
 
 /** Search terms for categories: what each shelf's products are for, as the market names it. */
-export async function queriesFor(categories = null) {
+export async function queriesFor(categories = null, { cap = LIMITS.maxQueries } = {}) {
   const models = await catalogueModels();
   const games = new Set(models.filter((m) => !categories || categories.includes(m.product.category)).map((m) => m.model.game));
   const labels = GAMES.filter((g) => games.has(g.key)).map((g) => g.label);
   if (!categories) labels.push(...GAMES.map((g) => g.label));
-  return [...new Set(labels)].slice(0, LIMITS.maxQueries);
+  return [...new Set(labels)].slice(0, cap);
 }
 
 /** Ask the permitted sources, classify, evaluate, and (if on) add what is safe. */
@@ -483,6 +483,88 @@ export async function scheduledDiscovery({ now = Date.now(), deadline = Date.now
     await mark('images', now);
   }
   return out;
+}
+
+/* ── The complete scan ─────────────────────────────────────────────────── */
+
+/**
+ * A complete scan: every search term for every category at every permitted
+ * source, then every open candidate evaluated, then the safe ones added. It
+ * takes as long as it takes — but a server function on Vercel lives 30
+ * seconds, so it runs in STEPS: each call works until its budget is spent,
+ * saves where it was, and the next call carries on. The admin page calls the
+ * next step until it says done; the CLI (scripts/discovery-full-scan.mjs)
+ * gives each step an unlimited budget. The per-host spacing and timeouts
+ * apply throughout — a long scan is slow, never fast.
+ */
+const FULL_KEY = 'discovery.full';
+async function fullState() {
+  const row = await get(`SELECT value FROM kv WHERE key=@k`, { k: FULL_KEY }).catch(() => null);
+  return parse(row?.value, null);
+}
+const saveFull = (st) => kvSet(FULL_KEY, JSON.stringify(st));
+
+export async function fullScanStatus() { return fullState(); }
+
+/** Start a complete scan (or say one is already running). */
+export async function startFullScan({ actor = 'system', categories = null, restart = false } = {}) {
+  const cur = await fullState();
+  if (cur && cur.phase !== 'done' && !restart) return cur;
+  const queries = await queriesFor(categories, { cap: Infinity });
+  const st = { id: `full-${Date.now().toString(36)}`, startedAt: nowIso(), by: actor, categories, phase: 'collect',
+    queries, qi: 0, recorded: 0, unavailable: [], errors: 0, candidates: null, ei: 0, byGate: {}, added: 0, steps: 0 };
+  await saveFull(st);
+  return st;
+}
+
+/** One step of the complete scan, within `budgetMs`. */
+export async function fullScanStep({ budgetMs = 20_000, fetchImpl = fetch, autoAdd = autoAddEnabled(), ...deps } = {}) {
+  const st = await fullState();
+  if (!st || st.phase === 'done') return st || { phase: 'idle' };
+  const until = Date.now() + budgetMs;
+  const left = () => Date.now() < until;
+  st.steps += 1;
+
+  if (st.phase === 'collect') {
+    const { collectFromSources } = await import('../market/engine.js');
+    const f = throttledFetch(fetchImpl);
+    while (st.qi < st.queries.length && left()) {
+      // eslint-disable-next-line no-await-in-loop
+      const r = await collectFromSources([st.queries[st.qi]], { fetchImpl: f });
+      st.recorded += r.recorded; st.errors += r.errors.length;
+      /* Reference prices (official:*) and the manual source are typed in by
+         hand on purpose; they are not "unavailable". */
+      for (const u of r.unavailable) {
+        if (/^official:|^manual$/.test(u.source) || st.unavailable.some((x) => x.source === u.source)) continue;
+        st.unavailable.push({ source: u.source, reason: u.reason });
+      }
+      st.qi += 1;
+    }
+    if (st.qi >= st.queries.length) st.phase = 'classify';
+  }
+  if (st.phase === 'classify' && left()) {
+    await runDiscovery();
+    st.candidates = (await all(`SELECT id FROM market_candidates WHERE status <> ALL(@final) ORDER BY created_at`, { final: FINAL })).map((r) => r.id);
+    st.ei = 0;
+    st.phase = 'evaluate';
+  }
+  if (st.phase === 'evaluate') {
+    const catalogue = await catalogueModels();
+    while (st.ei < st.candidates.length && left()) {
+      // eslint-disable-next-line no-await-in-loop
+      const r = await evaluateCandidate(st.candidates[st.ei], { ...deps, catalogue }).catch((e) => ({ status: 'error', reasons: [e.message] }));
+      st.byGate[r.status] = (st.byGate[r.status] || 0) + 1;
+      st.ei += 1;
+    }
+    if (st.ei >= st.candidates.length) st.phase = 'add';
+  }
+  if (st.phase === 'add' && left()) {
+    st.added = autoAdd ? (await addAllSafe()).added : 0;
+    st.phase = 'done';
+    st.finishedAt = nowIso();
+  }
+  await saveFull(st);
+  return { ...st, queries: undefined, candidates: undefined, totalQueries: st.queries.length, totalCandidates: st.candidates?.length ?? null };
 }
 
 export { parseTitle, productTitle };

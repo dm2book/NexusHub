@@ -248,8 +248,28 @@ console.log('\n— End to end —');
   const col = await collectFromSources(['Roblox'], { fetchImpl: async () => { asked++; return new Response('{}'); } });
   ok('a source without partner credentials is UNAVAILABLE and is not fetched', asked === 0 && col.unavailable.some((u) => u.source === 'kinguin' && /Public pages are NOT a fallback/.test(u.reason)));
 
+  /* The complete scan: as long as it takes, in steps that each fit a server function. */
+  await obs('Roblox 1200 Robux Global');
+  const start = await P.startFullScan({ actor: 'owner@test' });
+  ok('a complete scan takes every search term, uncapped', start.queries.length >= 20 && start.phase === 'collect');
+  ok('…and asking to start again while it runs returns the same scan', (await P.startFullScan({ actor: 'x' })).id === start.id);
+  let st, steps = 0;
+  const seen = [];
+  do {
+    // eslint-disable-next-line no-await-in-loop
+    st = await P.fullScanStep({ budgetMs: 15, supplierSources, imageFetch, autoAdd: true });
+    seen.push(`${st.phase}:${st.qi}:${st.ei}`); steps++;
+  } while (st.phase !== 'done' && steps < 500);
+  ok('…it runs in several resumable steps and finishes', st.phase === 'done' && steps > 1, `${steps} steps, ${st.phase}`);
+  ok('…every search term was asked, every open candidate evaluated', st.qi === st.totalQueries && st.ei === st.totalCandidates && st.totalCandidates >= 1);
+  ok('…progress only moves forward', seen.every((x, i) => i === 0 || Number(x.split(':')[1]) >= Number(seen[i - 1].split(':')[1])));
+  ok('…the new 1,200 Robux was found and judged', !!(await byDen(1200))?.gate_status);
+  ok('…and sources it may not ask are listed, not worked around', st.unavailable.some((u) => u.source === 'kinguin'));
+  ok('…when done, a new scan can start', (await P.startFullScan({ actor: 'x' })).id !== start.id);
+
   const fs = await import('node:fs');
   const page = fs.readFileSync(new URL('../../src/pages/admin/ProductDiscovery.jsx', import.meta.url), 'utf8');
+  ok('the admin page runs the complete scan step by step', /full\/step/.test(page) && page.includes('Volledige scan'));
   ok('the admin screen has the actions from the brief', ['Approve & add', 'Reject', 'Edit', 'Add all safe', 'Re-scan category', 'Re-scan product'].every((t) => page.includes(t)));
 }
 

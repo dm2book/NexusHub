@@ -13,7 +13,7 @@ import { rateLimit } from '../../middleware/rateLimit.js';
 import { catalogueAudit } from '../../services/discovery/catalogAuditService.js';
 import {
   discoveryList, addCandidate, addAllSafe, rejectCandidate, editCandidate,
-  scanCategories, rescanCandidate, evaluateCandidates,
+  scanCategories, rescanCandidate, evaluateCandidates, startFullScan, fullScanStep, fullScanStatus,
 } from '../../services/discovery/discoveryPipeline.js';
 import { sourceStatuses } from '../../services/market/sources.js';
 
@@ -36,6 +36,23 @@ router.get('/audit', requirePermission('products.read'), asyncHandler(async (_re
 router.post('/scan', requirePermission('products.write'), scanLimit, asyncHandler(async (req, res) => {
   const { categories } = z.object({ categories: z.array(z.string().max(60)).max(30).optional() }).parse(req.body || {});
   res.json(await scanCategories({ categories: categories?.length ? categories : null }));
+}));
+
+/* The complete scan, in steps (see fullScanStep). Start once; the page then
+   calls /full/step until the answer says done. Not under the scan rate limit:
+   each step is bounded by its own budget and the per-host spacing. */
+const brief = (st) => (st ? { ...st, queries: undefined, candidates: undefined,
+  totalQueries: st.queries?.length ?? st.totalQueries, totalCandidates: st.candidates?.length ?? st.totalCandidates ?? null } : { phase: 'idle' });
+router.get('/full', requirePermission('products.read'), asyncHandler(async (_req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json(brief(await fullScanStatus()));
+}));
+router.post('/full/start', requirePermission('products.write'), asyncHandler(async (req, res) => {
+  const { restart, categories } = z.object({ restart: z.boolean().optional(), categories: z.array(z.string().max(60)).max(30).optional() }).parse(req.body || {});
+  res.json(brief(await startFullScan({ actor: actorOf(req), restart: restart === true, categories: categories?.length ? categories : null })));
+}));
+router.post('/full/step', requirePermission('products.write'), asyncHandler(async (_req, res) => {
+  res.json(await fullScanStep({ budgetMs: 18_000 }));
 }));
 
 router.post('/evaluate', requirePermission('products.write'), scanLimit, asyncHandler(async (_req, res) => {
