@@ -26,6 +26,7 @@ import { reportStep } from '../lib/attribution.js';
 import { flyToCart } from '../lib/flyToCart.js';
 import Tilt from '../components/Tilt.jsx';
 import { DeliveryFacts, TrustRow } from '../components/store/ProductDelivery.jsx';
+import ProductTrust from '../components/store/ProductTrust.jsx';
 
 // Built per product, not per site: what a buyer asks about a Robux top-up that
 // needs their username is not what they ask about a Steam code. Answers a
@@ -150,7 +151,7 @@ export default function ProductDetail() {
   const navigate = useNavigate();
   const reviews = useReviews();
   const stats = useStats();
-  const { t, lang } = useI18n();
+  const { t, lang, locale } = useI18n();
   const cfg = useConfig();   // orderingPaused: the shop cannot honour an order at all
   const { has, toggle } = useWishlist();
   const [product, setProduct] = useState(() => bootProduct(id));
@@ -620,6 +621,8 @@ export default function ProductDetail() {
               column is how they drift apart. These four are policy and mechanism
               only, all true on day one. */}
           <TrustRow t={t} />
+          {/* Measured facts from real orders; draws nothing until there are some. */}
+          {!product.sample && <ProductTrust productId={product.id} t={t} locale={locale} />}
         </div>
       </div>
 

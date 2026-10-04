@@ -12,6 +12,7 @@ import { normalizeImageValue } from '../../services/imageStoreService.js';
 import { backfillArt, proposedCategories, artFor } from '../../services/productFitService.js';
 import { mediaReport, enrichMedia, enrichmentQueue, setOfficial } from '../../services/productMediaService.js';
 import { contentReport, applyContent, generateAll } from '../../services/productContentService.js';
+import { trustReport } from '../../services/productTrustService.js';
 import { findPhotos, photoQueue, photoGap, photoScope, setPhotoScope, restoreArtwork, SCOPES } from '../../services/supplier/supplierImageService.js';
 import { importCosts } from '../../services/costImportService.js';
 import { lossReport, applyFloor } from '../../services/lossPriceService.js';
@@ -141,6 +142,12 @@ router.get('/:id/content/preview', requirePermission('suppliers.read'), asyncHan
 router.post('/content/apply', requirePermission('suppliers.manage'), asyncHandler(async (req, res) => {
   const { productIds, onlyMissing } = z.object({ productIds: z.array(z.string()).min(1).max(200), onlyMissing: z.boolean().optional() }).parse(req.body || {});
   res.json(await applyContent(productIds, { actor: req.user, onlyMissing: onlyMissing === true }));
+}));
+
+/* ── Trust: per-product facts and score from real orders (productTrustService). */
+router.get('/trust', requirePermission('orders.read'), asyncHandler(async (_req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json(await trustReport());
 }));
 
 router.post('/images/restore-artwork', requirePermission('suppliers.manage'), asyncHandler(async (req, res) => {

@@ -31,6 +31,7 @@ import { isEnabled as mollieEnabled, SUPPORTED_METHODS as MOLLIE_METHODS } from 
 import { countryOf } from '../utils/netRisk.js';
 import { holdMessage } from '../services/fraudService.js';
 import { publicStats } from '../services/publicStatsService.js';
+import { productTrust } from '../services/productTrustService.js';
 import { recordPageView } from '../services/trackingService.js';
 import { recordVisit, recordEvent, attachOrder, adoptVisit } from '../services/attributionService.js';
 import { getCategoryLogos } from '../services/settingsService.js';
@@ -511,6 +512,16 @@ router.get('/products/:id', asyncHandler(async (req, res) => {
   if (!p || !p.active) throw new ApiError(404, 'Product not found');
   const count = await availableCount(p.id);
   res.json({ product: productPayload(p, count) });
+}));
+
+/* The trust layer: stock, last delivery, successful orders, fulfilment and
+   refund rates, measured delivery time and a score — from this shop's own
+   orders, and only the fields that have data (productTrustService). */
+router.get('/products/:id/trust', asyncHandler(async (req, res) => {
+  publicCache(res, 300);
+  const p = await getProduct(req.params.id);
+  if (!p || !p.active) throw new ApiError(404, 'Product not found');
+  res.json({ trust: await productTrust(p, await availableCount(p.id)) });
 }));
 
 // Price history for the product-page chart.
