@@ -60,12 +60,15 @@ export async function recordObservation(sourceKey, offer) {
   await run(
     `INSERT INTO market_observations (id, market_product_id, source_key, source_product_id, raw_title,
        price_cents, currency, price_eur_cents, fx_rate, fx_as_of, availability, is_official, url,
-       observed_at, created_at)
-     VALUES (@id,@p,@s,@sp,@t,@c,@cur,@eur,@rate,@fxat,@av,@off,@url,@obs,@at)`,
+       image_url, observed_at, created_at)
+     VALUES (@id,@p,@s,@sp,@t,@c,@cur,@eur,@rate,@fxat,@av,@off,@url,@img,@obs,@at)`,
     { id, p: product.id, s: sourceKey, sp: offer.sourceProductId || null, t: String(offer.title || '').slice(0, 400),
       c: priceCents, cur: currency, eur: converted?.cents ?? null, rate: converted?.rate ?? null,
       fxat: converted?.asOf ?? null, av: offer.availability || 'unknown',
       off: src.isOfficial ? 1 : 0, url: String(offer.url).slice(0, 1000),
+      /* The picture the source's API sent with this listing — kept as a
+         lead for image discovery, never shown as-is. https only. */
+      img: /^https:\/\/[^\s]+$/i.test(String(offer.imageUrl || '')) ? String(offer.imageUrl).slice(0, 1000) : null,
       obs: observedAt, at: nowIso() });
 
   return { observationId: id, marketProductId: product.id, model, converted: !!converted };

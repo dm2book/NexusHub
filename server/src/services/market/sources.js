@@ -107,6 +107,7 @@ export const SOURCES = [
         currency: String(o.price?.currency ?? o.currency ?? 'USD').toUpperCase(),
         availability: o.inStock === false ? 'out_of_stock' : (o.quantity > 0 ? 'in_stock' : 'unknown'),
         url: o.url || `${base}/offer/${o.id ?? ''}`,
+        imageUrl: o.imageUrl || o.image || null,
         hints: { platformRaw: o.platform || '', region: (o.region || '').toLowerCase() || undefined },
       }));
     },
@@ -142,6 +143,7 @@ export const SOURCES = [
         currency: String(p.currency || 'EUR').toUpperCase(),
         availability: Number(p.qty ?? 0) > 0 ? 'in_stock' : 'out_of_stock',
         url: p.slug ? `https://www.g2a.com/${p.slug}` : (p.url || 'https://www.g2a.com/'),
+        imageUrl: p.thumbnail || p.smallImage || null,
         hints: { platformRaw: p.platform || '', region: (p.region || '').toLowerCase() || undefined },
       }));
     },
@@ -183,6 +185,9 @@ export const SOURCES = [
         currency: String(p.currency || 'EUR').toUpperCase(),
         availability: Number(p.qty ?? p.textQty ?? 0) > 0 ? 'in_stock' : 'out_of_stock',
         url: p.productId ? `https://www.kinguin.net/category/${p.productId}` : 'https://www.kinguin.net/',
+        /* The publisher's cover art as the Integration API ships it — the same
+           field the supplier connector reads. */
+        imageUrl: p.images?.cover?.url || p.coverImageOriginal || p.coverImage || null,
         hints: { platformRaw: p.platform || '', region: (p.regionalLimitations || p.region || '').toLowerCase() || undefined },
       }));
     },
@@ -228,6 +233,7 @@ export const SOURCES = [
         currency: String(p.price?.currency ?? p.currency ?? 'EUR').toUpperCase(),
         availability: p.available === false ? 'out_of_stock' : (p.available === true ? 'in_stock' : 'unknown'),
         url: p.url || (p.slug ? `https://www.eneba.com/${p.slug}` : 'https://www.eneba.com/'),
+        imageUrl: p.image || p.cover || null,
         hints: { platformRaw: p.platform || '', region: (p.region || '').toLowerCase() || undefined },
       }));
     },

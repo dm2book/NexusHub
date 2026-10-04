@@ -91,6 +91,7 @@ const AdminProductMedia = lazy(() => import('./pages/admin/ProductMedia.jsx'));
 const AdminProductContent = lazy(() => import('./pages/admin/ProductContent.jsx'));
 const AdminProductTrust = lazy(() => import('./pages/admin/ProductTrustAdmin.jsx'));
 const AdminTrending = lazy(() => import('./pages/admin/Trending.jsx'));
+const AdminProductDiscovery = lazy(() => import('./pages/admin/ProductDiscovery.jsx'));
 const AdminProfit = lazy(() => import('./pages/admin/Profit.jsx'));
 const AdminLive = lazy(() => import('./pages/admin/Live.jsx'));
 const AdminFulfillment = lazy(() => import('./pages/admin/Fulfillment.jsx'));
@@ -210,6 +211,7 @@ export default function App() {
           <Route path="/admin/products/content" element={<AdminProductContent />} />
           <Route path="/admin/products/trust" element={<AdminProductTrust />} />
           <Route path="/admin/products/trending" element={<AdminTrending />} />
+          <Route path="/admin/products/discovery" element={<AdminProductDiscovery />} />
           <Route path="/admin/profit" element={<AdminProfit />} />
           <Route path="/admin/live" element={<AdminLive />} />
           <Route path="/admin/fulfillment" element={<AdminFulfillment />} />

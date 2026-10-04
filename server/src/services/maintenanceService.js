@@ -325,6 +325,21 @@ export async function runMaintenance() {
     summary.marketObservationsPruned = await pruneObservations();
   } catch (e) { summary.marketError = e.message; }
 
+  /* 15b. Product discovery (services/discovery): the next few search terms at
+   *      the permitted partner APIs, the daily re-evaluation of open
+   *      candidates, and the weekly picture check — inside what is left of the
+   *      time budget, and skipped when there is none. */
+  if (!late()) {
+    try {
+      const { scheduledDiscovery } = await import('./discovery/discoveryPipeline.js');
+      const d = await scheduledDiscovery({ deadline: startedAt + 24_000 });
+      summary.discoveryQueries = d.categories?.queries?.length || 0;
+      if (d.refresh) summary.discoveryEvaluated = d.refresh.evaluated;
+      if (d.refresh?.added) summary.discoveryAdded = d.refresh.added;
+      if (d.images) summary.discoveryImages = d.images.applied || 0;
+    } catch (e) { summary.discoveryError = e.message; }
+  }
+
   /* 16. Category logos that are still base64 inside the settings row.
    *
    *      /api/config is fetched on every page load and carried the bytes of

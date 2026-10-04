@@ -35,53 +35,62 @@
 export const GAMES = [
   { key: 'ea-fc', label: 'EA Sports FC', unit: 'points',
     patterns: [/\bea\s*(sports\s*)?fc\b/i, /\bfc\s*points?\b/i, /\bfifa\b/i, /\bfut\b/i] },
-  { key: 'roblox', label: 'Roblox', unit: 'robux',
+  { key: 'roblox', label: 'Roblox', unit: 'robux', defaultPlatform: 'any',
     patterns: [/\broblox\b/i, /\brobux\b/i] },
   { key: 'fortnite', label: 'Fortnite', unit: 'v-bucks',
     patterns: [/\bfortnite\b/i, /\bv-?bucks\b/i] },
   { key: 'minecraft', label: 'Minecraft', unit: 'minecoins',
     patterns: [/\bminecraft\b/i, /\bminecoins?\b/i] },
-  { key: 'pokemon-go', label: 'Pokémon GO', unit: 'pokecoins',
+  { key: 'pokemon-go', label: 'Pokémon GO', unit: 'pokecoins', defaultPlatform: 'mobile',
     patterns: [/\bpok[eé]mon\s*go\b/i, /\bpok[eé]coins?\b/i] },
-  { key: 'valorant', label: 'Valorant', unit: 'vp',
+  { key: 'valorant', label: 'Valorant', unit: 'vp', defaultPlatform: 'pc',
     patterns: [/\bvalorant\b/i, /\bvalorant\s*points?\b/i, /\bvp\b/i] },
   { key: 'call-of-duty', label: 'Call of Duty', unit: 'cod-points',
     patterns: [/\bcall\s*of\s*duty\b/i, /\bcod\s*points?\b/i, /\bmw[23]\b/i] },
-  { key: 'brawl-stars', label: 'Brawl Stars', unit: 'gems',
+  { key: 'brawl-stars', label: 'Brawl Stars', unit: 'gems', defaultPlatform: 'mobile',
     patterns: [/\bbrawl\s*stars\b/i] },
-  { key: 'clash-of-clans', label: 'Clash of Clans', unit: 'gems',
+  { key: 'clash-of-clans', label: 'Clash of Clans', unit: 'gems', defaultPlatform: 'mobile',
     patterns: [/\bclash\s*of\s*clans\b/i] },
   /* The rest of what this shop sells. Without them every Apex, Genshin or Free
      Fire listing parsed as game "unknown" — named "unknown 2,150" on the
      opportunity page, and merged with any other unknown product of the same
      amount into one key and one set of prices. */
-  { key: 'clash-royale', label: 'Clash Royale', unit: 'gems',
+  { key: 'clash-royale', label: 'Clash Royale', unit: 'gems', defaultPlatform: 'mobile',
     patterns: [/\bclash\s*royale\b/i] },
   { key: 'apex-legends', label: 'Apex Legends', unit: 'coins',
     patterns: [/\bapex\s*legends\b/i, /\bapex\s*coins?\b/i] },
-  { key: 'genshin-impact', label: 'Genshin Impact', unit: 'genesis-crystals',
+  { key: 'genshin-impact', label: 'Genshin Impact', unit: 'genesis-crystals', defaultPlatform: 'any',
     patterns: [/\bgenshin\b/i, /\bgenesis\s*crystals?\b/i] },
-  { key: 'free-fire', label: 'Free Fire', unit: 'diamonds',
+  { key: 'free-fire', label: 'Free Fire', unit: 'diamonds', defaultPlatform: 'mobile',
     patterns: [/\bfree\s*fire\b/i] },
-  { key: 'pubg-mobile', label: 'PUBG Mobile', unit: 'uc',
+  { key: 'pubg-mobile', label: 'PUBG Mobile', unit: 'uc', defaultPlatform: 'mobile',
     patterns: [/\bpubg\b/i] },
-  { key: 'mobile-legends', label: 'Mobile Legends', unit: 'diamonds',
+  { key: 'mobile-legends', label: 'Mobile Legends', unit: 'diamonds', defaultPlatform: 'mobile',
     patterns: [/\bmobile\s*legends\b/i, /\bmlbb\b/i] },
-  { key: 'league-of-legends', label: 'League of Legends', unit: 'rp',
+  { key: 'league-of-legends', label: 'League of Legends', unit: 'rp', defaultPlatform: 'pc',
     patterns: [/\bleague\s*of\s*legends\b/i, /\briot\s*points?\b/i] },
   { key: 'gta-online', label: 'GTA Online', unit: 'cash',
     patterns: [/\bgta\b/i, /\bshark\s*card\b/i] },
-  { key: 'discord', label: 'Discord', unit: 'months',
+  { key: 'discord', label: 'Discord', unit: 'months', defaultPlatform: 'any',
     patterns: [/\bdiscord\s*nitro\b/i] },
   { key: 'steam', label: 'Steam', unit: 'EUR', patterns: [/\bsteam\b/i] },
   { key: 'playstation-store', label: 'PlayStation Store', unit: 'EUR',
-    patterns: [/\bpsn\b.*\b(card|wallet|gift)/i, /\bplaystation\s*(store|network)\s*(card|gift)/i] },
+    patterns: [/\bpsn\b.*\b(card|wallet|gift)/i, /\bplaystation\s*(store|network)\s*(card|gift)/i,
+      /\bplaystation\s*store\s*(€|eur\b|\d)/i] },
+  /* Before the Xbox card: "Xbox Game Pass Ultimate 1 Month Card" is a
+     subscription, not store credit. */
+  { key: 'xbox-game-pass', label: 'Xbox Game Pass', unit: 'months',
+    patterns: [/\bgame\s*pass\b/i] },
   { key: 'xbox-store', label: 'Xbox', unit: 'EUR',
     patterns: [/\bxbox\b.*\b(card|gift|live)/i] },
   { key: 'nintendo-store', label: 'Nintendo eShop', unit: 'EUR',
     patterns: [/\bnintendo\b/i, /\beshop\b/i] },
-  { key: 'spotify', label: 'Spotify', unit: 'months', patterns: [/\bspotify\b/i] },
-  { key: 'netflix', label: 'Netflix', unit: 'EUR', patterns: [/\bnetflix\b/i] },
+  { key: 'spotify', label: 'Spotify', unit: 'months', defaultPlatform: 'any', patterns: [/\bspotify\b/i] },
+  { key: 'netflix', label: 'Netflix', unit: 'EUR', defaultPlatform: 'any', patterns: [/\bnetflix\b/i] },
+  { key: 'google-play', label: 'Google Play', unit: 'EUR', patterns: [/\bgoogle\s*play\b/i] },
+  { key: 'amazon', label: 'Amazon', unit: 'EUR', defaultPlatform: 'any', patterns: [/\bamazon\b/i] },
+  { key: 'apple', label: 'App Store & iTunes', unit: 'EUR',
+    patterns: [/\bitunes\b/i, /\bapple\s*(gift|store|card)/i, /\bapp\s*store\b.*\b(card|gift)/i] },
 ];
 
 /**
@@ -103,6 +112,7 @@ export const PLATFORMS = [
 /** Regions, as marketplaces write them. */
 export const REGIONS = [
   { key: 'eu', patterns: [/\b(eu|europe|european)\b/i, /\beuropa\b/i] },
+  { key: 'nl', patterns: [/\b(nl|netherlands|nederland|holland)\b/i] },
   { key: 'us', patterns: [/\b(us|usa|united\s*states|north\s*america|na)\b/i] },
   { key: 'uk', patterns: [/\b(uk|united\s*kingdom|gb|great\s*britain)\b/i] },
   { key: 'global', patterns: [/\b(global|worldwide|ww|region\s*free)\b/i] },
@@ -113,7 +123,8 @@ export const REGIONS = [
 ];
 
 export const PRODUCT_TYPES = [
-  { key: 'points', patterns: [/\bpoints?\b/i, /\brobux\b/i, /\bv-?bucks\b/i, /\bcoins?\b/i, /\bgems?\b/i, /\bvp\b/i] },
+  { key: 'points', patterns: [/\bpoints?\b/i, /\brobux\b/i, /\bv-?bucks\b/i, /\bcoins?\b/i, /\bgems?\b/i, /\bvp\b/i,
+    /\buc\b/i, /\bcp\b/i, /\bdiamonds?\b/i, /\bcrystals?\b/i, /\bminecoins?\b/i, /\bpok[eé]coins?\b/i, /\brp\b/i] },
   { key: 'giftcard', patterns: [/\bgift\s*card\b/i, /\bwallet\b/i, /\btop-?up\b/i, /\bcard\b/i] },
   { key: 'subscription', patterns: [/\bnitro\b/i, /\bpremium\b/i, /\bsubscription\b/i, /\bmonths?\b/i, /\bgame\s*pass\b/i] },
   { key: 'key', patterns: [/\b(cd-?)?key\b/i, /\blicen[cs]e\b/i, /\bactivation\b/i] },
@@ -188,13 +199,20 @@ export function parseTitle(rawTitle, hints = {}) {
       .split('-').filter(Boolean).slice(0, 4).join('-') || 'untitled'}`;
 
   const platformRaw = hints.platformRaw || (t.match(/\bps[45]\b|\bseries\s*[xs]\b/i)?.[0] || '');
-  const platform = hints.platform || first(PLATFORMS, t);
+  /* A game whose currency is not tied to a console (Robux, VP, a mobile
+     game's gems) carries its platform family when the title names none.
+     Never for a game sold per console — EA FC, COD, Apex, Fortnite, Minecraft:
+     there an unnamed platform stays unknown and goes to a person. */
+  const gameDefEarly = GAMES.find((g) => g.key === game);
+  const platform = hints.platform || first(PLATFORMS, t) || gameDefEarly?.defaultPlatform || null;
   if (!platform) unknown.push('platform');
 
   const region = hints.region || first(REGIONS, t);
   if (!region) unknown.push('region');
 
-  let productType = hints.productType || first(PRODUCT_TYPES, t);
+  /* A store card's game says what it is when the title only says "€25". */
+  let productType = hints.productType || first(PRODUCT_TYPES, t)
+    || (gameDefEarly?.unit === 'EUR' ? 'giftcard' : gameDefEarly?.unit === 'months' ? 'subscription' : null);
   if (!productType) unknown.push('productType');
 
   const denom = hints.denomination != null
@@ -203,6 +221,12 @@ export function parseTitle(rawTitle, hints = {}) {
   if (!denom) unknown.push('denomination');
 
   const gameDef = GAMES.find((g) => g.key === game);
+  /* A subscription counted in years is that many twelve months: "Nitro — 1
+     Year" and "Nitro — 1 Month" read as the same "1" and were one product. */
+  const years = /\b(\d+)\s*(?:years?|yrs?|jaar|jahre?|ans?)\b/i.exec(t);
+  if (denom && years && (gameDef?.unit === 'months' || productType === 'subscription') && hints.denomination == null) {
+    denom.value = Number(years[1]) * 12;
+  }
   const denomUnit = hints.denomUnit
     || (denom?.unit === 'EUR' ? 'EUR' : (gameDef?.unit || ''));
   const edition = hints.edition ?? parseEdition(t);
