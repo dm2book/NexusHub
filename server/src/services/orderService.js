@@ -863,6 +863,7 @@ export async function sendPaymentReminders({ afterMinutes = 60, maxAgeHours = 72
       const uid = await discordUidForUser(order.userId).catch(() => null);
       if (uid) {
         await postPaymentReminder(uid, {
+          lang: order.billing?.lang,
           orderNumber: order.number,
           amount: order.totalFormatted || formatMoney(order.total, order.currency),
         }).catch(() => {});
@@ -947,6 +948,7 @@ export async function sendReviewRequests({ afterHours = 24, limit = 25 } = {}) {
       const uid = await discordUidForUser(order.userId).catch(() => null);
       if (uid) {
         await postReviewRequest(uid, {
+          lang: order.billing?.lang,
           orderNumber: order.number,
           productName: order.items?.length === 1 ? order.items[0].name : null,
         }).catch(() => {});

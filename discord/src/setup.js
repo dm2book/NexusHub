@@ -20,14 +20,20 @@ import {
   Client, GatewayIntentBits, PermissionFlagsBits, ChannelType, Events,
   EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle,
   StringSelectMenuBuilder, StringSelectMenuOptionBuilder,
+  AutoModerationRuleTriggerType, AutoModerationActionType, AutoModerationRuleEventType,
 } from 'discord.js';
 import { ROLES, CATEGORIES, STAFF, MEMBERS, GAME_ROLES, NOTIFY_ROLES, LEVEL_ROLES,
   LANGUAGE_ROLES } from './config.js';
 import { buildPanels, PANEL_FOOTER, isPanelFooter, rolesPanelComponents } from './panels.js';
 import { resolveOverwrites, DANGEROUS_FOR_BOT, botInviteUrl } from './permissions.js';
 import { TICKET_TYPES } from './tickets.js';
+import { AUTOMOD_REGEX, AUTOMOD_KEYWORDS } from './scamGuard.js';
 
 const { DISCORD_TOKEN, DISCORD_GUILD_ID } = process.env;
+if (!DISCORD_TOKEN || !DISCORD_GUILD_ID) {
+  console.error('Set DISCORD_TOKEN and DISCORD_GUILD_ID before running setup.');
+  process.exit(1);
+}
 let STORE_URL = process.env.STORE_URL || 'https://forgemarket.nl';
 if (!/^https?:\/\//.test(STORE_URL)) STORE_URL = `https://${STORE_URL}`;
 // Optional — blank means the shop has no Trustpilot profile yet, and the setup
@@ -338,6 +344,45 @@ client.once(Events.ClientReady, async () => {
       }
     } catch (e) { console.log(`  ! AFK setup failed: ${e.message}`); }
 
+    // 2d) Discord AutoMod ──────────────────────────────────────────────────────
+    // Discord blocks the bait before anyone reads it, even while the bot is
+    // restarting; the bot's own guard stays as the second line. Matched by name
+    // (keyword rule) or by trigger type (spam and mention-spam: Discord allows
+    // one of each per server), and edited rather than duplicated on a re-run.
+    try {
+      const modLog = channelByName['mod-log'];
+      const exemptRoles = STAFF.map((k) => roleIds[k]).filter(Boolean);
+      const alert = modLog ? [{ type: AutoModerationActionType.SendAlertMessage,
+        metadata: { channel: modLog.id } }] : [];
+      const block = (msg) => ({ type: AutoModerationActionType.BlockMessage,
+        metadata: { customMessage: msg } });
+      const wanted = [
+        { name: 'ForgeMarket · scam bait', triggerType: AutoModerationRuleTriggerType.Keyword,
+          triggerMetadata: { keywordFilter: AUTOMOD_KEYWORDS, regexPatterns: AUTOMOD_REGEX },
+          actions: [block('Blocked: free-currency bait or a fake login link. Staff never DM you first.'), ...alert] },
+        { name: 'ForgeMarket · mention spam', triggerType: AutoModerationRuleTriggerType.MentionSpam,
+          triggerMetadata: { mentionTotalLimit: 5, mentionRaidProtectionEnabled: true },
+          actions: [block('Blocked: too many mentions in one message.'), ...alert] },
+        { name: 'ForgeMarket · spam', triggerType: AutoModerationRuleTriggerType.Spam,
+          triggerMetadata: {}, actions: [block('Blocked: this looks like spam.')] },
+      ];
+      const existing = await guild.autoModerationRules.fetch();
+      for (const w of wanted) {
+        const unique = w.triggerType !== AutoModerationRuleTriggerType.Keyword;
+        const have = existing.find((r) => r.name === w.name)
+          || (unique ? existing.find((r) => r.triggerType === w.triggerType) : null);
+        const body = { ...w, eventType: AutoModerationRuleEventType.MessageSend, enabled: true,
+          exemptRoles, reason: 'ForgeMarket setup' };
+        if (have) {
+          await have.edit(body);
+          console.log(`  · automod "${have.name}": synced`);
+        } else {
+          await guild.autoModerationRules.create(body);
+          console.log(`  + automod "${w.name}"`);
+        }
+      }
+    } catch (e) { console.log(`  ! automod setup failed (needs Manage Server): ${e.message}`); }
+
     // 3) Panels (rich content in every key channel) ───────────────────────────
     // Built from the shared panel module, so the bot's boot-time copy sync and
     // this first post can never diverge. Channel placeholders resolve to real
@@ -346,6 +391,7 @@ client.once(Events.ClientReady, async () => {
       Object.entries(channelByName).map(([n, c]) => [n, c.id]));
     const PANEL_COPY = buildPanels({
       storeUrl: STORE_URL, guildName: guild.name, channelIdByName, trustpilotUrl: TRUSTPILOT_URL,
+      supportHours: process.env.SUPPORT_HOURS,
     });
 
     /* A picker, not four buttons.
@@ -391,6 +437,7 @@ client.once(Events.ClientReady, async () => {
       ['suggestions'],
       ['starboard'],
       ['giveaways'],
+      ['giveaway-terms'],
       /* Its own button rather than an index into the picker row — that index
          was the Partnership button before this became a select menu, and an
          index into a list whose shape changed is how #partners ends up opening

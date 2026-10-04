@@ -67,6 +67,12 @@ export async function lastMaintenanceRun({ now = Date.now(), staleAfterHours = D
 export async function runMaintenance() {
   const summary = { otpPurged: 0, ipsForgotten: 0, sessionsExpired: 0, ordersCancelled: 0, remindersSent: 0, reviewRequestsSent: 0, cartRemindersSent: 0, fulfillmentsRetried: 0, launchAnnounced: 0, at: nowIso() };
 
+  // 0. Is the Discord bot still polling? (alerts the owner once per outage)
+  try {
+    const { checkBotHeartbeat } = await import('./discordService.js');
+    summary.discordBot = (await checkBotHeartbeat()).status;
+  } catch (e) { summary.discordBotError = e.message; }
+
   // 1. Purge OTP codes that are long expired / already consumed (keep table small).
   try {
     const r = await run(`DELETE FROM otp_codes WHERE expires_at < @cut OR (consumed_at IS NOT NULL AND created_at < @cut)`,

@@ -148,7 +148,7 @@ console.log('\n— The bot writes its state where a deploy cannot reach it —')
   ok('XP goes through it', /stateSet\('xp'/.test(bot));
   ok('the weekly bookkeeping goes through it', /stateSet\('meta'/.test(bot));
   ok('they are loaded again on ready',
-    /loadXP\(\);/.test(bot) && /loadMeta\(\);/.test(bot) && /restoreGiveaways\(c\);/.test(bot));
+    /loadXP\(\);/.test(bot) && /loadMeta\(\)/.test(bot) && /restoreGiveaways\(c\);/.test(bot));
   ok('the local file is kept as the fallback, not dropped',
     /existsSync\(file\)/.test(bot) && /writeFileSync\(file/.test(bot));
 

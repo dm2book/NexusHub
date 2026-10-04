@@ -65,11 +65,11 @@ console.log('\n— Steps nobody needed to take —');
      An assertion that tracks a call signature instead of a behaviour fails for
      improvements. */
   ok('verifying ends with a way out of Discord, not two channel names',
-    /Verified!\*\* Welcome in[\s\S]{0,700}await shopButton\(/.test(bot));
+    /t\('verified', lang\)[\s\S]{0,900}await shopButton\(/.test(bot));
   ok('…and points at the roles that drive restock pings',
-    /Verified!\*\* Welcome in[\s\S]{0,700}chanRef\(i\.guild, 'roles'\)/.test(bot));
+    /t\('verified', lang\)[\s\S]{0,700}chanRef\(i\.guild, 'roles'\)/.test(bot));
   ok('…while still saying when the shop opens',
-    /Verified!\*\* Welcome in[\s\S]{0,400}cta\.note/.test(bot));
+    /t\('verified', lang\)[\s\S]{0,400}cta\.note/.test(bot));
 }
 
 

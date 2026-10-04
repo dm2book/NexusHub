@@ -33,7 +33,11 @@ export const ROLES = [
   {
     key: 'vip', name: 'VIP Customer', color: '#a855f7', hoist: true, mentionable: false,
     perms: [],
-    responsibility: 'Top customers: early access to drops and codes, bonus giveaway entries, priority on tickets.',
+    /* Recognition only. This line promised early access, bonus giveaway
+       entries and ticket priority — none of which the code has ever done. The
+       store grants the role for lifetime spend (discordRolesService) and that
+       is all it is. */
+    responsibility: 'Recognition role for customers whose lifetime spend passed the VIP threshold. Synced automatically by the store; no extra perks.',
   },
   {
     key: 'partner', name: 'Partner', color: '#eab308', hoist: true, mentionable: false,
@@ -120,10 +124,10 @@ export const CATEGORIES = [
     // buried below seventeen chat and voice channels.
     name: '⭐ REVIEWS & TRUST', access: 'verified',
     channels: [
-      { name: 'reviews', type: 'text', readOnly: true, public: true, topic: 'Reviews from real orders — posted here automatically as they come in.' },
+      { name: 'reviews', type: 'text', readOnly: true, public: true, topic: 'Reviews from the shop, posted automatically. "Verified purchase" means tied to a completed order.' },
       // Renamed from "vouchers": in Dutch a voucher is a discount coupon, and
       // this server has a coupon channel two rows down.
-      { name: 'vouches', aka: ['vouchers'], type: 'text', slowmode: 30, topic: 'Bought from us? Leave a quick vouch for the community 💚' },
+      { name: 'vouches', aka: ['vouchers'], type: 'text', slowmode: 30, topic: 'Community vouches via /vouch. Vouches from a linked account with a completed order are labelled "Verified purchase".' },
       { name: 'proof-of-delivery', type: 'text', readOnly: true, public: true, topic: 'Screenshots of real, completed deliveries.' },
       { name: 'discount-codes', type: 'text', readOnly: true, topic: 'Active discount codes — redeem at checkout.' },
     ],
@@ -179,6 +183,11 @@ export const CATEGORIES = [
     channels: [
       { name: 'giveaways', type: 'text', readOnly: true, topic: 'Enter active giveaways. Hosted by the team & the bot.' },
       { name: 'winners', type: 'text', readOnly: true, topic: 'Hall of winners 🏆' },
+      /* The terms every giveaway embed links to. A Dutch promotional game
+         needs published conditions (organiser, how to enter, how the winner is
+         drawn and contacted); posting them once and linking them is what makes
+         each giveaway point at the same, honest rules. */
+      { name: 'giveaway-terms', type: 'text', readOnly: true, topic: 'Actievoorwaarden / giveaway terms — read before entering.' },
     ],
   },
   {
@@ -340,6 +349,40 @@ export const BANNER_VERSION = {
 export const bannerImage = (name) =>
   `{STORE_URL}/discord/banner-${name}.jpg?v=${BANNER_VERSION[name] || ''}`;
 
+/** Shown in #support-info unless the owner sets SUPPORT_HOURS. No time promise. */
+export const DEFAULT_SUPPORT_HOURS = 'Elke dag, reactie meestal binnen 24 uur (NL tijd)';
+
+/**
+ * Giveaway terms (actievoorwaarden), posted in #giveaway-terms by setup and
+ * linked from every giveaway. Written in Dutch first because the organiser and
+ * the law it answers to are Dutch; English follows for everyone else.
+ * Every rule here is one the bot enforces or the team does by hand — nothing
+ * aspirational.
+ */
+export const GIVEAWAY_TERMS = {
+  image: bannerImage('giveaways'),
+  color: 0xa855f7,
+  title: '📜 Actievoorwaarden · Giveaway terms',
+  description:
+    "**NL**\n" +
+    "1. Organisator: ForgeMarket ({STORE_URL}).\n" +
+    "2. Deelname is gratis; er is geen aankoop nodig en kopen vergroot je kans niet.\n" +
+    "3. Eén deelname per persoon (per Discord-account én per persoon). Meerdere accounts = uitsluiting.\n" +
+    "4. Je Discord-account moet minstens 7 dagen oud zijn en je moet de serverregels hebben geaccepteerd.\n" +
+    "5. Ben je jonger dan 16? Dan heb je toestemming van een ouder of verzorger nodig.\n" +
+    "6. De winnaar wordt na afloop willekeurig getrokken uit alle geldige deelnemers; iedereen heeft dezelfde kans. " +
+    "Het aantal deelnemers en een controlegetal (SHA-256 van de deelnemerslijst) worden vastgelegd.\n" +
+    "7. De winnaar krijgt binnen 7 dagen bericht via DM of ticket. Reageert de winnaar niet binnen 7 dagen, dan kan er opnieuw getrokken worden.\n" +
+    "8. De prijs is een code of winkeltegoed zoals in de giveaway vermeld, niet inwisselbaar voor geld.\n" +
+    "9. Bij misbruik of fraude kan ForgeMarket een deelname ongeldig verklaren.\n\n" +
+    "**EN**\n" +
+    "Organiser: ForgeMarket. Free entry, no purchase needed and buying does not improve your odds. One entry per person. " +
+    "Discord account at least 7 days old; rules accepted. Under 16? You need permission from a parent or guardian. " +
+    "Winners are drawn at random from all valid entrants, each with the same chance; the entrant count and a SHA-256 " +
+    "fingerprint of the entrant list are logged. Winners are contacted by DM or ticket within 7 days; no reply within " +
+    "7 days may mean a redraw. The prize is the code or store credit stated in the giveaway, with no cash alternative.",
+};
+
 export const MESSAGES = {
   welcome: (g) => ({
     image: bannerImage('welcome'),
@@ -363,7 +406,7 @@ export const MESSAGES = {
       "**1. Be respectful.** No harassment, hate, or NSFW.\n" +
       "**2. No scams.** Never trade outside official channels. Staff will *never* DM you first.\n" +
       "**3. No spam / self-promo** without permission.\n" +
-      "**4. Nederlands of Engels** in the main channels — anything else we can't moderate.\n" +
+      "**4. Nederlands, English, Deutsch or Français** — one per room: pick yours in <#roles> and keep to that room's language.\n" +
       "**5. One account per person.** No ban evasion.\n" +
       "**6. Use tickets for order issues** — don't share private info publicly.\n" +
       "**7. Staff decisions are final.** Appeals via ticket.\n\n" +
@@ -381,7 +424,7 @@ export const MESSAGES = {
       "• Pay with your order number as the reference\n" +
       "• We confirm the payment and send your code by email\n" +
       "• Track it any time with `/order` or on the site\n\n" +
-      "**Why trust us?** Reviews in <#reviews> are tied to real orders, <#proof-of-delivery> shows actual deliveries, " +
+      "**Why trust us?** Reviews marked **verified purchase** in <#reviews> are tied to a completed order, <#proof-of-delivery> shows actual deliveries, " +
       "and you get your money back if something never arrives.\n\n" +
       "👉 First step: verify in <#verify>.",
   },
@@ -390,20 +433,24 @@ export const MESSAGES = {
     color: 0x22c55e,
     title: '✅ Verify to enter',
     description:
-      "Tap **Verify** below to confirm you're human and unlock the full server: " +
-      "marketplace, community, giveaways and support.\n\nThis keeps the community safe from bots and scammers.",
+      /* Was "confirm you're human". A button proves nothing of the sort — it
+         is a rules agreement, and the account-age check behind it is what
+         actually keeps throwaway accounts out. Said as what it is. */
+      "Tap **Verify** below to accept the <#rules> and unlock the server: " +
+      "marketplace, community, giveaways and support.\n\n" +
+      "Discord accounts younger than 7 days are sent to a ticket instead, so a person can let you in.",
   },
   ticketPanel: {
     image: bannerImage('support'),
     color: 0x3b82f6,
     title: '🎫 Open a support ticket',
     description:
+      /* Listed from the same eight topics the picker below offers — this
+         panel used to name four that no longer matched it. */
       "Pick a topic below and we'll open a **private channel** with our team.\n\n" +
-      "🛒 **Order issue** — missing/incorrect delivery\n" +
-      "💳 **Payment** — checkout or refund\n" +
-      "🤝 **Partnership** — collab / affiliate\n" +
-      "❓ **Other** — anything else\n\n" +
-      "We answer as fast as we can during the day — and every ticket gets a real person, not a bot.",
+      "🛒 Help buying something · 📦 Order never arrived · 💳 Payment problem · ↩️ Refund request\n" +
+      "🏦 Bank reversed a payment · 🎮 Problem with what I received · 🤝 Partnership · ❓ Something else\n\n" +
+      "Every ticket is answered by a real person. When we're around: see <#support-info>.",
   },
   products: {
     image: bannerImage('products'),
@@ -411,7 +458,7 @@ export const MESSAGES = {
     title: '🛒 The ForgeMarket catalog',
     description:
       "Game currency, top-ups, gift cards and subscriptions — fair prices, real support, " +
-      "and reviews tied to real orders.\n\n" +
+      "and reviews marked verified when they come from a completed order.\n\n" +
       "**Popular:** Robux • V-Bucks • Valorant VP • CoD Points • Apex Coins • Genshin • Brawl Stars • Clash of Clans\n\n" +
       "Not sure what you need? Ask in <#ask-the-bot> and our assistant will recommend the right pack.\n\n" +
       "👇 Tap **Browse the shop** to see live prices.",
@@ -435,40 +482,59 @@ export const MESSAGES = {
     title: '🔥 Deals & bundles',
     description:
       "Limited-time offers and best-value bundles drop here.\n\n" +
-      "🔔 Turn on notifications for this channel so you never miss a deal.\n" +
-      "💜 **VIP Customers** get early access and extra discounts.",
+      "🔔 Turn on notifications for this channel, or pick the 🔥 Deals role in <#roles> to get pinged.",
   },
+  /* The pinned #announcements panel explains the channel. It used to say
+     "we're live!" — posted by setup, which runs before launch, so the server
+     announced an open shop weeks before checkout opened. The real launch
+     message is MESSAGES.launch below, posted by the bot itself, once, at
+     LAUNCH_DATE and never before. */
   announcement: {
     image: bannerImage('announcements'),
     color: 0x6366f1,
-    title: '📢 Welcome to ForgeMarket — we’re live!',
+    title: '📢 Announcements',
     description:
-      "Top up your favourite games without the hassle. ⚡\n\n" +
+      "Official ForgeMarket news: launches, product and pricing updates, and anything that changes how you order.\n\n" +
       "• **In stock? Sent automatically.** Everything else delivered by hand, usually within a few hours\n" +
       "• **Money back** if an order never arrives\n" +
-      "• **Reviews tied to real orders** and real proof of delivery\n" +
       "• **A real person** answering tickets right here on Discord\n\n" +
-      "Verify in <#verify>, then browse <#products>. Welcome aboard! 🎉",
+      "Follow this channel to get the posts in your own server. Accept the rules in <#verify>, then browse <#products>.",
   },
-  supportInfo: {
+  launch: {
+    image: bannerImage('announcements'),
+    color: 0x22c55e,
+    title: '🚀 ForgeMarket is open',
+    description:
+      "The shop is open for orders from today. ⚡\n\n" +
+      "• **In stock? Sent automatically** once your payment is confirmed. Everything else delivered by hand, usually within a few hours\n" +
+      "• **Money back** if an order never arrives\n" +
+      "• **A real person** answering tickets in <#open-a-ticket>\n\n" +
+      "👉 {STORE_URL}/shop",
+  },
+  /* Hours come from SUPPORT_HOURS (via buildPanels) so the owner states what
+     is true for them, rather than this file promising a speed. */
+  supportInfo: ({ supportHours = DEFAULT_SUPPORT_HOURS } = {}) => ({
     image: bannerImage('support'),
     color: 0x3b82f6,
     title: '📋 How support works',
     description:
-      "**Open hours:** every day. We're one small team, so replies come fast during the day and can wait until morning at night.\n" +
+      `**When:** ${supportHours}. We're a small team.\n` +
       "**Order issues:** open a ticket in <#open-a-ticket> with your order number.\n" +
       "**Refunds:** request from your order page or via a ticket — approved refunds go to your original method.\n" +
-      "**Safety:** our staff will **never DM you first** and never ask for passwords. Report anyone who does.",
-  },
+      "**Safety:** staff never DM you first. The only DMs from us come from this bot, about your own orders or alerts you turned on — it never asks for a password or a code.",
+  }),
   // Takes the Trustpilot URL because the strongest thing this panel can say is
   // "and you don't have to take our word for it" — but only once there is a
   // profile to point at. Unset, the line is absent rather than dead.
   reviewsIntro: ({ trustpilotUrl = '' } = {}) => ({
     image: bannerImage('vouches'),
     color: 0x22c55e,
-    title: '⭐ Verified customer reviews',
+    title: '⭐ Customer reviews',
     description:
-      "Every review here is tied to a **real, completed order** — no fakes.\n\n" +
+      /* Not "every review is tied to a real order — no fakes": community
+         vouches are mirrored here too. Each post says which kind it is. */
+      "Reviews from the shop land here automatically. Ones marked **verified purchase** are tied to a completed order; " +
+      "the rest are labelled **community vouch**.\n\n" +
       "See genuine delivery screenshots in <#proof-of-delivery>, and bought from us? " +
       "Leave a quick vouch in <#vouches> 💚" +
       (trustpilotUrl
@@ -487,10 +553,10 @@ export const MESSAGES = {
     color: 0xa855f7,
     title: '🎉 Giveaways',
     description:
-      "Free top-ups, every week! 🎁\n\n" +
-      "• Active giveaways are posted here — react/enter to join.\n" +
-      "• **VIP Customers** get bonus entries.\n" +
-      "• Winners are announced in <#winners>.\n\nGood luck! 🍀",
+      "Giveaways are posted here when we run one. 🎁\n\n" +
+      "• Tap **Enter** on a giveaway to join — free, one entry per person, everyone the same chance.\n" +
+      "• Winners are announced in <#winners> and contacted by DM or ticket.\n" +
+      "• Read the terms in <#giveaway-terms> before entering.\n\nGood luck! 🍀",
   },
   staffIntro: {
     color: 0x64748b,
@@ -544,11 +610,12 @@ export const MESSAGES = {
   vouchersIntro: {
     image: bannerImage('vouches'),
     color: 0x22c55e,
-    title: '💚 Vouchers & vouches',
+    title: '💚 Community vouches',
     description:
-      "Bought from us? Leave a quick **voucher** here — a screenshot + a line about your experience " +
-      "helps the whole community shop with confidence.\n\n" +
-      "Real customers only. Verified reviews are also posted in <#reviews>.",
+      "Leave a vouch with **/vouch** — a star rating and a line about your experience.\n\n" +
+      "Anyone who accepted the rules can vouch. If your Discord is linked to a store account with a completed order, " +
+      "your vouch is labelled **Verified purchase**; otherwise it is a **community vouch**. " +
+      "Only verified-purchase vouches are featured or sent to the website.",
   },
   discountCodes: {
     image: bannerImage('deals'),
@@ -556,7 +623,7 @@ export const MESSAGES = {
     title: '🏷️ Discount & voucher codes',
     description:
       "Active codes drop here — redeem them at checkout for money off.\n\n" +
-      "💜 **VIP Customers** get exclusive codes.\n🔔 Turn on notifications so you never miss one.",
+      "Each code says its own conditions. 🔔 Pick the 🔥 Deals role in <#roles> to get pinged.",
   },
   reportScam: {
     image: bannerImage('report-a-scam'),
@@ -637,11 +704,11 @@ export const MESSAGES = {
 // FAQ — powers the #faq channel AND the AI fallback.
 export const FAQ = [
   { q: 'How fast is delivery?', a: 'Items we have in stock are sent automatically once your payment is confirmed. Anything we buy in for you is delivered by hand, usually within a few hours during the day. Either way the code arrives by email.' },
-  { q: 'Is it safe / legit?', a: 'Encrypted checkout, automated fraud screening, reviews tied to real orders, and your money back if an order never arrives. Staff never DM you first.' },
+  { q: 'Is it safe / legit?', a: 'Encrypted checkout, automated fraud screening, reviews marked verified when they come from a completed order, and your money back if an order never arrives. Staff never DM you first.' },
   { q: 'What payment methods can I use?', a: 'You pay by bank transfer or payment link, using your order number as the reference. We confirm every payment by hand — usually within minutes during the day. More automatic methods are coming.' },
   { q: 'I didn’t get my code — what now?', a: 'First check spam. Then run `/order <your number>` to see the live status. Still nothing? Open a ticket in #open-a-ticket with your order number — if it never arrives you get your money back.' },
   { q: 'Can I get a refund?', a: 'Yes, request a refund from your order page or via a ticket. Approved refunds go back to your original payment method.' },
-  { q: 'How do I become a VIP?', a: 'VIP is granted to loyal customers — keep buying and stay active. VIPs get early access to drops and codes, bonus giveaway entries and priority on tickets.' },
-  { q: 'How do giveaways work?', a: 'We host giveaways in #giveaways. React/enter to participate; winners are posted in #winners. VIPs get bonus entries.' },
+  { q: 'What is the VIP role?', a: 'A recognition role the store gives automatically once your lifetime spend passes a threshold (link Discord on your account). It is a badge — it does not come with extra perks.' },
+  { q: 'How do giveaways work?', a: 'We host giveaways in #giveaways. Entry is free: one entry per person, every entrant has the same chance, and your Discord account must be at least 7 days old. Winners are posted in #winners. Full terms are in #giveaway-terms.' },
   { q: 'Do you sell <game> currency?', a: 'We stock Robux, V-Bucks, Valorant, CoD, Apex, Genshin, Brawl Stars, Clash of Clans and more — check #products or ask in #ask-the-bot.' },
 ];

@@ -81,5 +81,56 @@ console.log('\n— Ordering —');
     check('') === null && check(null) === null && check(undefined) === null);
 }
 
+console.log('\n— Free-currency bait and platform phishing —');
+{
+  /* The bait that actually targets this audience. Each one must be removed,
+     whatever kind the guard files it under. */
+  const bait = [
+    'FREE ROBUX!!! https://robux-rewards.gift/claim',
+    'free robux generator: rbx-free.com',
+    'free vbucks https://fortnite-gift.net',
+    'https://roblox.com.free-gift.ru',
+    'https://steamcommnunity.com/gift/123',
+    'https://dlscord.gift/nitro',
+    'gratis robux hier',
+    'vbucks generator works 100%',
+  ];
+  for (const t of bait) ok(`caught: "${t}"`, !!check(t), JSON.stringify(check(t)));
+  ok('a fake platform host is named as phishing',
+    check('https://steamcommnunity.com/gift/123')?.kind === 'phishing');
+  ok('…including one that starts with the real domain',
+    check('https://roblox.com.free-gift.ru')?.detail === 'roblox.com.free-gift.ru');
+
+  const normal = [
+    'how do I buy robux?',
+    'https://www.roblox.com/home',
+    'forgemarket.nl/track',
+    'https://discord.com/channels/1/2',
+    'https://store.steampowered.com/app/730',
+    'https://www.epicgames.com/fortnite/en-US/home',
+    'is shipping free? I want robux',
+  ];
+  for (const t of normal) ok(`allowed: "${t}"`, check(t) === null, JSON.stringify(check(t)));
+}
+
+console.log('\n— AutoMod patterns are valid and bounded —');
+{
+  const { AUTOMOD_REGEX, AUTOMOD_KEYWORDS } = await import('../src/scamGuard.js');
+  ok('at most 10 regex patterns (Discord limit)', AUTOMOD_REGEX.length <= 10);
+  ok('every pattern fits 260 chars', AUTOMOD_REGEX.every((r) => r.length <= 260));
+  ok('every pattern compiles', AUTOMOD_REGEX.every((r) => { try { new RegExp(r.replace('(?i)', ''), 'i'); return true; } catch { return false; } }));
+  ok('keywords fit Discord limits', AUTOMOD_KEYWORDS.length <= 1000 && AUTOMOD_KEYWORDS.every((k) => k.length <= 60));
+}
+
+console.log('\n— Edited messages are checked again —');
+{
+  const { readFileSync } = await import('node:fs');
+  const bot = readFileSync(new URL('../src/bot.js', import.meta.url), 'utf8');
+  ok('the bot listens for edits', /Events\.MessageUpdate/.test(bot));
+  ok('…and runs the same guard on them', /MessageUpdate[\s\S]{0,600}moderateMessage\(/.test(bot));
+  const setup = readFileSync(new URL('../src/setup.js', import.meta.url), 'utf8');
+  ok('setup creates AutoMod rules', /autoModerationRules/.test(setup));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

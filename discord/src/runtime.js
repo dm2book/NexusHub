@@ -57,11 +57,18 @@ export const log = {
 export const ENV_SPEC = {
   required: [
     ['DISCORD_TOKEN', 'Bot token — Developer Portal → your app → Bot → Reset Token.'],
+    /* Required, not recommended: without it the bot acted in every guild it was
+       added to — posting store announcements, granting roles and pinging staff
+       in any server that invited it. It now serves this one guild and leaves
+       any other on sight. */
+    ['DISCORD_GUILD_ID', 'Your server id (right-click the server → Copy Server ID). The bot only works in this '
+      + 'guild and leaves any other one it is added to.'],
   ],
   recommended: [
     ['DISCORD_CLIENT_ID', 'Application ID. Needed by `npm run invite` and command registration. '
       + 'DISCORD_APPLICATION_ID is accepted as an alias.'],
-    ['DISCORD_GUILD_ID', 'Your server id. Without it commands register globally (up to an hour to appear).'],
+    ['DISCORD_OWNER_IDS', 'Comma-separated Discord user ids allowed to run owner commands (/paylink, /digest, '
+      + '/stock, /launch, /coupon, /announce). Without it only members with Manage Server can.'],
     ['STORE_URL', 'Your storefront, e.g. https://forgemarket.nl. Every link the bot posts starts here.'],
     ['FORGEMARKET_API_URL', 'Usually the same as STORE_URL. Without it /price, /order and the relay are off.'],
     ['REVIEW_INGEST_SECRET', 'Must match the value in Vercel exactly, or the store relay stays silent: '
@@ -70,10 +77,20 @@ export const ENV_SPEC = {
   optional: [
     ['ANTHROPIC_API_KEY', 'AI answers in #ask-the-bot. Without it a rule-based FAQ answers instead.'],
     ['AI_MODEL', 'Defaults to claude-sonnet-4-6.'],
-    ['DISCORD_INVITE_URL', 'Fallback invite until the bot mints its own permanent one.'],
+    ['DISCORD_INVITE_URL', 'Invite shown by /invite until the bot has made its own permanent one. '
+      + 'No default: unset, /invite says the link is not ready yet.'],
+    ['DISCORD_PAYLINK_SECRET', 'Separate shared secret for /paylink (must match the API\u2019s DISCORD_PAYLINK_SECRET). '
+      + 'Unset = /paylink is disabled.'],
+    ['PAYLINK_HOSTS', 'Optional comma-separated extra check for /paylink hosts (e.g. tikkie.me,bunq.me). '
+      + 'The API always enforces its own payment-host allow-list.'],
+    ['LAUNCH_DATE', 'When the one-off launch announcement may post (ISO time). Default 2026-10-23T22:00:00Z '
+      + '(24 Oct 00:00 Amsterdam). Posted once, never before this moment.'],
+    ['AI_DAILY_CAP', 'Maximum AI answers per day across the server (/ask, /recommend, #ask-the-bot). Default 300.'],
+    ['SUPPORT_HOURS', 'Support availability text shown in #support-info. Default: '
+      + '"Elke dag, reactie meestal binnen 24 uur (NL tijd)".'],
     ['TRUSTPILOT_URL', 'Usually leave blank: the bot reads the profile from the website\u2019s /api/config, so setting it there is enough. Set it here only to override that.'],
     ['TRUSTPILOT_REVIEW_URL', 'Derived from TRUSTPILOT_URL when blank.'],
-    ['PORT', 'Health endpoint port. Railway sets this for you.'],
+    ['PORT', 'Health endpoint port. Railway sets this for you; leave it unset on PebbleHost.'],
     ['LOG_LEVEL', 'debug | info | warn | error. Default info.'],
     ['LOG_FORMAT', 'json | pretty. Default: pretty on a terminal, json otherwise.'],
     ['REPOST', 'One-off, for `npm run setup` only: re-post every panel. Never set on the host.'],
@@ -208,4 +225,35 @@ export async function loginWithRetry(client, token, {
     }
   }
   return false;
+}
+
+/**
+ * Exit when the gateway has been gone for too long.
+ *
+ * discord.js reconnects by itself for almost everything, but there are states
+ * — a resume loop, a session the library gave up on without a terminal close
+ * code — where the process stays alive and connected to nothing. A supervisor
+ * that only checks "is the process running" sees a healthy bot. Railway uses
+ * the health check at deploy time only, so this is what actually turns a
+ * silent dead bot into a restart: exit 1 and let the restart policy do its job.
+ */
+export function startWatchdog(client, {
+  maxDownMs = 5 * 60_000, everyMs = 30_000, now = () => Date.now(),
+  onDead = () => process.exit(1),
+} = {}) {
+  let downSince = null;
+  const tick = () => {
+    if (client?.isReady?.()) { downSince = null; return false; }
+    downSince ??= now();
+    if (now() - downSince > maxDownMs) {
+      log.error('gateway not ready for too long — exiting so the host restarts us',
+        { downForSeconds: Math.round((now() - downSince) / 1000) });
+      onDead();
+      return true;
+    }
+    return false;
+  };
+  const timer = setInterval(tick, everyMs);
+  timer.unref?.();
+  return { tick, stop: () => clearInterval(timer) };
 }

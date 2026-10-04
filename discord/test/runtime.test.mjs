@@ -37,9 +37,13 @@ console.log('— The environment is checked before anything connects —');
 {
   ok('nothing configured is not ok', checkEnv({}).ok === false);
   ok('…and names the token', checkEnv({}).missing.some(([k]) => k === 'DISCORD_TOKEN'));
-  ok('a token alone is enough to start', checkEnv({ DISCORD_TOKEN: 't' }).ok === true);
+  /* The guild id is required: without it the bot used to act in every guild
+     it was added to. */
+  ok('a token alone is not enough', checkEnv({ DISCORD_TOKEN: 't' }).ok === false);
+  ok('…the missing guild id is named', checkEnv({ DISCORD_TOKEN: 't' }).missing.some(([k]) => k === 'DISCORD_GUILD_ID'));
+  ok('a token and a guild id are enough to start', checkEnv({ DISCORD_TOKEN: 't', DISCORD_GUILD_ID: '1' }).ok === true);
   ok('…but the gaps are still reported',
-    checkEnv({ DISCORD_TOKEN: 't' }).degraded.length > 0);
+    checkEnv({ DISCORD_TOKEN: 't', DISCORD_GUILD_ID: '1' }).degraded.length > 0);
   ok('an empty string counts as missing', checkEnv({ DISCORD_TOKEN: '   ' }).ok === false);
 
   /* The one that mattered: without it the relay is silent and nothing says so. */
@@ -86,9 +90,18 @@ console.log('\n— The production start command —');
 {
   ok('npm start runs the bot', pkg.scripts.start === 'node src/bot.js');
   ok('the Procfile agrees', /worker: npm start/.test(read('Procfile')));
-  ok('railway.json agrees', JSON.parse(read('railway.json')).deploy.startCommand === 'npm start');
-  ok('the Dockerfile agrees', /CMD \["npm", "start"\]/.test(read('Dockerfile')));
-  ok('Railway restarts a crash', /ON_FAILURE/.test(read('railway.json')));
+  const railway = JSON.parse(read('railway.json'));
+  ok('Railway builds the Dockerfile', railway.build.builder === 'DOCKERFILE');
+  /* node, not npm: npm does not forward SIGTERM reliably and the bot flushes
+     state on it. Same file as `npm start` runs. */
+  ok('the Dockerfile runs the same file', /CMD \["node", "src\/bot\.js"\]/.test(read('Dockerfile')));
+  ok('…as the non-root user, owning its files', /USER node/.test(read('Dockerfile'))
+    && /--chown=node:node/.test(read('Dockerfile')));
+  ok('…with a health check', /HEALTHCHECK/.test(read('Dockerfile')));
+  ok('Railway always restarts the bot', railway.deploy.restartPolicyType === 'ALWAYS');
+  ok('…and checks /health on deploy', railway.deploy.healthcheckPath === '/health');
+  ok('state files never go into the image', ['giveaways.json', 'bot-meta.json', 'xp.json']
+    .every((f) => read('.dockerignore').includes(f)));
 }
 
 console.log('\n— Health: a websocket has no port, so give it one —');
@@ -186,6 +199,22 @@ console.log('\n— No local filesystem state is depended on —');
   ok('nothing else writes to disk',
     [...bot.matchAll(/writeFileSync\(/g)].length <= 2,
     `${[...bot.matchAll(/writeFileSync\(/g)].length} write sites`);
+}
+
+console.log('\n— The watchdog turns a silent dead gateway into a restart —');
+{
+  const { startWatchdog } = await import('../src/runtime.js');
+  let ready = false; let now = 0; let dead = 0;
+  const w = startWatchdog({ isReady: () => ready }, { maxDownMs: 300_000, everyMs: 3_600_000, now: () => now, onDead: () => { dead++; } });
+  w.tick(); now = 200_000; w.tick();
+  ok('a short outage is tolerated', dead === 0);
+  now = 301_000; w.tick();
+  ok('five minutes without a gateway exits', dead === 1);
+  ready = true; now = 400_000; w.tick(); ready = false; now = 500_000; w.tick();
+  ok('a reconnect resets the clock', dead === 1);
+  w.stop();
+  ok('the bot starts it', /startWatchdog\(client/.test(bot));
+  ok('…and exits non-zero on a terminal close', /shutdown\(`gateway \$\{code\}`, 1\)/.test(bot));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

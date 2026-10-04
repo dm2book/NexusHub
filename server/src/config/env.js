@@ -134,6 +134,10 @@ export const config = {
     memberCount: Number(env.DISCORD_MEMBER_COUNT || 0) || null,
     // Shared secret the bot uses to push /vouch reviews to /api/reviews/ingest.
     reviewIngestSecret: env.REVIEW_INGEST_SECRET || '',
+    /* Its own secret: /paylink attaches a payment link to a customer's order,
+       so a leak of the general bot secret must not be enough to redirect money.
+       Unset = the command is off. */
+    paylinkSecret: env.DISCORD_PAYLINK_SECRET || '',
   },
 
   // SMS / phone OTP via Twilio. Without credentials, phone codes are logged to

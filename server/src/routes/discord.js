@@ -126,7 +126,7 @@ router.post('/state/set',
  */
 export const canonicalPayLink = (b = {}) => `paylink:${b.number || ''}:${b.url || ''}`;
 router.post('/pay-link',
-  verifyIngest(canonicalPayLink)(config.discord.reviewIngestSecret),
+  verifyIngest(canonicalPayLink)(config.discord.paylinkSecret),
   asyncHandler(async (req, res) => {
     const number = String(req.body?.number || '').trim().toUpperCase();
     const url = String(req.body?.url || '').trim();
@@ -250,13 +250,19 @@ router.post('/referral',
 // The bot maintains a PERMANENT server invite (maxAge 0) and pushes it here so
 // the storefront never shows an expired link. The URL is bound into the HMAC
 // signature, and only real Discord invite URLs are accepted.
-export const canonicalInvite = (b = {}) => `invite:${b.url || ''}`;
+/* The bot signs the guild id too, so the store can refuse an invite to any
+   server but its own — a stranger who added the bot could otherwise point the
+   storefront's "Join Discord" at their server. */
+export const canonicalInvite = (b = {}) => `invite:${b.url || ''}${b.guildId ? `:${b.guildId}` : ''}`;
 router.post('/invite',
   verifyIngest(canonicalInvite)(config.discord.reviewIngestSecret),
   asyncHandler(async (req, res) => {
     const url = String(req.body?.url || '').trim();
     if (!/^https:\/\/(discord\.gg|discord\.com\/invite)\/[\w-]+$/.test(url)) {
       return res.status(400).json({ error: 'Not a Discord invite URL' });
+    }
+    if (config.discord.guildId && String(req.body?.guildId || '') !== config.discord.guildId) {
+      return res.status(403).json({ error: 'Invite is not for the configured server' });
     }
     await setLiveInviteUrl(url);
     await stampBotSeen();

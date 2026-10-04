@@ -28,8 +28,33 @@ import {
   buildPanels, panelNeedsUpdate, panelFooterIsStale, PANEL_FOOTER, isPanelFooter,
   rolesPanelComponents, languagePickerRow, hasLanguagePicker, LANGUAGE_PICKER_ID,
 } from './panels.js';
-import { log, reportEnv, startHealthServer, loginWithRetry } from './runtime.js';
+import { log, reportEnv, startHealthServer, loginWithRetry, startWatchdog } from './runtime.js';
 import { scamReason } from './scamGuard.js';
+import { t, helpFor } from './i18n.js';
+import { createLimiter, createDailyCap, createRecentIds, accountOldEnough } from './limits.js';
+import { drawWinners, entrantsFingerprint } from './giveaway.js';
+import { registerCommands } from './commands.js';
+import { buildLaunchAnnouncement, launchDue, DEFAULT_LAUNCH_DATE } from './panels.js';
+
+/**
+ * The one guild this bot serves.
+ *
+ * It used to act in every guild it was in — `guilds.cache.forEach` on every
+ * timer, `guilds.cache.first()` for the relay — so anyone who added the bot
+ * to their own server got store announcements, role grants and staff alerts
+ * meant for ours, and the relay could post a sale ping into whichever guild
+ * happened to be first in the cache. Required at startup (runtime.js), and
+ * any other guild is left on sight.
+ */
+const GUILD_ID = String(process.env.DISCORD_GUILD_ID || '').trim();
+const ours = (g) => !!g && g.id === GUILD_ID;
+/** Our guild from the cache, or null — never "whichever guild is first". */
+const homeGuild = (c = client) => c.guilds.cache.get(GUILD_ID) || null;
+/** Run fn on our guild only, when it is cached. */
+const onHome = (c, fn) => { const g = homeGuild(c); if (g) fn(g); };
+
+/** Every outbound HTTP call carries a deadline: a hanging API must not stall the bot. */
+const deadline = () => AbortSignal.timeout(8000);
 
 // Delivery explanation for a product category (falls back to a generic one).
 
@@ -46,8 +71,16 @@ const isStaff = (member) => member?.permissions?.has?.(PermissionFlagsBits.Manag
  * isStaff() also let them read weekly revenue and margins, publish discount
  * codes and announce to everyone — none of which answering a ticket requires.
  */
-const isOwnerLevel = (member) => member?.permissions?.has?.(PermissionFlagsBits.ManageGuild)
-  || member?.roles?.cache?.some((r) => ['Owner', 'Admin'].includes(r.name));
+/* By user id, not role name: anyone who can create a role called "Admin" —
+   or who is handed one by a careless click — passed the old check, which
+   gated revenue numbers and the payment-link command. With DISCORD_OWNER_IDS
+   set, only those ids pass; without it, Manage Server (the server owner
+   always has it). */
+const OWNER_IDS = new Set(String(process.env.DISCORD_OWNER_IDS || '')
+  .split(',').map((x) => x.trim()).filter(Boolean));
+const isOwnerLevel = (member) => (OWNER_IDS.size
+  ? OWNER_IDS.has(String(member?.id || member?.user?.id || ''))
+  : !!member?.permissions?.has?.(PermissionFlagsBits.ManageGuild));
 const OWNER_ONLY = { content: 'That one is owner/admin only.', ephemeral: true };
 
 // A support ticket, detected reliably by its topic (which survives the channel
@@ -84,6 +117,7 @@ async function stateGet(key, file) {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'x-timestamp': ts, 'x-signature': signature },
         body: JSON.stringify({ key }),
+        signal: deadline(),
       });
       if (res.ok) {
         const { value } = await res.json();
@@ -111,6 +145,7 @@ async function stateSet(key, value, file) {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-timestamp': ts, 'x-signature': signature },
       body: JSON.stringify({ key, value }),
+      signal: deadline(),
     });
     if (!res.ok && res.status !== 404) console.error(`[state] set ${key}: ${res.status}`);
   } catch (e) { console.error(`[state] set ${key} failed:`, e.message); }
@@ -119,7 +154,11 @@ async function stateSet(key, value, file) {
 // Giveaway store — persisted to giveaways.json so active giveaways (and their
 // entries) survive a bot restart; timers are re-armed on boot.
 const GIVEAWAYS = new Map(); // messageId -> { prize, entries:Set, endsAt, channelId, msgId, winnersCount, hostId, guildId }
-const ENDED = new Map();     // messageId -> { prize, entries:[], channelId }  (kept ~1h for /reroll)
+/* Ended giveaways live in META.endedGiveaways (durable), not in a Map that
+   forgot them after an hour: /reroll is for a winner who never answered, and
+   the terms give a winner seven days to answer. Kept until archived (30 days). */
+const ENDED_KEEP_MS = 30 * 24 * 60 * 60_000;
+const endedStore = () => (META.endedGiveaways ||= {});
 const GW_FILE = new URL('../giveaways.json', import.meta.url);
 let gwSaveTimer = null;
 function saveGiveaways() {
@@ -134,9 +173,10 @@ function saveGiveaways() {
 async function restoreGiveaways(c) {
   const data = (await stateGet('giveaways', GW_FILE)) || [];
   if (!Array.isArray(data)) return;
+  const guild = homeGuild(c);
+  if (!guild) return;
   for (const g of data) {
-    const guild = c.guilds.cache.get(g.guildId) || c.guilds.cache.first();
-    if (!guild) continue;
+    if (g.guildId && g.guildId !== GUILD_ID) continue;
     GIVEAWAYS.set(g.msgId, { ...g, entries: new Set(g.entries || []) });
     const msLeft = Math.max(0, (g.endsAt || 0) - Date.now());
     const ch = guild.channels.cache.get(g.channelId);
@@ -148,7 +188,7 @@ async function restoreGiveaways(c) {
     // Cap re-armed timers below the 32-bit overflow (~24.8 days) — a longer
     // wait is re-armed again on the next restart, never fired early.
     else setTimeout(finish, Math.min(msLeft, 20160 * 60_000));
-    console.log(`[giveaway] restored "${g.prize}" (${Math.round(msLeft / 60000)} min left, ${(g.entries || []).length} entries)`);
+    log.info('giveaway restored', { prize: g.prize, minutesLeft: Math.round(msLeft / 60000), entries: (g.entries || []).length });
   }
 }
 
@@ -189,15 +229,6 @@ const levelFor = (xp) => Math.floor(0.18 * Math.sqrt(xp));
 const xpForLevel = (lvl) => Math.ceil((lvl / 0.18) ** 2);
 const xpCooldown = new Map();
 
-// Anti-scam detection lives in its own module so it can be tested without a
-// Discord token — see discord/test/scam-guard.test.mjs.
-const SCAM_HOST_BASE = (() => {
-  try { return new URL(STORE_URL).hostname.replace(/^www\./, '').toLowerCase(); }
-  catch { return 'forgemarket.nl'; }
-})();
-const scamReasonFor = (content, { mentionCount = 0, mentionsEveryone = false } = {}) =>
-  scamReason(content, { storeHost: SCAM_HOST_BASE, mentionCount, mentionsEveryone });
-
 const {
   DISCORD_TOKEN, ANTHROPIC_API_KEY, AI_MODEL = 'claude-sonnet-4-6',
   REVIEW_INGEST_SECRET = '',
@@ -213,6 +244,19 @@ const STORE_URL = cleanUrl(process.env.STORE_URL, 'https://forgemarket.nl');
 // The store and its API live on the same domain, so default the API URL to the
 // store URL — /order, /digest and the live price list then work out of the box.
 const FORGEMARKET_API_URL = cleanUrl(process.env.FORGEMARKET_API_URL, STORE_URL);
+
+// Anti-scam detection lives in its own module so it can be tested without a
+// Discord token — see discord/test/scam-guard.test.mjs.
+/* Declared AFTER STORE_URL. It used to sit above it, so reading STORE_URL
+   threw in the temporal dead zone, the catch swallowed it, and the guard
+   always compared against the hardcoded default — a shop on any other domain
+   had no lookalike protection at all. */
+const SCAM_HOST_BASE = (() => {
+  try { return new URL(STORE_URL).hostname.replace(/^www\./, '').toLowerCase(); }
+  catch { return 'forgemarket.nl'; }
+})();
+const scamReasonFor = (content, { mentionCount = 0, mentionsEveryone = false } = {}) =>
+  scamReason(content, { storeHost: SCAM_HOST_BASE, mentionCount, mentionsEveryone });
 // Public Trustpilot profile. No default on purpose: an unset value must mean
 // "we have no profile yet" everywhere, so the bot stays silent about it rather
 // than sending a buyer who went to check the reviews to a 404.
@@ -258,6 +302,7 @@ async function pushReviewToSite({ author, avatarUrl, stars, body, externalId, di
     const signature = createHmac('sha256', REVIEW_INGEST_SECRET).update(`${ts}.${canonical}`).digest('hex');
     await fetch(`${FORGEMARKET_API_URL.replace(/\/$/, '')}/api/reviews/ingest`, {
       method: 'POST',
+      signal: deadline(),
       headers: {
         'content-type': 'application/json',
         'x-timestamp': ts,
@@ -411,7 +456,10 @@ async function shopLink(productUrl = null, surface = 'bot') {
 // silently kills sign-ups. On boot (and daily) we make sure a NON-expiring
 // invite exists (maxAge 0, unlimited uses) and push it to the site, which
 // serves it everywhere an invite is shown.
-const FALLBACK_INVITE = process.env.DISCORD_INVITE_URL || 'https://discord.gg/CrAfqENsSV';
+/* No hardcoded fallback: a baked-in invite outlives the server it points at,
+   and /invite would hand out a link to somebody else's server (or a dead one)
+   with total confidence. Unset means "not ready yet", said honestly. */
+const FALLBACK_INVITE = String(process.env.DISCORD_INVITE_URL || '').trim() || null;
 let PERMANENT_INVITE = null;
 
 async function ensurePermanentInvite(guild) {
@@ -437,12 +485,14 @@ async function ensurePermanentInvite(guild) {
     // Push the live link to the site (HMAC-signed; URL bound into the signature).
     if (FORGEMARKET_API_URL && REVIEW_INGEST_SECRET) {
       const ts = String(Date.now());
+      /* The guild id travels with the invite, inside the signature, so the
+         store can refuse an invite to any server but ours. */
       const signature = createHmac('sha256', REVIEW_INGEST_SECRET)
-        .update(`${ts}.invite:${invite.url}`).digest('hex');
+        .update(`${ts}.invite:${invite.url}:${guild.id}`).digest('hex');
       await fetch(`${FORGEMARKET_API_URL.replace(/\/$/, '')}/api/discord/invite`, {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'x-timestamp': ts, 'x-signature': signature },
-        body: JSON.stringify({ url: invite.url }),
+        body: JSON.stringify({ url: invite.url, guildId: guild.id }),
         signal: AbortSignal.timeout(8000),
       }).catch((e) => console.error('[invite->site]', e?.message));
     }
@@ -479,7 +529,32 @@ const client = new Client({
     GatewayIntentBits.MessageContent,
   ],
   partials: [Partials.Channel, Partials.Message, Partials.Reaction],
+  /* Nothing the bot sends pings a role or @everyone unless that one message
+     opts in. The default parse let anything echoed into a message — an AI
+     answer, a member's question copied into #leads, a suggestion title —
+     ping @everyone if it contained the string. Announcements, the raid alert,
+     the flash sale and the launch post opt in explicitly. */
+  allowedMentions: { parse: ['users'], repliedUser: true },
 });
+
+/** No pings at all: for AI text and anything that quotes a member. */
+const NO_PINGS = { parse: [] };
+
+/* Per-member cooldowns and the daily AI budget (see limits.js). */
+const limiter = createLimiter();
+const aiCap = createDailyCap(process.env.AI_DAILY_CAP ?? 300);
+/** Recently relayed outbox ids, so a failed ack never posts an event twice. */
+const relayed = createRecentIds(500);
+
+/** Spend a token, or reply with when to come back. Returns true when allowed. */
+async function allowed(i, bucket, lang) {
+  const r = limiter.take(bucket, i.user.id);
+  if (r.ok) return true;
+  const msg = { content: t('slowDown', lang, { min: Math.max(1, Math.ceil(r.retryMs / 60_000)) }), ephemeral: true };
+  if (i.deferred || i.replied) await i.editReply(msg).catch(() => {});
+  else await i.reply(msg).catch(() => {});
+  return false;
+}
 
 const STAR_THRESHOLD = 3;            // ⭐ reactions needed to hit the starboard
 // Starboard dedup — persisted in bot-meta.json so a restart can't repost.
@@ -595,7 +670,8 @@ const PRICE_UI = {
 
 function leadLog(guild, text) {
   const ch = findChannel(guild, 'leads');
-  if (ch) ch.send(text).catch(() => {});
+  // Quotes members' own words, so it must never be able to ping anyone.
+  if (ch) ch.send({ content: text, allowedMentions: NO_PINGS }).catch(() => {});
 }
 
 // ── AI ─────────────────────────────────────────────────────────────────────
@@ -606,6 +682,9 @@ const REPLY_IN = {
 
 async function askAI(question, products, lang = 'en') {
   if (!anthropic) return ruleBasedAnswer(question, products);
+  /* The server-wide daily budget. Past it, the FAQ answers and says why —
+     a polite fallback rather than silence or a surprise invoice. */
+  if (!aiCap.take()) return `${t('aiCap', lang)}\n\n${ruleBasedAnswer(question, products)}`;
   const catalog = products.slice(0, 40).map((p) => `- ${p.name} (${p.category}) — ${money(p.price, p.currency)}`).join('\n')
     || '(catalog unavailable — point users to the store)';
   const system = [
@@ -851,7 +930,7 @@ async function syncRolesControls(guild) {
 // type: only a real image/* response counts as "live".
 async function checkBrandAssets() {
   try {
-    const res = await fetch(BANNER('welcome'));
+    const res = await fetch(BANNER('welcome'), { signal: deadline() });
     const type = res.headers.get('content-type') || '';
     if (res.ok && type.startsWith('image/')) {
       console.log(`✅ Brand banners live at ${STORE_URL}/discord/`);
@@ -914,56 +993,120 @@ async function checkImpersonation(member) {
 }
 
 client.on(Events.GuildMemberUpdate, (oldM, newM) => {
+  if (!ours(newM.guild)) return;
   if (oldM.displayName !== newM.displayName) checkImpersonation(newM);
 });
 
+/** Leave a guild that is not ours, and say so in the log. */
+async function leaveForeign(guild, when) {
+  if (ours(guild)) return false;
+  log.warn('left a guild that is not DISCORD_GUILD_ID', {
+    when, guildId: guild.id, name: guild.name, owner: guild.ownerId,
+    hint: 'Developer Portal → Bot → turn "Public Bot" OFF so nobody else can add it.',
+  });
+  await guild.leave().catch((e) => log.error('could not leave guild', { guildId: guild.id, err: e.message }));
+  return true;
+}
+client.on(Events.GuildCreate, (g) => { leaveForeign(g, 'joined'); });
+
+/**
+ * The launch announcement — once, at or after LAUNCH_DATE, never from setup.
+ *
+ * setup.js used to pin "we're live!" in #announcements the moment it ran,
+ * which is weeks before launch. The bot now posts the real one itself when the
+ * moment arrives, and remembers in META that it did, so a restart (or a second
+ * replica) does not post it twice.
+ */
+const LAUNCH_DATE = String(process.env.LAUNCH_DATE || '').trim() || DEFAULT_LAUNCH_DATE;
+async function maybeAnnounceLaunch(guild) {
+  if (!metaLoaded || META.launchAnnounced || !launchDue(LAUNCH_DATE)) return;
+  const ch = findChannel(guild, 'announcements');
+  if (!ch) return;
+  META.launchAnnounced = new Date().toISOString();
+  saveMeta();
+  const channelIdByName = {};
+  guild.channels.cache.forEach((c) => { if (c.name) channelIdByName[c.name] = c.id; });
+  const a = buildLaunchAnnouncement({ storeUrl: STORE_URL, channelIdByName });
+  const e = new EmbedBuilder().setColor(a.color).setTitle(a.title).setDescription(a.description)
+    .setImage(a.image).setTimestamp();
+  const sent = await ch.send({
+    content: '@everyone', embeds: [e], allowedMentions: { parse: ['everyone'] },
+    components: [new ActionRowBuilder().addComponents(await shopButton(null, 'launch'))],
+  }).catch((err) => { log.error('launch announcement failed', { err: err.message }); return null; });
+  if (!sent) { delete META.launchAnnounced; saveMeta(); return; }
+  if (ch.type === ChannelType.GuildAnnouncement) await sent.crosspost().catch(() => {});
+  log.info('launch announcement posted', { channel: ch.name });
+}
+
 // ── ready ────────────────────────────────────────────────────────────────
-client.once(Events.ClientReady, (c) => {
-  console.log(`✅ ${c.user.tag} online — AI: ${anthropic ? 'on' : 'rule-based'} · API: ${FORGEMARKET_API_URL || 'sample'}`);
+client.once(Events.ClientReady, async (c) => {
+  log.info('bot online', { tag: c.user.tag, ai: anthropic ? 'on' : 'rule-based', api: FORGEMARKET_API_URL || null });
   c.user.setPresence({ activities: [{ name: '/order · check your order status' }], status: 'online' });
-  const refresh = () => c.guilds.cache.forEach((g) => updateServerStats(g));
+
+  // Any guild joined before this restriction existed (or while it was off).
+  for (const g of [...c.guilds.cache.values()]) await leaveForeign(g, 'ready');
+  if (!homeGuild(c)) {
+    log.error('the bot is not in DISCORD_GUILD_ID', {
+      guildId: GUILD_ID, fix: 'Invite it with `npm run invite`, or correct DISCORD_GUILD_ID.',
+    });
+  }
+
+  /* Register the commands on every boot. A PUT replaces the whole set, so this
+     is idempotent — and a deploy that adds a command no longer ships a handler
+     nobody can reach until someone remembers `npm run register`. */
+  registerCommands({ rest: c.rest, appId: c.application?.id || c.user.id, guildId: GUILD_ID })
+    .then((r) => log.info('slash commands registered', r))
+    .catch((e) => log.error('slash command registration failed', { err: e.message }));
+
+  const refresh = () => onHome(c, updateServerStats);
   refresh();
   setInterval(refresh, 6 * 60_000); // respect channel-rename rate limits
 
   // Cache members once so staff-impersonation checks see the full roster.
-  c.guilds.cache.forEach((g) => g.members.fetch().catch(() => {}));
+  onHome(c, (g) => g.members.fetch().catch(() => {}));
 
   // Live price list: refresh now + every 10 minutes.
-  const prices = () => c.guilds.cache.forEach((g) => updatePriceList(g));
+  const prices = () => onHome(c, updatePriceList);
   prices();
   setInterval(prices, 10 * 60_000);
 
   // Ticket hygiene: warn idle tickets after 24h, auto-close 24h later.
-  const sweep = () => c.guilds.cache.forEach((g) => sweepIdleTickets(g));
+  const sweep = () => onHome(c, sweepIdleTickets);
   setTimeout(sweep, 60_000); // let caches warm up first
   setInterval(sweep, 30 * 60_000);
 
-  // Weekly XP leaderboard (Mondays 17:00+ UTC, once per week).
-  setInterval(() => c.guilds.cache.forEach((g) => {
+  // Weekly XP leaderboard (Mondays 17:00+ UTC, once per week), weekly digest,
+  // housekeeping of ended giveaways, and the launch post when it is due.
+  setInterval(() => onHome(c, (g) => {
     maybePostWeeklyLeaderboard(g);
     maybePostWeeklyDigest(g);
+    pruneEndedGiveaways();
+    maybeAnnounceLaunch(g);
   }), 60 * 60_000);
+  // The launch check also runs every five minutes, so the post lands close to
+  // the moment rather than up to an hour after it.
+  setInterval(() => onHome(c, maybeAnnounceLaunch), 5 * 60_000);
 
   /* Pull back everything a deploy would otherwise have erased, then resume any
      giveaways that were live before it. XP and the weekly bookkeeping load in
      parallel; none of them gate the rest of boot. */
   loadXP();
-  loadMeta();
+  loadMeta().then(() => onHome(c, maybeAnnounceLaunch));
   restoreGiveaways(c);
 
   // Self-heal the channel panels: verify banner URLs, then edit banners into
   // the existing setup messages (no manual re-run of setup needed).
   checkBrandAssets().then((ok) => {
-    if (ok) c.guilds.cache.forEach((g) => syncPanelBanners(g));
+    if (ok) onHome(c, syncPanelBanners);
     // Copy sync runs regardless of the banner check — the text matters even when
     // the images are unreachable.
-    c.guilds.cache.forEach((g) => syncPanelCopy(g));
+    onHome(c, syncPanelCopy);
   });
   // The picker under #roles, for servers built before it existed.
-  c.guilds.cache.forEach((g) => syncRolesControls(g));
+  onHome(c, (g) => syncRolesControls(g));
 
   // Daily vouch spotlight → the house room (checked hourly, posts once a day).
-  setInterval(() => c.guilds.cache.forEach((g) => maybeVouchSpotlight(g)), 60 * 60_000);
+  setInterval(() => onHome(c, maybeVouchSpotlight), 60 * 60_000);
 
   // Relay the store's queued Discord events (sales, drops, alerts, DMs).
   setInterval(() => pollOutbox(c), 60_000);
@@ -977,38 +1120,38 @@ client.once(Events.ClientReady, (c) => {
 
   // Keep a never-expiring invite alive + mirrored on the site (re-checked daily
   // so even a manually-deleted invite heals itself within a day).
-  const invites = () => c.guilds.cache.forEach((g) => ensurePermanentInvite(g));
+  const invites = () => onHome(c, ensurePermanentInvite);
   setTimeout(invites, 20_000); // after channel caches warm up
   setInterval(invites, 24 * 60 * 60_000);
 
   // Site watchdog: every 15 min; alerts staff on downtime + recovery.
-  setInterval(() => c.guilds.cache.forEach((g) => checkSiteHealth(g)), 15 * 60_000);
-  setTimeout(() => c.guilds.cache.forEach((g) => checkSiteHealth(g)), 30_000);
-  setTimeout(() => c.guilds.cache.forEach((g) => maybeVouchSpotlight(g)), 90_000);
+  setInterval(() => onHome(c, checkSiteHealth), 15 * 60_000);
+  setTimeout(() => onHome(c, checkSiteHealth), 30_000);
+  setTimeout(() => onHome(c, maybeVouchSpotlight), 90_000);
 });
 
 // ── greet new members (with anti-scam warning) ─────────────────────────────
 client.on(Events.GuildMemberAdd, async (member) => {
+  if (!ours(member.guild)) return;
+  /* A join carries no locale, so the server's own language is the guess —
+     the same fallback every other plain event uses. */
+  const lang = memberLang(member, member.guild.preferredLocale);
   const dm = new EmbedBuilder().setColor(0x7c5cff)
-    .setTitle(`Welcome to ${member.guild.name} ⚡`)
+    .setTitle(t('welcomeTitle', lang, { guild: member.guild.name }))
     .setThumbnail(BRAND_ICON)
     .setImage(BANNER('welcome'))
     // One instruction, then what unlocks after it. Real channel mentions, so the
     // links are tappable — and the three channels that are still locked are
     // named as such instead of sending the member to a door they can't open.
     .setDescription(
-      `Hey ${member.user.username}! Glad you're here.\n\n` +
-      `**Step 1 — verify.** Tap ${chanRef(member.guild, 'verify')} and press the green button. ` +
-      'That unlocks the shop channels, giveaways and support.\n\n' +
-      `Already curious? ${chanRef(member.guild, 'how-to-buy')} and ${chanRef(member.guild, 'faq')} ` +
-      'are readable right now, no verification needed.\n\n' +
-      "🛡️ **Stay safe:** our staff will **NEVER** DM you first and will never ask for your password. " +
-      'We only sell through the official store link. Anyone who DMs you a "deal" is a scammer — report them.\n\n' +
-      "Money back if it never arrives · a real person on support · no account needed to buy.")
+      `${t('welcomeBody', lang, {
+        name: member.user.username, verify: chanRef(member.guild, 'verify'),
+        howto: chanRef(member.guild, 'how-to-buy'), faq: chanRef(member.guild, 'faq'),
+      })}\n\n${t('safety', lang)}\n\n${t('promise', lang)}`)
     .setFooter({ text: 'ForgeMarket · game top-ups & gift cards' });
   const dmButtons = new ActionRowBuilder().addComponents(
     await shopButton(null, 'join-dm'),
-    new ButtonBuilder().setLabel('📦 Track an order').setStyle(ButtonStyle.Link)
+    new ButtonBuilder().setLabel(t('track', lang)).setStyle(ButtonStyle.Link)
       .setURL(tagged(`${STORE_URL}/track`, 'join-dm')));
   /* A DM that never arrives is the most expensive silence in the funnel.
      Most Discord accounts have DMs from server members switched off, and this
@@ -1054,6 +1197,8 @@ client.on(Events.GuildMemberAdd, async (member) => {
 
 // ── interactions: buttons + slash ──────────────────────────────────────────
 client.on(Events.InteractionCreate, async (i) => {
+  // DMs (support ratings) have no guild; anything from another guild is ignored.
+  if (i.guildId && i.guildId !== GUILD_ID) return;
   try {
     if (i.isButton()) return await handleButton(i);
     // The ticket panel is a select menu now — eight things support needs to
@@ -1086,11 +1231,13 @@ client.on(Events.InteractionCreate, async (i) => {
 
 async function handleButton(i) {
   if (i.customId === 'verify') {
+    const lang = memberLang(i.member, i.locale);
     // Step 1: show the rules + a green "I agree" button (ephemeral, only to them).
     const role = findRole(i.guild, 'Verified Customer');
     if (role && i.member.roles.cache.has(role.id)) {
-      return i.reply({ content: 'You’re already verified ✅', ephemeral: true });
+      return i.reply({ content: t('alreadyVerified', lang), ephemeral: true });
     }
+    if (!accountOldEnough(i.user.createdTimestamp)) return tooYoungToVerify(i, lang);
     // Built from the same source as the #rules panel: a member must consent to
     // the rules that are actually posted, not to a copy that drifted from them.
     const channelIdByName = {};
@@ -1100,21 +1247,24 @@ async function handleButton(i) {
       trustpilotUrl: (await trustpilotLinks()).profile,
     }).rules;
     const rules = new EmbedBuilder().setColor(0x6366f1)
-      .setTitle('📜 Read & accept the rules')
-      .setDescription(`${rulesCopy.description}\n\nPress the green button below to accept and unlock the server.`)
+      .setTitle(t('rulesTitle', lang))
+      .setDescription(`${rulesCopy.description}\n\n${t('rulesPrompt', lang)}`)
       .setFooter({ text: 'ForgeMarket • verification' });
-    const agree = new ButtonBuilder().setCustomId('verify:agree').setLabel('I agree — verify me')
+    const agree = new ButtonBuilder().setCustomId('verify:agree').setLabel(t('agree', lang))
       .setEmoji('✅').setStyle(ButtonStyle.Success);
     return i.reply({ embeds: [rules], components: [new ActionRowBuilder().addComponents(agree)], ephemeral: true });
   }
 
   if (i.customId === 'verify:agree') {
+    const lang = memberLang(i.member, i.locale);
     // Step 2: they accepted → grant the Verified Customer role.
     const role = findRole(i.guild, 'Verified Customer');
     if (!role) return i.reply({ content: 'Verification role missing — ask an admin to run setup.', ephemeral: true });
     if (i.member.roles.cache.has(role.id)) {
-      return i.update({ content: 'You’re already verified ✅', embeds: [], components: [] }).catch(() => {});
+      return i.update({ content: t('alreadyVerified', lang), embeds: [], components: [] }).catch(() => {});
     }
+    // Checked again here: the rules prompt may have been opened by someone else's click.
+    if (!accountOldEnough(i.user.createdTimestamp)) return tooYoungToVerify(i, lang);
     // Never claim success we did not achieve. If the bot's own role sits below
     // "Verified Customer", Discord refuses the grant — and swallowing that told
     // every new member they were verified while they still saw an empty server.
@@ -1123,11 +1273,7 @@ async function handleButton(i) {
     } catch (e) {
       console.error('[verify] role grant failed:', e.message);
       leadLog(i.guild, `⚠️ Verification FAILED for <@${i.user.id}>: ${e.message} — drag my role above **${role.name}**.`);
-      return i.update({
-        content: '⚠️ I couldn’t give you the Verified role — my own role is ranked below it, so Discord blocked me. ' +
-          'This is on us, not you: an admin has been notified and it takes them 10 seconds to fix. Try again after that.',
-        embeds: [], components: [],
-      }).catch(() => {});
+      return i.update({ content: t('verifyFailed', lang), embeds: [], components: [] }).catch(() => {});
     }
     leadLog(i.guild, `\u2705 Verified: <@${i.user.id}>`);
     /* The step after verifying used to be two channel names and nothing else.
@@ -1142,18 +1288,18 @@ async function handleButton(i) {
        settled question is how a control starts getting ignored. */
     const needsLang = !langRoleOf(i.member);
     return i.update({
-      content: `\u2705 **Verified!** Welcome in \u2014 the full server is now unlocked.\n`
+      content: `${t('verified', lang)}\n`
         + `${cta.note ? `${cta.note}\n` : ''}`
-        + `Ask me anything in ${chanRef(i.guild, 'ask-the-bot')}, or browse `
-        + `${chanRef(i.guild, 'products')} and pick your games in ${chanRef(i.guild, 'roles')} `
-        + 'so you hear about restocks first. \u{1F3AE}'
-        + (needsLang ? '\n\nPick your language below and your chat room opens.' : ''),
+        + t('verifiedNext', lang, {
+          ask: chanRef(i.guild, 'ask-the-bot'), products: chanRef(i.guild, 'products'), roles: chanRef(i.guild, 'roles'),
+        })
+        + (needsLang ? `\n\n${t('pickLang', lang)}` : ''),
       embeds: [],
       components: [
         ...(needsLang ? [languagePickerRow()] : []),
         new ActionRowBuilder().addComponents(
           await shopButton(null, 'verify'),
-          new ButtonBuilder().setLabel('\u{1F4E6} Track an order')
+          new ButtonBuilder().setLabel(t('track', lang))
             .setStyle(ButtonStyle.Link).setURL(tagged(`${STORE_URL}/track`, 'verify'))),
       ],
     }).catch(() => {});
@@ -1179,13 +1325,33 @@ async function handleButton(i) {
   if (i.customId.startsWith('sugmod:')) return moderateSuggestion(i, i.customId.split(':')[1]);
 }
 
+/**
+ * An account younger than seven days does not get the role from a button.
+ *
+ * Throwaway accounts are what scam waves and raids are made of, and a
+ * one-tap gate stops none of them. A real new Discord user is not turned
+ * away, though: they get a ticket button, and a person lets them in.
+ */
+async function tooYoungToVerify(i, lang) {
+  leadLog(i.guild, `🕒 Verification deferred for <@${i.user.id}>: account created <t:${Math.floor(i.user.createdTimestamp / 1000)}:R> — sent to a ticket.`);
+  const payload = {
+    content: t('tooYoung', lang), embeds: [], ephemeral: true,
+    components: [new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId('ticket:general').setLabel(t('openTicket', lang))
+        .setEmoji('🎫').setStyle(ButtonStyle.Primary))],
+  };
+  return i.customId === 'verify:agree' ? i.update(payload).catch(() => {}) : i.reply(payload);
+}
+
 // Step 1 of a ticket: a small form. An order number up front means staff can
 // help immediately instead of opening with "what's your order number?".
 
 async function openTicketModal(i, type) {
   // One open ticket per member — check BEFORE showing the form.
   const existing = i.guild.channels.cache.find((c) => isOwnedBy(c.topic, i.user.id));
-  if (existing) return i.reply({ content: `You already have an open ticket: <#${existing.id}>`, ephemeral: true });
+  if (existing) {
+    return i.reply({ content: t('ticketExists', memberLang(i.member, i.locale), { ch: `<#${existing.id}>` }), ephemeral: true });
+  }
 
   const spec = ticketType(type);
   const modal = new ModalBuilder().setCustomId(`tmodal:${type}`)
@@ -1280,23 +1446,28 @@ async function claimTicket(i) {
 }
 
 async function enterGiveaway(i, messageId) {
+  const lang = memberLang(i.member, i.locale);
   const gw = GIVEAWAYS.get(messageId);
-  if (!gw) return i.reply({ content: 'This giveaway has ended.', ephemeral: true });
+  if (!gw) return i.reply({ content: t('gwEnded', lang), ephemeral: true });
   // Verified-only entry (ties into the verification gate).
   const verified = findRole(i.guild, 'Verified Customer');
   if (verified && !i.member.roles.cache.has(verified.id)) {
-    return i.reply({ content: `Please verify in ${chanRef(i.guild, 'verify')} first to enter giveaways. ✅`, ephemeral: true });
+    return i.reply({ content: t('gwVerifyFirst', lang, { verify: chanRef(i.guild, 'verify') }), ephemeral: true });
+  }
+  /* The terms say seven days; this is where that is true rather than written. */
+  if (!gw.entries.has(i.user.id) && !accountOldEnough(i.user.createdTimestamp)) {
+    return i.reply({ content: t('gwTooYoung', lang, { terms: chanRef(i.guild, 'giveaway-terms') }), ephemeral: true });
   }
   if (gw.entries.has(i.user.id)) {
     gw.entries.delete(i.user.id);
     updateGwCount(i.guild, gw);
     saveGiveaways();
-    return i.reply({ content: 'You left the giveaway. 👋', ephemeral: true });
+    return i.reply({ content: t('gwLeft', lang), ephemeral: true });
   }
   gw.entries.add(i.user.id);
   updateGwCount(i.guild, gw);
   saveGiveaways();
-  return i.reply({ content: `🎉 You’re in! **${gw.entries.size}** entries. (Tap again to leave.)`, ephemeral: true });
+  return i.reply({ content: t('gwIn', lang), ephemeral: true });
 }
 
 // Live-update the "Entries" field on the giveaway message.
@@ -1309,6 +1480,7 @@ function updateGwCount(guild, gw) {
 }
 
 async function openTicket(i, type, { orderNumber = '', details = '' } = {}) {
+  const lang = memberLang(i.member, i.locale);
   await i.deferReply({ ephemeral: true });
   // Tickets get their own staff-gated category; falls back to the panel's
   // category on servers that haven't re-run setup yet.
@@ -1318,7 +1490,8 @@ async function openTicket(i, type, { orderNumber = '', details = '' } = {}) {
 
   // One open ticket per member.
   const existing = i.guild.channels.cache.find((c) => isOwnedBy(c.topic, i.user.id));
-  if (existing) return i.editReply(`You already have an open ticket: <#${existing.id}>`);
+  if (existing) return i.editReply(t('ticketExists', lang, { ch: `<#${existing.id}>` }));
+  if (!(await allowed(i, 'ticket', lang))) return null;
 
   const staffRoles = ['Support', 'Admin', 'Moderator'].map((n) => findRole(i.guild, n)).filter(Boolean);
   // Member tiers can view the SUPPORT category, so explicitly hide each ticket
@@ -1341,7 +1514,8 @@ async function openTicket(i, type, { orderNumber = '', details = '' } = {}) {
     });
   } catch (e) {
     console.error('[ticket] create failed:', e.message);
-    return i.editReply('⚠️ I couldn’t create your ticket — make sure my role has **Manage Channels** and is high in the list. Ask an admin.');
+    leadLog(i.guild, `⚠️ Ticket creation failed for <@${i.user.id}>: ${e.message} — check my Manage Channels permission.`);
+    return i.editReply(t('ticketFailed', lang));
   }
 
   const label = ticketLabel(type);
@@ -1350,12 +1524,10 @@ async function openTicket(i, type, { orderNumber = '', details = '' } = {}) {
     .setColor(prio.key === 'high' ? 0xef4444 : prio.key === 'normal' ? 0x6366f1 : 0x64748b)
     .setTitle(`${label}`)
     .setDescription(
-      `Hi <@${i.user.id}>, thanks for reaching out! A team member will be with you shortly. ⚡` +
+      t('ticketHello', lang, { user: `<@${i.user.id}>` }) +
       (details ? `\n\n**Their message:**\n> ${details.slice(0, 800).replace(/\n/g, '\n> ')}` : '') +
       (orderNumber ? `\n\n**Order number:** \`${orderNumber}\`` : '') +
-      (!details && !orderNumber
-        ? '\n\n**To speed things up, please share:**\n• Your **order number** (if any)\n• A short description of the issue\n• Screenshots if relevant'
-        : '\n\nFeel free to add screenshots if relevant.'))
+      (!details && !orderNumber ? `\n\n${t('ticketAsk', lang)}` : `\n\n${t('ticketScreens', lang)}`))
     .setFooter({ text: 'ForgeMarket Support • use the buttons below' }).setTimestamp();
   const controls = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('ticket:claim').setLabel('Claim').setEmoji('🛠️').setStyle(ButtonStyle.Success),
@@ -1368,6 +1540,8 @@ async function openTicket(i, type, { orderNumber = '', details = '' } = {}) {
   await channel.send({
     content: supportPing ? `<@&${supportPing.id}> \u2014 ${prio.dot} ${prio.label}` : '',
     embeds: [embed], components: [controls],
+    // The Support ping is the one role mention this message is meant to make.
+    allowedMentions: { parse: ['users'], roles: supportPing ? [supportPing.id] : [] },
   }).catch(() => {});
 
   /* Log the OPEN, not only the close.
@@ -1394,7 +1568,7 @@ async function openTicket(i, type, { orderNumber = '', details = '' } = {}) {
     orderStatusEmbed(num, memberLang(i.member, i.locale)).then((e) => { if (e) channel.send({ embeds: [e] }).catch(() => {}); });
   }
   leadLog(i.guild, `🎫 Ticket opened by <@${i.user.id}> — **${label}** → <#${channel.id}>`);
-  return i.editReply(`✅ Your ticket is ready: <#${channel.id}>`);
+  return i.editReply(t('ticketReady', lang, { ch: `<#${channel.id}>` }));
 }
 
 /**
@@ -1444,7 +1618,7 @@ async function archiveTicket(ch, closedByText, dmLabel = null) {
           .setCustomId(`rate:${n}:${ch.name}`.slice(0, 100))
           .setLabel('\u2B50'.repeat(n)).setStyle(n >= 4 ? ButtonStyle.Success : ButtonStyle.Secondary)));
       await owner.send({
-        content: `Here’s the transcript of your ForgeMarket ticket (closed by ${dmLabel || 'our team'}).\n\n**How was our support?** Tap a rating below 👇`,
+        content: t('transcriptDm', memberLang(owner, ch.guild.preferredLocale), { by: dmLabel || 'ForgeMarket' }),
         files: [file], components: [stars],
       }).catch(() => {});
     }
@@ -1465,20 +1639,21 @@ async function archiveTicket(ch, closedByText, dmLabel = null) {
  */
 async function closeTicket(i) {
   const ch = i.channel;
-  const t = parseTopic(ch?.topic);
-  if (!t) return i.reply({ content: 'This isn\u2019t a ticket channel.', ephemeral: true });
+  const topic = parseTopic(ch?.topic);
+  if (!topic) return i.reply({ content: 'This isn\u2019t a ticket channel.', ephemeral: true });
+  const lang = memberLang(i.member, i.locale);
   const rows = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('ticket:close:yes').setLabel('Yes, close it')
+    new ButtonBuilder().setCustomId('ticket:close:yes').setLabel(t('closeYes', lang))
       .setEmoji('\u{1F512}').setStyle(ButtonStyle.Danger),
-    new ButtonBuilder().setCustomId('ticket:close:no').setLabel('Keep it open')
+    new ButtonBuilder().setCustomId('ticket:close:no').setLabel(t('closeNo', lang))
       .setStyle(ButtonStyle.Secondary));
+  // English source of the body, kept for staff searching the code: "the
+  // conversation cannot be reopened here".
   return i.reply({
     ephemeral: true,
     embeds: [new EmbedBuilder().setColor(0xf59e0b)
-      .setTitle('Close this ticket?')
-      .setDescription('The channel is deleted a few seconds after closing. '
-        + `${t.ownerId ? `<@${t.ownerId}> gets` : 'The member gets'} the transcript by DM, `
-        + 'and a copy goes to #ticket-logs \u2014 but the conversation cannot be reopened here.')],
+      .setTitle(t('closeTitle', lang))
+      .setDescription(t('closeBody', lang))],
     components: [rows],
   });
 }
@@ -1494,8 +1669,7 @@ async function confirmClose(i) {
     components: [],
   }).catch(() => {});
   await ch.send({ embeds: [new EmbedBuilder().setColor(0xef4444)
-    .setDescription(`\u{1F512} Ticket closed by <@${i.user.id}> \u2014 saving a transcript. `
-      + 'The channel disappears in a few seconds.')] }).catch(() => {});
+    .setDescription(t('closing', memberLang(i.member, i.locale), { user: `<@${i.user.id}>` }))] }).catch(() => {});
   await archiveTicket(ch, `<@${i.user.id}>`, i.user.tag);
 }
 
@@ -1535,11 +1709,9 @@ async function sweepIdleTickets(guild) {
 
 async function rateSupport(i, stars, ticket) {
   // Runs from a DM, so search the bot's guilds for the log channel.
-  let logs = null;
-  for (const g of i.client.guilds.cache.values()) {
-    const c = g.channels.cache.find((ch) => ch.name === 'ticket-logs');
-    if (c) { logs = c; break; }
-  }
+  // Only ever our own guild's log — never a #ticket-logs in someone else's server.
+  const home = homeGuild(i.client);
+  const logs = home ? findChannel(home, 'ticket-logs') : null;
   await i.update({ content: `Thanks for your feedback — you rated us ${'⭐'.repeat(stars)} (${stars}/5)! 💜`, components: [] }).catch(() => {});
   if (logs) await logs.send({ embeds: [new EmbedBuilder().setColor(stars >= 4 ? 0x10b981 : 0xf5b324)
     .setDescription(`\u2B50 Support rated **${stars}/5** by <@${i.user.id}>`
@@ -1558,59 +1730,44 @@ async function rateSupport(i, stars, ticket) {
 const PRE_VERIFY_COMMANDS = new Set(['help', 'order', 'shop', 'invite']);
 
 async function handleCommand(i) {
+  if (!i.guild) return i.reply({ content: 'Use me inside the ForgeMarket server.', ephemeral: true });
+  const lang = memberLang(i.member, i.locale);
   if (!PRE_VERIFY_COMMANDS.has(i.commandName) && i.guild) {
     const verified = findRole(i.guild, 'Verified Customer');
     if (verified && !i.member?.roles?.cache?.has(verified.id) && !isStaff(i.member)) {
-      return i.reply({
-        content: `Verify first in ${chanRef(i.guild, 'verify')} — it takes one tap and unlocks everything. ` +
-          'Tracking an order? `/order` works right away.',
-        ephemeral: true,
-      });
+      return i.reply({ content: t('verifyFirst', lang, { verify: chanRef(i.guild, 'verify') }), ephemeral: true });
     }
   }
+  /* Cooldowns on everything that costs money (AI), a person's time (tickets),
+     or other members' attention (polls, suggestions). /order and /price are
+     cheap but hit the store API, which rate-limits per caller. */
+  const BUCKET = { ask: 'ask', recommend: 'recommend', suggest: 'suggest', poll: 'poll', order: 'order', price: 'price' };
+  if (BUCKET[i.commandName] && !isStaff(i.member) && !(await allowed(i, BUCKET[i.commandName], lang))) return null;
   if (i.commandName === 'help') {
     // Buyers first, and only staff see the staff block — a shopper asking for
     // help should not have to read past /flashsale and /clearpins to find
-    // "where is my order?".
+    // "where is my order?". In the member's language, like /order.
+    const H = helpFor(lang);
     const e = new EmbedBuilder().setColor(0x6366f1)
-      .setAuthor({ name: 'ForgeMarket — what I can do', iconURL: BRAND_ICON })
-      .setDescription('Everything below is a slash command: type `/` and pick it.')
+      .setAuthor({ name: H.author, iconURL: BRAND_ICON })
+      .setDescription(H.intro)
       .addFields(
-        { name: '📦 Your order',
-          value: '`/order` — live status of an order (works without an account)\n' +
-                 '`/delivery` — how a product is delivered and redeemed\n' +
-                 '`/price` — current price of any product' },
-        { name: '🛒 Shopping',
-          value: '`/ask` — ask me anything about products or prices\n' +
-                 '`/shop` — open the store\n' +
-                 '`/drops` — upcoming drops & restocks\n' +
-                 /* The one command that turns a member into a salesperson, and it
-                    was in no list of what the bot can do — mentioned once, in one
-                    panel, in one channel. A referral programme nobody knows the
-                    command for pays out nothing. */
-                 '`/ref` — your referral link: 5% of every order it brings, as store credit' },
-        { name: '💬 Community',
-          value: '`/vouch` — leave a vouch after a purchase\n' +
-                 '`/suggest` — suggest an idea (the server votes)\n' +
-                 '`/rank` · `/daily` · `/leaderboard` — XP, streaks and the top members\n' +
-                 '`/balance` — your Forge Coins & store credit\n' +
-                 '`/poll` · `/invite` · `/stats` · `/serverinfo`' },
-        { name: '🆘 Something wrong?',
-          value: 'Open a ticket in **#open-a-ticket** with your order number — a real person answers. ' +
-                 'If an order never arrives, you get your money back.\n\n' +
-                 '🛡️ Staff will **never** DM you first and never ask for your password.' },
+        { name: H.order[0], value: H.order[1] },
+        /* /ref is the one command that turns a member into a salesperson, so it
+           is listed with what it pays. */
+        { name: H.shop[0], value: H.shop[1] },
+        { name: H.community[0], value: H.community[1] },
+        { name: H.help[0], value: H.help[1] },
       )
-      .setFooter({ text: 'Chat and voice both earn XP — level roles are automatic' });
+      .setFooter({ text: H.footer });
     if (isStaff(i.member)) {
       e.addFields({ name: '🛠️ Staff only',
-        value: '`/paylink` — attach a payment link with the exact amount to an order\n' +
-               '`/close` · `/giveaway` · `/reroll` · `/coupon` · `/flashsale`\n' +
-               '`/digest` — live store numbers · `/stock` — low stock · `/launch` — ready-to-sell check\n' +
-               '`/announce` · `/clearpins`' });
+        value: '`/close` · `/giveaway` · `/reroll` · `/flashsale` · `/clearpins`\n' +
+               'Owner: `/paylink` · `/coupon` · `/announce` · `/digest` · `/stock` · `/launch`' });
     }
     const row = new ActionRowBuilder().addComponents(
       await shopButton(),
-      new ButtonBuilder().setLabel('Track an order').setStyle(ButtonStyle.Link).setURL(`${STORE_URL}/track`),
+      new ButtonBuilder().setLabel(t('track', lang)).setStyle(ButtonStyle.Link).setURL(`${STORE_URL}/track`),
     );
     return i.reply({ ephemeral: true, embeds: [e], components: [row] });
   }
@@ -1661,7 +1818,10 @@ async function handleCommand(i) {
     return i.reply({ ephemeral: true, content: `\u{1F6CD}\uFE0F ${await shopLink()}` });
   }
   if (i.commandName === 'invite') {
-    return i.reply({ ephemeral: true, content: `📨 Invite friends with this link: ${PERMANENT_INVITE || FALLBACK_INVITE}` });
+    const link = PERMANENT_INVITE || FALLBACK_INVITE;
+    return i.reply({ ephemeral: true, content: link
+      ? `📨 Invite friends with this link: ${link}`
+      : 'The invite link isn’t ready yet — try again in a minute.' });
   }
   if (i.commandName === 'stats') {
     const g = i.guild;
@@ -1683,9 +1843,10 @@ async function handleCommand(i) {
        without this a German member asking for a Robux recommendation got an
        English answer every time — there was nothing German left in the prompt
        for the model to take a hint from. */
-    const answer = await askAI(q, products, memberLang(i.member, i.locale));
+    const answer = await askAI(q, products, lang);
     if (BUY_INTENT.test(q)) leadLog(i.guild, `💡 Buying intent from <@${i.user.id}>: "${q.slice(0, 120)}"`);
-    return i.editReply(answer.slice(0, 1900));
+    // Model output is never allowed to ping — whatever the question coaxed it into writing.
+    return i.editReply({ content: answer.slice(0, 1900), allowedMentions: NO_PINGS });
   }
 }
 
@@ -1774,7 +1935,7 @@ client.on(Events.MessageReactionAdd, async (reaction) => {
     if (reaction.partial) await reaction.fetch();
     if (reaction.emoji.name !== '⭐') return;
     const msg = reaction.message.partial ? await reaction.message.fetch() : reaction.message;
-    if (!msg.guild || msg.author?.bot) return;
+    if (!ours(msg.guild) || msg.author?.bot) return;
     if (reaction.count < STAR_THRESHOLD || starred.has(msg.id)) return;
     const board = findChannel(msg.guild, 'starboard');
     if (!board || board.id === msg.channel.id) return;
@@ -1792,7 +1953,19 @@ client.on(Events.MessageReactionAdd, async (reaction) => {
 
 // ── AI in #ask-the-bot ──────────────────────────────────────────────────────
 client.on(Events.MessageCreate, async (m) => {
-  if (m.author.bot || m.channel.name !== 'ask-the-bot') return;
+  if (m.author.bot || !ours(m.guild) || m.channel.name !== 'ask-the-bot') return;
+  // A scam message is the moderation handler's to delete, not ours to answer.
+  if (!isStaff(m.member) && scamReasonFor(m.content)) return;
+  /* Same bucket as /ask: one model, two doors. Told once, then the note
+     cleans itself up so the channel is not a wall of "slow down". */
+  const lim = isStaff(m.member) ? { ok: true } : limiter.take('ask', m.author.id);
+  if (!lim.ok) {
+    const lang = memberLang(m.member, m.guild?.preferredLocale);
+    const note = await m.reply({ content: t('slowDown', lang, { min: Math.max(1, Math.ceil(lim.retryMs / 60_000)) }),
+      allowedMentions: NO_PINGS }).catch(() => null);
+    setTimeout(() => note?.delete().catch(() => {}), 15_000);
+    return;
+  }
   await m.channel.sendTyping().catch(() => {});
   const products = await getProducts();
   /* A message carries no locale, but it carries the question itself — and the
@@ -1800,12 +1973,15 @@ client.on(Events.MessageCreate, async (m) => {
      anything ambiguous: the language this member picked, then the server's. */
   const answer = await askAI(m.content, products, memberLang(m.member, m.guild?.preferredLocale));
   if (BUY_INTENT.test(m.content)) leadLog(m.guild, `💡 Buying intent from <@${m.author.id}>: "${m.content.slice(0, 120)}"`);
-  m.reply(answer.slice(0, 1900)).catch(() => {});
+  m.reply({ content: answer.slice(0, 1900), allowedMentions: { ...NO_PINGS, repliedUser: true } }).catch(() => {});
 });
 
 // ── Auto-moderation: remove invites / scam promos (non-staff, outside tickets) ─
-client.on(Events.MessageCreate, async (m) => {
-  if (m.author.bot || !m.guild) return;
+/* One function for new AND edited messages. Posting "nice server" and editing
+   it into a phishing link a minute later walked straight past a guard that
+   only looked at MessageCreate. */
+async function moderateMessage(m) {
+  if (!m || m.author?.bot || !ours(m.guild)) return;
   if (isTicketChannel(m.channel)) return;
   if (isStaff(m.member)) return;
 
@@ -1819,10 +1995,12 @@ client.on(Events.MessageCreate, async (m) => {
   await m.delete().catch(() => {});
   const notice = hit.kind === 'lookalike'
     ? `⚠️ <@${m.author.id}> that link is **not** our shop. The only official address is ${STORE_URL} — anything else is someone trying to take your money.`
+    : hit.kind === 'phishing'
+      ? `⚠️ <@${m.author.id}> that link pretends to be a real site (\`${hit.detail}\`) — it is a fake login page. Never sign in through a link someone posts.`
     : hit.kind === 'solicit'
       ? `⚠️ <@${m.author.id}> no selling or buying by DM here. **Staff never DM you first**, and deals in DMs are how people get scammed.`
       : `⚠️ <@${m.author.id}> invites, mass pings & "free" offers aren't allowed. **Staff never DM you first** — stay safe.`;
-  const warn = await m.channel.send(notice).catch(() => null);
+  const warn = await m.channel.send({ content: notice, allowedMentions: { parse: [], users: [m.author.id] } }).catch(() => null);
   setTimeout(() => warn?.delete().catch(() => {}), 12_000);
 
   const log = findChannel(m.guild, 'mod-log');
@@ -1834,11 +2012,17 @@ client.on(Events.MessageCreate, async (m) => {
       .addFields({ name: 'Content', value: `\`\`\`${m.content.slice(0, 900).replace(/```/g, "'''")}\`\`\`` })
       .setTimestamp()] }).catch(() => {});
   }
+}
+client.on(Events.MessageCreate, (m) => { moderateMessage(m); });
+client.on(Events.MessageUpdate, async (_old, m) => {
+  // An edit can arrive as a partial (uncached message); fetch it to read the new text.
+  const msg = m?.partial ? await m.fetch().catch(() => null) : m;
+  moderateMessage(msg);
 });
 
 // ── Ticket activity: a human reply re-arms the inactivity timer ──────────────
 client.on(Events.MessageCreate, (m) => {
-  if (m.author.bot || !m.guild) return;
+  if (m.author.bot || !ours(m.guild)) return;
   const ch = m.channel;
   if (ch.topic?.startsWith('ticket-owner:') && ch.topic.includes(' · idlewarned')) {
     ch.setTopic(ch.topic.replace(' · idlewarned', '')).catch(() => {});
@@ -1847,8 +2031,9 @@ client.on(Events.MessageCreate, (m) => {
 
 // ── Member leave logging ────────────────────────────────────────────────────
 client.on(Events.GuildMemberRemove, (member) => {
-  const log = findChannel(member.guild, 'mod-log');
-  if (log) log.send(`🔴 ${member.user?.tag || member.id} left the server.`).catch(() => {});
+  if (!ours(member.guild)) return;
+  const modLog = findChannel(member.guild, 'mod-log');
+  if (modLog) modLog.send(`🔴 ${member.user?.tag || member.id} left the server.`).catch(() => {});
 });
 
 // Level roles: keep exactly the highest earned tier on the member's profile.
@@ -1888,7 +2073,7 @@ async function announceLevelUp(guild, user, member, lvl, fallbackCh) {
 
 // ── Leveling: award XP per message (60s cooldown), announce level-ups ─────────
 client.on(Events.MessageCreate, (m) => {
-  if (m.author.bot || !m.guild) return;
+  if (m.author.bot || !ours(m.guild)) return;
   if (isTicketChannel(m.channel)) return;
   const now = Date.now();
   if (now - (xpCooldown.get(m.author.id) || 0) < 60_000) return;
@@ -1908,7 +2093,7 @@ const voiceSessions = new Map(); // userId -> { since, guildId }
 const inRealVoice = (state) => !!state.channelId && state.channelId !== state.guild.afkChannelId;
 client.on(Events.VoiceStateUpdate, (oldS, newS) => {
   try {
-    if (newS.member?.user?.bot) return;
+    if (newS.member?.user?.bot || !ours(newS.guild)) return;
     const was = inRealVoice(oldS), is = inRealVoice(newS);
     if (!was && is) { voiceSessions.set(newS.id, { since: Date.now(), guildId: newS.guild.id }); return; }
     if (was && !is) {
@@ -2001,6 +2186,7 @@ async function ackOutbox(ids) {
     const signature = createHmac('sha256', REVIEW_INGEST_SECRET).update(`${ts}.${canonical}`).digest('hex');
     const res = await fetch(`${FORGEMARKET_API_URL.replace(/\/$/, '')}/api/discord/outbox/ack`, {
       method: 'POST',
+      signal: deadline(),
       headers: { 'content-type': 'application/json', 'x-timestamp': ts, 'x-signature': signature },
       body: JSON.stringify({ ids }),
     });
@@ -2016,6 +2202,7 @@ async function pollOutbox(c) {
     const signature = createHmac('sha256', REVIEW_INGEST_SECRET).update(`${ts}.outbox`).digest('hex');
     const res = await fetch(`${FORGEMARKET_API_URL.replace(/\/$/, '')}/api/discord/outbox`, {
       method: 'POST',
+      signal: deadline(),
       headers: { 'content-type': 'application/json', 'x-timestamp': ts, 'x-signature': signature },
       body: '{}',
     });
@@ -2028,20 +2215,24 @@ async function pollOutbox(c) {
     const delivered = [];
     for (const ev of events) {
       try {
+        /* Already posted, but the ack never landed (network, store restart),
+           so the store offered it again. Re-acknowledge instead of posting a
+           second copy of the same sale ping or restock. */
+        if (relayed.has(ev.id)) { delivered.push(ev.id); continue; }
         if (ev.channel === 'dm') {
           const { discordUserId, ...body } = ev.body || {};
           if (!discordUserId) { delivered.push(ev.id); continue; } // nothing to send to
           // A member with DMs closed will never accept this one; retrying it every
           // lease forever is worse than letting it go, so it counts as handled.
           await c.users.send(discordUserId, body)
-            .then(() => delivered.push(ev.id))
+            .then(() => { delivered.push(ev.id); relayed.add(ev.id); })
             .catch((e) => {
               if (e?.code === 50007) { delivered.push(ev.id); return; } // cannot DM this user
               console.error('[outbox] dm failed:', e.message);
             });
           continue;
         }
-        const guild = c.guilds.cache.first();
+        const guild = homeGuild(c);
         if (!guild) continue;
         const names = OUTBOX_CHANNEL[ev.channel] || ['leads'];
         const ch = names.map((n) => findChannel(guild, n)).find(Boolean);
@@ -2059,16 +2250,17 @@ async function pollOutbox(c) {
         const pingIds = [...new Set(pingRoles.map((r) => r.id))];
         // `fmPing` is ours; Discord never sees it.
         const { fmPing, ...payload } = ev.body || {};
+        /* Exactly the opt-in roles, and nothing the store's text might contain. */
         const body = pingIds.length
           ? { ...payload,
               content: [...pingIds.map((id) => `<@&${id}>`), payload.content].filter(Boolean).join(' '),
-              allowedMentions: { roles: pingIds } }
-          : payload;
+              allowedMentions: { parse: [], roles: pingIds } }
+          : { ...payload, allowedMentions: NO_PINGS };
         const sent = await ch.send(body).catch((e) => {
           console.error(`[outbox] #${ch.name} send failed:`, e.message);
           return null;
         });
-        if (sent) delivered.push(ev.id);
+        if (sent) { delivered.push(ev.id); relayed.add(ev.id); }
         // #announcements is an announcement channel; publishing is the only
         // reason to use that type, and nothing was ever crossposted.
         if (sent && ch.type === ChannelType.GuildAnnouncement) await sent.crosspost().catch(() => {});
@@ -2077,8 +2269,7 @@ async function pollOutbox(c) {
     if (delivered.length) await ackOutbox(delivered);
     if (events.length) {
       const stuck = events.length - delivered.length;
-      console.log(`📮 [outbox] relayed ${delivered.length}/${events.length} store event(s)` +
-        (stuck ? ` · ${stuck} left queued for retry` : ''));
+      log.info('outbox relayed', { delivered: delivered.length, offered: events.length, queuedForRetry: stuck });
     }
   } catch (e) {
     // 404 = the store hasn't deployed the outbox yet; stay quiet about it.
@@ -2087,31 +2278,44 @@ async function pollOutbox(c) {
 }
 
 // ── Order status (shared by /order, ticket auto-lookup and the ticket form) ──
-async function orderStatusEmbed(num, lang = 'en') {
-  if (!FORGEMARKET_API_URL) return null;
+/**
+ * Look an order up. Returns { embed } on success, { status: 404 } when the
+ * store has no such order, and { status: 'error' } for everything else —
+ * a 429, a 500 or a timeout. The two used to be the same `null`, so a busy
+ * store told a worried buyer their order did not exist.
+ */
+async function fetchOrderStatus(num, lang = 'en') {
+  if (!FORGEMARKET_API_URL) return { status: 'error' };
   try {
-    const res = await fetch(`${FORGEMARKET_API_URL}/api/track/${encodeURIComponent(num)}`);
-    if (!res.ok) return null;
+    const res = await fetch(`${FORGEMARKET_API_URL}/api/track/${encodeURIComponent(num)}`, { signal: deadline() });
+    if (res.status === 404) return { status: 404 };
+    if (!res.ok) return { status: 'error', code: res.status };
     const v = orderStatusView(await res.json(), { money, lang });
-    return new EmbedBuilder().setColor(v.color)
+    return { embed: new EmbedBuilder().setColor(v.color)
       .setAuthor({ name: v.author, iconURL: BRAND_ICON })
       .setTitle(v.title).setDescription(v.description || null)
       .addFields(...v.fields)
-      .setFooter({ text: v.footer }).setTimestamp();
-  } catch { return null; }
+      .setFooter({ text: v.footer }).setTimestamp() };
+  } catch { return { status: 'error' }; }
+}
+async function orderStatusEmbed(num, lang = 'en') {
+  return (await fetchOrderStatus(num, lang)).embed || null;
 }
 
 async function lookupOrder(i) {
   await i.deferReply({ ephemeral: true });
-  const num = i.options.getString('number').trim();
+  // Order numbers are upper case on the store; "fm-2026-abcd" is the same order.
+  const num = i.options.getString('number').trim().toUpperCase();
   /* The answer to "where is my order" is only worth giving in a language the
      member reads. Discord's own locale is the default, so nobody HAS to set
      anything — and a language picked in #roles beats it, because a guess
      must lose to an answer. */
   const lang = memberLang(i.member, i.locale);
   if (!FORGEMARKET_API_URL) return i.editReply(say(ORDER_UI.notConfigured, lang));
-  const e = await orderStatusEmbed(num, lang);
-  if (!e) return i.editReply(say(ORDER_UI.notFound, lang).replace('%s', num));
+  const r = await fetchOrderStatus(num, lang);
+  if (r.status === 404) return i.editReply(say(ORDER_UI.notFound, lang).replace('%s', num));
+  if (!r.embed) return i.editReply(say(ORDER_UI.busy, lang));
+  const e = r.embed;
   // The track page is the live version of this embed and needs no account, so
   // the buyer never has to come back and re-run the command to refresh.
   const row = new ActionRowBuilder().addComponents(
@@ -2123,67 +2327,91 @@ async function lookupOrder(i) {
 
 // ── /vouch → posts to #vouches ────────────────────────────────────────────────
 const vouchLastAt = new Map(); // userId → ts of their last vouch (anti-spam)
+
+/**
+ * Does this Discord member have a completed order on a linked store account?
+ *
+ * Asked over the signed /balance endpoint the bot already uses (the uid is
+ * bound into the signature). Any failure answers "no": an unverifiable vouch
+ * is still posted, just labelled as a community vouch — never upgraded.
+ */
+async function hasCompletedOrder(uid) {
+  if (!FORGEMARKET_API_URL || !REVIEW_INGEST_SECRET) return false;
+  try {
+    const ts = String(Date.now());
+    const signature = createHmac('sha256', REVIEW_INGEST_SECRET).update(`${ts}.balance:${uid}`).digest('hex');
+    const res = await fetch(`${FORGEMARKET_API_URL.replace(/\/$/, '')}/api/discord/balance`, {
+      method: 'POST',
+      signal: deadline(),
+      headers: { 'content-type': 'application/json', 'x-timestamp': ts, 'x-signature': signature },
+      body: JSON.stringify({ uid }),
+    });
+    if (!res.ok) return false;
+    const d = await res.json();
+    return !!d?.linked && Number(d.completedOrders) > 0;
+  } catch { return false; }
+}
+
+/** The footer that marks a vouch as tied to a completed order. The spotlight reads it. */
+const VERIFIED_VOUCH = 'Verified purchase';
+const COMMUNITY_VOUCH = 'Community vouch';
+
 async function postVouch(i) {
-  // A vouch is mirrored onto the storefront, where the page promises reviews
-  // come from real customers. A brand-new unverified account must not be able
-  // to write there — that is how a review section stops meaning anything.
+  const lang = memberLang(i.member, i.locale);
   const verified = findRole(i.guild, 'Verified Customer');
   if (verified && !i.member?.roles?.cache?.has(verified.id) && !isStaff(i.member)) {
-    return i.reply({
-      content: `Verify first in ${chanRef(i.guild, 'verify')} before leaving a vouch 💚`,
-      ephemeral: true,
-    });
+    return i.reply({ content: t('vouchVerifyFirst', lang, { verify: chanRef(i.guild, 'verify') }), ephemeral: true });
   }
   const message = i.options.getString('message');
-  const stars = Math.min(5, Math.max(1, i.options.getInteger('stars') || 5));
+  /* Required in the command now. It defaulted to 5, which turned "I didn't
+     pick" into a five-star rating on a channel whose job is honesty. */
+  const stars = i.options.getInteger('stars');
+  if (!Number.isInteger(stars) || stars < 1 || stars > 5) {
+    return i.reply({ content: '⭐ Pick 1–5 stars.', ephemeral: true });
+  }
   // One vouch per user per hour — keeps #vouches and the site honest.
   const last = vouchLastAt.get(i.user.id) || 0;
-  if (Date.now() - last < 3_600_000) {
-    return i.reply({ content: 'You already vouched recently — thank you! You can vouch again in a bit. 💚', ephemeral: true });
-  }
+  if (Date.now() - last < 3_600_000) return i.reply({ content: t('vouchRecent', lang), ephemeral: true });
   vouchLastAt.set(i.user.id, Date.now());
-  const ch = findChannel(i.guild, 'vouches') || findChannel(i.guild, 'vouchers');
-  const e = new EmbedBuilder().setColor(0x22c55e)
-    .setAuthor({ name: i.user.username, iconURL: i.user.displayAvatarURL() })
-    .setDescription(`${'⭐'.repeat(stars)}\n\n${message}`)
-    .setFooter({ text: 'Community vouch' }).setTimestamp();
-  if (ch) await ch.send({ embeds: [e] }).catch(() => {});
-  // Mirror the vouch onto the website's reviews section. externalId is keyed to
-  // the USER (not the interaction), so the server-side dedup allows at most one
-  // site review per Discord member — repeat /vouch spam can never flood the
-  // storefront with fake ratings.
-  pushReviewToSite({
-    author: i.user.username,
-    avatarUrl: i.user.displayAvatarURL({ extension: 'png', size: 128 }),
-    stars, body: message, externalId: `vouch:${i.user.id}`,
-    // Ties this vouch to a ForgeMarket account, which is what earns the
-    // reviewer role on the site. Signed along with the rest of the payload.
-    discordUid: i.user.id,
-  });
-  // Someone who just wrote something nice is the only person who will ever
-  // bother writing it twice. Asking here — and only here — is why this line is
-  // in the vouch reply rather than pinned somewhere nobody reads.
-  /* Staff have to be told, or nothing happens.
-     A vouch arrives on the site as PENDING and waits for a person to publish
-     it. Nothing anywhere said one was waiting, so they accumulate in an admin
-     list nobody opens while the storefront keeps saying "no reviews yet" — on a
-     shop whose single biggest conversion problem is having none. */
-  leadLog(i.guild, `⭐ New vouch from <@${i.user.id}> (${stars}/5) — waiting to be published: `
-    + `${tagged(`${STORE_URL}/admin/social`, 'vouch')}`);
+  await i.deferReply({ ephemeral: true });
 
-  /* And tell the member what actually happened.
-     This said "posted in #vouchers AND on the website". It is posted in
-     #vouchers; on the website it is pending review. Somebody who just wrote
-     something nice and then went to look for it would have found nothing, which
-     is the worst possible thing to do to the one person willing to advocate. */
+  /* "Real customers only" was a claim the command never checked: /vouch was
+     open to anyone who had pressed Verify. Now a vouch is labelled for what
+     it is. Verified purchase = a completed order on the Discord-linked store
+     account, checked by the store; anything else is a community vouch, and
+     only verified ones are featured or sent to the website. */
+  const purchase = await hasCompletedOrder(i.user.id);
+  const ch = findChannel(i.guild, 'vouches') || findChannel(i.guild, 'vouchers');
+  const e = new EmbedBuilder().setColor(purchase ? 0x22c55e : 0x6366f1)
+    .setAuthor({ name: i.user.username, iconURL: i.user.displayAvatarURL() })
+    .setDescription(`${'⭐'.repeat(stars)}${'☆'.repeat(5 - stars)}\n\n${message}`)
+    .setFooter({ text: purchase ? `✅ ${VERIFIED_VOUCH}` : COMMUNITY_VOUCH }).setTimestamp();
+  if (ch) await ch.send({ embeds: [e], allowedMentions: NO_PINGS }).catch(() => {});
+
+  if (purchase) {
+    // externalId is keyed to the USER, so the site holds at most one review per member.
+    pushReviewToSite({
+      author: i.user.username,
+      avatarUrl: i.user.displayAvatarURL({ extension: 'png', size: 128 }),
+      stars, body: message, externalId: `vouch:${i.user.id}`,
+      // Ties this vouch to a ForgeMarket account; signed with the rest of the payload.
+      discordUid: i.user.id,
+    });
+    /* Staff have to be told: a vouch arrives on the site as PENDING and waits
+       for a person to publish it. */
+    leadLog(i.guild, `⭐ New verified-purchase vouch from <@${i.user.id}> (${stars}/5) — waiting to be published: `
+      + `${tagged(`${STORE_URL}/admin/social`, 'vouch')}`);
+  } else {
+    leadLog(i.guild, `💬 Community vouch from <@${i.user.id}> (${stars}/5) — not linked to a completed order, so not sent to the site.`);
+  }
+
   /* From the site unless this bot overrides it, so the owner sets the profile
      once on the website rather than again here. */
   const { write: tpWrite } = await trustpilotLinks();
-  return i.reply({
-    ephemeral: true,
-    content: 'Thanks for the vouch! 💚 It is up in #vouchers now, and it goes on the website '
-      + 'once a person has read it — reviews there only ever come from real people, so each one is checked.'
-      + (tpWrite ? `\n\n⭐ Would you put it on Trustpilot too? It helps more than you'd think: ${tpWrite}` : ''),
+  const where = ch ? `<#${ch.id}>` : '#vouches';
+  return i.editReply({
+    content: t(purchase ? 'vouchThanksVerified' : 'vouchThanksCommunity', lang, { ch: where })
+      + (purchase && tpWrite ? `\n\n${t('trustpilotAsk', lang, { url: tpWrite })}` : ''),
   });
 }
 
@@ -2369,7 +2597,7 @@ async function dropsCmd(i) {
   await i.deferReply();
   let drops = [];
   try {
-    const res = await fetch(`${FORGEMARKET_API_URL}/api/drops`);
+    const res = await fetch(`${FORGEMARKET_API_URL}/api/drops`, { signal: deadline() });
     if (res.ok) drops = (await res.json()).drops || [];
   } catch { /* offline */ }
   const e = new EmbedBuilder().setColor(0x7c5cff).setTitle('📅 Upcoming drops')
@@ -2453,6 +2681,7 @@ function trackJoinForRaid(guild) {
 
 // ── Boost thank-you + member milestones ──────────────────────────────────────
 client.on(Events.GuildMemberUpdate, (oldM, newM) => {
+  if (!ours(newM.guild)) return;
   if (!oldM.premiumSince && newM.premiumSince) {
     const ch = houseChannel(newM.guild) || findChannel(newM.guild, 'announcements');
     ch?.send({ embeds: [new EmbedBuilder().setColor(0xf47fff)
@@ -2477,9 +2706,12 @@ function celebrateMilestone(guild) {
 // ── Weekly XP leaderboard → #general every Monday evening ────────────────────
 const META_FILE = new URL('../bot-meta.json', import.meta.url);
 let META = {};
+/* The launch post must not fire before META says whether it already did. */
+let metaLoaded = false;
 async function loadMeta() {
   const stored = await stateGet('meta', META_FILE);
   if (stored && typeof stored === 'object') META = { ...stored, ...META };
+  metaLoaded = true;
 }
 const saveMeta = () => { stateSet('meta', META, META_FILE); };
 
@@ -2527,7 +2759,7 @@ async function flashSale(i) {
   const msg = await ch.send({
     content: dealRole ? `<@&${dealRole.id}>` : '',
     embeds: [e],
-    allowedMentions: dealRole ? { roles: [dealRole.id] } : { parse: [] },
+    allowedMentions: dealRole ? { parse: [], roles: [dealRole.id] } : { parse: [] },
   });
   // Grey out the post when the sale ends (best-effort; survives a restart only
   // visually via the timestamp, which is fine — the countdown itself is live).
@@ -2594,7 +2826,7 @@ async function checkSiteHealth(guild) {
  */
 async function sendGuildBackup(c) {
   if (!FORGEMARKET_API_URL || !REVIEW_INGEST_SECRET) return false;
-  const guild = c.guilds.cache.first();
+  const guild = homeGuild(c);
   if (!guild) return false;
   try {
     const snapshot = {
@@ -2619,12 +2851,14 @@ async function sendGuildBackup(c) {
     const signature = createHmac('sha256', REVIEW_INGEST_SECRET).update(`${ts}.${canonical}`).digest('hex');
     const res = await fetch(`${FORGEMARKET_API_URL.replace(/\/$/, '')}/api/discord/backup`, {
       method: 'POST',
+      signal: deadline(),
       headers: { 'content-type': 'application/json', 'x-timestamp': ts, 'x-signature': signature },
       body: JSON.stringify({ guildId: guild.id, takenAt, snapshot }),
     });
     if (!res.ok) throw new Error(`backup ${res.status}`);
     const out = await res.json();
-    log(`[backup] server shape stored: ${out?.counts?.channels ?? '?'} channels, ${out?.counts?.roles ?? '?'} roles`);
+    // `log` is an object (runtime.js); calling it threw, so every successful backup logged a failure.
+    log.info('server shape backed up', { channels: out?.counts?.channels ?? null, roles: out?.counts?.roles ?? null });
     return true;
   } catch (e) { console.error('[backup]', e.message); return false; }
 }
@@ -2637,6 +2871,7 @@ async function fetchDigest() {
     const signature = createHmac('sha256', REVIEW_INGEST_SECRET).update(`${ts}.digest`).digest('hex');
     const res = await fetch(`${FORGEMARKET_API_URL.replace(/\/$/, '')}/api/discord/digest`, {
       method: 'POST',
+      signal: deadline(),
       headers: { 'content-type': 'application/json', 'x-timestamp': ts, 'x-signature': signature },
       body: '{}',
     });
@@ -2701,6 +2936,7 @@ async function refCmd(i) {
       .update(`${ts}.referral:${i.user.id}`).digest('hex');
     const res = await fetch(`${FORGEMARKET_API_URL.replace(/\/$/, '')}/api/discord/referral`, {
       method: 'POST',
+      signal: deadline(),
       headers: { 'content-type': 'application/json', 'x-timestamp': ts, 'x-signature': signature },
       body: JSON.stringify({ uid: i.user.id }),
     });
@@ -2750,6 +2986,7 @@ async function balanceCmd(i) {
       .update(`${ts}.balance:${i.user.id}`).digest('hex');
     const res = await fetch(`${FORGEMARKET_API_URL.replace(/\/$/, '')}/api/discord/balance`, {
       method: 'POST',
+      signal: deadline(),
       headers: { 'content-type': 'application/json', 'x-timestamp': ts, 'x-signature': signature },
       body: JSON.stringify({ uid: i.user.id }),
     });
@@ -2778,14 +3015,9 @@ async function balanceCmd(i) {
         value: `**${d.next.coinsAway}** more for ${d.next.label}\n`
           + `≈ ${money(d.next.spendAwayCents)} of spending away`,
       }] : [{ name: '🎯 Next reward', value: 'Everything in the shop is unlocked 🎉' }]),
-      /* A boost you paid for and have not spent. It used to buy nothing at all
-         — no command, no record, and a draw that could not represent an extra
-         entry. Now it is a thing you are holding, so it is shown. */
-      ...((d.boosts || 0) > 0 ? [{
-        name: '🎟️ Giveaway boosts',
-        value: `${d.boosts} unused — ${d.boosts === 1 ? 'it adds' : 'they add'} an extra entry `
-          + 'to the next giveaway you join. Nothing to claim; it is automatic.',
-      }] : []))
+      /* Giveaway "boosts" are no longer shown: the draw gives every entrant
+         one equal chance, so a boost would be a promise the bot does not keep. */
+    )
     .setDescription(`Spend coins in the [Forge Shop](${STORE_URL}/account/forge-shop) — store credit applies automatically at checkout.`)
     .setFooter({ text: 'ForgeMarket · live from your account' }).setTimestamp()] });
 }
@@ -2840,15 +3072,18 @@ async function maybeVouchSpotlight(guild) {
     const msgs = await src.messages.fetch({ limit: 50 }).catch(() => null);
     if (!msgs) return;
     const week = Date.now() - 7 * 86_400_000;
+    /* Verified purchases only. The spotlight is the server holding a vouch up
+       as proof; an unverified one does not get that megaphone. */
     const candidates = [...msgs.values()].filter((m) =>
-      m.createdTimestamp > week && m.embeds[0]?.description?.includes('⭐'));
+      m.createdTimestamp > week && m.author?.id === client.user.id
+      && m.embeds[0]?.footer?.text?.includes(VERIFIED_VOUCH));
     if (!candidates.length) return;
     META.lastSpotlight = today;
     saveMeta();
     const pick = candidates[Math.floor(Math.random() * candidates.length)];
     const e = EmbedBuilder.from(pick.embeds[0]).setColor(0x22c55e)
-      .setFooter({ text: 'Vouch spotlight · leave yours with /vouch' });
-    await dst.send({ content: '💚 **Vouch of the day**', embeds: [e] });
+      .setFooter({ text: `Vouch spotlight · ${VERIFIED_VOUCH} · leave yours with /vouch` });
+    await dst.send({ content: '💚 **Vouch of the day**', embeds: [e], allowedMentions: NO_PINGS });
   } catch (e) { console.error('[spotlight]', e.message); }
 }
 
@@ -2857,7 +3092,7 @@ const ORDER_RE = /\bFM-\d{4}-[A-Z0-9]{4,}\b/i;
 const orderLookupCooldown = new Map(); // channelId -> ts
 client.on(Events.MessageCreate, async (m) => {
   try {
-    if (m.author.bot || !m.guild || !FORGEMARKET_API_URL) return;
+    if (m.author.bot || !ours(m.guild) || !FORGEMARKET_API_URL) return;
     const match = m.content.match(ORDER_RE);
     if (!match) return;
     const now = Date.now();
@@ -2876,11 +3111,22 @@ client.on(Events.MessageCreate, async (m) => {
     // In a public channel we must NOT post it: the number may not be theirs, and
     // the status carries the order total. Point them at the private command
     // instead — most people paste a number because they don't know it exists.
-    await m.reply({
-      content: `Looking for that order? Run \`/order ${match[0].toUpperCase()}\` — the answer is only visible to you. ` +
-        'Heads up: an order number is personal, better not to post it in public. \u{1F512}',
-      allowedMentions: { repliedUser: true },
-    }).catch(() => {});
+    /* And take the number back down. It is the lookup key for /track, so
+       leaving it in a public channel lets anyone watch that order. The reply
+       goes to the channel (not as a reply-to), because the original is about
+       to disappear; it cleans itself up too. */
+    const canDelete = m.channel.permissionsFor?.(m.guild.members.me)?.has(PermissionFlagsBits.ManageMessages);
+    const note = await m.channel.send({
+      content: `<@${m.author.id}> looking for that order? Run \`/order\` with your number — the answer is only visible to you. ` +
+        (canDelete
+          ? 'I removed your message: an order number is personal, better not to post it in public. \u{1F512}'
+          : 'Heads up: an order number is personal, better not to post it in public. \u{1F512}'),
+      allowedMentions: { parse: [], users: [m.author.id] },
+    }).catch(() => null);
+    if (canDelete) {
+      await m.delete().catch(() => {});
+      setTimeout(() => note?.delete().catch(() => {}), 60_000);
+    }
   } catch { /* best-effort */ }
 });
 
@@ -2893,20 +3139,43 @@ client.on(Events.MessageCreate, async (m) => {
  * buyer's status page is already polling, so the button appears for them without
  * a refresh.
  */
+/* Its own secret. The relay secret is used by a dozen low-stakes endpoints and
+   sits in two hosting dashboards; the one that decides where a customer sends
+   money should not be the same key. Unset = the command is off. */
+const PAYLINK_SECRET = String(process.env.DISCORD_PAYLINK_SECRET || '').trim();
+const PAYLINK_HOSTS = String(process.env.PAYLINK_HOSTS || '')
+  .split(',').map((h) => h.trim().toLowerCase().replace(/^www\./, '')).filter(Boolean);
+
+/** https only, and (when PAYLINK_HOSTS is set) a listed host. The API re-checks its own allow-list. */
+function payLinkProblem(raw) {
+  let u;
+  try { u = new URL(raw); } catch { return 'That is not a valid link — it should start with https://'; }
+  if (u.protocol !== 'https:') return 'Payment links must start with https://';
+  if (u.username || u.password) return 'Remove the username/password part from the link.';
+  const host = u.hostname.toLowerCase().replace(/^www\./, '');
+  if (PAYLINK_HOSTS.length && !PAYLINK_HOSTS.some((h) => host === h || host.endsWith(`.${h}`))) {
+    return `\`${host}\` is not in PAYLINK_HOSTS (${PAYLINK_HOSTS.join(', ')}).`;
+  }
+  return null;
+}
+
 async function payLinkCmd(i) {
   if (!isOwnerLevel(i.member)) return i.reply(OWNER_ONLY);
   await i.deferReply({ ephemeral: true });
-  if (!FORGEMARKET_API_URL || !REVIEW_INGEST_SECRET) {
-    return i.editReply('Payment links aren’t configured — the store link or the shared secret is missing.');
+  if (!FORGEMARKET_API_URL || !PAYLINK_SECRET) {
+    return i.editReply('Payment links are disabled — set DISCORD_PAYLINK_SECRET on the bot and the API.');
   }
   const number = i.options.getString('order').trim().toUpperCase();
   const url = i.options.getString('link').trim();
+  const problem = payLinkProblem(url);
+  if (problem) return i.editReply(`⚠️ ${problem}`);
   try {
     const ts = String(Date.now());
-    const signature = createHmac('sha256', REVIEW_INGEST_SECRET)
+    const signature = createHmac('sha256', PAYLINK_SECRET)
       .update(`${ts}.paylink:${number}:${url}`).digest('hex');
     const res = await fetch(`${FORGEMARKET_API_URL.replace(/\/$/, '')}/api/discord/pay-link`, {
       method: 'POST',
+      signal: deadline(),
       headers: { 'content-type': 'application/json', 'x-timestamp': ts, 'x-signature': signature },
       body: JSON.stringify({ number, url }),
     });
@@ -2927,14 +3196,27 @@ async function postCoupon(i) {
   const code = i.options.getString('code').toUpperCase();
   const percent = Math.min(90, Math.max(1, i.options.getInteger('percent') || 10));
   const note = i.options.getString('note') || 'Redeem at checkout on the website.';
+  /* The footer said "limited time" on every code whatever its real expiry —
+     urgency the code did not have. Now an end date is shown only when the
+     owner gives one, as a Discord timestamp; otherwise nothing is said. */
+  const rawExpiry = (i.options.getString('expires') || '').trim();
+  const expiresAt = rawExpiry ? Date.parse(/^\d{4}-\d{2}-\d{2}$/.test(rawExpiry) ? `${rawExpiry}T23:59:59Z` : rawExpiry) : NaN;
+  if (rawExpiry && !Number.isFinite(expiresAt)) {
+    return i.reply({ content: 'I couldn’t read that end date — use YYYY-MM-DD, e.g. 2026-11-01.', ephemeral: true });
+  }
   const ch = findChannel(i.guild, 'discount-codes') || i.channel;
   const e = new EmbedBuilder().setColor(0xec4899).setTitle('🏷️ New discount code!')
     .setImage(BANNER('deals'))
     .setDescription(`Use code **\`${code}\`** for **${percent}% OFF** your order.\n\n${note}`)
-    .addFields({ name: 'Code', value: `\`${code}\``, inline: true }, { name: 'Discount', value: `${percent}%`, inline: true })
-    .setFooter({ text: 'ForgeMarket • limited time' }).setTimestamp();
+    .addFields({ name: 'Code', value: `\`${code}\``, inline: true }, { name: 'Discount', value: `${percent}%`, inline: true },
+      ...(Number.isFinite(expiresAt)
+        ? [{ name: 'Valid until', value: `<t:${Math.floor(expiresAt / 1000)}:D>`, inline: true }] : []))
+    .setFooter({ text: 'ForgeMarket' }).setTimestamp();
   const dealRole = i.guild.roles.cache.find((r) => r.name === 'Deals');
-  await ch.send({ content: dealRole ? `<@&${dealRole.id}>` : '', embeds: [e] }).catch(() => {});
+  await ch.send({
+    content: dealRole ? `<@&${dealRole.id}>` : '', embeds: [e],
+    allowedMentions: { parse: [], roles: dealRole ? [dealRole.id] : [] },
+  }).catch(() => {});
   return i.reply({ content: `Posted code **${code}** in <#${ch.id}>. (Add it to the site's COUPONS env to make it work at checkout.)`, ephemeral: true });
 }
 
@@ -3029,18 +3311,26 @@ async function startGiveaway(i) {
   // Clamp to 1 min – 14 days: a huge value overflows Node's 32-bit timer (the
   // giveaway would "end" after 1ms), a negative one ends it instantly.
   const minutes = Math.min(20160, Math.max(1, i.options.getInteger('minutes') || 10));
-  const winnersCount = Math.max(1, i.options.getInteger('winners') || 1);
+  const winnersCount = Math.min(20, Math.max(1, i.options.getInteger('winners') || 1));
   await i.reply({ content: `Starting a giveaway for **${prize}** (${minutes} min, ${winnersCount} winner${winnersCount > 1 ? 's' : ''})…`, ephemeral: true });
   const endsAt = Date.now() + minutes * 60_000;
   const ch = findChannel(i.guild, 'giveaways') || i.channel;
   const gwRole = i.guild.roles.cache.find((r) => r.name === 'Giveaways');
+  /* Every giveaway links the same published terms, and says the two rules a
+     member most needs before pressing Enter: it is free, and one entry each. */
   const e = new EmbedBuilder().setColor(0xa855f7).setTitle('🎉 GIVEAWAY')
     .setThumbnail(BRAND_ICON)
     .setImage(BANNER('giveaways'))
-    .setDescription(`**Prize:** ${prize}\n**Winners:** ${winnersCount}\n**Ends:** <t:${Math.floor(endsAt / 1000)}:R>\n\nTap **Enter** below to join!\nHosted by <@${i.user.id}>`)
+    .setDescription(`**Prize:** ${prize}\n**Winners:** ${winnersCount}\n**Ends:** <t:${Math.floor(endsAt / 1000)}:R>\n\n`
+      + 'Tap **Enter** below to join — free, one entry per person, everyone the same chance. '
+      + 'Discord account must be at least 7 days old.\n'
+      + `📜 Terms: ${chanRef(i.guild, 'giveaway-terms')}\nHosted by <@${i.user.id}>`)
     .addFields({ name: 'Entries', value: '🎟️ 0', inline: true })
-    .setFooter({ text: 'ForgeMarket giveaway · verified members only' });
-  const msg = await ch.send({ content: gwRole ? `<@&${gwRole.id}>` : '', embeds: [e] });
+    .setFooter({ text: 'ForgeMarket giveaway · organiser: ForgeMarket · no purchase necessary' });
+  const msg = await ch.send({
+    content: gwRole ? `<@&${gwRole.id}>` : '', embeds: [e],
+    allowedMentions: { parse: [], roles: gwRole ? [gwRole.id] : [] },
+  });
   const btn = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId(`gw:enter:${msg.id}`).setLabel('Enter').setEmoji('🎉').setStyle(ButtonStyle.Success));
   await msg.edit({ components: [btn] });
@@ -3050,37 +3340,21 @@ async function startGiveaway(i) {
 }
 
 /**
- * Bonus entries somebody paid coins for.
- *
- * The Forge Shop sells "+1 bonus entry in this week's giveaway" for 8 coins,
- * and this draw kept its entrants in a Set — one per person, by construction —
- * so the extra entry was not representable at all. Not by the bot, and not by
- * a staff member trying to honour it by hand. The coins bought nothing.
- *
- * Asked for at draw time rather than at entry time, so a boost bought after
- * entering still counts, and consumed against THIS giveaway's id so one
- * purchase is one extra entry in one draw. Failure is not fatal: a draw that
- * cannot reach the store runs unweighted and says so in the log rather than
- * not happening.
+ * Write the draw down where staff can check it: how many entered, and a
+ * SHA-256 of the sorted entrant ids. Anyone holding the list can recompute the
+ * fingerprint and see that the draw used exactly that list.
  */
-async function claimBoosts(entrantIds, giveawayId) {
-  if (!FORGEMARKET_API_URL || !REVIEW_INGEST_SECRET || !entrantIds.length) return {};
-  try {
-    const ts = String(Date.now());
-    const uids = [...entrantIds].sort();
-    const signature = createHmac('sha256', REVIEW_INGEST_SECRET)
-      .update(`${ts}.boosts:${giveawayId}:${uids.join(',')}`).digest('hex');
-    const res = await fetch(`${FORGEMARKET_API_URL.replace(/\/$/, '')}/api/discord/boosts/claim`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-timestamp': ts, 'x-signature': signature },
-      body: JSON.stringify({ giveawayId, uids: entrantIds }),
-    });
-    if (!res.ok) return {};
-    return (await res.json())?.boosts || {};
-  } catch (e) {
-    console.error('[giveaway] boosts unavailable, drawing unweighted:', e.message);
-    return {};
-  }
+function logDraw(guild, { id, prize, entrants, winners, kind = 'draw' }) {
+  const ch = findChannel(guild, 'mod-log') || findChannel(guild, 'leads');
+  ch?.send({ allowedMentions: NO_PINGS, embeds: [new EmbedBuilder().setColor(0xa855f7)
+    .setTitle(kind === 'reroll' ? '🔁 Giveaway reroll' : '🎲 Giveaway draw')
+    .addFields(
+      { name: 'Prize', value: String(prize).slice(0, 200), inline: true },
+      { name: 'Giveaway', value: `\`${id}\``, inline: true },
+      { name: 'Entrants', value: String(entrants.length), inline: true },
+      { name: 'Winners', value: winners.map((w) => `<@${w}>`).join(', ') || '—' },
+      { name: 'SHA-256 of sorted entrant ids', value: `\`${entrantsFingerprint(entrants)}\`` })
+    .setTimestamp()] }).catch(() => {});
 }
 
 async function endGiveaway(guild, id, msg) {
@@ -3090,36 +3364,20 @@ async function endGiveaway(guild, id, msg) {
   saveGiveaways();
   const ids = [...gw.entries];
 
-  /* One ticket each, plus one per boost. The Set stays the record of WHO
-     entered; the pool is what the draw reaches into. */
-  const boosts = await claimBoosts(ids, id);
-  const pool = [];
-  for (const uid of ids) {
-    pool.push(uid);
-    for (let n = 0; n < (boosts[uid] || 0); n++) pool.push(uid);
-  }
-  const boosted = Object.keys(boosts).length;
+  /* One equal chance each. The draw used to add tickets for Forge-Shop
+     "boosts" bought with coins earned by spending — a paid advantage in a
+     game of chance, which the terms (and Dutch rules on promotional games)
+     do not allow. The entrant list IS the pool. */
+  const picks = drawWinners(ids, gw.winnersCount || 1);
+  endedStore()[id] = {
+    prize: gw.prize, entries: ids, winners: picks, channelId: gw.channelId, endedAt: Date.now(),
+  };
+  saveMeta();
+  logDraw(guild, { id, prize: gw.prize, entrants: ids, winners: picks });
 
-  /* Drawn without replacement per PERSON, not per ticket: a second ticket
-     belonging to somebody already picked must not win them a second prize. */
-  const picks = [];
-  const remaining = [...pool];
-  while (picks.length < (gw.winnersCount || 1) && remaining.length) {
-    const taken = remaining.splice(Math.floor(Math.random() * remaining.length), 1)[0];
-    picks.push(taken);
-    for (let k = remaining.length - 1; k >= 0; k--) if (remaining[k] === taken) remaining.splice(k, 1);
-  }
-  ENDED.set(id, { prize: gw.prize, entries: ids, channelId: gw.channelId });
-  setTimeout(() => ENDED.delete(id), 3_600_000); // keep 1h for /reroll
-  /* The entry count says what the draw actually reached into. Printing the
-     number of PEOPLE while drawing from a weighted pool would quietly misreport
-     everybody's odds. */
-  const tally = boosted
-    ? `${pool.length} entries from ${ids.length} member${ids.length === 1 ? '' : 's'} `
-      + `· ${boosted} bonus ${boosted === 1 ? 'entry' : 'entries'} from the Forge Shop`
-    : `${ids.length} entries`;
+  const tally = `${ids.length} ${ids.length === 1 ? 'entry' : 'entries'}`;
   const text = picks.length
-    ? `🏆 The **${gw.prize}** giveaway ${picks.length > 1 ? 'winners are' : 'winner is'} ${picks.map((w) => `<@${w}>`).join(', ')}! Congrats 🎉 (${tally})\nOpen a ticket in #open-a-ticket to claim.`
+    ? `🏆 The **${gw.prize}** giveaway ${picks.length > 1 ? 'winners are' : 'winner is'} ${picks.map((w) => `<@${w}>`).join(', ')}! Congrats 🎉 (${tally})\nWe'll contact you by DM or ticket within 7 days — or open a ticket in #open-a-ticket to claim.`
     : `The **${gw.prize}** giveaway ended with no entries 😢`;
   const winners = findChannel(guild, 'winners');
   if (winners) winners.send(text).catch(() => {});
@@ -3134,12 +3392,36 @@ async function endGiveaway(guild, id, msg) {
   await msg?.edit?.({ components: [] }).catch(() => {});
 }
 
+/** Archive ended giveaways after 30 days, so META does not grow forever. */
+function pruneEndedGiveaways() {
+  const store = endedStore();
+  let changed = false;
+  for (const [id, g] of Object.entries(store)) {
+    if (Date.now() - (g.endedAt || 0) > ENDED_KEEP_MS) { delete store[id]; changed = true; }
+  }
+  if (changed) saveMeta();
+}
+
+/**
+ * Draw a replacement winner.
+ *
+ * It used to pick from everyone — including the person who had already won —
+ * and only for an hour after the draw, which is shorter than the seven days a
+ * winner has to answer. Now it skips every previous winner of that giveaway
+ * and works until the giveaway is archived.
+ */
 async function rerollGiveaway(i) {
   if (!isStaff(i.member)) return i.reply({ content: 'Only staff can reroll giveaways.', ephemeral: true });
   const id = i.options.getString('message_id').trim();
-  const g = ENDED.get(id);
-  if (!g || !g.entries.length) return i.reply({ content: 'No recent giveaway with entries found for that message id (rerolls expire after 1 hour).', ephemeral: true });
-  const w = g.entries[Math.floor(Math.random() * g.entries.length)];
+  const g = endedStore()[id];
+  if (!g || !g.entries?.length) {
+    return i.reply({ content: 'No ended giveaway with entries found for that message id (kept for 30 days).', ephemeral: true });
+  }
+  const [w] = drawWinners(g.entries, 1, { exclude: g.winners || [] });
+  if (!w) return i.reply({ content: 'Every entrant has already won this one — nobody left to draw.', ephemeral: true });
+  g.winners = [...(g.winners || []), w];
+  saveMeta();
+  logDraw(i.guild, { id, prize: g.prize, entrants: g.entries, winners: [w], kind: 'reroll' });
   const winners = findChannel(i.guild, 'winners') || i.channel;
   winners.send(`🔁 **Reroll!** The new **${g.prize}** winner is <@${w}>! Congrats 🎉`).catch(() => {});
   return i.reply({ content: `Rerolled — new winner <@${w}>.`, ephemeral: true });
@@ -3154,8 +3436,11 @@ process.on('unhandledRejection', (err) => {
   console.error('[unhandledRejection]', err?.stack || err?.message || err);
 });
 process.on('uncaughtException', (err) => {
-  console.error('[uncaughtException]', err?.stack || err?.message || err);
-  // Stay alive — a single bad event must not knock the whole bot offline.
+  /* Node's own guidance: after an uncaught exception the process state is
+     undefined. Flush what we can and exit 1, so the platform's restart policy
+     brings back a clean process instead of a half-broken one. */
+  log.error('uncaught exception — exiting', { err: err?.stack || err?.message || String(err) });
+  shutdown('uncaughtException', 1);
 });
 
 /**
@@ -3174,7 +3459,7 @@ let goingDown = false;
    and reaching it — a SIGTERM in that window would have thrown instead of
    flushing. */
 let healthServer = null;
-async function shutdown(signal) {
+async function shutdown(signal, exitCode = 0) {
   if (goingDown) return;
   goingDown = true;
   log.info('shutdown signal received', { signal });
@@ -3182,15 +3467,21 @@ async function shutdown(signal) {
   clearTimeout(gwSaveTimer);
   const giveaways = [...GIVEAWAYS.entries()]
     .map(([id, g]) => ({ ...g, msgId: id, entries: [...g.entries] }));
-  await Promise.allSettled([
-    stateSet('xp', XP, XP_FILE),
-    stateSet('giveaways', giveaways, GW_FILE),
-    stateSet('meta', META, META_FILE),
+  /* Capped at five seconds: a store that does not answer must not hold the
+     container past the platform's own kill timeout, which would lose the
+     local file writes too. Each request also carries its own deadline. */
+  await Promise.race([
+    Promise.allSettled([
+      stateSet('xp', XP, XP_FILE),
+      stateSet('giveaways', giveaways, GW_FILE),
+      stateSet('meta', META, META_FILE),
+    ]),
+    new Promise((r) => setTimeout(r, 5000)),
   ]);
   await client.destroy().catch(() => {});
   await new Promise((r) => (healthServer ? healthServer.close(r) : r()));
-  log.info('state flushed, shutting down', { signal });
-  process.exit(0);
+  log.info('state flushed, shutting down', { signal, exitCode });
+  process.exit(exitCode);
 }
 for (const sig of ['SIGTERM', 'SIGINT']) process.on(sig, () => { shutdown(sig); });
 
@@ -3217,7 +3508,8 @@ client.on(Events.ShardDisconnect, (event, id) => {
   log.warn('gateway disconnected', { shard: id, code, terminal });
   if (terminal) {
     log.error('gateway closed permanently — exiting so the platform restarts us', { code });
-    shutdown(`gateway ${code}`);
+    // Non-zero, or a supervisor configured to restart only on failure leaves us down.
+    shutdown(`gateway ${code}`, 1);
   }
 });
 
@@ -3236,3 +3528,8 @@ healthServer = startHealthServer(client);
 
 log.info('connecting to Discord…');
 loginWithRetry(client, DISCORD_TOKEN);
+
+/* The last line of defence: a gateway that has been gone for five minutes
+   is a dead bot, whatever discord.js thinks. Exit 1 and let the host restart
+   us — Railway only uses the health check at deploy time. */
+startWatchdog(client, { onDead: () => shutdown('watchdog: gateway down > 5 min', 1) });

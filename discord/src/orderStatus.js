@@ -158,6 +158,15 @@ export const ORDER_UI = {
     de: 'Keine Bestellung zu `%s` gefunden. Bestellnummern sehen aus wie `FM-2026-XXXXXXXX` — schau in die Bestätigungsmail oder öffne ein Ticket in #open-a-ticket, dann sehen wir für dich nach.',
     fr: 'Aucune commande trouvée pour `%s`. Les numéros de commande ressemblent à `FM-2026-XXXXXXXX` — vérifie l’e-mail de confirmation, ou ouvre un ticket dans #open-a-ticket et nous chercherons pour toi.',
   },
+  /* Not "not found": the store answered with something other than 404 (busy,
+     rate-limited, down). Telling a buyer their order does not exist because
+     the API was slow is the most alarming wrong answer available. */
+  busy: {
+    en: 'The store is busy right now — try again in a minute. Your order is not affected.',
+    nl: 'De winkel is even druk — probeer het over een minuutje opnieuw. Je bestelling verandert hier niet door.',
+    de: 'Der Shop ist gerade ausgelastet — versuch es in einer Minute noch mal. Deine Bestellung ist davon nicht betroffen.',
+    fr: 'La boutique est occupée — réessaie dans une minute. Ta commande n’est pas concernée.',
+  },
   notConfigured: {
     en: 'Order lookup isn’t configured yet.', nl: 'Bestellingen opzoeken is nog niet ingesteld.',
     de: 'Die Bestellsuche ist noch nicht eingerichtet.', fr: 'La recherche de commande n’est pas encore configurée.',
