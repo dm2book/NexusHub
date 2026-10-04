@@ -403,6 +403,31 @@ console.log('\n— End to end —');
   ok('new market products get their candidates in one go', bulk.classified >= 1 && !!(await get(`SELECT 1 FROM market_candidates WHERE market_product_id='mkp_bulk1'`)));
   ok('…and a second call finds nothing new', (await classifyNew()).classified === 0);
 
+  /* Add everything in review at once, priced from the shop's own prices. */
+  const peer = (name, price, meta = {}) => ({ product: { name, price, active: 1, metadata: meta }, model: parseTitle(name) });
+  const id = (x) => x;
+  ok('points: the nearest own pack\'s price per unit, times this pack', G.estimateFromCatalogue(parseTitle('475 VP — Valorant'),
+    [peer('1,000 VP — Valorant', 1000), peer('5,350 VP — Valorant', 4999)], { roundUp: id })?.priceCents === 475);
+  ok('gift cards: the own cards\' price-to-value, times this face value', G.estimateFromCatalogue(parseTitle('Steam Wallet €20'),
+    [peer('Steam Wallet €10', 1199), peer('Steam Wallet €25', 2799), peer('Steam Wallet €50', 5599)], { roundUp: id })?.priceCents === 2240);
+  ok('no own product of that game: no estimate, never another game\'s price', G.estimateFromCatalogue(parseTitle('475 VP — Valorant'), [peer('1,000 Robux', 999)]) === null);
+  ok('an estimated price is never the basis for the next estimate', G.estimateFromCatalogue(parseTitle('475 VP — Valorant'),
+    [peer('1,000 VP — Valorant', 1000, { pricing: { estimated: true } })]) === null);
+  await run(`UPDATE market_mentions SET seen_at=@at WHERE source_key='research'`, { at: R.RESEARCHED_AT.replace('2026-10-04', new Date().toISOString().slice(0, 10)) });
+  await P.evaluateCandidates({ limit: 1000, supplierSources: [], imageFetch });
+  const reviewBefore = (await get(`SELECT COUNT(*)::int AS n FROM market_candidates WHERE gate_status='REVIEW_REQUIRED' AND forge_product_id IS NULL AND status <> 'rejected'`)).n;
+  let bulkAdd = { remaining: 1 }, live = 0, rounds = 0; const bulkErrors = [];
+  while (bulkAdd.remaining && rounds < 50) { bulkAdd = await P.addAllReview({ actor: 'owner@test', deadline: Date.now() + 2_000 }); live += bulkAdd.live; bulkErrors.push(...bulkAdd.errors); rounds++; }
+  if (bulkErrors.length) console.log('bulk errors', bulkErrors); // eslint-disable-line no-await-in-loop
+  ok('"add all" takes every review product, in steps, until none are left', reviewBefore > 10 && bulkAdd.remaining === 0, JSON.stringify({ reviewBefore, bulkAdd, rounds }));
+  const est = await get(`SELECT p.* FROM products p WHERE p.metadata LIKE '%"estimated":true%' AND p.active = 1 ORDER BY p.created_at LIMIT 1`);
+  const estMeta = JSON.parse(est?.metadata || '{}');
+  ok('…live, priced from the shop\'s own prices, marked "estimated, cost unknown"', live > 0 && !!est && Number(est.price) > 0
+    && estMeta.pricing?.costUnknown === true && /prijs/.test(estMeta.pricing?.basis || ''), JSON.stringify({ live, name: est?.name, price: est?.price, pricing: estMeta.pricing }));
+  ok('…on the shop\'s own price endings', [49, 99].includes(Number(est.price) % 100));
+  const list2 = await P.discoveryList();
+  ok('nothing in review is left behind', list2.counts.REVIEW_REQUIRED === 0, JSON.stringify(list2.items.filter((i) => i.gate === 'REVIEW_REQUIRED' && !i.productId && i.status !== 'rejected').map((i) => [i.title, i.status, i.productId])));
+
   /* The complete scan: as long as it takes, in steps that each fit a server function. */
   await obs('Roblox 1200 Robux Global');
   const start = await P.startFullScan({ actor: 'owner@test' });
@@ -435,6 +460,7 @@ console.log('\n— End to end —');
   ok('the admin page runs the complete scan step by step', /full\/step/.test(page) && page.includes('Volledige scan'));
   ok('…says plainly when no automatic source could be asked', page.includes('no-sources') && /niet dat er niets ontbreekt/.test(page));
   ok('…and takes official packs with their source page', page.includes('/api/admin/discovery/reference') && page.includes('Officiële pakketten invoeren'));
+  ok('…and adds everything in review at once, showing the estimated price', page.includes('/api/admin/discovery/add-review') && page.includes('estimatedPrice'));
   ok('the admin screen has the actions from the brief', ['Approve & add', 'Reject', 'Edit', 'Add all safe', 'Re-scan category', 'Re-scan product'].every((t) => page.includes(t)));
 }
 
