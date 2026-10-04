@@ -12,6 +12,7 @@
 import { run, get, all, nowIso, tx } from '../db/index.js';
 import { waitUntil } from '@vercel/functions';
 
+const MIN_CHARGE_CENTS = 50;
 const ROBLOX_USERNAME = /^(?=.{3,20}$)[A-Za-z0-9]+(?:_[A-Za-z0-9]+)?$/;
 
 /* Keep the function alive for work that outlives the response (a no-op off Vercel). */
@@ -231,6 +232,16 @@ export async function createOrder(input, ctx = {}) {
   if (input.userId && input.useCredit) {
     const bal = await balanceOf(input.userId);
     creditApplied = Math.max(0, Math.min(Math.round(Number(input.useCredit) || 0), bal, afterDiscount));
+  }
+  /* Card payments have a floor: Stripe refuses a charge under €0.50, and it
+     would refuse it only after the store credit was already spent. Say it now,
+     before anything is written. */
+  if (afterDiscount - creditApplied > 0 && afterDiscount - creditApplied < MIN_CHARGE_CENTS) {
+    /* With credit: use a little less of it, so €0.50 is left to pay and the
+       rest of the credit stays in the wallet. Without: the order itself is
+       too small to charge. */
+    if (afterDiscount >= MIN_CHARGE_CENTS) creditApplied = afterDiscount - MIN_CHARGE_CENTS;
+    else throw badRequest('Het minimale bedrag om af te rekenen is €0,50.');
   }
   const total = Math.max(0, afterDiscount - creditApplied);
   /* Only what the buyer may tell us. Every money field on `billing` (credit,

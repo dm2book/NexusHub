@@ -140,11 +140,13 @@ console.log('— Matching reality —');
 {
   const t = nl('terms'), p = nl('privacy'), r = nl('refunds');
 
-  ok('the terms name the payment provider', /Mollie/.test(t));
+  /* The shop sells through Stripe (the owner's choice), not Mollie. */
+  ok('the terms name the payment provider', /Stripe/.test(t) && !/Mollie/.test(t));
+  /* Exactly the pinned Stripe methods (STRIPE_PAYMENT_METHODS) — no PayPal or Apple Pay promised. */
   ok('…and the methods actually offered',
-    ['iDEAL', 'Bancontact', 'Apple Pay', 'creditcard', 'PayPal'].every((m) => t.includes(m)));
+    ['iDEAL', 'Bancontact', 'betaalkaart'].every((m) => t.includes(m)) && !/PayPal|Apple Pay/.test(t));
   ok('the terms say payment confirms automatically', /automatisch bevestigd/.test(t));
-  ok('the privacy policy lists Mollie as a processor', /Mollie/.test(p));
+  ok('the privacy policy lists Stripe as a processor', /Stripe/.test(p));
   ok('…and says card details never reach us', /geen betaalgegevens/i.test(p));
 
   // The stale claims the previous versions carried.
@@ -193,12 +195,13 @@ console.log('— Cookies —');
   // The legal basis for having no banner. Claiming "we don't need consent"
   // without the reason is the kind of thing that reads as an excuse.
   ok('the cookie policy cites the Telecommunicatiewet', /11\.7a/.test(c));
-  ok('…and explains why there is no banner', /geen cookiebanner/.test(c));
+  /* There IS a consent bar (own statistics, ad measurement), and the policy says so. */
+  ok('…and says what consent is asked for, and that refusing changes nothing', /toestemming/.test(c) && /werkt de winkel precies hetzelfde/.test(c));
   ok('the one cookie is documented by name and retention',
     /fm_session/.test(c) && /30 dagen/.test(c));
   ok('localStorage is distinguished from cookies',
     /geen cookies/.test(c) && /winkelwagen/.test(c));
-  ok('third-party payment cookies are disclosed', /Mollie/.test(c));
+  ok('third-party payment cookies are disclosed', /Stripe/.test(c));
   ok('it says how to delete them', /instellingen van je browser/.test(c));
   ok('the English version cites the same law', /11\.7a/.test(en('cookies')));
 }

@@ -52,7 +52,7 @@ console.log('\n— Fifty scripts —');
   const per = Object.keys(THEMES).map((t) => UGC_SCRIPTS.filter((s) => s.theme === t).length);
   ok('ten themes of five', per.length === 10 && per.every((n) => n === 5), per.join(','));
   ok('every script has the four beats', UGC_SCRIPTS.every((s) => BEATS.every((b) => typeof s[b] === 'function')));
-  ok('the beats fill the brief: 2 + 3 + 5 + 4 = 14 s', BEAT_DUR.hook === 2 && BEAT_DUR.problem === 3 && BEAT_DUR.solution === 5 && BEAT_DUR.cta === 4);
+  ok('the beats fill the brief: 2 + 3 + 5 + 3.5 = 13.5 s, room for the voice inside 15', BEAT_DUR.hook === 2 && BEAT_DUR.problem === 3 && BEAT_DUR.solution === 5 && BEAT_DUR.cta === 3.5);
   const src = read('server/src/services/ugcScripts.js');
   ok('no price is written in a script — every one comes from the catalogue', !/€\s?\d/.test(src.replace(/\/\*[\s\S]*?\*\//g, '')));
   ok('…and no pack size either', !/\$\.n\(\d/.test(src));
@@ -176,7 +176,7 @@ const H = { authorization: `Bearer ${accessToken}`, 'content-type': 'application
   const r = await fetch(`${base}/ugc/storyboard`, { method: 'POST', headers: H, body: JSON.stringify({ scriptId: 'ugc-01', platform: 'reels' }) });
   const b = await r.json();
   ok('a storyboard: four beats in order', r.status === 200 && b.scenes.map((s) => s.type).join() === 'ugc-hook,ugc-problem,ugc-solution,ugc-cta', JSON.stringify(b).slice(0, 300));
-  ok('…14 seconds of minimum, a tight tail after each line', b.scenes.reduce((a, s) => a + s.minDur, 0) === 14 && b.scenes.every((s) => s.tail === 0.15));
+  ok('…13.5 seconds of minimum, a tight tail after each line', b.scenes.reduce((a, s) => a + s.minDur, 0) === 13.5 && b.scenes.every((s) => s.tail === 0.15));
   ok('…the picture under each line: fake login, then the checkout field', b.scenes[1].data.prop.kind === 'scam' && b.scenes[2].data.prop.kind === 'username');
   ok('…the end card is the product with its real price', b.scenes[3].data.product.price === '€9,99' && b.scenes[3].data.product.name === '1.000 Robux');
   ok('…a tracking link per script and platform', /utm_source=instagram&utm_campaign=ugc&utm_content=ugc-01$/.test(b.link), b.link);
@@ -200,6 +200,8 @@ const H = { authorization: `Bearer ${accessToken}`, 'content-type': 'application
   console.log('\n— The engine —');
   const tl = engine.layout(b, { '1-hook': 2.6, '2-problem': 1.0 });
   ok('a beat lasts as long as its line plus a short tail, or its window', Math.abs(tl.scenes[0].dur - (engine.VOICE_AT + 2.6 + 0.15)) < 1e-9 && tl.scenes[1].dur === 3);
+  const fast = engine.layout({ ...b, scenes: b.scenes.map((s) => ({ ...s, voiceRate: 1.1 })) }, { '1-hook': 2.2 });
+  ok('a faster voice (free voice in a UGC ad) takes proportionally less time', Math.abs(fast.scenes[0].voiceDur - 2.0) < 1e-9);
   const cues = engine.cuesOf(tl).map((c) => c[0]);
   ok('every beat has its sound: the impact, the error buzz, the check, the riser into the end card',
     ['impact', 'buzz', 'check', 'riser', 'ding'].every((k) => cues.includes(k)), cues.join(','));

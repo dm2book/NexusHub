@@ -2,7 +2,8 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { asyncHandler } from '../../middleware/error.js';
-import { requirePermission } from '../../middleware/rbac.js';
+import { requirePermission, requireRole } from '../../middleware/rbac.js';
+import { exportPersonalData, erasePersonalData } from '../../services/privacyService.js';
 import { all } from '../../db/index.js';
 import { listAuditLogs, audit } from '../../services/auditService.js';
 import { listFlaggedOrders, heldOrderCount } from '../../services/fraudService.js';
@@ -300,5 +301,23 @@ router.post('/users/:id/credit', requirePermission('wallet.manage'),
       metadata: { amount }, req });
     res.json({ balance: await balanceOf(req.params.id), entry });
   }));
+
+// ── AVG requests ───────────────────────────────────────────────────────────
+/* Everything held about one address, as a download (art. 15/20). Staff who
+   manage users may run it; the export itself is audited. */
+router.get('/privacy/export', requirePermission('users.manage'), asyncHandler(async (req, res) => {
+  const { email } = z.object({ email: z.string().email().max(200) }).parse(req.query || {});
+  const data = await exportPersonalData(email);
+  await audit({ actor: req.user, action: 'privacy.export', targetType: 'user', targetId: data.account?.id || null, req });
+  res.set('Content-Disposition', `attachment; filename="forgemarket-gegevens-${Date.now()}.json"`).json(data);
+}));
+
+/* Erase one address (art. 17). Owner only, and the address typed twice: this
+   cannot be undone. */
+router.post('/privacy/erase', requireRole('owner'), asyncHandler(async (req, res) => {
+  const { email, confirm } = z.object({ email: z.string().email().max(200), confirm: z.string().max(200) }).parse(req.body || {});
+  if (confirm.trim().toLowerCase() !== email.trim().toLowerCase()) throw badRequest('Type the email address again to confirm');
+  res.json(await erasePersonalData(email, { actor: req.user }));
+}));
 
 export default router;

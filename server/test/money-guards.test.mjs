@@ -142,6 +142,15 @@ console.log('\n— A guest\'s first big order waits for a human —');
     `${after.status} ${after.fraudHold} ${after.fraudHoldReason}`);
 }
 
+console.log('\n— Never a charge under €0.50 —');
+{
+  const v = await newUser();
+  await credit(v, 4980, 'adjustment', 'test top-up');
+  const o = await createOrder({ email: 'min@example.test', userId: v, useCredit: 4980, items: [{ productId: product.id, quantity: 1 }], ...consent });
+  ok('credit that would leave 20 cents leaves €0.50 instead, and keeps the rest in the wallet',
+    o.total === 50 && o.billing.creditApplied === 4950 && (await balanceOf(v)) === 30, `${o.total} ${o.billing.creditApplied} ${await balanceOf(v)}`);
+}
+
 console.log('\n— Stock and the hand-delivery queue —');
 {
   const { addProductCodes } = await import('../src/services/codeStockService.js');

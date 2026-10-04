@@ -67,6 +67,32 @@ export async function lastMaintenanceRun({ now = Date.now(), staleAfterHours = D
 export async function runMaintenance() {
   const summary = { otpPurged: 0, ipsForgotten: 0, sessionsExpired: 0, ordersCancelled: 0, remindersSent: 0, reviewRequestsSent: 0, cartRemindersSent: 0, fulfillmentsRetried: 0, launchAnnounced: 0, at: nowIso() };
 
+  /* Money first. The function has 30 seconds and this list grew to fifteen
+     steps, so the ones that matter most for a buyer — a paid order nobody
+     delivered, a mail that failed — run before the housekeeping, and the
+     slowest one (the supplier queue) is skipped when the budget is nearly
+     spent rather than starving everything after it. */
+  const startedAt = Date.now();
+  const late = () => Date.now() - startedAt > 18_000;
+
+  // 9. The net under the pipeline: any paid order nothing has picked up.
+  //    Delivery is started without being awaited, so on a serverless host it can
+  //    simply never run — the order sits paid, in stock and undelivered. The
+  //    automatic path is retried first; only what genuinely cannot be dispensed
+  //    (no stock, no auto-supplier — e.g. a P2P top-up) goes to the hand queue,
+  //    so it surfaces there instead of sitting invisible.
+  try {
+    const sweep = await sweepUnfulfilledPaidOrders({ limit: 50 });
+    summary.manualQueued = sweep.queued;
+    summary.autoDispensed = sweep.dispensed;
+  } catch (e) { summary.manualQueueError = e.message; }
+
+  // 10. Re-send transactional emails that failed on a transient provider error
+  //     (their full render context is persisted with the log row).
+  try {
+    summary.emailsRetried = await retryFailedEmails({ limit: 20 });
+  } catch (e) { summary.emailRetryError = e.message; }
+
   // 0. Is the Discord bot still polling? (alerts the owner once per outage)
   try {
     const { checkBotHeartbeat } = await import('./discordService.js');
@@ -180,21 +206,11 @@ export async function runMaintenance() {
 
   // 8. Drain the serial supplier queue (safety net if a payment-time drain was
   //    interrupted): buys + delivers pending paid orders one at a time.
-  try {
+  if (late()) summary.supplierQueueSkipped = 'time budget';
+  else try {
     summary.supplierQueue = (await drainSupplierQueue({ actorId: 'system' })).processed || 0;
   } catch (e) { summary.supplierQueueError = e.message; }
 
-  // 9. The net under the pipeline: any paid order nothing has picked up.
-  //    Delivery is started without being awaited, so on a serverless host it can
-  //    simply never run — the order sits paid, in stock and undelivered. The
-  //    automatic path is retried first; only what genuinely cannot be dispensed
-  //    (no stock, no auto-supplier — e.g. a P2P top-up) goes to the hand queue,
-  //    so it surfaces there instead of sitting invisible.
-  try {
-    const sweep = await sweepUnfulfilledPaidOrders({ limit: 50 });
-    summary.manualQueued = sweep.queued;
-    summary.autoDispensed = sweep.dispensed;
-  } catch (e) { summary.manualQueueError = e.message; }
 
   /* 9b. The mail the pre-launch banner promised.
    *
@@ -208,11 +224,6 @@ export async function runMaintenance() {
     summary.launchAnnounced = ann.sent;
   } catch (e) { summary.launchAnnounceError = e.message; }
 
-  // 10. Re-send transactional emails that failed on a transient provider error
-  //     (their full render context is persisted with the log row).
-  try {
-    summary.emailsRetried = await retryFailedEmails({ limit: 20 });
-  } catch (e) { summary.emailRetryError = e.message; }
 
   // 11. Reconcile Discord roles for the members checked longest ago.
   //

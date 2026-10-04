@@ -393,7 +393,7 @@ export const UGC_SCRIPTS = [
 
 export const BEATS = ['hook', 'problem', 'solution', 'cta'];
 /* The four windows the brief sets, in seconds: a beat holds at least this long. */
-export const BEAT_DUR = { hook: 2, problem: 3, solution: 5, cta: 4 };
+export const BEAT_DUR = { hook: 2, problem: 3, solution: 5, cta: 3.5 };
 
 /** Every product a script reads. */
 export const skusOf = (s) => [...new Set([s.sku, ...(s.skus || []), ...(s.packs || []), ...(s.receipt ? [s.receipt] : [])])];

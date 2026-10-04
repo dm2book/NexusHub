@@ -294,7 +294,11 @@ export default function Checkout() {
       }
       if (provider === 'stripe') {
         const { url } = await api.post(`/api/orders/${order.id}/checkout`, { email });
-        clear(); window.location.href = url; return;
+        /* The cart stays until the payment is done: the success page empties it.
+           Emptied here, a buyer who pressed "back" on Stripe came home to an
+           empty cart and had to find everything again. */
+        rememberOrder(order);
+        window.location.href = url; return;
       }
       if (provider === 'demo') {
         await api.post(`/api/orders/${order.id}/pay`, { email }).catch(() => {});
