@@ -8,6 +8,11 @@ import { config } from '../config/env.js';
 /** Auto-grant the "owner" role to bootstrap admins listed in ADMIN_EMAILS. */
 async function ensureAdmin(userId, email) {
   if (!config.auth.adminEmails.includes(String(email).toLowerCase())) return;
+  /* A bootstrap, not a standing grant: only while the shop has no owner yet.
+     Re-granted on every login, an owner role could never be taken back from
+     a listed address — nor from whoever got into that mailbox. */
+  const anyOwner = await get(`SELECT 1 FROM user_roles WHERE role_id='owner' LIMIT 1`).catch(() => null);
+  if (anyOwner) return;
   await run(`INSERT INTO user_roles (user_id, role_id, granted_at) VALUES (@u, 'owner', @at)
              ON CONFLICT (user_id, role_id) DO NOTHING`, { u: userId, at: nowIso() }).catch(() => {});
 }

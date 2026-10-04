@@ -13,7 +13,9 @@
  *
  * No discord.js import on purpose: this stays pure so it can be tested.
  */
-import { MESSAGES, FAQ, LANGUAGE_ROLES, GAME_ROLES, NOTIFY_ROLES } from './config.js';
+import {
+  MESSAGES, FAQ, LANGUAGE_ROLES, GAME_ROLES, NOTIFY_ROLES, GIVEAWAY_TERMS, DEFAULT_SUPPORT_HOURS,
+} from './config.js';
 
 /**
  * The footer under every pinned panel.
@@ -62,6 +64,7 @@ export function linkChannels(text, channelIdByName = {}) {
 /** Build every panel's final copy. Returns { channelName: {title, description, color, image} }. */
 export function buildPanels({
   storeUrl, guildName = 'ForgeMarket', channelIdByName = {}, trustpilotUrl = '',
+  supportHours = DEFAULT_SUPPORT_HOURS,
 } = {}) {
   const tp = String(trustpilotUrl || '').trim();
   const sub = (s) => String(s ?? '').replaceAll('{STORE_URL}', storeUrl);
@@ -91,7 +94,9 @@ export function buildPanels({
       description: copy(FAQ.map((f) => `**${f.q}**\n${f.a}`).join('\n\n')),
       color: 0x6366f1,
     },
-    'support-info': P(MESSAGES.supportInfo),
+    'support-info': P(MESSAGES.supportInfo({
+      supportHours: String(supportHours || '').trim() || DEFAULT_SUPPORT_HOURS,
+    })),
     'report-a-scam': P(MESSAGES.reportScam),
     'open-a-ticket': P(MESSAGES.ticketPanel),
     reviews: P(MESSAGES.reviewsIntro({ trustpilotUrl: tp })),
@@ -101,10 +106,29 @@ export function buildPanels({
     suggestions: P(MESSAGES.suggestionsIntro),
     starboard: P(MESSAGES.starboardIntro),
     giveaways: P(MESSAGES.giveawaysIntro),
+    'giveaway-terms': P(GIVEAWAY_TERMS),
     partners: P(MESSAGES.partnersIntro),
     'staff-announcements': P(MESSAGES.staffIntro),
     roles: P(MESSAGES.rolesPanel),
   };
+}
+
+/**
+ * The one-off launch announcement, with the same substitutions as a panel.
+ * Not a pinned panel: it is posted once, by the bot, at LAUNCH_DATE.
+ */
+export function buildLaunchAnnouncement({ storeUrl, channelIdByName = {} } = {}) {
+  const m = MESSAGES.launch;
+  const sub = (x) => linkChannels(String(x ?? '').replaceAll('{STORE_URL}', storeUrl), channelIdByName);
+  return { title: sub(m.title), description: sub(m.description), color: m.color,
+    image: String(m.image).replaceAll('{STORE_URL}', storeUrl) };
+}
+
+/** Has LAUNCH_DATE passed? Invalid dates fall back to the default launch moment. */
+export const DEFAULT_LAUNCH_DATE = '2026-10-23T22:00:00Z';
+export function launchDue(launchDate, now = Date.now()) {
+  const t = Date.parse(launchDate || DEFAULT_LAUNCH_DATE);
+  return now >= (Number.isFinite(t) ? t : Date.parse(DEFAULT_LAUNCH_DATE));
 }
 
 /**

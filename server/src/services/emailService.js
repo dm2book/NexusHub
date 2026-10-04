@@ -7,10 +7,11 @@
  * - Every send (success or failure) is recorded in email_log.
  * - Templates are loaded from the DB so admin edits take effect immediately.
  */
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import { config } from '../config/env.js';
 import { get, all, run, nowIso } from '../db/index.js';
 import { newId } from '../utils/ids.js';
-import { renderTemplate, renderTokens, wrapBranded, baseContext } from './templateService.js';
+import { renderTemplate, renderTokens, wrapBranded, wrapAdmin, baseContext, EMAIL_THEMES } from './templateService.js';
 import { alertOwner } from './notifyService.js';
 
 /**
@@ -37,7 +38,7 @@ async function getTransport() {
  * stalls. Throws with Resend's own message on failure (e.g. unverified sender),
  * which we record + log so the cause is never a mystery.
  */
-async function sendViaResend({ from, to, subject, html, text, replyTo }) {
+async function sendViaResend({ from, to, subject, html, text, replyTo, headers }) {
   // Hard timeout: without it a slow/unreachable Resend call hangs the whole
   // request until Vercel kills the function at maxDuration, and the client gets
   // a non-JSON platform error page instead of a normal response.
@@ -55,6 +56,7 @@ async function sendViaResend({ from, to, subject, html, text, replyTo }) {
         from, to, subject, html,
         ...(text ? { text } : {}),
         ...(replyTo ? { reply_to: replyTo } : {}),
+        ...(headers && Object.keys(headers).length ? { headers } : {}),
       }),
       signal: ctrl.signal,
     });
@@ -80,7 +82,7 @@ async function sendViaResend({ from, to, subject, html, text, replyTo }) {
 export function htmlToText(html) {
   return String(html)
     // The hidden inbox-preview line, and anything that is not content.
-    .replace(/<span class="preheader">[\s\S]*?<\/span>/gi, '')
+    .replace(/<span class="preheader"[^>]*>[\s\S]*?<\/span>/gi, '')
     .replace(/<style[\s\S]*?<\/style>/gi, '')
     .replace(/<head[\s\S]*?<\/head>/gi, '')
     // A link is worth nothing in text unless the address comes with it.
@@ -141,6 +143,151 @@ export function langFor(context = {}) {
   return TEMPLATE_LANGS.has(candidate) ? candidate : FALLBACK_LANG;
 }
 
+// ── Marketing: consent, unsubscribe, suppression ─────────────────────────
+
+/**
+ * The mails that are not strictly needed to deliver what somebody bought, and
+ * the list each one belongs to.
+ *
+ * Every one of these carries a visible unsubscribe link and the RFC 8058
+ * one-click headers (Gmail and Yahoo require both for bulk senders since 2024,
+ * and without them a launch-night send is the thing that lands the domain in
+ * spam). The scope is what one click turns off: stopping price alerts should
+ * not also stop the launch mail somebody asked for, and nothing here ever
+ * stops an order confirmation.
+ */
+export const MARKETING_SCOPES = {
+  launch_announcement: 'marketing',
+  cart_reminder: 'marketing',
+  broadcast: 'marketing',
+  price_drop: 'alerts',
+  review_request: 'reviews',
+};
+export const UNSUBSCRIBE_SCOPES = ['marketing', 'alerts', 'reviews'];
+
+const normEmail = (e) => String(e || '').trim().toLowerCase();
+
+/**
+ * The proof in an unsubscribe link: an HMAC of address and list, keyed with the
+ * server's existing JWT secret. Without it the endpoint would be a way to
+ * unsubscribe strangers — and, by answering differently for a known address,
+ * a way to ask who is on the list.
+ */
+export function unsubscribeToken(email, scope) {
+  return createHmac('sha256', config.auth.jwtSecret)
+    .update(`unsubscribe:${scope}:${normEmail(email)}`)
+    .digest('hex').slice(0, 32);
+}
+
+export function unsubscribeTokenOk(email, scope, token) {
+  if (!UNSUBSCRIBE_SCOPES.includes(scope)) return false;
+  const want = Buffer.from(unsubscribeToken(email, scope));
+  const got = Buffer.from(String(token || ''));
+  return want.length === got.length && timingSafeEqual(want, got);
+}
+
+/** The link — the same URL serves the confirm page (GET) and the one-click POST. */
+export function unsubscribeUrl(email, scope) {
+  const app = String(config.appUrl || '').replace(/\/+$/, '');
+  return `${app}/api/unsubscribe?e=${encodeURIComponent(normEmail(email))}`
+    + `&s=${encodeURIComponent(scope)}&t=${unsubscribeToken(email, scope)}`;
+}
+
+/** Has this address opted out of this list? */
+export async function isSuppressed(email, scope) {
+  const row = await get('SELECT 1 AS x FROM email_suppressions WHERE email = @e AND scope = @s',
+    { e: normEmail(email), s: scope }).catch(() => null);
+  return !!row;
+}
+
+/**
+ * Take an address off a list, everywhere that list is recorded.
+ *
+ * The suppression row is what the send path checks, so it holds for guests and
+ * for addresses that later create an account. The other writes keep the
+ * places a person can SEE their choice — the newsletter row, the account's
+ * marketing preference, the wishlist's alert toggles — telling the same story.
+ */
+export async function applyUnsubscribe(email, scope) {
+  const e = normEmail(email);
+  if (!e || !UNSUBSCRIBE_SCOPES.includes(scope)) return false;
+  const at = nowIso();
+  await run(`INSERT INTO email_suppressions (email, scope, created_at) VALUES (@e, @s, @at)
+             ON CONFLICT (email, scope) DO NOTHING`, { e, s: scope, at });
+  if (scope === 'marketing') {
+    await run(`UPDATE newsletter_signups SET unsubscribed_at = @at WHERE email = @e AND unsubscribed_at IS NULL`,
+      { e, at }).catch(() => {});
+    const users = await all('SELECT id, preferences FROM users WHERE email = @e', { e }).catch(() => []);
+    for (const u of users) {
+      let prefs = {};
+      try { prefs = JSON.parse(u.preferences || '{}') || {}; } catch { prefs = {}; }
+      if (prefs.emailMarketing === false) continue;
+      prefs.emailMarketing = false;
+      await run('UPDATE users SET preferences = @p WHERE id = @id',
+        { p: JSON.stringify(prefs), id: u.id }).catch(() => {});
+    }
+  }
+  if (scope === 'alerts') {
+    await run(`UPDATE wishlist_items SET alert_enabled = 0
+                WHERE user_id IN (SELECT id FROM users WHERE email = @e)`, { e }).catch(() => {});
+  }
+  return true;
+}
+
+/** RFC 8058: a POSTable https URL plus the header that says one click is enough. */
+function listUnsubscribeHeaders(url) {
+  return url ? {
+    'List-Unsubscribe': `<${url}>`,
+    'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+  } : {};
+}
+
+// ── What is safe to keep ─────────────────────────────────────────────────
+
+/** Never retried: a login code is dead within minutes, and a gift-card mail
+    can only be rebuilt from the code, which is exactly what is not stored. */
+const NO_RETRY = new Set(['login_otp', 'gift_card']);
+/* Keys that carry something that unlocks value: a login code, a delivered game
+   code, a gift-card code, or a block of HTML built from them. */
+const SECRET_KEY = /^(otp|code|codes|codeHtml|deliveryHtml|deliveriesHtml|redeemHtml|password|token|secret)$/i;
+
+function redact(value, depth = 0) {
+  if (depth > 6 || value == null || typeof value !== 'object') return { value, dropped: false };
+  let dropped = false;
+  const out = Array.isArray(value) ? [] : {};
+  for (const [k, v] of Object.entries(value)) {
+    if (SECRET_KEY.test(k)) { dropped = true; continue; }
+    const r = redact(v, depth + 1);
+    dropped = dropped || r.dropped;
+    if (Array.isArray(out)) out.push(r.value); else out[k] = r.value;
+  }
+  return { value: out, dropped };
+}
+
+/**
+ * The context as it may be written to email_log.
+ *
+ * The full render context used to be stored with every row so a failed send
+ * could be retried — which meant every login code and every delivered game
+ * code sat in plain text in a table the admin log endpoint returned whole.
+ * Now an order mail stores only the order id (the retry rebuilds everything
+ * from the order), anything else is stored with its secrets cut out, and a mail
+ * that cannot be rebuilt without a secret is marked as not retryable.
+ */
+export function persistableContext(eventKey, context = {}) {
+  if (context.orderId) {
+    return {
+      lang: context.lang || null,
+      _order: { id: context.orderId, ...(context.orderOpts || {}) },
+    };
+  }
+  const { value, dropped } = redact(context);
+  const out = { ...value };
+  delete out.orderOpts;
+  if (dropped || NO_RETRY.has(eventKey)) out._noRetry = true;
+  return out;
+}
+
 /**
  * Send a transactional email for `eventKey` to `to`, merging `context` with the
  * base brand context. Returns the email_log row id.
@@ -149,43 +296,61 @@ export async function sendEmail(eventKey, to, context = {}) {
   const id = newId('eml');
   const at = nowIso();
   const lang = langFor(context);
+  const stored = JSON.stringify(persistableContext(eventKey, context));
+  const scope = MARKETING_SCOPES[eventKey];
+
+  /* A marketing mail to somebody who said stop is not sent, and the decision
+     is logged rather than silent, so "why did they not get it?" has an answer. */
+  if (scope && await isSuppressed(to, scope)) {
+    await run(`INSERT INTO email_log (id, template_id, to_email, status, error, created_at)
+         VALUES (@id, @t, @to, 'suppressed', @err, @at)`,
+        { id, t: eventKey, to, err: `unsubscribed from ${scope}`, at });
+    return id;
+  }
+
   const tpl = await loadTemplate(eventKey, lang);
 
   if (!tpl || !tpl.enabled) {
     await run(`INSERT INTO email_log (id, template_id, to_email, status, error, context, created_at)
          VALUES (@id, @t, @to, 'failed', @err, @ctx, @at)`,
         { id, t: eventKey, to, err: tpl ? 'template disabled' : 'template missing',
-          ctx: JSON.stringify(context), at });
+          ctx: stored, at });
     return id;
   }
 
-  const ctx = baseContext(context);
+  const unsub = scope ? unsubscribeUrl(to, scope) : null;
+  const ctx = baseContext({
+    ...context,
+    ...(unsub ? { unsubscribe: { url: unsub, ...(context.unsubscribe || {}) } } : {}),
+  });
   const { subject, html } = renderTemplate(tpl, ctx);
   const from = `${config.email.fromName} <${config.email.fromAddress}>`;
   const replyTo = config.email.replyTo || undefined;
+  const headers = listUnsubscribeHeaders(ctx.unsubscribe?.url || null);
   /* A plain-text alternative on every message.
      Checked on the wire: these went out as `Content-Type: text/html` with no
      multipart/alternative. That is a spam-filter penalty on transactional mail
      that must arrive, and it is the only thing a watch preview, a screen reader
-     in text mode, or a client with images-and-HTML off has to show. The codes
-     in particular are the whole point of the mail and were unreadable without
-     an HTML renderer. */
+     in text mode, or a client with images-and-HTML off has to show. */
   const text = htmlToText(html);
 
   try {
     let info;
     let status;
     if (config.email.resendApiKey) {
-      info = await sendViaResend({ from, to, subject, html, text, replyTo }); // HTTP API (serverless-safe)
+      info = await sendViaResend({ from, to, subject, html, text, replyTo, headers }); // HTTP API (serverless-safe)
       status = 'sent';
     } else {
-      info = await (await getTransport()).sendMail({ from, to, subject, html, text, replyTo });
+      info = await (await getTransport()).sendMail({ from, to, subject, html, text, replyTo, headers });
       status = config.email.smtpUrl ? 'sent' : 'recorded';
     }
+    /* The subject of a login mail is stored as its template id only. It no
+       longer contains the code, but a subject an owner edits back to include
+       it should not be the thing that puts codes into a log again. */
     await run(`INSERT INTO email_log (id, template_id, to_email, subject, status, provider_ref, context, created_at)
          VALUES (@id, @t, @to, @subj, @st, @ref, @ctx, @at)`,
-        { id, t: eventKey, to, subj: subject, st: status,
-          ref: info.messageId || null, ctx: JSON.stringify(context), at });
+        { id, t: eventKey, to, subj: NO_RETRY.has(eventKey) ? `[${eventKey}]` : subject, st: status,
+          ref: info.messageId || null, ctx: stored, at });
     return id;
   } catch (err) {
     // Make the real reason visible in the function logs (e.g. Resend "you can
@@ -193,25 +358,21 @@ export async function sendEmail(eventKey, to, context = {}) {
     console.error(`[email] ${eventKey} -> ${to} FAILED: ${err.message}`);
     await run(`INSERT INTO email_log (id, template_id, to_email, subject, status, error, context, created_at)
          VALUES (@id, @t, @to, @subj, 'failed', @err, @ctx, @at)`,
-        { id, t: eventKey, to, subj: subject, err: err.message,
-          ctx: JSON.stringify(context), at });
+        { id, t: eventKey, to, subj: NO_RETRY.has(eventKey) ? `[${eventKey}]` : subject, err: err.message,
+          ctx: stored, at });
 
     /* A delivery mail that does not send is a paid-for code sitting in a
-       database table nobody reads. The row above records it and the retry
-       sweep will try again, but both of those are invisible: if the mailer is
-       misconfigured every order fails the same way and the shop looks fine
-       from the outside until the tickets arrive.
-
-       Deliberately keyed on the TEMPLATE, not the recipient. One bounced
-       address is the address; every order_completed failing is the mailer, and
-       that is the alert worth having. The storm rules then fold the rest of a
-       broken-mailer burst into one summary rather than one page per order. */
+       database table nobody reads. Keyed on the TEMPLATE, not the recipient:
+       one bounced address is the address; every order_completed failing is the
+       mailer, and that is the alert worth having. */
     alertOwner('email.failed', {
       title: `Email "${eventKey}" could not be sent`,
       lines: [
         `Recipient: ${String(to).replace(/(.).*(@.*)/, '$1•••$2')}`,
         `Error: ${String(err.message || 'unknown').slice(0, 200)}`,
-        'The message is in email_log and the hourly sweep will retry it.',
+        NO_RETRY.has(eventKey)
+          ? 'The failure is in email_log. This mail is not retried automatically.'
+          : 'The message is in email_log and the hourly sweep will retry it.',
       ],
       url: `${config.appUrl}/admin/emails`,
       key: `${eventKey}:${at.slice(0, 13)}`,
@@ -235,11 +396,14 @@ export async function sendEmailAsync(eventKey, to, context = {}) {
 }
 
 /**
- * Retry recently-failed transactional emails (maintenance sweep). The full
- * render context is persisted with every log row, so a transient provider
- * failure (Resend timeout, network blip) no longer means a customer never
- * gets their codes. Bounded: at most `maxAttempts` rows per template+recipient
- * in the window, so a permanently-broken address ages out instead of looping.
+ * Retry recently-failed transactional emails (maintenance sweep).
+ *
+ * An order mail is rebuilt from the order itself — the stored row holds only
+ * its id — so the retried mail shows the order as it is NOW, codes included,
+ * without the codes ever having been written to the log. Login codes are never
+ * retried, and neither is anything stored with a secret cut out of it. Bounded:
+ * at most `maxAttempts` rows per template+recipient in the window, so a
+ * permanently-broken address ages out instead of looping.
  */
 export async function retryFailedEmails({ limit = 20, maxAgeHours = 24, maxAttempts = 4 } = {}) {
   const cut = new Date(Date.now() - maxAgeHours * 3_600_000).toISOString();
@@ -247,9 +411,13 @@ export async function retryFailedEmails({ limit = 20, maxAgeHours = 24, maxAttem
     `SELECT id, template_id, to_email, context FROM email_log
       WHERE status = 'failed' AND created_at > @cut AND context IS NOT NULL
         AND error NOT IN ('template disabled', 'template missing')
+        AND template_id NOT IN ('login_otp', 'gift_card')
       ORDER BY created_at ASC LIMIT @l`, { cut, l: limit });
   let resent = 0;
   for (const r of rows) {
+    let ctx;
+    try { ctx = JSON.parse(r.context || '{}') || {}; } catch { ctx = {}; }
+    if (ctx._noRetry) continue;
     const prior = await get(
       `SELECT COUNT(*) AS n FROM email_log WHERE template_id=@t AND to_email=@to AND created_at > @cut`,
       { t: r.template_id, to: r.to_email, cut });
@@ -258,7 +426,15 @@ export async function retryFailedEmails({ limit = 20, maxAgeHours = 24, maxAttem
     const claim = await run(`UPDATE email_log SET status='retried' WHERE id=@id AND status='failed'`, { id: r.id });
     if (!claim?.changes) continue;
     try {
-      await sendEmail(r.template_id, r.to_email, JSON.parse(r.context || '{}'));
+      if (ctx._order?.id) {
+        const { orderEmailContextById } = await import('./orderService.js');
+        const { id: orderId, ...opts } = ctx._order;
+        const rebuilt = await orderEmailContextById(orderId, opts);
+        if (!rebuilt) continue;
+        await sendEmail(r.template_id, r.to_email, rebuilt);
+      } else {
+        await sendEmail(r.template_id, r.to_email, ctx);
+      }
       resent++;
     } catch { /* outcome already recorded as a fresh log row by sendEmail */ }
   }
@@ -266,36 +442,64 @@ export async function retryFailedEmails({ limit = 20, maxAgeHours = 24, maxAttem
 }
 
 /**
- * Send ad-hoc content (not a stored template) — used by the customer broadcast.
- * `subject` and `innerHtml` may use {{tokens}} resolved from `context` (e.g.
- * {{user.name}}); the content is wrapped in the branded shell. Every send is
- * logged to email_log under the given `logTag`. Throws on failure so the caller
- * can count it.
+ * Forget the mail log after `days` (default 30).
+ *
+ * Every row names a recipient and what they were sent; the log exists to
+ * answer "did that mail go out?" in the weeks after, not to be a permanent
+ * record of who bought what. The retry sweep only looks back a day.
  */
-export async function sendRawEmail({ to, subject, innerHtml, context = {}, logTag = 'broadcast' }) {
+export async function purgeEmailLog({ days = 30 } = {}) {
+  const cut = new Date(Date.now() - days * 86_400_000).toISOString();
+  const r = await run('DELETE FROM email_log WHERE created_at < @cut', { cut });
+  return r?.changes ?? 0;
+}
+
+/**
+ * Send ad-hoc content (not a stored template) — used by the customer broadcast
+ * and by owner alerts. `subject` and `innerHtml` may use {{tokens}} resolved
+ * from `context` (e.g. {{user.name}}). Customer mail is wrapped in the branded
+ * shell in the reader's language; owner alerts (`logTag` "alert:…") in a plain
+ * admin frame. `unsubscribeScope` makes it a marketing mail: suppressed
+ * addresses are skipped, and the visible link and one-click headers are added.
+ * Throws on failure so the caller can count it.
+ */
+export async function sendRawEmail({
+  to, subject, innerHtml, context = {}, logTag = 'broadcast', lang, unsubscribeScope = null,
+}) {
   const id = newId('eml');
   const at = nowIso();
-  const ctx = baseContext(context);
+  const admin = String(logTag).startsWith('alert:');
+  const scope = unsubscribeScope || (MARKETING_SCOPES[logTag] && !admin ? MARKETING_SCOPES[logTag] : null);
+  if (scope && await isSuppressed(to, scope)) {
+    await run(`INSERT INTO email_log (id, template_id, to_email, subject, status, error, created_at)
+         VALUES (@id, @t, @to, @subj, 'suppressed', @err, @at)`,
+        { id, t: logTag, to, subj: subject, err: `unsubscribed from ${scope}`, at });
+    return { id, status: 'suppressed' };
+  }
+  const unsub = scope ? unsubscribeUrl(to, scope) : null;
+  const ctx = baseContext({ ...context, ...(unsub ? { unsubscribe: { url: unsub } } : {}) });
   const subj = renderTokens(subject, ctx);
-  const html = wrapBranded(renderTokens(innerHtml, ctx), { preheader: subj });
+  const inner = renderTokens(innerHtml, ctx);
+  const html = admin
+    ? wrapAdmin(inner, { preheader: subj })
+    : wrapBranded(inner, {
+      preheader: subj, lang: langFor({ lang }), templateId: logTag,
+      theme: EMAIL_THEMES[logTag] || undefined, unsubscribeUrl: unsub,
+    });
   const from = `${config.email.fromName} <${config.email.fromAddress}>`;
-  /* The same two the transactional path has carried since it was measured on
-     the wire, and this one never did: a Reply-To that reaches a person, and a
-     plain-text alternative. Without the text part the message goes out as
-     `Content-Type: text/html` with no multipart, which is a spam-filter
-     penalty — and it is the only thing a watch preview or a screen reader in
-     text mode has to show. It mattered more once owner alerts started coming
-     through here: an alert about a chargeback is the last message that should
-     be sorted into junk. */
+  /* A Reply-To that reaches a person, and a plain-text alternative: without
+     the text part the message goes out as `Content-Type: text/html` with no
+     multipart, which is a spam-filter penalty. */
   const replyTo = config.email.replyTo || undefined;
   const text = htmlToText(html);
+  const headers = listUnsubscribeHeaders(unsub);
   try {
     let info; let status;
     if (config.email.resendApiKey) {
-      info = await sendViaResend({ from, to, subject: subj, html, text, replyTo });
+      info = await sendViaResend({ from, to, subject: subj, html, text, replyTo, headers });
       status = 'sent';
     } else {
-      info = await (await getTransport()).sendMail({ from, to, subject: subj, html, text, replyTo });
+      info = await (await getTransport()).sendMail({ from, to, subject: subj, html, text, replyTo, headers });
       status = config.email.smtpUrl ? 'sent' : 'recorded';
     }
     await run(`INSERT INTO email_log (id, template_id, to_email, subject, status, provider_ref, created_at)

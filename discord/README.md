@@ -29,18 +29,26 @@ cd discord
 cp .env.example .env          # fill in DISCORD_TOKEN, DISCORD_CLIENT_ID, DISCORD_GUILD_ID
 npm install
 
-REPOST=1 npm run register     # registers all slash commands to your server
-REPOST=1 npm run setup        # builds roles, categories, channels, permissions + (re)posts panels
+npm run register              # registers all slash commands to DISCORD_GUILD_ID (instant)
+REPOST=1 npm run setup        # builds roles, categories, channels, permissions, AutoMod + (re)posts panels
 npm start                     # runs the live bot (onboarding, tickets, giveaways, AI…)
 ```
 
 `REPOST=1` re-posts every panel (verify button, ticket buttons, self-role
-buttons). Both scripts are **idempotent** — existing roles/channels are reused,
-never duplicated, so it's safe to re-run after every update.
+buttons). Both scripts are **idempotent** — existing roles/channels/AutoMod rules
+are reused, never duplicated, so it's safe to re-run after every update.
+`npm run register` is a PUT of the full command list, so re-running it never
+duplicates anything; the bot also does the same PUT itself every time it starts.
+Without `DISCORD_GUILD_ID` the script registers globally (up to an hour to show) —
+but the bot itself refuses to start without `DISCORD_GUILD_ID`.
 
 **Create the bot:** discord.com/developers → New Application → Bot → copy token.
 Enable **Server Members Intent** and **Message Content Intent** (required for
-verify, leveling and automod). Then run `npm run invite` and open the link it
+verify, leveling and automod). **Switch "Public Bot" OFF** on the same Bot page —
+otherwise anyone with the invite link can add the bot to their own server. The
+bot only works in `DISCORD_GUILD_ID` and leaves any other server it is added to
+(it logs `left a guild that is not DISCORD_GUILD_ID`), but turning Public Bot off
+stops it from being added in the first place. Then run `npm run invite` and open the link it
 prints: `bot` + `applications.commands`, with the fifteen permissions the bot
 actually uses and nothing else. Drag the bot's role **above** every role it
 manages (Verified Customer, the loyalty tiers, the level roles) — Discord
@@ -56,7 +64,7 @@ without them the bot still works (rule-based FAQ + sample replies).
 
 `npm start` only runs while your terminal is open. To keep the bot online, host
 it on any always-on platform — see **§13. Deploy (24/7 hosting)** below for a
-copy-paste Railway / Render / VPS guide. A `Procfile` is included.
+copy-paste Railway / PebbleHost / Render / VPS guide. A `Procfile` is included.
 
 ---
 
@@ -110,7 +118,8 @@ each member sees only their own ticket.
 `events` (announcement), `event-signup`, `events-stage` (voice).
 
 ### 🎉 GIVEAWAYS — *verified*
-`giveaways` (read-only, hosted), `giveaway-chat`, `winners` (read-only).
+`giveaways` (read-only, hosted), `winners` (read-only), `giveaway-terms`
+(read-only — the actievoorwaarden every giveaway links to).
 
 ### 🛠️ STAFF — *staff only*
 `staff-chat`, `staff-announcements` (read-only), `ticket-logs` (transcripts),
@@ -128,7 +137,7 @@ Channel **descriptions/topics** are set automatically from `config.js`.
 | **Admin** | Manage Server/Channels/Roles/Messages, Kick/Ban, Timeout, Audit Log | Runs the server; manages staff & structure. Near-admin, below Owner. |
 | **Moderator** | Manage Messages/Threads, Kick, Timeout, voice moderation | Keeps community safe & on-topic; handles spam/scams; escalates. |
 | **Support** | Manage Messages/Threads (+ ticket access) | First line of customer help: tickets, orders, refunds, delivery. |
-| **VIP Customer** | Member + exclusive access | Loyal buyers: early drops, exclusive channels, better giveaway odds. |
+| **VIP Customer** | Same access as a member | Recognition role, granted by the store once lifetime spend passes `DISCORD_VIP_THRESHOLD_CENTS`. No extra perks. |
 | **Partner** | Member + partner channel | Affiliates/collaborators; co-marketing. |
 | **Verified Customer** | Base member access | Default tier after verification; full community access. |
 | **Bot** | Fifteen scoped permissions (`npm run invite`) — never Administrator | Automation: onboarding, tickets, AI, logging. |
@@ -190,7 +199,7 @@ resolve → transcript logged._
 
 - Discussion (`general`, `off-topic`, `introductions`) + game-specific (`gaming`)
   + media (`screenshots-media`) keep people talking.
-- **Events** (tournaments/drops) and **Giveaways** (with VIP bonus entries) create
+- **Events** (tournaments/drops) and **Giveaways** (free, one equal entry per person) create
   recurring reasons to return — and giveaways are a powerful acquisition loop.
 - Voice (the 🔊 VOICE hub + `events-stage`) deepens engagement — and pays XP.
 - Level roles (**Level 5 ⚡ / 10 🔥 / 20 💎 / 30 👑**) are granted automatically;
@@ -273,8 +282,12 @@ verified reviews from the store webhook into `#reviews`, and a leveling/XP syste
   to `#ticket-logs`, transcript **DM'd to the owner** with a ⭐ **rating** prompt.
   Also `/close`.
 - **Giveaways 2.0:** `/giveaway prize minutes winners` → Enter button with a **live
-  entry counter**, **multiple winners**, **verified-only** entry, tap-to-leave,
-  winner **DMs**, auto-post to `#winners`, and `/reroll` to pick a new winner.
+  entry counter**, **multiple winners**, **verified-only** entry, Discord account
+  ≥ 7 days old, one equal chance per entrant (no paid or bonus entries),
+  tap-to-leave, winner **DMs**, auto-post to `#winners`. On every draw the
+  entrant count and a SHA-256 of the sorted entrant ids go to `#mod-log`.
+  `/reroll` skips previous winners and works until the giveaway is archived
+  (30 days). Terms are posted by setup in `#giveaway-terms`.
 - **Leveling / XP:** earn XP per message (cooldown), **level-up announcements**,
   `/rank` (level, XP bar, rank) and `/leaderboard`. Persisted to `xp.json`.
   `/daily` claims a growing daily XP bonus (streaks, caps at 10 days) and a
@@ -283,16 +296,23 @@ verified reviews from the store webhook into `#reviews`, and a leveling/XP syste
 - **Starboard:** ⭐-react any message → at 3 stars it's reposted to `#starboard`.
 - **AI assistant "Forge"** (`#ask-the-bot`, `/ask`, `/recommend`): FAQ + live
   product recommendations (Claude + prompt caching, rule-based fallback).
-- **VIP automation** (store side): a paid order auto-grants *Verified Customer*
-  (< €20) or *VIP Customer* (≥ €20) to buyers who signed in with Discord.
+- **VIP automation** (store side): a paid order grants *Verified Customer*, and
+  lifetime spend over the VIP threshold adds *VIP Customer* (a recognition role)
+  to buyers who linked Discord.
 - **Promos:** `/coupon code percent` → posts to `#discount-codes` (pings Deals);
   `/flashsale deal minutes [code]` → live-countdown deal in `#deals` (auto-greys
   out when it ends); `/announce message` → posts to `#announcements`.
 - **Live server stats:** auto-managed voice channels (👥 Members, 💎 Boosts).
 - **Order lookup:** `/order <number>` via the store's public tracking API.
-- **Vouches:** `/vouch` posts a formatted, starred vouch to `#vouchers`.
-- **Auto-moderation:** removes Discord invites / "free nitro"-style scams from
-  non-staff (outside tickets) and logs to `#mod-log`.
+- **Vouches:** `/vouch stars message` (stars required) posts to `#vouches`. When
+  the member's Discord is linked to a store account with a completed order it is
+  labelled **Verified purchase**, sent to the website for review and eligible for
+  the daily spotlight; otherwise it is a **community vouch** and stays in Discord.
+- **Auto-moderation:** setup creates Discord AutoMod rules (scam keywords/regex,
+  mention spam, spam). The bot also removes invites, "free robux/vbucks/nitro" and
+  generator bait, lookalike store domains and fake Roblox/Steam/Discord/Epic links
+  from non-staff (outside tickets) — on new **and edited** messages — and logs to
+  `#mod-log`.
 - **Anti-scam & anti-raid:** welcome DM warns *staff never DMs first*;
   staff-impersonation detection (lookalike characters normalized) alerts
   `#mod-log` on join/nickname change; a join-rate spike (8+/min) pings staff.
@@ -304,7 +324,7 @@ verified reviews from the store webhook into `#reviews`, and a leveling/XP syste
 - **Community sparkle:** boost thank-yous in `#general`, member-count milestone
   celebrations every 100 members, a public welcome in `#general` on every join
   (auto-suppressed during join spikes, auto-deletes after 10 min) and a daily
-  **vouch spotlight** — one recent vouch reposted to `#general` every afternoon.
+  **vouch spotlight** — one recent verified-purchase vouch reposted every afternoon.
 - **Loyalty tier roles:** Bronze / Silver / Gold / Platinum are created by setup
   (colour-matched to the site) and assigned automatically by the store's
   role-sync on every paid order.
@@ -332,45 +352,57 @@ folder ships everything a host needs: a `Procfile`, a `Dockerfile`, a
 `railway.json`, and `engines.node >=18`.
 
 **First, one-time setup (run locally once):** register the slash commands and
-build the server. You only need to do this again when commands or the server
-structure change.
+build the server. Re-run `setup` when the server structure changes; the bot
+re-registers commands itself on every start.
 
 ```bash
 cd discord && npm install
-REPOST=1 npm run register
+npm run register
 REPOST=1 npm run setup
 ```
 
-Then deploy the always-on bot (`npm start`) with one of:
+Then deploy the always-on bot (`node src/bot.js`) with one of:
 
 ### Option A — Railway (recommended, 24/7)
 
 1. Push this repo to GitHub (already done).
 2. [railway.app](https://railway.app) → **New Project → Deploy from GitHub repo**
    → pick this repo.
-3. **Settings → Root Directory:** `discord` (so it builds this folder only).
-4. **Variables** → paste the block below. Every one of them is explained in
+3. **Settings → Source → Root Directory:** `discord` (so it builds this folder only).
+4. **Settings → Config-as-code → Railway Config File:** `/discord/railway.json`.
+   Railway does not look inside the root directory for it by itself; the path is
+   from the repository root.
+5. **Variables** → paste the block below. Every one of them is explained in
    [`.env.example`](.env.example), which is generated from the same list the bot
    validates against at startup, so the two cannot drift.
-5. **Deploy.** `railway.json` sets `npm start` and restarts on failure.
+6. **Deploy.** `railway.json` builds the `Dockerfile` (which runs
+   `node src/bot.js` as a non-root user), sets **restart policy ALWAYS** and the
+   health check path `/health`.
 
 **The variables Railway needs**
 
 | | Variable | Without it |
 |---|---|---|
 | **Required** | `DISCORD_TOKEN` | The bot refuses to start. |
-| Strongly recommended | `DISCORD_CLIENT_ID` | `npm run invite` and command registration cannot run. |
-| | `DISCORD_GUILD_ID` | Commands register globally — up to an hour to appear. |
+| **Required** | `DISCORD_GUILD_ID` | The bot refuses to start. It only serves this server and leaves any other. |
+| Strongly recommended | `DISCORD_CLIENT_ID` | `npm run invite` and `npm run register` cannot run. |
+| | `DISCORD_OWNER_IDS` | Owner commands (`/paylink`, `/digest`, `/coupon`, `/announce`…) fall back to "has Manage Server". |
 | | `STORE_URL` | Every link the bot posts has nowhere to go. |
 | | `FORGEMARKET_API_URL` | `/price`, `/order` and the store relay are off. |
 | | `REVIEW_INGEST_SECRET` | **The relay is silent**: no order pings, no drops, no delivery DMs, and no durable state. Must match Vercel exactly. |
 | Optional | `ANTHROPIC_API_KEY` | A rule-based FAQ answers instead of the AI. |
+| | `AI_DAILY_CAP` | Default 300 AI answers per day for the whole server. |
+| | `DISCORD_PAYLINK_SECRET` | `/paylink` is disabled. Must match the API's value. |
+| | `PAYLINK_HOSTS` | Only the API's payment-host allow-list applies. |
+| | `LAUNCH_DATE` | Launch post goes out at `2026-10-23T22:00:00Z` (24 Oct, 00:00 Amsterdam). |
+| | `SUPPORT_HOURS` | #support-info says "Elke dag, reactie meestal binnen 24 uur (NL tijd)". |
+| | `DISCORD_INVITE_URL` | `/invite` says the link is not ready until the bot has made its own. |
 | | `PORT` | Railway sets this itself — it turns on the health endpoint. |
 | | `LOG_LEVEL`, `LOG_FORMAT` | Defaults are `info` and JSON off a terminal. |
 
 The bot logs a warning naming every recommended variable it is missing, and what
-stops working. A missing token is fatal and exits `1`, so a half-configured
-deploy shows as crashed rather than as a bot that is quietly doing nothing.
+stops working. A missing required variable is fatal and exits `1`, so a
+half-configured deploy shows as crashed rather than as a bot quietly doing nothing.
 
 **Health check.** Railway → **Settings → Healthcheck Path: `/health`**. The bot
 serves it on `$PORT`:
@@ -380,11 +412,13 @@ serves it on `$PORT`:
   "gateway": { "ping": 41, "guilds": 1 }, "bot": "ForgeMarket#1234" }
 ```
 
-It answers **503 while the gateway is not connected**. That distinction is the
-whole point: a Discord bot holds a websocket, not a port, so a process that is
-running but disconnected looks perfectly healthy to anything that only checks
-whether it exists — and the server just sits silent. With the health check
-configured, Railway restarts it instead.
+It answers **503 while the gateway is not connected**. Railway only uses the
+health check **while deploying** (a new deploy goes live once `/health` answers
+200); it does not keep polling it afterwards. Staying up is handled by the bot
+itself: an in-process watchdog exits with code 1 when the gateway has not been
+ready for five minutes, a terminal gateway close (bad token, intents switched
+off) exits 1, and an uncaught exception flushes state and exits 1. With restart
+policy **ALWAYS**, Railway then starts a fresh process.
 
 **Logs.** JSON, one line per event, so Railway's log search can filter them:
 
@@ -406,13 +440,34 @@ default.
 - `running without REVIEW_INGEST_SECRET` — the bot is up but the shop cannot
   reach it. Copy the value from Vercel.
 
-### Option B — Render
+### Option B — PebbleHost (Discord bot hosting)
+1. Order a **Discord Bot** server with **Node.js 20**.
+2. In the file manager (or SFTP) upload the contents of the `discord/` folder —
+   **without** `node_modules` (PebbleHost installs dependencies itself from
+   `package.json`) and without any `.env` you have locally with secrets you
+   do not want there.
+3. **Startup file / main file:** `src/bot.js`.
+4. Create a `.env` file in the uploaded folder (same directory as
+   `package.json`) with at least `DISCORD_TOKEN`, `DISCORD_GUILD_ID`,
+   `DISCORD_CLIENT_ID`, `STORE_URL`, `FORGEMARKET_API_URL` and
+   `REVIEW_INGEST_SECRET` (see `.env.example` for the rest). Leave **`PORT`
+   unset** — PebbleHost does not route a web port to the bot, and without it
+   the health endpoint simply stays off.
+5. Once, from the PebbleHost console (or locally with the same `.env`):
+   `npm run register` and then `npm run setup`. Do not put these in the startup
+   command — the bot re-registers commands itself on every start, and `setup`
+   only needs to run when the server structure changes.
+6. Start the server. If the gateway drops and does not come back within five
+   minutes the bot exits with code 1; turn on PebbleHost's auto-restart so it
+   is started again.
+
+### Option C — Render
 1. [render.com](https://render.com) → **New → Background Worker** → connect repo.
-2. **Root Directory:** `discord` · **Build:** `npm ci` · **Start:** `npm start`.
+2. **Root Directory:** `discord` · **Build:** `npm ci` · **Start:** `node src/bot.js`.
 3. Add the same environment variables → Create. (Use a paid instance type; the
    free tier sleeps and the bot would drop offline.)
 
-### Option C — A VPS, in one command (no Railway needed)
+### Option D — A VPS, in one command (no Railway needed)
 For when Railway will not take your card: any Ubuntu 22.04/24.04 or Debian 12
 VPS works — pick a provider whose checkout accepts a payment method you have
 (iDEAL, PayPal, …). The smallest plan is plenty: 1 vCPU, 1 GB RAM.
@@ -432,7 +487,7 @@ To update: put the new folder on the server and run the same command — the
 settings and the live XP and giveaways are kept.
 Logs: `sudo journalctl -u forgemarket-bot -f`.
 
-### Option D — Docker by hand
+### Option E — Docker by hand
 ```bash
 # On the server, after cloning:
 cd discord

@@ -23,6 +23,8 @@
  */
 import { SupplierConnector } from './SupplierConnector.js';
 
+const SUPPLIER_TIMEOUT_MS = Number(process.env.SUPPLIER_TIMEOUT_MS || 15_000);
+
 const DEFAULT_BASE = 'https://api.eldorado.gg';
 
 export class EldoradoConnector extends SupplierConnector {
@@ -37,6 +39,9 @@ export class EldoradoConnector extends SupplierConnector {
     if (!this.config.apiKey) throw new Error('Eldorado: no apiKey configured');
     const res = await fetch(`${this.#base}${path}`, {
       method,
+      /* A supplier that never answers must not hold a paid order — or the
+         function — until the platform kills it mid-purchase. */
+      signal: AbortSignal.timeout(SUPPLIER_TIMEOUT_MS),
       headers: {
         'Authorization': `Bearer ${this.config.apiKey}`,
         'Content-Type': 'application/json',

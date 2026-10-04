@@ -167,11 +167,12 @@ console.log('\n— Stripe does iDEAL, and the check used to say it did not —')
 {
   ok('nothing claims Stripe has no iDEAL any more',
     !/no MOLLIE_API_KEY, so no iDEAL/.test(checks));
-  /* Checkout does not hardcode a method list, on purpose: naming `ideal`
-     throws at session creation if the account has not enabled it, which takes
-     the checkout down rather than degrading it. */
-  ok('checkout leaves the method list to the account',
-    !/payment_method_types/.test(svc));
+  /* The method list is pinned (no reversible SEPA debit for a digital code),
+     and naming `ideal` throws at session creation if the account has not
+     enabled it — so a refused list falls back to card instead of taking the
+     checkout down. */
+  ok('checkout pins its methods, and falls back to card when one is refused',
+    /payment_method_types: config\.payments\.stripe\.methods/.test(svc) && /payment_method_types: \['card'\]/.test(svc));
   /* Which makes it silent — so the check ASKS Stripe instead of assuming. */
   ok('…so the readiness check asks Stripe which methods are live',
     /export async function enabledMethods/.test(svc) && /await stripeMethods\(\)/.test(checks));

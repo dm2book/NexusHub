@@ -1,9 +1,21 @@
 /** Money helpers. Amounts are integer minor units (cents). */
 
-export function formatMoney(minor, currency = 'EUR') {
+/**
+ * The locale an amount is written in, per shop language.
+ *
+ * Every amount used to be formatted en-IE, so a Dutch mail said "€12.50" and a
+ * German one "€12.50" where its reader writes "12,50 €" — in the one place a
+ * buyer checks a number against their bank app. en-IE stays the default for
+ * callers that pass no language (admin views, owner alerts), which is what they
+ * have always shown.
+ */
+export const MONEY_LOCALES = { nl: 'nl-NL', en: 'en-IE', de: 'de-DE', fr: 'fr-FR' };
+
+export function formatMoney(minor, currency = 'EUR', lang) {
   const major = (Number(minor || 0) / 100);
+  const locale = MONEY_LOCALES[lang] || 'en-IE';
   try {
-    return new Intl.NumberFormat('en-IE', { style: 'currency', currency }).format(major);
+    return new Intl.NumberFormat(locale, { style: 'currency', currency: currency || 'EUR' }).format(major);
   } catch {
     return `${major.toFixed(2)} ${currency}`;
   }

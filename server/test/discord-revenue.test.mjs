@@ -24,8 +24,9 @@ const strip = (src) => src
   .replace(/\/\*[\s\S]*?\*\//g, ' ')
   .replace(/^\s*\/\/.*$/gm, ' ');
 
-const bot = read('discord', 'src', 'bot.js');
-const cmds = read('discord', 'src', 'register-commands.js');
+/* The bot's copy and command list now live in i18n.js and commands.js too. */
+const bot = ['bot.js', 'i18n.js', 'commands.js'].map((f) => read('discord', 'src', f)).join('\n');
+const cmds = ['register-commands.js', 'commands.js'].map((f) => read('discord', 'src', f)).join('\n');
 const dcfg = read('discord', 'src', 'config.js');
 const routes = read('server', 'src', 'routes', 'discord.js');
 const dsvc = read('server', 'src', 'services', 'discordService.js');
@@ -39,7 +40,8 @@ const ok = (name, cond, extra = '') => {
 
 console.log('— The referral programme is reachable from Discord —');
 {
-  ok('there is a /ref command', /setName\('ref'\)/.test(cmds));
+  /* Commands are now a table in commands.js: ['ref', description, …]. */
+  ok('there is a /ref command', /setName\('ref'\)|\['ref',/.test(cmds));
   ok('the bot handles it', /commandName === 'ref'/.test(bot) && /async function refCmd/.test(bot));
   ok('and it is answered privately', /refCmd\(i\)[\s\S]{0,600}?ephemeral: true/.test(bot),
     'a referral link in a public channel is one somebody else can take');
@@ -87,8 +89,12 @@ console.log('\n— The review ask reaches a linked buyer —');
     /postReviewRequest\(uid/.test(orders) && /sendEmailAsync\('review_request'/.test(orders));
   /* The claim it makes is the shop's real one, and the only one it has: a
      review here only counts from a delivered order. */
-  ok('and it makes the claim the shop can back',
-    /only counts if it came from a delivered order/.test(dsvc));
+  /* It used to say "only counts if it came from a delivered order" and
+     "landed a day ago" — neither true any more (community vouches exist; the
+     sweep runs a day or more after delivery). It now claims nothing it cannot
+     back, in the buyer's language. */
+  ok('and it makes no claim the shop cannot back',
+    !/landed a day ago/.test(dsvc) && !/only counts if it came from a delivered order/.test(dsvc) && /revTitle/.test(dsvc));
   ok('one ask per order, not a nag',
     /review_request_sent_at IS NULL/.test(orders));
 }
@@ -198,7 +204,7 @@ console.log('\n— The review DM asks where it counts most —');
      shop offers Trustpilot. */
   ok('the other prompts still have it',
     /trustpilotHtml/.test(read('server/src/services/orderService.js'))
-    && /Would you put it on Trustpilot too\?/.test(read('discord/src/bot.js')));
+    && /Would you put it on Trustpilot too\?/.test(read('discord/src/bot.js') + read('discord/src/i18n.js')));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

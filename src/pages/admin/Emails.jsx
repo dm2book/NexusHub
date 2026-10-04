@@ -116,7 +116,7 @@ export default function Emails() {
 
             {preview && (
               <div className="card p-2">
-                <iframe title="preview" srcDoc={preview} className="w-full h-[480px] rounded-xl bg-white" />
+                <iframe title="preview" sandbox="" srcDoc={preview} className="w-full h-[480px] rounded-xl bg-white" />
               </div>
             )}
           </div>

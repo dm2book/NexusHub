@@ -50,7 +50,8 @@ console.log('— Per-mail identity —');
   ok('eyebrows are distinct per mail', seen.size === DEFAULT_TEMPLATES.length, `${seen.size}/${DEFAULT_TEMPLATES.length}`);
 
   const render = async (id) => {
-    const tpl = await get('SELECT * FROM email_templates WHERE id=@id', { id });
+    /* One row per language now: ask for the Dutch one, not whichever comes first. */
+    const tpl = await get("SELECT * FROM email_templates WHERE id=@id AND lang='nl'", { id });
     return renderTemplate(tpl, baseContext({
       user: { name: 'Sam' }, order: { number: 'FM-1', total: '€9.99', url: 'https://forgemarket.nl/track?number=FM-1' },
       otp: { code: '123456', ttl: 10 }, refund: { amount: '€9.99' }, giftCard: { amount: '€10' },
@@ -123,16 +124,16 @@ console.log('\n— Redeem steps per category —');
 // ── 4. Upgrades never clobber an admin's own copy ───────────────────────────
 console.log('\n— Template upgrades —');
 {
-  await run('UPDATE email_templates SET body_html=@b WHERE id=@i',
+  await run("UPDATE email_templates SET body_html=@b WHERE id=@i AND lang='nl'",
     { b: LEGACY_TEMPLATE_BODIES.payment_confirmed[0], i: 'payment_confirmed' });
   await syncEmailTemplates();
-  const upgraded = await get("SELECT body_html FROM email_templates WHERE id='payment_confirmed'");
+  const upgraded = await get("SELECT body_html FROM email_templates WHERE id='payment_confirmed' AND lang='nl'");
   ok('an untouched old default is upgraded', /Wat er nu gebeurt/.test(upgraded.body_html));
 
   const mine = '<h1>Eigen tekst</h1><p>{{order.number}}</p>';
-  await run('UPDATE email_templates SET body_html=@b WHERE id=@i', { b: mine, i: 'payment_confirmed' });
+  await run("UPDATE email_templates SET body_html=@b WHERE id=@i AND lang='nl'", { b: mine, i: 'payment_confirmed' });
   await syncEmailTemplates();
-  const kept = await get("SELECT body_html FROM email_templates WHERE id='payment_confirmed'");
+  const kept = await get("SELECT body_html FROM email_templates WHERE id='payment_confirmed' AND lang='nl'");
   ok('an admin-edited body is left alone', kept.body_html === mine);
 }
 
@@ -156,7 +157,7 @@ console.log('\n— Trustpilot in the review request —');
   ok('the html token is not escaped into visible markup', !/&lt;a /.test(on));
 
   // A live database seeded before this change must pick the new copy up.
-  await run('UPDATE email_templates SET body_html=@b WHERE id=@i',
+  await run("UPDATE email_templates SET body_html=@b WHERE id=@i AND lang='nl'",
     { b: LEGACY_TEMPLATE_BODIES.review_request[0], i: 'review_request' });
   await syncEmailTemplates();
   /* The Dutch row: the upgrade path is Dutch-only (seed.js), and without the

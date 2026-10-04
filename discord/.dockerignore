@@ -4,4 +4,6 @@ npm-debug.log
 *.log
 guild-map.json
 xp.json
+giveaways.json
+bot-meta.json
 .git

@@ -17,6 +17,8 @@
 import { SupplierConnector } from './SupplierConnector.js';
 import { parseMoney } from '../../utils/money.js';
 
+const SUPPLIER_TIMEOUT_MS = Number(process.env.SUPPLIER_TIMEOUT_MS || 15_000);
+
 export class ApiConnector extends SupplierConnector {
   static kind = 'api';
   get supportsSync() { return true; }
@@ -38,6 +40,9 @@ export class ApiConnector extends SupplierConnector {
   async #request(path, { method = 'GET', body } = {}) {
     const res = await fetch(this.#url(path), {
       method,
+      /* A supplier that never answers must not hold a paid order — or the
+         function — until the platform kills it mid-purchase. */
+      signal: AbortSignal.timeout(SUPPLIER_TIMEOUT_MS),
       headers: this.#headers(),
       body: body ? JSON.stringify(body) : undefined,
     });

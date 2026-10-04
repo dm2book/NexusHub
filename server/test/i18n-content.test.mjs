@@ -62,10 +62,21 @@ const walk = (dir) => readdirSync(dir, { withFileTypes: true })
  */
 const files = ['src', 'server/src', 'discord/src']
   .flatMap((d) => walk(join(ROOT, d)))
-  .filter((f) => /\.jsx?$/.test(f));
+  .filter((f) => /\.jsx?$/.test(f))
+  /* Slash-command localisations: Discord takes the English text as the base
+     description (setDescription) and only the OTHER languages as a
+     localisation map, so these maps carry nl/de/fr and English sits beside
+     them by design. Every command and option is checked there instead. */
+  .filter((f) => !/discord[\/]src[\/]commands\.js$/.test(f));
 
 console.log('— Every language-keyed map covers every language —');
 {
+  {
+    const cmd = readFileSync(join(ROOT, 'discord/src/commands.js'), 'utf8');
+    const maps = [...cmd.matchAll(/\{ nl: '[^']*'[^}]*\}/g)].map((m) => m[0]);
+    ok('every slash command and option has nl, de and fr beside its English text',
+      maps.length >= 20 && maps.every((x) => /de: '/.test(x) && /fr: '/.test(x)), String(maps.length));
+  }
   ok(`the shop offers ${LANG_CODES.length} languages`, LANG_CODES.length >= 4, LANG_CODES.join(','));
 
   /**

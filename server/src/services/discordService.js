@@ -205,6 +205,26 @@ export async function stampBotSeen() {
   await run(`INSERT INTO kv (key, value, updated_at) VALUES ('discord_bot_seen_at', @v, @v)
              ON CONFLICT (key) DO UPDATE SET value=@v, updated_at=@v`, { v: at }).catch(() => {});
 }
+/**
+ * Tell the owner when the bot stops polling. It watches the site, but nothing
+ * watched it: an offline bot was noticed by customers first. Once per outage —
+ * the alert is keyed on the last time it was seen.
+ */
+export async function checkBotHeartbeat({ minutes = 10 } = {}) {
+  const r = await get(`SELECT value FROM kv WHERE key='discord_bot_seen_at'`).catch(() => null);
+  if (!r?.value) return { status: 'never seen' };
+  const age = Date.now() - Date.parse(r.value);
+  if (age < minutes * 60_000) return { status: 'online' };
+  const { alertOwner } = await import('./notifyService.js');
+  await alertOwner('system.error', {
+    title: 'Discord bot is offline',
+    lines: [`Last seen ${Math.round(age / 60_000)} minutes ago (${r.value}).`,
+      'Check the bot host (Railway/PebbleHost) — tickets, order lookups and alerts are down until it is back.'],
+    key: `bot-offline-${r.value}`,
+  }).catch(() => {});
+  return { status: 'offline', minutes: Math.round(age / 60_000) };
+}
+
 export async function botSeenRecently(hours = 24) {
   try {
     const r = await get(`SELECT value FROM kv WHERE key='discord_bot_seen_at'`);
@@ -398,7 +418,7 @@ export async function postFraudHoldAlert(order, { score, signals = [] } = {}) {
       { name: 'Order', value: `\`${order.number}\``, inline: true },
       { name: 'Amount', value: money(order.total, order.currency), inline: true },
       { name: 'Risk score', value: `${score} / 100`, inline: true },
-      { name: 'Customer', value: order.email || 'unknown' },
+      /* No email: Discord is not where a customer's address belongs. */
       ...(signals.length ? [{ name: 'Why', value: signals.map((s) => `• ${s.detail}`).join('\n').slice(0, 1000) }] : []),
       { name: 'Review', value: `${config.appUrl}/admin/security` },
     ],
@@ -467,7 +487,7 @@ export async function postDropEvent(kind, data = {}) {
   } else if (kind === 'restock') {
     embed = {
       title: `📦 Restocked: ${data.name}`,
-      description: `**${data.added}** new codes just landed${data.price ? ` — ${money(data.price, data.currency)}` : ''}.\n[Shop before it's gone](${config.appUrl}/product/${data.id})`,
+      description: `**${data.added}** new codes just landed${data.price ? ` — ${money(data.price, data.currency)}` : ''}.\n[Bekijk het](${config.appUrl}/product/${data.id})`,
       color: 0x10b981,
     };
   } else if (kind === 'coupon') {
@@ -618,17 +638,29 @@ export async function postReferralEarned(discordUserId, { commissionCents } = {}
  * order is not going anywhere for two weeks and saying otherwise would be a
  * countdown that is not counting anything.
  */
-export async function postPaymentReminder(discordUserId, { orderNumber, amount } = {}) {
+/* The two DMs the store sends a buyer, in the language they bought in. */
+const DM = {
+  nl: { payTitle: '💳 Je bestelling wacht op betaling', payBody: 'Maak het exacte bedrag over met je bestelnummer als omschrijving; we sturen hem zodra de betaling binnen is.', open: 'Open je bestelling', payFoot: 'er wordt niets automatisch afgeschreven',
+    revTitle: '⭐ Hoe ging het?', delivered: (p) => (p ? `Je **${p}** is geleverd.` : 'Je bestelling is geleverd.'), revBody: 'Een eerlijke review helpt andere kopers het meest.', vouch: (u) => `Typ \`/vouch\` in de server, of [schrijf hem op de site](${u}).`, tp: (u) => `⭐ Of zet hem op [Trustpilot](${u}) — die is openbaar en wij kunnen er niets aan veranderen.` },
+  en: { payTitle: '💳 Your order is waiting for payment', payBody: 'Transfer the exact amount shown with your order number as the reference, and it goes out as soon as the payment is matched.', open: 'Open your order', payFoot: 'nothing is charged automatically',
+    revTitle: '⭐ How did it go?', delivered: (p) => (p ? `Your **${p}** was delivered.` : 'Your order was delivered.'), revBody: 'An honest review helps other buyers most.', vouch: (u) => `Type \`/vouch\` in the server, or [write it on the site](${u}).`, tp: (u) => `⭐ Or put it on [Trustpilot](${u}) — that one is public and we cannot change a word of it.` },
+  de: { payTitle: '💳 Deine Bestellung wartet auf Zahlung', payBody: 'Überweise den genauen Betrag mit deiner Bestellnummer als Verwendungszweck; sie geht raus, sobald die Zahlung zugeordnet ist.', open: 'Bestellung öffnen', payFoot: 'es wird nichts automatisch abgebucht',
+    revTitle: '⭐ Wie lief es?', delivered: (p) => (p ? `Dein **${p}** wurde geliefert.` : 'Deine Bestellung wurde geliefert.'), revBody: 'Eine ehrliche Bewertung hilft anderen Käufern am meisten.', vouch: (u) => `Tippe \`/vouch\` im Server, oder [schreib sie auf der Website](${u}).`, tp: (u) => `⭐ Oder auf [Trustpilot](${u}) — die ist öffentlich und wir können kein Wort ändern.` },
+  fr: { payTitle: '💳 Ta commande attend le paiement', payBody: 'Vire le montant exact avec ton numéro de commande en référence ; elle part dès que le paiement est reçu.', open: 'Ouvrir ta commande', payFoot: 'rien n’est prélevé automatiquement',
+    revTitle: '⭐ Ça s’est bien passé ?', delivered: (p) => (p ? `Ton **${p}** a été livré.` : 'Ta commande a été livrée.'), revBody: 'Un avis honnête aide le plus les autres acheteurs.', vouch: (u) => `Tape \`/vouch\` sur le serveur, ou [écris-le sur le site](${u}).`, tp: (u) => `⭐ Ou sur [Trustpilot](${u}) — public, et nous ne pouvons rien y changer.` },
+};
+const dmLang = (l) => DM[l] || DM.en;
+
+export async function postPaymentReminder(discordUserId, { orderNumber, amount, lang } = {}) {
   if (!discordUserId || !orderNumber) return;
+  const t = dmLang(lang);
   await relayDm(discordUserId, {
     embeds: [{
-      title: '💳 Your order is waiting for payment',
-      description: `**${orderNumber}**${amount ? ` · ${amount}` : ''}\n\n`
-        + 'Transfer the exact amount shown with your order number as the reference, '
-        + 'and it goes out as soon as the payment is matched.\n\n'
-        + `[Open your order](${config.appUrl}/track?number=${encodeURIComponent(orderNumber)})`,
+      title: t.payTitle,
+      description: `**${orderNumber}**${amount ? ` · ${amount}` : ''}\n\n${t.payBody}\n\n`
+        + `[${t.open}](${config.appUrl}/track?number=${encodeURIComponent(orderNumber)})`,
       color: 0x6366f1,
-      footer: { text: `${config.email.fromName} · nothing is charged automatically` },
+      footer: { text: `${config.email.fromName} · ${t.payFoot}` },
       timestamp: new Date().toISOString(),
     }],
   }).catch(() => {});
@@ -646,25 +678,22 @@ export async function postPaymentReminder(discordUserId, { orderNumber, amount }
  * One ask per order, because the sweep already only picks orders it has not
  * asked about; a second prompt is a shop nagging someone who bought from it.
  */
-export async function postReviewRequest(discordUserId, { orderNumber, productName } = {}) {
+export async function postReviewRequest(discordUserId, { orderNumber, productName, lang } = {}) {
   if (!discordUserId) return;
+  const t = dmLang(lang);
   await relayDm(discordUserId, {
     embeds: [{
-      title: '⭐ How did it go?',
-      description: (productName ? `Your **${productName}** landed a day ago.\n\n` : 'Your order landed a day ago.\n\n')
-        + 'A review here only counts if it came from a delivered order, so yours is worth '
-        + 'more than a page of five stars from nobody.\n\n'
-        + `Type \`/vouch\` in the server, or [write it on the site](${config.appUrl}/reviews).`
+      title: t.revTitle,
+      /* "Landed a day ago" was a guess — the sweep runs a day or more after
+         delivery. And a /vouch is no longer only from a delivered order. */
+      description: `${t.delivered(productName)}\n\n${t.revBody}\n\n${t.vouch(`${config.appUrl}/reviews`)}`
         /* The same ask the delivery email carries, in the place a Discord buyer
            actually reads. The vouch reply already offers Trustpilot after
            somebody writes one; this is the step before it, and it was the only
            review prompt in the shop that did not mention the one page we cannot
            edit — which is exactly why it is worth more than the two we can.
            Empty when no profile is configured, like every other optional line. */
-        + (config.shop.trustpilotReviewUrl
-          ? `\n\n⭐ Or put it on [Trustpilot](${config.shop.trustpilotReviewUrl}) — `
-            + 'that one is public and we cannot change a word of it.'
-          : ''),
+        + (config.shop.trustpilotReviewUrl ? `\n\n${t.tp(config.shop.trustpilotReviewUrl)}` : ''),
       color: 0xf59e0b,
       footer: { text: `${config.email.fromName}${orderNumber ? ` · ${orderNumber}` : ''}` },
       timestamp: new Date().toISOString(),

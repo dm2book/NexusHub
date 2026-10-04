@@ -6,7 +6,7 @@
 import { run, get, all, nowIso } from '../db/index.js';
 import { newId } from '../utils/ids.js';
 import { couponFor } from '../config/env.js';
-import { badRequest, notFound } from '../utils/errors.js';
+import { badRequest, notFound, conflict } from '../utils/errors.js';
 import { postDropEvent } from './discordService.js';
 
 const up = (c) => String(c || '').trim().toUpperCase();
@@ -40,7 +40,7 @@ export async function evaluateCoupon(code, { subtotal = 0, userId = null, email 
     if (row.per_user_limit != null && (userId || email)) {
       const used = await get(
         `SELECT COUNT(*) AS n FROM coupon_redemptions WHERE code=@c AND (user_id=@u OR (email IS NOT NULL AND email=@e))`,
-        { c, u: userId, e: email ? String(email).toLowerCase() : null });
+        { c, u: userId, e: email ? canonicalEmail(email) : null });
       if (Number(used?.n || 0) >= row.per_user_limit) return { ok: false, reason: "You've already used this code" };
     }
     const discount = discountOf(row, subtotal);
@@ -60,15 +60,45 @@ export async function evaluateCoupon(code, { subtotal = 0, userId = null, email 
   return { ok: false, reason: 'Invalid or expired code' };
 }
 
-/** Record a redemption + bump the counter (DB coupons only). Best-effort. */
+/**
+ * One mailbox, however it is spelled: "a.b+promo@gmail.com" is "ab@gmail.com".
+ * Per-user limits keyed on the raw address were passed with a plus-alias.
+ */
+export function canonicalEmail(email) {
+  const e = String(email || '').trim().toLowerCase();
+  const [local, domain] = e.split('@');
+  if (!domain) return e;
+  let l = local.split('+')[0];
+  if (domain === 'gmail.com' || domain === 'googlemail.com') l = l.replace(/\./g, '');
+  return `${l}@${domain === 'googlemail.com' ? 'gmail.com' : domain}`;
+}
+
+/**
+ * Take one use of a coupon for an order — atomically. The count is raised
+ * only while it is under the limit, in the same statement that checks it, so
+ * six orders at once cannot all take a code meant for one. Called inside the
+ * order's transaction: a refusal rolls the order back with it.
+ */
 export async function recordCouponRedemption({ code, userId = null, email = null, orderId = null, ip = null }) {
   const c = up(code);
   if (!c) return;
+  const exists = await get('SELECT id FROM coupons WHERE code = @c', { c });
+  if (exists) {
+    const took = await get(`UPDATE coupons SET redeemed_count = redeemed_count + 1
+                             WHERE code = @c AND (max_redemptions IS NULL OR redeemed_count < max_redemptions)
+                             RETURNING id`, { c });
+    if (!took) throw conflict('This code has reached its limit');
+  }
   await run(
     `INSERT INTO coupon_redemptions (id, code, user_id, email, ip, order_id, created_at)
      VALUES (@id, @c, @u, @e, @ip, @o, @at)`,
-    { id: newId('crd'), c, u: userId, e: email ? String(email).toLowerCase() : null, ip, o: orderId, at: nowIso() });
-  await run('UPDATE coupons SET redeemed_count = redeemed_count + 1 WHERE code = @c', { c });
+    { id: newId('crd'), c, u: userId, e: email ? canonicalEmail(email) : null, ip, o: orderId, at: nowIso() });
+}
+
+/** Give a use back when an order that was never paid is cancelled or fails. */
+export async function releaseCouponRedemption(orderId) {
+  const r = await get(`DELETE FROM coupon_redemptions WHERE order_id = @o RETURNING code`, { o: orderId });
+  if (r?.code) await run(`UPDATE coupons SET redeemed_count = GREATEST(0, redeemed_count - 1) WHERE code = @c`, { c: r.code });
 }
 
 // ── Admin CRUD ───────────────────────────────────────────────────────────────

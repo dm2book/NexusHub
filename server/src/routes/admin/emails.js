@@ -57,7 +57,10 @@ router.get('/', requirePermission('emails.manage'), asyncHandler(async (req, res
 }));
 
 router.get('/log', requirePermission('emails.manage'), asyncHandler(async (_req, res) => {
-  res.json({ log: await all('SELECT * FROM email_log ORDER BY created_at DESC LIMIT 100') });
+  /* Never the context: it is the render input, and older rows held login codes
+     and delivered gift codes. What an admin needs is who, what and whether. */
+  res.json({ log: await all(`SELECT id, template_id, to_email, subject, status, provider_ref, error, created_at
+                               FROM email_log ORDER BY created_at DESC LIMIT 100`) });
 }));
 
 router.get('/:id', requirePermission('emails.manage'), asyncHandler(async (req, res) => {

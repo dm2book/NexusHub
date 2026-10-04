@@ -113,14 +113,14 @@ function withHead(html, { title, description, canonical, image, imageSize = { w:
     ...(ld || []).map((d) => `<script type="application/ld+json"${
       d['@type'] === 'Product' && ldProductId
         ? ` id="jsonld-product" data-product="${esc(ldProductId)}"` : ''
-    }>${JSON.stringify(d)}</script>`),
+    }>${JSON.stringify(d).replace(/</g, '\\u003c')}</script>`),
     /* The product itself, so React draws it on its first render.
        Same object /api/products/:id returns, from the same two queries this
        handler already ran. The page still refetches in the background — the
        HTML is edge-cached for five minutes and a price must not be five minutes
        old — but the visitor reads the product while that happens instead of
-       watching a spinner. JSON.stringify cannot emit `</script>`, but it can
-       emit the characters, so `<` is escaped. */
+       watching a spinner. JSON.stringify happily emits `</script>` from a product
+       name or description, so `<` is escaped — here and in the JSON-LD. */
     ...(boot
       ? [`<script>window.__FM_BOOT__=${JSON.stringify(boot).replace(/</g, '\\u003c')}</script>`]
       : []),

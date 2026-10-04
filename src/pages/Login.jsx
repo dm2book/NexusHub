@@ -40,8 +40,9 @@ export default function Login() {
   // it cannot, so the form never promises SMS and then takes it away — losing
   // the phone option on load reads as the page breaking.
   const [smsOk, setSmsOk] = useState(false);
-  const [step, setStep] = useState('id');        // id | code | totp
-  const [totpTicket, setTotpTicket] = useState(null); // 2FA challenge after a correct OTP
+  /* Arriving from a Discord/Google sign-in on a 2FA account: straight to the code. */
+  const [step, setStep] = useState(location.state?.totpTicket ? 'totp' : 'id');        // id | code | totp
+  const [totpTicket, setTotpTicket] = useState(location.state?.totpTicket || null); // 2FA challenge after a correct OTP or provider sign-in
   const [identifier, setIdentifier] = useState('');
   const [channel, setChannel] = useState('email');
   const [remember, setRemember] = useState(true);

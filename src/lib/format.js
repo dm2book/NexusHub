@@ -15,3 +15,9 @@ export const money = (cents, cur = 'EUR') => formatter(cur).format((cents || 0) 
 
 export const date = (iso) => (iso ? new Date(iso).toLocaleString() : '—');
 export const dateShort = (iso) => (iso ? new Date(iso).toLocaleDateString() : '—');
+
+/* A refund sends real money back through Stripe or Mollie and cannot be
+   undone — so it takes the order number, typed, not one stray click. */
+export const confirmRefund = (o) => (window.prompt(
+  `Terugbetalen: ${money(o.total, o.currency)} voor ${o.number}.\nDit stuurt het geld echt terug en kan niet ongedaan worden.\n\nTyp het bestelnummer om te bevestigen:`,
+) || '').trim().toUpperCase() === String(o.number).toUpperCase();

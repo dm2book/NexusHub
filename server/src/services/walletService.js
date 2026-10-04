@@ -69,6 +69,13 @@ export const credit = (userId, amount, type, description, opts = {}) =>
 export const debit = (userId, amount, type, description, opts = {}) =>
   addEntry({ userId, amount: -Math.abs(amount), type, description, ...opts });
 
+/** What an order took from the wallet, in cents (the sum of its 'spend' entries, as a positive number). */
+export async function spentOnOrder(orderId) {
+  if (!orderId) return 0;
+  const r = await get(`SELECT COALESCE(SUM(amount),0) AS s FROM credit_transactions WHERE order_id=@o AND type='spend'`, { o: orderId });
+  return Math.max(0, -Number(r?.s || 0));
+}
+
 /** Has this order already produced an entry of `type`? (idempotency guard) */
 export async function hasOrderEntry(orderId, type) {
   if (!orderId) return false;

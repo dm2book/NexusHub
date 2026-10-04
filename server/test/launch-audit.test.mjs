@@ -131,7 +131,10 @@ console.log('\n— A Dutch shop sends Dutch email —');
      would be a fabricated "previous body" in a list whose whole purpose is to
      recognise bodies that actually existed. Listed explicitly rather than
      inferred, so adding a template is a conscious decision either way. */
-  const BORN_DUTCH = new Set(['launch_announcement', 'price_drop']);
+  const BORN_DUTCH = new Set(['launch_announcement', 'price_drop',
+    /* Added with the mail audit, Dutch from their first line. */
+    'security_alert', 'order_cancelled', 'order_on_hold', 'payment_not_verified',
+    'refund_request_received', 'refund_request_rejected', 'ticket_opened', 'newsletter_confirm']);
   const needLegacy = DEFAULT_TEMPLATES.filter((t) => !BORN_DUTCH.has(t.id));
   ok('every template that was rewritten has its English body registered as legacy',
     needLegacy.every((t) => (LEGACY_TEMPLATE_BODIES[t.id] || []).length > 0),
@@ -143,9 +146,10 @@ console.log('\n— A Dutch shop sends Dutch email —');
     }), [...BORN_DUTCH].join(', '));
 
   // The seeded rows, not just the source: this is what actually gets sent.
-  const stored = await get(`SELECT subject, body_html FROM email_templates WHERE id='order_completed'`);
+  /* One row per language: the Dutch one is the shop's own. */
+  const stored = await get(`SELECT subject, body_html FROM email_templates WHERE id='order_completed' AND lang='nl'`);
   ok('the seeded delivery mail is Dutch', /klaar|geleverd/i.test(stored?.subject || ''), stored?.subject);
-  const otp = await get(`SELECT subject FROM email_templates WHERE id='login_otp'`);
+  const otp = await get(`SELECT subject FROM email_templates WHERE id='login_otp' AND lang='nl'`);
   ok('…and so is the login code', /inlogcode/i.test(otp?.subject || ''), otp?.subject);
 }
 

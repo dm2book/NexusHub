@@ -148,9 +148,13 @@ console.log('\n— In the language they signed up in —');
     trans.split('launch_announcement:').length === 4
     && /launch_announcement/.test(read('server/src/services/defaultTemplates.js')),
     String(trans.split('launch_announcement:').length - 1));
-  ok('…and every language has an unsubscribe link in it',
-    trans.split('launch_announcement:').slice(1)
-      .every((chunk) => chunk.slice(0, 1400).includes('newsletter.unsubscribeUrl')));
+  /* The link moved out of each template into the footer of every marketing
+     mail, signed per address and list, with the RFC 8058 headers — so no
+     language (and no future marketing template) can be sent without it. */
+  ok('…and every language gets an unsubscribe link — in the footer of every marketing mail',
+    /launch_announcement: 'marketing'/.test(read('server/src/services/emailService.js'))
+    && /unsubscribeUrl\s*\?/.test(read('server/src/services/templateService.js'))
+    && /List-Unsubscribe-Post/.test(read('server/src/services/emailService.js')));
 }
 
 console.log('\n— Getting off the list actually works —');

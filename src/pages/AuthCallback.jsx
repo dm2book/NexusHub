@@ -11,7 +11,11 @@ export default function AuthCallback() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.hash.slice(1));
     const token = params.get('token');
-    if (token) {
+    const totp = params.get('totp');
+    if (totp) {
+      /* A 2FA account: the login page asks for the authenticator code. */
+      navigate('/login', { replace: true, state: { totpTicket: totp } });
+    } else if (token) {
       login(token).then(() => navigate('/account', { replace: true }));
     } else {
       navigate('/login?error=oauth', { replace: true });

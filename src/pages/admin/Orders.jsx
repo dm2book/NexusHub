@@ -4,7 +4,7 @@ import {
   Search, Eye, Truck, CheckCircle2, RotateCcw, Mail, AlertTriangle, Download,
 } from 'lucide-react';
 import { api, getAccessToken } from '../../lib/api.js';
-import { money, dateShort } from '../../lib/format.js';
+import { money, dateShort, confirmRefund } from '../../lib/format.js';
 import { PageLoader, StatusBadge, EmptyState, Modal } from '../../components/ui.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
@@ -169,7 +169,7 @@ export default function AdminOrders() {
                       )}
                       {hasPermission('orders.refund') && ['completed', 'payment_received', 'processing', 'awaiting_fulfillment'].includes(o.status) && (
                         <IconBtn title="Refund" icon={RotateCcw} color="text-fuchsia-400"
-                          onClick={() => act(o, 'refund')} />
+                          onClick={() => confirmRefund(o) && act(o, 'refund')} />
                       )}
                       {hasPermission('orders.contact') && (
                         <IconBtn title="Contact customer" icon={Mail}

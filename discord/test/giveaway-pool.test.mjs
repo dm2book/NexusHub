@@ -1,27 +1,27 @@
 /**
- * The draw, and the bonus entries somebody paid for.
+ * The giveaway draw: one equal chance per entrant, nothing else.
  *
- * A giveaway kept its entrants in a `Set` of user ids and drew from that. One
- * ticket each, by construction — which is fine until the shop starts selling
- * "+1 bonus entry in this week's giveaway" for eight coins, which it does. The
- * extra entry was not representable at all: not by the bot, and not by a staff
- * member trying to honour it by hand. The coins bought nothing.
+ * The draw used to add tickets for Forge-Shop "boosts" bought with coins
+ * earned by spending — a paid advantage in a game of chance. That is gone, and
+ * these tests make sure it stays gone, along with the rules the published
+ * terms promise:
  *
- * The pool is what the draw reaches into now. Two things about it are easy to
- * get wrong and both cost somebody a prize:
- *
- *   · a second ticket must not win the same person a second prize, so the draw
- *     removes every ticket belonging to a winner, not just the one drawn;
- *   · the entry count printed at the end must be the size of the POOL. Printing
- *     the number of people while drawing from a weighted pool misreports
- *     everybody's odds.
+ *   · nobody wins twice in one draw;
+ *   · a reroll never picks someone who already won that giveaway;
+ *   · each entrant's odds are equal;
+ *   · the logged fingerprint depends on who entered, not on entry order;
+ *   · entry needs a Discord account at least seven days old.
  */
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createHash } from 'node:crypto';
+import { drawWinners, entrantsFingerprint } from '../src/giveaway.js';
+import { accountOldEnough, MIN_ACCOUNT_AGE_MS } from '../src/limits.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const bot = readFileSync(join(ROOT, 'src/bot.js'), 'utf8');
+const config = readFileSync(join(ROOT, 'src/config.js'), 'utf8');
 
 let pass = 0, fail = 0;
 const ok = (name, cond, extra = '') => {
@@ -29,92 +29,68 @@ const ok = (name, cond, extra = '') => {
   else { fail++; console.log(`  ❌ ${name} ${extra}`); }
 };
 
-/* The draw, reproduced exactly as bot.js builds and consumes the pool. Kept in
-   step by the source assertions at the bottom — bot.js cannot be imported
-   without a Discord client. */
-function buildPool(ids, boosts = {}) {
-  const pool = [];
-  for (const uid of ids) {
-    pool.push(uid);
-    for (let n = 0; n < (boosts[uid] || 0); n++) pool.push(uid);
+console.log('\n— One entry, one chance —');
+{
+  ok('a duplicate entrant id counts once', drawWinners(['a', 'a', 'a'], 3).length === 1);
+  for (let n = 0; n < 200; n++) {
+    const picks = drawWinners(['a', 'b', 'c', 'd'], 3);
+    if (new Set(picks).size !== picks.length) { ok('nobody wins twice', false, JSON.stringify(picks)); break; }
+    if (n === 199) ok('nobody wins twice', true);
   }
-  return pool;
+  ok('asking for more winners than people stops at the people', drawWinners(['a', 'b'], 5).length === 2);
+  ok('no entrants, no winners', drawWinners([], 1).length === 0);
+
+  /* Equal odds: over many draws each of four entrants wins about a quarter. */
+  const wins = { a: 0, b: 0, c: 0, d: 0 };
+  for (let n = 0; n < 8000; n++) wins[drawWinners(['a', 'b', 'c', 'd'], 1)[0]] += 1;
+  const rates = Object.values(wins).map((w) => w / 8000);
+  ok('every entrant has about the same chance', rates.every((r) => r > 0.21 && r < 0.29),
+    rates.map((r) => (r * 100).toFixed(1)).join('/'));
 }
-function draw(pool, winnersCount, rand = Math.random) {
-  const picks = [];
-  const remaining = [...pool];
-  while (picks.length < winnersCount && remaining.length) {
-    const taken = remaining.splice(Math.floor(rand() * remaining.length), 1)[0];
-    picks.push(taken);
-    for (let k = remaining.length - 1; k >= 0; k--) if (remaining[k] === taken) remaining.splice(k, 1);
+
+console.log('\n— Rerolls skip previous winners —');
+{
+  for (let n = 0; n < 100; n++) {
+    const [w] = drawWinners(['a', 'b', 'c'], 1, { exclude: ['a', 'b'] });
+    if (w !== 'c') { ok('the only remaining entrant is drawn', false, w); break; }
+    if (n === 99) ok('the only remaining entrant is drawn', true);
   }
-  return picks;
+  ok('when everyone has won, nobody is drawn', drawWinners(['a'], 1, { exclude: ['a'] }).length === 0);
 }
 
-console.log('\n— One ticket each, plus what you paid for —');
+console.log('\n— The fingerprint —');
 {
-  ok('no boosts is one ticket per person',
-    buildPool(['a', 'b', 'c']).length === 3);
-  ok('a boost is one extra ticket',
-    buildPool(['a', 'b'], { a: 1 }).length === 3);
-  ok('…and it belongs to the buyer',
-    buildPool(['a', 'b'], { a: 1 }).filter((x) => x === 'a').length === 2);
-  ok('two boosts are two extra tickets',
-    buildPool(['a'], { a: 2 }).length === 3);
-  ok('a boost for somebody who did not enter adds nothing',
-    buildPool(['a'], { z: 5 }).length === 1);
+  const ids = ['300', '100', '200'];
+  const expected = createHash('sha256').update(['100', '200', '300'].join('\n')).digest('hex');
+  ok('it is SHA-256 over the sorted ids', entrantsFingerprint(ids) === expected);
+  ok('entry order does not change it', entrantsFingerprint(['200', '300', '100']) === expected);
+  ok('a different entrant list does', entrantsFingerprint(['100', '200']) !== expected);
 }
 
-console.log('\n— A second ticket does not win a second prize —');
+console.log('\n— Account age —');
 {
-  /* The bug this guards: splice removes ONE ticket. A member holding two who is
-     drawn first would still be in the pool for the second prize, and could win
-     the same giveaway twice while other entrants are still in it. */
-  const pool = buildPool(['a', 'b'], { a: 3 });
-  for (let seed = 0; seed < 50; seed++) {
-    const picks = draw(pool, 2, () => (seed % 7) / 7);
-    if (new Set(picks).size !== picks.length) {
-      ok('nobody wins twice', false, JSON.stringify(picks));
-      break;
-    }
-    if (seed === 49) ok('nobody wins twice', true);
-  }
-  ok('…and the other entrant can still win',
-    new Set(Array.from({ length: 200 }, () => draw(pool, 2)[1])).has('b'));
-  ok('asking for more winners than there are people stops at the people',
-    draw(buildPool(['a'], { a: 4 }), 3).length === 1);
+  const now = Date.now();
+  ok('seven days is the bar', MIN_ACCOUNT_AGE_MS === 7 * 24 * 60 * 60_000);
+  ok('an account from yesterday is too young', !accountOldEnough(now - 86_400_000, now));
+  ok('an account from last month is fine', accountOldEnough(now - 30 * 86_400_000, now));
+  ok('an unknown creation time is not waved through', !accountOldEnough(undefined, now));
 }
 
-console.log('\n— Boosted odds are actually better —');
+console.log('\n— The bot draws this way, and only this way —');
 {
-  /* Four tickets against one: the boosted entrant should win far more often.
-     Asserted as a wide band rather than a number, because it is a random draw
-     and a tight assertion would be flaky rather than correct. */
-  const pool = buildPool(['boosted', 'plain'], { boosted: 3 });
-  let boostedWins = 0;
-  for (let n = 0; n < 4000; n++) if (draw(pool, 1)[0] === 'boosted') boostedWins += 1;
-  const rate = boostedWins / 4000;
-  ok('the boosted entrant wins about four times in five', rate > 0.70 && rate < 0.90,
-    `${(rate * 100).toFixed(1)}%`);
-}
-
-console.log('\n— The bot builds and draws the same way —');
-{
-  ok('the pool is built from entries plus boosts',
-    /for \(let n = 0; n < \(boosts\[uid\] \|\| 0\); n\+\+\) pool\.push\(uid\)/.test(bot));
-  ok('every ticket of a winner is removed, not just the drawn one',
-    /if \(remaining\[k\] === taken\) remaining\.splice\(k, 1\)/.test(bot));
-  ok('boosts are claimed against the giveaway id, so a retry is safe',
-    /claimBoosts\(ids, id\)/.test(bot));
-  ok('…and the request is signed with that id bound in',
-    /boosts:\$\{giveawayId\}/.test(bot));
-  /* A draw that cannot reach the store still has to happen. */
-  ok('an unreachable store draws unweighted rather than not at all',
-    /drawing unweighted/.test(bot));
-  ok('the announced tally is the pool, not the number of people',
-    /\$\{pool\.length\} entries from/.test(bot));
-  ok('…and it says where the bonus entries came from',
-    /bonus \$\{boosted === 1 \? 'entry' : 'entries'\} from the Forge Shop/.test(bot));
+  ok('no boosts are claimed any more', !/claimBoosts|boosts\/claim/.test(bot));
+  ok('no bonus entries are announced', !/bonus (entry|entries)/i.test(bot));
+  ok('the draw uses the shared function', /drawWinners\(ids, gw\.winnersCount/.test(bot));
+  ok('a reroll excludes earlier winners', /drawWinners\(g\.entries, 1, \{ exclude: g\.winners/.test(bot));
+  ok('ended giveaways are kept durably, not for an hour', !/setTimeout\(\(\) => ENDED\.delete/.test(bot)
+    && /endedStore\(\)\[id\] = \{/.test(bot));
+  ok('entrant count and fingerprint are logged', /entrantsFingerprint\(entrants\)/.test(bot)
+    && /name: 'Entrants'/.test(bot));
+  ok('entry checks account age', /async function enterGiveaway[\s\S]{0,900}accountOldEnough/.test(bot));
+  ok('every giveaway links the terms', /async function startGiveaway[\s\S]{0,1500}giveaway-terms/.test(bot));
+  ok('the terms exist and say what the bot enforces',
+    /GIVEAWAY_TERMS/.test(config) && /7 dagen/.test(config) && /16/.test(config) && /SHA-256/.test(config));
+  ok('nothing promises a weekly giveaway', !/every week/i.test(config));
 }
 
 console.log(`\n${fail === 0 ? '✅' : '❌'} giveaway-pool: ${pass} passed, ${fail} failed`);

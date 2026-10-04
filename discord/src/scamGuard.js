@@ -28,6 +28,48 @@ export const SOLICIT_REVERSE = new RegExp(
   String.raw`\b(selling|sell|cheap|cheaper)\b[\s\S]{0,80}\b(${GOODS})\b[\s\S]{0,80}\b(dm|pm|hmu|add)\s+(me|my|for)\b`, 'i');
 
 /**
+ * "free robux", "gratis vbucks", "robux generator" and every ordering of them.
+ *
+ * The single most common bait aimed at this audience, and the old phrase list
+ * only knew "free nitro". `gratis` because the server is Dutch; `gen` and
+ * `generator` because the bait is as often a "generator" as a gift.
+ */
+const BAIT_GOODS = String.raw`robux|rbx|v-?bucks|vbucks|vp|valorant\s*points|nitro|skins?`;
+export const FREE_BAIT = new RegExp(
+  String.raw`\b(free|gratis|generator|gen)\b[^.?!\n]{0,15}?\b(${BAIT_GOODS})\b`
+  + String.raw`|\b(${BAIT_GOODS})\b[^.?!\n]{0,15}?\b(free|gratis|generator|gen)\b`, 'i');
+
+/**
+ * Platforms whose login pages get cloned to steal accounts, with every host
+ * that genuinely belongs to them. A link carrying one of these brand words —
+ * or a one-letter variation of it (steamcommnunity, dlscord) — on any other
+ * host is phishing: roblox.com.free-gift.ru reads as Roblox and is not.
+ */
+export const PLATFORM_BRANDS = {
+  roblox: ['roblox.com', 'rbxcdn.com', 'roblox.qq.com'],
+  steamcommunity: ['steamcommunity.com'],
+  steampowered: ['steampowered.com'],
+  discord: ['discord.com', 'discord.gg', 'discordapp.com', 'discordapp.net', 'discord.gift',
+    'discord.new', 'discord.media', 'discordstatus.com'],
+  epicgames: ['epicgames.com', 'unrealengine.com'],
+  fortnite: ['fortnite.com', 'epicgames.com'],
+};
+
+/** A host pretending to be one of those platforms, or null. */
+export function platformLookalike(content) {
+  const official = Object.values(PLATFORM_BRANDS).flat();
+  for (const m of String(content).matchAll(/https?:\/\/([^\s/$.?#][^\s/]*)/gi)) {
+    const host = m[1].replace(/^www\./, '').toLowerCase().split(':')[0].split('@').pop();
+    if (official.some((h) => host === h || host.endsWith(`.${h}`))) continue;
+    const bare = host.replace(/[^a-z0-9]/g, '');
+    for (const brand of Object.keys(PLATFORM_BRANDS)) {
+      if (bare.includes(brand) || nearMiss(bare, brand)) return { host, brand };
+    }
+  }
+  return null;
+}
+
+/**
  * A link that borrows our name without being us.
  *
  * Compares every host in the message against the real one. Subdomains of the
@@ -81,10 +123,33 @@ export function scamReason(content, { storeHost = 'forgemarket.nl', mentionCount
   const text = String(content || '');
   const fake = lookalikeHost(text, storeHost);
   if (fake) return { kind: 'lookalike', detail: fake, label: `lookalike domain \`${fake}\`` };
+  const phish = platformLookalike(text);
+  if (phish) {
+    return { kind: 'phishing', detail: phish.host, label: `fake ${phish.brand} link \`${phish.host}\`` };
+  }
   if (SOLICIT.test(text) || SOLICIT_REVERSE.test(text)) {
     return { kind: 'solicit', label: 'selling top-ups by DM' };
   }
   if (mentionsEveryone || mentionCount >= 5) return { kind: 'mention', label: 'mass mention' };
   if (SCAM_PHRASE.test(text)) return { kind: 'phrase', label: 'invite link / scam phrase' };
+  if (FREE_BAIT.test(text)) return { kind: 'phrase', label: 'free currency / generator bait' };
   return null;
 }
+
+/**
+ * The same bait, as Discord AutoMod regex patterns (Rust syntax, ≤260 chars
+ * each, ≤10 per rule). AutoMod blocks the message before anyone sees it —
+ * including while this bot is restarting — and the in-process guard above
+ * stays as the second line, catching what a regex cannot (lookalike hosts by
+ * edit distance, edited messages).
+ */
+export const AUTOMOD_REGEX = [
+  String.raw`(?i)\b(free|gratis|generator|gen)\b[^.?!]{0,15}\b(robux|rbx|v-?bucks|vp|nitro|skins?)\b`,
+  String.raw`(?i)\b(robux|rbx|v-?bucks|nitro)\b[^.?!]{0,15}\b(free|gratis|generator|gen)\b`,
+  String.raw`(?i)https?://[^\s/]*(r0blox|rob1ox|robl0x|roblox\.com\.[a-z0-9-]+)`,
+  String.raw`(?i)https?://[^\s/]*(steamcommunlty|steamcommnunity|stearncommunity|steamcommunity\.[a-z]{2,}\.[a-z]{2,})`,
+  String.raw`(?i)https?://[^\s/]*(dlscord|discorcl|disc0rd|dicsord|discord-?nitro|discordgift)\.`,
+  String.raw`(?i)https?://[^\s/]*(epicgames|fortnite)[^\s/]*\.(ru|gift|xyz|top|ml|tk|click)\b`,
+];
+export const AUTOMOD_KEYWORDS = ['free robux', 'free vbucks', 'free v-bucks', 'robux generator',
+  'vbucks generator', 'gratis robux', 'gratis vbucks', 'free nitro'];

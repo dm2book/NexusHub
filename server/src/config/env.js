@@ -134,6 +134,10 @@ export const config = {
     memberCount: Number(env.DISCORD_MEMBER_COUNT || 0) || null,
     // Shared secret the bot uses to push /vouch reviews to /api/reviews/ingest.
     reviewIngestSecret: env.REVIEW_INGEST_SECRET || '',
+    /* Its own secret: /paylink attaches a payment link to a customer's order,
+       so a leak of the general bot secret must not be enough to redirect money.
+       Unset = the command is off. */
+    paylinkSecret: env.DISCORD_PAYLINK_SECRET || '',
   },
 
   // SMS / phone OTP via Twilio. Without credentials, phone codes are logged to
@@ -268,6 +272,10 @@ export const config = {
     // Shared secret the maintenance cron must present (Vercel Cron sets the
     // Authorization header to `Bearer <CRON_SECRET>`).
     cronSecret: env.CRON_SECRET || '',
+    /* Staff other than the owner need an authenticator app before the admin
+       opens: an admin account behind one emailed code is one phished inbox
+       away from the shop. On in production unless STAFF_2FA=off. */
+    requireStaff2fa: env.STAFF_2FA ? env.STAFF_2FA !== 'off' : isProd,
     // Fraud scoring thresholds.
     //
     // `review` holds the delivery: the order is paid and normal, but no code
@@ -342,6 +350,11 @@ export const config = {
     stripe: {
       secretKey: env.STRIPE_SECRET_KEY || '',
       webhookSecret: env.STRIPE_WEBHOOK_SECRET || '',
+      /* Which methods Checkout offers. Pinned, because Stripe otherwise offers
+         every method switched on in the dashboard — SEPA Direct Debit among
+         them, which the payer can reverse for eight weeks with no reason
+         given, after the code was already redeemed. */
+      methods: (env.STRIPE_PAYMENT_METHODS || 'card,ideal,bancontact').split(',').map((m) => m.trim()).filter(Boolean),
     },
     // Mollie: hosted checkout for iDEAL, Bancontact, Apple Pay, card and PayPal.
     // One key switches it on. There is no webhook secret to configure — Mollie
@@ -621,6 +634,17 @@ export function commerceBlockers() {
     if (/^test_/.test(config.payments.mollie.apiKey)) {
       reasons.push('MOLLIE_API_KEY is a test key, so no payment would be real (use the live key)');
     }
+    /* The same for Stripe — but only once the shop is open: before the launch
+       date a test key is how the owner tries the checkout on the real site. */
+    const launched = !config.launch.date || Date.now() >= new Date(config.launch.date).getTime();
+    if (launched && /^sk_test_/.test(config.payments.stripe.secretKey)) {
+      reasons.push('STRIPE_SECRET_KEY is a test key, so no payment would be real (use the live sk_live_ key)');
+    }
+  }
+  /* A Stripe key without its webhook secret takes the money and never hears
+     about it: every webhook is refused, so no order is ever marked paid. */
+  if (config.payments.stripe.secretKey && !config.payments.stripe.webhookSecret) {
+    reasons.push('STRIPE_WEBHOOK_SECRET is missing, so paid orders would never be marked paid');
   }
   return reasons;
 }

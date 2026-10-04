@@ -2,7 +2,7 @@
  * sub-route additionally enforces fine-grained permissions via RBAC. */
 import { Router } from 'express';
 import { requireAuth } from '../../middleware/auth.js';
-import { requireStaff, requirePermission } from '../../middleware/rbac.js';
+import { requireStaff, requirePermission, requireRole } from '../../middleware/rbac.js';
 import orders from './orders.js';
 import suppliers from './suppliers.js';
 import fulfillment from './fulfillment.js';
@@ -50,7 +50,7 @@ router.get('/legal-identity', asyncHandler(async (_req, res) => {
   res.json(await sellerIdentity());
 }));
 
-router.put('/legal-identity', requirePermission('analytics.write'),
+router.put('/legal-identity', requireRole('owner'),
   asyncHandler(async (req, res) => {
     const body = z.object(Object.fromEntries(
       Object.keys(FIELDS).map((k) => [k, z.string().max(200).nullish()]),
@@ -65,11 +65,11 @@ router.put('/legal-identity', requirePermission('analytics.write'),
  * the last four characters. A value is never sent to a browser, because a
  * screen that can show a Stripe key is a screen that can leak one.
  */
-router.get('/settings/keys', requirePermission('analytics.read'), asyncHandler(async (_req, res) => {
+router.get('/settings/keys', requireRole('owner'), asyncHandler(async (_req, res) => {
   res.json({ keys: await secretStatus(), missing: await missingEssentials() });
 }));
 
-router.put('/settings/keys/:id', requirePermission('analytics.write'),
+router.put('/settings/keys/:id', requireRole('owner'),
   asyncHandler(async (req, res) => {
     const { value } = z.object({ value: z.string().max(4000).nullish() }).parse(req.body || {});
     res.json({ keys: await setSecret(req.params.id, value ?? '', { actor: req.user }),
@@ -88,12 +88,12 @@ router.get('/backups', requirePermission('analytics.read'), asyncHandler(async (
   res.json({ backups: await listBackups({ limit: 10 }), status: await backupStatus() });
 }));
 
-router.post('/backups', requirePermission('analytics.write'), asyncHandler(async (req, res) => {
+router.post('/backups', requireRole('owner'), asyncHandler(async (req, res) => {
   res.json({ backup: await takeBackup({ actor: req.user, reason: 'manual' }),
     status: await backupStatus() });
 }));
 
-router.get('/backups/:id/download', requirePermission('analytics.write'),
+router.get('/backups/:id/download', requireRole('owner'),
   asyncHandler(async (req, res) => {
     const b = await readBackup(req.params.id, { actor: req.user });
     if (!b) return res.status(404).json({ error: { message: 'No such backup.' } });

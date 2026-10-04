@@ -7,8 +7,8 @@
  *   - timestamp must be within ±5 minutes (replay window),
  *   - constant-time comparison.
  *
- * A legacy `x-ingest-secret` shared-secret header is still accepted so a not-yet-
- * updated bot keeps working during rollout; prefer the signed path.
+ * The old plain `x-ingest-secret` header is no longer accepted: it carried no
+ * timestamp, so one captured request could be replayed forever. The bot signs.
  */
 import { hmacSha256, safeEqual } from '../utils/crypto.js';
 import { forbidden } from '../utils/errors.js';
@@ -45,10 +45,6 @@ export function verifyIngest(canonical) {
       if (!safeEqual(sig, expected)) return next(forbidden('Bad signature'));
       return next();
     }
-
-    // Legacy shared-secret fallback.
-    const hdr = req.get('x-ingest-secret');
-    if (hdr && safeEqual(hdr, secret)) return next();
     return next(forbidden('Missing or invalid signature'));
   };
 }

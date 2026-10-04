@@ -110,6 +110,7 @@ export async function confirmProof(proofId, ctx = {}) {
     `UPDATE payment_proofs SET status='confirmed', reviewed_by=@by, reviewed_at=@at WHERE id=@id AND status='pending'`,
     { by: ctx.user?.id || 'admin', at: nowIso(), id: proofId });
   if (!claim?.changes) throw badRequest('This proof was already reviewed.');
+  await dropScreenshot(proof);
 
   const updated = await markPaymentReceived(proof.order_id, proof.transaction_id || `proof_${proofId}`,
     { actorId: ctx.user?.id || 'admin', reason: 'Payment proof verified' });
@@ -122,6 +123,23 @@ export async function confirmProof(proofId, ctx = {}) {
   return updated;
 }
 
+/**
+ * Delete a proof's screenshot once it has been reviewed. A banking-app
+ * screenshot shows a name and an IBAN; the privacy policy promises it is
+ * deleted after the check, and nothing ever did. The decision, the amount and
+ * the transaction id stay on the proof as the record.
+ */
+async function dropScreenshot(proof) {
+  const id = /\/api\/images\/([0-9a-f]{32})/.exec(String(proof.screenshot_url || ''))?.[1];
+  await run(`UPDATE payment_proofs SET screenshot_url=NULL WHERE id=@id`, { id: proof.id }).catch(() => {});
+  /* Only an image no product uses and no other proof points at. */
+  if (id) {
+    await run(`DELETE FROM product_images WHERE id=@img AND product_id IS NULL
+                 AND NOT EXISTS (SELECT 1 FROM payment_proofs WHERE screenshot_url LIKE @like)`,
+      { img: id, like: `%${id}%` }).catch((e) => console.error('[proof] screenshot delete:', e.message));
+  }
+}
+
 /** Admin rejects a proof — order stays pending so the customer can resubmit. */
 export async function rejectProof(proofId, reason = '', ctx = {}) {
   const proof = await get('SELECT * FROM payment_proofs WHERE id=@id', { id: proofId });
@@ -130,6 +148,7 @@ export async function rejectProof(proofId, reason = '', ctx = {}) {
 
   await run(`UPDATE payment_proofs SET status='rejected', reject_reason=@r, reviewed_by=@by, reviewed_at=@at WHERE id=@id`,
     { r: String(reason).slice(0, 300) || 'Could not verify payment', by: ctx.user?.id || 'admin', at: nowIso(), id: proofId });
+  await dropScreenshot(proof);
 
   await audit({ action: 'payment.proof_reject', actor: ctx.user, targetType: 'order',
     targetId: proof.order_id, metadata: { proofId, reason }, req: ctx.req });
