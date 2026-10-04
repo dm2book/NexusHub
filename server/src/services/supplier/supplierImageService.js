@@ -41,7 +41,9 @@ const FETCH_TIMEOUT_MS = 8000;
 export const RETRY_AFTER_DAYS = 14;
 
 /** Image sources this service may overwrite. Anything else is somebody's choice. */
-const REPLACEABLE_SOURCES = new Set(['generated']);
+/* A Commons brand logo ('licensed') is a stand-in for the product picture:
+   the supplier's real one replaces it. */
+const REPLACEABLE_SOURCES = new Set(['generated', 'licensed']);
 const TILE = /^\/api\/products\/[^/]+\/tile\.svg$/;
 
 /** The shop's own shipped artwork: files in the repo, or art matched to a product. */

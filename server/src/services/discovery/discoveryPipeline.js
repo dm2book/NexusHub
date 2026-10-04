@@ -282,7 +282,7 @@ export async function evaluateCandidates({ limit = LIMITS.maxEvaluate, ids = nul
  * supplier in stock, a known cost and a price at or above the margin floor —
  * otherwise it is added hidden, with the reason on it.
  */
-export async function addCandidate(candidateId, { actor, auto = false, manualCostCents = null } = {}) {
+export async function addCandidate(candidateId, { actor, auto = false, manualCostCents = null, logoFetch = fetch } = {}) {
   if (!actor) throw new Error('adding a product needs a named actor');
   const c = await get(`SELECT * FROM market_candidates WHERE id=@id`, { id: candidateId });
   if (!c) throw Object.assign(new Error('no such candidate'), { status: 404 });
@@ -335,17 +335,16 @@ export async function addCandidate(candidateId, { actor, auto = false, manualCos
         imageConfidence: Number(c.image_confidence), ...(hiddenReason ? { hiddenReason } : {}) },
     },
   });
-  /* No official picture: the shop's own artwork for the shelf, or a drawn tile
-     with the product's name and amount — exactly what a hand-made product
-     gets. Marked as shop artwork, so Product media keeps it in "Ontbreekt"
-     and the weekly picture check replaces it when a supplier sends the real one. */
+  /* No official picture: the brand's logo under a free licence (Wikimedia
+     Commons) — not the shop's own drawn artwork. None found → no picture,
+     which Product media lists as missing. A supplier's real picture replaces
+     the logo when one arrives. */
   if (!(image?.url && image.confidence >= 0.5)) {
-    const { artFor } = await import('../productFitService.js');
-    const { updateProduct } = await import('../productService.js');
-    const art = artFor({ id: product.id, sku: content.sku, name: product.name, category: product.category,
-      denomination: model.denomination, denomUnit: model.denomUnit });
-    if (art.image) {
-      await updateProduct(product.id, { metadata: { ...product.metadata, image: art.image, imageSource: art.source, imageReason: art.reason } }).catch(() => {});
+    const { logoFor, logoMetadata, logosEnabled } = await import('./commonsLogoService.js');
+    const logo = logosEnabled() ? await logoFor(model.game, { fetchImpl: logoFetch }).catch(() => null) : null;
+    if (logo) {
+      const { updateProduct } = await import('../productService.js');
+      await updateProduct(product.id, { metadata: { ...product.metadata, ...logoMetadata(logo) } }).catch(() => {});
     }
   }
   if (manual == null && sup?.id && sup.sku) {
@@ -522,6 +521,13 @@ export async function scheduledDiscovery({ now = Date.now(), deadline = Date.now
     const ev = await evaluateCandidates({ ...deps, limit: 8, deadline }).catch(() => []);
     out.refresh = { evaluated: ev.length, added: autoAddEnabled() ? (await addAllSafe().catch(() => ({ added: 0 }))).added : 0 };
     await mark('refresh', now);
+  }
+  /* Brand logos instead of shop artwork, a batch per run until every product
+     that shows artwork has its free-licence logo (production only — it asks
+     Wikimedia Commons). */
+  const { applyLogos, logosEnabled } = await import('./commonsLogoService.js');
+  if (logosEnabled() && Date.now() < deadline) {
+    out.logos = await applyLogos({ fetchImpl, limit: 20, deadline }).catch((e) => ({ error: e.message }));
   }
   if (Date.now() < deadline && await due('images', JOBS.images, now)) {
     const { enrichmentQueue, enrichMedia } = await import('../productMediaService.js');
