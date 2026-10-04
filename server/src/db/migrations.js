@@ -2136,4 +2136,31 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS lang TEXT;
       );
     `,
   },
+  {
+    id: '056_product_discovery_pipeline',
+    /*
+     * The discovery pipeline (services/discovery): what a source's API sent as
+     * the listing's picture, and per candidate the safety gate's verdict with
+     * everything behind it — match and image confidence, the supplier listing
+     * and its cost, the suggested price and margin, the generated content and
+     * the chosen picture with its provenance. Plus an owner's edits, kept apart
+     * from what the pipeline found.
+     */
+    sql: `
+      ALTER TABLE market_observations ADD COLUMN IF NOT EXISTS image_url TEXT;
+      ALTER TABLE market_candidates ADD COLUMN IF NOT EXISTS gate_status TEXT;
+      ALTER TABLE market_candidates ADD COLUMN IF NOT EXISTS gate_reasons TEXT;
+      ALTER TABLE market_candidates ADD COLUMN IF NOT EXISTS image_confidence NUMERIC;
+      ALTER TABLE market_candidates ADD COLUMN IF NOT EXISTS image TEXT;
+      ALTER TABLE market_candidates ADD COLUMN IF NOT EXISTS supplier TEXT;
+      ALTER TABLE market_candidates ADD COLUMN IF NOT EXISTS sources_found TEXT;
+      ALTER TABLE market_candidates ADD COLUMN IF NOT EXISTS suggested_price_cents BIGINT;
+      ALTER TABLE market_candidates ADD COLUMN IF NOT EXISTS supplier_cost_cents BIGINT;
+      ALTER TABLE market_candidates ADD COLUMN IF NOT EXISTS expected_margin_pct NUMERIC;
+      ALTER TABLE market_candidates ADD COLUMN IF NOT EXISTS content TEXT;
+      ALTER TABLE market_candidates ADD COLUMN IF NOT EXISTS edits TEXT;
+      ALTER TABLE market_candidates ADD COLUMN IF NOT EXISTS evaluated_at TEXT;
+      CREATE INDEX IF NOT EXISTS idx_market_candidates_gate ON market_candidates (gate_status, updated_at DESC);
+    `,
+  },
 ];
