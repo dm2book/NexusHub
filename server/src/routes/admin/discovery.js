@@ -42,7 +42,7 @@ router.post('/scan', requirePermission('products.write'), scanLimit, asyncHandle
 /* The complete scan, in steps (see fullScanStep). Start once; the page then
    calls /full/step until the answer says done. Not under the scan rate limit:
    each step is bounded by its own budget and the per-host spacing. */
-const brief = (st) => (st ? { ...st, queries: undefined, candidates: undefined,
+const brief = (st) => (st ? { ...st, queries: undefined, candidates: undefined, classifyIds: undefined,
   totalQueries: st.queries?.length ?? st.totalQueries, totalCandidates: st.candidates?.length ?? st.totalCandidates ?? null } : { phase: 'idle' });
 router.get('/full', requirePermission('products.read'), asyncHandler(async (_req, res) => {
   res.set('Cache-Control', 'no-store');

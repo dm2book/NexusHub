@@ -386,6 +386,23 @@ console.log('\n— End to end —');
   delete process.env.DISCOVERY_RESEARCH;
   ok('outside production it loads only when asked (DISCOVERY_RESEARCH=on)', P.researchEnabled() === false);
 
+  /* A remote database answers in ~0.1 s: every step must stop on time and resume. */
+  const slowRun = await runDiscovery({ deadline: Date.now() - 1 });
+  ok('the classify run stops at its deadline and says how much is left', slowRun.classified === 0 && slowRun.remaining > 0, JSON.stringify(slowRun));
+  await run(`DELETE FROM kv WHERE key LIKE 'discovery.research.%'`);
+  const part = await S.importResearch({ deadline: Date.now() - 1 });
+  ok('the research import stops at its deadline and resumes, never half-marked done', part.complete === false && part.next === 0
+    && !(await get(`SELECT 1 FROM kv WHERE key='discovery.research.version'`)));
+  const whole = await S.importResearch({ deadline: Date.now() + 60_000 });
+  ok('…and finishes in later steps', whole.complete === true && (await S.importResearch()).skipped === 'already imported');
+
+  const { classifyNew } = await import('../src/services/market/discovery.js');
+  await run(`INSERT INTO market_products (id, canonical_key, product_type, game, edition, platform, region, denomination, denom_unit, quantity, title, created_at, updated_at)
+             VALUES ('mkp_bulk1','points:roblox:-:any:global:123456:robux:1','points','roblox','','any','global',123456,'robux',1,'Roblox 123456',@at,@at)`, { at: new Date().toISOString() });
+  const bulk = await classifyNew();
+  ok('new market products get their candidates in one go', bulk.classified >= 1 && !!(await get(`SELECT 1 FROM market_candidates WHERE market_product_id='mkp_bulk1'`)));
+  ok('…and a second call finds nothing new', (await classifyNew()).classified === 0);
+
   /* The complete scan: as long as it takes, in steps that each fit a server function. */
   await obs('Roblox 1200 Robux Global');
   const start = await P.startFullScan({ actor: 'owner@test' });

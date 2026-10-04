@@ -108,13 +108,59 @@ export function classify(marketProduct, catalogue, observations) {
     reason: `not in the catalogue; ${observations.length} observation(s)`, confidence: 0.9 };
 }
 
-/** Classify everything we have observed and write the candidate rows. */
-export async function runDiscovery() {
+/**
+ * Give every market product that has no candidate yet its first verdict, in
+ * three statements however many there are: the products, their latest
+ * observation per source, and one INSERT. The per-product loop below costs a
+ * few round trips each — fine locally, minutes against a remote database for
+ * the hundred-odd products one research import adds.
+ */
+export async function classifyNew({ limit = 1000 } = {}) {
+  const fresh = await all(`SELECT p.* FROM market_products p LEFT JOIN market_candidates c ON c.market_product_id = p.id
+                            WHERE c.id IS NULL ORDER BY p.created_at LIMIT @l`, { l: limit });
+  if (!fresh.length) return { classified: 0 };
   const catalogue = await forgeCatalogModels();
-  const products = await all(`SELECT * FROM market_products ORDER BY created_at`);
+  const cut = new Date(Date.now() - 168 * 3600_000).toISOString();
+  const obs = await all(`SELECT DISTINCT ON (market_product_id, source_key, COALESCE(source_product_id, '')) *
+                           FROM market_observations WHERE market_product_id = ANY(@ids) AND observed_at >= @cut
+                          ORDER BY market_product_id, source_key, COALESCE(source_product_id, ''), observed_at DESC`,
+  { ids: fresh.map((p) => p.id), cut });
+  const by = new Map();
+  for (const o of obs) { if (!by.has(o.market_product_id)) by.set(o.market_product_id, []); by.get(o.market_product_id).push(o); }
+  const P = { at: nowIso() };
+  const rows = fresh.map((mp, n) => {
+    const v = classify(mp, catalogue, by.get(mp.id) || []);
+    Object.assign(P, { [`i${n}`]: newId('mkc'), [`p${n}`]: mp.id, [`s${n}`]: v.status, [`r${n}`]: v.reason,
+      [`f${n}`]: v.forgeProductId || null, [`d${n}`]: v.duplicateOf || null, [`c${n}`]: v.confidence });
+    return `(@i${n},@p${n},@s${n},@r${n},@f${n},@d${n},@c${n},@at,@at)`;
+  });
+  await run(`INSERT INTO market_candidates (id, market_product_id, status, reason, forge_product_id, duplicate_of, match_confidence, created_at, updated_at)
+             VALUES ${rows.join(',')} ON CONFLICT (market_product_id) DO NOTHING`, P);
+  return { classified: fresh.length };
+}
+
+/**
+ * Classify everything we have observed and write the candidate rows.
+ *
+ * Bounded by a deadline: each product costs a few database round trips, and
+ * against a remote database a few hundred products is longer than a server
+ * function lives — the run was killed mid-way and started over every hour.
+ * Products whose candidate is oldest (or missing) go first, so consecutive
+ * runs work through the whole set. `onlyNew` classifies only products that
+ * have no candidate yet.
+ */
+export async function runDiscovery({ deadline = Date.now() + 15_000, onlyNew = false, ids = null, atLeast = 0 } = {}) {
+  const catalogue = await forgeCatalogModels();
+  const products = await all(
+    `SELECT p.* FROM market_products p LEFT JOIN market_candidates c ON c.market_product_id = p.id
+      ${ids ? 'WHERE p.id = ANY(@ids)' : onlyNew ? 'WHERE c.id IS NULL' : ''}
+      ORDER BY c.updated_at ASC NULLS FIRST, p.created_at`, ids ? { ids } : {});
   const counts = { discovered: 0, already_listed: 0, possible_duplicate: 0, unavailable: 0, needs_review: 0 };
+  let done = 0;
 
   for (const mp of products) {
+    if (done >= atLeast && Date.now() > deadline) break;
+    done += 1;
     const obs = await latestPerSource(mp.id);
     const verdict = classify(mp, catalogue, obs);
     counts[verdict.status] = (counts[verdict.status] || 0) + 1;
@@ -141,12 +187,19 @@ export async function runDiscovery() {
     } else {
       await run(`INSERT INTO market_candidates (id, market_product_id, status, reason, forge_product_id,
                    duplicate_of, match_confidence, created_at, updated_at)
-                 VALUES (@id,@p,@s,@r,@f,@d,@c,@at,@at)`,
+                 VALUES (@id,@p,@s,@r,@f,@d,@c,@at,@at)
+                 /* Another run (the hourly one, or a button) may have just made it:
+                    then this verdict updates that row instead of failing. Never over a
+                    decision a person made. */
+                 ON CONFLICT (market_product_id) DO UPDATE SET status=EXCLUDED.status, reason=EXCLUDED.reason,
+                   forge_product_id=COALESCE(EXCLUDED.forge_product_id, market_candidates.forge_product_id),
+                   duplicate_of=EXCLUDED.duplicate_of, match_confidence=EXCLUDED.match_confidence, updated_at=EXCLUDED.updated_at
+                 WHERE market_candidates.status NOT IN ('approved', 'rejected', 'product_created', 'published')`,
         { id: newId('mkc'), p: mp.id, s: verdict.status, r: verdict.reason,
           f: verdict.forgeProductId || null, d: verdict.duplicateOf || null, c: verdict.confidence, at });
     }
   }
-  return { classified: products.length, counts };
+  return { classified: done, remaining: products.length - done, counts };
 }
 
 /** The dashboard's five buckets, with the product and its freshest evidence. */

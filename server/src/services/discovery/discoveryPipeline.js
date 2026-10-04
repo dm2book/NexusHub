@@ -29,7 +29,7 @@ import { config } from '../../config/env.js';
 import { audit } from '../auditService.js';
 import { latestPerSource } from '../market/observations.js';
 import { GAMES, parseTitle } from '../market/normalize.js';
-import { CANDIDATE_STATUS, decideCandidate, runDiscovery } from '../market/discovery.js';
+import { CANDIDATE_STATUS, decideCandidate, runDiscovery, classifyNew } from '../market/discovery.js';
 import { categoryFor } from '../productFitService.js';
 import { generateAll } from '../productContentService.js';
 import { deliveryField } from '../../../../src/lib/deliveryInfo.js';
@@ -259,18 +259,25 @@ export async function evaluateCandidate(candidateId, deps = {}) {
 }
 
 /** Evaluate every open candidate (not yet decided), oldest evaluation first. */
-export async function evaluateCandidates({ limit = LIMITS.maxEvaluate, ids = null, deadline = Infinity, ...deps } = {}) {
+export async function evaluateCandidates({ limit = LIMITS.maxEvaluate, ids = null, deadline = Infinity, concurrency = 4, ...deps } = {}) {
   const rows = ids
     ? await all(`SELECT id FROM market_candidates WHERE id = ANY(@ids)`, { ids })
     : await all(`SELECT id FROM market_candidates WHERE status <> ALL(@final)
                   ORDER BY evaluated_at ASC NULLS FIRST LIMIT @l`, { final: FINAL, l: limit });
   const catalogue = deps.catalogue || await catalogueModels();
+  /* A few at a time: each evaluation is ~10 round trips to the database, and
+     one after another they did a dozen per maintenance run. Still small, so a
+     shared connection pool and the suppliers' APIs are not flooded. */
   const out = [];
-  for (const r of rows) {
-    if (Date.now() > deadline) break;
-    // eslint-disable-next-line no-await-in-loop
-    out.push(await evaluateCandidate(r.id, { ...deps, catalogue }).catch((e) => ({ id: r.id, status: 'error', reasons: [e.message] })));
-  }
+  let next = 0;
+  const worker = async () => {
+    while (next < rows.length && Date.now() <= deadline) {
+      const r = rows[next++];
+      // eslint-disable-next-line no-await-in-loop
+      out.push(await evaluateCandidate(r.id, { ...deps, catalogue }).catch((e) => ({ id: r.id, status: 'error', reasons: [e.message] })));
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(concurrency, rows.length) }, worker));
   return out;
 }
 
@@ -492,7 +499,7 @@ export async function nightlyCategoryBatch({ size = BATCH, fetchImpl = fetch } =
   const collected = await collectFromSources(batch, { fetchImpl: f });
   const searched = await collectMentions(batch, { fetchImpl: f }).catch(() => ({ mentions: 0 }));
   await kvSet('discovery.cursor', (from + batch.length) % queries.length);
-  await runDiscovery();
+  await classifyNew();
   return { queries: batch, recorded: collected.recorded, mentions: searched.mentions || 0, unavailable: collected.unavailable.length, errors: collected.errors.length };
 }
 
@@ -507,13 +514,20 @@ export async function scheduledDiscovery({ now = Date.now(), deadline = Date.now
   /* The desk research, once per version, and then every candidate nobody has
      evaluated yet — cheap (no network without suppliers), so it is done on
      the next maintenance run rather than waiting a week. */
-  const research = researchEnabled() ? await importResearch().catch((e) => ({ error: e.message })) : {};
-  if (research.mentions) { await runDiscovery(); out.research = research; }
+  /* Each piece gets a share of the time that is left, and stops on time. */
+  const slice = (ms) => Math.min(deadline, Date.now() + ms);
+  const research = researchEnabled() && Date.now() < deadline
+    ? await importResearch({ deadline: slice(8_000) }).catch((e) => ({ error: e.message })) : {};
+  if (research.mentions || research.error) out.research = research;
+  if (Date.now() < deadline) {
+    const cls = await classifyNew().catch(() => null);
+    if (cls?.classified) out.classified = cls.classified;
+  }
   const fresh = await all(`SELECT id FROM market_candidates WHERE evaluated_at IS NULL AND status <> ALL(@final) LIMIT 300`, { final: FINAL }).catch(() => []);
   if (fresh.length && Date.now() < deadline) {
     out.firstEvaluation = (await evaluateCandidates({ ...deps, ids: fresh.map((r) => r.id), deadline }).catch(() => [])).length;
   }
-  if (await due('categories', JOBS.categories, now)) {
+  if (Date.now() < deadline && await due('categories', JOBS.categories, now)) {
     out.categories = await nightlyCategoryBatch({ fetchImpl }).catch((e) => ({ error: e.message }));
     await mark('categories', now);
   }
@@ -653,7 +667,15 @@ export async function fullScanStep({ budgetMs = 20_000, fetchImpl = fetch, autoA
     if (st.qi >= st.queries.length) st.phase = 'classify';
   }
   if (st.phase === 'classify' && left()) {
-    await runDiscovery();
+    /* Every market product once, in order, across as many steps as it takes. */
+    if (!st.classifyIds) { st.classifyIds = (await all(`SELECT id FROM market_products ORDER BY created_at`)).map((r) => r.id); st.ci = 0; }
+    while (st.ci < st.classifyIds.length && left()) {
+      // eslint-disable-next-line no-await-in-loop
+      const r = await runDiscovery({ ids: st.classifyIds.slice(st.ci, st.ci + 25), deadline: until, atLeast: 1 });
+      st.ci += Math.max(1, r.classified);
+    }
+  }
+  if (st.phase === 'classify' && st.ci >= (st.classifyIds?.length ?? Infinity) && left()) {
     st.candidates = (await all(`SELECT id FROM market_candidates WHERE status <> ALL(@final) ORDER BY created_at`, { final: FINAL })).map((r) => r.id);
     st.ei = 0;
     st.phase = 'evaluate';
@@ -674,7 +696,7 @@ export async function fullScanStep({ budgetMs = 20_000, fetchImpl = fetch, autoA
     st.finishedAt = nowIso();
   }
   await saveFull(st);
-  return { ...st, queries: undefined, candidates: undefined, totalQueries: st.queries.length, totalCandidates: st.candidates?.length ?? null };
+  return { ...st, queries: undefined, candidates: undefined, classifyIds: undefined, totalQueries: st.queries.length, totalCandidates: st.candidates?.length ?? null };
 }
 
 export { parseTitle, productTitle };
