@@ -156,7 +156,7 @@ export const LEGAL_DOCS = {
           h: 'Artikel 14 — Klachten',
           body: [
             'Heb je een klacht, laat het ons dan binnen bekwame tijd weten nadat je het gebrek hebt ontdekt — per e-mail, via je bestelpagina of via onze Discord. Wij bevestigen je klacht en reageren inhoudelijk binnen 14 dagen. Hebben wij meer tijd nodig, dan laten we dat binnen die termijn weten.',
-            'Komen wij er samen niet uit, dan kun je je klacht voorleggen aan het Europese ODR-platform via **ec.europa.eu/odr**. Je behoudt altijd het recht om naar de bevoegde rechter te stappen.',
+            'Komen wij er samen niet uit, dan kun je naar de bevoegde rechter. Gratis advies over je rechten als consument krijg je bij **ConsuWijzer** (consuwijzer.nl); woon je in een ander EU-land, dan helpt het **Europees Consumentencentrum** (eccnederland.nl). (Het Europese ODR-platform bestaat sinds 20 juli 2025 niet meer.)',
           ],
         },
         {
@@ -291,7 +291,7 @@ export const LEGAL_DOCS = {
           h: 'Article 14 — Complaints',
           body: [
             'If you have a complaint, tell us within a reasonable time of discovering the problem — by email, through your order page, or on our Discord. We acknowledge your complaint and respond substantively within 14 days. If we need longer, we will say so within that period.',
-            'If we cannot resolve it together, you can bring your complaint to the European ODR platform at **ec.europa.eu/odr**. You always retain the right to go to a competent court.',
+            'If we cannot resolve it together, you can go to the competent court. Free advice on your consumer rights is available from **ConsuWijzer** (consuwijzer.nl); if you live in another EU country, the **European Consumer Centre** (eccnederland.nl) can help. (The EU ODR platform was closed on 20 July 2025.)',
           ],
         },
         {

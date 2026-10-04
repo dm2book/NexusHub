@@ -404,7 +404,7 @@ const NL = {
   'legal.t9h': '9. Aansprakelijkheid',
   'legal.t9': 'We zijn aansprakelijk voor het leveren van waar je voor betaald hebt. Daarbuiten is onze aansprakelijkheid per bestelling beperkt tot het bedrag dat je ervoor hebt betaald, voor zover de wet dat toelaat. Niets hierin beperkt rechten die je als consument hebt en die niet contractueel beperkt mogen worden.',
   'legal.t10h': '10. Recht en klachten',
-  'legal.t10': 'Nederlands recht is van toepassing. Komen we er samen niet uit, dan kun je je klacht voorleggen aan het Europese ODR-platform via ec.europa.eu/odr. Je houdt altijd het recht om naar een bevoegde rechter te stappen.',
+  'legal.t10': 'Nederlands recht is van toepassing. Komen we er samen niet uit, dan kun je naar de bevoegde rechter. Gratis advies over je rechten krijg je bij ConsuWijzer (consuwijzer.nl), of bij het Europees Consumentencentrum (eccnederland.nl) als je in een ander EU-land woont.',
   'legal.t10b': 'We kunnen deze voorwaarden aanpassen. Voor jouw bestelling geldt de versie die gepubliceerd was op het moment dat je bestelde.',
   'legal.pIntro': 'Dit beleid legt uit welke persoonsgegevens ForgeMarket verzamelt, waarom, wie ze verder ziet, en wat je eraan kunt doen. Het beschrijft hoe de winkel echt werkt — we verkopen je gegevens niet en we volgen je niet over andere websites.',
   'legal.p1h': 'Wat we verzamelen',
