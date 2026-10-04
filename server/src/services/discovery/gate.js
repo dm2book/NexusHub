@@ -175,7 +175,7 @@ export function gate(input) {
      Two websites or more → a person reviews it; one → not enough. */
   if (!inStockSources.length && !supplierInStock && mentionDomains > 0) {
     if (mentionDomains < 2 && !freshObservations) return out(GATE.UNAVAILABLE, ['seen on only one website — not enough evidence that it exists']);
-    reasons.push(`found only in search results (${mentionDomains} websites) — price and stock unknown`);
+    reasons.push(`found only in search results or research (${mentionDomains} websites) — price and stock unknown`);
   } else if (!inStockSources.length && !supplierInStock) {
     const why = sourceErrors.length && !freshObservations ? `the sources could not be asked (${sourceErrors.join('; ')})`
       : !freshObservations ? `no observation in the last ${STALE_HOURS / 24} days — the data is stale`

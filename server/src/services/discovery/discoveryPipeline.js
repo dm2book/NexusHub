@@ -39,7 +39,7 @@ import { pickBest } from '../supplier/bestSourceService.js';
 import { searchCandidates } from '../supplier/catalogScanService.js';
 import { catalogueModels } from './catalogAuditService.js';
 import { productTitle } from './names.js';
-import { collectMentions, mentionsFor } from './searchSource.js';
+import { collectMentions, mentionsFor, importResearch } from './searchSource.js';
 import { GATE, PRESENCE, STALE_HOURS, catalogMatch, gate, imageConfidence, skuFor, suggestPrice } from './gate.js';
 
 export const LIMITS = {
@@ -49,6 +49,9 @@ export const LIMITS = {
   maxEvaluate: Number(process.env.DISCOVERY_MAX_EVALUATE || 25),         // candidates per run
 };
 export const autoAddEnabled = () => String(process.env.DISCOVERY_AUTO_ADD ?? 'on') !== 'off';
+/* The desk research loads itself in production; elsewhere (tests, local) only
+   when asked, so a test database is not filled with it behind a test's back. */
+export const researchEnabled = () => (process.env.DISCOVERY_RESEARCH ? process.env.DISCOVERY_RESEARCH === 'on' : config.isProd);
 const FINAL = [CANDIDATE_STATUS.APPROVED, CANDIDATE_STATUS.REJECTED, CANDIDATE_STATUS.PRODUCT_CREATED, CANDIDATE_STATUS.PUBLISHED];
 const parse = (s, d = null) => { try { return s == null ? d : (typeof s === 'string' ? JSON.parse(s) : s); } catch { return d; } };
 
@@ -489,6 +492,15 @@ export async function nightlyCategoryBatch({ size = BATCH, fetchImpl = fetch } =
  */
 export async function scheduledDiscovery({ now = Date.now(), deadline = Date.now() + 20_000, fetchImpl = fetch, ...deps } = {}) {
   const out = {};
+  /* The desk research, once per version, and then every candidate nobody has
+     evaluated yet — cheap (no network without suppliers), so it is done on
+     the next maintenance run rather than waiting a week. */
+  const research = researchEnabled() ? await importResearch().catch((e) => ({ error: e.message })) : {};
+  if (research.mentions) { await runDiscovery(); out.research = research; }
+  const fresh = await all(`SELECT id FROM market_candidates WHERE evaluated_at IS NULL AND status <> ALL(@final) LIMIT 300`, { final: FINAL }).catch(() => []);
+  if (fresh.length && Date.now() < deadline) {
+    out.firstEvaluation = (await evaluateCandidates({ ...deps, ids: fresh.map((r) => r.id), deadline }).catch(() => [])).length;
+  }
   if (await due('categories', JOBS.categories, now)) {
     out.categories = await nightlyCategoryBatch({ fetchImpl }).catch((e) => ({ error: e.message }));
     await mark('categories', now);
@@ -582,6 +594,7 @@ export async function fullScanStatus() { return fullState(); }
 
 /** Start a complete scan (or say one is already running). */
 export async function startFullScan({ actor = 'system', categories = null, restart = false } = {}) {
+  if (researchEnabled()) await importResearch().catch(() => {});
   const cur = await fullState();
   if (cur && cur.phase !== 'done' && !restart) return cur;
   const queries = await queriesFor(categories, { cap: Infinity });

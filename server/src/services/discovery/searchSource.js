@@ -137,12 +137,57 @@ export async function collectMentions(labels, { fetchImpl = fetch, credentials =
   return out;
 }
 
+/* Desk research is dated when it was done, and counts for 90 days — never
+   re-stamped "today" to look fresh. Search results count for the normal week. */
+export const RESEARCH_DAYS = 90;
+
 /** The fresh mentions behind one market product: pages and distinct websites. */
 export async function mentionsFor(marketProductId, { sinceHours = 7 * 24 } = {}) {
   const cut = new Date(Date.now() - sinceHours * 3600_000).toISOString();
-  const rows = await all(`SELECT url, domain, title, seen_at FROM market_mentions WHERE market_product_id=@p AND seen_at >= @cut`,
-    { p: marketProductId, cut }).catch(() => []);
+  const researchCut = new Date(Date.now() - RESEARCH_DAYS * 86_400_000).toISOString();
+  const rows = await all(`SELECT url, domain, title, seen_at, source_key FROM market_mentions WHERE market_product_id=@p
+                           AND (seen_at >= @cut OR (source_key = 'research' AND seen_at >= @rcut))`,
+    { p: marketProductId, cut, rcut: researchCut }).catch(() => []);
   return { pages: rows.length, domains: [...new Set(rows.map((r) => r.domain))], rows };
 }
 
 export const searchConfigured = async () => !!(await credentialsFor('brave'))?.apiKey;
+
+/**
+ * Load the desk research (researchedPacks.js) as mentions, once per research
+ * version. Idempotent: the same page for the same product is one row, dated
+ * when the research was done.
+ */
+export async function importResearch({ force = false } = {}) {
+  const { RESEARCHED_PACKS, RESEARCHED_AT, RESEARCH_VERSION } = await import('./researchedPacks.js');
+  const done = await all(`SELECT value FROM kv WHERE key='discovery.research.version'`).catch(() => []);
+  if (!force && done[0]?.value === RESEARCH_VERSION) return { skipped: 'already imported', version: RESEARCH_VERSION };
+  const { upsertMarketProduct } = await import('../market/observations.js');
+  let mentions = 0;
+  for (const pack of RESEARCHED_PACKS) {
+    const def = GAMES.find((g) => g.key === pack.game);
+    if (!def) continue;
+    const productType = def.unit === 'EUR' ? 'giftcard' : def.unit === 'months' ? 'subscription' : 'points';
+    for (const platform of pack.platforms || [undefined]) {
+      for (const denomination of pack.amounts) {
+        const model = parseTitle(`${def.label} ${denomination}`, { game: def.key, denomination, denomUnit: def.unit, productType,
+          ...(platform ? { platform } : {}), region: pack.region });
+        // eslint-disable-next-line no-await-in-loop
+        const mp = await upsertMarketProduct(model);
+        for (const url of pack.sources) {
+          let domain = '';
+          try { domain = new URL(url).hostname.replace(/^www\./, ''); } catch { continue; }
+          // eslint-disable-next-line no-await-in-loop
+          await run(`INSERT INTO market_mentions (id, market_product_id, source_key, query, title, url, domain, seen_at)
+                     VALUES (@id, @p, 'research', @q, @t, @u, @d, @at) ON CONFLICT (market_product_id, url) DO NOTHING`,
+          { id: newId('mkm'), p: mp.id, q: `research ${RESEARCH_VERSION}`, t: `${def.label}: ${pack.amounts.join(', ')}`,
+            u: url, d: domain, at: RESEARCHED_AT });
+          mentions += 1;
+        }
+      }
+    }
+  }
+  await run(`INSERT INTO kv (key, value, updated_at) VALUES ('discovery.research.version', @v, @at)
+             ON CONFLICT (key) DO UPDATE SET value=@v, updated_at=@at`, { v: RESEARCH_VERSION, at: nowIso() });
+  return { mentions, version: RESEARCH_VERSION };
+}

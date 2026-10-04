@@ -25,7 +25,8 @@ const ok = (name, cond, extra = '') => {
   if (cond) { pass++; console.log(`  ✅ ${name}`); } else { fail++; console.log(`  ❌ ${name} ${extra}`); }
 };
 
-const { parseTitle } = await import('../src/services/market/normalize.js');
+const { parseTitle, GAMES } = await import('../src/services/market/normalize.js');
+const GAMES_KEYS = new Set(GAMES.map((g) => g.key));
 const G = await import('../src/services/discovery/gate.js');
 const P = await import('../src/services/discovery/discoveryPipeline.js');
 const A = await import('../src/services/discovery/catalogAuditService.js');
@@ -311,10 +312,37 @@ console.log('\n— End to end —');
   ok('our own pages are never evidence, and the game must be in the result\'s title', !(await fcm(99999)) && !(await fcm(7777)));
   const ev18500 = await P.evaluateCandidates({ ids: [(await get(`SELECT id FROM market_candidates WHERE market_product_id=@p`, { p: (await fcm(18500)).id })).id], supplierSources: [], imageFetch });
   ok('18,500 FC Points on two websites: REVIEW_REQUIRED, "found only in search results"', ev18500[0].status === 'REVIEW_REQUIRED'
-    && ev18500[0].reasons.some((r) => /found only in search results \(2 websites\)/.test(r)), JSON.stringify(ev18500[0].reasons));
+    && ev18500[0].reasons.some((r) => /found only in search results or research \(2 websites\)/.test(r)), JSON.stringify(ev18500[0].reasons));
   const ev250 = await P.evaluateCandidates({ ids: [(await get(`SELECT id FROM market_candidates WHERE market_product_id=@p`, { p: (await fcm(250)).id })).id], supplierSources: [], imageFetch });
   ok('250 FC Points on one website only: UNAVAILABLE — not enough evidence', ev250[0].status === 'UNAVAILABLE' && /only one website/.test(ev250[0].reasons[0]));
   ok('search results alone never reach auto-approve', ev18500[0].matchConfidence < G.AUTO_MATCH);
+
+  /* Desk research: packs found by hand, with their pages, loaded as mentions. */
+  const R = await import('../src/services/discovery/researchedPacks.js');
+  const domainsOf = (urls) => new Set(urls.map((u) => new URL(u).hostname.replace(/^www\./, '')));
+  ok('every researched pack names at least two different websites', R.RESEARCHED_PACKS.every((p) => domainsOf(p.sources).size >= 2),
+    R.RESEARCHED_PACKS.filter((p) => domainsOf(p.sources).size < 2).map((p) => p.game).join());
+  ok('…every game in it is one the parser knows, every region sellable', R.RESEARCHED_PACKS.every((p) => GAMES_KEYS.has(p.game) && G.SELLABLE_REGIONS.includes(p.region)));
+  ok('…and it is dated, not "today"', R.RESEARCHED_AT === '2026-10-04T12:00:00Z');
+  const before = (await get(`SELECT COUNT(*)::int AS n FROM market_mentions WHERE source_key='research'`)).n;
+  const imp = await S.importResearch();
+  const again2 = await S.importResearch();
+  ok('the research loads once per version', imp.mentions > 100 && again2.skipped === 'already imported' && before === 0);
+  ok('…dated when it was done', !!(await get(`SELECT 1 FROM market_mentions WHERE source_key='research' AND seen_at=@at`, { at: R.RESEARCHED_AT })));
+  await runDiscovery();
+  const valMp = await get(`SELECT id FROM market_products WHERE game='valorant' AND denomination=475`);
+  const valC = await get(`SELECT id FROM market_candidates WHERE market_product_id=@p`, { p: valMp.id });
+  const [val] = await P.evaluateCandidates({ ids: [valC.id], supplierSources: [], imageFetch });
+  ok('475 Valorant Points (not sold yet) is a missing product for review, with its websites', val.status === 'REVIEW_REQUIRED'
+    && val.reasons.some((r) => /research \(3 websites\)/.test(r)), JSON.stringify(val.reasons));
+  const mnt = await get(`SELECT c.gate_status FROM market_candidates c JOIN market_products p ON p.id=c.market_product_id WHERE p.game='valorant' AND p.denomination=1000`);
+  const [v1000] = await P.evaluateCandidates({ ids: [(await get(`SELECT c.id FROM market_candidates c JOIN market_products p ON p.id=c.market_product_id WHERE p.game='valorant' AND p.denomination=1000`)).id], supplierSources: [], imageFetch });
+  ok('1,000 VP — which the shop sells — is recognised as a duplicate', v1000.status === 'DUPLICATE', JSON.stringify([mnt, v1000.status]));
+  await run(`UPDATE market_mentions SET seen_at=@old WHERE source_key='research'`, { old: new Date(Date.now() - 100 * 86_400_000).toISOString() });
+  const [stale] = await P.evaluateCandidates({ ids: [valC.id], supplierSources: [], imageFetch });
+  ok('after 90 days the research no longer counts: stale', stale.status === 'UNAVAILABLE', JSON.stringify(stale.reasons));
+  delete process.env.DISCOVERY_RESEARCH;
+  ok('outside production it loads only when asked (DISCOVERY_RESEARCH=on)', P.researchEnabled() === false);
 
   /* The complete scan: as long as it takes, in steps that each fit a server function. */
   await obs('Roblox 1200 Robux Global');
