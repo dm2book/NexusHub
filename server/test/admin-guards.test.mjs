@@ -96,6 +96,16 @@ console.log('\n— Staff need 2FA —');
   config.security.requireStaff2fa = false;
 }
 
+console.log('\n— Support stays in its lane —');
+{
+  const support = await person('support');
+  ok('support cannot announce a drop', (await call('POST', '/api/admin/drops', support, { title: 'X', startsAt: new Date().toISOString() })).status === 403);
+  ok('…nor read the launch checks', (await call('GET', '/api/admin/launch-check', support)).status === 403);
+  const made = await call('POST', '/api/admin/drops', owner, { title: 'Weekend drop', startsAt: new Date(Date.now() + 86_400_000).toISOString() });
+  ok('the owner can, and it is in the audit log', made.status === 201
+    && !!(await get(`SELECT 1 FROM audit_logs WHERE action='drop.create' AND actor_id=@a`, { a: owner.id })));
+}
+
 console.log('\n— Store credit —');
 {
   ok('an admin cannot credit themselves', (await call('POST', `/api/admin/security/users/${admin.id}/credit`, admin, { amount: 500 })).status === 400);

@@ -18,6 +18,7 @@ import market from './market.js';
 import daily from './daily.js';
 import money from './money.js';
 import { asyncHandler } from '../../middleware/error.js';
+import { audit } from '../../services/auditService.js';
 import { launchChecks } from '../../services/launchCheckService.js';
 import { sellerIdentity, setSellerIdentity, FIELDS }
   from '../../services/sellerIdentityService.js';
@@ -34,7 +35,7 @@ const router = Router();
 router.use(requireAuth, requireStaff);
 
 // Live "can I sell today?" readiness report for the admin dashboard.
-router.get('/launch-check', asyncHandler(async (_req, res) => {
+router.get('/launch-check', requirePermission('analytics.read'), asyncHandler(async (_req, res) => {
   res.json(await launchChecks());
 }));
 
@@ -46,7 +47,7 @@ router.get('/launch-check', asyncHandler(async (_req, res) => {
  * invoice and in the terms a customer agreed to. The service audits both sides
  * of the change.
  */
-router.get('/legal-identity', asyncHandler(async (_req, res) => {
+router.get('/legal-identity', requirePermission('analytics.read'), asyncHandler(async (_req, res) => {
   res.json(await sellerIdentity());
 }));
 
@@ -115,7 +116,7 @@ router.get('/backups/:id/download', requireRole('owner'),
  * a shop that has quietly opened early looks perfectly healthy to the other
  * report.
  */
-router.get('/launch-plan', asyncHandler(async (_req, res) => {
+router.get('/launch-plan', requirePermission('analytics.read'), asyncHandler(async (_req, res) => {
   res.json(await launchPlan());
 }));
 
@@ -155,16 +156,23 @@ router.get('/nav-counts', asyncHandler(async (_req, res) => {
 
 // Drop calendar management.
 router.get('/drops', asyncHandler(async (_req, res) => { res.json({ drops: await listAllDrops() }); }));
-router.post('/drops', asyncHandler(async (req, res) => {
+/* Drops are announced to the whole Discord: monetisation staff only, and audited. */
+router.post('/drops', requirePermission('monetization.manage'), asyncHandler(async (req, res) => {
   const body = z.object({
     title: z.string().min(1).max(120),
     category: z.string().max(40).optional(),
     note: z.string().max(300).optional(),
     startsAt: z.string().min(1),
   }).parse(req.body || {});
-  res.status(201).json({ drop: await createDrop(body, req.user.id) });
+  const drop = await createDrop(body, req.user.id);
+  await audit({ actor: req.user, action: 'drop.create', targetType: 'drop', targetId: drop?.id || null, metadata: { title: body.title }, req });
+  res.status(201).json({ drop });
 }));
-router.delete('/drops/:id', asyncHandler(async (req, res) => { await deleteDrop(req.params.id); res.json({ ok: true }); }));
+router.delete('/drops/:id', requirePermission('monetization.manage'), asyncHandler(async (req, res) => {
+  await deleteDrop(req.params.id);
+  await audit({ actor: req.user, action: 'drop.delete', targetType: 'drop', targetId: req.params.id, req });
+  res.json({ ok: true });
+}));
 
 router.use('/orders', orders);
 router.use('/suppliers', suppliers);

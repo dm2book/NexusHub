@@ -21,16 +21,19 @@ router.get('/tickets/:id', requirePermission('tickets.read'), asyncHandler(async
 }));
 router.post('/tickets/:id/reply', requirePermission('tickets.manage'),
   asyncHandler(async (req, res) => {
-    const { body } = z.object({ body: z.string().min(1) }).parse(req.body);
-    res.json({ ticket: await support.replyTicket(req.params.id,
-      { authorId: req.user.id, authorKind: 'staff', body }) });
+    const { body } = z.object({ body: z.string().min(1).max(5000) }).parse(req.body);
+    const ticket = await support.replyTicket(req.params.id, { authorId: req.user.id, authorKind: 'staff', body });
+    await audit({ actor: req.user, action: 'ticket.reply', targetType: 'ticket', targetId: req.params.id, req });
+    res.json({ ticket });
   }));
 router.post('/tickets/:id/status', requirePermission('tickets.manage'),
   asyncHandler(async (req, res) => {
     const { status } = z.object({
       status: z.enum(['open', 'pending', 'resolved', 'closed']),
     }).parse(req.body);
-    res.json({ ticket: await support.setTicketStatus(req.params.id, status, req.user.id) });
+    const ticket = await support.setTicketStatus(req.params.id, status, req.user.id);
+    await audit({ actor: req.user, action: 'ticket.status', targetType: 'ticket', targetId: req.params.id, metadata: { status }, req });
+    res.json({ ticket });
   }));
 
 // Refund requests
