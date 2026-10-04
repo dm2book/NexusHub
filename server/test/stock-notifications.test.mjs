@@ -209,7 +209,8 @@ console.log('\n— Staff alerts stay with staff —');
   ok('the game role is added to that ping, not a second message',
     /const game = gameRoleFor\(guild, ev\.body\)/.test(bot));
   ok('roles are de-duplicated before mentioning', /new Set\(pingRoles\.map/.test(bot));
-  ok('mentions are constrained to those roles', /allowedMentions: \{ roles: pingIds \}/.test(bot));
+  /* `parse: []` as well since the Discord pass: nothing but those roles can ping. */
+  ok('mentions are constrained to those roles', /allowedMentions: \{ (parse: \[\], )?roles: pingIds \}/.test(bot));
   ok('our own routing field never reaches Discord',
     /const \{ fmPing, \.\.\.payload \} = ev\.body/.test(bot));
 

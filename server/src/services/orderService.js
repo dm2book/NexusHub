@@ -236,13 +236,14 @@ export async function createOrder(input, ctx = {}) {
   /* Only what the buyer may tell us. Every money field on `billing` (credit,
      discounts, coupon) is set by the server below; copying the client's object
      whole let a buyer write `creditApplied` and be paid it back on cancel. */
-  const BUYER_FIELDS = ['full_name', 'city', 'lang', 'deliveryMethod', 'deliveryDetails', 'deliveryLabel'];
+  const BUYER_FIELDS = ['full_name', 'city', 'country', 'country_code', 'lang', 'deliveryMethod', 'deliveryDetails', 'deliveryLabel'];
   const billing = Object.fromEntries(BUYER_FIELDS
     .filter((k) => input.billing?.[k] != null && typeof input.billing[k] !== 'object')
     .map((k) => [k, input.billing[k]]));
   // Bound the free-text billing fields (they flow into emails and admin views).
   if (billing.full_name) billing.full_name = String(billing.full_name).trim().slice(0, 80);
   if (billing.city) billing.city = String(billing.city).trim().slice(0, 80);
+  for (const k of ['country', 'country_code']) if (billing[k]) billing[k] = String(billing[k]).trim().slice(0, 60);
   /* Which language the buyer read the shop in — kept so the person answering a
      ticket knows which one to answer in. Bounded to the codes the storefront
      actually offers; anything else is dropped rather than stored. */
