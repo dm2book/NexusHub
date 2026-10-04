@@ -187,7 +187,14 @@ export async function runDiscovery({ deadline = Date.now() + 15_000, onlyNew = f
     } else {
       await run(`INSERT INTO market_candidates (id, market_product_id, status, reason, forge_product_id,
                    duplicate_of, match_confidence, created_at, updated_at)
-                 VALUES (@id,@p,@s,@r,@f,@d,@c,@at,@at)`,
+                 VALUES (@id,@p,@s,@r,@f,@d,@c,@at,@at)
+                 /* Another run (the hourly one, or a button) may have just made it:
+                    then this verdict updates that row instead of failing. Never over a
+                    decision a person made. */
+                 ON CONFLICT (market_product_id) DO UPDATE SET status=EXCLUDED.status, reason=EXCLUDED.reason,
+                   forge_product_id=COALESCE(EXCLUDED.forge_product_id, market_candidates.forge_product_id),
+                   duplicate_of=EXCLUDED.duplicate_of, match_confidence=EXCLUDED.match_confidence, updated_at=EXCLUDED.updated_at
+                 WHERE market_candidates.status NOT IN ('approved', 'rejected', 'product_created', 'published')`,
         { id: newId('mkc'), p: mp.id, s: verdict.status, r: verdict.reason,
           f: verdict.forgeProductId || null, d: verdict.duplicateOf || null, c: verdict.confidence, at });
     }
