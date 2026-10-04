@@ -244,7 +244,9 @@ export const SOURCES = [
      never-automated so nobody later mistakes the absence of a fetcher for an
      oversight. A human types the publisher's own listed price; the engine then
      has a reference that is not a competitor. */
-  ...['ea', 'roblox', 'microsoft', 'sony', 'nintendo', 'mojang', 'niantic'].map((vendor) => ({
+  ...['ea', 'roblox', 'microsoft', 'sony', 'nintendo', 'mojang', 'niantic', 'riot', 'supercell', 'hoyoverse',
+    'activision', 'epic', 'tencent', 'garena', 'moonton', 'rockstar', 'valve', 'discord', 'spotify', 'netflix',
+    'google', 'apple', 'amazon'].map((vendor) => ({
     key: `official:${vendor}`,
     label: `${vendor.toUpperCase()} store (reference price, entered by hand)`,
     kind: 'manual',

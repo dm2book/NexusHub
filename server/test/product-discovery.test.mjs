@@ -248,6 +248,35 @@ console.log('\n— End to end —');
   const col = await collectFromSources(['Roblox'], { fetchImpl: async () => { asked++; return new Response('{}'); } });
   ok('a source without partner credentials is UNAVAILABLE and is not fetched', asked === 0 && col.unavailable.some((u) => u.source === 'kinguin' && /Public pages are NOT a fallback/.test(u.reason)));
 
+  /* Official packs the owner read on EA's store — the fix for "FIFA has only two". */
+  const fcSrc = 'https://www.ea.com/games/ea-sports-fc/fc-points';
+  const ref = await P.addReferenceDenominations({ game: 'ea-fc', platforms: ['playstation', 'xbox'], region: 'eu', sourceUrl: fcSrc, actor: 'owner@test',
+    amounts: [{ denomination: 500, priceCents: 499 }, { denomination: 1600, priceCents: 1499 }, { denomination: 2800, priceCents: 2499 }] },
+  { supplierSources: [], imageFetch });
+  const fcRow = async (d, platform) => get(`SELECT c.* FROM market_candidates c JOIN market_products p ON p.id = c.market_product_id
+    WHERE p.game='ea-fc' AND p.denomination=@d AND p.platform=@pl`, { d, pl: platform });
+  ok('official packs are recorded per platform, with the page they came from', ref.recorded === 6
+    && !!(await get(`SELECT 1 FROM market_observations WHERE source_key='official:ea' AND url=@u AND is_official=1`, { u: fcSrc })));
+  ok('1,600 — which the shop already sells — is DUPLICATE on both platforms', (await fcRow(1600, 'playstation')).gate_status === 'DUPLICATE'
+    && (await fcRow(1600, 'xbox')).gate_status === 'DUPLICATE');
+  const fc500 = await fcRow(500, 'playstation');
+  ok('500 and 2,800 are missing products, one per platform, for review — never automatic on one source',
+    fc500.gate_status === 'REVIEW_REQUIRED' && (await fcRow(2800, 'xbox')).gate_status === 'REVIEW_REQUIRED'
+    && /match confidence 95%/.test(fc500.gate_reasons), fc500.gate_reasons);
+  ok("…named per platform in the shop's style", JSON.parse(fc500.content).title === '500 FC Points PlayStation EU', fc500.content?.slice(0, 80));
+  const own = await P.addCandidate(fc500.id, { actor: 'owner@test', manualCostCents: 380 });
+  const p500 = await get(`SELECT * FROM products WHERE id=@id`, { id: own.productId });
+  const m500 = JSON.parse(p500.metadata);
+  ok('the owner can deliver it themselves: sellable with their own cost, above the margin floor',
+    own.sellable && p500.active === 1 && m500.deliveryMode === 'manual' && m500.costCents === 380 && Number(p500.price) >= 499, JSON.stringify(own));
+  const hidden = await P.addCandidate((await fcRow(2800, 'xbox')).id, { actor: 'owner@test' });
+  ok('without a supplier or an own cost it is added hidden', !hidden.sellable && hidden.hiddenReason === 'no supplier');
+  const auto = await P.addCandidate((await fcRow(2800, 'playstation')).id, { actor: 'system', auto: true, manualCostCents: 100 }).then(() => 'added', (e) => e.status);
+  ok('the automatic path never uses an own cost to add a review product', auto === 409);
+  const badUrl = await P.addReferenceDenominations({ game: 'ea-fc', amounts: [{ denomination: 100, priceCents: 99 }], sourceUrl: 'http://x' }).then(() => 'ok', (e) => e.status);
+  const badGame = await P.addReferenceDenominations({ game: 'nope', amounts: [{ denomination: 100, priceCents: 99 }], sourceUrl: fcSrc }).then(() => 'ok', (e) => e.status);
+  ok('an entry needs the official https page and a game the parser knows', badUrl === 400 && badGame === 400);
+
   /* The complete scan: as long as it takes, in steps that each fit a server function. */
   await obs('Roblox 1200 Robux Global');
   const start = await P.startFullScan({ actor: 'owner@test' });
@@ -270,6 +299,8 @@ console.log('\n— End to end —');
   const fs = await import('node:fs');
   const page = fs.readFileSync(new URL('../../src/pages/admin/ProductDiscovery.jsx', import.meta.url), 'utf8');
   ok('the admin page runs the complete scan step by step', /full\/step/.test(page) && page.includes('Volledige scan'));
+  ok('…says plainly when no automatic source could be asked', page.includes('no-sources') && /niet dat er niets ontbreekt/.test(page));
+  ok('…and takes official packs with their source page', page.includes('/api/admin/discovery/reference') && page.includes('Officiële pakketten invoeren'));
   ok('the admin screen has the actions from the brief', ['Approve & add', 'Reject', 'Edit', 'Add all safe', 'Re-scan category', 'Re-scan product'].every((t) => page.includes(t)));
 }
 
