@@ -222,6 +222,9 @@ console.log('\n— End to end —');
   const r800 = await P.addCandidate(c800.id, { actor: 'owner@test' });
   const p800 = await get(`SELECT * FROM products WHERE id=@id`, { id: r800.productId });
   ok('a person can add a REVIEW_REQUIRED product — without a supplier it is added HIDDEN', r800.created && !r800.sellable && p800.active === 0 && r800.hiddenReason === 'no supplier');
+  const m800 = JSON.parse(p800.metadata);
+  ok('…and with no official picture it gets the shop\'s own artwork or a drawn tile — never an empty card',
+    !!m800.image && m800.imageSource !== 'supplier' && !m800.imageOfficial, JSON.stringify({ image: m800.image, source: m800.imageSource }));
   const dupAdd = await P.addCandidate((await byDen(1000)).id, { actor: 'owner@test' }).then(() => 'added', (e) => e.status);
   ok('a DUPLICATE cannot be added', dupAdd === 409);
   const unsafeAuto = await P.addCandidate((await byDen(4500)).id, { actor: 'system', auto: true }).then(() => 'added', (e) => e.status);
