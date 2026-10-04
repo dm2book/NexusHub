@@ -248,6 +248,20 @@ router.get('/newsletter/unsubscribe', asyncHandler(async (req, res) => {
     + 'Je bent uitgeschreven voor de nieuwsbrief. Mails over je eigen bestellingen komen nog wel.\n');
 }));
 
+/* CSP violation reports. The full policy is sent as Report-Only first, so a
+   rule that would break the shop shows up here (in the function logs) before
+   it is ever enforced. Throttled: a misbehaving extension must not flood logs. */
+router.post('/csp-report', rateLimit({ bucket: 'csp', windowMs: 60_000, max: 30 }),
+  express.json({ type: ['application/csp-report', 'application/reports+json', 'application/json'], limit: '16kb' }),
+  (req, res) => {
+    const r = req.body?.['csp-report'] || (Array.isArray(req.body) ? req.body[0]?.body : req.body) || {};
+    const directive = r['violated-directive'] || r.effectiveDirective || r['effective-directive'] || '?';
+    const blocked = String(r['blocked-uri'] || r.blockedURL || r['blocked-url'] || '?').slice(0, 200);
+    const page = String(r['document-uri'] || r.documentURL || '').replace(/\?.*$/, '').slice(0, 200);
+    console.warn(`[csp] ${directive} blocked ${blocked} on ${page}`);
+    res.status(204).end();
+  });
+
 /* ── One unsubscribe page for every marketing mail ─────────────────────────
    The link in each mail (and its List-Unsubscribe header) points here, signed
    per address and list. Opening it only ASKS — mail scanners open links, and a
