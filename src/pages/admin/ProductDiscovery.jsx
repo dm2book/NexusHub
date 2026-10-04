@@ -253,7 +253,7 @@ export default function ProductDiscovery() {
           </div>
 
           {edit && (
-            <div className="card p-4 mb-4 text-sm grid gap-2 sm:grid-cols-4 items-end">
+            <div id="discovery-edit" className="card p-4 mb-4 text-sm grid gap-2 sm:grid-cols-4 items-end">
               <label className="text-slate-400">Naam<input className="input mt-1" value={edit.title} onChange={(e) => setEdit({ ...edit, title: e.target.value })} /></label>
               <label className="text-slate-400">Categorie<input className="input mt-1" value={edit.category} onChange={(e) => setEdit({ ...edit, category: e.target.value })} /></label>
               <label className="text-slate-400">Prijs (€)<input className="input mt-1" value={edit.price} onChange={(e) => setEdit({ ...edit, price: e.target.value })} /></label>
@@ -263,12 +263,12 @@ export default function ProductDiscovery() {
           )}
 
           <div className="card overflow-x-auto">
-            <table className="w-full text-sm" style={{ minWidth: 1100 }}>
+            <table className="w-full text-sm" style={{ minWidth: 980 }}>
               <thead className="text-left text-slate-400 border-b border-white/5">
                 <tr>
                   <th className="px-3 py-3">Product</th><th className="px-3 py-3">Status</th><th className="px-3 py-3">Bronnen</th>
                   <th className="px-3 py-3">Match</th><th className="px-3 py-3">Afbeelding</th><th className="px-3 py-3">Prijs</th>
-                  <th className="px-3 py-3">Kostprijs</th><th className="px-3 py-3">Marge</th><th className="px-3 py-3" />
+                  <th className="px-3 py-3">Kostprijs</th><th className="px-3 py-3">Marge</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
@@ -276,9 +276,32 @@ export default function ProductDiscovery() {
                   const g = GATES[i.gate] || { t: i.gate ? i.gate : 'Nog niet beoordeeld', c: '#94a3b8' };
                   return (
                     <tr key={i.id} className="align-top">
-                      <td className="px-3 py-3">
+                      <td className="px-3 py-3" style={{ minWidth: 260 }}>
                         <div className="text-slate-200">{i.title}</div>
                         <div className="text-xs text-slate-500">{i.category || '—'} · {i.denomination != null ? `${i.denomination} ${i.unit}` : ''} · {i.platform} · {i.region}</div>
+                        {/* The actions sit under the name, not in a last column: on a
+                            phone the table scrolls sideways and a button at the far
+                            right was simply never seen. */}
+                        <div className="flex flex-wrap gap-1 mt-2">
+                        {['AUTO_APPROVE', 'REVIEW_REQUIRED'].includes(i.gate) && (
+                          <button type="button" className="btn-ghost text-xs" disabled={!!busy} onClick={() => addOne(i)}>
+                            <Check size={13} /> Approve & add
+                          </button>
+                        )}
+                        <button type="button" className="btn-ghost text-xs" onClick={() => {
+                          setEdit({ id: i.id, title: i.title, category: i.category || '', price: i.suggestedPrice ? (i.suggestedPrice / 100).toFixed(2) : '' });
+                          /* The form opens above the list — bring it into view on a phone. */
+                          setTimeout(() => document.getElementById('discovery-edit')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50);
+                        }}>
+                          <Pencil size={13} /> Edit
+                        </button>
+                        <button type="button" className="btn-ghost text-xs" disabled={!!busy} onClick={() => act(`rescan-${i.id}`, () => api.post(`/api/admin/discovery/${i.id}/rescan`, {}), 'Opnieuw bekeken.')}>
+                          <RefreshCw size={13} /> Re-scan product
+                        </button>
+                        <button type="button" className="btn-ghost text-xs" disabled={!!busy} onClick={() => act(`rej-${i.id}`, () => api.post(`/api/admin/discovery/${i.id}/reject`, {}), 'Afgewezen.')}>
+                          <X size={13} /> Reject
+                        </button>
+                        </div>
                       </td>
                       <td className="px-3 py-3" style={{ maxWidth: 260 }}>
                         <span className="inline-flex rounded-full border px-2 py-0.5 text-xs" style={chip(g.c)}>{g.t}</span>
@@ -294,26 +317,10 @@ export default function ProductDiscovery() {
                       <td className="px-3 py-3 tabular-nums text-slate-300">{i.suggestedPrice ? money(i.suggestedPrice) : ''}</td>
                       <td className="px-3 py-3 tabular-nums text-slate-300">{i.supplierCost != null ? money(i.supplierCost) : ''}</td>
                       <td className="px-3 py-3 tabular-nums text-slate-300">{i.margin != null ? `${i.margin}%` : ''}</td>
-                      <td className="px-3 py-3 text-right whitespace-nowrap">
-                        {['AUTO_APPROVE', 'REVIEW_REQUIRED'].includes(i.gate) && (
-                          <button type="button" className="btn-ghost text-xs" disabled={!!busy} onClick={() => addOne(i)}>
-                            <Check size={13} /> Approve & add
-                          </button>
-                        )}
-                        <button type="button" className="btn-ghost text-xs" onClick={() => setEdit({ id: i.id, title: i.title, category: i.category || '', price: i.suggestedPrice ? (i.suggestedPrice / 100).toFixed(2) : '' })}>
-                          <Pencil size={13} /> Edit
-                        </button>
-                        <button type="button" className="btn-ghost text-xs" disabled={!!busy} onClick={() => act(`rescan-${i.id}`, () => api.post(`/api/admin/discovery/${i.id}/rescan`, {}), 'Opnieuw bekeken.')}>
-                          <RefreshCw size={13} /> Re-scan product
-                        </button>
-                        <button type="button" className="btn-ghost text-xs" disabled={!!busy} onClick={() => act(`rej-${i.id}`, () => api.post(`/api/admin/discovery/${i.id}/reject`, {}), 'Afgewezen.')}>
-                          <X size={13} /> Reject
-                        </button>
-                      </td>
                     </tr>
                   );
                 })}
-                {!items.length && <tr><td colSpan={9} className="px-3 py-6 text-center text-slate-500">Niets in deze lijst.</td></tr>}
+                {!items.length && <tr><td colSpan={8} className="px-3 py-6 text-center text-slate-500">Niets in deze lijst.</td></tr>}
               </tbody>
             </table>
           </div>

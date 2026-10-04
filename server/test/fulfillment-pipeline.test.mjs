@@ -43,6 +43,10 @@ const ok = (n, c, x = '') => { if (c) { pass++; console.log(`  ✅ ${n}`); } els
 
 const { ensureReady } = await import('../src/app.js');
 await ensureReady();
+/* This hour's maintenance is claimed up front: the automatic run the first
+   request would start also auto-dispenses codes, and racing it made the
+   "no code is lost" counts flaky. */
+await (await import('../src/services/bootUpkeep.js')).claimInterval('maintenance_auto', 3_600_000);
 await new Promise((r) => setTimeout(r, 4000));
 
 const { run, get, all, nowIso } = await import('../src/db/index.js');
