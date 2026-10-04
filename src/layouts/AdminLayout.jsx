@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Outlet, NavLink, Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   Zap, BarChart3, ShoppingCart, Truck, PackageCheck, Package,
-  Mail, ShieldAlert, LogOut, Store, LifeBuoy, Menu, X, Users, ShieldCheck, Activity, Gauge, Tag, LayoutGrid, TrendingUp, Euro, Percent, Radio, Rocket, Crown, Megaphone, Scale, Clapperboard, Film } from 'lucide-react';
+  Mail, ShieldAlert, LogOut, Store, LifeBuoy, Menu, X, Users, ShieldCheck, Activity, Gauge, Tag, LayoutGrid, TrendingUp, Euro, Percent, Radio, Rocket, Crown, Megaphone, Scale, Clapperboard, Film, ImageIcon } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { api } from '../lib/api.js';
 
@@ -17,6 +17,7 @@ const NAV = [
   { to: '/admin/orders', icon: ShoppingCart, label: 'Orders', perm: 'orders.read', badge: 'orders' },
   { to: '/admin/payments', icon: ShieldCheck, label: 'Payments', perm: 'orders.update', badge: 'payments' },
   { to: '/admin/products', icon: Package, label: 'Products', perm: 'orders.read' },
+  { to: '/admin/products/media', icon: ImageIcon, label: 'Product media', perm: 'suppliers.read' },
   { to: '/admin/categories', icon: LayoutGrid, label: 'Categories', perm: 'orders.read' },
   { to: '/admin/users', icon: Users, label: 'Users', perm: 'users.read' },
   { to: '/admin/fulfillment', icon: PackageCheck, label: 'Fulfillment', perm: 'fulfillment.manage', badge: 'fulfillment' },

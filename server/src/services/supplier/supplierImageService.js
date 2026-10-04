@@ -28,7 +28,8 @@
 import { all } from '../../db/index.js';
 import { scanSources, matchCheck } from './bestSourceService.js';
 import { searchCandidates } from './catalogScanService.js';
-import { storeImage } from '../imageStoreService.js';
+import { storeImage, dimensions } from '../imageStoreService.js';
+import { mediaRecord, mediaStatus } from '../productMediaService.js';
 import { audit } from '../auditService.js';
 
 /** What a product photo may be. SVG is refused, as it is for uploads. */
@@ -137,7 +138,7 @@ export async function downloadImage(url, { fetchImpl = fetch } = {}) {
  * (nothing carried, carried but not the right product, carried with no image)
  * and only one of them is fixed by waiting.
  */
-export async function findPhotos(productIds, { apply = false, actor = null, sources = null, fetchImpl = fetch, scope = 'placeholders' } = {}) {
+export async function findPhotos(productIds, { apply = false, actor = null, sources = null, fetchImpl = fetch, scope = 'placeholders', refresh = false } = {}) {
   const { getProduct, updateProduct } = await import('../productService.js');
   const srcs = sources || await scanSources();
   const rows = [];
@@ -148,7 +149,11 @@ export async function findPhotos(productIds, { apply = false, actor = null, sour
     if (!product) continue;
     const base = { productId: id, name: product.name };
 
-    if (!needsPhoto(product, { scope })) {
+    /* `refresh`: a supplier photo that is outdated or too low in quality is
+       looked for again — the only kind of existing picture that may be. */
+    const stale = refresh && product.metadata?.imageSource === 'supplier'
+      && ['outdated', 'low_quality'].includes(mediaStatus(product).status);
+    if (!needsPhoto(product, { scope }) && !stale) {
       rows.push({ ...base, status: 'kept', detail: 'already has its own picture' });
       continue;
     }
@@ -182,9 +187,15 @@ export async function findPhotos(productIds, { apply = false, actor = null, sour
            back" is one button rather than a restore from backup. */
         const previous = isArtwork(product.image, product.metadata) ? product.image : null;
         // eslint-disable-next-line no-await-in-loop
+        /* Where it came from, when, and how good it is — what the media
+           report reads to call a picture official, outdated or low quality. */
+        const dims = dimensions(mime, bytes) || {};
+        // eslint-disable-next-line no-await-in-loop
         await updateProduct(id, { metadata: {
           ...product.metadata, image: stored.url,
           imageSource: 'supplier', imageFrom: photo.supplierName, imageTitle: photo.title,
+          ...mediaRecord({ source: 'supplier', sourceUrl: photo.url, width: dims.width, height: dims.height,
+            bytes: bytes.length, mime, official: true }),
           ...(previous ? { imagePrevious: previous } : {}),
         } });
         rows.push({ ...base, status: 'applied', image: stored.url, from: photo.supplierName, title: photo.title });
