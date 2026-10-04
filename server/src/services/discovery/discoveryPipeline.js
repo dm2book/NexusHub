@@ -335,6 +335,19 @@ export async function addCandidate(candidateId, { actor, auto = false, manualCos
         imageConfidence: Number(c.image_confidence), ...(hiddenReason ? { hiddenReason } : {}) },
     },
   });
+  /* No official picture: the shop's own artwork for the shelf, or a drawn tile
+     with the product's name and amount — exactly what a hand-made product
+     gets. Marked as shop artwork, so Product media keeps it in "Ontbreekt"
+     and the weekly picture check replaces it when a supplier sends the real one. */
+  if (!(image?.url && image.confidence >= 0.5)) {
+    const { artFor } = await import('../productFitService.js');
+    const { updateProduct } = await import('../productService.js');
+    const art = artFor({ id: product.id, sku: content.sku, name: product.name, category: product.category,
+      denomination: model.denomination, denomUnit: model.denomUnit });
+    if (art.image) {
+      await updateProduct(product.id, { metadata: { ...product.metadata, image: art.image, imageSource: art.source, imageReason: art.reason } }).catch(() => {});
+    }
+  }
   if (manual == null && sup?.id && sup.sku) {
     const { mapSupplierProduct } = await import('../supplier/supplierService.js');
     await mapSupplierProduct({ supplierId: sup.id, productId: product.id, supplierSku: sup.sku, supplierUrl: sup.url, cost, priority: 10 }).catch(() => {});

@@ -334,11 +334,13 @@ export async function runMaintenance() {
       const { scheduledDiscovery } = await import('./discovery/discoveryPipeline.js');
       const d = await scheduledDiscovery({ deadline: startedAt + 24_000 });
       summary.discoveryQueries = d.categories?.queries?.length || 0;
+      if (d.research?.mentions) summary.discoveryResearchMentions = d.research.mentions;
+      if (d.firstEvaluation) summary.discoveryFirstEvaluated = d.firstEvaluation;
       if (d.refresh) summary.discoveryEvaluated = d.refresh.evaluated;
       if (d.refresh?.added) summary.discoveryAdded = d.refresh.added;
       if (d.images) summary.discoveryImages = d.images.applied || 0;
     } catch (e) { summary.discoveryError = e.message; }
-  }
+  } else summary.discoverySkipped = 'time budget';
 
   /* 16. Category logos that are still base64 inside the settings row.
    *
