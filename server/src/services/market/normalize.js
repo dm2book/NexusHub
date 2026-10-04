@@ -75,7 +75,8 @@ export const GAMES = [
     patterns: [/\bdiscord\s*nitro\b/i] },
   { key: 'steam', label: 'Steam', unit: 'EUR', patterns: [/\bsteam\b/i] },
   { key: 'playstation-store', label: 'PlayStation Store', unit: 'EUR',
-    patterns: [/\bpsn\b.*\b(card|wallet|gift)/i, /\bplaystation\s*(store|network)\s*(card|gift)/i] },
+    patterns: [/\bpsn\b.*\b(card|wallet|gift)/i, /\bplaystation\s*(store|network)\s*(card|gift)/i,
+      /\bplaystation\s*store\s*(€|eur\b|\d)/i] },
   /* Before the Xbox card: "Xbox Game Pass Ultimate 1 Month Card" is a
      subscription, not store credit. */
   { key: 'xbox-game-pass', label: 'Xbox Game Pass', unit: 'months',
@@ -87,6 +88,7 @@ export const GAMES = [
   { key: 'spotify', label: 'Spotify', unit: 'months', defaultPlatform: 'any', patterns: [/\bspotify\b/i] },
   { key: 'netflix', label: 'Netflix', unit: 'EUR', defaultPlatform: 'any', patterns: [/\bnetflix\b/i] },
   { key: 'google-play', label: 'Google Play', unit: 'EUR', patterns: [/\bgoogle\s*play\b/i] },
+  { key: 'amazon', label: 'Amazon', unit: 'EUR', defaultPlatform: 'any', patterns: [/\bamazon\b/i] },
   { key: 'apple', label: 'App Store & iTunes', unit: 'EUR',
     patterns: [/\bitunes\b/i, /\bapple\s*(gift|store|card)/i, /\bapp\s*store\b.*\b(card|gift)/i] },
 ];
@@ -122,7 +124,7 @@ export const REGIONS = [
 
 export const PRODUCT_TYPES = [
   { key: 'points', patterns: [/\bpoints?\b/i, /\brobux\b/i, /\bv-?bucks\b/i, /\bcoins?\b/i, /\bgems?\b/i, /\bvp\b/i,
-    /\buc\b/i, /\bdiamonds?\b/i, /\bcrystals?\b/i, /\bminecoins?\b/i, /\bpok[eé]coins?\b/i, /\brp\b/i] },
+    /\buc\b/i, /\bcp\b/i, /\bdiamonds?\b/i, /\bcrystals?\b/i, /\bminecoins?\b/i, /\bpok[eé]coins?\b/i, /\brp\b/i] },
   { key: 'giftcard', patterns: [/\bgift\s*card\b/i, /\bwallet\b/i, /\btop-?up\b/i, /\bcard\b/i] },
   { key: 'subscription', patterns: [/\bnitro\b/i, /\bpremium\b/i, /\bsubscription\b/i, /\bmonths?\b/i, /\bgame\s*pass\b/i] },
   { key: 'key', patterns: [/\b(cd-?)?key\b/i, /\blicen[cs]e\b/i, /\bactivation\b/i] },
@@ -219,6 +221,12 @@ export function parseTitle(rawTitle, hints = {}) {
   if (!denom) unknown.push('denomination');
 
   const gameDef = GAMES.find((g) => g.key === game);
+  /* A subscription counted in years is that many twelve months: "Nitro — 1
+     Year" and "Nitro — 1 Month" read as the same "1" and were one product. */
+  const years = /\b(\d+)\s*(?:years?|yrs?|jaar|jahre?|ans?)\b/i.exec(t);
+  if (denom && years && (gameDef?.unit === 'months' || productType === 'subscription') && hints.denomination == null) {
+    denom.value = Number(years[1]) * 12;
+  }
   const denomUnit = hints.denomUnit
     || (denom?.unit === 'EUR' ? 'EUR' : (gameDef?.unit || ''));
   const edition = hints.edition ?? parseEdition(t);

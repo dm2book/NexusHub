@@ -46,6 +46,12 @@ console.log('\n— Normalisation —');
   ok('the brief\'s list is recognised: Google Play, Apple, Game Pass, PUBG UC, NL region', parseTitle('Google Play €25 NL').game === 'google-play'
     && parseTitle('App Store & iTunes €25 NL').game === 'apple' && parseTitle('Xbox Game Pass 3 Months').game === 'xbox-game-pass'
     && parseTitle('PUBG Mobile 660 UC Global').productType === 'points' && parseTitle('Steam Wallet €20 NL').region === 'nl');
+  ok('a year of a subscription is twelve months, never the same product as one month',
+    parseTitle('Discord Nitro — 1 Year').denomination === 12 && parseTitle('Discord Nitro — 1 Month').denomination === 1
+    && A.findDuplicates([ours('Discord Nitro — 1 Year'), ours('Discord Nitro — 1 Month')]).length === 0);
+  ok('the live catalogue\'s own names read: PlayStation Store €25, CP — Call of Duty, Amazon',
+    parseTitle('PlayStation Store €25').game === 'playstation-store' && parseTitle('9,500 CP — Call of Duty').productType === 'points'
+    && parseTitle('Amazon Gift Card €25').game === 'amazon');
   ok('names in the shop\'s own style', P.productTitle(parseTitle('Roblox 4500 Robux Global')) === '4,500 Robux'
     && P.productTitle(parseTitle('Steam Wallet €20 EU')) === 'Steam Wallet €20 EU'
     && P.productTitle(parseTitle('EA FC 1600 Points PS5 EU')) === '1,600 FC Points PlayStation EU', P.productTitle(parseTitle('EA FC 1600 Points PS5 EU')));
