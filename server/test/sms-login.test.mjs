@@ -75,6 +75,8 @@ console.log('\n— Production without a provider: refuse, do not pretend —');
   `], {
     // NODE_ENV=production without TWILIO_* — exactly what runs on Vercel today.
     env: { ...process.env, NODE_ENV: 'production', LOG_LEVEL: 'silent',
+      // Production now defaults to the 24 October launch gate; this suite is about SMS, not the launch.
+      LAUNCH_MODE: 'open',
       TWILIO_ACCOUNT_SID: '', TWILIO_AUTH_TOKEN: '', TWILIO_FROM: '',
       JWT_SECRET: 'x'.repeat(48), ADMIN_EMAILS: 'a@b.c',
       // NODE_ENV=production also flips DATABASE_SSL on, and the throwaway
@@ -120,6 +122,8 @@ console.log('\n— With a provider configured, nothing is blocked —');
     srv.close();
   `], {
     env: { ...process.env, NODE_ENV: 'production', LOG_LEVEL: 'silent',
+      // Production now defaults to the 24 October launch gate; this suite is about SMS, not the launch.
+      LAUNCH_MODE: 'open',
       TWILIO_ACCOUNT_SID: 'ACtest', TWILIO_AUTH_TOKEN: 'tok', TWILIO_FROM: 'ForgeMarket',
       JWT_SECRET: 'x'.repeat(48), ADMIN_EMAILS: 'a@b.c',
       // NODE_ENV=production also flips DATABASE_SSL on, and the throwaway
