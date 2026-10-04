@@ -2098,4 +2098,26 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS lang TEXT;
     /* Support loses orders.refund (see seed.js): a refund moves real money. */
     sql: `DELETE FROM role_permissions WHERE role_id = 'support' AND permission_id = 'orders.refund';`,
   },
+  {
+    id: '054_email_suppressions_and_log_scrub',
+    /*
+     * One table that says "this address left this list", checked on every
+     * marketing send — guests included, and addresses that later make an
+     * account. And the email log stops holding secrets: login codes and the
+     * delivered-code blocks were stored in `context` and readable by any admin.
+     * New rows store a redacted context (emailService.persistableContext); this
+     * clears what older rows kept.
+     */
+    sql: `
+      CREATE TABLE IF NOT EXISTS email_suppressions (
+        email       TEXT NOT NULL,
+        scope       TEXT NOT NULL,
+        created_at  TEXT NOT NULL,
+        PRIMARY KEY (email, scope)
+      );
+      UPDATE email_log SET context = NULL
+       WHERE template_id IN ('login_otp', 'gift_card')
+          OR context LIKE '%"otp"%' OR context LIKE '%deliveryHtml%' OR context LIKE '%codeHtml%';
+    `,
+  },
 ];

@@ -1,5 +1,5 @@
 /** Public storefront routes: browse catalog, place an order, track by number. */
-import { Router } from 'express';
+import express, { Router } from 'express';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { config, manualPayMethods, commerceBlockers } from '../config/env.js';
@@ -7,6 +7,7 @@ import { asyncHandler } from '../middleware/error.js';
 import { publicCache } from '../utils/httpCache.js';
 import { requireLaunched, launchAtIso } from '../services/launchGateService.js';
 import { subscribe, unsubscribe, tokenMatches } from '../services/newsletterService.js';
+import { unsubscribeTokenOk, applyUnsubscribe, UNSUBSCRIBE_SCOPES } from '../services/emailService.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 import { listProducts, getProduct, trendingProducts, priceHistory } from '../services/productService.js';
 import { availableCounts, availableCount } from '../services/codeStockService.js';
@@ -237,9 +238,55 @@ router.get('/newsletter/unsubscribe', asyncHandler(async (req, res) => {
     t: z.string().max(64),
   }).parse(req.query || {});
   if (tokenMatches(e, t)) await unsubscribe(e);
+  /* Only the newsletter stops — order mails still come, so saying "no more
+     email from us" was not true. */
   res.type('text/plain; charset=utf-8').send(
-    'You have been unsubscribed. You will not get any more email from us.\n\n'
-    + 'Je bent uitgeschreven. Je krijgt geen mail meer van ons.\n');
+    'You are off the newsletter. Mails about your own orders still arrive.\n\n'
+    + 'Je bent uitgeschreven voor de nieuwsbrief. Mails over je eigen bestellingen komen nog wel.\n');
+}));
+
+/* ── One unsubscribe page for every marketing mail ─────────────────────────
+   The link in each mail (and its List-Unsubscribe header) points here, signed
+   per address and list. Opening it only ASKS — mail scanners open links, and a
+   GET that unsubscribed would take people off lists they never left. The
+   button POSTs; a mail client's one-click (RFC 8058) POSTs the same URL. The
+   answer is the same whether or not the address was on the list. */
+const UNSUB_COPY = {
+  nl: { ask: { marketing: 'Geen nieuws en aanbiedingen meer ontvangen?', alerts: 'Geen prijsalerts meer ontvangen?', reviews: 'Geen vragen om een review meer?' }, button: 'Ja, afmelden', done: 'Je bent afgemeld. Mails over je eigen bestellingen komen nog wel.', bad: 'Deze link is niet geldig. Afmelden kan ook via je accountinstellingen.' },
+  en: { ask: { marketing: 'Stop getting news and offers?', alerts: 'Stop getting price alerts?', reviews: 'Stop getting review requests?' }, button: 'Yes, unsubscribe', done: 'You are unsubscribed. Mails about your own orders still arrive.', bad: 'This link is not valid. You can also unsubscribe in your account settings.' },
+  de: { ask: { marketing: 'Keine News und Angebote mehr erhalten?', alerts: 'Keine Preisalarme mehr erhalten?', reviews: 'Keine Bitten um Bewertungen mehr?' }, button: 'Ja, abmelden', done: 'Du bist abgemeldet. Mails zu deinen eigenen Bestellungen kommen weiterhin.', bad: 'Dieser Link ist ungültig. Abmelden geht auch in deinen Kontoeinstellungen.' },
+  fr: { ask: { marketing: 'Ne plus recevoir les nouveautés et offres ?', alerts: 'Ne plus recevoir les alertes de prix ?', reviews: 'Ne plus recevoir de demandes d’avis ?' }, button: 'Oui, me désabonner', done: 'Tu es désabonné. Les mails sur tes propres commandes arrivent toujours.', bad: 'Ce lien n’est pas valide. Tu peux aussi te désabonner dans les réglages de ton compte.' },
+};
+const unsubLang = (req) => {
+  const q = String(req.query.lang || '').slice(0, 2);
+  if (UNSUB_COPY[q]) return q;
+  const al = String(req.get('accept-language') || '').toLowerCase();
+  return ['nl', 'de', 'fr', 'en'].find((l) => al.startsWith(l) || al.includes(`,${l}`)) || 'nl';
+};
+const escHtml = (v) => String(v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const unsubPage = (lang, body) => `<!doctype html><html lang="${lang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>ForgeMarket</title></head>
+<body style="margin:0;background:#0b0a12;color:#e9e6f7;font:16px/1.5 system-ui,sans-serif;display:flex;min-height:100vh;align-items:center;justify-content:center;padding:16px">
+<div style="max-width:420px;width:100%;background:#16122c;border:1px solid #2c2550;border-radius:16px;padding:28px"><div style="font-weight:700;letter-spacing:.08em;margin-bottom:14px">FORGE<span style="color:#a855f7">MARKET</span></div>${body}</div></body></html>`;
+const unsubQuery = z.object({ e: z.string().email().max(200), s: z.string().max(20), t: z.string().max(64) });
+
+router.get('/unsubscribe', asyncHandler(async (req, res) => {
+  const lang = unsubLang(req);
+  const c = UNSUB_COPY[lang];
+  const q = unsubQuery.safeParse(req.query || {});
+  res.set('Cache-Control', 'no-store').type('html');
+  if (!q.success || !UNSUBSCRIBE_SCOPES.includes(q.data.s)) return res.send(unsubPage(lang, `<p>${escHtml(c.bad)}</p>`));
+  const action = `/api/unsubscribe?e=${encodeURIComponent(q.data.e)}&s=${encodeURIComponent(q.data.s)}&t=${encodeURIComponent(q.data.t)}&lang=${lang}`;
+  res.send(unsubPage(lang, `<p style="margin:0 0 18px">${escHtml(c.ask[q.data.s])}</p>
+    <p style="margin:0 0 18px;color:#a9a3c9;font-size:14px">${escHtml(q.data.e)}</p>
+    <form method="post" action="${escHtml(action)}"><button type="submit" style="width:100%;padding:12px;border:0;border-radius:999px;background:#a855f7;color:#fff;font-weight:700;font-size:16px;cursor:pointer">${escHtml(c.button)}</button></form>`));
+}));
+
+router.post('/unsubscribe', express.urlencoded({ extended: false, limit: '4kb' }), asyncHandler(async (req, res) => {
+  const lang = unsubLang(req);
+  const c = UNSUB_COPY[lang];
+  const q = unsubQuery.safeParse(req.query || {});
+  if (q.success && unsubscribeTokenOk(q.data.e, q.data.s, q.data.t)) await applyUnsubscribe(q.data.e, q.data.s);
+  res.set('Cache-Control', 'no-store').type('html').send(unsubPage(lang, `<p>${escHtml(q.success ? c.done : c.bad)}</p>`));
 }));
 
 /* The link in every price alert. Same shape as the newsletter's: an HMAC of

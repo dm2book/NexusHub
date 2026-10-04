@@ -1306,7 +1306,7 @@ function statusBlurb(status) {
     payment_received: 'We confirmed your payment and are preparing your order.',
     processing: 'Your order is being processed — we will email you the moment it is ready.',
     awaiting_fulfillment:
-      'We are getting this one for you by hand. It arrives by email, usually within a few hours during the day; orders placed late at night go out first thing in the morning.',
+      'We are getting this one for you by hand. It arrives by email; orders placed late at night go out first thing in the morning.',
     completed: 'Your order is complete — check your deliveries & downloads.',
     refunded: 'A refund has been issued for your order.',
     cancelled: 'Your order has been cancelled.',
@@ -1554,6 +1554,11 @@ function deliveryHtml(order, lang) {
 /** Order breakdown for the emails: subtotal, each discount, store credit, total.
  *  Without this the line-item (list price) and the final total look mismatched
  *  whenever a coupon/member/bundle discount or store credit was applied. */
+/* "10,000 Robux" in a Dutch, German or French mail reads as ten point zero:
+   thousands written the way each language writes them (1.000 · 1,000 · 1 000). */
+const localName = (name, lang = 'nl') => (lang === 'en' ? String(name || '')
+  : String(name || '').replace(/(\d),(\d{3})\b/g, lang === 'fr' ? '$1\u00a0$2' : '$1.$2'));
+
 function summaryHtml(order, lang) {
   const c = emailCopy(lang);
   const cur = order.currency;
@@ -1570,7 +1575,7 @@ function summaryHtml(order, lang) {
   for (const i of order.items || []) {
     const mpv = rate > 0 && isVoucher(i)
       ? `<br><span style="color:#8b8fa3;font-size:12px">${escapeHtml(c.vatMpv)}</span>` : '';
-    rows.push(`<tr><td style="padding:9px 0;border-bottom:1px solid #24243a;color:#cbd1de;font-size:14px">${escapeHtml(i.name)} <span style="color:#8b8fa3">× ${i.quantity}</span>${mpv}</td>` +
+    rows.push(`<tr><td style="padding:9px 0;border-bottom:1px solid #24243a;color:#cbd1de;font-size:14px">${escapeHtml(localName(i.name, lang))} <span style="color:#8b8fa3">× ${i.quantity}</span>${mpv}</td>` +
       `<td style="padding:9px 0;border-bottom:1px solid #24243a;color:#fff;font-size:14px;text-align:right;white-space:nowrap">${money(i.unit_price * i.quantity)}</td></tr>`);
   }
   const line = (label, cents, neg = false) => `<tr><td style="padding:8px 0;border-bottom:1px solid #24243a;color:#9aa3b8;font-size:13.5px">${label}</td>` +

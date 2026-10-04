@@ -5,7 +5,10 @@
  */
 import { run, get, nowIso } from './index.js';
 import { migrate } from './migrate.js';
-import { DEFAULT_TEMPLATES, LEGACY_TEMPLATE_BODIES } from '../services/defaultTemplates.js';
+import { createHash } from 'node:crypto';
+import {
+  DEFAULT_TEMPLATES, LEGACY_TEMPLATE_BODIES, LEGACY_TEMPLATE_HASHES, normalizeTemplate,
+} from '../services/defaultTemplates.js';
 import { TEMPLATE_TRANSLATIONS } from '../services/templateTranslations.js';
 
 // Permission catalog. Granular so roles can be composed precisely.
@@ -103,14 +106,20 @@ export async function seed() {
  * Runs on every boot (cheap: one SELECT per template).
  */
 export async function syncEmailTemplates(at = nowIso()) {
-  const normalize = (s) => String(s || '').replace(/\s+/g, ' ').trim();
+  const normalize = normalizeTemplate;
+  const fingerprint = (str) => createHash('sha256').update(normalize(str)).digest('hex').slice(0, 16);
 
   /* One row per (template, language).
      The Dutch set is the shop's own; the other three come from
      templateTranslations.js. An owner who has edited a template by hand keeps
      that edit — the upgrade path only ever replaces a body that still matches a
-     known previous default, and it is now scoped per language, so editing the
-     Dutch order mail does not freeze the German one. */
+     known previous default, scoped per language, so editing the Dutch order
+     mail does not freeze the German one.
+
+     Body and subject are judged separately. An owner who reworded only the
+     subject keeps their subject while the body still picks up a fix, and the
+     other way round — the login code coming out of the subject line must not
+     wait for nobody having touched the body. */
   const variants = [
     ...DEFAULT_TEMPLATES.map((t) => ({ lang: 'nl', id: t.id, name: t.name, subject: t.subject, body: t.body_html })),
     ...Object.entries(TEMPLATE_TRANSLATIONS).flatMap(([lang, byId]) =>
@@ -120,19 +129,28 @@ export async function syncEmailTemplates(at = nowIso()) {
   ];
 
   for (const v of variants) {
-    const exists = await get('SELECT id, body_html FROM email_templates WHERE id = @id AND lang = @lang',
+    const exists = await get('SELECT id, subject, body_html FROM email_templates WHERE id = @id AND lang = @lang',
       { id: v.id, lang: v.lang });
     if (!exists) {
       await run(`INSERT INTO email_templates (id, lang, name, subject, body_html, enabled, updated_at)
                  VALUES (@id, @lang, @name, @subject, @body, 1, @at)`,
                 { id: v.id, lang: v.lang, name: v.name, subject: v.subject, body: v.body, at });
-    } else if (v.lang === 'nl'
-      && (LEGACY_TEMPLATE_BODIES[v.id] || []).some((old) => normalize(old) === normalize(exists.body_html))) {
-      await run(`UPDATE email_templates SET name = @name, subject = @subject, body_html = @body, updated_at = @at
-                 WHERE id = @id AND lang = @lang`,
-                { id: v.id, lang: v.lang, name: v.name, subject: v.subject, body: v.body, at });
-      console.log(`  · email template "${v.id}" (${v.lang}) upgraded to the new default`);
+      continue;
     }
+    const known = LEGACY_TEMPLATE_HASHES[v.lang]?.[v.id] || { body: [], subject: [] };
+    const oldBody = normalize(exists.body_html) !== normalize(v.body)
+      && (known.body.includes(fingerprint(exists.body_html))
+        || (v.lang === 'nl' && (LEGACY_TEMPLATE_BODIES[v.id] || []).some((old) => normalize(old) === normalize(exists.body_html))));
+    const oldSubject = String(exists.subject) !== String(v.subject)
+      && known.subject.includes(fingerprint(exists.subject));
+    if (!oldBody && !oldSubject) continue;
+    await run(`UPDATE email_templates SET subject = @subject, body_html = @body, updated_at = @at
+               WHERE id = @id AND lang = @lang`,
+              { id: v.id, lang: v.lang, at,
+                subject: oldSubject ? v.subject : exists.subject,
+                body: oldBody ? v.body : exists.body_html });
+    console.log(`  · email template "${v.id}" (${v.lang}) upgraded to the new default`
+      + `${oldBody && oldSubject ? '' : oldBody ? ' (body)' : ' (subject)'}`);
   }
 }
 

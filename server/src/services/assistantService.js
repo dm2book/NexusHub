@@ -115,16 +115,16 @@ const REDEEM = {
 
 const T = {
   delivery: {
-    nl: 'Zit het op voorraad, dan gaat je code **automatisch** de deur uit zodra we je betaling bevestigen. Staat het niet op voorraad, dan kopen we het voor je in en leveren we met de hand — meestal binnen een paar uur overdag. Je code komt altijd binnen op het mailadres dat je bij het bestellen opgeeft.',
-    en: 'If it is in stock your code goes out **automatically** as soon as we confirm your payment. If it is not, we buy it in for you and deliver by hand — usually within a few hours during the day. Either way the code arrives at the email you used at checkout.',
-    de: 'Ist der Artikel auf Lager, geht dein Code **automatisch** raus, sobald wir deine Zahlung bestätigt haben. Ist er es nicht, kaufen wir ihn für dich ein und liefern von Hand — tagsüber meist innerhalb weniger Stunden. In beiden Fällen kommt der Code an die E-Mail-Adresse, die du bei der Bestellung angegeben hast.',
-    fr: 'Si l’article est en stock, ton code part **automatiquement** dès que nous confirmons ton paiement. Sinon, nous l’achetons pour toi et le livrons à la main — en journée, généralement en quelques heures. Dans les deux cas, le code arrive à l’adresse e-mail utilisée lors de la commande.',
+    nl: 'Zit het op voorraad, dan gaat je code **automatisch** de deur uit zodra we je betaling bevestigen. Staat het niet op voorraad, dan kopen we het voor je in en leveren we met de hand. Je code komt altijd binnen op het mailadres dat je bij het bestellen opgeeft.',
+    en: 'If it is in stock your code goes out **automatically** as soon as we confirm your payment. If it is not, we buy it in for you and deliver by hand. Either way the code arrives at the email you used at checkout.',
+    de: 'Ist der Artikel auf Lager, geht dein Code **automatisch** raus, sobald wir deine Zahlung bestätigt haben. Ist er es nicht, kaufen wir ihn für dich ein und liefern von Hand. In beiden Fällen kommt der Code an die E-Mail-Adresse, die du bei der Bestellung angegeben hast.',
+    fr: 'Si l’article est en stock, ton code part **automatiquement** dès que nous confirmons ton paiement. Sinon, nous l’achetons pour toi et le livrons à la main. Dans les deux cas, le code arrive à l’adresse e-mail utilisée lors de la commande.',
   },
   payment: {
-    nl: 'Je plaatst eerst je bestelling. Daarna zie je het bedrag en een **referentie** (je bestelnummer). Betaal met die referentie erbij — zo koppelen we jouw betaling aan jouw bestelling. Wij bevestigen elke betaling met de hand, meestal binnen een paar minuten overdag. Geen creditcard-checkout dus, en geen verborgen kosten.',
-    en: 'You place the order first. Then you see the amount and a **reference** (your order number). Pay with that reference in the description — that is how we match your payment to your order. We confirm every payment by hand, usually within minutes during the day. No card checkout, and no hidden fees.',
-    de: 'Du gibst zuerst die Bestellung auf. Danach siehst du den Betrag und einen **Verwendungszweck** (deine Bestellnummer). Überweise mit diesem Verwendungszweck — so ordnen wir deine Zahlung deiner Bestellung zu. Wir bestätigen jede Zahlung von Hand, tagsüber meist innerhalb von Minuten. Also keine Kartenzahlung an der Kasse und keine versteckten Kosten.',
-    fr: 'Tu passes d’abord la commande. Ensuite tu vois le montant et une **référence** (ton numéro de commande). Paie en indiquant cette référence — c’est ainsi que nous relions ton paiement à ta commande. Nous confirmons chaque paiement à la main, en journée généralement en quelques minutes. Donc pas de paiement par carte à la caisse, et aucun frais caché.',
+    nl: 'Je plaatst eerst je bestelling. Daarna zie je het bedrag en een **referentie** (je bestelnummer). Betaal met die referentie erbij — zo koppelen we jouw betaling aan jouw bestelling. Wij bevestigen elke betaling met de hand. Geen creditcard-checkout dus, en geen verborgen kosten.',
+    en: 'You place the order first. Then you see the amount and a **reference** (your order number). Pay with that reference in the description — that is how we match your payment to your order. We confirm every payment by hand. No card checkout, and no hidden fees.',
+    de: 'Du gibst zuerst die Bestellung auf. Danach siehst du den Betrag und einen **Verwendungszweck** (deine Bestellnummer). Überweise mit diesem Verwendungszweck — so ordnen wir deine Zahlung deiner Bestellung zu. Wir bestätigen jede Zahlung von Hand. Also keine Kartenzahlung an der Kasse und keine versteckten Kosten.',
+    fr: 'Tu passes d’abord la commande. Ensuite tu vois le montant et une **référence** (ton numéro de commande). Paie en indiquant cette référence — c’est ainsi que nous relions ton paiement à ta commande. Nous confirmons chaque paiement à la main. Donc pas de paiement par carte à la caisse, et aucun frais caché.',
   },
   refund: {
     nl: 'Komt je bestelling niet aan, dan krijg je je geld terug. Open een ticket in onze Discord met je bestelnummer, of mail terug op je bestelbevestiging. Een terugbetaling staat meestal binnen 1–3 werkdagen op de rekening waarmee je betaalde.',
@@ -228,10 +228,10 @@ const FOUND = {
     fr: 'En stock — envoyé automatiquement dès que ton paiement est confirmé.',
   },
   byHand: {
-    nl: 'Deze koop ik voor je in en lever ik met de hand, meestal binnen een paar uur.',
-    en: 'These we buy in and deliver by hand, usually within a few hours.',
-    de: 'Die kaufen wir für dich ein und liefern von Hand, meist innerhalb weniger Stunden.',
-    fr: 'Ceux-là, nous les achetons pour toi et les livrons à la main, généralement en quelques heures.',
+    nl: 'Deze koop ik voor je in en lever ik met de hand.',
+    en: 'These we buy in and deliver by hand.',
+    de: 'Die kaufen wir für dich ein und liefern von Hand.',
+    fr: 'Ceux-là, nous les achetons pour toi et les livrons à la main.',
   },
 };
 

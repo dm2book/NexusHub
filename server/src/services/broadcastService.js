@@ -2,7 +2,7 @@
  * Customer broadcast (newsletter / announcement) — send one ad-hoc branded email
  * to many customers at once.
  *
- * Respects opt-out: recipients whose profile has emailMarketing === false are
+ * Opt-in only (see broadcastRecipients): recipients whose profile has emailMarketing !== true are
  * skipped. Sends are throttled (well under Resend's rate limit) and capped per
  * run so a single call can't blow the daily quota or a serverless time budget.
  * Every message is logged to email_log (template_id = 'broadcast').
@@ -13,21 +13,33 @@ import { sendRawEmail } from './emailService.js';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const parse = (s) => { try { return JSON.parse(s || '{}'); } catch { return {}; } };
 
-/** Deduped list of opted-in recipients: [{ email, name }]. */
+/**
+ * Deduped list of recipients who ASKED for it: [{ email, name }].
+ *
+ * Opt-in, not opt-out. The list used to be every account unless marketing had
+ * been switched off — and in the Netherlands (Telecommunicatiewet 11.7) a
+ * newsletter needs consent first. Consent here is either the account's
+ * "Product news & offers" switch, turned on, or a newsletter sign-up that was
+ * not withdrawn. Anyone on the suppression list is left out either way.
+ */
 export async function broadcastRecipients() {
-  const rows = await all(
+  const users = await all(
     `SELECT email, display_name, preferences FROM users
       WHERE email IS NOT NULL AND email <> '' ORDER BY created_at ASC`);
+  const signups = await all(
+    `SELECT email FROM newsletter_signups WHERE unsubscribed_at IS NULL ORDER BY created_at ASC`).catch(() => []);
+  const suppressed = new Set((await all(`SELECT email FROM email_suppressions WHERE scope='marketing'`).catch(() => []))
+    .map((r) => String(r.email).toLowerCase()));
   const seen = new Set();
   const out = [];
-  for (const r of rows) {
-    const email = String(r.email).toLowerCase();
-    if (seen.has(email)) continue;
-    // Opt-out: only skip when the customer explicitly turned marketing off.
-    if (parse(r.preferences).emailMarketing === false) continue;
-    seen.add(email);
-    out.push({ email, name: r.display_name || email.split('@')[0] });
-  }
+  const add = (email, name) => {
+    const e = String(email).toLowerCase();
+    if (seen.has(e) || suppressed.has(e)) return;
+    seen.add(e);
+    out.push({ email: e, name: name || e.split('@')[0] });
+  };
+  for (const r of users) if (parse(r.preferences).emailMarketing === true) add(r.email, r.display_name);
+  for (const r of signups) add(r.email);
   return out;
 }
 
