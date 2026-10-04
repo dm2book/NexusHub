@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ScrollText, ShieldAlert, Users } from 'lucide-react';
-import { api } from '../../lib/api.js';
+import { ScrollText, ShieldAlert, Users, UserX } from 'lucide-react';
+import { api, getAccessToken } from '../../lib/api.js';
 import { date, money } from '../../lib/format.js';
 import { PageLoader } from '../../components/ui.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
@@ -11,6 +11,7 @@ const TABS = [
   { id: 'audit', label: 'Audit logs', icon: ScrollText, perm: 'audit.read' },
   { id: 'fraud', label: 'Fraud review', icon: ShieldAlert, perm: 'security.manage' },
   { id: 'users', label: 'Users & roles', icon: Users, perm: 'users.read' },
+  { id: 'privacy', label: 'AVG-verzoeken', icon: UserX, perm: 'users.manage' },
 ];
 
 export default function Security() {
@@ -33,6 +34,58 @@ export default function Security() {
       {tab === 'audit' && <AuditLogs />}
       {tab === 'fraud' && <FraudReview />}
       {tab === 'users' && <UsersRoles />}
+      {tab === 'privacy' && <PrivacyRequests />}
+    </div>
+  );
+}
+
+/**
+ * Inzage- en verwijderverzoeken (AVG art. 15 en 17). Exporteren: alles wat de
+ * shop over een adres weet, als JSON om te mailen. Wissen: alleen de eigenaar,
+ * met het adres twee keer getypt — bestellingen blijven voor de boekhouding,
+ * maar zonder naam, adres en e-mail.
+ */
+function PrivacyRequests() {
+  const toast = useToast();
+  const { user } = useAuth();
+  const isOwner = (user?.roles || []).includes('owner');
+  const [email, setEmail] = useState('');
+  const [busy, setBusy] = useState(false);
+  const exportData = async () => {
+    setBusy(true);
+    try {
+      const r = await fetch(`/api/admin/security/privacy/export?email=${encodeURIComponent(email.trim())}`, {
+        credentials: 'include', headers: { authorization: `Bearer ${getAccessToken()}` } });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({})))?.error?.message || `Export ${r.status}`);
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(await r.blob()); a.download = `gegevens-${email.trim()}.json`; a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 60_000);
+      toast.success('Export gedownload — stuur dit bestand naar de aanvrager.');
+    } catch (e) { toast.error(e.message); } finally { setBusy(false); }
+  };
+  const erase = async () => {
+    const confirm = window.prompt(`Alle persoonsgegevens van ${email.trim()} worden gewist. Dit kan niet ongedaan worden.\nBestellingen blijven voor de boekhouding, zonder naam/adres/e-mail.\n\nTyp het e-mailadres opnieuw om te bevestigen:`);
+    if (!confirm) return;
+    setBusy(true);
+    try {
+      const r = await api.post('/api/admin/security/privacy/erase', { email: email.trim(), confirm });
+      toast.success(`Gewist. Bestellingen geanonimiseerd: ${r.counts?.orders ?? 0}.`);
+      setEmail('');
+    } catch (e) { toast.error(e.message); } finally { setBusy(false); }
+  };
+  return (
+    <div className="card p-5 max-w-xl space-y-4">
+      <p className="text-sm text-slate-400">Iemand vraagt welke gegevens je hebt, of wil gewist worden? Je hebt daar een maand voor.
+        Exporteer eerst (om op te sturen of te bewaren als bewijs), wis daarna als dat gevraagd is.</p>
+      <label className="block text-xs text-slate-400">E-mailadres van de aanvrager
+        <input type="email" name="privacy-email" value={email} onChange={(e) => setEmail(e.target.value)}
+          className="mt-1 w-full rounded-xl bg-white/5 border border-white/10 text-slate-200 text-sm h-10 px-3" />
+      </label>
+      <div className="flex gap-2">
+        <button type="button" className="btn-ghost text-sm" disabled={busy || !email.includes('@')} onClick={exportData}>Gegevens exporteren</button>
+        {isOwner && <button type="button" className="btn-ghost text-sm text-rose-300" disabled={busy || !email.includes('@')} onClick={erase}>Alles wissen</button>}
+      </div>
+      {!isOwner && <p className="text-xs text-slate-500">Wissen kan alleen de eigenaar.</p>}
     </div>
   );
 }
