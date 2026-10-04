@@ -59,6 +59,12 @@ export function launchAtIso() {
  * have opened. `launchState()` below is what decides whether to take money.
  */
 export function isPrelaunch(now = Date.now()) {
+  /* The deliberate overrides win here too. This quick check guards the sign-in
+     route, and it used to read only the date — so LAUNCH_MODE=open opened the
+     checkout while new accounts were still refused until the date. */
+  const mode = String(config.launch.mode || '').toLowerCase();
+  if (mode === 'open') return false;
+  if (mode === 'prelaunch') return true;
   const t = launchAtMs();
   return t !== null && now < t;
 }
