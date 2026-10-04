@@ -14,7 +14,7 @@ import { catalogueAudit } from '../../services/discovery/catalogAuditService.js'
 import {
   discoveryList, addCandidate, addAllSafe, rejectCandidate, editCandidate,
   scanCategories, rescanCandidate, evaluateCandidates, startFullScan, fullScanStep, fullScanStatus,
-  addReferenceDenominations, VENDOR_OF,
+  addReferenceDenominations, VENDOR_OF, addAllReview,
 } from '../../services/discovery/discoveryPipeline.js';
 import { sourceStatuses } from '../../services/market/sources.js';
 
@@ -63,6 +63,12 @@ router.post('/evaluate', requirePermission('products.write'), scanLimit, asyncHa
 
 router.post('/add-safe', requirePermission('products.write'), asyncHandler(async (req, res) => {
   res.json(await addAllSafe({ actor: actorOf(req) }));
+}));
+
+/* Every review product at once, priced from the shop's own prices. In steps:
+   call again until `remaining` is 0. */
+router.post('/add-review', requirePermission('products.write'), asyncHandler(async (req, res) => {
+  res.json(await addAllReview({ actor: actorOf(req), deadline: Date.now() + 18_000 }));
 }));
 
 router.post('/:id/rescan', requirePermission('products.write'), scanLimit, asyncHandler(async (req, res) => {

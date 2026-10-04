@@ -60,6 +60,24 @@ export default function ProductDiscovery() {
       priceCents: Math.round(Number(String(r.p).replace(',', '.')) * 100) })),
   }).then((r) => { setRef(null); return r; }), (r) => `${r.recorded} officiële pakketten vastgelegd, ${r.evaluated.length} beoordeeld.`);
 
+  /* Every review product at once, priced from the shop's own prices — in
+     steps that each fit a server function, until none are left. */
+  const addAllReview = async () => {
+    if (!window.confirm('Alle producten met "Review nodig" toevoegen?\n\nDe verkoopprijs komt uit je eigen prijzen voor hetzelfde spel (zelfde prijs per eenheid, of dezelfde prijs/waarde bij cadeaukaarten), afgerond op ,49/,99. Ze komen live, gemarkeerd als "prijs geschat, kostprijs onbekend". Producten van een spel dat je nog niet verkoopt worden verborgen toegevoegd.\n\nZet vóór de opening (24 okt) je leveranciers-API-sleutels erin, zodat de kostprijs bekend is.')) return;
+    setBusy('review');
+    let live = 0, hidden = 0;
+    try {
+      for (let i = 0; i < 200; i++) {
+        // eslint-disable-next-line no-await-in-loop
+        const r = await api.post('/api/admin/discovery/add-review', {});
+        live += r.live; hidden += r.hidden;
+        if (!r.remaining || !r.processed) break;
+      }
+      toast.success(`${live} producten live toegevoegd${hidden ? `, ${hidden} verborgen (geen prijsbasis)` : ''}.`);
+    } catch (e) { toast.error(e.message); }
+    finally { setBusy(''); load(); }
+  };
+
   /* No supplier: the owner may deliver it themselves, with their own cost. */
   const addOne = (i) => {
     let body = {};
@@ -236,6 +254,9 @@ export default function ProductDiscovery() {
             )}
           </div>
           <div className="flex flex-wrap items-center gap-2 mb-4">
+            <button type="button" className="btn-primary text-sm" disabled={!!busy || !data.counts.REVIEW_REQUIRED} onClick={addAllReview}>
+              <Check size={14} /> {busy === 'review' ? 'Bezig met toevoegen…' : `Alles uit review toevoegen (${data.counts.REVIEW_REQUIRED || 0})`}
+            </button>
             <button type="button" className="btn-primary text-sm" disabled={!!busy || !data.counts.AUTO_APPROVE}
               onClick={() => act('safe', () => api.post('/api/admin/discovery/add-safe', {}), (r) => `${r.added} veilige producten toegevoegd.`)}>
               <ShieldCheck size={14} /> Add all safe
@@ -314,7 +335,8 @@ export default function ProductDiscovery() {
                         {i.image?.url ? <img src={i.image.url} alt="" className="rounded bg-white/5 object-contain" style={{ width: 44, height: 44 }} loading="lazy" title={`${i.image.sourceType} · ${i.image.width}×${i.image.height} · ${i.image.sourceUrl}`} /> : null}
                         <div className="text-xs text-slate-400 tabular-nums">{pct(i.imageConfidence)}</div>
                       </td>
-                      <td className="px-3 py-3 tabular-nums text-slate-300">{i.suggestedPrice ? money(i.suggestedPrice) : ''}</td>
+                      <td className="px-3 py-3 tabular-nums text-slate-300">{i.suggestedPrice ? money(i.suggestedPrice)
+                        : i.estimatedPrice ? <span title={`Geschat: ${i.estimateBasis}`}>≈ {money(i.estimatedPrice)}</span> : ''}</td>
                       <td className="px-3 py-3 tabular-nums text-slate-300">{i.supplierCost != null ? money(i.supplierCost) : ''}</td>
                       <td className="px-3 py-3 tabular-nums text-slate-300">{i.margin != null ? `${i.margin}%` : ''}</td>
                     </tr>

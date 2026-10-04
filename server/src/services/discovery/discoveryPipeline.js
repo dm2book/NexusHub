@@ -40,7 +40,7 @@ import { searchCandidates } from '../supplier/catalogScanService.js';
 import { catalogueModels } from './catalogAuditService.js';
 import { productTitle } from './names.js';
 import { collectMentions, mentionsFor, importResearch } from './searchSource.js';
-import { GATE, PRESENCE, STALE_HOURS, catalogMatch, gate, imageConfidence, skuFor, suggestPrice } from './gate.js';
+import { GATE, PRESENCE, STALE_HOURS, catalogMatch, gate, imageConfidence, skuFor, suggestPrice, estimateFromCatalogue } from './gate.js';
 
 export const LIMITS = {
   minIntervalMs: Number(process.env.DISCOVERY_MIN_INTERVAL_MS || 1500), // per host
@@ -289,7 +289,7 @@ export async function evaluateCandidates({ limit = LIMITS.maxEvaluate, ids = nul
  * supplier in stock, a known cost and a price at or above the margin floor —
  * otherwise it is added hidden, with the reason on it.
  */
-export async function addCandidate(candidateId, { actor, auto = false, manualCostCents = null, logoFetch = fetch } = {}) {
+export async function addCandidate(candidateId, { actor, auto = false, manualCostCents = null, priceFromCatalogue = false, logoFetch = fetch } = {}) {
   if (!actor) throw new Error('adding a product needs a named actor');
   const c = await get(`SELECT * FROM market_candidates WHERE id=@id`, { id: candidateId });
   if (!c) throw Object.assign(new Error('no such candidate'), { status: 404 });
@@ -302,8 +302,15 @@ export async function addCandidate(candidateId, { actor, auto = false, manualCos
   const mp = await get(`SELECT * FROM market_products WHERE id=@id`, { id: c.market_product_id });
   const model = modelOf(mp);
   /* The catalogue may have changed since the evaluation: check again. */
-  const presence = catalogMatch(model, await catalogueModels());
-  if (presence.status === PRESENCE.ALREADY_EXISTS) throw Object.assign(new Error(`already sold as "${presence.product.name}"`), { status: 409 });
+  const catalogue = await catalogueModels();
+  const presence = catalogMatch(model, catalogue);
+  if (presence.status === PRESENCE.ALREADY_EXISTS) {
+    /* Added meanwhile — often the same pack found twice (a search result and
+       the research). Say so on the row, so it leaves the review list. */
+    await run(`UPDATE market_candidates SET gate_status=@g, gate_reasons=@r, updated_at=@at WHERE id=@id`,
+      { g: GATE.DUPLICATE, r: JSON.stringify([`already sold as "${presence.product.name}"`]), at: nowIso(), id: c.id });
+    throw Object.assign(new Error(`already sold as "${presence.product.name}"`), { status: 409 });
+  }
 
   const content = parse(c.content, null);
   if (!content) throw Object.assign(new Error('no generated content — re-scan the product'), { status: 409 });
@@ -316,11 +323,18 @@ export async function addCandidate(candidateId, { actor, auto = false, manualCos
   const manual = !auto && Number(manualCostCents) > 0 ? Math.round(Number(manualCostCents)) : null;
   const cost = manual ?? sup?.cost ?? null;
   const floor = cost != null ? floorPrice(cost) : null;
-  const price = Number(edits.priceCents || c.suggested_price_cents) || (manual ? floor : 0);
+  /* Asked for in bulk by the owner before launch: no supplier and no cost yet,
+     so the price comes from the shop's own prices for the same game, and the
+     product goes live marked "estimated, cost unknown" — the owner adds the
+     supplier keys (and with them the cost) before the shop takes orders. */
+  const estimate = priceFromCatalogue && !auto && manual == null && cost == null && !edits.priceCents
+    ? estimateFromCatalogue(model, catalogue, { roundUp: roundUpToEnding }) : null;
+  const price = Number(edits.priceCents || c.suggested_price_cents) || (manual ? floor : 0) || estimate?.priceCents || 0;
   const fulfilable = manual != null || !!(sup?.safe && sup.inStock);
-  const sellable = !!(fulfilable && cost != null && price > 0 && price >= floor);
-  const hiddenReason = sellable ? null : !fulfilable ? (!sup ? 'no supplier' : 'supplier out of stock')
-    : cost == null ? 'supplier cost unknown' : !(price > 0) ? 'no price' : 'price under the margin floor';
+  const sellable = !!(estimate && price > 0) || !!(fulfilable && cost != null && price > 0 && price >= floor);
+  const hiddenReason = sellable ? null : priceFromCatalogue && !estimate ? 'no price basis: the shop sells nothing of this game yet'
+    : !fulfilable ? (!sup ? 'no supplier' : 'supplier out of stock')
+      : cost == null ? 'supplier cost unknown' : !(price > 0) ? 'no price' : 'price under the margin floor';
 
   const { createProduct } = await import('../productService.js');
   const product = await createProduct({
@@ -329,6 +343,7 @@ export async function addCandidate(candidateId, { actor, auto = false, manualCos
     metadata: {
       source: 'discovery', marketProductId: mp.id, canonicalKey: mp.canonical_key, sku: content.sku,
       ...(manual != null ? { deliveryMode: 'manual', costCents: manual } : {}),
+      ...(estimate ? { pricing: { estimated: true, costUnknown: true, basis: estimate.basis, at: nowIso() } } : {}),
       productType: model.productType, game: model.game, edition: model.edition || null, platform: model.platform,
       region: model.region, denomination: model.denomination, denomUnit: model.denomUnit,
       ...(image?.url && image.confidence >= 0.5 ? {
@@ -382,6 +397,26 @@ export async function addAllSafe({ actor = 'system:discovery' } = {}) {
     out.push(await addCandidate(r.id, { actor, auto: true }).catch((e) => ({ id: r.id, error: e.message })));
   }
   return { added: out.filter((o) => o.created).length, results: out };
+}
+
+/**
+ * Every REVIEW_REQUIRED candidate, added in one go with a price from the
+ * shop's own prices (see addCandidate, priceFromCatalogue). Bounded by a
+ * deadline so it fits a server function; call again until `remaining` is 0.
+ */
+export async function addAllReview({ actor, deadline = Date.now() + 18_000, logoFetch = fetch } = {}) {
+  if (!actor) throw new Error('adding products needs a named actor');
+  const rows = await all(`SELECT id FROM market_candidates WHERE gate_status=@g AND forge_product_id IS NULL AND status <> ALL(@final)
+                           ORDER BY updated_at`, { g: GATE.REVIEW_REQUIRED, final: [CANDIDATE_STATUS.REJECTED, CANDIDATE_STATUS.PRODUCT_CREATED, CANDIDATE_STATUS.PUBLISHED] });
+  const out = [];
+  for (const r of rows) {
+    if (out.length && Date.now() > deadline) break;
+    // eslint-disable-next-line no-await-in-loop
+    out.push(await addCandidate(r.id, { actor, priceFromCatalogue: true, logoFetch }).catch((e) => ({ id: r.id, error: e.message })));
+  }
+  return { processed: out.length, live: out.filter((o) => o.created && o.sellable).length,
+    hidden: out.filter((o) => o.created && !o.sellable).length, errors: out.filter((o) => o.error).map((o) => o.error).slice(0, 5),
+    remaining: rows.length - out.length };
 }
 
 export async function rejectCandidate(candidateId, { actor, reason = 'rejected in Product Discovery' } = {}) {
@@ -460,7 +495,15 @@ export async function discoveryList({ gate: g = null, limit = 300 } = {}) {
     margin: r.expected_margin_pct == null ? null : Number(r.expected_margin_pct),
     edits: parse(r.edits, {}), productId: r.forge_product_id, evaluatedAt: r.evaluated_at,
   }));
-  const counts = Object.fromEntries(Object.values(GATE).map((x) => [x, items.filter((i) => i.gate === x && !i.productId).length]));
+  /* What "add all" would price each one at, from the shop's own prices. */
+  const catalogue = await catalogueModels().catch(() => []);
+  for (const i of items) {
+    if (i.suggestedPrice || i.denomination == null) continue;
+    const est = estimateFromCatalogue({ game: i.game, denomination: i.denomination, denomUnit: i.unit }, catalogue, { roundUp: roundUpToEnding });
+    if (est) { i.estimatedPrice = est.priceCents; i.estimateBasis = est.basis; }
+  }
+  /* Open ones only: added or rejected candidates are no longer waiting for anything. */
+  const counts = Object.fromEntries(Object.values(GATE).map((x) => [x, items.filter((i) => i.gate === x && !i.productId && i.status !== 'rejected').length]));
   return { counts, added: items.filter((i) => i.productId).length, autoAdd: autoAddEnabled(), items };
 }
 

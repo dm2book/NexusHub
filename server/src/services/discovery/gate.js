@@ -201,6 +201,37 @@ export function gate(input) {
   return reasons.length ? out(GATE.REVIEW_REQUIRED) : out(GATE.AUTO_APPROVE);
 }
 
+/**
+ * A sale price from the shop's OWN prices for the same game — the only basis
+ * there is when no supplier and no market price is known.
+ *
+ *   gift cards (EUR)  the median of price ÷ face value over the shop's cards
+ *                     of that brand, times this card's face value
+ *   everything else   the shop's pack of that game nearest in size (by ratio),
+ *                     its price per unit times this pack's size
+ * Rounded up to the shop's own endings. No pack of that game in the shop → no
+ * estimate (null), never a guess from another game. Products whose own price
+ * was estimated are never used as a basis.
+ */
+export function estimateFromCatalogue(model, catalogue, { roundUp = (x) => x } = {}) {
+  const target = Number(model.denomination);
+  if (!(target > 0)) return null;
+  const peers = catalogue.filter((c) => c.product.active && Number(c.product.price) > 0
+    && c.model.game === model.game && (c.model.denomUnit || '') === (model.denomUnit || '')
+    && Number(c.model.denomination) > 0 && !c.product.metadata?.pricing?.estimated);
+  if (!peers.length) return null;
+  const names = peers.map((p) => p.product.name);
+  if (model.denomUnit === 'EUR') {
+    const ratios = peers.map((p) => Number(p.product.price) / (Number(p.model.denomination) * 100)).sort((a, b) => a - b);
+    const ratio = ratios[Math.floor(ratios.length / 2)];
+    return { priceCents: roundUp(Math.round(target * 100 * ratio)), basis: `prijs/waarde van ${names.join(', ')}`, peers: peers.length };
+  }
+  const nearest = [...peers].sort((a, b) => Math.abs(Math.log(Number(a.model.denomination) / target))
+    - Math.abs(Math.log(Number(b.model.denomination) / target)))[0];
+  const perUnit = Number(nearest.product.price) / Number(nearest.model.denomination);
+  return { priceCents: roundUp(Math.round(perUnit * target)), basis: `prijs per eenheid van ${nearest.product.name}`, peers: peers.length };
+}
+
 /** A stable SKU from the canonical model: ROBLOX-1000-ANY-GLOBAL. */
 export function skuFor(model) {
   return [model.game, model.edition, model.denomination, model.denomUnit === 'EUR' ? 'EUR' : '', model.platform, model.region]
