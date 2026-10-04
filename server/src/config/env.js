@@ -42,10 +42,14 @@ export const config = {
      0.21. Only ever applied once a btw-identificatienummer is published — see
      vatService — so setting it before registering changes nothing. */
   vatRate: env.VAT_RATE ? Number(env.VAT_RATE) : undefined,
+  /* www is the canonical host: forgemarket.nl answers with a 308 to it (Vercel
+     domain settings), the SEO canonical uses it, and the SMS one-time code is
+     bound to it. A default without www sent every mail link through a redirect
+     and pinned CORS to an origin the shop is never served from. */
   appUrl: env.APP_URL
-    || (isProd ? 'https://forgemarket.nl' : 'http://localhost:3000'),
+    || (isProd ? 'https://www.forgemarket.nl' : 'http://localhost:3000'),
   apiUrl: env.API_URL
-    || (isProd ? 'https://forgemarket.nl' : 'http://localhost:4000'),
+    || (isProd ? 'https://www.forgemarket.nl' : 'http://localhost:4000'),
 
   db: {
     // Postgres connection string. Different hosts/integrations expose it under
