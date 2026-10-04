@@ -152,6 +152,12 @@ export default function AdStudio() {
         }
       }
       decode.close().catch(() => {});
+      /* The free voice speaks slowly for a 10–15 s ad: 10% faster keeps a UGC
+         ad inside 15 seconds and sounds like the energetic read TikTok uses.
+         Premium voices already speak at that pace. */
+      if (b.kind === 'ugc' && !['elevenlabs', 'openai', 'none'].includes(voiceId)) {
+        b.scenes = b.scenes.map((s) => ({ ...s, voiceRate: 1.1 }));
+      }
       media.current = { assets, voices: vbuf, timeline: layout(b, durs), player: null };
       setT(0); draw(0.6);
       setState({ phase: 'ready', note: '' });

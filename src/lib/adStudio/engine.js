@@ -92,7 +92,9 @@ const XFADE = 0.32;                // the hand-over between two scenes
 export function layout(board, voiceDurations = {}) {
   let t = 0;
   const scenes = board.scenes.map((s) => {
-    const v = voiceDurations[s.id] || 0;
+    /* A scene may speak its line a little faster (`voiceRate`, e.g. 1.1 for a
+       free voice in a 15-second UGC ad): the line then takes less time. */
+    const v = (voiceDurations[s.id] || 0) / (s.voiceRate || 1);
     const dur = Math.max(s.minDur, v ? VOICE_AT + v + (s.tail ?? TAIL) : 0);
     const out = { ...s, start: t, dur, voiceDur: v };
     t += dur;
@@ -704,11 +706,14 @@ export function scheduleAudio(ctx, destination, timeline, voices = {}, t0 = 0, {
     const buf = voices[s.id];
     if (!buf) continue;
     const src = ctx.createBufferSource(); src.buffer = buf;
+    const rate = s.voiceRate || 1;
+    src.playbackRate.value = rate;
+    const len = buf.duration / rate;
     /* A 15 ms fade in and 40 ms out: no click at the start or end of a line. */
     const g = ctx.createGain();
     const a = t0 + s.start + VOICE_AT;
     g.gain.setValueAtTime(0, a); g.gain.linearRampToValueAtTime(1.3, a + 0.015);
-    g.gain.setValueAtTime(1.3, a + Math.max(0.02, buf.duration - 0.04)); g.gain.linearRampToValueAtTime(0, a + buf.duration);
+    g.gain.setValueAtTime(1.3, a + Math.max(0.02, len - 0.04)); g.gain.linearRampToValueAtTime(0, a + len);
     const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 90;
     src.connect(hp).connect(g).connect(master);
     src.start(a);
