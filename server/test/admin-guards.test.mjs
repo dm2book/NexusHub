@@ -83,6 +83,19 @@ console.log('\n— The owner role —');
   ok('a listed address is not made owner while an owner exists', !granted);
 }
 
+console.log('\n— Staff need 2FA —');
+{
+  const { config } = await import('../src/config/env.js');
+  config.security.requireStaff2fa = true;
+  const r1 = await call('GET', '/api/admin/orders', admin);
+  const b1 = await r1.json().catch(() => ({}));
+  ok('an admin without an authenticator app is kept out', r1.status === 403 && b1.error?.code === 'totp_required', `${r1.status} ${JSON.stringify(b1).slice(0, 120)}`);
+  ok('…the owner is never locked out', (await call('GET', '/api/admin/orders', owner)).status === 200);
+  await run(`UPDATE users SET totp_secret='JBSWY3DPEHPK3PXP', totp_enabled_at=@at WHERE id=@id`, { id: admin.id, at: nowIso() });
+  ok('…and gets in once 2FA is on', (await call('GET', '/api/admin/orders', admin)).status === 200);
+  config.security.requireStaff2fa = false;
+}
+
 console.log('\n— Store credit —');
 {
   ok('an admin cannot credit themselves', (await call('POST', `/api/admin/security/users/${admin.id}/credit`, admin, { amount: 500 })).status === 400);

@@ -272,6 +272,10 @@ export const config = {
     // Shared secret the maintenance cron must present (Vercel Cron sets the
     // Authorization header to `Bearer <CRON_SECRET>`).
     cronSecret: env.CRON_SECRET || '',
+    /* Staff other than the owner need an authenticator app before the admin
+       opens: an admin account behind one emailed code is one phished inbox
+       away from the shop. On in production unless STAFF_2FA=off. */
+    requireStaff2fa: env.STAFF_2FA ? env.STAFF_2FA !== 'off' : isProd,
     // Fraud scoring thresholds.
     //
     // `review` holds the delivery: the order is paid and normal, but no code
