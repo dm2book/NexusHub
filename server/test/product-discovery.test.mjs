@@ -219,12 +219,51 @@ console.log('\n— End to end —');
   ok('…and the next evaluation reads 400 Robux as already sold', !again.find((e) => e.title === '400 Robux' && e.status !== 'DUPLICATE'));
 
   const c800 = await byDen(800);
-  const r800 = await P.addCandidate(c800.id, { actor: 'owner@test' });
+  /* Wikimedia Commons, faked: a public-domain Roblox logo, and its PNG render. */
+  process.env.DISCOVERY_LOGOS = 'on';
+  const commonsCalls = [];
+  const commons = async (url, opts) => {
+    commonsCalls.push({ url: String(url), ua: opts?.headers?.['User-Agent'] });
+    if (String(url).startsWith('https://upload.wikimedia.org/')) return new Response(png(800, 300), { status: 200, headers: { 'content-type': 'image/png' } });
+    const page = (title, licence, extra = {}) => ({ title, imageinfo: [{ mime: 'image/svg+xml', width: 1000, height: 400,
+      thumburl: `https://upload.wikimedia.org/thumb/${encodeURIComponent(title)}.png`, descriptionurl: `https://commons.wikimedia.org/wiki/${encodeURIComponent(title)}`,
+      extmetadata: { LicenseShortName: { value: licence }, Artist: { value: '<a href="x">Roblox Corporation</a>' } }, ...extra }] });
+    return new Response(JSON.stringify({ query: { pages: {
+      1: page('File:Roblox Logo 2025.png', 'Public domain'),
+      2: page('File:Roblox fan logo.svg', 'Public domain'),
+      3: page('File:Roblox logo 2010.svg', 'Public domain'),
+      4: page('File:Roblox logo alt.svg', 'CC BY-SA 4.0'),
+    } } }), { status: 200, headers: { 'content-type': 'application/json' } });
+  };
+  const r800 = await P.addCandidate(c800.id, { actor: 'owner@test', logoFetch: commons });
   const p800 = await get(`SELECT * FROM products WHERE id=@id`, { id: r800.productId });
   ok('a person can add a REVIEW_REQUIRED product — without a supplier it is added HIDDEN', r800.created && !r800.sellable && p800.active === 0 && r800.hiddenReason === 'no supplier');
   const m800 = JSON.parse(p800.metadata);
-  ok('…and with no official picture it gets the shop\'s own artwork or a drawn tile — never an empty card',
-    !!m800.image && m800.imageSource !== 'supplier' && !m800.imageOfficial, JSON.stringify({ image: m800.image, source: m800.imageSource }));
+  ok('…with no official picture it gets the brand\'s free-licence logo from Wikimedia Commons, not shop artwork',
+    /^\/api\/images\//.test(m800.image) && m800.imageSource === 'licensed' && m800.imageLicence === 'Public domain'
+    && /commons\.wikimedia\.org\/wiki\/File%3ARoblox%20Logo%202025\.png/.test(m800.imageSourceUrl) && m800.imageAuthor === 'Roblox Corporation'
+    && m800.imageOfficial === false, JSON.stringify(m800).slice(0, 300));
+  ok('…asked through the Commons API, identifying the shop', commonsCalls.some((c) => c.url.startsWith('https://commons.wikimedia.org/w/api.php')) && commonsCalls.every((c) => /ForgeMarket/.test(c.ua || '')));
+  const L = await import('../src/services/discovery/commonsLogoService.js');
+  const f = (title, licence, mime = 'image/svg+xml') => ({ title, licence, mime, thumbUrl: 'https://upload.wikimedia.org/x.png', width: 500 });
+  ok('only public domain or CC0 is taken — not CC BY-SA, not unknown', !L.pickLogo([f('File:Steam logo.svg', 'CC BY-SA 4.0'), f('File:Steam logo 2.svg', '')], 'Steam')
+    && L.pickLogo([f('File:Steam logo.svg', 'Public domain')], 'Steam')?.title === 'File:Steam logo.svg');
+  ok('…and not a fan, old or unrelated file', !L.pickLogo([f('File:Steam fan logo.svg', 'Public domain'), f('File:Steam logo 2004.svg', 'Public domain'), f('File:Valve logo.svg', 'Public domain')], 'Steam'));
+  const { updateProduct: up } = await import('../src/services/productService.js');
+  const { createProduct: cp } = await import('../src/services/productService.js');
+  const art = await cp({ name: '1,700 Robux', category: 'robux', price: 1999, announce: false, metadata: { image: '/products/icons/robux.svg', imageSource: 'artwork' } });
+  const upl = await cp({ name: '3,000 Robux', category: 'robux', price: 2999, announce: false, metadata: { image: '/api/images/' + 'f'.repeat(32) + '.png', imageSource: 'upload' } });
+  const lr = await L.applyLogos({ fetchImpl: commons });
+  const artAfter = JSON.parse((await get('SELECT metadata FROM products WHERE id=@i', { i: art.id })).metadata);
+  const uplAfter = JSON.parse((await get('SELECT metadata FROM products WHERE id=@i', { i: upl.id })).metadata);
+  ok('shop artwork on existing products is replaced by the free logo', lr.applied >= 1 && artAfter.imageSource === 'licensed');
+  ok('…an owner\'s upload is never touched', uplAfter.imageSource === 'upload' && uplAfter.image.endsWith('f'.repeat(32) + '.png'));
+  const { needsPhoto } = await import('../src/services/supplier/supplierImageService.js');
+  ok('…and a supplier\'s real picture may replace the logo later', needsPhoto({ metadata: artAfter }));
+  const { mediaStatus } = await import('../src/services/productMediaService.js');
+  ok('Product media still lists a logo as "missing an official picture", saying why', mediaStatus({ metadata: artAfter }).status === 'missing'
+    && /free licence/.test(mediaStatus({ metadata: artAfter }).reasons[0]));
+  delete process.env.DISCOVERY_LOGOS;
   const dupAdd = await P.addCandidate((await byDen(1000)).id, { actor: 'owner@test' }).then(() => 'added', (e) => e.status);
   ok('a DUPLICATE cannot be added', dupAdd === 409);
   const unsafeAuto = await P.addCandidate((await byDen(4500)).id, { actor: 'system', auto: true }).then(() => 'added', (e) => e.status);

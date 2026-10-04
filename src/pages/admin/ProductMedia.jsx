@@ -24,7 +24,7 @@ const STATUS = {
   official: { label: 'Officieel', icon: BadgeCheck, c: '#6ee7b7' },
 };
 const SOURCE = { supplier: 'Leverancier (API)', official: 'Eigen upload, officieel', upload: 'Eigen upload', link: 'Link',
-  generated: 'Gegenereerd', artwork: 'Shop-artwork', 'matched-art': 'Shop-artwork', unknown: 'Onbekend' };
+  generated: 'Gegenereerd', licensed: 'Merklogo (Wikimedia Commons, vrije licentie)', artwork: 'Shop-artwork', 'matched-art': 'Shop-artwork', unknown: 'Onbekend' };
 
 export default function ProductMedia() {
   const toast = useToast();
