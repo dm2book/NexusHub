@@ -386,6 +386,16 @@ console.log('\n— End to end —');
   delete process.env.DISCOVERY_RESEARCH;
   ok('outside production it loads only when asked (DISCOVERY_RESEARCH=on)', P.researchEnabled() === false);
 
+  /* A remote database answers in ~0.1 s: every step must stop on time and resume. */
+  const slowRun = await runDiscovery({ deadline: Date.now() - 1 });
+  ok('the classify run stops at its deadline and says how much is left', slowRun.classified === 0 && slowRun.remaining > 0, JSON.stringify(slowRun));
+  await run(`DELETE FROM kv WHERE key LIKE 'discovery.research.%'`);
+  const part = await S.importResearch({ deadline: Date.now() - 1 });
+  ok('the research import stops at its deadline and resumes, never half-marked done', part.complete === false && part.next === 0
+    && !(await get(`SELECT 1 FROM kv WHERE key='discovery.research.version'`)));
+  const whole = await S.importResearch({ deadline: Date.now() + 60_000 });
+  ok('…and finishes in later steps', whole.complete === true && (await S.importResearch()).skipped === 'already imported');
+
   /* The complete scan: as long as it takes, in steps that each fit a server function. */
   await obs('Roblox 1200 Robux Global');
   const start = await P.startFullScan({ actor: 'owner@test' });

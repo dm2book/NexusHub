@@ -108,13 +108,28 @@ export function classify(marketProduct, catalogue, observations) {
     reason: `not in the catalogue; ${observations.length} observation(s)`, confidence: 0.9 };
 }
 
-/** Classify everything we have observed and write the candidate rows. */
-export async function runDiscovery() {
+/**
+ * Classify everything we have observed and write the candidate rows.
+ *
+ * Bounded by a deadline: each product costs a few database round trips, and
+ * against a remote database a few hundred products is longer than a server
+ * function lives — the run was killed mid-way and started over every hour.
+ * Products whose candidate is oldest (or missing) go first, so consecutive
+ * runs work through the whole set. `onlyNew` classifies only products that
+ * have no candidate yet.
+ */
+export async function runDiscovery({ deadline = Date.now() + 15_000, onlyNew = false, ids = null, atLeast = 0 } = {}) {
   const catalogue = await forgeCatalogModels();
-  const products = await all(`SELECT * FROM market_products ORDER BY created_at`);
+  const products = await all(
+    `SELECT p.* FROM market_products p LEFT JOIN market_candidates c ON c.market_product_id = p.id
+      ${ids ? 'WHERE p.id = ANY(@ids)' : onlyNew ? 'WHERE c.id IS NULL' : ''}
+      ORDER BY c.updated_at ASC NULLS FIRST, p.created_at`, ids ? { ids } : {});
   const counts = { discovered: 0, already_listed: 0, possible_duplicate: 0, unavailable: 0, needs_review: 0 };
+  let done = 0;
 
   for (const mp of products) {
+    if (done >= atLeast && Date.now() > deadline) break;
+    done += 1;
     const obs = await latestPerSource(mp.id);
     const verdict = classify(mp, catalogue, obs);
     counts[verdict.status] = (counts[verdict.status] || 0) + 1;
@@ -146,7 +161,7 @@ export async function runDiscovery() {
           f: verdict.forgeProductId || null, d: verdict.duplicateOf || null, c: verdict.confidence, at });
     }
   }
-  return { classified: products.length, counts };
+  return { classified: done, remaining: products.length - done, counts };
 }
 
 /** The dashboard's five buckets, with the product and its freshest evidence. */

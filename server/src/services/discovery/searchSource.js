@@ -158,36 +158,67 @@ export const searchConfigured = async () => !!(await credentialsFor('brave'))?.a
  * version. Idempotent: the same page for the same product is one row, dated
  * when the research was done.
  */
-export async function importResearch({ force = false } = {}) {
+export async function importResearch({ force = false, deadline = Date.now() + 10_000 } = {}) {
   const { RESEARCHED_PACKS, RESEARCHED_AT, RESEARCH_VERSION } = await import('./researchedPacks.js');
   const done = await all(`SELECT value FROM kv WHERE key='discovery.research.version'`).catch(() => []);
   if (!force && done[0]?.value === RESEARCH_VERSION) return { skipped: 'already imported', version: RESEARCH_VERSION };
-  const { upsertMarketProduct } = await import('../market/observations.js');
+  /* Resumable: one pack per step, a handful of statements each (a remote
+     database answers in ~0.1 s, so row-by-row writes did not fit a function). */
+  const cursorKey = `discovery.research.cursor.${RESEARCH_VERSION}`;
+  const cur = await all(`SELECT value FROM kv WHERE key=@k`, { k: cursorKey }).catch(() => []);
+  let i = force ? 0 : Number(cur[0]?.value) || 0;
   let mentions = 0;
-  for (const pack of RESEARCHED_PACKS) {
+  for (; i < RESEARCHED_PACKS.length; i++) {
+    if (Date.now() > deadline) break;
+    const pack = RESEARCHED_PACKS[i];
     const def = GAMES.find((g) => g.key === pack.game);
     if (!def) continue;
     const productType = def.unit === 'EUR' ? 'giftcard' : def.unit === 'months' ? 'subscription' : 'points';
+    const models = [];
     for (const platform of pack.platforms || [undefined]) {
       for (const denomination of pack.amounts) {
-        const model = parseTitle(`${def.label} ${denomination}`, { game: def.key, denomination, denomUnit: def.unit, productType,
-          ...(platform ? { platform } : {}), region: pack.region });
-        // eslint-disable-next-line no-await-in-loop
-        const mp = await upsertMarketProduct(model);
-        for (const url of pack.sources) {
-          let domain = '';
-          try { domain = new URL(url).hostname.replace(/^www\./, ''); } catch { continue; }
-          // eslint-disable-next-line no-await-in-loop
-          await run(`INSERT INTO market_mentions (id, market_product_id, source_key, query, title, url, domain, seen_at)
-                     VALUES (@id, @p, 'research', @q, @t, @u, @d, @at) ON CONFLICT (market_product_id, url) DO NOTHING`,
-          { id: newId('mkm'), p: mp.id, q: `research ${RESEARCH_VERSION}`, t: `${def.label}: ${pack.amounts.join(', ')}`,
-            u: url, d: domain, at: RESEARCHED_AT });
-          mentions += 1;
-        }
+        models.push(parseTitle(`${def.label} ${denomination}`, { game: def.key, denomination, denomUnit: def.unit, productType,
+          ...(platform ? { platform } : {}), region: pack.region }));
       }
     }
+    const P = {};
+    const rows = models.map((m, n) => {
+      Object.assign(P, { [`id${n}`]: newId('mkp'), [`k${n}`]: m.canonicalKey, [`t${n}`]: m.productType, [`g${n}`]: m.game, [`e${n}`]: m.edition,
+        [`p${n}`]: m.platform, [`r${n}`]: m.region, [`d${n}`]: m.denomination, [`u${n}`]: m.denomUnit, [`q${n}`]: m.quantity, [`ti${n}`]: m.title });
+      return `(@id${n},@k${n},@t${n},@g${n},@e${n},@p${n},@r${n},@d${n},@u${n},@q${n},@ti${n},@at,@at)`;
+    });
+    // eslint-disable-next-line no-await-in-loop
+    await run(`INSERT INTO market_products (id, canonical_key, product_type, game, edition, platform, region, denomination, denom_unit, quantity, title, created_at, updated_at)
+               VALUES ${rows.join(',')} ON CONFLICT (canonical_key) DO NOTHING`, { ...P, at: nowIso() });
+    // eslint-disable-next-line no-await-in-loop
+    const ids = await all(`SELECT id FROM market_products WHERE canonical_key = ANY(@keys)`, { keys: models.map((m) => m.canonicalKey) });
+    const M = {};
+    const mrows = [];
+    let n = 0;
+    for (const { id } of ids) {
+      for (const url of pack.sources) {
+        let domain = '';
+        try { domain = new URL(url).hostname.replace(/^www\./, ''); } catch { continue; }
+        Object.assign(M, { [`i${n}`]: newId('mkm'), [`p${n}`]: id, [`u${n}`]: url, [`d${n}`]: domain });
+        mrows.push(`(@i${n},@p${n},'research',@q,@t,@u${n},@d${n},@at)`);
+        n += 1;
+      }
+    }
+    if (mrows.length) {
+      // eslint-disable-next-line no-await-in-loop
+      await run(`INSERT INTO market_mentions (id, market_product_id, source_key, query, title, url, domain, seen_at)
+                 VALUES ${mrows.join(',')} ON CONFLICT (market_product_id, url) DO NOTHING`,
+      { ...M, q: `research ${RESEARCH_VERSION}`, t: `${def.label}: ${pack.amounts.join(', ')}`, at: RESEARCHED_AT });
+      mentions += mrows.length;
+    }
+    // eslint-disable-next-line no-await-in-loop
+    await run(`INSERT INTO kv (key, value, updated_at) VALUES (@k, @v, @at) ON CONFLICT (key) DO UPDATE SET value=@v, updated_at=@at`,
+      { k: cursorKey, v: String(i + 1), at: nowIso() });
   }
-  await run(`INSERT INTO kv (key, value, updated_at) VALUES ('discovery.research.version', @v, @at)
-             ON CONFLICT (key) DO UPDATE SET value=@v, updated_at=@at`, { v: RESEARCH_VERSION, at: nowIso() });
-  return { mentions, version: RESEARCH_VERSION };
+  if (i >= RESEARCHED_PACKS.length) {
+    await run(`INSERT INTO kv (key, value, updated_at) VALUES ('discovery.research.version', @v, @at)
+               ON CONFLICT (key) DO UPDATE SET value=@v, updated_at=@at`, { v: RESEARCH_VERSION, at: nowIso() });
+    return { mentions, version: RESEARCH_VERSION, complete: true };
+  }
+  return { mentions, version: RESEARCH_VERSION, complete: false, next: i };
 }
