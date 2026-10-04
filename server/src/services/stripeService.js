@@ -148,6 +148,25 @@ export async function createCheckoutSession(order) {
   return { id: session.id, url: session.url, paymentIntentId: session.payment_intent || null };
 }
 
+/**
+ * What Stripe's own fraud engine (Radar) and the card say about a payment:
+ * the risk level and the card's country. Null when it cannot be read — a
+ * check that cannot run must not stop a sale.
+ */
+export async function paymentRisk(paymentIntentId) {
+  const s = await stripe();
+  if (!s || !/^pi_/.test(String(paymentIntentId || ''))) return null;
+  try {
+    const pi = await s.paymentIntents.retrieve(paymentIntentId, { expand: ['latest_charge'] });
+    const ch = pi.latest_charge || {};
+    return {
+      level: ch.outcome?.risk_level || null,             // normal | elevated | highest | not_assessed
+      score: ch.outcome?.risk_score ?? null,
+      cardCountry: ch.payment_method_details?.card?.country || null,
+    };
+  } catch { return null; }
+}
+
 /** A Checkout session that is still open, by id — or null. */
 export async function openSession(id) {
   const s = await stripe();

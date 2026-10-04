@@ -1048,6 +1048,8 @@ async function hydrate(row) {
     // by the buyer's status page and by the review queue — the same fact, so it
     // can never be true in one place and false in another.
     fraudHold: !!row.fraud_hold, fraudHoldReason: row.fraud_hold_reason || null,
+    /* Where the checkout request came from (platform header) — compared with the card's country. */
+    country: row.country || null,
     fraudReviewedAt: row.fraud_reviewed_at || null,
     ip: row.ip || null,
     notes: row.notes,

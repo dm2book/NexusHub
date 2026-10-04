@@ -30,7 +30,7 @@
  * by the provider's own id first, and a repeat is recognised as a repeat.
  */
 import { Router } from 'express';
-import { constructEvent, isTestKey } from '../services/stripeService.js';
+import { constructEvent, isTestKey, paymentRisk } from '../services/stripeService.js';
 import { getOrder, markPaymentReceived, setPspPayment } from '../services/orderService.js';
 import { settleAsRefunded } from '../services/refundSettlement.js';
 import { recordChargeback } from '../services/chargebackService.js';
@@ -134,11 +134,35 @@ async function markPaid(order, session, why, event) {
     }
     return 'already settled';
   }
+  /* A code cannot be taken back once it is redeemed, so a payment Stripe
+     itself finds risky — or paid with a card from another country than the
+     order, or a guest's first big order — waits for a human before anything
+     is delivered. The money is taken; only delivery waits. */
+  const reasons = await riskReasons(order, session);
+  if (reasons.length) {
+    await run(`UPDATE orders SET fraud_hold=1, fraud_status='review', fraud_hold_reason=@r WHERE id=@id`,
+      { id: order.id, r: reasons.join(' · ').slice(0, 500) });
+  }
   await markPaymentReceived(order.id, session.payment_intent || session.id,
     { actorId: 'stripe', reason: why });
   await audit({ actor: { id: 'stripe', email: 'stripe' }, action: 'order.payment_received',
     targetType: 'order', targetId: order.id, metadata: { provider: 'stripe' } });
   return 'paid';
+}
+
+const FIRST_ORDER_REVIEW_CENTS = Number(process.env.STRIPE_REVIEW_FIRST_ORDER_CENTS || 10_000);
+async function riskReasons(order, session) {
+  const out = [];
+  const risk = await paymentRisk(session.payment_intent).catch(() => null);
+  if (risk?.level === 'elevated' || risk?.level === 'highest') out.push(`Stripe Radar: ${risk.level} risk${risk.score != null ? ` (${risk.score})` : ''}`);
+  if (risk?.cardCountry && order.country && risk.cardCountry !== order.country) out.push(`card from ${risk.cardCountry}, order from ${order.country}`);
+  if (!order.userId && Number(order.total) >= FIRST_ORDER_REVIEW_CENTS) {
+    const before = await get(`SELECT 1 FROM orders WHERE lower(email)=lower(@e) AND id<>@id
+                                AND status IN ('payment_received','processing','awaiting_fulfillment','completed') LIMIT 1`,
+      { e: order.email, id: order.id }).catch(() => null);
+    if (!before) out.push(`first order from a guest, ${(order.total / 100).toFixed(2)} EUR`);
+  }
+  return out;
 }
 
 router.post('/stripe/webhook', async (req, res) => {

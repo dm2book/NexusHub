@@ -131,6 +131,17 @@ const fresh = (i) => createOrder({ email: `wh-${i}@example.test`, items: [{ prod
   ok('a chargeback refunds the order without a "refund issued" mail', after.status === 'refunded' && !mail, `${after.status} ${!!mail}`);
 }
 
+console.log('\n— A guest\'s first big order waits for a human —');
+{
+  const big = await createProduct({ name: 'Big Card', category: 'giftcard', price: 15000, announce: false });
+  const g = await createOrder({ email: `first-${Date.now()}@example.test`, items: [{ productId: big.id, quantity: 1 }], ...consent });
+  await send('checkout.session.completed', { id: 'cs_big', object: 'checkout.session', payment_status: 'paid',
+    amount_total: 15000, currency: 'eur', metadata: { orderId: g.id }, payment_intent: 'pi_big' });
+  const after = await getOrder(g.id);
+  ok('paid, but held for review before anything is delivered', after.status !== 'pending' && after.fraudHold === true && /first order from a guest/.test(after.fraudHoldReason || ''),
+    `${after.status} ${after.fraudHold} ${after.fraudHoldReason}`);
+}
+
 console.log('\n— Stock and the hand-delivery queue —');
 {
   const { addProductCodes } = await import('../src/services/codeStockService.js');
