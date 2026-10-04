@@ -18,6 +18,10 @@ const ok = (name, cond, extra = '') => {
 
 const { createApp, ensureReady } = await import('../src/app.js');
 await ensureReady();
+/* This hour's maintenance is claimed up front: the automatic run the first
+   request would start also sends pending wishlist alerts, and racing it made
+   the cooldown check below flaky (it sent the alert the test was about to). */
+await (await import('../src/services/bootUpkeep.js')).claimInterval('maintenance_auto', 3_600_000);
 const { run, get, all, nowIso } = await import('../src/db/index.js');
 const { newId } = await import('../src/utils/ids.js');
 const { createProduct, updateProduct } = await import('../src/services/productService.js');
