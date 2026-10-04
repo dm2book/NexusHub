@@ -275,7 +275,7 @@ export async function evaluateCandidates({ limit = LIMITS.maxEvaluate, ids = nul
  * supplier in stock, a known cost and a price at or above the margin floor —
  * otherwise it is added hidden, with the reason on it.
  */
-export async function addCandidate(candidateId, { actor, auto = false } = {}) {
+export async function addCandidate(candidateId, { actor, auto = false, manualCostCents = null } = {}) {
   if (!actor) throw new Error('adding a product needs a named actor');
   const c = await get(`SELECT * FROM market_candidates WHERE id=@id`, { id: candidateId });
   if (!c) throw Object.assign(new Error('no such candidate'), { status: 404 });
@@ -296,12 +296,17 @@ export async function addCandidate(candidateId, { actor, auto = false } = {}) {
   const edits = parse(c.edits, {});
   const sup = parse(c.supplier, null);
   const image = parse(c.image, null);
-  const price = Number(edits.priceCents || c.suggested_price_cents) || 0;
-  const cost = sup?.cost ?? null;
+  /* The owner delivers it themselves (as the shop's hand-delivered products
+     are): their own cost price replaces the supplier's, and the same margin
+     floor applies. Never on the automatic path — a person says so. */
+  const manual = !auto && Number(manualCostCents) > 0 ? Math.round(Number(manualCostCents)) : null;
+  const cost = manual ?? sup?.cost ?? null;
   const floor = cost != null ? floorPrice(cost) : null;
-  const sellable = !!(sup?.safe && sup.inStock && cost != null && price > 0 && price >= floor);
-  const hiddenReason = sellable ? null : !sup ? 'no supplier' : cost == null ? 'supplier cost unknown'
-    : !sup.inStock ? 'supplier out of stock' : !(price > 0) ? 'no price' : 'price under the margin floor';
+  const price = Number(edits.priceCents || c.suggested_price_cents) || (manual ? floor : 0);
+  const fulfilable = manual != null || !!(sup?.safe && sup.inStock);
+  const sellable = !!(fulfilable && cost != null && price > 0 && price >= floor);
+  const hiddenReason = sellable ? null : !fulfilable ? (!sup ? 'no supplier' : 'supplier out of stock')
+    : cost == null ? 'supplier cost unknown' : !(price > 0) ? 'no price' : 'price under the margin floor';
 
   const { createProduct } = await import('../productService.js');
   const product = await createProduct({
@@ -309,6 +314,7 @@ export async function addCandidate(candidateId, { actor, auto = false } = {}) {
     description: content.nl.long, price, currency: 'EUR', active: sellable, announce: false,
     metadata: {
       source: 'discovery', marketProductId: mp.id, canonicalKey: mp.canonical_key, sku: content.sku,
+      ...(manual != null ? { deliveryMode: 'manual', costCents: manual } : {}),
       productType: model.productType, game: model.game, edition: model.edition || null, platform: model.platform,
       region: model.region, denomination: model.denomination, denomUnit: model.denomUnit,
       ...(image?.url && image.confidence >= 0.5 ? {
@@ -322,7 +328,7 @@ export async function addCandidate(candidateId, { actor, auto = false } = {}) {
         imageConfidence: Number(c.image_confidence), ...(hiddenReason ? { hiddenReason } : {}) },
     },
   });
-  if (sup?.id && sup.sku) {
+  if (manual == null && sup?.id && sup.sku) {
     const { mapSupplierProduct } = await import('../supplier/supplierService.js');
     await mapSupplierProduct({ supplierId: sup.id, productId: product.id, supplierSku: sup.sku, supplierUrl: sup.url, cost, priority: 10 }).catch(() => {});
   }
@@ -483,6 +489,58 @@ export async function scheduledDiscovery({ now = Date.now(), deadline = Date.now
     await mark('images', now);
   }
   return out;
+}
+
+/* ── Official reference denominations ──────────────────────────────────── */
+
+/** Which publisher's store is the official reference for a game. */
+export const VENDOR_OF = {
+  'ea-fc': 'ea', roblox: 'roblox', fortnite: 'epic', minecraft: 'mojang', 'pokemon-go': 'niantic', valorant: 'riot',
+  'league-of-legends': 'riot', 'call-of-duty': 'activision', 'brawl-stars': 'supercell', 'clash-of-clans': 'supercell',
+  'clash-royale': 'supercell', 'apex-legends': 'ea', 'genshin-impact': 'hoyoverse', 'free-fire': 'garena',
+  'pubg-mobile': 'tencent', 'mobile-legends': 'moonton', 'gta-online': 'rockstar', discord: 'discord', steam: 'valve',
+  'playstation-store': 'sony', 'xbox-store': 'microsoft', 'xbox-game-pass': 'microsoft', 'nintendo-store': 'nintendo',
+  spotify: 'spotify', netflix: 'netflix', 'google-play': 'google', apple: 'apple', amazon: 'amazon',
+};
+
+/**
+ * Denominations the OWNER read on the publisher's own store, entered with the
+ * page they came from. Publisher stores have no API and forbid automated
+ * collection, so a person reads them — this records what that person saw, as
+ * an official observation with its source URL, and runs it through the same
+ * normalisation, duplicate check and gate as everything else. Nothing here is
+ * ever AUTO_APPROVE on its own: one source is 95% at most.
+ */
+export async function addReferenceDenominations({ game, platforms = ['unknown'], region = 'eu', amounts = [], currency = 'EUR', sourceUrl, actor } = {}, deps = {}) {
+  const def = GAMES.find((g) => g.key === game);
+  if (!def) throw Object.assign(new Error(`unknown game "${game}"`), { status: 400 });
+  if (!/^https:\/\/\S+$/i.test(String(sourceUrl || ''))) throw Object.assign(new Error('give the official page the amounts came from (https)'), { status: 400 });
+  if (!amounts.length) throw Object.assign(new Error('no amounts given'), { status: 400 });
+  const vendor = VENDOR_OF[game];
+  const { recordObservation } = await import('../market/observations.js');
+  const productType = def.unit === 'EUR' ? 'giftcard' : def.unit === 'months' ? 'subscription' : 'points';
+  const keys = [];
+  for (const platform of platforms) {
+    for (const a of amounts) {
+      const denomination = Number(a.denomination);
+      if (!(denomination > 0) || !(Number(a.priceCents) > 0)) continue;
+      const hints = { game, platform: platform === 'unknown' ? undefined : platform, region, denomination, denomUnit: def.unit, productType };
+      // eslint-disable-next-line no-await-in-loop
+      const r = await recordObservation(vendor ? `official:${vendor}` : 'manual', {
+        title: `${def.label} ${denomination} ${def.unit} ${platform !== 'unknown' ? platform : ''} ${region}`.replace(/\s+/g, ' ').trim(),
+        priceCents: Math.round(Number(a.priceCents)), currency, availability: 'in_stock', url: sourceUrl,
+        sourceProductId: `${game}:${platform}:${region}:${denomination}`, hints,
+      });
+      keys.push(r.marketProductId);
+    }
+  }
+  await runDiscovery();
+  const ids = (await all(`SELECT id FROM market_candidates WHERE market_product_id = ANY(@ids) AND status <> ALL(@final)`,
+    { ids: [...new Set(keys)], final: FINAL })).map((r) => r.id);
+  const evaluated = ids.length ? await evaluateCandidates({ ids, ...deps }) : [];
+  await audit({ actor, action: 'discovery.reference_added', targetType: 'market', targetId: game,
+    metadata: { platforms, region, amounts: amounts.map((a) => a.denomination), sourceUrl } }).catch(() => {});
+  return { recorded: keys.length, evaluated: evaluated.map((e) => ({ id: e.id, title: e.title, status: e.status, reasons: e.reasons })) };
 }
 
 /* ── The complete scan ─────────────────────────────────────────────────── */

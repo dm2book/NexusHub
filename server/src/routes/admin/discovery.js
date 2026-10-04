@@ -14,6 +14,7 @@ import { catalogueAudit } from '../../services/discovery/catalogAuditService.js'
 import {
   discoveryList, addCandidate, addAllSafe, rejectCandidate, editCandidate,
   scanCategories, rescanCandidate, evaluateCandidates, startFullScan, fullScanStep, fullScanStatus,
+  addReferenceDenominations, VENDOR_OF,
 } from '../../services/discovery/discoveryPipeline.js';
 import { sourceStatuses } from '../../services/market/sources.js';
 
@@ -69,7 +70,23 @@ router.post('/:id/rescan', requirePermission('products.write'), scanLimit, async
 }));
 
 router.post('/:id/add', requirePermission('products.write'), asyncHandler(async (req, res) => {
-  try { res.json(await addCandidate(req.params.id, { actor: actorOf(req) })); } catch (e) { fail(res, e); }
+  const { manualCostCents } = z.object({ manualCostCents: z.number().int().positive().max(1_000_000).optional() }).parse(req.body || {});
+  try { res.json(await addCandidate(req.params.id, { actor: actorOf(req), manualCostCents })); } catch (e) { fail(res, e); }
+}));
+
+/* Official denominations the owner read on a publisher's store. */
+router.get('/reference/games', requirePermission('products.read'), asyncHandler(async (_req, res) => {
+  const { GAMES } = await import('../../services/market/normalize.js');
+  res.json({ games: GAMES.map((g) => ({ key: g.key, label: g.label, unit: g.unit, platformBound: !g.defaultPlatform && g.unit !== 'EUR', vendor: VENDOR_OF[g.key] || null })) });
+}));
+router.post('/reference', requirePermission('products.write'), asyncHandler(async (req, res) => {
+  const body = z.object({
+    game: z.string().max(40), region: z.enum(['eu', 'nl', 'global']),
+    platforms: z.array(z.enum(['playstation', 'xbox', 'pc', 'nintendo', 'ios', 'android', 'mobile', 'any', 'unknown'])).min(1).max(8),
+    amounts: z.array(z.object({ denomination: z.number().positive().max(1_000_000), priceCents: z.number().int().positive().max(1_000_000) })).min(1).max(30),
+    sourceUrl: z.string().url().max(500),
+  }).parse(req.body || {});
+  try { res.json(await addReferenceDenominations({ ...body, currency: 'EUR', actor: actorOf(req) })); } catch (e) { fail(res, e); }
 }));
 
 router.post('/:id/reject', requirePermission('products.write'), asyncHandler(async (req, res) => {

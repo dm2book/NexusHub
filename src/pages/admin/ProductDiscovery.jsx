@@ -35,11 +35,43 @@ export default function ProductDiscovery() {
   const [busy, setBusy] = useState('');
   const [edit, setEdit] = useState(null);
   const [full, setFull] = useState(null);
+  const [games, setGames] = useState([]);
+  const [ref, setRef] = useState(null);
   const [running, setRunning] = useState(false);
 
   const load = () => api.get('/api/admin/discovery').then(setData).catch((e) => { toast.error(e.message); setData(false); });
   const loadAudit = () => api.get('/api/admin/discovery/audit').then(setAudit).catch((e) => toast.error(e.message));
-  useEffect(() => { load(); api.get('/api/admin/discovery/full').then(setFull).catch(() => {}); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    load();
+    api.get('/api/admin/discovery/full').then(setFull).catch(() => {});
+    api.get('/api/admin/discovery/reference/games').then((r) => setGames(r.games || [])).catch(() => {});
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* EA FC's packs as search results list them — NOT verified against EA's own
+     store from here. Prefilled to save typing, with empty prices: the owner
+     checks the amounts and types the prices on the official page. */
+  const EAFC_SEEN = [100, 500, 1050, 1600, 2800, 5900, 12000, 18500];
+  const newRef = (game = '') => setRef({ game, platforms: [], region: 'eu', sourceUrl: '',
+    rows: game === 'ea-fc' ? EAFC_SEEN.map((d) => ({ d: String(d), p: '' })) : [{ d: '', p: '' }] });
+  const saveRef = () => act('ref', () => api.post('/api/admin/discovery/reference', {
+    game: ref.game, region: ref.region, sourceUrl: ref.sourceUrl.trim(),
+    platforms: ref.platforms.length ? ref.platforms : ['unknown'],
+    amounts: ref.rows.filter((r) => r.d && r.p).map((r) => ({ denomination: Number(String(r.d).replace(/[.,\s]/g, '')),
+      priceCents: Math.round(Number(String(r.p).replace(',', '.')) * 100) })),
+  }).then((r) => { setRef(null); return r; }), (r) => `${r.recorded} officiële pakketten vastgelegd, ${r.evaluated.length} beoordeeld.`);
+
+  /* No supplier: the owner may deliver it themselves, with their own cost. */
+  const addOne = (i) => {
+    let body = {};
+    if (!i.supplier) {
+      const raw = window.prompt(`${i.title}: geen leverancier gevonden.\nLever je dit zelf (met de hand)? Vul je inkoopprijs in € in.\nLeeg laten = verborgen toevoegen, niet verkoopbaar.`, '');
+      if (raw === null) return;
+      const eur = Number(String(raw).replace(',', '.'));
+      if (raw.trim() && eur > 0) body = { manualCostCents: Math.round(eur * 100) };
+    }
+    act(`add-${i.id}`, () => api.post(`/api/admin/discovery/${i.id}/add`, body),
+      (r) => (r.sellable ? 'Toegevoegd en verkoopbaar.' : `Toegevoegd, verborgen: ${r.hiddenReason}.`));
+  };
 
   /* The complete scan runs in steps of under 20 seconds (a server function
      lives 30). This keeps asking for the next step until it says done; the
@@ -79,7 +111,8 @@ export default function ProductDiscovery() {
   const open = data.items.filter((i) => !i.productId && i.status !== 'rejected');
   const items = open.filter((i) => !filter || i.gate === filter);
   const categories = [...new Set(open.map((i) => i.category).filter(Boolean))].sort();
-  const available = data.sources.filter((s) => s.status === 'available');
+  const automatic = data.sources.filter((s) => !s.key.startsWith('official') && s.key !== 'manual');
+  const available = automatic.filter((s) => s.status === 'available');
 
   return (
     <div>
@@ -90,12 +123,19 @@ export default function ProductDiscovery() {
         ≥95% heeft, een leverancier op voorraad met bekende kostprijs en een winstgevende prijs. De rest wacht hier.
         Automatisch toevoegen staat <span className="text-white">{data.autoAdd ? 'aan' : 'uit'}</span>.
       </p>
-      <div className="text-xs text-slate-400 mb-4">
-        Bronnen: {available.length ? available.map((s) => s.label).join(', ') : <span style={{ color: '#fcd34d' }}>geen bron beschikbaar — voeg partner-API-sleutels toe (Kinguin, G2A, Eldorado, Eneba)</span>}
-        {data.sources.filter((s) => s.status !== 'available' && !s.key.startsWith('official')).length > 0 && (
-          <span> · niet beschikbaar: {data.sources.filter((s) => s.status !== 'available' && !s.key.startsWith('official')).map((s) => s.label).join(', ')}</span>
-        )}
-      </div>
+      {!available.length ? (
+        <div className="rounded-xl border p-4 mb-4 text-sm" style={chip('#fcd34d')} data-testid="no-sources">
+          <div className="text-white mb-1">De scan kan nu niets vinden: er is geen enkele automatische bron.</div>
+          Kinguin, G2A, Eldorado en Eneba werken alleen met jouw partner-API-sleutel (Admin → Market → bronnen, of in
+          Vercel bijv. KINGUIN_API_KEY). Een scan zonder bron vindt 0 producten — dat betekent niet dat er niets ontbreekt.
+          Tot die tijd kun je hieronder de officiële pakketten invoeren die je op de winkel van de uitgever ziet.
+        </div>
+      ) : (
+        <div className="text-xs text-slate-400 mb-4">
+          Automatische bronnen: {available.map((s) => s.label).join(', ')}
+          {automatic.length > available.length && <span> · niet beschikbaar: {automatic.filter((s) => s.status !== 'available').map((s) => s.label).join(', ')}</span>}
+        </div>
+      )}
 
       <div className="flex gap-2 mb-4">
         {[['missing', `Ontbrekende producten (${open.length})`], ['audit', 'Catalogus-audit']].map(([k, l]) => (
@@ -113,6 +153,65 @@ export default function ProductDiscovery() {
                 <div className="text-xl text-white tabular-nums">{data.counts[k] || 0}</div>
               </button>
             ))}
+          </div>
+          <div className="card p-3 mb-4 text-sm">
+            {!ref ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <button type="button" className="btn-ghost text-sm" onClick={() => newRef('ea-fc')}>Officiële pakketten invoeren (EA FC)</button>
+                <button type="button" className="btn-ghost text-sm" onClick={() => newRef('')}>Officiële pakketten invoeren (ander spel)</button>
+                <span className="text-xs text-slate-400">Wat je op de winkel van de uitgever ziet, met de link erbij. Gaat altijd langs review.</span>
+              </div>
+            ) : (
+              <div className="grid gap-3">
+                <div className="flex flex-wrap gap-2 items-end">
+                  <label className="text-slate-400 text-xs">Spel
+                    <select className="input mt-1" value={ref.game} onChange={(e) => newRef(e.target.value)}>
+                      <option value="">Kies…</option>
+                      {games.map((g) => <option key={g.key} value={g.key}>{g.label}</option>)}
+                    </select>
+                  </label>
+                  <label className="text-slate-400 text-xs">Regio
+                    <select className="input mt-1" value={ref.region} onChange={(e) => setRef({ ...ref, region: e.target.value })}>
+                      <option value="eu">EU</option><option value="nl">NL</option><option value="global">Global</option>
+                    </select>
+                  </label>
+                  <label className="text-slate-400 text-xs flex-1" style={{ minWidth: 260 }}>Officiële pagina (link)
+                    <input className="input mt-1" placeholder="https://www.ea.com/…" value={ref.sourceUrl} onChange={(e) => setRef({ ...ref, sourceUrl: e.target.value })} />
+                  </label>
+                </div>
+                {games.find((g) => g.key === ref.game)?.platformBound && (
+                  <div className="flex flex-wrap gap-3 text-xs text-slate-300">
+                    <span className="text-slate-400">Platforms (elk wordt een eigen product):</span>
+                    {['playstation', 'xbox', 'pc', 'nintendo'].map((p) => (
+                      <label key={p} className="flex items-center gap-1">
+                        <input type="checkbox" checked={ref.platforms.includes(p)}
+                          onChange={(e) => setRef({ ...ref, platforms: e.target.checked ? [...ref.platforms, p] : ref.platforms.filter((x) => x !== p) })} /> {p}
+                      </label>
+                    ))}
+                  </div>
+                )}
+                {ref.game === 'ea-fc' && (
+                  <div className="text-xs" style={{ color: '#fcd34d' }}>
+                    Deze bedragen komen uit zoekresultaten en zijn niet bij EA zelf gecontroleerd. Controleer ze op de officiële
+                    winkel, verwijder wat daar niet staat en vul de prijzen in die je daar ziet. Rijen zonder prijs worden overgeslagen.
+                  </div>
+                )}
+                <div className="grid gap-1" style={{ maxWidth: 420 }}>
+                  {ref.rows.map((r, n) => (
+                    <div key={n} className="flex gap-2">
+                      <input className="input" placeholder="Aantal / bedrag" value={r.d} onChange={(e) => setRef({ ...ref, rows: ref.rows.map((x, k) => (k === n ? { ...x, d: e.target.value } : x)) })} />
+                      <input className="input" placeholder="Prijs €" value={r.p} onChange={(e) => setRef({ ...ref, rows: ref.rows.map((x, k) => (k === n ? { ...x, p: e.target.value } : x)) })} />
+                      <button type="button" className="btn-ghost text-xs" onClick={() => setRef({ ...ref, rows: ref.rows.filter((_, k) => k !== n) })}><X size={12} /></button>
+                    </div>
+                  ))}
+                  <button type="button" className="btn-ghost text-xs" style={{ justifySelf: 'start' }} onClick={() => setRef({ ...ref, rows: [...ref.rows, { d: '', p: '' }] })}>+ rij</button>
+                </div>
+                <div className="flex gap-2">
+                  <button type="button" className="btn-primary text-sm" disabled={!!busy || !ref.game || !ref.sourceUrl.trim()} onClick={saveRef}>Vastleggen en beoordelen</button>
+                  <button type="button" className="btn-ghost text-sm" onClick={() => setRef(null)}>Annuleren</button>
+                </div>
+              </div>
+            )}
           </div>
           <div className="card p-3 mb-4 text-sm">
             <div className="flex flex-wrap items-center gap-2">
@@ -196,9 +295,7 @@ export default function ProductDiscovery() {
                       <td className="px-3 py-3 tabular-nums text-slate-300">{i.margin != null ? `${i.margin}%` : ''}</td>
                       <td className="px-3 py-3 text-right whitespace-nowrap">
                         {['AUTO_APPROVE', 'REVIEW_REQUIRED'].includes(i.gate) && (
-                          <button type="button" className="btn-ghost text-xs" disabled={!!busy}
-                            onClick={() => act(`add-${i.id}`, () => api.post(`/api/admin/discovery/${i.id}/add`, {}),
-                              (r) => (r.sellable ? 'Toegevoegd en verkoopbaar.' : `Toegevoegd, verborgen: ${r.hiddenReason}.`))}>
+                          <button type="button" className="btn-ghost text-xs" disabled={!!busy} onClick={() => addOne(i)}>
                             <Check size={13} /> Approve & add
                           </button>
                         )}
