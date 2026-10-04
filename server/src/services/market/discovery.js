@@ -109,6 +109,37 @@ export function classify(marketProduct, catalogue, observations) {
 }
 
 /**
+ * Give every market product that has no candidate yet its first verdict, in
+ * three statements however many there are: the products, their latest
+ * observation per source, and one INSERT. The per-product loop below costs a
+ * few round trips each — fine locally, minutes against a remote database for
+ * the hundred-odd products one research import adds.
+ */
+export async function classifyNew({ limit = 1000 } = {}) {
+  const fresh = await all(`SELECT p.* FROM market_products p LEFT JOIN market_candidates c ON c.market_product_id = p.id
+                            WHERE c.id IS NULL ORDER BY p.created_at LIMIT @l`, { l: limit });
+  if (!fresh.length) return { classified: 0 };
+  const catalogue = await forgeCatalogModels();
+  const cut = new Date(Date.now() - 168 * 3600_000).toISOString();
+  const obs = await all(`SELECT DISTINCT ON (market_product_id, source_key, COALESCE(source_product_id, '')) *
+                           FROM market_observations WHERE market_product_id = ANY(@ids) AND observed_at >= @cut
+                          ORDER BY market_product_id, source_key, COALESCE(source_product_id, ''), observed_at DESC`,
+  { ids: fresh.map((p) => p.id), cut });
+  const by = new Map();
+  for (const o of obs) { if (!by.has(o.market_product_id)) by.set(o.market_product_id, []); by.get(o.market_product_id).push(o); }
+  const P = { at: nowIso() };
+  const rows = fresh.map((mp, n) => {
+    const v = classify(mp, catalogue, by.get(mp.id) || []);
+    Object.assign(P, { [`i${n}`]: newId('mkc'), [`p${n}`]: mp.id, [`s${n}`]: v.status, [`r${n}`]: v.reason,
+      [`f${n}`]: v.forgeProductId || null, [`d${n}`]: v.duplicateOf || null, [`c${n}`]: v.confidence });
+    return `(@i${n},@p${n},@s${n},@r${n},@f${n},@d${n},@c${n},@at,@at)`;
+  });
+  await run(`INSERT INTO market_candidates (id, market_product_id, status, reason, forge_product_id, duplicate_of, match_confidence, created_at, updated_at)
+             VALUES ${rows.join(',')} ON CONFLICT (market_product_id) DO NOTHING`, P);
+  return { classified: fresh.length };
+}
+
+/**
  * Classify everything we have observed and write the candidate rows.
  *
  * Bounded by a deadline: each product costs a few database round trips, and

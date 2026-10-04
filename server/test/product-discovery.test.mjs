@@ -396,6 +396,13 @@ console.log('\n— End to end —');
   const whole = await S.importResearch({ deadline: Date.now() + 60_000 });
   ok('…and finishes in later steps', whole.complete === true && (await S.importResearch()).skipped === 'already imported');
 
+  const { classifyNew } = await import('../src/services/market/discovery.js');
+  await run(`INSERT INTO market_products (id, canonical_key, product_type, game, edition, platform, region, denomination, denom_unit, quantity, title, created_at, updated_at)
+             VALUES ('mkp_bulk1','points:roblox:-:any:global:123456:robux:1','points','roblox','','any','global',123456,'robux',1,'Roblox 123456',@at,@at)`, { at: new Date().toISOString() });
+  const bulk = await classifyNew();
+  ok('new market products get their candidates in one go', bulk.classified >= 1 && !!(await get(`SELECT 1 FROM market_candidates WHERE market_product_id='mkp_bulk1'`)));
+  ok('…and a second call finds nothing new', (await classifyNew()).classified === 0);
+
   /* The complete scan: as long as it takes, in steps that each fit a server function. */
   await obs('Roblox 1200 Robux Global');
   const start = await P.startFullScan({ actor: 'owner@test' });
