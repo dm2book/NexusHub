@@ -68,6 +68,7 @@ export async function collectFromSources(queries, { fetchImpl = fetch } = {}) {
     }
     const src = SOURCES.find((x) => x.key === s.key);
     if (!src || src.kind === 'manual') continue;      // manual sources are pushed to us
+    if (src.kind === 'search') continue;              // mentions, not offers: discovery/searchSource.js
 
     for (const q of queries) {
       try {
