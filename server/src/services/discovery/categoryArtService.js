@@ -7,17 +7,18 @@
  *      game or brand, the one nearest in amount (12,000 FC Points art goes on
  *      18,500 rather than on 500). A gift card only ever takes the artwork of
  *      its own brand: a Netflix card never shows the Amazon card.
- *   2. the category logo the owner set in the admin, for that game;
- *   3. only when the owner has no artwork for this game at all: the shop's own
- *      board, drawn with this product's own amount (a shipped file from
- *      public/products/art, or /api/products/:id/tile.svg).
+ *   2. otherwise the shop's own board with this product's own amount and the
+ *      game's REAL logo in it — the category logo the owner set, or the brand
+ *      logo held under a free licence (productFitService.tileLogo) — at
+ *      /api/products/:id/tile.svg; a shipped board from public/products/art
+ *      where one exists for exactly this product.
  *
  * Never touched: the owner's own uploads — they ARE the look. The picture it
  * replaces is kept in metadata.imagePrevious, so nothing is lost.
  */
 import { all } from '../../db/index.js';
 import { config } from '../../config/env.js';
-import { matchArt, tilePath } from '../productFitService.js';
+import { matchArt, tilePath, brandSlug } from '../productFitService.js';
 import { parseTitle } from '../market/normalize.js';
 
 /* Applied by the scheduled run in production; elsewhere (tests, local) only
@@ -29,7 +30,9 @@ const parse = (m) => { try { return typeof m === 'string' ? JSON.parse(m || '{}'
 const STORED = /^\/api\/images\//;
 /* Shelves that hold many brands: there the brand must match exactly. */
 const MIXED = new Set(['giftcard', 'subscription']);
-const gameOf = (name) => { const g = parseTitle(name || '', {}).game; return g && !String(g).startsWith('unknown') ? g : null; };
+/* The brand first, so "Xbox €15 NL" and "Xbox Gift Card €25" are one brand
+   even where the market parser only knows the second. */
+const gameOf = (name) => { const b = brandSlug(name || ''); if (b) return b; const g = parseTitle(name || '', {}).game; return g && !String(g).startsWith('unknown') ? g : null; };
 
 /** Is this the owner's own upload — the look, never replaced? */
 export function isOwnerArtwork(meta = {}) {
@@ -46,8 +49,8 @@ function sameGame(ref, product, game) {
 
 /**
  * The artwork for one product. `references` are the owner's uploads
- * (artworkReferences), `categoryLogos` the logos set in the admin; with
- * neither it is the shop's drawn board.
+ * (artworkReferences); without one for this game it is the shop's board,
+ * which draws the game's logo itself. `categoryLogos` is kept for callers.
  */
 export function artworkFor(product, references = [], categoryLogos = {}) {
   const meta = parse(product.metadata);
@@ -62,8 +65,11 @@ export function artworkFor(product, references = [], categoryLogos = {}) {
     })[0];
     return { image: best.image, from: best.name };
   }
-  const logo = MIXED.has(product.category) ? null : categoryLogos[product.category];
-  if (STORED.test(String(logo || ''))) return { image: logo, from: `category logo (${product.category})` };
+  /* With a real logo for this game the live board draws it; a shipped board
+     only has the shop's drawn icon. */
+  const hasLogo = (!MIXED.has(product.category) && STORED.test(String(categoryLogos?.[product.category] || '')))
+    || meta.imagePreviousSource === 'licensed' || meta.imageSource === 'licensed';
+  if (hasLogo) return { image: tilePath(product.id), from: 'drawn for this product, with the game\'s logo' };
   const hit = matchArt({ sku: product.sku || meta.sku || null, name: product.name, category: product.category,
     denomination: meta.denomination ?? null });
   return hit.image ? { image: hit.image, from: hit.reason } : { image: tilePath(product.id), from: 'drawn for this product' };

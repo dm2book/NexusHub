@@ -139,7 +139,7 @@ console.log('\n— The owner\'s own artwork on every product (the EA FC look) �
   const linked = await createProduct({ name: `Discord Nitro — 1 Month ${tag}`, category: 'discord-nitro', price: 999, announce: false,
     metadata: { image: 'https://example.com/nitro.png' } });
   const shipped = await createProduct({ name: `1,000 Apex Coins ${tag}`, category: 'apex', price: 999, announce: false,
-    metadata: { denomination: 1000, image: '/api/images/' + '5'.repeat(32) + '.png', imageSource: 'licensed' } });
+    metadata: { denomination: 1000, image: '/api/images/' + '5'.repeat(32) + '.png', imageSource: 'supplier' } });
   const big = await createProduct({ name: `12,000 FC Points — EA FC ${tag}`, category: 'eafc', price: 9999, announce: false, metadata: { image: '/api/images/' + '2'.repeat(32) + '.webp' } });
   const fc = await createProduct({ name: `18,500 FC Points PlayStation ${tag}`, category: 'eafc', price: 14999, announce: false,
     metadata: { source: 'discovery', denomination: 18500, image: '/api/images/' + '6'.repeat(32) + '.png', imageSource: 'licensed' } });
@@ -147,6 +147,8 @@ console.log('\n— The owner\'s own artwork on every product (the EA FC look) �
     metadata: { source: 'discovery', denomination: 500 } });
   const amazon = await createProduct({ name: `Amazon Gift Card €25 ${tag}`, category: 'giftcard', price: 2500, announce: false, metadata: { image: '/api/images/' + '7'.repeat(32) + '.webp' } });
   const netflix = await createProduct({ name: `Netflix €15 NL ${tag}`, category: 'giftcard', price: 1500, announce: false, metadata: { source: 'discovery', denomination: 15 } });
+  const xboxOwn = await createProduct({ name: `Xbox Gift Card €25 ${tag}`, category: 'giftcard', price: 2500, announce: false, metadata: { image: '/api/images/' + '8'.repeat(32) + '.webp' } });
+  const xboxNl = await createProduct({ name: `Xbox €15 NL ${tag}`, category: 'giftcard', price: 1500, announce: false, metadata: { source: 'discovery', denomination: 15 } });
   const amazon50 = await createProduct({ name: `Amazon Gift Card €50 ${tag}`, category: 'giftcard', price: 5000, announce: false, metadata: { source: 'discovery', denomination: 50 } });
 
   const stopped = await art.applyCategoryArtwork({ deadline: Date.now() - 1 });
@@ -165,12 +167,30 @@ console.log('\n— The owner\'s own artwork on every product (the EA FC look) �
   ok('…the one nearest in amount', (await m(fcSmall)).image === upload, (await m(fcSmall)).image);
   ok('a gift card takes only its own brand\'s artwork: Netflix never shows the Amazon card', (await m(netflix)).image === tile(netflix), (await m(netflix)).image);
   ok('…and the same brand does share it', (await m(amazon50)).image === '/api/images/' + '7'.repeat(32) + '.webp');
+  ok('"Xbox €15 NL" is an Xbox card too, and takes the owner\'s Xbox artwork', (await m(xboxNl)).image === '/api/images/' + '8'.repeat(32) + '.webp', (await m(xboxNl)).image);
+  ok('a game with a real logo but no owner card gets the board that draws that logo', (await m(logo)).image === tile(logo) && /logo/.test((await m(logo)).imageFrom), (await m(logo)).imageFrom);
   ok('both owner uploads stay as they are', (await m(big)).image === '/api/images/' + '2'.repeat(32) + '.webp' && (await m(amazon)).image === '/api/images/' + '7'.repeat(32) + '.webp');
   ok('the owner\'s own upload is the look, and is never touched', (await m(own)).image === upload && !(await m(own)).imageSource && r.kept >= 1);
   ok('running it again changes nothing — and keeps the first previous picture', (await art.applyCategoryArtwork()).applied === 0);
   ok('the supplier photo sweep never replaces it', !needsPhoto({ metadata: await m(logo) }, { scope: 'all' }));
   ok('Product media lists it as own artwork — not missing — so the button visibly worked', media.mediaStatus({ metadata: await m(logo) }).status === 'own'
     && /own artwork/.test(media.mediaStatus({ metadata: await m(logo) }).reasons[0]));
+  {
+    const fit = await import('../src/services/productFitService.js');
+    const { storeImage } = await import('../src/services/imageStoreService.js');
+    /* A real 1×1 PNG stands in for the brand logo held under a free licence. */
+    const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
+    const { url } = await storeImage('image/png', png, { source: 'licensed' });
+    const val = await createProduct({ name: `11,000 Valorant Points EU ${tag}`, category: 'valorant', price: 8999, announce: false,
+      metadata: { source: 'discovery', denomination: 11000, image: url, imageSource: 'licensed' } });
+    await art.applyCategoryArtwork();
+    const vm = await m(val);
+    const logoUri = await fit.tileLogo(await getProduct(val.id));
+    ok('the board finds the logo the product carried before (kept in imagePrevious)', vm.imagePrevious === url && /^data:image\/png;base64,/.test(logoUri || ''), logoUri && logoUri.slice(0, 40));
+    const svg = await fit.renderTileArt(await getProduct(val.id), { logo: logoUri });
+    ok('…and draws it in the ring, with the product\'s own amount', svg.includes('href="data:image/png;base64,') && svg.includes('11,000'), svg.slice(0, 200));
+    ok('a gift card with no logo still draws its own brand: "Xbox €15 NL" is not a gift box', fit.brandSlug('Xbox €15 NL') === 'xbox' && fit.brandSlug('PlayStation Store €20 NL') === 'playstation');
+  }
   const page = (await import('node:fs')).readFileSync(new URL('../../src/pages/admin/ProductMedia.jsx', import.meta.url), 'utf8');
   ok('the admin page has the button', page.includes('Eigen artwork op alle producten') && page.includes('/api/admin/products/media/category-artwork'));
 }

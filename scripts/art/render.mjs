@@ -109,6 +109,15 @@ const INK = (() => {
  */
 export function inlineMark(src, { x, y, w, h }) {
   if (!src) return null;
+  /* A logo handed over as bytes — the owner's own category logo, or a brand
+     logo the shop holds under a free licence — drawn on the stage, clipped to
+     the round plate so a square picture sits in the ring like the drawn marks. */
+  if (/^data:image\/(png|jpe?g|webp|gif);base64,/i.test(String(src))) {
+    const cx = x + w / 2, cy = y + h / 2, r = Math.min(w, h) / 2;
+    return `<clipPath id="logoclip"><circle cx="${cx}" cy="${cy}" r="${r}"/></clipPath>`
+      + `<circle cx="${cx}" cy="${cy}" r="${r}" fill="#0b0918"/>`
+      + `<image x="${x}" y="${y}" width="${w}" height="${h}" preserveAspectRatio="xMidYMid meet" clip-path="url(#logoclip)" href="${src}"/>`;
+  }
   const file = path.join(PUBLIC, String(src).replace(/^\/+/, ''));
   const bundled = BUNDLED[String(src)];
   const disk = fs.existsSync(file);
