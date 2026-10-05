@@ -247,7 +247,57 @@ const BRAND_MARK = {
   spotify: 'spotify', discord: 'discord-nitro',
 };
 
-export async function renderTileArt(product) {
+/* A gift card's brand from its words, for names the market parser does not
+   place ("Xbox €15 NL", "PlayStation Store €20 NL"). Most specific first. */
+const BRAND_WORDS = [
+  [/game\s*pass/i, 'gamepass'], [/xbox/i, 'xbox'], [/playstation|\bpsn\b/i, 'playstation'],
+  [/nintendo|eshop/i, 'nintendo'], [/steam/i, 'steam'], [/netflix/i, 'netflix'], [/google\s*play/i, 'googleplay'],
+  [/app\s*store|itunes|apple/i, 'itunes'], [/amazon/i, 'amazon'], [/spotify/i, 'spotify'], [/discord/i, 'discord-nitro'],
+];
+export function brandSlug(name = '') {
+  const game = parseTitle(name || '', {}).game;
+  if (BRAND_MARK[game]) return BRAND_MARK[game];
+  /* A game the parser knows is that game: "1,100 COD Points PlayStation" is
+     COD on a PlayStation, not a PlayStation card. Words only for the rest. */
+  if (game && !String(game).startsWith('unknown')) return null;
+  return (BRAND_WORDS.find(([re]) => re.test(name)) || [])[1] || null;
+}
+
+const LOGO_MAX_BYTES = 400_000;
+const parseMeta = (m) => { try { return typeof m === 'string' ? JSON.parse(m || '{}') : (m || {}); } catch { return {}; } };
+
+/**
+ * The real logo for this product's board, as a data URI, or null:
+ *   1. the category logo the owner set in the admin (their own upload);
+ *   2. the brand logo this product carried under a free licence before it got
+ *      its board (kept in metadata.imagePrevious) — COD and Valorant.
+ * Only stored pictures: a board is an <img>, which never fetches anything.
+ */
+export async function tileLogo(product, { categoryLogos = null } = {}) {
+  try {
+    const meta = parseMeta(product?.metadata);
+    let logos = categoryLogos;
+    if (!logos) { const { getCategoryLogos } = await import('./settingsService.js'); logos = await getCategoryLogos().catch(() => ({})); }
+    const candidates = [
+      !['giftcard', 'subscription'].includes(product?.category) ? logos?.[product?.category] : null,
+      meta.imagePreviousSource === 'licensed' ? meta.imagePrevious : null,
+      meta.imageSource === 'licensed' ? meta.image : null,
+    ];
+    const { readImage } = await import('./imageStoreService.js');
+    for (const src of candidates) {
+      const m = /^\/api\/images\/([a-f0-9]{32})\./i.exec(String(src || ''));
+      if (!m) continue;
+      // eslint-disable-next-line no-await-in-loop
+      const img = await readImage(m[1]);
+      if (img && /^image\/(png|jpe?g|webp|gif)$/i.test(img.mime) && img.bytes.length <= LOGO_MAX_BYTES) {
+        return `data:${img.mime};base64,${img.bytes.toString('base64')}`;
+      }
+    }
+  } catch { /* the drawn mark is the fallback */ }
+  return null;
+}
+
+export async function renderTileArt(product, { logo = null } = {}) {
   try {
     const { mainSvg, brandMark } = await import('../../../scripts/art/render.mjs');
     /* Without its image. A product that gets this tile HAS the tile as its
@@ -256,7 +306,7 @@ export async function renderTileArt(product) {
        and leave the ring empty.
        But WITH its brand, when the name says which: a shelf like "giftcard"
        holds Steam, Netflix and Apple, and the shelf's mark is a gift box. */
-    const mark = brandMark(BRAND_MARK[parseTitle(product?.name || '', {}).game]);
+    const mark = logo || brandMark(brandSlug(product?.name || ''));
     return mainSvg({ ...product, image: mark, imageLegacy: null },
       { unit: unitFrom(product?.name) });
   } catch (e) {
