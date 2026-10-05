@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
+import { platformOf } from '../lib/platform.js';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Search, SlidersHorizontal, PackageX, LayoutGrid, CloudOff } from 'lucide-react';
 import { api } from '../lib/api.js';
@@ -19,7 +20,9 @@ import { useTrending } from '../lib/useTrending.js';
 import { Flame } from 'lucide-react';
 
 const SORTS = {
-  popular: { key: 'shop.sortPopular', label: 'Popular', fn: (a, b) => (b.featured === true) - (a.featured === true) },
+  /* Featured first, then small to large: "4,600 → 12,000 → 1,600" read as a
+     shelf in no order. Within one game the price follows the amount. */
+  popular: { key: 'shop.sortPopular', label: 'Popular', fn: (a, b) => ((b.featured === true) - (a.featured === true)) || (a.price - b.price) },
   price_asc: { key: 'shop.sortPriceAsc', label: 'Price: Low → High', fn: (a, b) => a.price - b.price },
   price_desc: { key: 'shop.sortPriceDesc', label: 'Price: High → Low', fn: (a, b) => b.price - a.price },
   name: { key: 'shop.sortName', label: 'Name A–Z', fn: (a, b) => a.name.localeCompare(b.name) },
@@ -37,6 +40,7 @@ export default function Shop({ landingCategory = null, landingPath = null } = {}
   const [products, setProducts] = useState(() => readSeed('products'));
   const [search, setSearch] = useState(() => new URLSearchParams(window.location.search).get('search') || '');
   const [sort, setSort] = useState('popular');
+  const [platform, setPlatform] = useState('');
   /* Measured at 390px: rendering the whole catalogue made this page 15,455px —
      18 screens — and fired 65 image requests before the buyer had scrolled once.
      A phone pays for every one of those. 24 fills roughly three screens, which
@@ -95,11 +99,26 @@ export default function Shop({ landingCategory = null, landingPath = null } = {}
   const urlSearch = params.get('search') || '';
   useEffect(() => { setSearch(urlSearch); }, [urlSearch]);
 
-  useEffect(() => { setShown(PAGE); }, [category, sort, search]);
+  useEffect(() => { setShown(PAGE); }, [category, sort, search, platform]);
+  useEffect(() => { setPlatform(''); }, [category]);
+
+  /* The platforms on this shelf, when there is a choice to make: FC Points or
+     COD Points for PlayStation do not work on Xbox, and a buyer should be able
+     to see only theirs. */
+  const platforms = useMemo(() => {
+    const seen = new Map();
+    for (const p of products || []) {
+      if (category && (p.category || '') !== category) continue;
+      const pf = platformOf(p);
+      if (pf && !seen.has(pf.id)) seen.set(pf.id, pf);
+    }
+    return seen.size >= 2 ? [...seen.values()] : [];
+  }, [products, category]);
 
   const visible = useMemo(() => {
     let list = (products || []).slice();
     if (category) list = list.filter((p) => (p.category || '') === category);
+    if (platform) list = list.filter((p) => platformOf(p)?.id === platform);
     const q = normalizeSearch(search);
     if (q) {
       // Match on name / category / description, ignoring case + punctuation
@@ -109,7 +128,7 @@ export default function Shop({ landingCategory = null, landingPath = null } = {}
         || normalizeSearch(p.description).includes(q));
     }
     return list.sort(SORTS[sort].fn);
-  }, [products, category, search, sort]);
+  }, [products, category, search, sort, platform]);
 
   /* Choosing a category is a NAVIGATION, not a filter.
 
@@ -292,6 +311,20 @@ export default function Shop({ landingCategory = null, landingPath = null } = {}
             </div>
           </div>
         </div>
+
+        {platforms.length > 0 && (
+          <div className="flex flex-wrap gap-2 -mt-1 mb-5" role="group" aria-label={t('shop.platform', 'Platform')} data-testid="platform-filter">
+            {[{ id: '', label: t('shop.allPlatforms', 'All platforms') }, ...platforms].map((pf) => (
+              <button key={pf.id || 'all'} type="button" onClick={() => setPlatform(pf.id)} aria-pressed={platform === pf.id}
+                className="rounded-full h-9 px-3.5 text-sm font-semibold border transition"
+                style={platform === pf.id
+                  ? { background: pf.color || '#7c3aed', borderColor: pf.color || '#7c3aed', color: '#fff' }
+                  : { background: '#fff', borderColor: '#e2e8f0', color: '#334155' }}>
+                {pf.label}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* grid */}
         {products === null ? (

@@ -41,6 +41,8 @@ export default function Checkout() {
   const [email, setEmail] = useState('');
   const [fullName, setFullName] = useState('');
   const [city, setCity] = useState('');
+  const [showBilling, setShowBilling] = useState(false);
+  const [showCoupon, setShowCoupon] = useState(false);
   const [busy, setBusy] = useState(false);
   // EU distance-selling: digital goods keep a 14-day withdrawal right unless the
   // buyer explicitly asks for immediate delivery and acknowledges losing it.
@@ -435,6 +437,14 @@ export default function Checkout() {
                   autoComplete="email" inputMode="email" autoCapitalize="off" autoCorrect="off" spellCheck={false}
                   className="input" placeholder="you@example.com" />
               </div>
+              {/* Name and city are optional and not needed for a digital code, so
+                  they wait behind a link instead of asking twice for nothing. */}
+              {!showBilling ? (
+                <button type="button" onClick={() => setShowBilling(true)}
+                  className="text-[13px] font-semibold text-violet-700 hover:underline">
+                  {t('checkout.addName', '+ Put a name on the receipt (optional)')}
+                </button>
+              ) : (
               <div className="grid sm:grid-cols-2 gap-4">
                 <div>
                   <label className="label" htmlFor="co-name">{t('checkout.name', 'Full name')}</label>
@@ -447,6 +457,7 @@ export default function Checkout() {
                     className="input" placeholder={t('checkout.optional', 'Optional')} />
                 </div>
               </div>
+              )}
               {offersChoice && !requiresAccount && (
                 <div>
                   {/* This caption heads a pair of BUTTONS, not a field, so a
@@ -541,7 +552,14 @@ export default function Checkout() {
               </div>
             ))}
           </div>
-          {/* Coupon */}
+          {/* Coupon — a link until someone has one. An open "discount code"
+              field sends a buyer off to search for codes and not come back. */}
+          {!(showCoupon || coupon) ? (
+            <button type="button" onClick={() => setShowCoupon(true)}
+              className="text-[13px] font-semibold text-violet-700 hover:underline mb-4">
+              {t('checkout.haveCoupon', 'Have a discount code?')}
+            </button>
+          ) : (
           <div className="flex gap-2 mb-4">
             <input value={couponInput} onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
               aria-label={t('checkout.couponPh', 'Discount code')} enterKeyHint="done"
@@ -549,6 +567,7 @@ export default function Checkout() {
               placeholder={t('checkout.couponPh', 'Discount code')} className="input py-2 text-base" />
             <button type="button" onClick={applyCoupon} className="btn-ghost px-4 min-h-[44px] text-sm">{t('checkout.apply', 'Apply')}</button>
           </div>
+          )}
           {/* Store credit */}
           {creditBalance > 0 && (
             <label className="flex items-center justify-between gap-2 mb-4 cursor-pointer rounded-xl bg-space-black border border-white/10 px-3.5 py-3">

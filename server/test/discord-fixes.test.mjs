@@ -201,10 +201,14 @@ console.log('\n— The page and the server agree —');
 
   // Role colours are Discord's, chosen for Discord's dark chrome. On the white
   // card this page uses in light mode they measured 2.15:1 to 3.96:1.
+  // The roles list (Owner, Admin, Moderator…) is gone from the page: it told a
+  // buyer nothing about why to join. If it ever returns, its names must not be
+  // painted in the role colour, and the swatch must stay decorative.
   ok('role names are not painted in the role colour',
     !/className="font-medium" style=\{\{ color \}\}/.test(page),
     'role names still take an inline colour that fails contrast on a light card');
-  ok('the colour swatch is marked decorative', /aria-hidden[\s\S]{0,140}background: color/.test(page));
+  ok('no roles directory, or one whose colour swatch is decorative',
+    !/roles\(t\)/.test(page) || /aria-hidden[\s\S]{0,140}background: color/.test(page));
 }
 
 // ── 6. Signed-in customers get the invite that still works ──────────────────

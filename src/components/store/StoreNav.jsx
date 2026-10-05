@@ -211,7 +211,7 @@ export default function StoreNav() {
             language. Below 1152 the menu button beside the logo carries the
             same links, in full, so nothing is lost by waiting; the two
             thresholds move together for that reason. */}
-        <nav className="hidden min-[1152px]:flex items-center gap-5 xl:gap-6 text-[15px] font-medium text-slate-600 min-w-0 overflow-hidden">
+        <nav className="hidden min-[1152px]:flex items-center gap-4 text-[14.5px] font-medium text-slate-600 min-w-0 overflow-hidden">
           {NAV.map((n) => (
             <Link key={n.label} to={n.to}
               className={`relative py-1 whitespace-nowrap hover:text-slate-900 transition ${active(n.to) ? 'text-violet-600' : ''}`}>
@@ -295,8 +295,11 @@ export default function StoreNav() {
             beside them. A longer label truncates rather than leaving the
             viewport. */}
         {!loading && !user && (
-          <Link to="/login" className="hidden sm:inline-flex items-center gap-1.5 text-white text-[15px] font-semibold rounded-xl px-4 h-10 shrink-0 min-w-0 max-w-[40vw] shadow-lg shadow-violet-500/30 hover:brightness-105 transition"
-            style={{ backgroundImage: 'linear-gradient(135deg,#7c5cff,#a855f7)' }}>
+          /* An outline, not the gradient: an account is not needed to buy (guest
+             checkout), so this was the loudest button on the page pulling the
+             eye away from the products and from Shop now. */
+          <Link to="/login" className="hidden sm:inline-flex items-center gap-1.5 text-[15px] font-semibold rounded-xl px-4 h-10 shrink-0 min-w-0 max-w-[40vw] hover:brightness-105 transition"
+            style={{ background: '#fff', color: '#6d28d9', border: '1.5px solid #c4b5fd' }}>
             <span className="truncate">{t('nav.signup', 'Sign Up')}</span>
             <ArrowRight size={16} className="shrink-0" />
           </Link>

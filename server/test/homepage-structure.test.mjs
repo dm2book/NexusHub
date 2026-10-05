@@ -26,13 +26,15 @@ const ok = (name, cond, extra = '') => { if (cond) { pass++; console.log(`  ✅ 
 console.log('— The agreed order —');
 {
   // Every section must exist, and in this order: a buyer should meet the goods
-  // before the argument, and the argument before the questions.
+  // before the explanation, the explanation before the argument, and the
+  // argument before the questions. (How it works used to sit above the
+  // products and put the first one 2.3 screens down on a phone.)
   const marks = [
     ['Hero', 'fm-stage'],
-    ['How it works', "home.howTitle"],
     // `pillars.map` also renders the hero chips, so it cannot mark this
     // section. The pack count only exists on a product card.
     ['Popular products', "home.packs"],
+    ['How it works', "home.howTitle"],
     ['Why ForgeMarket', "home.whyTitle"],
     ['Reviews', "home.reviewsTitle"],
     ['FAQ', "home.faqTitle"],
