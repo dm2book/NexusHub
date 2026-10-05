@@ -336,6 +336,8 @@ export async function runMaintenance() {
       summary.discoveryQueries = d.categories?.queries?.length || 0;
       if (d.research?.mentions) summary.discoveryResearchMentions = d.research.mentions;
       if (d.firstEvaluation) summary.discoveryFirstEvaluated = d.firstEvaluation;
+      if (d.artwork?.applied) summary.discoveryArtworkApplied = d.artwork.applied;
+      if (d.artwork?.none?.length) summary.discoveryArtworkNone = d.artwork.none.join(',');
       if (d.logos?.applied) summary.discoveryLogosApplied = d.logos.applied;
       if (d.logos?.none?.length) summary.discoveryLogosNone = d.logos.none.join(',');
       if (d.logos?.error || d.logos?.errors?.length) summary.discoveryLogosError = d.logos.error || d.logos.errors[0];

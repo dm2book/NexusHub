@@ -76,6 +76,7 @@ export function mediaStatus(product, { now = Date.now() } = {}) {
   if (!official) {
     const why = TILE.test(String(image)) ? 'a drawn placeholder tile'
       : String(image).startsWith('/products/') ? 'the shop’s own icon or artwork, not the publisher’s'
+        : meta.imageSource === 'category-artwork' ? `the shop's own artwork${meta.imageFrom ? ` (from ${meta.imageFrom})` : ''}, not the publisher's product picture`
         : meta.imageSource === 'licensed' ? `the brand's logo under a free licence (${meta.imageLicence || 'Wikimedia Commons'}), not a product picture`
         : meta.imageSource === 'generated' ? 'a generated picture'
           : /^https?:/.test(String(image)) ? 'a linked picture with no known licence'

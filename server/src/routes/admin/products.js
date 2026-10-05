@@ -119,6 +119,11 @@ router.post('/media/enrich', requirePermission('suppliers.manage'), asyncHandler
   res.set('Cache-Control', 'no-store');
   res.json({ ...(await enrichMedia(ids, { actor: req.user })), done: false });
 }));
+/* The owner's own artwork on every product (categoryArtService), in steps. */
+router.post('/media/category-artwork', requirePermission('suppliers.manage'), asyncHandler(async (req, res) => {
+  const { applyCategoryArtwork } = await import('../../services/discovery/categoryArtService.js');
+  res.json(await applyCategoryArtwork({ actor: req.user, deadline: Date.now() + 18_000 }));
+}));
 router.post('/:id/media/official', requirePermission('suppliers.manage'), asyncHandler(async (req, res) => {
   const { official, sourceUrl } = z.object({ official: z.boolean(), sourceUrl: z.string().url().max(500).optional() }).parse(req.body || {});
   try {
