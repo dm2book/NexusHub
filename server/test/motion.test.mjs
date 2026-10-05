@@ -110,8 +110,10 @@ console.log('\n— This round’s moving parts —');
     /<span key=\{count\}/.test(home));
 
   /* One light for "online", wherever the shop says it. */
-  ok('the bot’s status light is the hero’s, not a second one',
-    (home.match(/className="fm-livedot"/g) || []).length >= 2);
+  /* The ForgeBot card that carried the second light is gone (one chat entry
+     point, the bubble); the hero's light is the one "online" light left. */
+  ok('"online" is said with one light, the hero’s',
+    (home.match(/className="fm-livedot"/g) || []).length >= 1 && !/animate-ping/.test(home));
 
   ok('the filled buttons catch a light when pointed at', has(/@keyframes fmShine/));
   ok('…and only while pointed at — it is not a loop',
