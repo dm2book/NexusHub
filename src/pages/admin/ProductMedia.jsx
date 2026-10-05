@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ImageOff, Clock, BadgeCheck, ImageDown, RefreshCw } from 'lucide-react';
+import { ImageOff, Clock, BadgeCheck, ImageDown, RefreshCw, Palette } from 'lucide-react';
 import { api } from '../../lib/api.js';
 import { date } from '../../lib/format.js';
 import { PageLoader } from '../../components/ui.jsx';
@@ -21,6 +21,7 @@ const STATUS = {
   missing: { label: 'Ontbreekt', icon: ImageOff, c: '#fda4af' },
   low_quality: { label: 'Lage kwaliteit', icon: ImageDown, c: '#fcd34d' },
   outdated: { label: 'Verouderd', icon: Clock, c: '#7dd3fc' },
+  own: { label: 'Eigen artwork', icon: Palette, c: '#c4b5fd' },
   official: { label: 'Officieel', icon: BadgeCheck, c: '#6ee7b7' },
 };
 const SOURCE = { supplier: 'Leverancier (API)', official: 'Eigen upload, officieel', upload: 'Eigen upload', link: 'Link',
@@ -84,7 +85,7 @@ export default function ProductMedia() {
         gegenereerde plaatjes en stockfoto's tellen niet. Er wordt niets van andere sites geplukt.
         Verouderd = langer dan {data.maxAgeDays} dagen niet ververst; lage kwaliteit = score onder {data.minQuality}/100.
       </p>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 mb-5">
+      <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-5 mb-5">
         {Object.entries(STATUS).map(([k, v]) => (
           <button key={k} type="button" onClick={() => setFilter(filter === k ? '' : k)} data-testid={`media-${k}`}
             className="rounded-xl border px-4 py-3 text-left"

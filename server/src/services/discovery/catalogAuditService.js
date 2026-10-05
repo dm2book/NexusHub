@@ -112,7 +112,7 @@ export function auditCatalogue(models, { suppliers = new Map(), codes = {}, mark
       wrongCategory: ms.filter((m) => owner.has(m.model.game) && owner.get(m.model.game) !== category && mains.get(category) !== m.model.game)
         .map((m) => row(m, { belongsIn: owner.get(m.model.game) })),
       missingImage: media.filter(([, s]) => !s.image).map(([m]) => row(m)),
-      weakImage: media.filter(([, s]) => s.image && s.status !== 'official').map(([m, s]) => row(m, { status: s.status, reason: s.reasons[0] })),
+      weakImage: media.filter(([, s]) => s.image && !['official', 'own'].includes(s.status)).map(([m, s]) => row(m, { status: s.status, reason: s.reasons[0] })),
       missingDescription: ms.filter((m) => String(m.product.description || '').trim().length < 40).map((m) => row(m)),
       missingSupplier: ms.filter((m) => !suppliers.has(m.product.id) && !(codes[m.product.id] > 0)).map((m) => row(m)),
       items: ms.map((m) => ({
