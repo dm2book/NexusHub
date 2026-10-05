@@ -125,7 +125,7 @@ console.log('\n— Admin —');
   ok('the admin page shows Missing, Outdated, Own artwork, Official and Low quality', ['Ontbreekt', 'Verouderd', 'Eigen artwork', 'Officieel', 'Lage kwaliteit'].every((t) => page.includes(t)));
 }
 
-console.log('\n— The shop\'s own artwork on every product (the EA FC look) —');
+console.log('\n— The owner\'s own artwork on every product (the EA FC look) —');
 {
   const art = await import('../src/services/discovery/categoryArtService.js');
   const { needsPhoto } = await import('../src/services/supplier/supplierImageService.js');
@@ -140,6 +140,14 @@ console.log('\n— The shop\'s own artwork on every product (the EA FC look) —
     metadata: { image: 'https://example.com/nitro.png' } });
   const shipped = await createProduct({ name: `1,000 Apex Coins ${tag}`, category: 'apex', price: 999, announce: false,
     metadata: { denomination: 1000, image: '/api/images/' + '5'.repeat(32) + '.png', imageSource: 'licensed' } });
+  const big = await createProduct({ name: `12,000 FC Points — EA FC ${tag}`, category: 'eafc', price: 9999, announce: false, metadata: { image: '/api/images/' + '2'.repeat(32) + '.webp' } });
+  const fc = await createProduct({ name: `18,500 FC Points PlayStation ${tag}`, category: 'eafc', price: 14999, announce: false,
+    metadata: { source: 'discovery', denomination: 18500, image: '/api/images/' + '6'.repeat(32) + '.png', imageSource: 'licensed' } });
+  const fcSmall = await createProduct({ name: `500 FC Points Xbox ${tag}`, category: 'eafc', price: 499, announce: false,
+    metadata: { source: 'discovery', denomination: 500 } });
+  const amazon = await createProduct({ name: `Amazon Gift Card €25 ${tag}`, category: 'giftcard', price: 2500, announce: false, metadata: { image: '/api/images/' + '7'.repeat(32) + '.webp' } });
+  const netflix = await createProduct({ name: `Netflix €15 NL ${tag}`, category: 'giftcard', price: 1500, announce: false, metadata: { source: 'discovery', denomination: 15 } });
+  const amazon50 = await createProduct({ name: `Amazon Gift Card €50 ${tag}`, category: 'giftcard', price: 5000, announce: false, metadata: { source: 'discovery', denomination: 50 } });
 
   const stopped = await art.applyCategoryArtwork({ deadline: Date.now() - 1 });
   ok('it stops at its deadline and says how much is left', stopped.applied === 0 && stopped.remaining > 0);
@@ -152,6 +160,12 @@ console.log('\n— The shop\'s own artwork on every product (the EA FC look) —
   ok('…and a linked picture', (await m(linked)).image === tile(linked));
   ok('where the shop ships a board for exactly this amount, that file is used', (await m(shipped)).image === '/products/art/apex-1000.svg', (await m(shipped)).image);
   ok('the picture it replaced is kept, so nothing is lost', (await m(logo)).imagePrevious === '/api/images/' + '3'.repeat(32) + '.png' && (await m(logo)).imagePreviousSource === 'licensed');
+  ok('a product of a game the owner made artwork for gets THAT artwork — the EA FC card with its logos', (await m(fc)).image === '/api/images/' + '2'.repeat(32) + '.webp'
+    && (await m(fc)).imageSource === 'own-artwork' && /12,000 FC Points/.test((await m(fc)).imageFrom), JSON.stringify(await m(fc)));
+  ok('…the one nearest in amount', (await m(fcSmall)).image === upload, (await m(fcSmall)).image);
+  ok('a gift card takes only its own brand\'s artwork: Netflix never shows the Amazon card', (await m(netflix)).image === tile(netflix), (await m(netflix)).image);
+  ok('…and the same brand does share it', (await m(amazon50)).image === '/api/images/' + '7'.repeat(32) + '.webp');
+  ok('both owner uploads stay as they are', (await m(big)).image === '/api/images/' + '2'.repeat(32) + '.webp' && (await m(amazon)).image === '/api/images/' + '7'.repeat(32) + '.webp');
   ok('the owner\'s own upload is the look, and is never touched', (await m(own)).image === upload && !(await m(own)).imageSource && r.kept >= 1);
   ok('running it again changes nothing — and keeps the first previous picture', (await art.applyCategoryArtwork()).applied === 0);
   ok('the supplier photo sweep never replaces it', !needsPhoto({ metadata: await m(logo) }, { scope: 'all' }));
