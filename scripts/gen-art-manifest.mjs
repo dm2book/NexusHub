@@ -52,7 +52,7 @@ ${paths.map((p) => `  '${p}',`).join('\n')}
 /**
  * Does this image source resolve to something?
  *
- * Returns 'ok' | 'stored' | 'missing' | 'remote' | 'uploaded' | 'none'. Remote
+ * Returns 'ok' | 'stored' | 'drawn' | 'missing' | 'remote' | 'uploaded' | 'none'. Remote
  * links and data-URI uploads are the owner's own; we can say they are set, not
  * that they still load, and pretending otherwise would be the more expensive
  * lie.
@@ -77,6 +77,11 @@ export function artStatus(src) {
      hex characters, so a near-miss is genuinely missing. The id IS the content
      hash, so a URL of this shape either serves those bytes or nothing. */
   if (/^\\/api\\/images\\/[a-f0-9]{32}\\.[a-z0-9]+$/i.test(path)) return 'stored';
+  /* The shop's own board, drawn live for this product by
+     /api/products/<id>/tile.svg (productFitService.renderTileArt) — it always
+     renders, so it is art, not a gap. Calling these "no usable image" put a
+     false BLOCKER on the launch check for every product given own artwork. */
+  if (/^\\/api\\/products\\/[A-Za-z0-9_-]+\\/tile\\.svg$/.test(path)) return 'drawn';
   return SHIPPED_ART.has(path) ? 'ok' : 'missing';
 }
 `;

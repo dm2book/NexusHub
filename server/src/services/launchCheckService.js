@@ -270,7 +270,7 @@ export async function launchChecks() {
     const rows = await all(`SELECT name, category, metadata FROM products WHERE active = 1`);
     const seen = new Map();          // image src → categories using it
     const blank = [];
-    let remote = 0, uploaded = 0, stored = 0;
+    let remote = 0, uploaded = 0, stored = 0, drawn = 0;
     for (const r of rows) {
       let meta = {}; try { meta = JSON.parse(r.metadata || '{}'); } catch { /* keep {} */ }
       const src = meta.image || iconFor(r.category);
@@ -279,6 +279,7 @@ export async function launchChecks() {
       if (status === 'remote') remote++;
       if (status === 'uploaded') uploaded++;
       if (status === 'stored') stored++;
+      if (status === 'drawn') drawn++;
       if (src) {
         if (!seen.has(src)) seen.set(src, new Set());
         seen.get(src).add(r.category);
@@ -293,6 +294,7 @@ export async function launchChecks() {
        "all products have art" line checkable rather than trusted. */
     const extra = [
       stored && `${stored} stored`,
+      drawn && `${drawn} own artwork`,
       remote && `${remote} external link(s)`,
       uploaded && `${uploaded} upload(s)`,
     ].filter(Boolean).join(', ');
