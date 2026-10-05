@@ -115,7 +115,11 @@ export async function runProductDiscovery({ force = false, fetchImpl = fetch } =
   const fresh = await all(
     `SELECT c.id, p.title, p.canonical_key FROM market_candidates c
        JOIN market_products p ON p.id = c.market_product_id
-      WHERE c.status = @s AND c.created_at > @cut`,
+      WHERE c.status = @s AND c.created_at > @cut
+        /* Seen at a real source in this run's window — not a product known only
+           from desk research or search mentions, which the owner already sees
+           in Product Discovery (a research import paged them a dozen times). */
+        AND EXISTS (SELECT 1 FROM market_observations o WHERE o.market_product_id = p.id AND o.observed_at > @cut)`,
     { s: CANDIDATE_STATUS.DISCOVERED, cut: new Date(Date.now() - 26 * 3600_000).toISOString() });
   for (const f of fresh.slice(0, 10)) {
     await alertOwner('market.new_product', {

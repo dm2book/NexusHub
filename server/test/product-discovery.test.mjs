@@ -428,6 +428,20 @@ console.log('\n— End to end —');
   const list2 = await P.discoveryList();
   ok('nothing in review is left behind', list2.counts.REVIEW_REQUIRED === 0, JSON.stringify(list2.items.filter((i) => i.gate === 'REVIEW_REQUIRED' && !i.productId && i.status !== 'rejected').map((i) => [i.title, i.status, i.productId])));
 
+  /* The daily market job pages the owner about NEW products seen at a real
+     source — not about the desk research, which a research import turned
+     into a dozen e-mails. */
+  {
+    const { runProductDiscovery } = await import('../src/services/market/engine.js');
+    const md = await runProductDiscovery({ force: true, fetchImpl: async () => new Response('{}') });
+    const researchOnly = (await get(`SELECT COUNT(*)::int AS n FROM market_candidates c WHERE c.status = 'discovered'
+      AND NOT EXISTS (SELECT 1 FROM market_observations o WHERE o.market_product_id = c.market_product_id)`)).n;
+    const paged = await all(`SELECT title FROM owner_alerts WHERE event = 'market.new_product'`);
+    ok('research and search mentions page nobody; only products seen at a real source do',
+      researchOnly > 10 && paged.every((a) => !/Valorant|Genshin|Mobile Legends|League/i.test(a.title)) && md.newCandidates < researchOnly,
+      JSON.stringify({ researchOnly, newCandidates: md.newCandidates, paged: paged.map((a) => a.title) }));
+  }
+
   /* The complete scan: as long as it takes, in steps that each fit a server function. */
   await obs('Roblox 1200 Robux Global');
   const start = await P.startFullScan({ actor: 'owner@test' });
