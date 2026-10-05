@@ -32,7 +32,7 @@ import { audit } from './auditService.js';
 
 export const MEDIA_MAX_AGE_DAYS = Number(process.env.MEDIA_MAX_AGE_DAYS || 180);
 export const MIN_QUALITY = 60;
-export const STATUSES = ['missing', 'low_quality', 'outdated', 'official'];
+export const STATUSES = ['missing', 'low_quality', 'outdated', 'own', 'official'];
 
 const TILE = /^\/api\/products\/[^/]+\/tile\.svg$/;
 const parse = (m) => { try { return typeof m === 'string' ? JSON.parse(m || '{}') : (m || {}); } catch { return {}; } };
@@ -73,6 +73,15 @@ export function mediaStatus(product, { now = Date.now() } = {}) {
   };
   const official = isOfficial({ ...meta, image });
   if (!image) return { status: 'missing', reasons: ['no picture'], official, ...record };
+  /* The owner's own artwork — the shop's drawn boards they put on every
+     product, or a picture they uploaded themselves — is a choice, not a gap.
+     Listing it under "missing" made the "own artwork" button look as if it had
+     saved nothing. */
+  const ownBoard = ['own-artwork', 'category-artwork'].includes(meta.imageSource);
+  const ownUpload = /^\/api\/images\//.test(String(image)) && meta.source !== 'discovery' && [undefined, null, '', 'upload'].includes(meta.imageSource);
+  if (!official && (ownBoard || ownUpload)) {
+    return { status: 'own', reasons: [ownBoard ? `the shop's own artwork${meta.imageFrom ? ` (${meta.imageFrom})` : ''}` : 'your own upload'], official, ...record };
+  }
   if (!official) {
     /* The owner's choice first: a drawn board they put on on purpose is their
        own artwork, not a placeholder. */
@@ -98,7 +107,7 @@ export function mediaStatus(product, { now = Date.now() } = {}) {
 /** Every active product with its media status, worst first, and the counts. */
 export async function mediaReport({ now = Date.now() } = {}) {
   const rows = await all(`SELECT id, name, category, metadata FROM products WHERE active = 1 ORDER BY name`);
-  const order = { missing: 0, low_quality: 1, outdated: 2, official: 3 };
+  const order = { missing: 0, low_quality: 1, outdated: 2, own: 3, official: 4 };
   const items = rows.map((r) => ({ id: r.id, name: r.name, category: r.category, ...mediaStatus(r, { now }) }))
     .sort((a, b) => order[a.status] - order[b.status] || a.name.localeCompare(b.name));
   const counts = Object.fromEntries(STATUSES.map((s) => [s, items.filter((i) => i.status === s).length]));

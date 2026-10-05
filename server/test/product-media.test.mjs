@@ -48,7 +48,9 @@ console.log('\n— Status —');
   ok('the shop’s own category icon is missing — not the publisher’s artwork', s({ image: '/products/icons/robux.svg' }) === 'missing');
   ok('a generated picture is missing', s({ image: '/api/images/' + 'a'.repeat(32) + '.png', imageSource: 'generated' }) === 'missing');
   ok('a linked picture is missing — no licence behind it', s({ image: 'https://example.com/robux.png' }) === 'missing');
-  ok('an upload nobody marked as official is missing', s({ image: '/api/images/' + 'b'.repeat(32) + '.png', imageSource: 'upload' }) === 'missing');
+  ok('the owner\'s own upload is their own artwork — not missing', s({ image: '/api/images/' + 'b'.repeat(32) + '.png', imageSource: 'upload' }) === 'own');
+  ok('…and so is the shop\'s drawn board they put on', s({ image: '/api/products/x/tile.svg', imageSource: 'own-artwork' }) === 'own');
+  ok('…but a picture added by discovery is not the owner\'s upload', s({ image: '/api/images/' + 'c'.repeat(32) + '.png', source: 'discovery' }) === 'missing');
   const sup = { image: '/api/images/' + 'c'.repeat(32) + '.png', imageSource: 'supplier' };
   ok('a supplier picture with no date is outdated', s(sup) === 'outdated');
   ok('…older than the limit is outdated', s({ ...sup, imageUpdatedAt: new Date(Date.now() - (media.MEDIA_MAX_AGE_DAYS + 5) * 86_400_000).toISOString(), imageQuality: 90 }) === 'outdated');
@@ -113,14 +115,14 @@ console.log('\n— Admin —');
   const base = `http://127.0.0.1:${srv.address().port}/api/admin/products`;
   const H = { authorization: `Bearer ${accessToken}`, 'content-type': 'application/json' };
   const rep = await (await fetch(`${base}/media`, { headers: H })).json();
-  ok('the report has the four counts and every active product',
-    ['missing', 'low_quality', 'outdated', 'official'].every((k) => typeof rep.counts?.[k] === 'number') && rep.items.length === rep.total);
+  ok('the report has the five counts and every active product',
+    ['missing', 'low_quality', 'outdated', 'own', 'official'].every((k) => typeof rep.counts?.[k] === 'number') && rep.items.length === rep.total);
   ok('…worst first: missing before official', rep.items.findIndex((i) => i.status === 'missing') < rep.items.findIndex((i) => i.status === 'official'));
   ok('…not for a visitor', (await fetch(`${base}/media`)).status === 401);
   srv.close();
   const fs = await import('node:fs');
   const page = fs.readFileSync(new URL('../../src/pages/admin/ProductMedia.jsx', import.meta.url), 'utf8');
-  ok('the admin page shows Missing, Outdated, Official and Low quality', ['Ontbreekt', 'Verouderd', 'Officieel', 'Lage kwaliteit'].every((t) => page.includes(t)));
+  ok('the admin page shows Missing, Outdated, Own artwork, Official and Low quality', ['Ontbreekt', 'Verouderd', 'Eigen artwork', 'Officieel', 'Lage kwaliteit'].every((t) => page.includes(t)));
 }
 
 console.log('\n— The shop\'s own artwork on every product (the EA FC look) —');
@@ -153,7 +155,8 @@ console.log('\n— The shop\'s own artwork on every product (the EA FC look) —
   ok('the owner\'s own upload is the look, and is never touched', (await m(own)).image === upload && !(await m(own)).imageSource && r.kept >= 1);
   ok('running it again changes nothing — and keeps the first previous picture', (await art.applyCategoryArtwork()).applied === 0);
   ok('the supplier photo sweep never replaces it', !needsPhoto({ metadata: await m(logo) }, { scope: 'all' }));
-  ok('Product media says it is the shop\'s own artwork', /own artwork/.test(media.mediaStatus({ metadata: await m(logo) }).reasons[0]));
+  ok('Product media lists it as own artwork — not missing — so the button visibly worked', media.mediaStatus({ metadata: await m(logo) }).status === 'own'
+    && /own artwork/.test(media.mediaStatus({ metadata: await m(logo) }).reasons[0]));
   const page = (await import('node:fs')).readFileSync(new URL('../../src/pages/admin/ProductMedia.jsx', import.meta.url), 'utf8');
   ok('the admin page has the button', page.includes('Eigen artwork op alle producten') && page.includes('/api/admin/products/media/category-artwork'));
 }
