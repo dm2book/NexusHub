@@ -346,7 +346,7 @@ const CARD_UNITS = [[/\bRP\b/, 'RP'], [/crystals?/i, 'CRYSTALS'], [/\bUC\b/, 'UC
 const RASTER_MARK = new Set(['cod', 'discord-nitro', 'eafc', 'playstation', 'robux', 'steam', 'v-bucks', 'valorant', 'xbox']);
 const PLATFORMS = [[/playstation|\bps[45]?\b|\bpsn\b/i, 'PLAYSTATION'], [/xbox/i, 'XBOX'], [/\bpc\b/i, 'PC'], [/\bnl\b/i, 'NL'], [/\beu\b/i, 'EU']];
 
-export function cardSvg(product, { logo = null, brand = null, unit = null } = {}) {
+export function cardSvg(product, { logo = null, plate = null, brand = null, unit = null } = {}) {
   const W = 700, H = 600;
   const key = (brand && THEMES[brand]) ? brand : (THEMES[product.category] ? product.category : 'giftcard');
   const [c1, c2, c3] = THEMES[key];
@@ -364,7 +364,11 @@ export function cardSvg(product, { logo = null, brand = null, unit = null } = {}
      trims them to their ink so they fill the same stage. */
   const raster = !isData && /\.webp$/.test(String(src)) && BUNDLED[String(src)];
   const href = isData ? src : raster ? `data:image/webp;base64,${raster.b64}` : null;
-  const hero = href
+  /* A brand logo (a wordmark, often black or white on nothing) sits on a
+     plate in the contrasting colour, like a sticker on the card. */
+  const hero = href && plate
+    ? `<g filter="url(#cshadow)"><rect x="130" y="92" width="440" height="236" rx="40" fill="${plate === 'dark' ? '#0d0b16' : '#ffffff'}"/><rect x="130" y="92" width="440" height="236" rx="40" fill="none" stroke="${c2}" stroke-opacity=".55" stroke-width="3"/><image x="168" y="122" width="364" height="176" preserveAspectRatio="xMidYMid meet" href="${href}"/></g>`
+    : href
     ? `<g filter="url(#cshadow)"><clipPath id="cherc"><rect x="195" y="62" width="310" height="290" rx="44"/></clipPath><image x="195" y="62" width="310" height="290" preserveAspectRatio="xMidYMid meet" clip-path="url(#cherc)" href="${href}"/></g>`
     : `<g filter="url(#cshadow)">${inlineMark(src, { x: 190, y: 50, w: 320, h: 310 }) || ''}</g>`;
   /* The platform chip, unless the label already says it (a PlayStation card). */

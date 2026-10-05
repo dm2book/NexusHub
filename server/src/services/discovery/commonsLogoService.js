@@ -162,3 +162,28 @@ export async function applyLogos({ fetchImpl = fetch, limit = 40, deadline = Inf
   return out;
 }
 
+
+/** The stored logo record for a game, from the cache only — never a fetch. */
+export async function cachedLogo(gameKey) {
+  const row = await get(`SELECT value FROM kv WHERE key=@k`, { k: `commons.logo.${gameKey}` }).catch(() => null);
+  try { return row ? JSON.parse(row.value) : null; } catch { return null; }
+}
+
+/**
+ * Make sure every game and brand in the catalogue has its free logo looked up
+ * (one Commons search per brand, cached 30 days) so the product cards can draw
+ * it. Only fills the cache: no product is changed. Bounded by `deadline`.
+ */
+export async function warmLogos({ fetchImpl = fetch, deadline = Infinity, keys = null } = {}) {
+  const want = keys || [...new Set((await all(`SELECT name FROM products WHERE active = 1`)).map((r) => parseTitle(r.name, {}).game))];
+  const out = { checked: 0, found: 0 };
+  for (const key of want) {
+    if (Date.now() > deadline) break;
+    if (!GAMES.some((g) => g.key === key)) continue;
+    // eslint-disable-next-line no-await-in-loop
+    const logo = await logoFor(key, { fetchImpl }).catch(() => null);
+    out.checked += 1;
+    if (logo) out.found += 1;
+  }
+  return out;
+}

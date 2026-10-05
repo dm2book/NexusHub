@@ -33,6 +33,7 @@
  * sells is reported as a NEW category rather than silently invented, because
  * adding a shelf is a decision and a raw slug on the storefront is a bug.
  */
+import zlib from 'node:zlib';
 import { all } from '../db/index.js';
 import { SHIPPED_ART } from '../../../src/lib/shippedArt.js';
 import { parseTitle } from './market/normalize.js';
@@ -265,35 +266,99 @@ export function brandSlug(name = '') {
 
 const LOGO_MAX_BYTES = 400_000;
 const parseMeta = (m) => { try { return typeof m === 'string' ? JSON.parse(m || '{}') : (m || {}); } catch { return {}; } };
+/* Brands whose real app icon ships with the shop (PlayStation's blue square,
+   Xbox's green one, Steam, Valorant, Roblox): the card draws that. */
+const BUNDLED_ICON = new Set(['playstation', 'xbox', 'steam', 'valorant', 'robux']);
+/* A card's brand → the market's game key, for the logo cache. */
+const GAME_KEY = { xbox: 'xbox-store', playstation: 'playstation-store', nintendo: 'nintendo-store', steam: 'steam', netflix: 'netflix',
+  googleplay: 'google-play', itunes: 'apple', amazon: 'amazon', spotify: 'spotify', 'discord-nitro': 'discord', gamepass: 'xbox-game-pass' };
 
 /**
- * The real logo for this product's board, as a data URI, or null:
- *   1. the category logo the owner set in the admin (their own upload);
- *   2. the brand logo this product carried under a free licence before it got
- *      its board (kept in metadata.imagePrevious) — COD and Valorant.
- * Only stored pictures: a board is an <img>, which never fetches anything.
+ * How bright a PNG's visible pixels are, 0–1 — so a white logo is put on a
+ * dark plate and a black one on a white plate. Plain 8-bit, non-interlaced
+ * PNG only (what Commons renders); anything else answers null.
+ */
+export function pngLuminance(buf) {
+  try {
+    if (buf.readUInt32BE(0) !== 0x89504e47) return null;
+    let p = 8, w = 0, h = 0, depth = 0, type = 0, inter = 0, palette = null, trns = null; const idat = [];
+    while (p < buf.length) {
+      const len = buf.readUInt32BE(p), t = buf.toString('ascii', p + 4, p + 8), d = buf.subarray(p + 8, p + 8 + len);
+      if (t === 'IHDR') { w = d.readUInt32BE(0); h = d.readUInt32BE(4); depth = d[8]; type = d[9]; inter = d[12]; }
+      else if (t === 'PLTE') palette = d; else if (t === 'tRNS') trns = d; else if (t === 'IDAT') idat.push(d); else if (t === 'IEND') break;
+      p += 12 + len;
+    }
+    if (depth !== 8 || inter) return null;
+    const ch = { 0: 1, 2: 3, 3: 1, 4: 2, 6: 4 }[type]; if (!ch) return null;
+    const raw = zlib.inflateSync(Buffer.concat(idat)), stride = w * ch, img = Buffer.alloc(stride * h);
+    for (let y = 0; y < h; y += 1) {
+      const f = raw[y * (stride + 1)], row = raw.subarray(y * (stride + 1) + 1, (y + 1) * (stride + 1)), o = y * stride;
+      for (let x = 0; x < stride; x += 1) {
+        const a = x >= ch ? img[o + x - ch] : 0, b = y ? img[o - stride + x] : 0, c = x >= ch && y ? img[o - stride + x - ch] : 0;
+        const pa = Math.abs(b - c), pb = Math.abs(a - c), pc = Math.abs(a + b - 2 * c);
+        const pred = f === 1 ? a : f === 2 ? b : f === 3 ? (a + b) >> 1 : f === 4 ? (pa <= pb && pa <= pc ? a : pb <= pc ? b : c) : 0;
+        img[o + x] = (row[x] + pred) & 255;
+      }
+    }
+    let sum = 0, n = 0; const step = Math.max(1, Math.floor((w * h) / 40000));
+    for (let i = 0; i < w * h; i += step) {
+      let r, g, bl, al = 255; const q = i * ch;
+      if (type === 0) { r = g = bl = img[q]; } else if (type === 4) { r = g = bl = img[q]; al = img[q + 1]; }
+      else if (type === 2) { r = img[q]; g = img[q + 1]; bl = img[q + 2]; }
+      else if (type === 6) { r = img[q]; g = img[q + 1]; bl = img[q + 2]; al = img[q + 3]; }
+      else { const k = img[q]; r = palette[k * 3]; g = palette[k * 3 + 1]; bl = palette[k * 3 + 2]; al = trns && k < trns.length ? trns[k] : 255; }
+      if (al < 128) continue;
+      sum += (0.2126 * r + 0.7152 * g + 0.0722 * bl) / 255; n += 1;
+    }
+    return n ? sum / n : null;
+  } catch { return null; }
+}
+
+/**
+ * The real logo for this product's card, or null (the card then draws the
+ * brand's bundled icon). Returns { src: data URI, plate: 'light'|'dark'|null }:
+ *   1. the category logo the owner set in the admin — their own picture, as is;
+ *   2. none for brands whose real app icon ships with the shop (PlayStation…);
+ *   3. the brand logo this product carried under a free licence;
+ *   4. the brand's free logo from Wikimedia Commons (cached, never fetched here).
+ * A logo from 3 or 4 goes on a plate that keeps it readable: white for a dark
+ * logo, near-black for a light one.
  */
 export async function tileLogo(product, { categoryLogos = null } = {}) {
   try {
     const meta = parseMeta(product?.metadata);
     let logos = categoryLogos;
     if (!logos) { const { getCategoryLogos } = await import('./settingsService.js'); logos = await getCategoryLogos().catch(() => ({})); }
-    const candidates = [
-      !['giftcard', 'subscription'].includes(product?.category) ? logos?.[product?.category] : null,
-      meta.imagePreviousSource === 'licensed' ? meta.imagePrevious : null,
-      meta.imageSource === 'licensed' ? meta.image : null,
-    ];
     const { readImage } = await import('./imageStoreService.js');
-    for (const src of candidates) {
+    const load = async (src) => {
       const m = /^\/api\/images\/([a-f0-9]{32})\./i.exec(String(src || ''));
-      if (!m) continue;
-      // eslint-disable-next-line no-await-in-loop
+      if (!m) return null;
       const img = await readImage(m[1]);
-      if (img && /^image\/(png|jpe?g|webp|gif)$/i.test(img.mime) && img.bytes.length <= LOGO_MAX_BYTES) {
-        return `data:${img.mime};base64,${img.bytes.toString('base64')}`;
-      }
+      return img && /^image\/(png|jpe?g|webp|gif)$/i.test(img.mime) && img.bytes.length <= LOGO_MAX_BYTES ? img : null;
+    };
+    const asLogo = (img, plated) => {
+      let plate = null;
+      if (plated && img.mime === 'image/png') { const l = pngLuminance(img.bytes); plate = l == null ? 'light' : l > 0.6 ? 'dark' : 'light'; }
+      return { src: `data:${img.mime};base64,${img.bytes.toString('base64')}`, plate };
+    };
+    const own = !['giftcard', 'subscription'].includes(product?.category) ? await load(logos?.[product?.category]) : null;
+    if (own) return asLogo(own, false);
+    const brand = brandSlug(product?.name || '');
+    if (BUNDLED_ICON.has(brand) || (!brand && BUNDLED_ICON.has(product?.category === 'robux' ? 'robux' : product?.category))) return null;
+    for (const src of [meta.imagePreviousSource === 'licensed' ? meta.imagePrevious : null, meta.imageSource === 'licensed' ? meta.image : null]) {
+      // eslint-disable-next-line no-await-in-loop
+      const img = await load(src);
+      if (img) return asLogo(img, true);
     }
-  } catch { /* the drawn mark is the fallback */ }
+    const game = parseTitle(product?.name || '', {}).game;
+    const key = GAME_KEY[brand] || (game && !String(game).startsWith('unknown') ? game : null);
+    if (key) {
+      const { cachedLogo } = await import('./discovery/commonsLogoService.js');
+      const rec = await cachedLogo(key);
+      const img = rec?.url ? await load(rec.url) : null;
+      if (img) return asLogo(img, true);
+    }
+  } catch { /* the bundled icon is the fallback */ }
   return null;
 }
 
@@ -302,7 +367,8 @@ export async function renderTileArt(product, { logo = null } = {}) {
     const { cardSvg } = await import('../../../scripts/art/render.mjs');
     /* The store card: the brand's colours, its logo as the hero, the
        product's own amount on a glass plate (render.mjs cardSvg). */
-    return cardSvg({ ...product, image: null }, { logo, brand: brandSlug(product?.name || ''), unit: unitFrom(product?.name) });
+    const l = typeof logo === 'string' ? { src: logo, plate: null } : logo;
+    return cardSvg({ ...product, image: null }, { logo: l?.src || null, plate: l?.plate || null, brand: brandSlug(product?.name || ''), unit: unitFrom(product?.name) });
   } catch (e) {
     console.error('[tile] art renderer failed, drawing the plain tile:', e.message);
     return renderTile(product);

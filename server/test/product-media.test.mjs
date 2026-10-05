@@ -181,14 +181,24 @@ console.log('\n— The owner\'s own artwork on every product (the EA FC look) �
     /* A real 1×1 PNG stands in for the brand logo held under a free licence. */
     const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
     const { url } = await storeImage('image/png', png, { source: 'licensed' });
-    const val = await createProduct({ name: `11,000 Valorant Points EU ${tag}`, category: 'valorant', price: 8999, announce: false,
-      metadata: { source: 'discovery', denomination: 11000, image: url, imageSource: 'licensed' } });
+    const val = await createProduct({ name: `2,400 COD Points PC ${tag}`, category: 'cod', price: 1999, announce: false,
+      metadata: { source: 'discovery', denomination: 2400, image: url, imageSource: 'licensed' } });
     await art.applyCategoryArtwork();
     const vm = await m(val);
     const logoUri = await fit.tileLogo(await getProduct(val.id));
-    ok('the board finds the logo the product carried before (kept in imagePrevious)', vm.imagePrevious === url && /^data:image\/png;base64,/.test(logoUri || ''), logoUri && logoUri.slice(0, 40));
+    ok('the card finds the logo the product carried before (kept in imagePrevious)', vm.imagePrevious === url && /^data:image\/png;base64,/.test(logoUri?.src || ''), JSON.stringify(logoUri)?.slice(0, 60));
+    ok('…and knows which plate keeps it readable', ['light', 'dark'].includes(logoUri?.plate));
     const svg = await fit.renderTileArt(await getProduct(val.id), { logo: logoUri });
-    ok('…and draws it as the hero, with the product\'s own amount and currency', svg.includes('href="data:image/png;base64,') && svg.includes('11,000') && svg.includes('>VP<'), svg.slice(0, 200));
+    ok('…and draws it on that plate, with the product\'s own amount and currency', svg.includes('href="data:image/png;base64,') && svg.includes('2,400') && svg.includes('>COD POINTS<'), svg.slice(0, 200));
+    ok('PlayStation, Xbox, Steam and Valorant keep the real app icon the shop ships', await fit.tileLogo({ name: 'PlayStation Store €20 NL', category: 'giftcard', metadata: {} }) === null);
+    /* A one-pixel RGBA PNG of one colour, built here so the test owns its bytes. */
+    const { deflateSync, crc32 } = await import('node:zlib');
+    const chunk = (t, d) => { const len = Buffer.alloc(4); len.writeUInt32BE(d.length); const td = Buffer.concat([Buffer.from(t), d]);
+      const c = Buffer.alloc(4); c.writeUInt32BE(crc32(td)); return Buffer.concat([len, td, c]); };
+    const onePx = (r, g, b) => Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+      chunk('IHDR', Buffer.from([0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0, 0, 0])), chunk('IDAT', deflateSync(Buffer.from([0, r, g, b, 255]))), chunk('IEND', Buffer.alloc(0))]);
+    ok('a white logo is read as light (it goes on the dark plate), a black one as dark',
+      fit.pngLuminance(onePx(255, 255, 255)) > 0.9 && fit.pngLuminance(onePx(0, 0, 0)) < 0.1, `${fit.pngLuminance(onePx(255, 255, 255))} ${fit.pngLuminance(onePx(0, 0, 0))}`);
     const xb = await fit.renderTileArt({ id: 'x', name: 'Xbox €15 NL', category: 'giftcard', metadata: {} });
     ok('a gift card is drawn in its brand\'s colours with its real logo', xb.includes('>XBOX<') && xb.includes('data:image/webp;base64,') && xb.includes('€15'));
     ok('a gift card with no logo still draws its own brand: "Xbox €15 NL" is not a gift box', fit.brandSlug('Xbox €15 NL') === 'xbox' && fit.brandSlug('PlayStation Store €20 NL') === 'playstation');
