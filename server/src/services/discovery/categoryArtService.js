@@ -18,7 +18,7 @@
  */
 import { all } from '../../db/index.js';
 import { config } from '../../config/env.js';
-import { matchArt, tilePath, brandSlug } from '../productFitService.js';
+import { tilePath, brandSlug } from '../productFitService.js';
 import { parseTitle } from '../market/normalize.js';
 
 /* Applied by the scheduled run in production; elsewhere (tests, local) only
@@ -65,14 +65,12 @@ export function artworkFor(product, references = [], categoryLogos = {}) {
     })[0];
     return { image: best.image, from: best.name };
   }
-  /* With a real logo for this game the live board draws it; a shipped board
-     only has the shop's drawn icon. */
+  /* The live store card: the game's colours, its real logo (the owner's
+     category logo or a licensed one, where there is one) and this product's
+     own amount. The older shipped boards are no longer used. */
   const hasLogo = (!MIXED.has(product.category) && STORED.test(String(categoryLogos?.[product.category] || '')))
     || meta.imagePreviousSource === 'licensed' || meta.imageSource === 'licensed';
-  if (hasLogo) return { image: tilePath(product.id), from: 'drawn for this product, with the game\'s logo' };
-  const hit = matchArt({ sku: product.sku || meta.sku || null, name: product.name, category: product.category,
-    denomination: meta.denomination ?? null });
-  return hit.image ? { image: hit.image, from: hit.reason } : { image: tilePath(product.id), from: 'drawn for this product' };
+  return { image: tilePath(product.id), from: hasLogo ? 'drawn for this product, with the game\'s logo' : 'drawn for this product' };
 }
 
 /** The owner's uploads, read once. */

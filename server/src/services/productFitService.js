@@ -299,16 +299,10 @@ export async function tileLogo(product, { categoryLogos = null } = {}) {
 
 export async function renderTileArt(product, { logo = null } = {}) {
   try {
-    const { mainSvg, brandMark } = await import('../../../scripts/art/render.mjs');
-    /* Without its image. A product that gets this tile HAS the tile as its
-       image, and markFor() takes a product's own picture as the mark first —
-       so the tile would try to draw itself inside its own ring, find nothing,
-       and leave the ring empty.
-       But WITH its brand, when the name says which: a shelf like "giftcard"
-       holds Steam, Netflix and Apple, and the shelf's mark is a gift box. */
-    const mark = logo || brandMark(brandSlug(product?.name || ''));
-    return mainSvg({ ...product, image: mark, imageLegacy: null },
-      { unit: unitFrom(product?.name) });
+    const { cardSvg } = await import('../../../scripts/art/render.mjs');
+    /* The store card: the brand's colours, its logo as the hero, the
+       product's own amount on a glass plate (render.mjs cardSvg). */
+    return cardSvg({ ...product, image: null }, { logo, brand: brandSlug(product?.name || ''), unit: unitFrom(product?.name) });
   } catch (e) {
     console.error('[tile] art renderer failed, drawing the plain tile:', e.message);
     return renderTile(product);

@@ -160,7 +160,7 @@ console.log('\n— The owner\'s own artwork on every product (the EA FC look) �
     && (await m(logo)).imageSource === 'own-artwork' && !(await m(logo)).imageLicence, JSON.stringify(await m(logo)));
   ok('…a supplier photo too — products that already HAD a picture get it as well', (await m(supplier)).image === tile(supplier));
   ok('…and a linked picture', (await m(linked)).image === tile(linked));
-  ok('where the shop ships a board for exactly this amount, that file is used', (await m(shipped)).image === '/products/art/apex-1000.svg', (await m(shipped)).image);
+  ok('a product with no owner card gets the live store card for its own amount', (await m(shipped)).image === tile(shipped), (await m(shipped)).image);
   ok('the picture it replaced is kept, so nothing is lost', (await m(logo)).imagePrevious === '/api/images/' + '3'.repeat(32) + '.png' && (await m(logo)).imagePreviousSource === 'licensed');
   ok('a product of a game the owner made artwork for gets THAT artwork — the EA FC card with its logos', (await m(fc)).image === '/api/images/' + '2'.repeat(32) + '.webp'
     && (await m(fc)).imageSource === 'own-artwork' && /12,000 FC Points/.test((await m(fc)).imageFrom), JSON.stringify(await m(fc)));
@@ -188,7 +188,9 @@ console.log('\n— The owner\'s own artwork on every product (the EA FC look) �
     const logoUri = await fit.tileLogo(await getProduct(val.id));
     ok('the board finds the logo the product carried before (kept in imagePrevious)', vm.imagePrevious === url && /^data:image\/png;base64,/.test(logoUri || ''), logoUri && logoUri.slice(0, 40));
     const svg = await fit.renderTileArt(await getProduct(val.id), { logo: logoUri });
-    ok('…and draws it in the ring, with the product\'s own amount', svg.includes('href="data:image/png;base64,') && svg.includes('11,000'), svg.slice(0, 200));
+    ok('…and draws it as the hero, with the product\'s own amount and currency', svg.includes('href="data:image/png;base64,') && svg.includes('11,000') && svg.includes('>VP<'), svg.slice(0, 200));
+    const xb = await fit.renderTileArt({ id: 'x', name: 'Xbox €15 NL', category: 'giftcard', metadata: {} });
+    ok('a gift card is drawn in its brand\'s colours with its real logo', xb.includes('>XBOX<') && xb.includes('data:image/webp;base64,') && xb.includes('€15'));
     ok('a gift card with no logo still draws its own brand: "Xbox €15 NL" is not a gift box', fit.brandSlug('Xbox €15 NL') === 'xbox' && fit.brandSlug('PlayStation Store €20 NL') === 'playstation');
   }
   const page = (await import('node:fs')).readFileSync(new URL('../../src/pages/admin/ProductMedia.jsx', import.meta.url), 'utf8');
