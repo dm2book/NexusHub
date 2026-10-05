@@ -359,12 +359,13 @@ export async function addCandidate(candidateId, { actor, auto = false, manualCos
         imageConfidence: Number(c.image_confidence), ...(hiddenReason ? { hiddenReason } : {}) },
     },
   });
-  /* The shop's own board with this product's own amount — the look of the
-     products the owner made by hand (the EA FC cards). See categoryArtService. */
+  /* The owner's own artwork for this game — the look of the products the owner
+     made by hand (the EA FC cards). See categoryArtService. */
   {
-    const { artworkFor } = await import('./categoryArtService.js');
+    const { artworkFor, artworkInputs } = await import('./categoryArtService.js');
     const { updateProduct } = await import('../productService.js');
-    const art = artworkFor({ id: product.id, sku: product.sku, name: product.name, category: product.category, metadata: product.metadata });
+    const { references, logos } = await artworkInputs().catch(() => ({ references: [], logos: {} }));
+    const art = artworkFor({ id: product.id, sku: product.sku, name: product.name, category: product.category, metadata: product.metadata }, references, logos);
     if (art) {
       await updateProduct(product.id, { metadata: { ...product.metadata, image: art.image, imageSource: 'own-artwork',
         imageFrom: art.from, imageOfficial: false, imageUpdatedAt: nowIso() } }).catch(() => {});
