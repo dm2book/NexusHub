@@ -359,17 +359,14 @@ export async function addCandidate(candidateId, { actor, auto = false, manualCos
         imageConfidence: Number(c.image_confidence), ...(hiddenReason ? { hiddenReason } : {}) },
     },
   });
-  /* The owner's own artwork, as on the products they made by hand (the EA FC
-     look): from their product in the same category nearest in amount, or the
-     category logo. Only when there is none, the brand's free-licence logo. */
+  /* The shop's own board with this product's own amount — the look of the
+     products the owner made by hand (the EA FC cards). See categoryArtService. */
   {
-    const { artworkFor, artworkReferences } = await import('./categoryArtService.js');
-    const { getCategoryLogos } = await import('../settingsService.js');
+    const { artworkFor } = await import('./categoryArtService.js');
     const { updateProduct } = await import('../productService.js');
-    const art = artworkFor({ id: product.id, name: product.name, category: product.category, metadata: product.metadata },
-      await artworkReferences(), await getCategoryLogos().catch(() => ({})));
+    const art = artworkFor({ id: product.id, sku: product.sku, name: product.name, category: product.category, metadata: product.metadata });
     if (art) {
-      await updateProduct(product.id, { metadata: { ...product.metadata, image: art.image, imageSource: 'category-artwork',
+      await updateProduct(product.id, { metadata: { ...product.metadata, image: art.image, imageSource: 'own-artwork',
         imageFrom: art.from, imageOfficial: false, imageUpdatedAt: nowIso() } }).catch(() => {});
     } else if (!(image?.url && image.confidence >= 0.5)) {
       const { logoFor, logoMetadata, logosEnabled } = await import('./commonsLogoService.js');

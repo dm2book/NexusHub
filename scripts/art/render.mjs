@@ -52,6 +52,15 @@ const BRAND_BY_SKU = {
  * So a pack cover is replaced by the brand logo the cover was made from, which
  * is what the composition actually wants: one mark, one number, one voice.
  */
+/** The brand's own mark for a slug (netflix, googleplay, itunes, …), or null. */
+export function brandMark(slug) {
+  if (!slug) return null;
+  const candidate = markPath(slug);
+  if (hasAsset(candidate)) return candidate;
+  const svg = `/products/icons/${slug}.svg`;
+  return hasAsset(svg) ? svg : null;
+}
+
 export function markFor(product) {
   /* Never composite our own output. After one --apply the product's image IS a
      generated artboard, so a second run drew the previous card inside the new
