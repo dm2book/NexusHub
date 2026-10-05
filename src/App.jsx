@@ -86,6 +86,7 @@ const AdminTopCustomers = lazy(() => import('./pages/admin/TopCustomers.jsx'));
 const AdminAdIntelligence = lazy(() => import('./pages/admin/AdIntelligence.jsx'));
 const AdminProfitCenter = lazy(() => import('./pages/admin/SupplierProfitCenter.jsx'));
 const AdminAdScripts = lazy(() => import('./pages/admin/AdScripts.jsx'));
+const AdminAdConcepts = lazy(() => import('./pages/admin/AdConcepts.jsx'));
 const AdminAdStudio = lazy(() => import('./pages/admin/AdStudio.jsx'));
 const AdminProductMedia = lazy(() => import('./pages/admin/ProductMedia.jsx'));
 const AdminProductContent = lazy(() => import('./pages/admin/ProductContent.jsx'));
@@ -206,6 +207,7 @@ export default function App() {
           <Route path="/admin/growth/ads" element={<AdminAdIntelligence />} />
           <Route path="/admin/profit-center" element={<AdminProfitCenter />} />
           <Route path="/admin/growth/ad-scripts" element={<AdminAdScripts />} />
+          <Route path="/admin/growth/ad-concepts" element={<AdminAdConcepts />} />
           <Route path="/admin/growth/ad-studio" element={<AdminAdStudio />} />
           <Route path="/admin/products/media" element={<AdminProductMedia />} />
           <Route path="/admin/products/content" element={<AdminProductContent />} />

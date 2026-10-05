@@ -9,6 +9,7 @@ import * as attribution from '../../services/attributionService.js';
 import * as adPerf from '../../services/adPerformanceService.js';
 import { adIntelligence } from '../../services/adIntelligenceService.js';
 import { generateAdScripts, adScriptProducts } from '../../services/adScriptService.js';
+import { generateConcepts, conceptProducts, conceptsMarkdown } from '../../services/adConceptService.js';
 import { ugcOptions, buildUgcBoard, UGC_LANGS } from '../../services/ugcStudioService.js';
 import { studioOptions, buildStoryboard, synthesizePremium, ANGLES, PLATFORMS, LENGTHS, LANGS, VOICE_PROVIDERS } from '../../services/adStudioService.js';
 import { notFound } from '../../utils/errors.js';
@@ -134,6 +135,25 @@ router.get('/ad-scripts/:productId', asyncHandler(async (req, res) => {
   const out = await generateAdScripts(String(req.params.productId).slice(0, 64));
   if (!out) throw notFound('Product not found');
   res.json(out);
+}));
+
+/**
+ * Growth → Ad Concepts: 100 TikTok concepts (UGC, Story, POV, Comparison,
+ * Meme, Reddit-style, TikTok native) as shooting scripts, filled in from the
+ * product's facts and gated like every other advert.
+ */
+router.get('/ad-concepts', asyncHandler(async (_req, res) => {
+  res.json({ products: await conceptProducts() });
+}));
+router.get('/ad-concepts/:productId', asyncHandler(async (req, res) => {
+  const out = await generateConcepts(String(req.params.productId).slice(0, 64));
+  if (!out) throw notFound('Product not found');
+  res.json(out);
+}));
+router.get('/ad-concepts/:productId/script.md', asyncHandler(async (req, res) => {
+  const md = await conceptsMarkdown(String(req.params.productId).slice(0, 64));
+  if (!md) throw notFound('Product not found');
+  res.type('text/markdown; charset=utf-8').set('Content-Disposition', 'attachment; filename="tiktok-concepten.md"').send(md);
 }));
 
 /**
