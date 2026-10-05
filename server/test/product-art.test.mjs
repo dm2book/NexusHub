@@ -167,6 +167,9 @@ console.log('\n— The generated art manifest still matches public/products —'
   ok('a link is reported as remote, not verified', artStatus('https://cdn.example/x.png') === 'remote');
   ok('an upload is reported as uploaded', artStatus('data:image/webp;base64,AAAA') === 'uploaded');
   ok('nothing at all is "none"', artStatus(null) === 'none' && artStatus('') === 'none');
+  ok('the shop\'s own board drawn live per product is art, not missing',
+    artStatus('/api/products/prd_u1hMwO8SB6WxQWe0iTr3a/tile.svg') === 'drawn');
+  ok('a near-miss of the board path is still missing', artStatus('/api/products/x/tile.png') === 'missing');
 }
 
 // ── 6. No two categories wear the same picture ─────────────────────────────
