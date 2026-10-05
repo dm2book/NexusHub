@@ -161,6 +161,7 @@ export default function ProductDetail() {
   const [notFound, setNotFound] = useState(false);
   const [unavailable, setUnavailable] = useState(false);
   const [recs, setRecs] = useState({ crossSell: [], upsell: [] });
+  const [others, setOthers] = useState([]);
   const [mysteryPool, setMysteryPool] = useState(null);
   const [priceHist, setPriceHist] = useState([]);
   const [heroBroken, setHeroBroken] = useState(false); // product image failed to load
@@ -256,6 +257,9 @@ export default function ProductDetail() {
     // that server-side, including the same-category fallback, and returns six
     // products instead of seventy-two.
     api.get(`/api/products/${id}/recommendations`).then(setRecs).catch(() => {});
+    /* Something ELSE to add: the trending list, for when no real co-purchases
+       exist yet. Other sizes of this same product are the pack switcher's job. */
+    api.get('/api/products/trending').then((r) => setOthers(r.products || [])).catch(() => setOthers([]));
   }, [id]);
 
   /* These three used to depend on the product OBJECT, which was fine while the
@@ -327,7 +331,15 @@ export default function ProductDetail() {
 
   const { icon: Icon, grad, label } = categoryVisual(product.category);
   const desc = productDescription(product, lang);
-  const crossSell = (recs.crossSell || []).slice(0, 4);
+  /* "Frequently bought together" showed 1,600 and 4,600 FC Points under 12,000
+     FC Points — nobody buys three sizes of one thing; those are the pack
+     switcher above. Only other products here: real co-purchases first, then
+     trending ones, the same platform before the rest. */
+  const coBought = (recs.crossSell || []).filter((p) => p.category !== product?.category);
+  const myPlatform = platformOf(product)?.id;
+  const alsoLike = others.filter((p) => p.id !== product?.id && p.category !== product?.category)
+    .sort((a, b) => (platformOf(b)?.id === myPlatform) - (platformOf(a)?.id === myPlatform));
+  const crossSell = (coBought.length ? coBought : alsoLike).slice(0, 4);
   const upsell = recs.upsell?.[0] || null;
   /* Other sizes of the same thing, for the pack switcher.
      This used to be `related`, computed from a fetch of the WHOLE catalogue that
@@ -622,8 +634,10 @@ export default function ProductDetail() {
                 </div>
               ) : (
                 <>
-                  <button onClick={addToCart} className="btn-ghost py-3"><ShoppingCart size={18} /> {t('product.addToCart', 'Add to cart')}</button>
+                  {/* Buying is the main action, so it comes first and leads;
+                      the cart is the second choice for someone still adding. */}
                   <button onClick={buyNow} className="btn-primary py-3">{t('product.buyNow', 'Buy now')}</button>
+                  <button onClick={addToCart} className="btn-ghost py-3"><ShoppingCart size={18} /> {t('product.addToCart', 'Add to cart')}</button>
                 </>
               )}
               <button onClick={() => toggle(product.id)} aria-label="Wishlist"
@@ -816,7 +830,7 @@ export default function ProductDetail() {
 
       {crossSell.length > 0 && (
         <div className="mt-16">
-          <h2 className="text-2xl font-extrabold text-slate-900 mb-6">{recs.crossSell?.length ? t('product.boughtTogether', 'Frequently bought together') : t('product.alsoLike', 'You might also like')}</h2>
+          <h2 className="text-2xl font-extrabold text-slate-900 mb-6">{coBought.length ? t('product.boughtTogether', 'Frequently bought together') : t('product.alsoLike', 'You might also like')}</h2>
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 fm-grid-in">
             {crossSell.map((p) => <LightProductCard key={p.id} product={p} onAdd={(x) => { add(x); toast.success(`${x.name} ${t('cart.added', 'added')}`); }} />)}
           </div>
@@ -849,7 +863,14 @@ export default function ProductDetail() {
             {t('launch.ctaClosed', 'Opens on launch day')}
           </span>
         ) : (
-          <button onClick={addToCart} className="btn-primary flex-1 py-3 fm-tap"><ShoppingCart size={17} /> {t('product.addToCart', 'Add to cart')}</button>
+          <>
+            {/* One tap to the checkout; the cart stays one tap away beside it. */}
+            <button onClick={addToCart} aria-label={t('product.addToCart', 'Add to cart')}
+              className="btn-ghost shrink-0 fm-tap" style={{ width: 48, height: 48, padding: 0, justifyContent: 'center' }}>
+              <ShoppingCart size={18} />
+            </button>
+            <button onClick={buyNow} className="btn-primary flex-1 py-3 fm-tap">{t('product.buyNow', 'Buy now')}</button>
+          </>
         )}
       </div>
     </div>

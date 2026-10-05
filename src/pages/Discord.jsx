@@ -1,12 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useI18n } from '../lib/i18n.jsx';
+import { Link } from 'react-router-dom';
 import {
-  MessageCircle, Hash, Megaphone, ShoppingBag, Users, Star, Ticket,
-  Crown, Shield, Wrench, Headphones, Tag, Sparkles, ArrowRight, Circle,
+  MessageCircle, Hash, Megaphone, ShoppingBag, Users, Star, Ticket, Circle,
 } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { useAuth } from '../context/AuthContext.jsx';
-import { SectionHeading } from '../components/ui.jsx';
 import { usePageMeta } from '../lib/useMeta.js';
 
 /**
@@ -37,15 +36,6 @@ const CHANNELS = [
   { group: 'COMMUNITY', icon: Users,
     items: ['general-nl', 'general-en', 'general-de', 'general-fr', 'media',
       'suggestions', 'starboard', 'giveaways'] },
-];
-
-const roles = (t) => [
-  { name: 'Owner', icon: Crown, color: '#f59e0b', desc: t('discord.rOwner', 'Full control') },
-  { name: 'Admin', icon: Shield, color: '#ef4444', desc: t('discord.rAdmin', 'Management access') },
-  { name: 'Moderator', icon: Wrench, color: '#3b82f6', desc: t('discord.rMod', 'Keeps the server in order') },
-  { name: 'Support', icon: Headphones, color: '#10b981', desc: t('discord.rSupport', 'Handles your tickets') },
-  { name: 'VIP', icon: Sparkles, color: '#a855f7', desc: t('discord.rVip', 'Perks for regulars') },
-  { name: 'Customer', icon: Tag, color: '#64748b', desc: t('discord.rCustomer', 'Verified buyer') },
 ];
 
 const perks = (t) => [
@@ -140,57 +130,6 @@ export default function Discord() {
         </div>
       </section>
 
-      {/* Channels */}
-      <section className="section py-14">
-        <SectionHeading eyebrow={t('discord.inside', 'Inside the server')} title={t('discord.channels', 'A channel for everything')} center />
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {CHANNELS.map(({ group, icon: Icon, items }) => (
-            <div key={group} className="card p-5">
-              <div className="flex items-center gap-2 text-indigo-300 font-rajdhani uppercase tracking-wider text-sm mb-3">
-                <Icon size={16} /> {group}
-              </div>
-              <ul className="space-y-1.5">
-                {items.map((c) => (
-                  <li key={c} className="flex items-center gap-2 text-slate-400 text-sm hover:text-white transition">
-                    <Hash size={14} className="text-slate-600" /> {c}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Roles */}
-      <section className="section py-14">
-        <SectionHeading eyebrow={t('discord.hierarchy', 'Who’s who')} title={t('discord.rolesTitle', 'Roles & ranks')} center />
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {/* The role colour lives in the swatch, not in the words.
-              These are Discord's own role colours, and they are chosen to sit on
-              Discord's dark chrome. Painted onto the white card this page uses in
-              light mode they measured 2.15:1 (Owner) to 3.96:1 (VIP) against a
-              4.5:1 floor — the role names were the least readable text on the
-              page. The swatch is decoration and carries no contrast requirement;
-              the name it labels is written out beside it, so nothing is conveyed
-              by colour alone. */}
-          {roles(t).map(({ name, icon: Icon, color, desc }) => (
-            <div key={name} className="card p-5 flex items-center gap-4 hover:border-primary/30 transition">
-              <div aria-hidden className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0"
-                   style={{ background: color, boxShadow: `0 6px 18px -8px ${color}` }}>
-                {/* Inline, not `text-white`: the light theme remaps that class to
-                    slate-900 for the whole scope, which turned these into dark
-                    glyphs on a saturated tile. */}
-                <Icon size={20} style={{ color: '#fff' }} strokeWidth={2.4} />
-              </div>
-              <div>
-                <div className="font-medium text-white">{name}</div>
-                <div className="text-slate-500 text-sm">{desc}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
       {/* Perks + CTA */}
       <section className="section py-14">
         <div className="grid lg:grid-cols-2 gap-6 items-stretch">
@@ -216,6 +155,38 @@ export default function Discord() {
             </div>
           </div>
         </div>
+      </section>
+      {/* Channels — folded away. A buyer deciding whether to join wants the
+          reasons, not a directory of #starboard and #general-fr; the list is
+          one tap away for whoever is curious. */}
+      <section className="section py-10">
+        <details className="group">
+          <summary className="cursor-pointer list-none text-center font-semibold text-violet-700 hover:underline">
+            {t('discord.showChannels', 'See every channel in the server')}
+          </summary>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5 mt-6">
+          {CHANNELS.map(({ group, icon: Icon, items }) => (
+            <div key={group} className="card p-5">
+              <div className="flex items-center gap-2 text-indigo-300 font-rajdhani uppercase tracking-wider text-sm mb-3">
+                <Icon size={16} /> {group}
+              </div>
+              <ul className="space-y-1.5">
+                {items.map((c) => (
+                  <li key={c} className="flex items-center gap-2 text-slate-400 text-sm hover:text-white transition">
+                    <Hash size={14} className="text-slate-600" /> {c}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+        </details>
+      </section>
+
+      {/* Back to the shop: the page used to end on Discord with no way back
+          but the menu. */}
+      <section className="section pb-16 text-center">
+        <Link to="/shop" className="btn-primary px-7 py-3.5 inline-flex text-base">{t('discord.backToShop', 'Back to the shop')}</Link>
       </section>
     </div>
   );

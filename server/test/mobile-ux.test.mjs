@@ -105,7 +105,7 @@ console.log('\n— A phone does not download the whole catalogue —');
   ok('the grid renders a window, not everything', /visible\.slice\(0, shown\)/.test(shop));
   ok('the rest is one tap away', /shop\.loadMore/.test(shop));
   ok('the window resets when the filter changes',
-    /useEffect\(\(\) => \{ setShown\(PAGE\); \}, \[category, sort, search\]\)/.test(shop));
+    /useEffect\(\(\) => \{ setShown\(PAGE\); \}, \[category, sort, search(, platform)?\]\)/.test(shop));
 
   /* The card no longer renders an <img> itself — ProductMedia does, once, for
      every surface. And "lazy on everything" turned out to be the wrong rule: it

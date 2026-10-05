@@ -186,15 +186,22 @@ function CartCrossSell({ items, onAdd }) {
   useEffect(() => {
     let live = true;
     const fromTrending = () => api.get('/api/products/trending').then((r) => r.products || []);
+    /* Co-purchases first, trending to fill: the co-purchase list falls back to
+       the same category server-side, which is exactly what is filtered out. */
     const p = seed
-      ? api.get(`/api/products/${seed}/recommendations`).then((r) => (r.crossSell?.length ? r.crossSell : fromTrending())).catch(fromTrending)
+      ? Promise.all([api.get(`/api/products/${seed}/recommendations`).then((r) => r.crossSell || []).catch(() => []), fromTrending().catch(() => [])])
+        .then(([co, tr]) => [...co, ...tr])
       : fromTrending();
     Promise.resolve(p).then((list) => { if (live) setRecs(list || []); }).catch(() => {});
     return () => { live = false; };
   }, [seed]);
 
+  /* Not another size of what is already in the cart (the cart offered 4,600
+     and 1,600 FC Points next to 12,000) — something else from the shop. */
   const inCart = new Set(items.map((i) => i.id));
-  const show = recs.filter((p) => !inCart.has(p.id)).slice(0, 4);
+  const cartCats = new Set(items.map((i) => i.category).filter(Boolean));
+  const seen = new Set();
+  const show = recs.filter((p) => !inCart.has(p.id) && !cartCats.has(p.category) && !seen.has(p.id) && seen.add(p.id)).slice(0, 4);
   if (show.length === 0) return null;
 
   return (

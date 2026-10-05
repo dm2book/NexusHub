@@ -30,13 +30,11 @@ const CommandPalette = lazy(() => import('../components/store/CommandPalette.jsx
 import MobileTabBar from '../components/store/MobileTabBar.jsx';
 import AnnouncementBar from '../components/store/AnnouncementBar.jsx';
 import StoreFooter from '../components/store/StoreFooter.jsx';
-import SellerIdentity from '../components/store/SellerIdentity.jsx';
 import { money, carriesOwnBackground, categoryLabel } from '../lib/catalog.js';
 import { withFallback, SAMPLE_PRODUCTS, iconPath, CATALOG_UNAVAILABLE } from '../lib/sampleCatalog.js';
 import { useCategoryLogos } from '../lib/useCategoryLogos.js';
 import { useTrustpilot } from '../lib/useTrustpilot.js';
 import { SUPPORT_EMAIL } from '../lib/support.js';
-import { openForgeChat } from '../lib/forgeChat.js';
 import { allowed, onConsentChange } from '../lib/consent.js';
 import CookieConsent from '../components/CookieConsent.jsx';
 const ChatWidget = lazy(() => import('../components/ChatWidget.jsx'));
@@ -306,7 +304,7 @@ export default function HomeStore() {
             <span className="hidden min-[1400px]:inline fm-head text-xl truncate">ForgeMarket</span>
           </Link>
 
-          <nav className="hidden min-[1152px]:flex items-center gap-5 xl:gap-6 text-[15px] font-medium text-slate-600 min-w-0 overflow-hidden">
+          <nav className="hidden min-[1152px]:flex items-center gap-4 text-[14.5px] font-medium text-slate-600 min-w-0 overflow-hidden">
             {NAV.map((n, i) => (
               <Link key={n.label} to={n.to}
                 className={`relative py-1 whitespace-nowrap hover:text-slate-900 transition ${i === 0 ? 'text-violet-600' : ''}`}>
@@ -375,8 +373,8 @@ export default function HomeStore() {
               instead of pushing the primary call to action off the screen. */}
           {!user && (
             <Link to="/login" aria-label={tr('nav.signup', 'Sign Up')}
-              className="fm-shine inline-flex items-center justify-center xs:justify-start gap-1.5 text-white text-[15px] font-semibold rounded-xl w-10 xs:w-auto px-0 xs:px-3.5 sm:px-4 h-10 shrink-0 min-w-0 max-w-[46vw] shadow-lg shadow-violet-500/30 hover:brightness-105 transition"
-              style={{ backgroundImage: 'linear-gradient(135deg,#7c5cff,#a855f7)' }}>
+              className="inline-flex items-center justify-center xs:justify-start gap-1.5 text-[15px] font-semibold rounded-xl w-10 xs:w-auto px-0 xs:px-3.5 sm:px-4 h-10 shrink-0 min-w-0 max-w-[46vw] hover:brightness-105 transition"
+              style={{ background: '#fff', color: '#6d28d9', border: '1.5px solid #c4b5fd' }}>
               {/* Below 400px there is room for roughly 72px here, and a button
                   reading "Accou…" is worse than no words at all. Same pattern the
                   account link already uses: the icon always fits, the word
@@ -459,35 +457,9 @@ export default function HomeStore() {
             </div>
           )}
 
-          {/* ForgeBot widget */}
-          <div className="bg-white rounded-2xl border border-slate-200/70 p-4 shadow-sm">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-[15px]">ForgeBot</span>
-                <span className="inline-flex items-center gap-1.5 text-[11px] text-emerald-600 font-medium">
-                  {/* The same light the hero badge carries, so "online" looks
-                      the same wherever the shop says it. */}
-                  <span className="fm-livedot" style={{ width: 6, height: 6 }} aria-hidden /> {tr('bot.online', 'Online')}
-                </span>
-              </div>
-            </div>
-            <div className="flex items-start gap-2.5 mt-3">
-              <span className="w-9 h-9 rounded-xl grid place-items-center text-white shrink-0"
-                style={{ backgroundImage: 'linear-gradient(135deg,#7c5cff,#a855f7)' }}>🤖</span>
-              <button type="button" onClick={() => openForgeChat()}
-                className="bg-slate-100 rounded-xl rounded-tl-sm px-3 py-2 text-[13px] text-slate-600 text-left hover:bg-slate-200 transition">
-                {tr('home.botHi', 'Hi! 👋 How can I help you today?')}
-              </button>
-            </div>
-            {/* This used to be a link to the contact page. A card that shows an
-                avatar, a greeting and a green "Online" dot is a chat as far as
-                anyone tapping it is concerned — so now it opens the real one. */}
-            <button type="button" onClick={() => openForgeChat()}
-              className="fm-shine mt-3 w-full flex items-center justify-center gap-2 text-white font-semibold text-sm rounded-xl h-10 transition hover:brightness-105"
-              style={{ backgroundImage: 'linear-gradient(135deg,#7c5cff,#a855f7)' }}>
-              <MessageCircle size={16} /> {tr('home.chat', 'Chat with us')}
-            </button>
-          </div>
+          {/* The ForgeBot card that stood here was a third way into the same
+              chat — beside the floating bubble and its own "Chat with us"
+              button. One entry point (the bubble, on every page) is enough. */}
         </aside>
 
         {/* The assistant itself. The homepage is not inside SiteLayout, so
@@ -629,7 +601,7 @@ export default function HomeStore() {
                      this shop can say, at the visual weight of a disclaimer.
                      Each now leads with the claim in white and carries the
                      qualifier behind it, on a panel that reads as one block. */
-                  <ul className="fm-trustpanel flex flex-col gap-2.5 mt-7 rounded-2xl px-4 py-3.5">
+                  <ul className="fm-trustpanel hidden sm:flex flex-col gap-2.5 mt-7 rounded-2xl px-4 py-3.5">
                     {[
                       { lead: tr('home.trustWhoLead', 'A named person, in the Netherlands'),
                         rest: tr('home.trustWho2', 'not a faceless storefront — name and contact on every page') },
@@ -667,35 +639,6 @@ export default function HomeStore() {
             </div>
           </section>
 
-          {/* How it works — a manual-payment store has to answer "what happens
-              after I pay?" before it asks for money. */}
-          <section className="fm-reveal fm-reveal-children">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="fm-head text-2xl">{tr('home.howTitle', 'How it works')}</h2>
-              <Link to="/how-it-works" className="text-sm font-semibold text-violet-600 hover:text-violet-700 inline-flex items-center gap-1 fm-hit">
-                {tr('home.howMore', 'More detail')} <ChevronRight size={15} />
-              </Link>
-            </div>
-            <div className="grid sm:grid-cols-3 gap-4">
-              {[
-                { n: '1', icon: LayoutGrid, title: tr('home.h1t', 'Pick your top-up'),
-                  sub: tr('home.h1s', 'Choose the amount you want. No account needed — you can check out as a guest.') },
-                { n: '2', icon: Tag, title: tr('home.h2t', 'Pay with the reference shown'),
-                  sub: tr('home.h2s', 'You get the exact amount and a payment reference right after checkout. Copy both into your bank app.') },
-                { n: '3', icon: Zap, title: tr('home.h3t', 'Get your code'),
-                  sub: tr('home.h3s', 'In stock? Sent automatically once your payment is confirmed. Otherwise delivered by hand, usually within a few hours.') },
-              ].map((c) => (
-                <div key={c.n} className="bg-white rounded-2xl border border-slate-200/70 shadow-sm p-5">
-                  <div className="flex items-center gap-2.5 mb-2">
-                    <span className="w-8 h-8 rounded-lg bg-violet-100 text-violet-700 grid place-items-center fm-num text-sm">{c.n}</span>
-                    <c.icon size={17} className="text-violet-500" />
-                  </div>
-                  <div className="font-bold text-slate-900">{c.title}</div>
-                  <p className="text-sm text-slate-500 mt-1 leading-relaxed">{c.sub}</p>
-                </div>
-              ))}
-            </div>
-          </section>
 
           {/* ── Popular products ──────────────────────────────────────────
               Three pillars, each resolved from the live catalogue. Grouping by
@@ -795,6 +738,38 @@ export default function HomeStore() {
             </section>
           ))}
 
+          {/* How it works — a manual-payment store has to answer "what happens
+              after I pay?" before it asks for money. Below the shelves, not
+              above them: it pushed the first product 2.3 screens down on a
+              phone, and a visitor meets the goods before the explanation. */}
+          <section className="fm-reveal fm-reveal-children">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="fm-head text-2xl">{tr('home.howTitle', 'How it works')}</h2>
+              <Link to="/how-it-works" className="text-sm font-semibold text-violet-600 hover:text-violet-700 inline-flex items-center gap-1 fm-hit">
+                {tr('home.howMore', 'More detail')} <ChevronRight size={15} />
+              </Link>
+            </div>
+            <div className="grid sm:grid-cols-3 gap-4">
+              {[
+                { n: '1', icon: LayoutGrid, title: tr('home.h1t', 'Pick your top-up'),
+                  sub: tr('home.h1s', 'Choose the amount you want. No account needed — you can check out as a guest.') },
+                { n: '2', icon: Tag, title: tr('home.h2t', 'Pay with the reference shown'),
+                  sub: tr('home.h2s', 'You get the exact amount and a payment reference right after checkout. Copy both into your bank app.') },
+                { n: '3', icon: Zap, title: tr('home.h3t', 'Get your code'),
+                  sub: tr('home.h3s', 'In stock? Sent automatically once your payment is confirmed. Otherwise delivered by hand, usually within a few hours.') },
+              ].map((c) => (
+                <div key={c.n} className="bg-white rounded-2xl border border-slate-200/70 shadow-sm p-5">
+                  <div className="flex items-center gap-2.5 mb-2">
+                    <span className="w-8 h-8 rounded-lg bg-violet-100 text-violet-700 grid place-items-center fm-num text-sm">{c.n}</span>
+                    <c.icon size={17} className="text-violet-500" />
+                  </div>
+                  <div className="font-bold text-slate-900">{c.title}</div>
+                  <p className="text-sm text-slate-500 mt-1 leading-relaxed">{c.sub}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+
           {/* ── Why ForgeMarket ───────────────────────────────────────────
               Four reasons, each one a fact a buyer can check today rather than a
               value the shop claims to hold. The identity block underneath is the
@@ -823,14 +798,13 @@ export default function HomeStore() {
                   <span className={`w-11 h-11 rounded-xl grid place-items-center shrink-0 ${c.color}`}><c.icon size={20} /></span>
                   <div>
                     <div className="font-bold text-slate-900">{c.t}</div>
-                    <p className="text-sm text-slate-500 mt-1 leading-relaxed">{c.s}</p>
+                    <p className="hidden sm:block text-sm text-slate-500 mt-1 leading-relaxed">{c.s}</p>
                   </div>
                 </div>
               ))}
             </div>
-            <div className="mt-4">
-              <SellerIdentity />
-            </div>
+            {/* Who is selling stays on every page in the footer; on the homepage
+                it doubled a block the visitor meets again a screen later. */}
           </section>
 
           {/* ── Reviews ───────────────────────────────────────────────────
@@ -1129,7 +1103,7 @@ function HeroRender() {
   useParallax(ref);
   usePointerTilt(tilt);
   return (
-    <div ref={ref} className="relative h-[250px] sm:h-[360px]">
+    <div ref={ref} className="hidden lg:block relative h-[250px] sm:h-[360px]">
       {/* SCALED, not squashed — see the note this replaced: every card is placed
           from the centre, so the composition keeps its geometry and the whole
           thing is scaled to fit a phone. The middle step is not decoration:
