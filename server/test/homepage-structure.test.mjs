@@ -78,10 +78,8 @@ console.log('\n— Nothing is invented —');
   ok('prices come from the real cheapest product',
     /items\.reduce\(\(a, b\) => \(a\.price <= b\.price \? a : b\)\)/.test(home));
   // Reviews: real ones or an honest empty state — never filler.
-  ok('reviews render only when real ones exist', /hasReviews \?/.test(home));
-  ok('the empty state says so rather than faking it', /home\.noReviewsT/.test(home));
-  ok('the empty state offers somewhere real to check instead',
-    /home\.askBuyers/.test(home) && /footer\.trust/.test(home));
+  ok('reviews render only when real ones exist', /\{hasReviews && \(/.test(home));
+  ok('no empty "no reviews yet" block before the first real review — it read as a warning', !/home\.noReviewsT/.test(home));
   // The stats grid that printed "0 / — / —" on launch day is gone for good.
   ok('no stats grid can render an empty figure', !/const statCards/.test(home));
 }

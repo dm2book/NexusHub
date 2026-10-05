@@ -67,7 +67,7 @@ console.log('\n— The rating belongs to whoever earned it —');
   // shop's rather than presented under the product name as this product's.
   ok('the shop rating is labelled as the shop\'s', /pd\.shopRating/.test(code));
   ok('the review block says it is about the shop', /pd\.shopReviews/.test(code));
-  ok('a shop with no reviews says so plainly', /pd\.noReviewsYet/.test(code));
+  ok('a shop with no reviews says nothing under the name, rather than a line that reads as a warning', !/pd\.noReviewsYet/.test(code));
   // The JSON-LD must still not borrow it.
   ok('product structured data still claims no rating', !/aggregateRating/.test(code));
 }
@@ -165,9 +165,7 @@ console.log('\n— The page argues for the sale —');
   ok('and the FAQ falls back to it', /product\.deliveryField \|\| deliveryField\(product\.category/.test(code));
 
   // The empty state was a grey box on the page where the decision is made.
-  ok('the reviews empty state explains itself', /product\.noReviewsWhy/.test(code));
-  ok('and offers the two places a buyer can check instead',
-    /home\.askBuyers/.test(code) && /footer\.trust/.test(code));
+  ok('the reviews block shows only once a real review exists, the FAQ then takes the width', /\{reviews\.length > 0 && \(/.test(code) && !/product\.noReviewsWhy/.test(code));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

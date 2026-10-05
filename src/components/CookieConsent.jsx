@@ -42,12 +42,17 @@ export default function CookieConsent() {
       aria-label={t('cookie.title', 'Cookies on ForgeMarket')}
       className="fixed inset-x-3 bottom-3 z-[70] mx-auto max-w-xl rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl sm:inset-x-auto sm:left-4 sm:bottom-4">
       <div className="flex items-start gap-3">
-        <span aria-hidden className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-violet-100 text-violet-700">
+        <span aria-hidden className="mt-0.5 hidden sm:flex items-center justify-center h-9 w-9 shrink-0 rounded-xl bg-violet-100 text-violet-700">
           <Cookie size={18} />
         </span>
         <div className="min-w-0">
           <p className="font-semibold text-slate-900">{t('cookie.title', 'Cookies on ForgeMarket')}</p>
-          <p className="mt-1 text-[13px] leading-relaxed text-slate-600">
+          {/* On a phone the full text covered half the first screen; the short
+              line says the same choice, and "what we store exactly" has the rest. */}
+          <p className="mt-1 text-[13px] leading-relaxed text-slate-600 sm:hidden">
+            {t('cookie.short', 'We only measure page visits if you agree. The shop works either way.')}
+          </p>
+          <p className="mt-1 text-[13px] leading-relaxed text-slate-600 hidden sm:block">
             {t('cookie.body', 'We always store what the shop needs to work: staying signed in, your cart and your language. We would also like to measure which pages get visited. That part is up to you, and the shop works either way.')}
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
@@ -55,7 +60,11 @@ export default function CookieConsent() {
             <button onClick={() => decide(true)} className="btn-primary flex-1 min-w-[130px] justify-center py-2.5 text-sm">
               {t('cookie.accept', 'Accept')}
             </button>
-            <button onClick={() => decide(false)} className="btn-ghost flex-1 min-w-[130px] justify-center py-2.5 text-sm">
+            {/* Its own colours: btn-ghost is the dark theme's light-grey text,
+                which on this white banner was all but invisible — refusing has
+                to be as easy to see as accepting. */}
+            <button onClick={() => decide(false)} className="btn flex-1 min-w-[130px] justify-center py-2.5 text-sm"
+              style={{ background: '#fff', color: '#0f172a', border: '1.5px solid #cbd5e1', fontWeight: 600 }}>
               {t('cookie.reject', 'Only what is necessary')}
             </button>
           </div>

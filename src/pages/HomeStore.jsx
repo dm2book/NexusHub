@@ -837,7 +837,11 @@ export default function HomeStore() {
               Real ones when they exist. Before that, the honest version: say
               there are none yet and point at the two places a buyer can check
               instead. Inventing social proof here is the one thing that would
-              undo everything above it. */}
+              undo everything above it.
+              Until the first real review the whole block stays away: an empty
+              "no reviews yet" between the products and the checkout told a
+              first-time buyer the one thing they were afraid of. */}
+          {hasReviews && (
           <section className="fm-reveal">
             <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-1.5 sm:gap-4 mb-3">
               <div>
@@ -859,7 +863,6 @@ export default function HomeStore() {
               </Link>
             </div>
 
-            {hasReviews ? (
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {reviews.slice(0, 3).map((r) => (
                   <div key={r.id} className="bg-white rounded-2xl border border-slate-200/70 shadow-sm p-5">
@@ -873,30 +876,8 @@ export default function HomeStore() {
                   </div>
                 ))}
               </div>
-            ) : (
-              <div className="bg-white rounded-2xl border border-slate-200/70 shadow-sm p-6 sm:p-7">
-                <div className="font-bold text-slate-900">{tr('home.noReviewsT', 'No reviews yet — the shop is new')}</div>
-                <p className="text-sm text-slate-500 mt-1.5 leading-relaxed max-w-2xl">
-                  {tr('home.noReviewsS', 'Rather than borrow someone else’s, there is nothing here until a real buyer leaves one. A review can only be written from a delivered order, so this page fills up at the pace the shop actually sells.')}
-                </p>
-                <div className="flex flex-wrap gap-2.5 mt-4">
-                  <Link to="/discord" className="fm-press inline-flex items-center gap-2 text-white text-sm font-semibold rounded-xl px-4 h-11 shadow-lg shadow-violet-500/25 hover:brightness-105 transition"
-                    style={{ backgroundImage: 'linear-gradient(135deg,#5865F2,#7c5cff)' }}>
-                    <MessageCircle size={16} /> {tr('home.askBuyers', 'Ask in Discord before you buy')}
-                  </Link>
-                  {trustpilot && (
-                    <a href={trustpilot} target="_blank" rel="noreferrer"
-                      className="inline-flex items-center gap-2 text-sm font-semibold rounded-xl px-4 h-11 border border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 transition">
-                      ⭐ {tr('home.whoTrustpilot', 'Check us on Trustpilot')}
-                    </a>
-                  )}
-                  <Link to="/trust" className="inline-flex items-center gap-2 text-sm font-semibold rounded-xl px-4 h-11 border border-slate-200 text-slate-700 hover:bg-slate-50 transition">
-                    <ShieldCheck size={16} /> {tr('footer.trust', 'Trust Center')}
-                  </Link>
-                </div>
-              </div>
-            )}
           </section>
+          )}
 
           {/* ── FAQ ───────────────────────────────────────────────────────
               The four questions a manual-payment shop gets asked before the

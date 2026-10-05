@@ -26,6 +26,8 @@ import { reportStep } from '../lib/attribution.js';
 import { flyToCart } from '../lib/flyToCart.js';
 import Tilt from '../components/Tilt.jsx';
 import { DeliveryFacts, TrustRow } from '../components/store/ProductDelivery.jsx';
+import PaymentBadges from '../components/store/PaymentBadges.jsx';
+import { platformOf } from '../lib/platform.js';
 import ProductTrust from '../components/store/ProductTrust.jsx';
 
 // Built per product, not per site: what a buyer asks about a Robux top-up that
@@ -479,6 +481,17 @@ export default function ProductDetail() {
         <div className="animate-fade-up">
           <span className="text-xs uppercase tracking-wider text-indigo-400 font-rajdhani">{label}</span>
           <h1 className="text-3xl sm:text-4xl text-white mt-2">{product.name}</h1>
+          {/* A code for one console does not work on another. Said right under
+              the name, not in the FAQ — this is the wrong purchase to prevent. */}
+          {platformOf(product) && (() => {
+            const pf = platformOf(product);
+            return (
+              <div className="flex flex-wrap items-center gap-2" style={{ marginTop: 10 }} data-testid="product-platform">
+                <span className="font-bold text-white rounded-full" style={{ background: pf.color, fontSize: 12, padding: '4px 10px' }}>{pf.label}</span>
+                <span className="text-[13px] text-slate-600">{t('pd.platformOnly', 'This code only works on {p} — check your platform before you buy.', { p: pf.label })}</span>
+              </div>
+            );
+          })()}
 
           {/* rating + stock */}
           <div className="flex items-center gap-3 mt-3 text-sm">
@@ -496,9 +509,7 @@ export default function ProductDetail() {
                 <span>{t('pd.shopRating', '{r} across the shop · {n} reviews', {
                   r: stats.rating, n: stats.reviews.toLocaleString('en-US') })}</span>
               </Link>
-            ) : (
-              <span className="text-slate-500">{t('pd.noReviewsYet', 'No reviews yet — the shop is new')}</span>
-            )}
+            ) : null /* No reviews yet: say nothing here rather than a line that reads as a warning, right under the name. */}
           </div>
 
           <div className="flex items-center gap-3 mt-4">
@@ -620,6 +631,9 @@ export default function ProductDetail() {
                 <Heart size={18} fill={wished ? 'currentColor' : 'none'} />
               </button>
             </div>
+            {/* How you will pay, read right under the button — before the tap,
+                not on the next page. */}
+            {!prelaunch && <PaymentBadges className="mt-3" />}
           </div>
 
           {/* Trust indicators, read last before the tap. The old block here
@@ -742,7 +756,11 @@ export default function ProductDetail() {
       })()}
 
       {/* Reviews + FAQ */}
-      <div className="grid lg:grid-cols-2 gap-10 mt-16">
+      {/* Reviews only once a real buyer has left one: an empty "no reviews yet"
+          block on the page where the decision is made cost more trust than it
+          bought. The FAQ then takes the full width. */}
+      <div className={`grid ${reviews.length ? 'lg:grid-cols-2' : ''} gap-10 mt-16`}>
+        {reviews.length > 0 && (
         <section>
           <div className="flex items-center justify-between mb-5">
             <h2 className="text-2xl font-extrabold text-slate-900">{t('pd.shopReviews', 'What buyers say about the shop')}</h2>
@@ -766,32 +784,6 @@ export default function ProductDetail() {
             </div>
           )}
           <div className="space-y-3">
-            {reviews.length === 0 && (
-              /* The homepage's empty state says WHY there are none and offers
-                 the two places a buyer can check instead; this one was a grey
-                 box reading "be the first after your purchase", on the page
-                 where the decision is actually made. Same honesty, same two
-                 doors — and the reason is itself the strongest thing this shop
-                 can say about its reviews: they only come from delivered
-                 orders, which is more than a page of five stars proves. */
-              <div className="card p-4">
-                <div className="font-semibold text-slate-100 text-sm">
-                  {t('pd.noReviewsYet', 'No reviews yet — the shop is new')}
-                </div>
-                <p className="text-slate-400 text-[13px] mt-1.5 leading-relaxed">
-                  {t('product.noReviewsWhy', 'A review here can only be written from a delivered order, so this fills up at the pace the shop actually sells. Nothing is borrowed from anywhere else in the meantime.')}
-                </p>
-                <div className="flex flex-wrap gap-2 mt-3">
-                  <Link to="/discord" className="inline-flex items-center gap-1.5 text-[13px] font-semibold rounded-lg px-3 h-9 text-white"
-                    style={{ backgroundImage: 'linear-gradient(135deg,#5865F2,#7c5cff)' }}>
-                    <MessageCircle size={14} /> {t('home.askBuyers', 'Ask in Discord before you buy')}
-                  </Link>
-                  <Link to="/trust" className="inline-flex items-center gap-1.5 text-[13px] font-semibold rounded-lg px-3 h-9 border border-white/15 text-slate-200 hover:bg-white/5 transition">
-                    <ShieldCheck size={14} /> {t('footer.trust', 'Trust Center')}
-                  </Link>
-                </div>
-              </div>
-            )}
             {reviews.slice(0, 3).map((r) => (
               <div key={r.id} className="card p-4 fm-lift">
                 <div className="flex text-amber-400 mb-1.5">{Array.from({ length: r.stars || 5 }).map((_, i) => <Star key={i} size={13} fill="currentColor" />)}</div>
@@ -804,6 +796,7 @@ export default function ProductDetail() {
             ))}
           </div>
         </section>
+        )}
 
         <section>
           <h2 className="text-2xl font-extrabold text-slate-900 mb-5">{t('product.faqTitle', 'Frequently asked')}</h2>

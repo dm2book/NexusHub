@@ -6,6 +6,7 @@ import { useI18n } from '../../lib/i18n.jsx';
 import { useCart } from '../../context/CartContext.jsx';
 import { iconFor } from '../../lib/sampleCatalog.js';
 import ProductMedia from './ProductMedia.jsx';
+import { platformOf } from '../../lib/platform.js';
 import { navigateWithTransition } from '../../lib/viewTransition.js';
 import { flyToCart } from '../../lib/flyToCart.js';
 import { useWishlist } from '../../lib/wishlist.js';
@@ -51,6 +52,7 @@ function LightProductCard({ product, onAdd, priority = false }) {
   const showActions = !POINTS || hover;
   const onSale = product.compareAtPrice > product.price;
   const discountPct = onSale ? Math.round((1 - product.price / product.compareAtPrice) * 100) : 0;
+  const platform = platformOf(product);
 
   // Open the product with a shared-element morph: the clicked card media becomes
   // the destination hero. Plain navigation on modifier/middle clicks.
@@ -118,6 +120,14 @@ function LightProductCard({ product, onAdd, priority = false }) {
           )}
           {product.featured && (
             <span className="text-[10px] font-bold text-amber-800 bg-amber-100 rounded-full px-2 py-0.5">★ {t('card.featured', 'Featured')}</span>
+          )}
+          {/* Which console or PC this code works on — the most likely wrong
+              purchase, said on the card where the choice is made. */}
+          {platform && (
+            <span className="text-[10px] font-bold text-white rounded-full px-2 py-0.5 shadow-sm" style={{ background: platform.color }}
+              data-testid="card-platform">
+              {platform.label}
+            </span>
           )}
         </div>
         {/* Not animate-pulse. That fades a whole element in and out — it is

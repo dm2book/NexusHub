@@ -80,11 +80,21 @@ export function categoryVisual(category) {
  * the map cannot grow in any meaningful way.
  */
 const FORMATTERS = new Map();
+/* Prices in the reader's own notation: €79,99 on the Dutch shop, not the
+   English €79.99. The language provider keeps <html lang> current, so a switch
+   re-renders with the right one; English (and the prerender, which has no
+   document) keeps en-IE. */
+const NUMBER_LOCALE = { nl: 'nl-NL', de: 'de-DE', fr: 'fr-FR' };
+const pageLocale = () => {
+  try { return NUMBER_LOCALE[document.documentElement.lang] || 'en-IE'; } catch { return 'en-IE'; }
+};
 const formatter = (cur) => {
-  let f = FORMATTERS.get(cur);
+  const loc = pageLocale();
+  const key = `${loc}|${cur}`;
+  let f = FORMATTERS.get(key);
   if (!f) {
-    f = new Intl.NumberFormat('en-IE', { style: 'currency', currency: cur });
-    FORMATTERS.set(cur, f);
+    f = new Intl.NumberFormat(loc, { style: 'currency', currency: cur });
+    FORMATTERS.set(key, f);
   }
   return f;
 };

@@ -70,7 +70,10 @@ export function isRealSale(o) {
 /** Stock as the storefront can honestly state it. */
 export function stockState(product, count) {
   if (!product) return null;
-  if (product.deliveryMode === 'auto') return count > 0 ? { state: 'in_stock', ...(count <= 6 ? { left: count } : {}) } : { state: 'out_of_stock' };
+  if (product.deliveryMode === 'auto' && count > 0) return { state: 'in_stock', ...(count <= 6 ? { left: count } : {}) };
+  /* No codes on the shelf is not "sold out": the order is taken and bought in
+     by hand, which is exactly what the product page's delivery box says.
+     Reading "Uitverkocht" under "Op bestelling leverbaar" told buyers both. */
   return { state: 'on_order' };
 }
 
