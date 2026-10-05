@@ -219,6 +219,21 @@ export async function applyStoredSecrets() {
   return applied;
 }
 
+/**
+ * Re-apply the stored settings at most once a minute per server instance.
+ * Saving applies them on the instance that handled the save; every other warm
+ * instance kept what it read at its cold start, so a payment link saved in the
+ * admin reached the checkout only on whichever instance had just restarted.
+ */
+let appliedAt = 0;
+let applying = null;
+export async function refreshStoredSecrets({ maxAgeMs = 60_000, now = Date.now() } = {}) {
+  if (now - appliedAt < maxAgeMs) return false;
+  applying ??= applyStoredSecrets().finally(() => { appliedAt = Date.now(); applying = null; });
+  await applying.catch(() => {});
+  return true;
+}
+
 const last4 = (v) => (v && v.length > 4 ? `…${v.slice(-4)}` : (v ? '…' : ''));
 
 /**

@@ -205,14 +205,18 @@ router.get('/stats', asyncHandler(async (_req, res) => {
  *
  * Order: Stripe (the shop's choice), then Mollie, then manual, then demo.
  */
-const manual = manualPayMethods();
+/* Read per request, never once at import: the payment links an owner saves
+   in the admin are applied from the database after this module has loaded,
+   and a value captured here kept the checkout on whatever the environment
+   had at boot (seen live: PayPal and Revolut saved, only Tikkie offered). */
+const manual = () => manualPayMethods();
 /* Stripe first: it is the provider the shop chose, it confirms itself through
    its webhook like Mollie does, and with a live key it should win over any
    payment link left configured from before. */
 const paymentProvider = () =>
   stripeEnabled() ? 'stripe'
     : mollieEnabled() ? 'mollie'
-      : manual.length ? 'manual'
+      : manual().length ? 'manual'
         : config.payments.demoMode ? 'demo' : 'none';
 
 // Public runtime config the SPA can read (feature flags, enabled providers).
@@ -343,6 +347,14 @@ router.post('/newsletter',
     res.status(201).json({ ok: true, subscribed: true, alreadySubscribed: r.alreadySubscribed });
   }));
 
+/* The payment links and keys an owner saves in the admin, fresh on this
+   instance too (at most once a minute) — before the config the checkout reads
+   and before an order is placed. */
+router.use(['/config', '/orders'], async (_req, _res, next) => {
+  await import('../services/secretStore.js').then((m) => m.refreshStoredSecrets()).catch(() => {});
+  next();
+});
+
 router.get('/config', asyncHandler(async (_req, res) => {
   publicCache(res, 60);
   // Owner-set per-category logos (best-effort — never fail config on a DB hiccup).
@@ -367,7 +379,7 @@ router.get('/config', asyncHandler(async (_req, res) => {
        it quoted one total and charged another: a 50% code on €9.99 showed
        €4.99 in the cart and took €5.99. Sent so both sides use one number. */
     maxDiscountPercent: Math.max(0, Math.min(100, config.market.maxTotalDiscountPercent)),
-    paymentMethods: manual,                 // [{id,label,target,kind}]
+    paymentMethods: manual(),               // [{id,label,target,kind}]
     // What the buyer may end up seeing on Mollie's page. Which of these is
     // actually offered depends on the amount and the country, so the checkout
     // asks /api/mollie/methods for the real list once it knows the total —
