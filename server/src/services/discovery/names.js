@@ -16,7 +16,8 @@ export function productTitle(m) {
   const platformSpecific = game && !game.defaultPlatform && PLATFORM_LABEL[m.platform]
     && !new RegExp(PLATFORM_LABEL[m.platform], 'i').test(game.label) ? ` ${PLATFORM_LABEL[m.platform]}` : '';
   if (m.denomUnit === 'EUR') return `${game?.key === 'steam' ? 'Steam Wallet' : game?.label || m.title} €${n}${region}`;
-  if (m.denomUnit === 'months') return `${game?.label || m.title} ${n} ${n === 1 ? 'maand' : 'maanden'}${platformSpecific}${region}`;
+  /* English, like the rest of the catalogue's names ("Discord Nitro — 1 Month"). */
+  if (m.denomUnit === 'months') return `${game?.label || m.title} ${n} ${n === 1 ? 'Month' : 'Months'}${platformSpecific}${region}`;
   const unit = UNIT_LABEL[m.denomUnit] || m.denomUnit;
   const named = ['diamonds', 'gems'].includes(m.denomUnit) ? `${n.toLocaleString('en-US')} ${m.denomUnit[0].toUpperCase()}${m.denomUnit.slice(1)} — ${game?.label}`
     : `${n.toLocaleString('en-US')} ${unit}`;

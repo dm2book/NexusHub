@@ -119,6 +119,27 @@ console.log('\n— Report, apply and admin —');
 
   const ap = await (await fetch(`${base}/content/apply`, { method: 'POST', headers: H, body: JSON.stringify({ productIds: [a.id, own.id, bare.id], onlyMissing: true }) })).json();
   const after = await getProduct(bare.id);
+  ok('the English text goes in `description` (what the English site reads), the Dutch in descriptionNl',
+    /^[A-Z0-9].*\b(You|We)\b/.test(after.description) && /\b(Je|We zetten|Afrekenen)\b/.test(after.metadata.descriptionNl || ''), JSON.stringify([after.description.slice(0, 80), (after.metadata.descriptionNl || '').slice(0, 80)]));
+  const { describeProduct } = await import('../../src/lib/productCopy.js');
+  const { withCopy } = await import('../src/services/productCopy.js');
+  const shown = withCopy(after);
+  ok('…so each language shows its own text', describeProduct(shown, 'en') === after.description && describeProduct(shown, 'nl') === after.metadata.descriptionNl);
+
+  /* Products written before the fix: Dutch in `description`. The migration moves it. */
+  const { MIGRATIONS } = await import('../src/db/migrations.js');
+  const fix = MIGRATIONS.find((m) => m.id === '058_generated_copy_language');
+  const broken = await createProduct({ name: `Xbox Game Pass 1 maand EU ${tag}`, category: 'gamepass', price: 1499, announce: false,
+    description: 'NL tekst die gegenereerd was', metadata: { source: 'discovery', content: { nl: { long: 'NL tekst die gegenereerd was' }, en: { long: 'English text that was generated' } } } });
+  const owned = await createProduct({ name: `Owner copy ${tag}`, category: 'robux', price: 999, announce: false,
+    description: 'Written by the owner', metadata: { content: { nl: { long: 'iets anders' }, en: { long: 'something else' } } } });
+  await run(fix.sql);
+  const fixed = await getProduct(broken.id);
+  ok('the repair puts the generated English back in `description` and the Dutch in descriptionNl',
+    fixed.description === 'English text that was generated' && fixed.metadata.descriptionNl === 'NL tekst die gegenereerd was');
+  ok('…renames "1 maand" to "1 Month" on discovery products', /Xbox Game Pass 1 Month EU/.test(fixed.name), fixed.name);
+  ok('…and never touches a description the owner wrote', (await getProduct(owned.id)).description === 'Written by the owner');
+
   ok('applying writes the long description and keeps both languages in metadata',
     ap.applied === 2 && ap.rows.find((r) => r.id === a.id)?.status === 'applied' && after.description.length > 120 && after.metadata.content?.nl?.faq?.length >= 3 && after.metadata.content?.en && after.metadata.content.generatedAt);
   ok('…leaves the description the owner wrote', (await getProduct(own.id)).description.startsWith('Een beschrijving die de eigenaar') && ap.rows.find((r) => r.id === own.id)?.status === 'kept');

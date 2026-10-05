@@ -339,9 +339,11 @@ export async function addCandidate(candidateId, { actor, auto = false, manualCos
   const { createProduct } = await import('../productService.js');
   const product = await createProduct({
     name: edits.title || content.title, category: edits.category || content.category, sku: content.sku,
-    description: content.nl.long, price, currency: 'EUR', active: sellable, announce: false,
+    /* English in `description`, Dutch in descriptionNl — see productCopy.js. */
+    description: content.en.long, price, currency: 'EUR', active: sellable, announce: false,
     metadata: {
       source: 'discovery', marketProductId: mp.id, canonicalKey: mp.canonical_key, sku: content.sku,
+      descriptionNl: content.nl.long,
       ...(manual != null ? { deliveryMode: 'manual', costCents: manual } : {}),
       ...(estimate ? { pricing: { estimated: true, costUnknown: true, basis: estimate.basis, at: nowIso() } } : {}),
       productType: model.productType, game: model.game, edition: model.edition || null, platform: model.platform,

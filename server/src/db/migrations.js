@@ -2186,4 +2186,27 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS lang TEXT;
       CREATE INDEX IF NOT EXISTS idx_market_mentions_product ON market_mentions (market_product_id, seen_at DESC);
     `,
   },
+  {
+    id: '058_generated_copy_language',
+    /*
+     * Generated product copy was written in Dutch into `description`, which the
+     * storefront reads as the ENGLISH text (Dutch lives in descriptionNl), so
+     * the English site showed Dutch. Where `description` is exactly the
+     * generated Dutch text, put the generated English there and the Dutch in
+     * descriptionNl. A description the owner wrote is never touched. And the
+     * subscription names discovery wrote in Dutch ("1 maand") follow the
+     * catalogue's English ("1 Month").
+     */
+    sql: `
+      UPDATE products
+         SET description = metadata::jsonb #>> '{content,en,long}',
+             metadata = (metadata::jsonb || jsonb_build_object('descriptionNl', metadata::jsonb #>> '{content,nl,long}'))::text
+       WHERE metadata LIKE '{%' AND metadata LIKE '%"content"%'
+         AND metadata::jsonb #>> '{content,en,long}' IS NOT NULL
+         AND description = metadata::jsonb #>> '{content,nl,long}';
+      UPDATE products
+         SET name = regexp_replace(regexp_replace(name, ' 1 maand\\M', ' 1 Month'), ' (\\d+) maanden\\M', ' \\1 Months')
+       WHERE metadata LIKE '{%' AND metadata LIKE '%discovery%' AND metadata::jsonb ->> 'source' = 'discovery' AND name ~ ' \\d+ maand(en)?\\M';
+    `,
+  },
 ];
