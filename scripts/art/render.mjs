@@ -321,3 +321,87 @@ ${mark || `<circle cx="1160" cy="450" r="170" fill="#1b1636" stroke="${accent}" 
 <rect x="0" y="${H - 7}" width="${W}" height="7" fill="url(#${id}rim)"/>
 </svg>`;
 }
+
+/* ── The live product card ─────────────────────────────────────────────────
+ * What /api/products/:id/tile.svg draws for a product without the owner's own
+ * card: the game's or brand's own colours edge to edge, its logo as the hero,
+ * and the product's own amount on a glass plate — a store card, not an icon
+ * on a dark board. Shipped files keep mainSvg; this is the runtime look. */
+const THEMES = {
+  eafc: ['#0b3d2e', '#00e676', '#062016'], cod: ['#3a2a12', '#ff9a1f', '#120c05'], valorant: ['#4a0d14', '#ff4655', '#14060a'],
+  xbox: ['#0e3d0e', '#3ee03e', '#051405'], playstation: ['#06265e', '#2f8cff', '#030c1f'], steam: ['#122840', '#66c0f4', '#070f19'],
+  nintendo: ['#5c0710', '#ff2a3d', '#1a0306'], netflix: ['#4d070b', '#ff2b36', '#140304'], googleplay: ['#083b33', '#34d399', '#03130f'],
+  itunes: ['#3d0f3a', '#ff5ec4', '#13050f'], amazon: ['#3d2405', '#ffa31a', '#140b02'], spotify: ['#0b3d1e', '#1ed760', '#04140a'],
+  'discord-nitro': ['#1e1f5c', '#7c83ff', '#08081c'], gamepass: ['#0e3d0e', '#9be15d', '#051405'], genshin: ['#3a2c0c', '#f5c451', '#120d03'],
+  league: ['#2e2610', '#c89b3c', '#0e0b05'], freefire: ['#4a1a05', '#ff7a1a', '#170802'], robux: ['#1f2933', '#e2e8f0', '#0a0e12'],
+  'v-bucks': ['#0f2a4d', '#4fc3ff', '#050d18'], apex: ['#4a0d0d', '#ff4d4d', '#160404'], pubg: ['#3a2f0c', '#f2a900', '#120e03'],
+  brawl: ['#3d2a05', '#ffc928', '#140d02'], clash: ['#3d2a05', '#ffcc33', '#140d02'], clashroyale: ['#0d2a4d', '#4da3ff', '#040d18'],
+  pokemongo: ['#0d2a4d', '#ffcb05', '#040d18'], mlbb: ['#0d2240', '#5ab0ff', '#040b16'], minecraft: ['#1f3d12', '#7bd34a', '#0a1406'],
+  gta: ['#123d1f', '#57d27a', '#06140a'], giftcard: ['#2a1a4d', '#a78bfa', '#0c0718'],
+};
+const BRAND_LABEL = { steam: 'STEAM', playstation: 'PLAYSTATION STORE', xbox: 'XBOX', nintendo: 'NINTENDO ESHOP', netflix: 'NETFLIX',
+  googleplay: 'GOOGLE PLAY', itunes: 'APP STORE & ITUNES', amazon: 'AMAZON', spotify: 'SPOTIFY', 'discord-nitro': 'DISCORD NITRO', gamepass: 'XBOX GAME PASS' };
+const CARD_UNITS = [[/\bRP\b/, 'RP'], [/crystals?/i, 'CRYSTALS'], [/\bUC\b/, 'UC'], [/pok[eé]coins/i, 'POKÉCOINS'],
+  [/apex coins/i, 'APEX COINS'], [/\bCP\b|cod points/i, 'COD POINTS'], [/valorant points|\bVP\b/i, 'VP'], [/fc points/i, 'FC POINTS'], [/diamonds?/i, 'DIAMONDS'], [/gems?/i, 'GEMS']];
+const RASTER_MARK = new Set(['cod', 'discord-nitro', 'eafc', 'playstation', 'robux', 'steam', 'v-bucks', 'valorant', 'xbox']);
+const PLATFORMS = [[/playstation|\bps[45]?\b|\bpsn\b/i, 'PLAYSTATION'], [/xbox/i, 'XBOX'], [/\bpc\b/i, 'PC'], [/\bnl\b/i, 'NL'], [/\beu\b/i, 'EU']];
+
+export function cardSvg(product, { logo = null, plate = null, brand = null, unit = null } = {}) {
+  const W = 700, H = 600;
+  const key = (brand && THEMES[brand]) ? brand : (THEMES[product.category] ? product.category : 'giftcard');
+  const [c1, c2, c3] = THEMES[key];
+  const hl0 = headline(product.name, product.description);
+  /* The currency's own name where the name says it; the caller's guess last. */
+  const named = (CARD_UNITS.find(([re]) => re.test(product.name || '')) || [])[1];
+  const unitWord = named || unit;
+  const hl = hl0 && (named || (!hl0.small && unitWord)) && !String(hl0.big).startsWith('€') ? { ...hl0, small: String(unitWord).toUpperCase() } : hl0;
+  /* The hero: a logo handed over (the owner's or a licensed one), else the
+     brand's real raster mark, else its drawn icon. */
+  const slug = brand || product.category;
+  const src = logo || (RASTER_MARK.has(slug) ? `/products/icons/${slug}.webp` : brandMark(slug) || markPath(product.category));
+  const isData = /^data:image\//.test(String(src || ''));
+  /* Rasters go in whole and large; drawn icons through inlineMark, which
+     trims them to their ink so they fill the same stage. */
+  const raster = !isData && /\.webp$/.test(String(src)) && BUNDLED[String(src)];
+  const href = isData ? src : raster ? `data:image/webp;base64,${raster.b64}` : null;
+  /* A brand logo (a wordmark, often black or white on nothing) sits on a
+     plate in the contrasting colour, like a sticker on the card. */
+  const hero = href && plate
+    ? `<g filter="url(#cshadow)"><rect x="130" y="92" width="440" height="236" rx="40" fill="${plate === 'dark' ? '#0d0b16' : '#ffffff'}"/><rect x="130" y="92" width="440" height="236" rx="40" fill="none" stroke="${c2}" stroke-opacity=".55" stroke-width="3"/><image x="168" y="122" width="364" height="176" preserveAspectRatio="xMidYMid meet" href="${href}"/></g>`
+    : href
+    ? `<g filter="url(#cshadow)"><clipPath id="cherc"><rect x="195" y="62" width="310" height="290" rx="44"/></clipPath><image x="195" y="62" width="310" height="290" preserveAspectRatio="xMidYMid meet" clip-path="url(#cherc)" href="${href}"/></g>`
+    : `<g filter="url(#cshadow)">${inlineMark(src, { x: 190, y: 50, w: 320, h: 310 }) || ''}</g>`;
+  /* The platform chip, unless the label already says it (a PlayStation card). */
+  const plat0 = (PLATFORMS.find(([re]) => re.test(product.name || '')) || [])[1];
+  const plat = plat0 && !(BRAND_LABEL[brand] || '').includes(plat0) ? plat0 : null;
+  const label = (BRAND_LABEL[brand] || CATEGORY_LABEL[product.category] || '').toUpperCase();
+  const big = hl ? hl.big : '';
+  const bigSize = hl ? fitSize(big, 7, 118, 64) : 0;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${esc(product.name)}">
+<title>${esc(product.name)}</title>
+<defs>
+<linearGradient id="cbg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${c1}"/><stop offset=".6" stop-color="${c3}"/><stop offset="1" stop-color="#05040a"/></linearGradient>
+<radialGradient id="cglow" cx="350" cy="205" r="300" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="${c2}" stop-opacity=".55"/><stop offset=".55" stop-color="${c2}" stop-opacity=".12"/><stop offset="1" stop-color="${c2}" stop-opacity="0"/></radialGradient>
+<linearGradient id="csheen" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset=".5" stop-color="#fff" stop-opacity=".07"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+<linearGradient id="cplate" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff" stop-opacity=".10"/><stop offset="1" stop-color="#ffffff" stop-opacity=".03"/></linearGradient>
+<linearGradient id="cnum" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="${c2}"/></linearGradient>
+<filter id="cshadow" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="14" stdDeviation="16" flood-color="#000" flood-opacity=".55"/></filter>
+<filter id="cblur" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="40"/></filter>
+<pattern id="cdots" width="22" height="22" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1.4" fill="#fff" opacity=".07"/></pattern>
+</defs>
+<rect width="${W}" height="${H}" fill="url(#cbg)"/>
+<rect width="${W}" height="${H}" fill="url(#cdots)"/>
+<circle cx="350" cy="205" r="300" fill="url(#cglow)"/>
+<circle cx="560" cy="80" r="120" fill="${c2}" opacity=".18" filter="url(#cblur)"/>
+<path d="M-60 520 L320 -40 L420 -40 L40 520Z" fill="url(#csheen)"/>
+<path d="M300 640 L700 60 L760 60 L360 640Z" fill="url(#csheen)" opacity=".7"/>
+${hero}
+${label ? `<text x="34" y="52" font-family="Inter, system-ui, sans-serif" font-size="22" font-weight="800" letter-spacing="3" fill="#fff" opacity=".85">${esc(label)}</text>` : ''}
+${plat ? `<g><rect x="${W - 34 - (plat.length * 15 + 34)}" y="26" rx="18" width="${plat.length * 15 + 34}" height="36" fill="#000" fill-opacity=".35" stroke="${c2}" stroke-opacity=".7" stroke-width="2"/><text x="${W - 34 - (plat.length * 15 + 34) / 2}" y="51" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="18" font-weight="800" letter-spacing="2" fill="#fff">${plat}</text></g>` : ''}
+<rect x="30" y="372" width="${W - 60}" height="196" rx="28" fill="url(#cplate)" stroke="#fff" stroke-opacity=".14" stroke-width="2"/>
+${hl ? `<text x="350" y="${hl.small ? 486 : 502}" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="${bigSize}" font-weight="900" letter-spacing="-2" fill="${c2}" opacity=".45" filter="url(#cblur)">${esc(big)}</text>
+<text x="350" y="${hl.small ? 486 : 502}" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="${bigSize}" font-weight="900" letter-spacing="-2" fill="url(#cnum)">${esc(big)}</text>` : `<text x="350" y="490" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="54" font-weight="900" fill="#fff">${esc(String(product.name || '').slice(0, 22))}</text>`}
+${hl && hl.small ? `<text x="350" y="536" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="${fitSize(hl.small, 10, 28, 18)}" font-weight="800" letter-spacing="8" fill="${c2}">${esc(hl.small)}</text>` : ''}
+<path transform="translate(650 556) scale(1.1)" fill="#fff" opacity=".35" d="M9 6 L4.6 18.6 h5.1 l-2.2 8.4 L23.4 12.2 h-6.4 l2.2-6.2 z"/>
+</svg>`;
+}

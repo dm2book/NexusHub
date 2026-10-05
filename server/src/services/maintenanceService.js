@@ -99,6 +99,26 @@ export async function runMaintenance() {
     summary.discordBot = (await checkBotHeartbeat()).status;
   } catch (e) { summary.discordBotError = e.message; }
 
+  /* 0b. The owner's own artwork on every product. Early, because it used to
+     sit at the end of discovery and never got its turn when the market steps
+     ran long — the owner's cards stayed off the shop for hours. Idempotent:
+     a product that already has its artwork costs nothing. */
+  try {
+    const { applyCategoryArtwork, artworkEnabled } = await import('./discovery/categoryArtService.js');
+    if (artworkEnabled()) {
+      const a = await applyCategoryArtwork({ deadline: startedAt + 8_000 });
+      if (a.applied) summary.artworkApplied = a.applied;
+      if (a.remaining) summary.artworkRemaining = a.remaining;
+    }
+    /* The free brand logos the product cards draw (one Commons search per
+       brand, cached 30 days — production only). */
+    const { logosEnabled, warmLogos } = await import('./discovery/commonsLogoService.js');
+    if (logosEnabled() && Date.now() < startedAt + 10_000) {
+      const w = await warmLogos({ deadline: startedAt + 10_000 });
+      if (w.found) summary.brandLogos = w.found;
+    }
+  } catch (e) { summary.artworkError = e.message; }
+
   // 1. Purge OTP codes that are long expired / already consumed (keep table small).
   try {
     const r = await run(`DELETE FROM otp_codes WHERE expires_at < @cut OR (consumed_at IS NOT NULL AND created_at < @cut)`,
