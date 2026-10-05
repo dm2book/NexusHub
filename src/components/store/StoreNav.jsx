@@ -1,10 +1,11 @@
 import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Search, ShoppingCart, Zap, ArrowRight, Shield, Menu, X, User } from 'lucide-react';
+import { Search, ShoppingCart, Zap, ArrowRight, Shield, Menu, X, User, Heart } from 'lucide-react';
 import { useCart } from '../../context/CartContext.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useI18n, LANGUAGES } from '../../lib/i18n.jsx';
 import MobileDrawer from './MobileDrawer.jsx';
+import { useWishlist } from '../../lib/wishlist.js';
 
 /**
  * Language chooser.
@@ -138,6 +139,7 @@ export default function StoreNav() {
   }, []);
 
   const { count } = useCart();
+  const { count: saved } = useWishlist();
   const { user, isStaff, loading } = useAuth();
   const { pathname } = useLocation();
   const { t } = useI18n();
@@ -245,6 +247,17 @@ export default function StoreNav() {
         </button>
 
         <LangSwitch className="hidden sm:inline-flex" />
+
+        {/* The wishlist, beside the cart: a heart pressed on any card shows up
+            here at once, with how many are saved. */}
+        <Link to="/wishlist" aria-label={t('nav.wishlist', 'Wishlist')}
+          className="relative w-11 h-11 shrink-0 rounded-xl hover:bg-slate-100 grid place-items-center text-slate-700">
+          <Heart size={20} fill={saved > 0 ? '#ec4899' : 'none'} style={saved > 0 ? { color: '#ec4899' } : undefined} />
+          {saved > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full text-white text-[11px] font-semibold grid place-items-center"
+              style={{ background: '#ec4899' }} data-testid="nav-wishlist-count">{saved}</span>
+          )}
+        </Link>
 
         <Link to="/cart" data-cart-target aria-label={t('nav.cart', 'Shopping cart')}
           className="relative w-11 h-11 shrink-0 rounded-xl hover:bg-slate-100 grid place-items-center text-slate-700">

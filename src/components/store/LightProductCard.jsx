@@ -9,6 +9,7 @@ import ProductMedia from './ProductMedia.jsx';
 import { navigateWithTransition } from '../../lib/viewTransition.js';
 import { flyToCart } from '../../lib/flyToCart.js';
 import { useWishlist } from '../../lib/wishlist.js';
+import { useToast } from '../../context/ToastContext.jsx';
 
 /* Does this device point (mouse/trackpad)? Then the card's buttons wait for the
    pointer, as on Eneba; on a touch screen there is no hover, so they show. */
@@ -41,6 +42,7 @@ function LightProductCard({ product, onAdd, priority = false }) {
   const navigate = useNavigate();
   const to = `/product/${product.id}`;
   const { has, toggle } = useWishlist();
+  const toast = useToast();
   const wished = has(product.id);
   /* The lift is the card's own CSS (.fm-pcard:hover). The buttons are shown
      with inline styles rather than new classes: the stylesheet is at its size
@@ -79,7 +81,7 @@ function LightProductCard({ product, onAdd, priority = false }) {
           `none` is the only way to actually mean none. */}
       {/* The wishlist heart, top right of the picture, as on Eneba. Outside the
           link, so pressing it saves rather than opens the product. */}
-      <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggle(product.id); }}
+      <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); const added = toggle(product.id); toast?.success?.(added ? t('card.saved', 'Saved to your wishlist') : t('card.removed', 'Removed from your wishlist')); }}
         aria-label={wished ? t('card.unsave', 'Remove from wishlist') : t('card.save', 'Save to wishlist')} aria-pressed={wished}
         className="absolute z-20 grid place-items-center rounded-full bg-white/90 shadow-sm"
         style={{ top: 22, right: 22, width: 34, height: 34, color: wished ? '#ec4899' : '#64748b', transition: 'transform .15s' }}>
