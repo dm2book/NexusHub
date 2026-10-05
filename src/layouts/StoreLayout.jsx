@@ -11,6 +11,7 @@ const CommandPalette = lazy(() => import('../components/store/CommandPalette.jsx
 import MobileTabBar from '../components/store/MobileTabBar.jsx';
 const ChatWidget = lazy(() => import('../components/ChatWidget.jsx'));
 import AnnouncementBar from '../components/store/AnnouncementBar.jsx';
+import { CheckoutHeader, CheckoutFooter } from '../components/store/CheckoutHeader.jsx';
 import { useReveal } from '../lib/useReveal.js';
 
 /**
@@ -36,6 +37,26 @@ export default function StoreLayout() {
     return onConsentChange(store);
   }, []);
   useReveal();
+  /* The checkout is a focused step: no menu, search, footer columns, tab bar,
+     live-sales toast or chat — every one a door out of the page where the money
+     is decided. The success page after it is a normal page again. */
+  const focus = /^\/checkout\/?$/.test(pathname);
+  /* On a phone the product and cart pages carry their own sticky buy bar; the
+     floating chat bubble sat on top of it and of the prices. Desktop keeps it. */
+  const chatOnPhone = !/^\/(product\/|cart)/.test(pathname);
+
+  if (focus) {
+    return (
+      <div className="min-h-screen flex flex-col bg-[#f6f7fb]">
+        <CheckoutHeader />
+        <main key={pathname} className="theme-light flex-1 fm-page">
+          <Outlet />
+        </main>
+        <CheckoutFooter />
+        <div className="theme-light"><CookieConsent /></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-[#f6f7fb]">
@@ -71,7 +92,9 @@ export default function StoreLayout() {
       {/* The assistant used to exist on the homepage alone. Every page that can
           raise a question — the shop, a product, the cart, checkout, the status
           page — is inside THIS layout, so that is where it has to live. */}
-      <DeferUntilIdle><Suspense fallback={null}><ChatWidget /></Suspense></DeferUntilIdle>
+      <div className={chatOnPhone ? '' : 'hidden lg:block'}>
+        <DeferUntilIdle><Suspense fallback={null}><ChatWidget /></Suspense></DeferUntilIdle>
+      </div>
     </div>
   );
 }

@@ -16,8 +16,8 @@ export function trustLines(trust, t, locale = 'en-GB') {
   const out = [];
   const st = trust.stock?.state;
   if (st === 'in_stock') out.push({ k: 'stock', text: trust.stock.left ? t('tr.inStockLeft', 'In stock · {n} left', { n: trust.stock.left }) : t('tr.inStock', 'In stock') });
-  else if (st === 'on_order') out.push({ k: 'stock', text: t('tr.onOrder', 'Bought in for each order') });
-  else if (st === 'out_of_stock') out.push({ k: 'stock', text: t('tr.out', 'Out of stock') });
+  /* "Bought in per order" is already the delivery box right above this block;
+     saying it twice reads like a warning. Only real shelf stock is a fact here. */
   if (trust.lastDelivery) {
     const d = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(trust.lastDelivery));
     out.push({ k: 'last', text: t('tr.last', 'Last delivered on {d}', { d }) });

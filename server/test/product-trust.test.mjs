@@ -89,7 +89,7 @@ console.log('\n— Stock —');
 {
   ok('auto-delivered with codes on the shelf: in stock', trust.stockState({ deliveryMode: 'auto' }, 40).state === 'in_stock' && trust.stockState({ deliveryMode: 'auto' }, 40).left === undefined);
   ok('…with a few left: the number', trust.stockState({ deliveryMode: 'auto' }, 3).left === 3);
-  ok('…with none: out of stock', trust.stockState({ deliveryMode: 'auto' }, 0).state === 'out_of_stock');
+  ok('…with none: bought in per order, never "sold out" (the order is still taken and delivered by hand)', trust.stockState({ deliveryMode: 'auto' }, 0).state === 'on_order');
   ok('delivered by hand: bought in per order', trust.stockState({ deliveryMode: 'manual' }, 0).state === 'on_order');
 }
 

@@ -10,7 +10,7 @@ import { useWishlist } from '../../lib/wishlist.js';
  * the two never overlap. Safe-area padding for iPhones with a home indicator.
  */
 /** Pages with their own fixed bottom UI, where the tab bar would collide. */
-const hasMobileTabBar = (pathname) => !/^\/(product\/|checkout)/.test(String(pathname || ''));
+const hasMobileTabBar = (pathname) => !/^\/(product\/|checkout|cart)/.test(String(pathname || ''));
 
 export default function MobileTabBar() {
   const { pathname } = useLocation();

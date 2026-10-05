@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { PayMark } from '../components/store/PaymentBadges.jsx';
 import { Lock, ShieldCheck, Loader2, ShoppingBag, ExternalLink, Copy, CheckCircle2, Wallet } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { getConfig } from '../lib/useConfig.js';
@@ -20,7 +21,6 @@ import { rememberOrder, recallOrder, forgetOrder } from '../lib/lastOrder.js';
 import { rememberMyOrder } from '../lib/myOrders.js';
 import { reportStep, attributionForOrder } from '../lib/attribution.js';
 
-const METHOD_ICON = { tikkie: '🟢', revolut: '⚫', paypal: '🔵' };
 
 // No URL building here: the created order carries every method already resolved
 // for its own total, so the checkout and the status page can never disagree.
@@ -46,6 +46,7 @@ export default function Checkout() {
   // buyer explicitly asks for immediate delivery and acknowledges losing it.
   // Without this every code sold is refundable on demand.
   const [consent, setConsent] = useState(false);
+  const [triedConsent, setTriedConsent] = useState(false);
   // Resolved once so the sentence stored against the order is byte-for-byte the
   // one this buyer actually read — including which language they read it in.
   const consentSentence = t('checkout.consent',
@@ -53,7 +54,8 @@ export default function Checkout() {
   // A disabled button that does nothing when tapped reads as a broken shop.
   const jumpToConsent = () => {
     const el = document.getElementById('fm-consent');
-    if (!el) return;
+    /* On a phone the box is in the pay bar, already on screen. */
+    if (!el || !el.offsetParent) return;
     el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     el.querySelector('input')?.focus({ preventScroll: true });
   };
@@ -202,8 +204,6 @@ export default function Checkout() {
     }).catch(() => {});
   }, []);
 
-  const amountEur = (grandTotal / 100).toFixed(2);
-
   /* Before launch the checkout is not a form, it is an explanation.
 
      The cart cannot normally be filled yet, but one saved in localStorage
@@ -234,6 +234,9 @@ export default function Checkout() {
 
   const placeOrder = async (e) => {
     e.preventDefault();
+    /* The button is live from the start; without the tick it takes the buyer
+       to the box instead of greying out with a warning nobody had earned yet. */
+    if (!consent) { setTriedConsent(true); jumpToConsent(); return; }
     setBusy(true);
     try {
       const { order } = await api.post('/api/orders', {
@@ -332,12 +335,14 @@ export default function Checkout() {
   // ── Manual payment instructions (after order placed) ──
   if (placed) {
     // Use the server order's authoritative total — the cart was just cleared, so
-    // the live cart-derived `amountEur` would read €0.00 here.
+    // the live cart-derived total would read €0.00 here.
     const payEur = ((placed.total ?? 0) / 100).toFixed(2);
     // From the order the server just created, not recomputed from the cart.
     const pm = (placed.payMethods || []).find((x) => x.id === methodId) || (placed.payMethods || [])[0] || null;
     return (
       <div className="section py-12 max-w-xl">
+        {/* Where they are: ordered, now paying, then confirmation. */}
+        <CheckoutSteps current={2} />
         <div className="card p-8 text-center">
           <div className="w-14 h-14 rounded-2xl mx-auto flex items-center justify-center mb-4 bg-amber-500/15 border border-amber-500/30 text-2xl">⏳</div>
           <h1 className="text-2xl text-white">{t('checkout.almostThere', 'Almost there — complete your payment')}</h1>
@@ -353,7 +358,7 @@ export default function Checkout() {
             <div className="flex gap-2 justify-center mt-5">
               {methods.map((x) => (
                 <button key={x.id} onClick={() => setMethodId(x.id)}
-                  className={`chip ${methodId === x.id ? 'chip-active' : ''}`}>{METHOD_ICON[x.id] || '💳'} {x.label}</button>
+                  className={`chip ${methodId === x.id ? 'chip-active' : ''}`}><PayMark id={x.id} label={x.label} size="sm" /></button>
               ))}
             </div>
           )}
@@ -361,8 +366,8 @@ export default function Checkout() {
           {pm && (
             <div className="mt-5">
               {pm.url
-                ? <a href={pm.url} target="_blank" rel="noreferrer" className="btn-primary w-full py-3.5 text-base"><ExternalLink size={18} /> {t('checkout.payWith', 'Pay')} €{payEur} {t('checkout.with', 'with')} {pm.label}</a>
-                : <div className="glass rounded-xl p-4 text-white">{t('checkout.payTo', 'Send')} €{payEur} {t('checkout.payToWho', 'to')} {pm.target}</div>}
+                ? <a href={pm.url} target="_blank" rel="noreferrer" className="btn-primary w-full py-3.5 text-base"><ExternalLink size={18} /> {t('checkout.payWith', 'Pay')} {money(placed.total ?? 0, placed.currency || 'EUR')} {t('checkout.with', 'with')} {pm.label}</a>
+                : <div className="glass rounded-xl p-4 text-white">{t('checkout.payTo', 'Send')} {money(placed.total ?? 0, placed.currency || 'EUR')} {t('checkout.payToWho', 'to')} {pm.target}</div>}
               {pm.prefilled && (
                 <p className="text-emerald-300 text-xs mt-2">
                   ✓ {t('checkout.filledIn', 'The amount is already in the link — you only have to confirm.')}
@@ -490,13 +495,29 @@ export default function Checkout() {
                   {methods.map((m) => (
                     <button type="button" key={m.id} onClick={() => setMethodId(m.id)}
                       className={`rounded-xl border p-4 text-left transition ${methodId === m.id ? 'border-primary bg-primary/10' : 'border-white/10 hover:border-white/25'}`}>
-                      <div className="text-2xl">{METHOD_ICON[m.id] || '💳'}</div>
-                      <div className="text-white font-medium mt-1">{m.label}</div>
+                      <PayMark id={m.id} label={m.label} />
+                      <div className="text-white font-medium mt-2">{m.label}</div>
                       <div className="text-slate-500 text-xs">{t('checkout.payByLink', 'Pay by link')}</div>
                     </button>
                   ))}
                 </div>
-                <p className="text-slate-400 text-sm mt-4">{t('checkout.manual1', 'Place your order, then pay')} €{amountEur} {t('checkout.manual2', 'via')} {methods.find((x) => x.id === methodId)?.label || t('checkout.chosenMethod', 'your chosen method')} {t('checkout.manual3', 'using your order number as reference. We confirm it manually.')}</p>
+                {/* What happens after the button, in order — a manual payment is
+                    three steps, and a buyer who knows them before the tap does
+                    not stall halfway, wondering whether it worked. */}
+                <ol className="mt-4 space-y-2.5" data-testid="manual-timeline">
+                  {[
+                    t('checkout.tl1', 'Place your order — you get an order number straight away.'),
+                    t('checkout.tl2', 'Pay {amount} with {method}, with your order number as the description. Both can be copied with one tap.',
+                      { amount: money(grandTotal, currency), method: methods.find((x) => x.id === methodId)?.label || t('checkout.chosenMethod', 'your chosen method') }),
+                    t('checkout.tl3', 'We confirm your payment and deliver. The status page updates by itself, and you get it by email too.'),
+                  ].map((line, i) => (
+                    <li key={i} className="flex items-start gap-2.5 text-sm text-slate-400">
+                      <span className="shrink-0 rounded-full grid place-items-center font-bold text-white"
+                        style={{ width: 24, height: 24, fontSize: 12, backgroundImage: 'linear-gradient(135deg,#7c5cff,#a855f7)' }}>{i + 1}</span>
+                      <span className="leading-snug" style={{ paddingTop: 2 }}>{line}</span>
+                    </li>
+                  ))}
+                </ol>
               </>
             ) : (
               <p className="text-slate-400 text-sm">
@@ -549,7 +570,8 @@ export default function Checkout() {
             {creditToApply > 0 && <div className="flex justify-between text-sm text-indigo-300"><span>{t('checkout.credit', 'Store credit')}</span><span>−{money(creditToApply, currency)}</span></div>}
             <div className="flex justify-between text-lg pt-1"><span className="text-slate-300">{t('cart.total', 'Total')}</span><span className="text-white font-semibold">{money(grandTotal, currency)}</span></div>
           </div>
-          <label id="fm-consent" className="flex items-start gap-2.5 mb-3 text-[12.5px] text-slate-400 cursor-pointer scroll-mt-24">
+          <label id="fm-consent" className="hidden lg:flex items-start gap-2.5 mb-3 text-[12.5px] text-slate-400 cursor-pointer scroll-mt-24"
+            style={triedConsent && !consent ? { outline: '2px solid #f59e0b', outlineOffset: 4, borderRadius: 8 } : undefined}>
             <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)}
               className="mt-0.5 shrink-0 w-4 h-4 accent-violet-600" />
             <span>{consentSentence}</span>
@@ -564,7 +586,7 @@ export default function Checkout() {
               </p>
             </div>
           )}
-          <button disabled={busy || !consent || paused} className="btn-primary w-full py-3">
+          <button disabled={busy || paused} className="btn-primary w-full py-3">
             {busy ? <Loader2 size={18} className="animate-spin" />
               : paused ? <>{t('checkout.pausedBtn', 'Ordering paused')}</>
               : provider === 'mollie' ? <>{t('checkout.payNow', 'Pay {amount} securely', { amount: money(grandTotal, currency) })}</>
@@ -572,7 +594,7 @@ export default function Checkout() {
               : provider === 'manual' ? <>{t('checkout.placePay', 'Place order & pay')}</>
               : <>{t('checkout.placeOrder', 'Place order')}</>}
           </button>
-          {!consent && !busy && (
+          {triedConsent && !consent && !busy && (
             <p className="text-amber-300 text-[12.5px] mt-2 text-center">
               {t('checkout.consentFirst', 'Tick the box above to continue — it is required by EU law before we can deliver straight away.')}
             </p>
@@ -589,10 +611,8 @@ export default function Checkout() {
         </div>
 
         {/* Sticky pay bar — on a phone the real button is far below the fold. */}
-        {/* The bar is the only thing a phone shows on arrival, and its button is
-            dead until the consent box — 293px further down, measured — is ticked.
-            The explanation therefore has to live INSIDE the bar, and tapping the
-            disabled button has to take you to the box rather than doing nothing. */}
+        {/* The bar is the only thing a phone shows on arrival, so the consent
+            tick lives in it, right under the button it unlocks. */}
         <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur border-t border-slate-200 px-4 py-3"
           style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}>
           <div className="flex items-center gap-3">
@@ -600,26 +620,24 @@ export default function Checkout() {
               <div className="text-[11px] text-slate-500">{t('cart.total', 'Total')}</div>
               <div className="text-lg fm-num text-violet-600 leading-tight">{money(grandTotal, currency)}</div>
             </div>
-            {!consent && !busy ? (
-              <button type="button" onClick={jumpToConsent}
-                className="btn-primary flex-1 py-3 fm-tap">
-                {t('checkout.reviewFirst', 'Confirm delivery to continue')}
-              </button>
-            ) : (
-              <button type="submit" disabled={busy || paused} className="btn-primary flex-1 py-3 fm-tap">
-                {busy ? <Loader2 size={18} className="animate-spin" />
-                  : provider === 'mollie' ? <>{t('checkout.payNowShort', 'Pay securely')}</>
-                  : provider === 'stripe' ? <>{t('checkout.payCard', 'Pay with card')}</>
-                  : provider === 'manual' ? <>{t('checkout.placePay', 'Place order & pay')}</>
-                  : <>{t('checkout.placeOrder', 'Place order')}</>}
-              </button>
-            )}
+            <button type="submit" disabled={busy || paused} className="btn-primary flex-1 py-3 fm-tap">
+              {busy ? <Loader2 size={18} className="animate-spin" />
+                : provider === 'mollie' ? <>{t('checkout.payNowShort', 'Pay securely')}</>
+                : provider === 'stripe' ? <>{t('checkout.payCard', 'Pay with card')}</>
+                : provider === 'manual' ? <>{t('checkout.placePay', 'Place order & pay')}</>
+                : <>{t('checkout.placeOrder', 'Place order')}</>}
+            </button>
           </div>
-          {!consent && !busy && (
-            <p className="text-slate-500 text-[11.5px] mt-1.5 leading-snug">
-              {t('checkout.consentFirstShort', 'One tick needed: EU law requires your go-ahead before we deliver straight away.')}
-            </p>
-          )}
+          {/* The legally required tick, in the bar, next to the button it unlocks.
+              It used to sit 293px further down in the summary while the bar's
+              button read "Confirm delivery to continue" — an instruction instead
+              of an action, pointing at something off screen. */}
+          <label className="flex items-start gap-2 mt-2 leading-snug text-slate-600 cursor-pointer"
+            style={{ fontSize: 11.5, ...(triedConsent && !consent ? { color: '#b45309' } : {}) }}>
+            <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)}
+              className="mt-0.5 shrink-0 w-4 h-4 accent-violet-600" />
+            <span>{consentSentence}</span>
+          </label>
         </div>
       </form>
     </div>

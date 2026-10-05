@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import PaymentBadges from '../components/store/PaymentBadges.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { Minus, Plus, Trash2, ShoppingBag, ArrowRight } from 'lucide-react';
 import { useCart } from '../context/CartContext.jsx';
@@ -125,6 +126,7 @@ export default function Cart() {
           <button onClick={() => navigateWithTransition(navigate, '/checkout')} className="btn-primary w-full py-3">
             {t('cart.checkout', 'Checkout')} <ArrowRight size={18} />
           </button>
+          <PaymentBadges className="mt-3 justify-center" />
           <Link to="/shop" className="block text-center text-sm text-slate-500 hover:text-violet-600 mt-4">{t('cart.continue', 'Continue shopping')}</Link>
         </div>
       </div>
@@ -134,10 +136,11 @@ export default function Cart() {
       {/* Measured with three items on a 390px phone: the Checkout button sat at
           869px in an 844px viewport — off screen, with nothing pinned. The
           checkout page already has a bar like this; the cart, one step earlier
-          in the same funnel, did not. Sits above the 63px tab bar, and repeats
-          the total so the buyer never has to scroll back to check it. */}
+          in the same funnel, did not. The tab bar is off on this page, so the bar
+          sits at the bottom edge, and repeats the total so the buyer never has
+          to scroll back to check it. */}
       <div className="lg:hidden fixed inset-x-0 z-30 bg-white/95 backdrop-blur border-t border-slate-200 px-4 py-3 flex items-center gap-3"
-        style={{ bottom: 'calc(63px + env(safe-area-inset-bottom))' }}>
+        style={{ bottom: 0, paddingBottom: 'calc(12px + env(safe-area-inset-bottom))' }}>
         <div className="min-w-0">
           <div className="text-[11px] text-slate-400">{t('cart.total', 'Total')}</div>
           <div className="text-[19px] font-extrabold text-slate-900 leading-tight tabular-nums">{money(total, currency)}</div>

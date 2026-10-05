@@ -9,9 +9,14 @@ import { useI18n } from '../../lib/i18n.jsx';
  * delivered in 34s". Real delivered orders only (privacy-safe: first name + city
  * only). Renders nothing until the store has real activity. Rotates in/out.
  */
+export const FRESH_SECONDS = 48 * 3600;
+
 export default function RecentlyDelivered() {
   const { t } = useI18n();
-  const feed = useLiveFeed();
+  /* Only what happened in the last 48 hours. "Delivered · 68 days ago" is real,
+     but it tells a visitor nobody has bought since — the opposite of the point. */
+  const all = useLiveFeed();
+  const feed = all?.filter((r) => Number(r.secondsAgo) <= FRESH_SECONDS) || [];
   const [idx, setIdx] = useState(0);
   const [show, setShow] = useState(false);
 
@@ -27,7 +32,7 @@ export default function RecentlyDelivered() {
     const first = setTimeout(cycle, 2500);
     const id = setInterval(cycle, 6500);
     return () => { clearTimeout(first); clearInterval(id); };
-  }, [feed]);
+  }, [feed.length]);
 
   if (!feed?.length) return null;
   const r = feed[idx] || feed[0];
