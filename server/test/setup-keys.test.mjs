@@ -233,5 +233,25 @@ console.log('\n— How many orders can this shop actually serve? —');
   ok('…nor listed as missing stock', !manual.dry.some((r) => r.id === p.id));
 }
 
+console.log('\n— A payment link saved in the admin reaches the checkout —');
+{
+  /* Seen live: PayPal and Revolut saved, the checkout still offered only
+     Tikkie — the routes read the links once, at import, and other warm
+     instances never re-read the stored settings. */
+  await store.setSecret('pay.paypal', 'https://www.paypal.me/ForgeMarket', { actor: STAFF });
+  await store.setSecret('pay.revolut', 'https://revolut.me/forgemarket', { actor: STAFF });
+  /* Another, already warm instance: it booted before the save. */
+  config.payments.manual.paypal = '';
+  config.payments.manual.revolut = '';
+  const { createApp } = await import('../src/app.js');
+  const srv = createApp().listen(0);
+  const cfg = await (await fetch(`http://127.0.0.1:${srv.address().port}/api/config`)).json();
+  srv.close();
+  const ids = (cfg.paymentMethods || []).map((m) => m.id);
+  ok('the checkout offers the saved PayPal and Revolut links', ids.includes('paypal') && ids.includes('revolut'), JSON.stringify(cfg.paymentMethods));
+  ok('…with the link exactly as saved', cfg.paymentMethods.find((m) => m.id === 'paypal')?.target === 'https://www.paypal.me/ForgeMarket');
+  ok('…and re-reads the stored settings at most once a minute', (await store.refreshStoredSecrets()) === false);
+}
+
 console.log(`\n${fail ? '❌' : '✅'} setup-keys: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
