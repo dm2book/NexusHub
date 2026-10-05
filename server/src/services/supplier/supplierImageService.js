@@ -67,6 +67,8 @@ export function needsPhoto(product, { scope = 'placeholders' } = {}) {
   const image = product?.image ?? meta.image;
   if (!image) return true;
   if (meta.imageSource === 'supplier') return false;
+  /* The owner chose the shop's own boards for every product. */
+  if (meta.imageSource === 'own-artwork') return false;
   if (TILE.test(String(image))) return true;
   if (REPLACEABLE_SOURCES.has(meta.imageSource)) return true;
   return scope === 'all' && isArtwork(image, meta);

@@ -24,7 +24,7 @@ const STATUS = {
   official: { label: 'Officieel', icon: BadgeCheck, c: '#6ee7b7' },
 };
 const SOURCE = { supplier: 'Leverancier (API)', official: 'Eigen upload, officieel', upload: 'Eigen upload', link: 'Link',
-  generated: 'Gegenereerd', 'category-artwork': 'Eigen artwork (categorie)', licensed: 'Merklogo (Wikimedia Commons, vrije licentie)', artwork: 'Shop-artwork', 'matched-art': 'Shop-artwork', unknown: 'Onbekend' };
+  generated: 'Gegenereerd', 'own-artwork': 'Eigen artwork (getekend)', 'category-artwork': 'Eigen artwork (categorie)', licensed: 'Merklogo (Wikimedia Commons, vrije licentie)', artwork: 'Shop-artwork', 'matched-art': 'Shop-artwork', unknown: 'Onbekend' };
 
 export default function ProductMedia() {
   const toast = useToast();
@@ -53,7 +53,7 @@ export default function ProductMedia() {
   };
   /* The owner's own artwork on every product — in steps, until done. */
   const ownArtwork = async () => {
-    if (!window.confirm('Jouw eigen artwork op alle producten zetten?\n\nElk product krijgt de afbeelding van jouw eigen product in dezelfde categorie (het dichtstbijzijnde bedrag), of je categorie-logo. Je eigen uploads blijven staan. Merklogo\'s en leveranciersfoto\'s worden vervangen.')) return;
+    if (!window.confirm('Jouw eigen artwork op alle producten zetten?\n\nElk product krijgt de eigen getekende kaart van de winkel, met het logo en zijn eigen bedrag — de stijl van je EA FC-producten. Je eigen uploads blijven staan. Merklogo\'s, leveranciersfoto\'s en andere afbeeldingen worden vervangen; de vorige afbeelding wordt bewaard.')) return;
     setBusy(true);
     let applied = 0;
     try {
@@ -61,7 +61,7 @@ export default function ProductMedia() {
         // eslint-disable-next-line no-await-in-loop
         const r = await api.post('/api/admin/products/media/category-artwork', {});
         applied += r.applied;
-        if (!r.remaining) { toast.success(`${applied} producten hebben nu je eigen artwork.${r.none?.length ? ` Geen artwork gevonden voor: ${r.none.join(', ')}.` : ''}`); break; }
+        if (!r.remaining) { toast.success(`${applied} producten hebben nu je eigen artwork. Je eigen uploads (${r.kept}) zijn blijven staan.`); break; }
       }
     } catch (e) { toast.error(e.message); }
     finally { setBusy(false); load(); }

@@ -211,7 +211,7 @@ console.log('\n— End to end —');
   ok('…sellable: active, priced, mapped to the supplier at its cost', p400.active === 1 && Number(p400.price) === Number(c400.suggested_price_cents)
     && !!(await get(`SELECT 1 FROM supplier_products WHERE product_id=@p AND supplier_sku='kg-400' AND cost=360`, { p: p400.id })));
   ok('…with category, SKU, picture, description, SEO and platform/region', p400.category === 'robux' && p400.sku === 'ROBLOX-400-ANY-GLOBAL'
-    && meta.image === img.url && meta.imageSource === 'supplier' && meta.platform === 'any' && meta.region === 'global'
+    && meta.imageSource === 'own-artwork' && meta.platform === 'any' && meta.region === 'global'
     && p400.description.length > 100 && meta.content?.nl?.seoDescription);
   ok('…and nothing else was added automatically', (await all(`SELECT id FROM products WHERE metadata LIKE '%"source":"discovery"%'`)).length === 1);
   ok('running it again adds nothing twice', (await P.addAllSafe()).added === 0);
@@ -239,11 +239,8 @@ console.log('\n— End to end —');
   const p800 = await get(`SELECT * FROM products WHERE id=@id`, { id: r800.productId });
   ok('a person can add a REVIEW_REQUIRED product — without a supplier it is added HIDDEN', r800.created && !r800.sellable && p800.active === 0 && r800.hiddenReason === 'no supplier');
   const m800 = JSON.parse(p800.metadata);
-  ok('…with no official picture it gets the brand\'s free-licence logo from Wikimedia Commons, not shop artwork',
-    /^\/api\/images\//.test(m800.image) && m800.imageSource === 'licensed' && m800.imageLicence === 'Public domain'
-    && /commons\.wikimedia\.org\/wiki\/File%3ARoblox%20Logo%202025\.png/.test(m800.imageSourceUrl) && m800.imageAuthor === 'Roblox Corporation'
-    && m800.imageOfficial === false, JSON.stringify(m800).slice(0, 300));
-  ok('…asked through the Commons API, identifying the shop', commonsCalls.some((c) => c.url.startsWith('https://commons.wikimedia.org/w/api.php')) && commonsCalls.every((c) => /ForgeMarket/.test(c.ua || '')));
+  ok('…and it gets the shop\'s own board with its own amount (the EA FC look)', m800.imageSource === 'own-artwork'
+    && (m800.image === `/api/products/${p800.id}/tile.svg` || /^\/products\/art\//.test(m800.image)), JSON.stringify(m800).slice(0, 300));
   const L = await import('../src/services/discovery/commonsLogoService.js');
   const f = (title, licence, mime = 'image/svg+xml') => ({ title, licence, mime, thumbUrl: 'https://upload.wikimedia.org/x.png', width: 500 });
   ok('only public domain or CC0 is taken — not CC BY-SA, not unknown', !L.pickLogo([f('File:Steam logo.svg', 'CC BY-SA 4.0'), f('File:Steam logo 2.svg', '')], 'Steam')

@@ -74,9 +74,11 @@ export function mediaStatus(product, { now = Date.now() } = {}) {
   const official = isOfficial({ ...meta, image });
   if (!image) return { status: 'missing', reasons: ['no picture'], official, ...record };
   if (!official) {
-    const why = TILE.test(String(image)) ? 'a drawn placeholder tile'
-      : String(image).startsWith('/products/') ? 'the shop’s own icon or artwork, not the publisher’s'
-        : meta.imageSource === 'category-artwork' ? `the shop's own artwork${meta.imageFrom ? ` (from ${meta.imageFrom})` : ''}, not the publisher's product picture`
+    /* The owner's choice first: a drawn board they put on on purpose is their
+       own artwork, not a placeholder. */
+    const why = ['own-artwork', 'category-artwork'].includes(meta.imageSource) ? `the shop's own artwork${meta.imageFrom ? ` (${meta.imageFrom})` : ''}, not the publisher's product picture`
+      : TILE.test(String(image)) ? 'a drawn placeholder tile'
+        : String(image).startsWith('/products/') ? 'the shop’s own icon or artwork, not the publisher’s'
         : meta.imageSource === 'licensed' ? `the brand's logo under a free licence (${meta.imageLicence || 'Wikimedia Commons'}), not a product picture`
         : meta.imageSource === 'generated' ? 'a generated picture'
           : /^https?:/.test(String(image)) ? 'a linked picture with no known licence'
@@ -118,7 +120,7 @@ export async function enrichmentQueue({ limit = 8, now = Date.now() } = {}) {
   const { items } = await mediaReport({ now });
   return items.filter((i) => i.status !== 'official')
     /* An upload the owner chose is theirs: a supplier photo never replaces it. */
-    .filter((i) => !['upload', 'link'].includes(i.source))
+    .filter((i) => !['upload', 'link', 'own-artwork'].includes(i.source))
     .slice(0, limit).map((i) => i.id);
 }
 

@@ -240,14 +240,24 @@ export function renderTile(product) {
  * hundred KB, and the storefront's other routes should not pay for them on a
  * cold start. Any failure falls back to renderTile, so a tile is never a 500.
  */
+/* The brand mark for a game the market parser reads from a product's name. */
+const BRAND_MARK = {
+  steam: 'steam', 'playstation-store': 'playstation', 'xbox-store': 'xbox', 'xbox-game-pass': 'gamepass',
+  'nintendo-store': 'nintendo', netflix: 'netflix', 'google-play': 'googleplay', apple: 'itunes', amazon: 'amazon',
+  spotify: 'spotify', discord: 'discord-nitro',
+};
+
 export async function renderTileArt(product) {
   try {
-    const { mainSvg } = await import('../../../scripts/art/render.mjs');
+    const { mainSvg, brandMark } = await import('../../../scripts/art/render.mjs');
     /* Without its image. A product that gets this tile HAS the tile as its
        image, and markFor() takes a product's own picture as the mark first —
        so the tile would try to draw itself inside its own ring, find nothing,
-       and leave the ring empty. */
-    return mainSvg({ ...product, image: null, imageLegacy: null },
+       and leave the ring empty.
+       But WITH its brand, when the name says which: a shelf like "giftcard"
+       holds Steam, Netflix and Apple, and the shelf's mark is a gift box. */
+    const mark = brandMark(BRAND_MARK[parseTitle(product?.name || '', {}).game]);
+    return mainSvg({ ...product, image: mark, imageLegacy: null },
       { unit: unitFrom(product?.name) });
   } catch (e) {
     console.error('[tile] art renderer failed, drawing the plain tile:', e.message);
