@@ -24,7 +24,7 @@ const STATUS = {
   official: { label: 'Officieel', icon: BadgeCheck, c: '#6ee7b7' },
 };
 const SOURCE = { supplier: 'Leverancier (API)', official: 'Eigen upload, officieel', upload: 'Eigen upload', link: 'Link',
-  generated: 'Gegenereerd', licensed: 'Merklogo (Wikimedia Commons, vrije licentie)', artwork: 'Shop-artwork', 'matched-art': 'Shop-artwork', unknown: 'Onbekend' };
+  generated: 'Gegenereerd', 'category-artwork': 'Eigen artwork (categorie)', licensed: 'Merklogo (Wikimedia Commons, vrije licentie)', artwork: 'Shop-artwork', 'matched-art': 'Shop-artwork', unknown: 'Onbekend' };
 
 export default function ProductMedia() {
   const toast = useToast();
@@ -48,6 +48,21 @@ export default function ProductMedia() {
         if (!r.applied && r.rows.every((x) => x.status !== 'applied')) break;
       }
       toast.success('Klaar — de lijst is bijgewerkt.');
+    } catch (e) { toast.error(e.message); }
+    finally { setBusy(false); load(); }
+  };
+  /* The owner's own artwork on every product — in steps, until done. */
+  const ownArtwork = async () => {
+    if (!window.confirm('Jouw eigen artwork op alle producten zetten?\n\nElk product krijgt de afbeelding van jouw eigen product in dezelfde categorie (het dichtstbijzijnde bedrag), of je categorie-logo. Je eigen uploads blijven staan. Merklogo\'s en leveranciersfoto\'s worden vervangen.')) return;
+    setBusy(true);
+    let applied = 0;
+    try {
+      for (let i = 0; i < 50; i++) {
+        // eslint-disable-next-line no-await-in-loop
+        const r = await api.post('/api/admin/products/media/category-artwork', {});
+        applied += r.applied;
+        if (!r.remaining) { toast.success(`${applied} producten hebben nu je eigen artwork.${r.none?.length ? ` Geen artwork gevonden voor: ${r.none.join(', ')}.` : ''}`); break; }
+      }
     } catch (e) { toast.error(e.message); }
     finally { setBusy(false); load(); }
   };
@@ -83,6 +98,7 @@ export default function ProductMedia() {
         <button type="button" className="btn-primary text-sm" disabled={busy} onClick={enrich}>
           <RefreshCw size={14} /> {busy ? 'Bezig…' : 'Officiële afbeeldingen zoeken'}
         </button>
+        <button type="button" className="btn-ghost text-sm" disabled={busy} onClick={ownArtwork}>Eigen artwork op alle producten</button>
         <span className="text-xs text-slate-500">Zoekt bij je leveranciers voor alles wat niet "Officieel" is. Je eigen uploads blijven staan.</span>
       </div>
       {log.length > 0 && (

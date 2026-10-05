@@ -2,6 +2,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { Home, LayoutGrid, Heart, ShoppingCart, PackageSearch } from 'lucide-react';
 import { useCart } from '../../context/CartContext.jsx';
 import { useI18n } from '../../lib/i18n.jsx';
+import { useWishlist } from '../../lib/wishlist.js';
 
 /**
  * App-style bottom tab bar for the storefront on phones. Hidden on ≥lg screens
@@ -14,6 +15,7 @@ const hasMobileTabBar = (pathname) => !/^\/(product\/|checkout)/.test(String(pat
 export default function MobileTabBar() {
   const { pathname } = useLocation();
   const { count } = useCart();
+  const { count: saved } = useWishlist();
   const { t } = useI18n();
 
   if (!hasMobileTabBar(pathname)) return null;
@@ -22,7 +24,7 @@ export default function MobileTabBar() {
     { to: '/', icon: Home, label: t('tab.home', 'Home'), exact: true },
     { to: '/shop', icon: LayoutGrid, label: t('tab.shop', 'Shop') },
     { to: '/track', icon: PackageSearch, label: t('tab.track', 'Track') },
-    { to: '/wishlist', icon: Heart, label: t('tab.saved', 'Saved') },
+    { to: '/wishlist', icon: Heart, label: t('tab.saved', 'Saved'), badge: saved },
     { to: '/cart', icon: ShoppingCart, label: t('tab.cart', 'Cart'), badge: count },
   ];
   const active = (tab) => (tab.exact ? pathname === tab.to : pathname.startsWith(tab.to));

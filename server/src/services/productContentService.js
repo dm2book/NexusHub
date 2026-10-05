@@ -242,8 +242,12 @@ export async function applyContent(productIds, { actor = null, onlyMissing = fal
     const g = generateAll(p);
     if (!g.ok) { rows.push({ id, name: p.name, status: 'refused', detail: g.refused.slice(0, 2).join(' | ') }); continue; }
     // eslint-disable-next-line no-await-in-loop
-    await updateProduct(id, { description: g.content.nl.long,
-      metadata: { ...p.metadata, content: { ...g.content, generated: true, generatedAt: new Date().toISOString() } } });
+    /* `description` is the ENGLISH text — the storefront reads it for English
+       and keeps Dutch, German and French in descriptionNl/De/Fr (productCopy.js).
+       Writing Dutch here showed Dutch on the English site. German and French
+       fall back to the storefront's own copy for the category. */
+    await updateProduct(id, { description: g.content.en.long,
+      metadata: { ...p.metadata, descriptionNl: g.content.nl.long, content: { ...g.content, generated: true, generatedAt: new Date().toISOString() } } });
     rows.push({ id, name: p.name, status: 'applied' });
   }
   const applied = rows.filter((r) => r.status === 'applied').length;

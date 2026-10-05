@@ -339,9 +339,11 @@ export async function addCandidate(candidateId, { actor, auto = false, manualCos
   const { createProduct } = await import('../productService.js');
   const product = await createProduct({
     name: edits.title || content.title, category: edits.category || content.category, sku: content.sku,
-    description: content.nl.long, price, currency: 'EUR', active: sellable, announce: false,
+    /* English in `description`, Dutch in descriptionNl — see productCopy.js. */
+    description: content.en.long, price, currency: 'EUR', active: sellable, announce: false,
     metadata: {
       source: 'discovery', marketProductId: mp.id, canonicalKey: mp.canonical_key, sku: content.sku,
+      descriptionNl: content.nl.long,
       ...(manual != null ? { deliveryMode: 'manual', costCents: manual } : {}),
       ...(estimate ? { pricing: { estimated: true, costUnknown: true, basis: estimate.basis, at: nowIso() } } : {}),
       productType: model.productType, game: model.game, edition: model.edition || null, platform: model.platform,
@@ -357,16 +359,22 @@ export async function addCandidate(candidateId, { actor, auto = false, manualCos
         imageConfidence: Number(c.image_confidence), ...(hiddenReason ? { hiddenReason } : {}) },
     },
   });
-  /* No official picture: the brand's logo under a free licence (Wikimedia
-     Commons) — not the shop's own drawn artwork. None found → no picture,
-     which Product media lists as missing. A supplier's real picture replaces
-     the logo when one arrives. */
-  if (!(image?.url && image.confidence >= 0.5)) {
-    const { logoFor, logoMetadata, logosEnabled } = await import('./commonsLogoService.js');
-    const logo = logosEnabled() ? await logoFor(model.game, { fetchImpl: logoFetch }).catch(() => null) : null;
-    if (logo) {
-      const { updateProduct } = await import('../productService.js');
-      await updateProduct(product.id, { metadata: { ...product.metadata, ...logoMetadata(logo) } }).catch(() => {});
+  /* The owner's own artwork, as on the products they made by hand (the EA FC
+     look): from their product in the same category nearest in amount, or the
+     category logo. Only when there is none, the brand's free-licence logo. */
+  {
+    const { artworkFor, artworkReferences } = await import('./categoryArtService.js');
+    const { getCategoryLogos } = await import('../settingsService.js');
+    const { updateProduct } = await import('../productService.js');
+    const art = artworkFor({ id: product.id, name: product.name, category: product.category, metadata: product.metadata },
+      await artworkReferences(), await getCategoryLogos().catch(() => ({})));
+    if (art) {
+      await updateProduct(product.id, { metadata: { ...product.metadata, image: art.image, imageSource: 'category-artwork',
+        imageFrom: art.from, imageOfficial: false, imageUpdatedAt: nowIso() } }).catch(() => {});
+    } else if (!(image?.url && image.confidence >= 0.5)) {
+      const { logoFor, logoMetadata, logosEnabled } = await import('./commonsLogoService.js');
+      const logo = logosEnabled() ? await logoFor(model.game, { fetchImpl: logoFetch }).catch(() => null) : null;
+      if (logo) await updateProduct(product.id, { metadata: { ...product.metadata, ...logoMetadata(logo) } }).catch(() => {});
     }
   }
   if (manual == null && sup?.id && sup.sku) {
@@ -582,9 +590,12 @@ export async function scheduledDiscovery({ now = Date.now(), deadline = Date.now
   /* Brand logos instead of shop artwork, a batch per run until every product
      that shows artwork has its free-licence logo (production only — it asks
      Wikimedia Commons). */
-  const { applyLogos, logosEnabled } = await import('./commonsLogoService.js');
-  if (logosEnabled() && Date.now() < deadline) {
-    out.logos = await applyLogos({ fetchImpl, limit: 20, deadline }).catch((e) => ({ error: e.message }));
+  /* The owner's own artwork on every product (the EA FC look) — idempotent,
+     and it carries on where it stopped. Brand logos are no longer spread over
+     products that have no artwork: the owner chose their own. */
+  const { applyCategoryArtwork, artworkEnabled } = await import('./categoryArtService.js');
+  if (artworkEnabled() && Date.now() < deadline) {
+    out.artwork = await applyCategoryArtwork({ deadline }).catch((e) => ({ error: e.message }));
   }
   if (Date.now() < deadline && await due('images', JOBS.images, now)) {
     const { enrichmentQueue, enrichMedia } = await import('../productMediaService.js');

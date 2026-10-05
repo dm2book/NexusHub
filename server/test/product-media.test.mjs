@@ -123,5 +123,37 @@ console.log('\n— Admin —');
   ok('the admin page shows Missing, Outdated, Official and Low quality', ['Ontbreekt', 'Verouderd', 'Officieel', 'Lage kwaliteit'].every((t) => page.includes(t)));
 }
 
+console.log('\n— The owner\'s own artwork on every product (the EA FC look) —');
+{
+  const art = await import('../src/services/discovery/categoryArtService.js');
+  const { setCategoryLogo } = await import('../src/services/settingsService.js');
+  const img = (c) => '/api/images/' + c.repeat(32) + '.webp';
+  const tag = Date.now().toString(36);
+  const big = await createProduct({ name: `12,000 FC Points — EA FC ${tag}`, category: `fc${tag}`, price: 9999, announce: false, metadata: { image: img('1') } });
+  const mid = await createProduct({ name: `1,600 FC Points — EA FC ${tag}`, category: `fc${tag}`, price: 1499, announce: false, metadata: { image: img('2') } });
+  const small = await createProduct({ name: `500 FC Points PlayStation EU`, category: `fc${tag}`, price: 499, announce: false,
+    metadata: { source: 'discovery', denomination: 500, image: '/api/images/' + '3'.repeat(32) + '.png', imageSource: 'licensed', imageLicence: 'Public domain' } });
+  const huge = await createProduct({ name: `18,500 FC Points Xbox`, category: `fc${tag}`, price: 14999, announce: false,
+    metadata: { source: 'discovery', denomination: 18500, image: '/api/images/' + '4'.repeat(32) + '.jpg', imageSource: 'supplier' } });
+  const logoOnly = await createProduct({ name: `500 Gems — Brawl Stars ${tag}`, category: `bs${tag}`, price: 499, announce: false, metadata: {} });
+  await setCategoryLogo(`bs${tag}`, img('5'));
+  const nothing = await createProduct({ name: `Some Card €10 ${tag}`, category: `zz${tag}`, price: 999, announce: false, metadata: {} });
+
+  const stopped = await art.applyCategoryArtwork({ deadline: Date.now() - 1 });
+  ok('it stops at its deadline and says how much is left', stopped.applied === 0 && stopped.remaining > 0);
+  const r = await art.applyCategoryArtwork();
+  const m = async (p) => (await getProduct(p.id)).metadata;
+  ok('500 FC Points gets the owner\'s artwork of the nearest pack (1,600, not 12,000)', (await m(small)).image === img('2')
+    && (await m(small)).imageSource === 'category-artwork' && !(await m(small)).imageLicence, JSON.stringify(await m(small)));
+  ok('18,500 gets the 12,000 artwork, replacing the supplier photo', (await m(huge)).image === img('1'));
+  ok('the owner\'s own uploads are never touched', (await m(big)).image === img('1') && (await m(mid)).image === img('2') && !(await m(big)).imageSource);
+  ok('a category with no owner artwork uses the category logo', (await m(logoOnly)).image === img('5'));
+  ok('…and one with neither is named, not guessed', r.none.includes(`zz${tag}`) && !(await m(nothing)).image);
+  ok('running it again changes nothing', (await art.applyCategoryArtwork()).applied === 0);
+  ok('Product media says where the picture came from', /own artwork \(from 1,600 FC Points/.test(media.mediaStatus({ metadata: await m(small) }).reasons[0]));
+  const page = (await import('node:fs')).readFileSync(new URL('../../src/pages/admin/ProductMedia.jsx', import.meta.url), 'utf8');
+  ok('the admin page has the button', page.includes('Eigen artwork op alle producten') && page.includes('/api/admin/products/media/category-artwork'));
+}
+
 console.log(`\n${fail ? '❌' : '✅'} product-media: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

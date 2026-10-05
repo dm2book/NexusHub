@@ -615,7 +615,7 @@ export default function ProductDetail() {
                   <button onClick={buyNow} className="btn-primary py-3">{t('product.buyNow', 'Buy now')}</button>
                 </>
               )}
-              <button onClick={() => toggle(product)} aria-label="Wishlist"
+              <button onClick={() => toggle(product.id)} aria-label="Wishlist"
                 className={`btn-ghost px-3.5 ${wished ? 'text-pink-500' : ''}`}>
                 <Heart size={18} fill={wished ? 'currentColor' : 'none'} />
               </button>

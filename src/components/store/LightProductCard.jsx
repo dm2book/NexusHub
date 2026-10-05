@@ -1,6 +1,6 @@
-import { memo } from 'react';
+import { memo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ShoppingCart, Zap, Clock } from 'lucide-react';
+import { ShoppingCart, Zap, Clock, Heart } from 'lucide-react';
 import { categoryVisual, categoryLabel, money, carriesOwnBackground, productDescription } from '../../lib/catalog.js';
 import { useI18n } from '../../lib/i18n.jsx';
 import { useCart } from '../../context/CartContext.jsx';
@@ -8,6 +8,12 @@ import { iconFor } from '../../lib/sampleCatalog.js';
 import ProductMedia from './ProductMedia.jsx';
 import { navigateWithTransition } from '../../lib/viewTransition.js';
 import { flyToCart } from '../../lib/flyToCart.js';
+import { useWishlist } from '../../lib/wishlist.js';
+import { useToast } from '../../context/ToastContext.jsx';
+
+/* Does this device point (mouse/trackpad)? Then the card's buttons wait for the
+   pointer, as on Eneba; on a touch screen there is no hover, so they show. */
+const POINTS = typeof window !== 'undefined' && !!window.matchMedia?.('(hover: hover) and (pointer: fine)').matches;
 
 // Per-category glow colour behind the artwork (falls back to brand violet).
 const GLOW = {
@@ -35,6 +41,14 @@ function LightProductCard({ product, onAdd, priority = false }) {
   const photoArt = carriesOwnBackground(product.image || iconFor(product.category));
   const navigate = useNavigate();
   const to = `/product/${product.id}`;
+  const { has, toggle } = useWishlist();
+  const toast = useToast();
+  const wished = has(product.id);
+  /* The lift is the card's own CSS (.fm-pcard:hover). The buttons are shown
+     with inline styles rather than new classes: the stylesheet is at its size
+     budget, and this costs it nothing. */
+  const [hover, setHover] = useState(false);
+  const showActions = !POINTS || hover;
   const onSale = product.compareAtPrice > product.price;
   const discountPct = onSale ? Math.round((1 - product.price / product.compareAtPrice) * 100) : 0;
 
@@ -43,12 +57,15 @@ function LightProductCard({ product, onAdd, priority = false }) {
   const openWithMorph = (e) => {
     if (e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1) return;
     e.preventDefault();
-    const media = e.currentTarget.querySelector('[data-morph]') || e.currentTarget;
+    /* From the picture or from the 'view' button: the morph always starts at the card's artwork. */
+    const media = e.currentTarget.closest('.group')?.querySelector('[data-morph]') || e.currentTarget.querySelector('[data-morph]') || e.currentTarget;
     navigateWithTransition(navigate, to, media);
   };
 
   return (
-    <div className="fm-pcard group w-full rounded-2xl p-3 sm:p-4 flex flex-col">
+    <div className="fm-pcard group w-full rounded-2xl p-3 sm:p-4 flex flex-col"
+      onMouseEnter={POINTS ? () => setHover(true) : undefined} onMouseLeave={POINTS ? () => setHover(false) : undefined}
+      onFocus={POINTS ? () => setHover(true) : undefined} onBlur={POINTS ? (e) => { if (!e.currentTarget.contains(e.relatedTarget)) setHover(false); } : undefined}>
       {/* Two kinds of tile, because there are two kinds of artwork.
 
           A generated icon is a transparent badge drawn FOR the plinth: it wants
@@ -62,6 +79,14 @@ function LightProductCard({ product, onAdd, priority = false }) {
           glow — it picks the default one. That is a violet disc at 55% sitting
           over every product photo in the shop, which is the haze on the artwork.
           `none` is the only way to actually mean none. */}
+      {/* The wishlist heart, top right of the picture, as on Eneba. Outside the
+          link, so pressing it saves rather than opens the product. */}
+      <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); const added = toggle(product.id); toast?.success?.(added ? t('card.saved', 'Saved to your wishlist') : t('card.removed', 'Removed from your wishlist')); }}
+        aria-label={wished ? t('card.unsave', 'Remove from wishlist') : t('card.save', 'Save to wishlist')} aria-pressed={wished}
+        className="absolute z-20 grid place-items-center rounded-full bg-white/90 shadow-sm"
+        style={{ top: 22, right: 22, width: 34, height: 34, color: wished ? '#ec4899' : '#64748b', transition: 'transform .15s' }}>
+        <Heart size={17} fill={wished ? 'currentColor' : 'none'} />
+      </button>
       <a href={to} onClick={openWithMorph}
         /* One shape at every width, and it is the shape the artwork needs.
 
@@ -101,7 +126,8 @@ function LightProductCard({ product, onAdd, priority = false }) {
             the one that looked like it had not loaded yet. It is a solid,
             legible chip now; the number is the urgency. */}
         {product.stockLeft > 0 && (
-          <span className="absolute top-2.5 right-2.5 z-10 text-[10px] font-bold text-white bg-rose-600/95 rounded-full px-2 py-0.5 shadow-sm ring-1 ring-inset ring-white/25 backdrop-blur">
+          <span className="absolute top-2.5 right-2.5 z-10 text-[10px] font-bold text-white bg-rose-600/95 rounded-full px-2 py-0.5 shadow-sm ring-1 ring-inset ring-white/25 backdrop-blur"
+            style={{ top: 48 }}>
             {product.stockLeft === 1 ? t('card.lastOne', 'Last one!') : t('card.onlyLeft', 'Only {n} left', { n: product.stockLeft })}
           </span>
         )}
@@ -142,19 +168,24 @@ function LightProductCard({ product, onAdd, priority = false }) {
           <span className="ml-2 text-slate-400 line-through fm-num text-[13px]">{money(product.compareAtPrice, product.currency)}</span>
         )}
       </div>
-      <div className="flex items-center gap-2 mt-3">
-        <Link to={`/product/${product.id}`}
-          className="fm-cta flex-1 text-center text-sm font-semibold rounded-lg h-11 sm:h-10 grid place-items-center">
-          {t('product.buyNow', 'Buy Now')}
-        </Link>
-        <button aria-label="Add to cart"
+      {/* Two actions, as on Eneba: add to cart, and view the product. With a
+          mouse they slide in when the card is pointed at; the space is kept so
+          nothing below moves. */}
+      <div className="flex flex-col gap-2 mt-3"
+        style={{ opacity: showActions ? 1 : 0, transform: showActions ? 'none' : 'translateY(6px)',
+          transition: 'opacity .18s ease, transform .18s ease', pointerEvents: showActions ? 'auto' : 'none' }}>
+        <button type="button"
           onClick={(e) => {
             flyToCart(e.currentTarget.closest('.group')?.querySelector('[data-morph]'));
             onAdd?.(product);
           }}
-          className="w-11 h-11 sm:w-10 sm:h-10 shrink-0 rounded-lg border border-slate-200 grid place-items-center text-slate-500 hover:bg-slate-50 hover:text-violet-600 active:scale-90 transition-transform">
-          <ShoppingCart size={16} />
+          className="fm-cta w-full text-sm font-semibold rounded-lg h-11 sm:h-10 flex items-center justify-center gap-2 active:scale-90 transition-transform">
+          <ShoppingCart size={16} /> {t('product.addToCart', 'Add to cart')}
         </button>
+        <Link to={to} onClick={openWithMorph}
+          className="w-full text-center text-sm font-semibold rounded-lg h-11 sm:h-10 grid place-items-center border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-violet-600">
+          {t('card.view', 'View product')}
+        </Link>
       </div>
     </div>
   );
