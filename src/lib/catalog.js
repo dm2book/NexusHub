@@ -84,7 +84,7 @@ const FORMATTERS = new Map();
    English €79.99. The language provider keeps <html lang> current, so a switch
    re-renders with the right one; English (and the prerender, which has no
    document) keeps en-IE. */
-const NUMBER_LOCALE = { nl: 'nl-NL', de: 'de-DE', fr: 'fr-FR' };
+const NUMBER_LOCALE = { nl: 'nl-NL', en: 'en-IE', de: 'de-DE', fr: 'fr-FR' };
 const pageLocale = () => {
   try { return NUMBER_LOCALE[document.documentElement.lang] || 'en-IE'; } catch { return 'en-IE'; }
 };
