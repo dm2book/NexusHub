@@ -50,7 +50,7 @@ export default function Tickets() {
                 <div className="text-white text-sm">{tk.subject}</div>
                 <div className="text-slate-500 text-xs font-mono">{tk.number} · {tk.created_at ? new Date(tk.created_at).toLocaleDateString(locale) : '—'}</div>
               </div>
-              <span className={`text-xs uppercase tracking-wider ${STATUS_COLOR[tk.status]}`}>{t(`acc.status.${tk.status}`, tk.status)}</span>
+              <span className={`text-xs uppercase tracking-wider ${STATUS_COLOR[tk.status]}`}>{t(`acc.ticket.status.${tk.status}`, tk.status)}</span>
             </Link>
           ))}
         </div>

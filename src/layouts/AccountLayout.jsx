@@ -1,11 +1,37 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Outlet, NavLink, Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   Zap, LayoutDashboard, ShoppingBag, Download, LifeBuoy,
   Wallet, Bell, User, LogOut, Shield, Menu, Gift, Star, Coins, Trophy,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
-import { useI18n } from '../lib/i18n.jsx';
+import { useI18n, extendDictionary } from '../lib/i18n.jsx';
+import { PageLoader } from '../components/ui.jsx';
+
+/* The account area's own strings, one file per language, fetched only for the
+   language being read — the storefront never downloads them. English needs
+   none: it is the text written in the components. */
+const ACCOUNT_DICTS = {
+  nl: () => import('../lib/i18n/account.nl.js'),
+  de: () => import('../lib/i18n/account.de.js'),
+  fr: () => import('../lib/i18n/account.fr.js'),
+};
+const loadedAccountDicts = new Set();
+function useAccountDictionary(lang) {
+  const known = !ACCOUNT_DICTS[lang] || loadedAccountDicts.has(lang);
+  const [ready, setReady] = useState(known);
+  useEffect(() => {
+    if (!ACCOUNT_DICTS[lang] || loadedAccountDicts.has(lang)) { setReady(true); return undefined; }
+    let live = true;
+    setReady(false);
+    ACCOUNT_DICTS[lang]()
+      .then((m) => { extendDictionary(lang, m.default || {}); loadedAccountDicts.add(lang); })
+      .catch(() => { /* a failed chunk is an English page, not a broken one */ })
+      .finally(() => { if (live) setReady(true); });
+    return () => { live = false; };
+  }, [lang]);
+  return ready;
+}
 
 const NAV = (t) => [
   { to: '/account', icon: LayoutDashboard, label: t('acc.layout.overview', 'Overview'), end: true },
@@ -23,7 +49,9 @@ const NAV = (t) => [
 
 export default function AccountLayout() {
   const { user, isStaff, logout } = useAuth();
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
+  /* Wait for the strings rather than flash English and then switch. */
+  const dictReady = useAccountDictionary(lang);
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const [open, setOpen] = useState(false);
@@ -61,6 +89,7 @@ export default function AccountLayout() {
     </>
   );
 
+  if (!dictReady) return <PageLoader />;
   return (
     <div className="min-h-screen flex">
       {/* Desktop sidebar */}

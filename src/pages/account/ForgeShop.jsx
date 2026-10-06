@@ -5,11 +5,13 @@ import { api } from '../../lib/api.js';
 import { money, dateShort } from '../../lib/format.js';
 import { PageLoader } from '../../components/ui.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
+import { useI18n } from '../../lib/i18n.jsx';
 
 const REASON = { order: 'Earned from an order', redeem: 'Redeemed in Forge Shop' };
 
 export default function ForgeShop() {
   const toast = useToast();
+  const { t } = useI18n();
   const [data, setData] = useState(null);
   const [busy, setBusy] = useState('');
   const [copied, setCopied] = useState('');
@@ -18,21 +20,21 @@ export default function ForgeShop() {
   useEffect(() => { load(); }, []);
 
   const redeem = async (r) => {
-    if (data.balance < r.cost) { toast.error('Not enough Forge Coins yet.'); return; }
+    if (data.balance < r.cost) { toast.error(t('acc.shop.notEnough', 'Not enough Forge Coins yet.')); return; }
     setBusy(r.id);
     try {
       const res = await api.post('/api/account/coins/redeem', { rewardId: r.id });
-      if (res.couponCode) toast.success(`Unlocked! Your code: ${res.couponCode}`);
-      else toast.success('Redeemed! Claim it in our Discord.');
+      if (res.couponCode) toast.success(t('acc.shop.unlocked', 'Unlocked! Your code: {code}', { code: res.couponCode }));
+      else toast.success(t('acc.shop.redeemedDiscord', 'Redeemed! Claim it in our Discord.'));
       await load();
-    } catch (e) { toast.error(e.message || 'Could not redeem.'); }
+    } catch (e) { toast.error(e.message || t('acc.shop.redeemError', 'Could not redeem.')); }
     finally { setBusy(''); }
   };
 
-  const copy = (code) => { navigator.clipboard?.writeText(code); setCopied(code); toast.success('Code copied'); setTimeout(() => setCopied(''), 1500); };
+  const copy = (code) => { navigator.clipboard?.writeText(code); setCopied(code); toast.success(t('acc.shop.codeCopied', 'Code copied')); setTimeout(() => setCopied(''), 1500); };
 
   if (data === null) return <PageLoader />;
-  if (!data) return <div className="card p-8 text-slate-400">Couldn’t load the Forge Shop.</div>;
+  if (!data) return <div className="card p-8 text-slate-400">{t('acc.shop.loadError', 'Couldn’t load the Forge Shop.')}</div>;
 
   const ICON = { coupon: Ticket, boost: Sparkles };
 
@@ -66,7 +68,7 @@ export default function ForgeShop() {
         <div className="relative flex flex-col lg:flex-row lg:items-end gap-8">
           <div className="min-w-0">
             <div className="text-[13px] uppercase tracking-widest text-slate-500 font-semibold">
-              Your Forge Coins
+              {t('acc.shop.yourCoins', 'Your Forge Coins')}
             </div>
             <div className="flex items-end gap-3 mt-1">
               <Coins size={34} className="text-amber-300 mb-1.5 shrink-0" />
@@ -76,8 +78,7 @@ export default function ForgeShop() {
               </span>
             </div>
             <p className="text-slate-400 text-sm mt-3 max-w-md">
-              Every <b className="text-slate-200">{money(data.perCoinCents ?? 1000)}</b> you spend
-              earns a coin, automatically. Spend them below.
+              {t('acc.shop.everyBefore', 'Every')} <b className="text-slate-200">{money(data.perCoinCents ?? 1000)}</b> {t('acc.shop.everyAfter', 'you spend earns a coin, automatically. Spend them below.')}
             </p>
           </div>
 
@@ -85,27 +86,27 @@ export default function ForgeShop() {
               balance is working toward. */}
           <dl className="grid grid-cols-2 sm:grid-cols-3 gap-x-8 gap-y-3 lg:ml-auto">
             <div>
-              <dt className="text-[11px] uppercase tracking-wider text-slate-500">Earned</dt>
+              <dt className="text-[11px] uppercase tracking-wider text-slate-500">{t('acc.shop.earned', 'Earned')}</dt>
               <dd className="text-slate-200 font-semibold tabular-nums">
                 {earned == null ? '—' : earned}
               </dd>
             </div>
             <div>
-              <dt className="text-[11px] uppercase tracking-wider text-slate-500">Spent</dt>
+              <dt className="text-[11px] uppercase tracking-wider text-slate-500">{t('acc.shop.spent', 'Spent')}</dt>
               <dd className="text-slate-200 font-semibold tabular-nums">
                 {spent == null ? '—' : spent}
               </dd>
             </div>
             <div className="col-span-2 sm:col-span-1">
-              <dt className="text-[11px] uppercase tracking-wider text-slate-500">Next reward</dt>
+              <dt className="text-[11px] uppercase tracking-wider text-slate-500">{t('acc.shop.nextReward', 'Next reward')}</dt>
               <dd className="text-slate-200 font-semibold">
                 {/* The label in full. Trimming " discount code" off it turned
                     "€10 discount code" into "€10", so the line read "9 more for
                     €10" — which sounds like a price, not a reward. */}
                 {next
                   ? <>{next.coinsAway}
-                      <span className="text-slate-500 font-normal"> → {next.label}</span></>
-                  : <span className="text-emerald-300">everything unlocked</span>}
+                      <span className="text-slate-500 font-normal"> → {t(`acc.shop.item.${next.id}.label`, next.label)}</span></>
+                  : <span className="text-emerald-300">{t('acc.shop.allUnlocked', 'everything unlocked')}</span>}
               </dd>
             </div>
           </dl>
@@ -125,11 +126,12 @@ export default function ForgeShop() {
             grid place-items-center shrink-0"><Sparkles size={18} /></span>
           <div className="min-w-0">
             <div className="text-slate-100 font-semibold text-sm">
-              {boosts} giveaway {boosts === 1 ? 'boost' : 'boosts'} ready
+              {boosts === 1 ? t('acc.shop.boostsReady.one', '{n} giveaway boost ready', { n: boosts }) : t('acc.shop.boostsReady.other', '{n} giveaway boosts ready', { n: boosts })}
             </div>
             <p className="text-slate-400 text-[13px] mt-0.5">
-              {boosts === 1 ? 'It adds' : 'They add'} an extra entry to the next giveaway you
-              join in Discord. Nothing to claim — it happens when the winner is drawn.
+              {boosts === 1
+                ? t('acc.shop.boostInfo.one', 'It adds an extra entry to the next giveaway you join in Discord. Nothing to claim — it happens when the winner is drawn.')
+                : t('acc.shop.boostInfo.other', 'They add an extra entry to the next giveaway you join in Discord. Nothing to claim — it happens when the winner is drawn.')}
             </p>
           </div>
         </div>
@@ -140,7 +142,7 @@ export default function ForgeShop() {
         <div className="flex items-baseline justify-between gap-4 mb-3">
           <h2 className="text-lg text-white font-bold">Forge Shop</h2>
           <span className="text-[12.5px] text-slate-500">
-            Codes are single-use and never expire.
+            {t('acc.shop.codesNote', 'Codes are single-use and never expire.')}
           </span>
         </div>
         {/* Four across on a wide screen. The page was capped at max-w-3xl, so on
@@ -164,7 +166,7 @@ export default function ForgeShop() {
                   <span className="absolute -top-2.5 right-4 rounded-full bg-amber-400/15
                     border border-amber-400/35 px-2 py-0.5 text-[10.5px] font-bold uppercase
                     tracking-wider text-amber-300">
-                    Best value
+                    {t('acc.shop.bestValue', 'Best value')}
                   </span>
                 )}
 
@@ -176,7 +178,7 @@ export default function ForgeShop() {
                     <Icon size={19} />
                   </span>
                   <div className="min-w-0">
-                    <div className="font-semibold text-white leading-tight">{r.label}</div>
+                    <div className="font-semibold text-white leading-tight">{t(`acc.shop.item.${r.id}.label`, r.label)}</div>
                     <div className="inline-flex items-center gap-1 text-amber-300/90 text-[13px]
                       font-bold tabular-nums mt-0.5">
                       <Coins size={13} /> {r.cost}
@@ -184,7 +186,7 @@ export default function ForgeShop() {
                   </div>
                 </div>
 
-                <p className="text-slate-400 text-[13px] leading-relaxed flex-1">{r.blurb}</p>
+                <p className="text-slate-400 text-[13px] leading-relaxed flex-1">{r.blurb && t(`acc.shop.item.${r.id}.blurb`, r.blurb)}</p>
 
                 {/* How close you are, and what closing the gap actually takes.
                     "Need 15 more" on a dead grey button says the door is shut;
@@ -194,14 +196,14 @@ export default function ForgeShop() {
                   {afford ? (
                     <button onClick={() => redeem(r)} disabled={busy === r.id}
                       className="btn-primary w-full text-sm font-semibold rounded-xl py-2.5">
-                      {busy === r.id ? '…' : 'Redeem'}
+                      {busy === r.id ? '…' : t('acc.shop.redeem', 'Redeem')}
                     </button>
                   ) : (
                     <>
                       <div className="flex items-baseline justify-between text-[11.5px] mb-1.5">
                         <span className="text-slate-500 tabular-nums">{pct}%</span>
                         <span className="text-slate-500">
-                          ≈ {money(Math.round(away * 100))} more spent
+                          {t('acc.shop.moreSpent', '≈ {amount} more spent', { amount: money(Math.round(away * 100)) })}
                         </span>
                       </div>
                       <div className="h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
@@ -222,10 +224,10 @@ export default function ForgeShop() {
       <div className="rounded-2xl border border-white/10 bg-elevated/40 p-5">
         <div className="flex items-baseline justify-between gap-4 mb-3">
           <h3 className="text-white font-semibold flex items-center gap-2">
-            <History size={16} className="text-slate-400" /> History
+            <History size={16} className="text-slate-400" /> {t('acc.shop.history', 'History')}
           </h3>
           {data.history?.length > 0 && (
-            <span className="text-[12px] text-slate-500">last {data.history.length}</span>
+            <span className="text-[12px] text-slate-500">{t('acc.shop.lastN', 'last {n}', { n: data.history.length })}</span>
           )}
         </div>
 
@@ -238,10 +240,9 @@ export default function ForgeShop() {
               <Coins size={17} />
             </span>
             <div>
-              <div className="text-slate-300 text-sm font-medium">No coins yet</div>
+              <div className="text-slate-300 text-sm font-medium">{t('acc.shop.noCoins', 'No coins yet')}</div>
               <p className="text-slate-500 text-[13px] mt-0.5">
-                They arrive on their own — one for every {money(data.perCoinCents ?? 1000)} of a
-                paid order. Nothing to sign up for.
+                {t('acc.shop.noCoinsHint', 'They arrive on their own — one for every {amount} of a paid order. Nothing to sign up for.', { amount: money(data.perCoinCents ?? 1000) })}
               </p>
             </div>
           </div>
@@ -258,7 +259,7 @@ export default function ForgeShop() {
                       {up ? <Coins size={15} /> : <Ticket size={15} />}
                     </span>
                     <div className="min-w-0">
-                      <div className="text-slate-200 truncate">{REASON[h.reason] || h.reason}</div>
+                      <div className="text-slate-200 truncate">{t(`acc.shop.reason.${h.reason}`, REASON[h.reason] || h.reason)}</div>
                       <div className="text-slate-500 text-xs">{dateShort(h.createdAt)}</div>
                     </div>
                   </div>
@@ -286,12 +287,11 @@ export default function ForgeShop() {
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl
         border border-white/10 bg-elevated/40 px-5 py-4">
         <p className="text-slate-400 text-[13px] max-w-xl">
-          Redeemed a code? It stays in your <b className="text-slate-300">History</b> above — copy
-          it any time and use it at checkout. Codes are single-use and never expire.
+          {t('acc.shop.footerBefore', 'Redeemed a code? It stays in your')} <b className="text-slate-300">{t('acc.shop.history', 'History')}</b> {t('acc.shop.footerAfter', 'above — copy it any time and use it at checkout. Codes are single-use and never expire.')}
         </p>
         <Link to="/shop" className="btn-primary text-sm font-semibold rounded-xl px-4 py-2.5
           whitespace-nowrap">
-          Browse the shop
+          {t('acc.shop.browse', 'Browse the shop')}
         </Link>
       </div>
     </div>

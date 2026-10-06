@@ -33,7 +33,7 @@ export default function TicketDetail() {
         <ArrowLeft size={16} /> {t('acc.ticket.back', 'Back to tickets')}
       </Link>
       <h1 className="text-2xl text-white">{ticket.subject}</h1>
-      <p className="text-slate-500 text-sm font-mono mb-6">{ticket.number} · {t(`acc.status.${ticket.status}`, ticket.status)}</p>
+      <p className="text-slate-500 text-sm font-mono mb-6">{ticket.number} · {t(`acc.ticket.status.${ticket.status}`, ticket.status)}</p>
 
       <div className="space-y-3 mb-6">
         {ticket.messages.map((m) => (

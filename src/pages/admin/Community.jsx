@@ -55,7 +55,7 @@ export default function AdminCommunity() {
           <h3 className="text-white mb-3">Levels</h3>
           <div className="space-y-2">
             {d.levels.map((l) => (
-              <div key={l.level} className="grid grid-cols-[150px_1fr_40px] items-center gap-3 text-[13px]">
+              <div key={l.level} className="grid items-center gap-3 text-[13px]" style={{ gridTemplateColumns: '150px 1fr 40px' }}>
                 <span className="text-slate-300 truncate">{l.level}. {l.nameEn} <span className="text-slate-500">({l.min}+)</span></span>
                 <Bar value={l.users} max={maxLevel} />
                 <span className="text-slate-200 text-right tabular-nums">{l.users}</span>
@@ -67,7 +67,7 @@ export default function AdminCommunity() {
           <h3 className="text-white mb-3">Referral levels</h3>
           <div className="space-y-2">
             {d.referralLevels.map((l) => (
-              <div key={l.id} className="grid grid-cols-[150px_1fr_40px] items-center gap-3 text-[13px]">
+              <div key={l.id} className="grid items-center gap-3 text-[13px]" style={{ gridTemplateColumns: '150px 1fr 40px' }}>
                 <span className="text-slate-300">{l.nameEn} <span className="text-slate-500">({l.min}+)</span></span>
                 <Bar value={l.users} max={maxRef} />
                 <span className="text-slate-200 text-right tabular-nums">{l.users}</span>
@@ -83,7 +83,7 @@ export default function AdminCommunity() {
 
       <div className="card p-5" data-testid="admin-milestones">
         <h3 className="text-white flex items-center gap-2 mb-1"><Target size={17} className="text-emerald-300" /> Community milestones</h3>
-        <p className="text-[12px] text-slate-500 mb-3 flex gap-1.5"><Info size={13} className="shrink-0 mt-px" /> Visitors see a milestone only once it has really been reached.</p>
+        <p className="text-[12px] text-slate-500 mb-3 flex gap-1.5"><Info size={13} className="shrink-0" style={{ marginTop: 1 }} /> Visitors see a milestone only once it has really been reached.</p>
         <div className="grid sm:grid-cols-2 gap-4">
           {d.milestones.map((m) => (
             <div key={m.id}>
@@ -103,11 +103,11 @@ export default function AdminCommunity() {
       <div className="card p-5">
         <h3 className="text-white mb-3">Badges and achievements — how many people really earned them</h3>
         {groups.map((g) => (
-          <div key={g} className="mb-4 last:mb-0">
+          <div key={g} className="mb-4">
             <div className="text-[12px] uppercase tracking-wider text-slate-500 font-semibold mb-2">{g}</div>
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
               {d.achievements.filter((a) => a.groupEn === g).map((a) => (
-                <div key={a.id} className="rounded-lg border border-white/10 bg-white/[.03] px-3 py-2 flex items-center gap-3">
+                <div key={a.id} className="rounded-lg border border-white/10 px-3 py-2 flex items-center gap-3">
                   <span className="text-xl">{a.icon}</span>
                   <div className="min-w-0 flex-1"><div className="text-[13px] text-white truncate">{a.nameEn}</div><div className="text-[11.5px] text-slate-500 truncate">{a.descEn}</div></div>
                   <span className="text-white font-semibold tabular-nums">{a.earnedBy}</span>
