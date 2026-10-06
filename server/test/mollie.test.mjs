@@ -440,9 +440,10 @@ console.log('— Wiring —');
   ok('the webhook route is mounted before the general API rate limit',
     webhookRoute > 0 && webhookRoute < apiLimit, `${webhookRoute} vs ${apiLimit}`);
 
-  const admin = fs.readFileSync('src/routes/admin/orders.js', 'utf8');
+  // The admin refund (and an approved refund request) go through refundService.
+  const admin = fs.readFileSync('src/services/refundService.js', 'utf8');
   const refundCall = admin.indexOf('refundPayment(psp.paymentId');
-  const statusChange = admin.indexOf("transitionOrder(req.params.id, 'refunded'");
+  const statusChange = admin.indexOf("await moveToRefunded(order.id, { ...ctx, reason: reason || 'Refunded by staff' })");
   ok('the admin refund sends the money back BEFORE marking the order refunded',
     refundCall > 0 && refundCall < statusChange, `${refundCall} vs ${statusChange}`);
 
