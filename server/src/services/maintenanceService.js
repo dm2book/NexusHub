@@ -83,6 +83,14 @@ export async function runMaintenance() {
     summary.supplierQueue = (await drainSupplierQueue({ actorId: 'system' }, { budgetMs: 8_000 })).processed || 0;
   } catch (e) { summary.supplierQueueError = e.message; }
 
+  /* 8b. Stripe payments whose webhook never arrived: paid at Stripe, pending
+     here. Asked of Stripe directly and settled through the webhook's own path. */
+  try {
+    const { reconcileStripeSessions } = await import('./stripeSettlement.js');
+    const r = await reconcileStripeSessions({ deadline: Date.now() + 5_000 });
+    if (r.checked) summary.stripeReconciled = r;
+  } catch (e) { summary.stripeReconcileError = e.message; }
+
   // 9. The net under the pipeline: any paid order nothing has picked up.
   //    Delivery is started without being awaited, so on a serverless host it can
   //    simply never run — the order sits paid, in stock and undelivered. The

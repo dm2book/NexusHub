@@ -59,6 +59,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let seq = 0;
 const RUN = Date.now().toString(36);
 const SUPPLIER_LOG = {};
+const SESSIONS = new Map();
+const PAID_SESSIONS = new Set();
 
 function hang(svc, signal) {
   return new Promise((_, reject) => {
@@ -127,10 +129,16 @@ const stripeServer = http.createServer((req, res) => {
     let out = {};
     if (req.method === 'POST' && p === '/v1/checkout/sessions') {
       const id = `cs_test_lw_${RUN}_${++seq}`;
+      const f = new URLSearchParams(body);
+      SESSIONS.set(id, { amount: Number(f.get('line_items[0][price_data][unit_amount]')), orderId: f.get('metadata[orderId]') });
       out = { id, object: 'checkout.session', status: 'open', url: `https://checkout.stripe.com/c/pay/${id}`, payment_intent: null };
     } else if (p.startsWith('/v1/checkout/sessions/')) {
       const id = p.split('/').pop();
-      out = { id, object: 'checkout.session', status: 'open', url: `https://checkout.stripe.com/c/pay/${id}`, payment_intent: null };
+      const known = SESSIONS.get(id) || {};
+      const paid = PAID_SESSIONS.has(id);
+      out = { id, object: 'checkout.session', status: paid ? 'complete' : 'open', url: `https://checkout.stripe.com/c/pay/${id}`,
+        payment_status: paid ? 'paid' : 'unpaid', amount_total: known.amount, currency: 'eur',
+        payment_intent: paid ? `pi_lw_${known.orderId}` : null, metadata: { orderId: known.orderId }, client_reference_id: known.orderId };
     } else if (p.startsWith('/v1/payment_intents/')) {
       out = { id: p.split('/').pop(), object: 'payment_intent', latest_charge: { outcome: { risk_level: 'normal', risk_score: 14 }, payment_method_details: { card: { country: 'NL' } } } };
     } else if (p === '/v1/refunds') {
@@ -490,6 +498,26 @@ if (want('probe')) {
     rightAfter_lessThan10min: { orders: blocked.ids.length, viaSupplier: await viaSupplier(blocked.ids), status: blocked.status },
     after10min: { orders: after.ids.length, viaSupplier: await viaSupplier(after.ids), status: after.status },
   });
+}
+
+if (want('reconcile')) {
+  /* Paid at Stripe, and the webhook never comes. */
+  const cat = await catalogue('recon', { stock: 10 });
+  const ids = [];
+  for (let i = 0; i < 5; i++) {
+    const r = await placeGuest(cat.stocked.id, { email: `recon${i}-${TAG}@example.com`, ip: freshIp() });
+    await stripeCheckout(r.order);
+    ids.push(r.order.id);
+  }
+  const rows = await all(`SELECT id, psp_payment_id FROM orders WHERE id = ANY(@ids)`, { ids });
+  for (const r of rows) PAID_SESSIONS.add(r.psp_payment_id);
+  // Fifteen minutes ago, so the sweep considers them.
+  await run(`UPDATE orders SET created_at=@t WHERE id = ANY(@ids)`, { ids, t: new Date(Date.now() - 15 * 60_000).toISOString() });
+  const before = (await get(`SELECT COUNT(*)::int AS n FROM orders WHERE id = ANY(@ids) AND status='pending'`, { ids })).n;
+  await runMaintenance();
+  await quiesce(ids);
+  log('Stripe paid, webhook never arrived — maintenance finds it', { orders: ids.length, pendingBefore: before,
+    after: Object.fromEntries((await all(`SELECT status, COUNT(*)::int AS n FROM orders WHERE id = ANY(@ids) GROUP BY status`, { ids })).map((x) => [x.status, x.n])) });
 }
 
 if (want('supplierhang')) {

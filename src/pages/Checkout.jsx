@@ -298,7 +298,22 @@ export default function Checkout() {
         return;
       }
       if (provider === 'stripe') {
-        const { url } = await api.post(`/api/orders/${order.id}/checkout`, { email });
+        let url;
+        try {
+          ({ url } = await api.post(`/api/orders/${order.id}/checkout`, { email }));
+        } catch (e) {
+          /* Stripe is down or slow. The order exists and nothing was charged,
+             so rather than an error and a dead end, the buyer gets the pay
+             screen for the shop's other methods (Tikkie, Revolut, …) — the
+             launch-week simulation left every one of these orders pending. */
+          if (!(order.payMethods || []).length) throw e;
+          toast.error(t('checkout.cardDown', 'Card payment is not available right now. Nothing has been charged — you can pay another way below.'));
+          clear();
+          rememberOrder(order);
+          setPlaced(order);
+          navigate(`/checkout?order=${encodeURIComponent(order.number)}`, { replace: true });
+          return;
+        }
         /* The cart stays until the payment is done: the success page empties it.
            Emptied here, a buyer who pressed "back" on Stripe came home to an
            empty cart and had to find everything again. */

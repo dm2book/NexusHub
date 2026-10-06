@@ -36,7 +36,9 @@ export function errorHandler(err, req, res, _next) {
      rate limiting in the database where the count is shared. The key is the
      route plus the minute: a burst on one endpoint is one page, and the storm
      rules fold the rest of an outage into a single summary. */
-  const route = `${req.method} ${req.path}`;
+  /* The route PATTERN, not the path: /api/orders/<id>/checkout failing for
+     twenty buyers in a Stripe outage is one problem, not twenty keys. */
+  const route = `${req.method} ${req.route?.path ? `${req.baseUrl || ''}${req.route.path}` : req.path}`;
   alertOwner('system.error', {
     title: `500 on ${route}`,
     lines: [

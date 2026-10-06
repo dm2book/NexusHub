@@ -1,0 +1,44 @@
+# Hourly maintenance — the heartbeat the Vercel plan cannot give.
+#
+# Vercel's free plan runs a cron at most once a day, so /api/cron/maintenance
+# ran at 04:00 and otherwise only when a visitor happened to arrive. That run is
+# what retries failed mails, drains the supplier queue and recovers paid orders
+# nothing picked up — in the launch-week simulation, an email outage took 15
+# runs to catch up, which is 15 days at one run a day.
+#
+# This calls the same protected route every hour. It needs a repository secret
+# named CRON_SECRET with the SAME value as the CRON_SECRET environment variable
+# on Vercel (Settings → Secrets and variables → Actions → New repository
+# secret). Without it the job says so and stops, rather than failing every hour.
+name: Hourly maintenance
+
+on:
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  maintenance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Run shop maintenance
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          SITE: https://www.forgemarket.nl
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::notice::CRON_SECRET is not set as a repository secret — skipping. See the comment at the top of this file."
+            exit 0
+          fi
+          code=$(curl -sS -o body.json -w '%{http_code}' --max-time 60 \
+            -H "Authorization: Bearer $CRON_SECRET" "$SITE/api/cron/maintenance")
+          echo "HTTP $code"
+          # The summary has counts only (orders recovered, mails retried) — no customer data.
+          head -c 2000 body.json; echo
+          if [ "$code" != "200" ]; then
+            echo "::error::Maintenance answered $code"
+            exit 1
+          fi

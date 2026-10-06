@@ -178,6 +178,13 @@ export async function paymentRisk(paymentIntentId) {
   } catch { return null; }
 }
 
+/** A Checkout session as Stripe has it now, by id — or null. */
+export async function retrieveSession(id) {
+  const s = await stripe();
+  if (!s || !/^cs_/.test(String(id || ''))) return null;
+  return s.checkout.sessions.retrieve(id);
+}
+
 /** A Checkout session that is still open, by id — or null. */
 export async function openSession(id) {
   const s = await stripe();

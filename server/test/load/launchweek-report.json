@@ -830,6 +830,13 @@
           "completed": 10
         }
       }
+    },
+    "Stripe paid, webhook never arrived — maintenance finds it": {
+      "orders": 5,
+      "pendingBefore": 5,
+      "after": {
+        "completed": 5
+      }
     }
   },
   "calls": {

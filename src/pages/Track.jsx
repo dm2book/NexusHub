@@ -409,6 +409,8 @@ export default function Track() {
             </div>
           )}
 
+          {result.status === 'completed' && !user && <GuestCodes number={result.number} t={t} />}
+
           {result.status === 'completed' && <GuestReview number={result.number} t={t} />}
 
           {/* Only once money has actually moved. Before that there is nothing to
@@ -518,6 +520,70 @@ function GuestReview({ number, t }) {
  * Collapsed by default. It is a real option, not a suggestion, and a refund form
  * sitting open under a delivered order reads as an invitation to use it.
  */
+/**
+ * A guest's codes, here — not only in an email that may not have arrived.
+ * Asks for the email the order was placed with (the same proof the refund
+ * request uses); nothing is shown until it matches.
+ */
+function GuestCodes({ number, t }) {
+  const toast = useToast();
+  const [email, setEmail] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [codes, setCodes] = useState(null);
+  const [copied, setCopied] = useState(-1);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      const r = await api.post(`/api/track/${encodeURIComponent(number)}/codes`, { email: email.trim() });
+      setCodes(r.codes || []);
+    } catch (err) { toast.error(err.message); }
+    finally { setBusy(false); }
+  };
+  const copy = async (text, i) => {
+    try { await navigator.clipboard.writeText(text); setCopied(i); setTimeout(() => setCopied(-1), 1500); } catch { /* no clipboard */ }
+  };
+
+  if (codes) {
+    return (
+      <div className="rounded-2xl border border-white/10 bg-white/5 p-5 mb-6" data-testid="guest-codes">
+        <div className="text-white font-semibold">{t('trackCodes.title', 'Your codes')}</div>
+        {codes.length === 0 && <p className="text-slate-400 text-sm mt-1">{t('trackCodes.none', 'No codes on this order — what you bought was delivered another way (see your email).')}</p>}
+        {codes.map((c, i) => (
+          <div key={i} style={{ marginTop: 10 }}>
+            {c.item && <div className="text-slate-400 text-xs">{c.item}</div>}
+            {c.content ? (
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 4 }}>
+                <code className="text-white" style={{ flex: 1, padding: '8px 10px', borderRadius: 10, border: '1px solid rgba(127,127,127,.3)', fontSize: 14, wordBreak: 'break-all' }}>{c.content}</code>
+                <button type="button" onClick={() => copy(c.content, i)} className="btn-ghost text-sm" aria-label={t('trackCodes.copy', 'Copy')}>
+                  {copied === i ? <Check size={15} /> : <Copy size={15} />}
+                </button>
+              </div>
+            ) : (
+              <p className="text-slate-400 text-sm mt-1">{t('trackCodes.inMail', 'This one is a file or link — it is in your delivery email.')}</p>
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  }
+  return (
+    <form onSubmit={submit} className="rounded-2xl border border-white/10 bg-white/5 p-5 mb-6">
+      <div className="text-white font-semibold">{t('trackCodes.ask', 'No email? Show your codes here')}</div>
+      <p className="text-slate-400 text-xs mt-0.5">{t('trackCodes.sub', 'Enter the email you ordered with. We only show the codes when it matches this order.')}</p>
+      <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+        <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
+          placeholder={t('refundReq.email', 'Email used for this order')} className="input text-sm" style={{ flex: '1 1 200px' }} />
+        <button disabled={busy || !email.trim()} className="btn-primary text-sm px-5">
+          {busy ? <Loader2 size={15} className="animate-spin" /> : <ShieldCheck size={15} />}
+          {t('trackCodes.show', 'Show codes')}
+        </button>
+      </div>
+    </form>
+  );
+}
+
 function GuestRefund({ number, creditAllowed = false, t }) {
   const toast = useToast();
   const [open, setOpen] = useState(false);

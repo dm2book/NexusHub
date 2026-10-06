@@ -323,8 +323,12 @@ export const config = {
       // Per email address, rolling 24h.
       perEmailPerDay: Number(env.LIMIT_ORDERS_PER_EMAIL_DAY ?? 8),
       // Per IP, rolling 24h. Higher than the email limit: a household, a school
-      // or a phone network legitimately shares one address.
-      perIpPerDay: Number(env.LIMIT_ORDERS_PER_IP_DAY ?? 15),
+      // or a phone network legitimately shares one address. Was 15 — mobile
+      // networks put many customers behind one address (CGNAT), and in the
+      // launch-week simulation 5 of 20 buyers on one shared address were turned
+      // away at 500 orders a day. The per-email limit (8) and the fraud score
+      // are what actually stop one person ordering too much.
+      perIpPerDay: Number(env.LIMIT_ORDERS_PER_IP_DAY ?? 40),
       // Total value one email may order in 24h, in cents.
       valuePerEmailPerDay: Number(env.LIMIT_VALUE_PER_EMAIL_DAY ?? 100_000),
       // Largest single order, in cents. The ceiling on one mistake.

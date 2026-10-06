@@ -954,6 +954,39 @@ router.post('/track/:number/refund-request',
     res.status(201).json({ ok: true, id: r.id });
   }));
 
+/**
+ * A guest's codes, on the track page — not only in their inbox.
+ *
+ * A guest has no account, so until now the delivery email was the ONLY place
+ * their code existed for them. The launch-week simulation took the mail
+ * provider down for a day: 37 of 100 buyers had paid, been delivered, and could
+ * see nothing. The credential is the same pair the refund request uses — the
+ * order number (only ever shown to the buyer) and the email it was placed with
+ * — rate-limited, answered identically for a wrong number and a wrong email,
+ * and every view is written to the audit log.
+ */
+router.post('/track/:number/codes',
+  rateLimit({ bucket: 'track_codes', windowMs: 60_000, max: 5, shared: true }),
+  asyncHandler(async (req, res) => {
+    const { email } = z.object({ email: z.string().email() }).parse(req.body || {});
+    const order = await getOrderByNumber(req.params.number).catch(() => null);
+    if (!order || order.email.toLowerCase() !== email.toLowerCase()) {
+      throw new ApiError(404, 'We could not find an order with that number and email address.');
+    }
+    if (order.status !== 'completed') return res.json({ status: order.status, codes: [] });
+    const nameOf = Object.fromEntries((order.items || []).map((it) => [it.id, it.name]));
+    const codes = (order.deliveries || []).map((d) => ({
+      item: nameOf[d.order_item_id || d.orderItemId] || null,
+      type: d.type,
+      // Files and links are in the email; a code is what a buyer needs here.
+      content: d.type === 'code' || d.type === 'text' ? d.content : null,
+    }));
+    await audit({ action: 'delivery.view_guest', actor: { email: order.email }, targetType: 'order',
+      targetId: order.id, metadata: { count: codes.length }, req }).catch(() => {});
+    res.set('Cache-Control', 'no-store');
+    res.json({ status: order.status, codes });
+  }));
+
 // Public tracking by order number (no PII beyond status timeline).
 router.get('/track/:number', asyncHandler(async (req, res) => {
   const order = await getOrderByNumber(req.params.number);
