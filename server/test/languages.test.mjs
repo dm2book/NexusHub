@@ -113,7 +113,7 @@ console.log('\n— Nothing still asks "is this Dutch?" —');
   ok('the assistant falls back to English, not to Dutch',
     /COPY\[lang\] \|\| COPY\.en/.test(chat));
   ok('the dictionary lookup is a map, not a ternary',
-    /DICTS\[lang\]\?\.\[key\] \?\? en/.test(i18n) && !/lang === 'nl' \? \(NL\[key\]/.test(i18n));
+    /DICTS\[lang\]\?\.\[key\] \?\? (EXTRA\[lang\]\?\.\[key\] \?\? )?en/.test(i18n) && !/lang === 'nl' \? \(NL\[key\]/.test(i18n));
   ok('a stored language is validated against the registry, not two strings',
     /LANG_CODES\.includes\(stored\)/.test(i18n));
   ok('a regional tag like fr-BE or de-AT still matches',

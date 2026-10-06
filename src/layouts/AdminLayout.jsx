@@ -38,6 +38,7 @@ const NAV = [
   { to: '/admin/growth/ad-scripts', icon: Clapperboard, label: 'Ad Scripts', perm: 'analytics.read' },
   { to: '/admin/growth/ad-concepts', icon: Film, label: 'Ad Concepts', perm: 'analytics.read' },
   { to: '/admin/growth/ad-studio', icon: Film, label: 'Ad Studio', perm: 'analytics.read' },
+  { to: '/admin/growth/seo', icon: FileText, label: 'SEO pages', perm: 'analytics.read' },
   { heading: 'Shop' },
   { to: '/admin/support', icon: LifeBuoy, label: 'Support', perm: 'tickets.read', badge: 'tickets' },
   { to: '/admin/social', icon: Activity, label: 'Social proof', perm: 'social.moderate' },

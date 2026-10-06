@@ -24,6 +24,7 @@ import { availableCount } from '../services/codeStockService.js';
 import { reviewStats } from '../services/reviewsService.js';
 import { productPayload } from '../services/productPayload.js';
 import { LANDING, landingPathFor } from '../../../src/content/seo.js';
+import { seoPageByPath, pagePayload, payMethodLabels, siteUrl } from '../services/seoPageService.js';
 
 const router = Router();
 
@@ -61,7 +62,7 @@ const SITE_URL = () => config.appUrl.replace(/\/+$/, '');
  * first — a bug that only ever shows up in somebody else's chat window.
  */
 function withHead(html, { title, description, canonical, image, imageSize = { w: 1200, h: 630 },
-  ld, ldProductId, preloadImage, boot }) {
+  ld, ldProductId, preloadImage, boot, ogType = 'product', chunks: pageChunks = null }) {
   const drop = [
     /\s*<title>[\s\S]*?<\/title>/,
     /\s*<meta name="description"[^>]*>/,
@@ -76,7 +77,7 @@ function withHead(html, { title, description, canonical, image, imageSize = { w:
     `<title>${esc(title)}</title>`,
     `<meta name="description" content="${esc(description)}" />`,
     `<link rel="canonical" href="${esc(canonical)}" />`,
-    '<meta property="og:type" content="product" />',
+    `<meta property="og:type" content="${esc(ogType)}" />`,
     `<meta property="og:site_name" content="${esc(config.email.fromName)}" />`,
     `<meta property="og:url" content="${esc(canonical)}" />`,
     `<meta property="og:title" content="${esc(title)}" />`,
@@ -145,7 +146,7 @@ function withHead(html, { title, description, canonical, image, imageSize = { w:
     ...(preloadImage
       ? [`<link rel="preload" as="image" href="${esc(preloadImage)}" fetchpriority="high" />`]
       : []),
-    ...routeChunks().map((f) => `<link rel="modulepreload" crossorigin href="/${esc(f)}">`),
+    ...(pageChunks || routeChunks()).map((f) => `<link rel="modulepreload" crossorigin href="/${esc(f)}">`),
   ];
   return preloads.length
     ? out.replace('<head>', `<head>\n    ${preloads.join('\n    ')}`)
@@ -241,7 +242,10 @@ function describe(product, inStock) {
     ? 'Direct geleverd na betaling'
     : 'Met de hand geleverd, meestal binnen een paar uur';
   const base = (product.description || '').trim().replace(/\s+/g, ' ');
-  const tail = `${price} · ${delivery} · Betaal met iDEAL.`;
+  /* The methods the checkout really takes. This promised iDEAL on
+     every product page while the shop took Tikkie, Revolut and PayPal. */
+  const methods = payMethodLabels();
+  const tail = `${price} · ${delivery}${methods.length ? ` · Betaal met ${methods.slice(0, 3).join(', ')}` : ''}.`;
   // 155 characters is where Google starts truncating; the part that gets cut is
   // always the part you cared about, so the facts go first.
   /* Math.max, because slice() with a negative argument counts from the END:
@@ -387,6 +391,42 @@ router.get('/product/:id', asyncHandler(async (req, res, next) => {
        a 2MB base64 blob in a preload tag is not a head start, it is the head. */
     preloadImage: product.image && !product.image.startsWith('data:') ? product.image : null,
     boot: { product: payload },
+  }));
+}));
+
+/**
+ * The generated SEO pages (seoPageService / src/lib/seoCatalog.js): game,
+ * gift-card brand, platform and gift-budget pages. The head — title, meta
+ * description, canonical, FAQPage / ItemList / BreadcrumbList schema — is
+ * written here so a crawler has it without running JavaScript, and a plain
+ * HTML version of the page (heading, intro, product links, FAQ, related
+ * links) sits in the first-paint shell until React draws the real one.
+ */
+const GENERATED = /^\/(games|giftcards|platform|cadeau)\/[a-z0-9-]+\/?$/;
+router.get(GENERATED, asyncHandler(async (req, res, next) => {
+  const html = await appShell();
+  if (!html) return next();
+  const path = req.path.replace(/\/+$/, '');
+  const page = await seoPageByPath(path).catch(() => null);
+  if (!page || page.handWritten) {
+    res.set('Cache-Control', 'public, max-age=0, s-maxage=60');
+    return res.status(page ? 200 : 404).type('html').send(html);
+  }
+  const payload = pagePayload(page, 'nl');
+  const c = payload.copy;
+  const canonical = siteUrl() + page.path;
+  const productLinks = page.products.map((p) => `<li><a href="/product/${esc(p.id)}">${esc(p.name)}</a></li>`).join('');
+  const faq = payload.faq.map((f) => `<h3>${esc(f.q)}</h3><p>${esc(f.a)}</p>`).join('');
+  const related = page.links.map((l) => `<li><a href="${esc(l.path)}">${esc(l.path)}</a></li>`).join('');
+  const body = `<div id="fm-shell"><main class="seo-static" style="max-width:1100px;margin:0 auto;padding:32px 20px;font-family:Inter,system-ui,sans-serif">
+      <h1>${esc(c.h1)}</h1><p>${esc(c.intro)}</p><ul>${productLinks}</ul>
+      <h2>FAQ</h2>${faq}${related ? `<ul>${related}</ul>` : ''}</main></div>`;
+  const shelled = html.replace(/<div id="fm-shell"[\s\S]*?<\/div>\s*<\/div>\s*<\/div>/, body);
+  res.set('Cache-Control', 'public, max-age=0, s-maxage=300, stale-while-revalidate=86400');
+  res.type('html').send(withHead(shelled, {
+    title: `${c.title}`, description: c.description, canonical, ogType: 'website',
+    image: `${siteUrl()}/og.jpg?v=7dad09e1`, ld: payload.schema, chunks: [],
+    boot: { seoPage: payload },
   }));
 }));
 
