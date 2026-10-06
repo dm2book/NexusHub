@@ -190,5 +190,53 @@ console.log('\n— 7. Refund: money back or store credit —');
   ok('approving a request refunds through refundOrder (not just a status flip)', /refundOrder\(request\.order_id, \{ method: how/.test(sup) && !/transitionOrder\(decision\.order_id, 'refunded'/.test(sup));
 }
 
+console.log('\n— 8. A guest sees their codes on the track page —');
+{
+  const { createApp } = await import('../src/app.js');
+  const { deliverOrder } = await import('../src/services/orderService.js');
+  const prod = await createProduct({ name: `LR Codes ${tag}`, category: 'giftcard', price: 1500, announce: false, deliveryMode: 'manual' });
+  const email = `codes-${tag}@example.com`;
+  const o = await createOrder({ consent: true, consentText: 'test', email, items: [{ productId: prod.id, quantity: 1 }] }, { actorId: 'test' });
+  const srv = createApp().listen(0); const base = `http://127.0.0.1:${srv.address().port}`;
+  const ask = (number, e) => fetch(`${base}/api/track/${number}/codes`, { method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-forwarded-for': `10.9.${Math.floor(Math.random() * 200)}.${Math.floor(Math.random() * 200)}` },
+    body: JSON.stringify({ email: e }) });
+  await transitionOrder(o.id, 'payment_received', { actorId: 'test' });
+  const early = await (await ask(o.number, email)).json();
+  ok('before delivery: no codes, and no error', Array.isArray(early.codes) && early.codes.length === 0, JSON.stringify(early));
+  const full = await getOrder(o.id);
+  await deliverOrder(o.id, [{ orderItemId: full.items[0].id, type: 'code', content: `GIFT-${tag}` }], { actorId: 'test' });
+  const r = await ask(o.number, email.toUpperCase());
+  const body = await r.json();
+  ok('with the right email: the code, with the product name', r.ok && body.codes?.[0]?.content === `GIFT-${tag}` && /LR Codes/.test(body.codes[0].item || ''), JSON.stringify(body));
+  const wrong = await ask(o.number, 'someone-else@example.com');
+  ok('with another email: the same "not found" as a wrong number', wrong.status === 404);
+  const nope = await ask('FM-NOPE-0000', email);
+  ok('…and a wrong number gives exactly that answer', nope.status === 404);
+  ok('never cached anywhere', r.headers.get('cache-control') === 'no-store');
+  const seen = await get(`SELECT 1 FROM audit_logs WHERE action='delivery.view_guest' AND target_id=@id`, { id: o.id });
+  ok('every view is in the audit log', !!seen);
+  srv.close();
+}
+
+console.log('\n— 9. The rest of the list —');
+{
+  const { readFileSync, existsSync } = await import('node:fs');
+  const wf = new URL('../../.github/workflows/maintenance.yml', import.meta.url);
+  const yml = existsSync(wf) ? readFileSync(wf, 'utf8') : '';
+  ok('maintenance runs every hour (GitHub Actions — the Vercel plan allows only daily)', /cron: '17 \* \* \* \*'/.test(yml) && /api\/cron\/maintenance/.test(yml));
+  ok('…and skips quietly when the secret is not set', /CRON_SECRET is not set/.test(yml));
+  const { config } = await import('../src/config/env.js');
+  ok('a shared mobile IP is allowed 40 orders a day (was 15)', process.env.LIMIT_ORDERS_PER_IP_DAY != null || config.security.orderLimits.perIpPerDay === 40,
+    `${config.security.orderLimits.perIpPerDay}`);
+  const co = readFileSync(new URL('../../src/pages/Checkout.jsx', import.meta.url), 'utf8');
+  ok('card payment down → the pay screen for the other methods, not a dead end', /checkout\.cardDown/.test(co) && /setPlaced\(order\)/.test(co));
+  const ss = src('services/stripeSettlement.js');
+  ok('a Stripe payment whose webhook never came is found by maintenance', /export async function reconcileStripeSessions/.test(ss)
+    && /reconcileStripeSessions/.test(src('services/maintenanceService.js')));
+  ok('…through the webhook\'s own checks (amount, currency, risk)', /export async function markPaid/.test(ss) && /from '..\/services\/stripeSettlement.js'/.test(src('routes/payments.js')));
+  ok('one alert per failing endpoint, not per order id', /req\.route\?\.path/.test(src('middleware/error.js')));
+}
+
 console.log(`\n${fail ? '❌' : '✅'} launch-resilience: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
