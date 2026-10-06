@@ -170,7 +170,7 @@ export default function DiscordCard() {
       {state.linked && state.inviteUrl && (
         <a href={state.inviteUrl} target="_blank" rel="noreferrer"
           className="inline-flex items-center gap-1.5 mt-4 text-sm text-indigo-300 hover:underline">
-          <ExternalLink size={14} /> {t('discord.openServer', 'Open {name}', { name: state.serverName || 'the server' })}
+          <ExternalLink size={14} /> {t('discord.openServer', 'Open {name}', { name: state.serverName || t('acc.discord.theServer', 'the server') })}
         </a>
       )}
     </div>

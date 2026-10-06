@@ -1,50 +1,54 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Monitor, LogOut, ShieldCheck, Smartphone, Pencil, History, Check } from 'lucide-react';
 import { api } from '../../lib/api.js';
-import { date } from '../../lib/format.js';
+import { useI18n } from '../../lib/i18n.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
 import TwoFactor from '../../components/account/TwoFactor.jsx';
 
+// Same output as format.js `date`, but in the shop's language rather than the browser's.
+const when = (iso, locale) => (iso ? new Date(iso).toLocaleString(locale) : '—');
+
 export default function Settings() {
   const { user, reload } = useAuth();
   const toast = useToast();
+  const { t } = useI18n();
   const [displayName, setDisplayName] = useState(user?.displayName || '');
   const prefs = user?.preferences || {};
   const [emailOrderUpdates, setOrderUpdates] = useState(prefs.emailOrderUpdates !== false);
   const [emailMarketing, setMarketing] = useState(!!prefs.emailMarketing);
 
   const saveProfile = async () => {
-    try { await api.patch('/api/account/profile', { displayName }); await reload(); toast.success('Profile updated.'); }
+    try { await api.patch('/api/account/profile', { displayName }); await reload(); toast.success(t('acc.settings.profileUpdated', 'Profile updated.')); }
     catch (err) { toast.error(err.message); }
   };
   const savePrefs = async () => {
     try { await api.patch('/api/account/preferences', { emailOrderUpdates, emailMarketing });
-      await reload(); toast.success('Preferences saved.'); }
+      await reload(); toast.success(t('acc.settings.prefsSaved', 'Preferences saved.')); }
     catch (err) { toast.error(err.message); }
   };
 
   return (
     <div className="max-w-2xl space-y-6">
-      <h1 className="text-2xl text-white">Profile settings</h1>
+      <h1 className="text-2xl text-white">{t('acc.settings.title', 'Profile settings')}</h1>
 
       <div className="card p-6">
-        <h3 className="text-white mb-4">Profile</h3>
+        <h3 className="text-white mb-4">{t('acc.settings.profile', 'Profile')}</h3>
         <div className="space-y-4">
-          <div><label className="label">Email</label>
+          <div><label className="label">{t('acc.settings.email', 'Email')}</label>
             <input className="input opacity-60" value={user?.email} disabled /></div>
-          <div><label className="label">Display name</label>
+          <div><label className="label">{t('acc.settings.displayName', 'Display name')}</label>
             <input className="input" value={displayName} onChange={(e) => setDisplayName(e.target.value)} /></div>
-          <button onClick={saveProfile} className="btn-primary">Save profile</button>
+          <button onClick={saveProfile} className="btn-primary">{t('acc.settings.saveProfile', 'Save profile')}</button>
         </div>
       </div>
 
       <div className="card p-6">
-        <h3 className="text-white mb-4">Notifications</h3>
+        <h3 className="text-white mb-4">{t('acc.settings.notifications', 'Notifications')}</h3>
         <div className="space-y-3">
-          <Toggle label="Order status emails" checked={emailOrderUpdates} onChange={setOrderUpdates} />
-          <Toggle label="Product news & offers" checked={emailMarketing} onChange={setMarketing} />
-          <button onClick={savePrefs} className="btn-primary mt-2">Save preferences</button>
+          <Toggle label={t('acc.settings.orderEmails', 'Order status emails')} checked={emailOrderUpdates} onChange={setOrderUpdates} />
+          <Toggle label={t('acc.settings.marketingEmails', 'Product news & offers')} checked={emailMarketing} onChange={setMarketing} />
+          <button onClick={savePrefs} className="btn-primary mt-2">{t('acc.settings.savePrefs', 'Save preferences')}</button>
         </div>
       </div>
 
@@ -54,8 +58,8 @@ export default function Settings() {
       <LoginHistory />
 
       <div className="card p-6">
-        <h3 className="text-white mb-1">Roles</h3>
-        <p className="text-slate-400 text-sm">{user?.roles?.join(', ') || 'customer'}</p>
+        <h3 className="text-white mb-1">{t('acc.settings.roles', 'Roles')}</h3>
+        <p className="text-slate-400 text-sm">{user?.roles?.join(', ') || t('acc.settings.roleCustomer', 'customer')}</p>
       </div>
     </div>
   );
@@ -63,6 +67,7 @@ export default function Settings() {
 
 function ActiveSessions() {
   const toast = useToast();
+  const { t, locale } = useI18n();
   const [sessions, setSessions] = useState(null);
   const [busy, setBusy] = useState(false);
 
@@ -73,30 +78,30 @@ function ActiveSessions() {
 
   const revoke = async (id) => {
     setBusy(true);
-    try { await api.del(`/api/auth/sessions/${id}`); toast.success('Signed out that device.'); load(); }
+    try { await api.del(`/api/auth/sessions/${id}`); toast.success(t('acc.settings.sessionRevoked', 'Signed out that device.')); load(); }
     catch (err) { toast.error(err.message); } finally { setBusy(false); }
   };
   const revokeOthers = async () => {
     setBusy(true);
-    try { await api.post('/api/auth/sessions/revoke-others'); toast.success('Signed out all other devices.'); load(); }
+    try { await api.post('/api/auth/sessions/revoke-others'); toast.success(t('acc.settings.othersRevoked', 'Signed out all other devices.')); load(); }
     catch (err) { toast.error(err.message); } finally { setBusy(false); }
   };
 
   return (
     <div className="card p-6">
       <div className="flex items-center justify-between mb-1">
-        <h3 className="text-white flex items-center gap-2"><ShieldCheck size={17} className="text-emerald-400" /> Active sessions</h3>
+        <h3 className="text-white flex items-center gap-2"><ShieldCheck size={17} className="text-emerald-400" /> {t('acc.settings.sessionsTitle', 'Active sessions')}</h3>
         {sessions?.length > 1 && (
           <button onClick={revokeOthers} disabled={busy} className="btn-ghost text-xs">
-            <LogOut size={14} /> Sign out others
+            <LogOut size={14} /> {t('acc.settings.signOutOthers', 'Sign out others')}
           </button>
         )}
       </div>
-      <p className="text-slate-500 text-sm mb-4">Devices currently signed in to your account. Revoke any you don't recognise.</p>
+      <p className="text-slate-500 text-sm mb-4">{t('acc.settings.sessionsIntro', 'Devices currently signed in to your account. Revoke any you don\'t recognise.')}</p>
       {sessions === null ? (
-        <p className="text-slate-500 text-sm">Loading…</p>
+        <p className="text-slate-500 text-sm">{t('acc.settings.loading', 'Loading…')}</p>
       ) : sessions.length === 0 ? (
-        <p className="text-slate-500 text-sm">No active sessions.</p>
+        <p className="text-slate-500 text-sm">{t('acc.settings.noSessions', 'No active sessions.')}</p>
       ) : (
         <div className="space-y-2">
           {sessions.map((s) => (
@@ -105,12 +110,12 @@ function ActiveSessions() {
               <div className="flex-1 min-w-0">
                 <div className="text-white text-sm flex items-center gap-2">
                   {s.device}
-                  {s.current && <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-300">This device</span>}
+                  {s.current && <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-300">{t('acc.settings.thisDevice', 'This device')}</span>}
                 </div>
-                <div className="text-slate-500 text-xs">{s.ip || 'unknown IP'} · active {date(s.lastUsedAt)}</div>
+                <div className="text-slate-500 text-xs">{s.ip || t('acc.settings.unknownIp', 'unknown IP')} · {t('acc.settings.activeAt', 'active {when}', { when: when(s.lastUsedAt, locale) })}</div>
               </div>
               {!s.current && (
-                <button onClick={() => revoke(s.id)} disabled={busy} className="text-xs text-slate-400 hover:text-red-400">Revoke</button>
+                <button onClick={() => revoke(s.id)} disabled={busy} className="text-xs text-slate-400 hover:text-red-400">{t('acc.settings.revoke', 'Revoke')}</button>
               )}
             </div>
           ))}
@@ -134,6 +139,7 @@ function Toggle({ label, checked, onChange }) {
 
 function TrustedDevices() {
   const toast = useToast();
+  const { t, locale } = useI18n();
   const [devices, setDevices] = useState(null);
   const [editing, setEditing] = useState(null);
   const [name, setName] = useState('');
@@ -144,27 +150,27 @@ function TrustedDevices() {
   useEffect(() => { load(); }, [load]);
 
   const rename = async (id) => {
-    try { await api.patch(`/api/auth/devices/${id}`, { name }); toast.success('Renamed.'); setEditing(null); load(); }
+    try { await api.patch(`/api/auth/devices/${id}`, { name }); toast.success(t('acc.settings.renamed', 'Renamed.')); setEditing(null); load(); }
     catch (err) { toast.error(err.message); }
   };
   const revoke = async (id) => {
-    try { await api.del(`/api/auth/devices/${id}`); toast.success('Device removed — it’ll need a code next time.'); load(); }
+    try { await api.del(`/api/auth/devices/${id}`); toast.success(t('acc.settings.deviceRemoved', 'Device removed — it’ll need a code next time.')); load(); }
     catch (err) { toast.error(err.message); }
   };
   const logoutAll = async () => {
-    try { await api.post('/api/auth/logout-all'); toast.success('Signed out everywhere.'); window.location.href = '/login'; }
+    try { await api.post('/api/auth/logout-all'); toast.success(t('acc.settings.signedOutEverywhere', 'Signed out everywhere.')); window.location.href = '/login'; }
     catch (err) { toast.error(err.message); }
   };
 
   return (
     <div className="card p-6">
       <div className="flex items-center justify-between mb-1">
-        <h3 className="text-white flex items-center gap-2"><Smartphone size={17} className="text-indigo-300" /> Trusted devices</h3>
-        <button onClick={logoutAll} className="btn-ghost text-xs text-red-300 hover:bg-red-500/10"><LogOut size={14} /> Sign out everywhere</button>
+        <h3 className="text-white flex items-center gap-2"><Smartphone size={17} className="text-indigo-300" /> {t('acc.settings.devicesTitle', 'Trusted devices')}</h3>
+        <button onClick={logoutAll} className="btn-ghost text-xs text-red-300 hover:bg-red-500/10"><LogOut size={14} /> {t('acc.settings.signOutEverywhere', 'Sign out everywhere')}</button>
       </div>
-      <p className="text-slate-500 text-sm mb-4">Devices that skip the login code. Remove any you don’t recognise.</p>
-      {devices === null ? <p className="text-slate-500 text-sm">Loading…</p>
-        : devices.length === 0 ? <p className="text-slate-500 text-sm">No trusted devices yet. Tick “Trust this device” at login.</p>
+      <p className="text-slate-500 text-sm mb-4">{t('acc.settings.devicesIntro', 'Devices that skip the login code. Remove any you don’t recognise.')}</p>
+      {devices === null ? <p className="text-slate-500 text-sm">{t('acc.settings.loading', 'Loading…')}</p>
+        : devices.length === 0 ? <p className="text-slate-500 text-sm">{t('acc.settings.noDevices', 'No trusted devices yet. Tick “Trust this device” at login.')}</p>
         : (
           <div className="space-y-2">
             {devices.map((d) => (
@@ -178,15 +184,15 @@ function TrustedDevices() {
                     </div>
                   ) : (
                     <>
-                      <div className="text-white text-sm">{d.name || 'Device'}</div>
-                      <div className="text-slate-500 text-xs">{d.ip || 'unknown IP'} · last used {date(d.lastUsedAt)}</div>
+                      <div className="text-white text-sm">{d.name || t('acc.settings.device', 'Device')}</div>
+                      <div className="text-slate-500 text-xs">{d.ip || t('acc.settings.unknownIp', 'unknown IP')} · {t('acc.settings.lastUsedAt', 'last used {when}', { when: when(d.lastUsedAt, locale) })}</div>
                     </>
                   )}
                 </div>
                 {editing !== d.id && (
                   <button onClick={() => { setEditing(d.id); setName(d.name || ''); }} className="p-1.5 text-slate-400 hover:text-white"><Pencil size={14} /></button>
                 )}
-                <button onClick={() => revoke(d.id)} className="text-xs text-slate-400 hover:text-red-400">Remove</button>
+                <button onClick={() => revoke(d.id)} className="text-xs text-slate-400 hover:text-red-400">{t('acc.settings.remove', 'Remove')}</button>
               </div>
             ))}
           </div>
@@ -196,22 +202,29 @@ function TrustedDevices() {
 }
 
 function LoginHistory() {
+  const { t, locale } = useI18n();
   const [history, setHistory] = useState(null);
   useEffect(() => { api.get('/api/auth/login-history').then((r) => setHistory(r.history)).catch(() => setHistory([])); }, []);
+  const channels = {
+    email: t('acc.settings.channel.email', 'email'),
+    sms: t('acc.settings.channel.sms', 'sms'),
+    totp: t('acc.settings.channel.totp', 'totp'),
+    trusted_device: t('acc.settings.channel.trustedDevice', 'trusted device'),
+  };
   return (
     <div className="card p-6">
-      <h3 className="text-white flex items-center gap-2 mb-4"><History size={17} className="text-slate-400" /> Login history</h3>
-      {history === null ? <p className="text-slate-500 text-sm">Loading…</p>
-        : history.length === 0 ? <p className="text-slate-500 text-sm">No login history yet.</p>
+      <h3 className="text-white flex items-center gap-2 mb-4"><History size={17} className="text-slate-400" /> {t('acc.settings.historyTitle', 'Login history')}</h3>
+      {history === null ? <p className="text-slate-500 text-sm">{t('acc.settings.loading', 'Loading…')}</p>
+        : history.length === 0 ? <p className="text-slate-500 text-sm">{t('acc.settings.noHistory', 'No login history yet.')}</p>
         : (
           <div className="space-y-1.5 max-h-64 overflow-auto">
             {history.map((h, i) => (
               <div key={i} className="flex items-center justify-between text-sm bg-space-black rounded-lg px-3 py-2">
                 <span className="text-slate-300">
-                  {h.success ? '✅' : '❌'} {h.channel?.replace('_', ' ')}
-                  {h.suspicious ? <span className="text-amber-300 text-xs ml-1">· new device</span> : ''}
+                  {h.success ? '✅' : '❌'} {channels[h.channel] || h.channel?.replace('_', ' ')}
+                  {h.suspicious ? <span className="text-amber-300 text-xs ml-1">· {t('acc.settings.newDevice', 'new device')}</span> : ''}
                 </span>
-                <span className="text-slate-500 text-xs">{h.ip || '—'} · {date(h.createdAt)}</span>
+                <span className="text-slate-500 text-xs">{h.ip || '—'} · {when(h.createdAt, locale)}</span>
               </div>
             ))}
           </div>
