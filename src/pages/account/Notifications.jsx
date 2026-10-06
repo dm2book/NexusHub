@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Bell, CheckCheck, Package, Truck, ShieldAlert, Sparkles } from 'lucide-react';
 import { api } from '../../lib/api.js';
-import { date } from '../../lib/format.js';
 import { PageLoader, EmptyState } from '../../components/ui.jsx';
+import { useI18n } from '../../lib/i18n.jsx';
 
 // Map notification `type` → customer-facing category + icon.
 const META = {
@@ -16,14 +16,23 @@ const META = {
 };
 const metaFor = (type) => META[type] || META.system;
 
-const TABS = [
-  { id: 'all', label: 'All' },
-  { id: 'orders', label: 'Order updates' },
-  { id: 'delivery', label: 'Delivery' },
-  { id: 'security', label: 'Security' },
+const TABS = (t) => [
+  { id: 'all', label: t('acc.notif.tab.all', 'All') },
+  { id: 'orders', label: t('acc.notif.tab.orders', 'Order updates') },
+  { id: 'delivery', label: t('acc.notif.tab.delivery', 'Delivery') },
+  { id: 'security', label: t('acc.notif.tab.security', 'Security') },
 ];
 
+// Empty-state titles per tab — whole sentences, so each language can word them naturally.
+const EMPTY_TITLE = (t) => ({
+  all: t('acc.notif.empty', 'No notifications'),
+  orders: t('acc.notif.empty.orders', 'No order update notifications'),
+  delivery: t('acc.notif.empty.delivery', 'No delivery notifications'),
+  security: t('acc.notif.empty.security', 'No security notifications'),
+});
+
 export default function Notifications() {
+  const { t, locale } = useI18n();
   const [items, setItems] = useState(null);
   const [tab, setTab] = useState('all');
 
@@ -44,22 +53,22 @@ export default function Notifications() {
   return (
     <div>
       <div className="flex items-center justify-between mb-5">
-        <h1 className="text-2xl text-white">Notifications</h1>
-        <button onClick={markAll} className="btn-ghost text-sm"><CheckCheck size={16} /> Mark all read</button>
+        <h1 className="text-2xl text-white">{t('acc.notif.title', 'Notifications')}</h1>
+        <button onClick={markAll} className="btn-ghost text-sm"><CheckCheck size={16} /> {t('acc.notif.markAllRead', 'Mark all read')}</button>
       </div>
 
       <div className="flex gap-2 overflow-x-auto pb-1 mb-5">
-        {TABS.map((t) => (
-          <button key={t.id} onClick={() => setTab(t.id)}
+        {TABS(t).map((tb) => (
+          <button key={tb.id} onClick={() => setTab(tb.id)}
             className={`shrink-0 px-3.5 py-2 rounded-xl text-sm transition border ${
-              tab === t.id ? 'bg-primary/20 border-primary/40 text-white' : 'border-white/10 text-slate-400 hover:text-white hover:bg-white/5'}`}>
-            {t.label}{t.id !== 'all' && counts[t.id] ? <span className="ml-1 text-xs text-slate-500">{counts[t.id]}</span> : ''}
+              tab === tb.id ? 'bg-primary/20 border-primary/40 text-white' : 'border-white/10 text-slate-400 hover:text-white hover:bg-white/5'}`}>
+            {tb.label}{tb.id !== 'all' && counts[tb.id] ? <span className="ml-1 text-xs text-slate-500">{counts[tb.id]}</span> : ''}
           </button>
         ))}
       </div>
 
       {filtered.length === 0 ? (
-        <EmptyState icon={Bell} title={tab === 'all' ? 'No notifications' : `No ${TABS.find((t) => t.id === tab)?.label.toLowerCase()} notifications`} />
+        <EmptyState icon={Bell} title={EMPTY_TITLE(t)[tab]} />
       ) : (
         <div className="card divide-y divide-white/5">
           {filtered.map((n) => {
@@ -74,7 +83,7 @@ export default function Notifications() {
                     {!n.read_at && <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />}
                   </div>
                   {n.body && <div className="text-slate-400 text-sm">{n.body}</div>}
-                  <div className="text-slate-500 text-xs mt-1">{date(n.created_at)}</div>
+                  <div className="text-slate-500 text-xs mt-1">{n.created_at ? new Date(n.created_at).toLocaleString(locale) : '—'}</div>
                 </div>
               </div>
             );

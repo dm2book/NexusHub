@@ -2,13 +2,14 @@ import { useEffect, useState, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Send } from 'lucide-react';
 import { api } from '../../lib/api.js';
-import { date } from '../../lib/format.js';
 import { PageLoader } from '../../components/ui.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
+import { useI18n } from '../../lib/i18n.jsx';
 
 export default function TicketDetail() {
   const { id } = useParams();
   const toast = useToast();
+  const { t, locale } = useI18n();
   const [ticket, setTicket] = useState(null);
   const [body, setBody] = useState('');
 
@@ -29,19 +30,19 @@ export default function TicketDetail() {
   return (
     <div className="max-w-3xl">
       <Link to="/account/tickets" className="inline-flex items-center gap-2 text-slate-400 hover:text-white text-sm mb-5">
-        <ArrowLeft size={16} /> Back to tickets
+        <ArrowLeft size={16} /> {t('acc.ticket.back', 'Back to tickets')}
       </Link>
       <h1 className="text-2xl text-white">{ticket.subject}</h1>
-      <p className="text-slate-500 text-sm font-mono mb-6">{ticket.number} · {ticket.status}</p>
+      <p className="text-slate-500 text-sm font-mono mb-6">{ticket.number} · {t(`acc.status.${ticket.status}`, ticket.status)}</p>
 
       <div className="space-y-3 mb-6">
         {ticket.messages.map((m) => (
           <div key={m.id} className={`card p-4 ${m.author_kind === 'staff' ? 'border-primary/30' : ''}`}>
             <div className="flex justify-between mb-1">
               <span className="text-xs uppercase tracking-wider text-indigo-400">
-                {m.author_kind === 'staff' ? 'Support' : m.author_kind === 'system' ? 'System' : 'You'}
+                {m.author_kind === 'staff' ? t('acc.ticket.author.staff', 'Support') : m.author_kind === 'system' ? t('acc.ticket.author.system', 'System') : t('acc.ticket.author.you', 'You')}
               </span>
-              <span className="text-xs text-slate-500">{date(m.created_at)}</span>
+              <span className="text-xs text-slate-500">{m.created_at ? new Date(m.created_at).toLocaleString(locale) : '—'}</span>
             </div>
             <p className="text-slate-200 text-sm whitespace-pre-wrap">{m.body}</p>
           </div>
@@ -51,8 +52,8 @@ export default function TicketDetail() {
       {ticket.status !== 'closed' && (
         <div className="flex gap-3">
           <textarea rows={2} value={body} onChange={(e) => setBody(e.target.value)}
-            className="input" placeholder="Write a reply…" />
-          <button onClick={reply} className="btn-primary px-5"><Send size={16} /></button>
+            className="input" placeholder={t('acc.ticket.replyPlaceholder', 'Write a reply…')} />
+          <button onClick={reply} className="btn-primary px-5" aria-label={t('acc.ticket.send', 'Send reply')} title={t('acc.ticket.send', 'Send reply')}><Send size={16} /></button>
         </div>
       )}
     </div>
