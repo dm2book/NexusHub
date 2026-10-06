@@ -122,15 +122,28 @@ export function listTickets({ userId, status } = {}) {
 
 // ── Refund requests ────────────────────────────────────────────────────────
 
-export async function requestRefund({ orderId, userId, reason, amount } = {}) {
+/**
+ * A buyer asks for a refund — and says how: `money` back the way they paid, or
+ * `credit` in their account. Credit is only offered on an order placed with an
+ * account (it lives in a wallet); asked for on a guest order it is refused
+ * rather than quietly turned into money, so the buyer is never told one thing
+ * and given another. The amount shown for credit is everything the order took,
+ * store credit used on it included — the same figure refundOrder will credit.
+ */
+export async function requestRefund({ orderId, userId, reason, amount, method = 'money' } = {}) {
   const order = await getOrder(orderId);
   if (!order) throw notFound('Order not found');
+  if (!['money', 'credit'].includes(method)) throw badRequest('Choose money back or store credit');
+  if (method === 'credit' && !order.userId) {
+    throw badRequest('Store credit needs an account — this order was placed without one.');
+  }
+  const { creditRefundAmount } = await import('./refundService.js');
   const id = newId('ref');
   const at = nowIso();
-  await run(`INSERT INTO refund_requests (id, order_id, user_id, reason, amount, created_at, updated_at)
-       VALUES (@id, @oid, @uid, @reason, @amt, @at, @at)`,
+  await run(`INSERT INTO refund_requests (id, order_id, user_id, reason, amount, method, created_at, updated_at)
+       VALUES (@id, @oid, @uid, @reason, @amt, @method, @at, @at)`,
       { id, oid: orderId, uid: userId || null, reason: reason || null,
-        amt: amount ?? order.total, at });
+        amt: amount ?? (method === 'credit' ? await creditRefundAmount(order) : order.total), method, at });
   return get('SELECT * FROM refund_requests WHERE id=@id', { id });
 }
 
@@ -146,6 +159,10 @@ export function getRefundRequestForOrder(orderId) {
     { o: orderId });
 }
 
+export function getRefundRequest(id) {
+  return get('SELECT * FROM refund_requests WHERE id=@id', { id });
+}
+
 export function listRefundRequests({ status } = {}) {
   const clause = status ? 'WHERE rr.status=@status' : '';
   return all(`SELECT rr.*, o.number AS order_number, o.email AS customer
@@ -154,11 +171,11 @@ export function listRefundRequests({ status } = {}) {
              status ? { status } : {});
 }
 
-export async function decideRefund(id, { status, decidedBy } = {}) {
+export async function decideRefund(id, { status, decidedBy, method } = {}) {
   if (!['approved', 'rejected', 'processed'].includes(status)) {
     throw badRequest('Invalid refund decision');
   }
-  await run(`UPDATE refund_requests SET status=@st, decided_by=@by, updated_at=@at WHERE id=@id`,
-      { st: status, by: decidedBy || null, at: nowIso(), id });
+  await run(`UPDATE refund_requests SET status=@st, decided_by=@by, method=COALESCE(@m, method), updated_at=@at WHERE id=@id`,
+      { st: status, by: decidedBy || null, m: method || null, at: nowIso(), id });
   return get('SELECT * FROM refund_requests WHERE id=@id', { id });
 }

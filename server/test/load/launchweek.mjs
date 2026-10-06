@@ -472,6 +472,26 @@ if (want('supplier')) {
     recovery: passes, afterRecovery: (await outcome(r.ids, '1970-01-01')).status });
 }
 
+if (want('probe')) {
+  /* After an outage: two failed deliveries bar the supplier; once the pause
+     has passed (backdated here instead of waiting ten minutes) the next order
+     tries it, succeeds, and the ones after it follow. */
+  MODE.supplier = 'down';
+  const down = await day('probedown', 4, { stock: 0, stripeShare: 1, manualShare: 0, dearShare: 0, accountShare: 0, concurrency: 1 });
+  MODE.supplier = 'up';
+  await leaseFree();
+  const blocked = await day('probeblocked', 5, { stock: 0, stripeShare: 1, manualShare: 0, dearShare: 0, accountShare: 0, concurrency: 1 });
+  await run(`UPDATE fulfillment_requests SET updated_at = @t WHERE status='failed' AND mode='auto'`,
+    { t: new Date(Date.now() - 11 * 60_000).toISOString() });
+  const after = await day('probeafter', 10, { stock: 0, stripeShare: 1, manualShare: 0, dearShare: 0, accountShare: 0, concurrency: 1 });
+  const viaSupplier = async (ids) => (await get(`SELECT COUNT(DISTINCT order_id)::int AS n FROM fulfillment_requests WHERE order_id = ANY(@ids) AND mode='auto' AND status='fulfilled'`, { ids })).n;
+  log('Supplier back after an outage — is it used again?', {
+    duringOutage: { orders: down.ids.length, status: down.status },
+    rightAfter_lessThan10min: { orders: blocked.ids.length, viaSupplier: await viaSupplier(blocked.ids), status: blocked.status },
+    after10min: { orders: after.ids.length, viaSupplier: await viaSupplier(after.ids), status: after.status },
+  });
+}
+
 if (want('supplierhang')) {
   MODE.supplier = 'hang';
   const r = await day('suphang', 12, { stock: 0, stripeShare: 1, manualShare: 0, dearShare: 0, concurrency: 12 });

@@ -486,7 +486,14 @@ export async function autoFulfillFromSuppliers(orderId, ctx = {}) {
 // across serverless instances, and process orders strictly in sequence.
 const QUEUE_LOCK = 'supplier_queue_lock';
 
-async function acquireLease(ttlMs = 5 * 60_000) {
+/* A drain runs inside one function call, which Vercel ends at 30 s — so a lease
+   that outlives that is a lease nobody holds. It was five minutes: a function
+   killed mid-drain blocked the queue for five minutes, and every order paid in
+   that window waited for the next trigger. 90 s covers a drain's own budget
+   plus one supplier call that times out. */
+const LEASE_TTL_MS = 90_000;
+
+async function acquireLease(ttlMs = LEASE_TTL_MS) {
   const now = Date.now();
   const token = newId('lease');
   // Win when there's no lease, or the current one has expired (crashed worker).
@@ -530,30 +537,64 @@ async function nextSupplierOrder(skip = new Set()) {
 /**
  * Drain the supplier queue serially: process paid orders one after another,
  * oldest first, buying + delivering each fully before the next. Only one worker
- * runs at a time (lease); bounded per call so it fits a serverless budget — the
+ * runs at a time (lease); bounded by time so it fits a serverless budget — the
  * next trigger (a new payment or the maintenance tick) continues where it left
  * off. Triggered on payment and from maintenance.
+ *
+ * ── THE GAP THIS CLOSES ─────────────────────────────────────────────────────
+ * A payment that arrives while another worker holds the lease does not drain:
+ * it leaves its order to the holder. The launch-week simulation showed two ways
+ * the holder then dropped it:
+ *   - it stopped after 25 orders, so in a burst everything after the 25th sat
+ *     paid and untouched until the next payment or the hourly sweep (127 of
+ *     500 orders in the burst run);
+ *   - an order paid in the moment between the holder's last "anything left?"
+ *     and its release was seen by nobody (6 of 20 at a 4-second supplier).
+ * So the count cap is gone — time is the only bound — and after letting go the
+ * holder looks once more: anything that arrived in that moment is either taken
+ * by its own payment (the lease is free now) or by this worker going round
+ * again.
  */
-export async function drainSupplierQueue(ctx = {}, { maxOrders = 25, budgetMs = 25_000 } = {}) {
-  const token = await acquireLease();
-  if (!token) return { skipped: true }; // another worker owns the queue → stay serial
+export async function drainSupplierQueue(ctx = {}, { maxOrders = 500, budgetMs = 22_000 } = {}) {
   const start = Date.now();
   const attempted = new Set();
   let processed = 0;
-  try {
-    while (attempted.size < maxOrders && Date.now() - start < budgetMs) {
-      const id = await nextSupplierOrder(attempted);
-      if (!id) break;
-      attempted.add(id); // mark before working so a no-op (margin guard) advances
-      // Fully source + deliver THIS one order before looking at the next.
-      const did = await autoFulfillFromSuppliers(id, { ...ctx, actorId: ctx.actorId || 'system' })
-        .catch((e) => { console.error('[supplier-queue]', id, e.message); return false; });
-      if (did) processed++;
+  let rounds = 0;
+  for (;;) {
+    const token = await acquireLease();
+    if (!token) return rounds ? { processed } : { skipped: true }; // another worker owns the queue
+    rounds++;
+    let emptied = false;
+    try {
+      while (attempted.size < maxOrders && Date.now() - start < budgetMs) {
+        const id = await nextSupplierOrder(attempted);
+        if (!id) { emptied = true; break; }
+        attempted.add(id); // mark before working so a no-op (margin guard) advances
+        // Fully source + deliver THIS one order before looking at the next.
+        const did = await autoFulfillFromSuppliers(id, { ...ctx, actorId: ctx.actorId || 'system' })
+          .catch((e) => { console.error('[supplier-queue]', id, e.message); return false; });
+        if (did) processed++;
+      }
+    } finally {
+      await releaseLease(token);
     }
-  } finally {
-    await releaseLease(token);
+    if (!emptied || Date.now() - start >= budgetMs || rounds >= 5) break;
+    if (!(await nextSupplierOrder(attempted))) break;
   }
   return { processed };
+}
+
+/** Is this paid order one the supplier queue will take — no request yet, and an
+    item a supplier can deliver right now? The sweep leaves those to the queue. */
+export async function supplierQueueOwns(orderId) {
+  const open = await get(`SELECT id FROM fulfillment_requests WHERE order_id=@o LIMIT 1`, { o: orderId });
+  if (open) return false;
+  const order = await getOrder(orderId);
+  if (!order) return false;
+  for (const it of order.items) {
+    if (it.product_id && await resolveFulfillmentSupplier(it.product_id)) return true;
+  }
+  return false;
 }
 
 /**

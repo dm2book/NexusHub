@@ -34,8 +34,16 @@ import { relayDm } from './discordService.js';
 
 const API = 'https://discord.com/api/v10';
 
+/* Five seconds, like every other Discord call here. This one had none, and it
+   runs on the payment path (role sync, the delivery DM): with Discord's API
+   accepting connections and not answering, the launch-week simulation held a
+   Stripe webhook for 45 s and more — past Vercel's 30 s, which killed it after
+   the order was marked paid and before its delivery was started. */
+const DISCORD_TIMEOUT_MS = 5_000;
+
 async function discord(path, init = {}) {
   const res = await fetch(`${API}${path}`, {
+    signal: AbortSignal.timeout(DISCORD_TIMEOUT_MS),
     ...init,
     headers: {
       Authorization: `Bot ${config.discord.botToken}`,

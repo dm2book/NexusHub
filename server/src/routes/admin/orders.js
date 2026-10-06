@@ -11,8 +11,7 @@ import {
   listOrders, getOrder, transitionOrder, markPaymentReceived, setOrderNotes, deliverOrder,
   exportOrdersCsv, orderUrlFor, setOrderPayLink, clearOrderPayLink, getPspPayment,
 } from '../../services/orderService.js';
-import { refundPayment, isEnabled as mollieEnabled } from '../../services/mollieService.js';
-import { refundPaymentIntent, isEnabled as stripeEnabled } from '../../services/stripeService.js';
+import { refundOrder } from '../../services/refundService.js';
 import { PayLinkError } from '../../utils/payLink.js';
 import { fulfillOrder, listFulfillment, listFulfillmentLogs } from '../../services/fulfillmentService.js';
 import * as analytics from '../../services/analyticsService.js';
@@ -149,43 +148,27 @@ router.post('/:id/complete', requirePermission('orders.complete'),
  */
 router.post('/:id/refund', requirePermission('orders.refund'),
   asyncHandler(async (req, res) => {
-    const { reason } = z.object({ reason: z.string().optional() }).parse(req.body);
+    const { reason, method } = z.object({
+      reason: z.string().optional(),
+      method: z.enum(['money', 'credit']).optional(),
+    }).parse(req.body);
     const existing = await getOrder(req.params.id);
     if (!existing) throw notFound('Order not found');
-
-    let refund = null;
-    const psp = await getPspPayment(existing.id);
-    if (psp?.provider === 'mollie' && mollieEnabled()) {
-      try {
-        refund = await refundPayment(psp.paymentId, {
-          cents: existing.total,
-          currency: existing.currency || 'EUR',
-          description: `Refund ${existing.number}`,
-        });
-      } catch (e) {
+    let out;
+    try {
+      out = await refundOrder(existing.id, { method: method || 'money', ...actor(req), reason });
+    } catch (e) {
+      if (e.pspFailure) {
         await audit({ actor: req.user, action: 'order.refund_failed', targetType: 'order',
-          targetId: existing.id, metadata: { paymentId: psp.paymentId, error: e.message }, req });
-        throw badRequest(`Mollie refused the refund: ${e.message}`);
+          targetId: existing.id, metadata: e.pspFailure, req });
       }
+      throw e;
     }
-    /* The same for Stripe, which this branch did not have: the order went to
-       `refunded`, the buyer was told so, and the money stayed with the shop. */
-    if (psp?.provider === 'stripe' && stripeEnabled()) {
-      try {
-        refund = await refundPaymentIntent(existing.paymentRef || psp.paymentId, { cents: existing.total, orderId: existing.id });
-      } catch (e) {
-        await audit({ actor: req.user, action: 'order.refund_failed', targetType: 'order',
-          targetId: existing.id, metadata: { paymentId: psp.paymentId, error: e.message }, req });
-        throw badRequest(`Stripe refused the refund: ${e.message}`);
-      }
-    }
-
-    const order = await transitionOrder(req.params.id, 'refunded',
-      { ...actor(req), reason: reason || 'Refunded by staff' });
     await audit({ actor: req.user, action: 'order.refund', targetType: 'order',
-      targetId: order.id,
-      metadata: { reason, provider: psp?.provider || 'manual', refundId: refund?.id || null }, req });
-    res.json({ order, refund });
+      targetId: existing.id,
+      metadata: { reason, method: method || 'money', provider: out.refund?.provider || null,
+        refundId: out.refund?.id || null, credited: out.refund?.amount || null }, req });
+    res.json({ order: out.order, refund: out.refund });
   }));
 
 // Cancel.

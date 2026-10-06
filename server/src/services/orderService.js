@@ -614,7 +614,8 @@ export async function transitionOrder(orderId, to, ctx = {}) {
     // Delivered count / live feed just changed → refresh the public stats now.
     bustSocialCaches();
     // DM Discord-linked buyers their codes + a /vouch prompt (best-effort).
-    await sendDeliveryDm(updated).catch(() => {});
+    // Not awaited: Discord being slow must not hold the delivery request.
+    keepAlive(sendDeliveryDm(updated).catch(() => {}));
   }
   // If the order is cancelled/refunded, return any store credit that was spent on it.
   /* An order that stops being a sale takes its referral commission with it.
@@ -698,8 +699,11 @@ export async function transitionOrder(orderId, to, ctx = {}) {
   // single paid order. The reconciler works out the whole set from scratch, so
   // one call handles both directions.
   if (['payment_received', 'completed', 'refunded', 'cancelled', 'failed'].includes(to)) {
-    await syncMemberRoles(updated.userId, { reason: `order ${updated.number} → ${to}` })
-      .catch((e) => console.error('[discord] role sync:', e.message));
+    /* Not awaited. This sat between "paid" and "start the delivery": with
+       Discord's API hanging, the webhook never reached the delivery at all.
+       Roles are a nicety that the maintenance sweep reconciles anyway. */
+    keepAlive(syncMemberRoles(updated.userId, { reason: `order ${updated.number} → ${to}` })
+      .catch((e) => console.error('[discord] role sync:', e.message)));
   }
   if (updated.userId) {
     const n = emailCopy(updated.billing?.lang).notice;
@@ -1655,7 +1659,7 @@ export function orderUrlFor(order) {
  * store credit, and it never said whether the refund was all of the order or
  * part of it.
  */
-function refundDetailsHtml(order, lang, refundCents) {
+function refundDetailsHtml(order, lang, refundCents, refundAs = null) {
   const c = emailCopy(lang);
   const cur = order.currency;
   const total = Number(order.total || 0);
@@ -1663,6 +1667,16 @@ function refundDetailsHtml(order, lang, refundCents) {
   const remaining = Math.max(0, total - refunded);
   const credit = Number(order.billing?.creditApplied || 0);
   const method = String(order.billing?.paymentMethod || '').toLowerCase();
+  /* Refunded as store credit at the buyer's choice: all of it is in the
+     wallet already, whatever they paid with. */
+  if (refundAs === 'credit') {
+    const all = total + credit;
+    const row = (label, value) => `<tr><td style="padding:6px 0;color:#9aa3b8;font-size:13.5px">${escapeHtml(label)}</td>`
+      + `<td style="padding:6px 0;color:#ffffff;font-size:13.5px;text-align:right">${escapeHtml(value)}</td></tr>`;
+    return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:0 0 14px">`
+      + `${row(c.refundRefunded, formatMoney(all, cur, lang))}${row(c.refundVia, c.refundMethods.credit)}</table>`
+      + `<p>${escapeHtml(c.refundTiming.creditAll)}</p>`;
+  }
   const kind = order.pspProvider ? 'card'
     : /bank|transfer|overboeking|sepa/.test(method) ? 'bank'
       : total > 0 ? 'manual' : 'credit';
@@ -1727,6 +1741,7 @@ function emailContext(order, ctx = {}) {
     orderOpts: {
       ...(ctx.refundAmount != null ? { refundAmount: ctx.refundAmount } : {}),
       ...(ctx.reason ? { reason: String(ctx.reason).slice(0, 200) } : {}),
+      ...(ctx.refundAs ? { refundAs: ctx.refundAs } : {}),
     },
     user: { name: order.billing?.full_name || order.email.split('@')[0] },
     order: {
@@ -1750,8 +1765,10 @@ function emailContext(order, ctx = {}) {
       url: orderUrlFor(order),
     },
     refund: {
-      amount: formatMoney(ctx.refundAmount != null ? ctx.refundAmount : order.total, order.currency, lang),
-      detailsHtml: refundDetailsHtml(order, lang, ctx.refundAmount),
+      amount: formatMoney(ctx.refundAs === 'credit'
+        ? Number(order.total || 0) + Number(order.billing?.creditApplied || 0)
+        : ctx.refundAmount != null ? ctx.refundAmount : order.total, order.currency, lang),
+      detailsHtml: refundDetailsHtml(order, lang, ctx.refundAmount, ctx.refundAs),
     },
     cancel: { reasonHtml: cancelReasonHtml(order, lang, ctx.reason) },
   };

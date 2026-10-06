@@ -2209,4 +2209,16 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS lang TEXT;
        WHERE metadata LIKE '{%' AND metadata LIKE '%discovery%' AND metadata::jsonb ->> 'source' = 'discovery' AND name ~ ' \\d+ maand(en)?\\M';
     `,
   },
+  {
+    id: '059_refund_method',
+    /*
+     * A buyer who asks for a refund chooses how: the money back the way they
+     * paid, or the amount as store credit in their account (only possible on
+     * an order placed with an account — credit lives in a wallet). The owner's
+     * approval then does exactly that. Existing requests were all for money.
+     */
+    sql: `
+      ALTER TABLE refund_requests ADD COLUMN IF NOT EXISTS method TEXT NOT NULL DEFAULT 'money';
+    `,
+  },
 ];
