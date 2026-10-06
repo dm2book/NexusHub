@@ -18,6 +18,7 @@ import { listOrders, getOrder } from '../services/orderService.js';
 import { addVerifiedReview } from '../services/reviewsService.js';
 import { updateProfile, updatePreferences, publicUser } from '../services/userService.js';
 import { loyaltyFor } from '../services/loyaltyService.js';
+import { communityProfile } from '../services/communityService.js';
 import { affiliateStats } from '../services/affiliateService.js';
 import { coinBalance, coinHistory, coinProgress, redeemReward, spendCoins }
   from '../services/forgeCoinService.js';
@@ -59,6 +60,13 @@ function dedupe(orders) {
 }
 
 // ── Rewards: loyalty tier, affiliate program, Forge+ membership ──────────────
+/* Level, XP, badges, achievements, referral level and streaks — all
+   recomputed from this customer's own real orders, reviews, referrals and
+   check-ins (communityService). */
+router.get('/community', asyncHandler(async (req, res) => {
+  res.json(await communityProfile(req.user.id));
+}));
+
 router.get('/rewards', asyncHandler(async (req, res) => {
   const [loyalty, affiliate, membership, walletBalance, coins] = await Promise.all([
     loyaltyFor(req.user.id),

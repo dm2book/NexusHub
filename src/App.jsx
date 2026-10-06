@@ -68,6 +68,8 @@ const Billing = lazy(() => import('./pages/account/Billing.jsx'));
 const Notifications = lazy(() => import('./pages/account/Notifications.jsx'));
 const Settings = lazy(() => import('./pages/account/Settings.jsx'));
 const Rewards = lazy(() => import('./pages/account/Rewards.jsx'));
+const AccountCommunity = lazy(() => import('./pages/account/Community.jsx'));
+const AdminCommunity = lazy(() => import('./pages/admin/Community.jsx'));
 const ForgeShop = lazy(() => import('./pages/account/ForgeShop.jsx'));
 const WalletPage = lazy(() => import('./pages/account/Wallet.jsx'));
 const Referrals = lazy(() => import('./pages/account/Referrals.jsx'));
@@ -87,6 +89,8 @@ const AdminAdIntelligence = lazy(() => import('./pages/admin/AdIntelligence.jsx'
 const AdminProfitCenter = lazy(() => import('./pages/admin/SupplierProfitCenter.jsx'));
 const AdminAdScripts = lazy(() => import('./pages/admin/AdScripts.jsx'));
 const AdminAdConcepts = lazy(() => import('./pages/admin/AdConcepts.jsx'));
+const SeoCollection = lazy(() => import('./pages/SeoCollection.jsx'));
+const AdminSeoPages = lazy(() => import('./pages/admin/SeoPages.jsx'));
 const AdminAdStudio = lazy(() => import('./pages/admin/AdStudio.jsx'));
 const AdminProductMedia = lazy(() => import('./pages/admin/ProductMedia.jsx'));
 const AdminProductContent = lazy(() => import('./pages/admin/ProductContent.jsx'));
@@ -142,6 +146,10 @@ export default function App() {
               <Shop landingCategory={def.category} landingPath={path} />} />
           ))}
           <Route path="/wishlist" element={<Wishlist />} />
+          {/* Generated catalogue pages (src/lib/seoCatalog.js). */}
+          {['/games/:slug', '/giftcards/:slug', '/platform/:slug', '/cadeau/:slug'].map((p) => (
+            <Route key={p} path={p} element={<SeoCollection />} />
+          ))}
           <Route path="/product/:id" element={<ProductDetail />} />
           <Route path="/cart" element={<Cart />} />
           <Route path="/checkout" element={<Checkout />} />
@@ -175,6 +183,7 @@ export default function App() {
         <Route element={<ProtectedRoute><AccountLayout /></ProtectedRoute>}>
           <Route path="/account" element={<Dashboard />} />
           <Route path="/account/rewards" element={<Rewards />} />
+          <Route path="/account/community" element={<AccountCommunity />} />
           <Route path="/account/forge-shop" element={<ForgeShop />} />
           <Route path="/account/wallet" element={<WalletPage />} />
           <Route path="/account/referrals" element={<Referrals />} />
@@ -208,6 +217,8 @@ export default function App() {
           <Route path="/admin/profit-center" element={<AdminProfitCenter />} />
           <Route path="/admin/growth/ad-scripts" element={<AdminAdScripts />} />
           <Route path="/admin/growth/ad-concepts" element={<AdminAdConcepts />} />
+          <Route path="/admin/community" element={<AdminCommunity />} />
+          <Route path="/admin/growth/seo" element={<AdminSeoPages />} />
           <Route path="/admin/growth/ad-studio" element={<AdminAdStudio />} />
           <Route path="/admin/products/media" element={<AdminProductMedia />} />
           <Route path="/admin/products/content" element={<AdminProductContent />} />

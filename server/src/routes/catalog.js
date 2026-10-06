@@ -186,6 +186,26 @@ router.post('/attribution/event',
 // Public trust stats for the storefront (orders delivered, avg delivery, recent
 // deliveries…). Cached briefly so the homepage stays fast under load.
 let statsCache = { at: 0, data: null };
+/* A generated SEO page (game / gift card / platform / gift budget), in the
+   reader's language: copy, FAQ, related links, schema and the product ids. */
+router.get('/seo/page', asyncHandler(async (req, res) => {
+  publicCache(res, 300);
+  const { seoPageByPath, pagePayload } = await import('../services/seoPageService.js');
+  const path = String(req.query.path || '').slice(0, 120).replace(/\/+$/, '');
+  const page = await seoPageByPath(path);
+  if (!page) throw new ApiError(404, 'No such page');
+  res.json({ page: pagePayload(page, String(req.query.lang || 'nl')) });
+}));
+
+/* Community milestones the shop has really passed — counted from completed
+   orders, verified reviews, referrals and check-ins; none are shown before
+   they are reached. */
+router.get('/community/milestones', asyncHandler(async (_req, res) => {
+  publicCache(res, 300);
+  const { publicMilestones } = await import('../services/communityService.js');
+  res.json({ milestones: await publicMilestones() });
+}));
+
 router.get('/stats', asyncHandler(async (_req, res) => {
   publicCache(res, 300);
   if (!statsCache.data || Date.now() - statsCache.at > 30_000) {
@@ -856,8 +876,15 @@ router.get('/sitemap.xml', asyncHandler(async (_req, res) => {
     .filter(([, def]) => !def.category || (perCategory[String(def.category).toLowerCase()] || 0) >= 2)
     .map(([path, def]) => [path, def.category ? '0.9' : '0.8', 'daily']);
 
+  /* The generated game, gift-card, platform and gift-budget pages
+     (seoPageService) — each exists only where the catalogue has depth, the
+     same rule as the landing pages above. Hand-written ones are listed there. */
+  const { seoPages } = await import('../services/seoPageService.js');
+  const generated = ((await seoPages().catch(() => ({ pages: [] }))).pages || [])
+    .filter((pg) => !pg.handWritten).map((pg) => [pg.path, pg.type === 'budget' ? '0.6' : '0.8', 'daily']);
+
   const urls = [
-    ...[...staticPages, ...landingPages].map(([p, prio, freq]) => ({ loc: `${base}${p}`, prio, freq })),
+    ...[...staticPages, ...landingPages, ...generated].map(([p, prio, freq]) => ({ loc: `${base}${p}`, prio, freq })),
     // Products carry a real lastmod so a price change is re-crawled rather than
     // waiting for the whole site to be revisited.
     ...products.map((p) => ({

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Outlet, NavLink, Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   Zap, BarChart3, ShoppingCart, Truck, PackageCheck, Package,
-  Mail, ShieldAlert, LogOut, Store, LifeBuoy, Menu, X, Users, ShieldCheck, Activity, Gauge, Tag, LayoutGrid, TrendingUp, Euro, Percent, Radio, Rocket, Crown, Megaphone, Scale, Clapperboard, Film, ImageIcon, FileText, BadgeCheck, PackageSearch } from 'lucide-react';
+  Mail, ShieldAlert, LogOut, Store, LifeBuoy, Menu, X, Users, ShieldCheck, Activity, Gauge, Tag, LayoutGrid, TrendingUp, Euro, Percent, Radio, Rocket, Crown, Megaphone, Scale, Clapperboard, Film, ImageIcon, FileText, BadgeCheck, PackageSearch, Trophy } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { api } from '../lib/api.js';
 
@@ -33,10 +33,12 @@ const NAV = [
   { heading: 'Growth' },
   { to: '/admin/growth/opportunities', icon: Rocket, label: 'Product Opportunities', perm: 'products.read' },
   { to: '/admin/growth/customers', icon: Crown, label: 'Top Customers', perm: 'analytics.read' },
+  { to: '/admin/community', icon: Trophy, label: 'Community', perm: 'analytics.read' },
   { to: '/admin/growth/ads', icon: Megaphone, label: 'Ad Intelligence', perm: 'analytics.read' },
   { to: '/admin/growth/ad-scripts', icon: Clapperboard, label: 'Ad Scripts', perm: 'analytics.read' },
   { to: '/admin/growth/ad-concepts', icon: Film, label: 'Ad Concepts', perm: 'analytics.read' },
   { to: '/admin/growth/ad-studio', icon: Film, label: 'Ad Studio', perm: 'analytics.read' },
+  { to: '/admin/growth/seo', icon: FileText, label: 'SEO pages', perm: 'analytics.read' },
   { heading: 'Shop' },
   { to: '/admin/support', icon: LifeBuoy, label: 'Support', perm: 'tickets.read', badge: 'tickets' },
   { to: '/admin/social', icon: Activity, label: 'Social proof', perm: 'social.moderate' },

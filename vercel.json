@@ -31,6 +31,22 @@
       "destination": "/api"
     },
     {
+      "source": "/cadeau/(.*)",
+      "destination": "/api"
+    },
+    {
+      "source": "/platform/(.*)",
+      "destination": "/api"
+    },
+    {
+      "source": "/giftcards/(.+)",
+      "destination": "/api"
+    },
+    {
+      "source": "/games/(.*)",
+      "destination": "/api"
+    },
+    {
       "source": "/((?!api/).*)",
       "destination": "/index.html"
     }

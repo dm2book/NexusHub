@@ -1012,6 +1012,18 @@ const NL = {
   'cookie.body': 'Wat de winkel nodig heeft slaan we altijd op: ingelogd blijven, je winkelwagen en je taal. Daarnaast willen we graag meten welke pagina\u2019s bezocht worden. Dat deel is aan jou — de winkel werkt hoe dan ook.',
   'cookie.accept': 'Accepteren',
   'cookie.reject': 'Alleen het noodzakelijke',
+  'seo.giftcards': '{x} giftcards',
+  'seo.platform': 'Voor {x}',
+  'seo.budget': 'Cadeau onder €{x}',
+  'seo.game': '{unit} voor {name}',
+  'seo.related': 'Gerelateerd',
+  'milestone.title': 'Community-mijlpalen',
+  'milestone.orders': 'afgeronde bestellingen',
+  'milestone.buyers': 'verschillende kopers',
+  'milestone.items': 'codes en top-ups geleverd',
+  'milestone.reviews': 'geverifieerde reviews',
+  'milestone.referrals': 'vrienden die via een vriend bestelden',
+  'milestone.checkins': 'dagelijkse check-ins',
   'discord.showChannels': 'Bekijk alle kanalen in de server',
   'discord.backToShop': 'Terug naar de winkel',
   'shop.platform': 'Platform',
@@ -1148,7 +1160,17 @@ export function loadDictionary(code) {
     .catch(() => { console.warn(`[i18n] could not load the ${code} dictionary — falling back to English`); });
 }
 
-const lookup = (lang, key, en) => DICTS[lang]?.[key] ?? en;
+/* Area dictionaries — strings for a part of the site only some visitors reach
+   (the signed-in account area), registered by that area's own chunk so they
+   never weigh on the storefront's first load. Same lookup order: the main
+   dictionary, then the area's, then the English written in the code. */
+const EXTRA = {};
+export function extendDictionary(lang, entries) {
+  EXTRA[lang] = { ...(EXTRA[lang] || {}), ...entries };
+  dictVersion += 1;
+  listeners.forEach((fn) => fn());
+}
+const lookup = (lang, key, en) => DICTS[lang]?.[key] ?? EXTRA[lang]?.[key] ?? en;
 
 function readStoredLang() {
   try {

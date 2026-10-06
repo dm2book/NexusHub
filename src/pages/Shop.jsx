@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { platformOf } from '../lib/platform.js';
+import { useSeoPage, SeoFaq, SeoLinks } from '../components/store/SeoExtras.jsx';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Search, SlidersHorizontal, PackageX, LayoutGrid, CloudOff } from 'lucide-react';
 import { api } from '../lib/api.js';
@@ -379,7 +380,16 @@ export default function Shop({ landingCategory = null, landingPath = null } = {}
             </span>
           </div>
         )}
+        {/* A hand-written landing page gets the generated FAQ (with its
+            FAQPage schema) and links to related pages underneath. */}
+        {landingPath && <LandingExtras path={landingPath} />}
       </main>
     </div>
   );
+}
+
+function LandingExtras({ path }) {
+  const page = useSeoPage(path);
+  if (!page) return null;
+  return (<><SeoFaq page={page} withSchema /><SeoLinks page={page} /></>);
 }

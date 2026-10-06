@@ -228,7 +228,7 @@ export default function StoreNav() {
             lighter grey measures 2.34:1 — well under the 4.5:1 that small text
             needs. Same visual weight, actually readable. */}
         <button onClick={() => window.dispatchEvent(new CustomEvent('forge:cmdk'))}
-          className="hidden md:flex items-center gap-2 bg-slate-100 rounded-xl px-3.5 h-10 w-[190px] min-[1400px]:w-[232px] text-slate-500 hover:bg-slate-200/70 transition">
+          className="hidden md:flex items-center gap-2 bg-slate-100 rounded-xl px-3.5 h-10 w-[190px] min-[1600px]:w-[232px] text-slate-500 hover:bg-slate-200/70 transition">
           <Search size={16} />
           {/* Two labels, because the box is a fixed 190px below xl and 240px
               above it, and "Search for products..." does not fit in 190 — nor
@@ -237,8 +237,8 @@ export default function StoreNav() {
               than a short one, so the narrow width gets a label written for
               it. Same pattern the Sign Up button beside this one already uses:
               the icon always fits, the words appear when there is room. */}
-          <span className="text-sm whitespace-nowrap min-[1400px]:hidden">{t('nav.searchShort', 'Search…')}</span>
-          <span className="text-sm whitespace-nowrap hidden min-[1400px]:inline truncate">{t('nav.search', 'Search products…')}</span>
+          <span className="text-sm whitespace-nowrap min-[1600px]:hidden">{t('nav.searchShort', 'Search…')}</span>
+          <span className="text-sm whitespace-nowrap hidden min-[1600px]:inline truncate">{t('nav.search', 'Search products…')}</span>
           <kbd className="ml-auto text-[11px] bg-white border border-slate-200 rounded px-1.5 py-0.5">⌘K</kbd>
         </button>
         <button onClick={() => window.dispatchEvent(new CustomEvent('forge:cmdk'))} aria-label={t('nav.search', 'Search products…')}

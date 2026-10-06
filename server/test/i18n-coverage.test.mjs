@@ -43,6 +43,9 @@ for (const f of files) {
 const i18n = readFileSync(join(SRC, 'lib/i18n.jsx'), 'utf8');
 const dict = i18n.slice(i18n.indexOf('const NL = {'), i18n.indexOf('\n};', i18n.indexOf('const NL = {')));
 const translated = new Set([...dict.matchAll(/^\s*'([^']+)':/gm)].map((m) => m[1]));
+// The account area's strings live in their own lazily loaded dictionary.
+const accountNl = readFileSync(join(SRC, 'lib/i18n/account.nl.js'), 'utf8');
+for (const m of accountNl.matchAll(/^\s*"([^"]+)":/gm)) translated.add(m[1]);
 
 console.log('— Dutch coverage —');
 {
