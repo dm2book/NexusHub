@@ -68,6 +68,8 @@ const Billing = lazy(() => import('./pages/account/Billing.jsx'));
 const Notifications = lazy(() => import('./pages/account/Notifications.jsx'));
 const Settings = lazy(() => import('./pages/account/Settings.jsx'));
 const Rewards = lazy(() => import('./pages/account/Rewards.jsx'));
+const AccountCommunity = lazy(() => import('./pages/account/Community.jsx'));
+const AdminCommunity = lazy(() => import('./pages/admin/Community.jsx'));
 const ForgeShop = lazy(() => import('./pages/account/ForgeShop.jsx'));
 const WalletPage = lazy(() => import('./pages/account/Wallet.jsx'));
 const Referrals = lazy(() => import('./pages/account/Referrals.jsx'));
@@ -175,6 +177,7 @@ export default function App() {
         <Route element={<ProtectedRoute><AccountLayout /></ProtectedRoute>}>
           <Route path="/account" element={<Dashboard />} />
           <Route path="/account/rewards" element={<Rewards />} />
+          <Route path="/account/community" element={<AccountCommunity />} />
           <Route path="/account/forge-shop" element={<ForgeShop />} />
           <Route path="/account/wallet" element={<WalletPage />} />
           <Route path="/account/referrals" element={<Referrals />} />
@@ -208,6 +211,7 @@ export default function App() {
           <Route path="/admin/profit-center" element={<AdminProfitCenter />} />
           <Route path="/admin/growth/ad-scripts" element={<AdminAdScripts />} />
           <Route path="/admin/growth/ad-concepts" element={<AdminAdConcepts />} />
+          <Route path="/admin/community" element={<AdminCommunity />} />
           <Route path="/admin/growth/ad-studio" element={<AdminAdStudio />} />
           <Route path="/admin/products/media" element={<AdminProductMedia />} />
           <Route path="/admin/products/content" element={<AdminProductContent />} />

@@ -8,6 +8,7 @@ import { useReviews } from '../lib/useReviews.js';
 import { usePageMeta } from '../lib/useMeta.js';
 import { useI18n } from '../lib/i18n.jsx';
 import LiveActivity from '../components/store/LiveActivity.jsx';
+import CommunityMilestones from '../components/store/CommunityMilestones.jsx';
 import SellerIdentity from '../components/store/SellerIdentity.jsx';
 
 const guarantees = (t) => [
@@ -115,6 +116,7 @@ export default function Trust() {
 
       {/* Live, database-backed activity (hides itself until there's real data) */}
       <LiveActivity />
+      <CommunityMilestones />
 
       {/* Who is selling. On a page about trust this outranks any statistic: a
           buyer sending a bank transfer to a shop they have never heard of wants

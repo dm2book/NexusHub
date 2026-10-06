@@ -186,6 +186,15 @@ router.post('/attribution/event',
 // Public trust stats for the storefront (orders delivered, avg delivery, recent
 // deliveries…). Cached briefly so the homepage stays fast under load.
 let statsCache = { at: 0, data: null };
+/* Community milestones the shop has really passed — counted from completed
+   orders, verified reviews, referrals and check-ins; none are shown before
+   they are reached. */
+router.get('/community/milestones', asyncHandler(async (_req, res) => {
+  publicCache(res, 300);
+  const { publicMilestones } = await import('../services/communityService.js');
+  res.json({ milestones: await publicMilestones() });
+}));
+
 router.get('/stats', asyncHandler(async (_req, res) => {
   publicCache(res, 300);
   if (!statsCache.data || Date.now() - statsCache.at > 30_000) {
