@@ -57,6 +57,8 @@ const CALLS = { email: 0, discord: 0, supplier: 0, stripe: 0 };
 const UNBOUNDED = { email: 0, discord: 0, supplier: 0, stripe: 0 };   // hangs no timeout ended
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let seq = 0;
+const RUN = Date.now().toString(36);
+const SUPPLIER_LOG = {};
 
 function hang(svc, signal) {
   return new Promise((_, reject) => {
@@ -101,10 +103,12 @@ globalThis.fetch = async (input, init = {}) => {
     throw new TypeError(`fetch failed (simulation blocks ${url.hostname})`);
   }
   CALLS[svc]++;
+  if (svc === 'supplier') { const k = `${(init.method || 'GET').toUpperCase()} ${url.pathname.replace(/\/[^/]*\d[^/]*$/, '/:ref')} (${MODE.supplier})`; SUPPLIER_LOG[k] = (SUPPLIER_LOG[k] || 0) + 1; }
   const mode = MODE[svc];
   if (mode === 'down') { await sleep(15); const e = new TypeError('fetch failed'); e.cause = { code: 'ECONNREFUSED' }; throw e; }
   if (mode === '503') return json({ message: 'Service Unavailable' }, 503);
   if (mode === 'hang') return hang(svc, init.signal);
+  if (svc === 'supplier' && SLOW_SUPPLIER_MS) await sleep(SLOW_SUPPLIER_MS);
   return answer(svc, url, init);
 };
 
@@ -122,7 +126,7 @@ const stripeServer = http.createServer((req, res) => {
     const p = req.url.split('?')[0];
     let out = {};
     if (req.method === 'POST' && p === '/v1/checkout/sessions') {
-      const id = `cs_test_lw${++seq}`;
+      const id = `cs_test_lw_${RUN}_${++seq}`;
       out = { id, object: 'checkout.session', status: 'open', url: `https://checkout.stripe.com/c/pay/${id}`, payment_intent: null };
     } else if (p.startsWith('/v1/checkout/sessions/')) {
       const id = p.split('/').pop();
@@ -243,7 +247,7 @@ async function stripeCheckout(order) {
 }
 
 async function webhook(type, object) {
-  const payload = JSON.stringify({ id: `evt_lw${++seq}`, object: 'event', type, livemode: false, created: Math.floor(Date.now() / 1000), data: { object } });
+  const payload = JSON.stringify({ id: `evt_lw_${TAG}_${++seq}`, object: 'event', type, livemode: false, created: Math.floor(Date.now() / 1000), data: { object } });
   const header = signer.webhooks.generateTestHeaderString({ payload, secret: 'whsec_launchweek' });
   const t = Date.now();
   try {
@@ -295,6 +299,7 @@ async function outcome(ids, since) {
 /* ── One day of orders ──────────────────────────────────────────────────── */
 async function day(label, n, { stock, concurrency = 8, stripeShare = 0.8, accountShare = 0.3, discordShare = 0.1,
   cgnatShare = 0.05, dearShare = 0.04, manualShare = 0.15, burst = 0 } = {}) {
+  await leaseFree();
   const since = nowIso();
   const cat = await catalogue(label, { stock });
   const cgnatIp = freshIp();
@@ -347,18 +352,61 @@ async function day(label, n, { stock, concurrency = 8, stripeShare = 0.8, accoun
 }
 
 const strip = ({ ids, cat, ...r }) => r;
-const log = (name, r) => { report.phases[name] = strip(r); console.log(`\n■ ${name}\n${JSON.stringify(strip(r), null, 1).slice(0, 3000)}`); };
+/** Phases must not leak into each other: wait for any supplier drain still
+    running from the last one to let go of its lease, and say how long it took. */
+async function leaseFree(maxMs = 120_000) {
+  const t = Date.now();
+  while (Date.now() - t < maxMs) {
+    const row = await get(`SELECT 1 FROM kv WHERE key='supplier_queue_lock'`);
+    if (!row) return Date.now() - t;
+    await sleep(500);
+  }
+  return -1;
+}
+const log = (name, r) => { r = { ...r, supplierCallsSoFar: { ...SUPPLIER_LOG } }; report.phases[name] = strip(r); console.log(`\n■ ${name}\n${JSON.stringify(strip(r), null, 1).slice(0, 3000)}`); };
 
 /* ── Phases ─────────────────────────────────────────────────────────────── */
 let base500 = null;
+let SLOW_SUPPLIER_MS = 0;
 
 if (want('d100')) {
-  log('Day @ 100 orders — everything up', await day('d100', 100, { stock: 60 }));
+  log('Day @ 100 orders — everything up', { ...(await day('d100', 100, { stock: 60 })), leaseWaitMs: await leaseFree() });
 }
 
 if (want('d500')) {
   base500 = await day('d500', 500, { stock: 250, burst: 60, concurrency: 12 });
-  log('Day @ 500 orders — everything up, 60 at once at the start', base500);
+  const supByMode = Object.fromEntries((await all(`SELECT p.name LIKE 'Robux 2000%' AS supplier_only, fr.mode||':'||fr.status AS k, COUNT(*)::int AS n FROM fulfillment_requests fr JOIN order_items oi ON oi.id=fr.order_item_id JOIN products p ON p.id=oi.product_id WHERE fr.order_id = ANY(@ids) GROUP BY 1,2`, { ids: base500.ids })).map((r) => [`${r.supplier_only ? 'supplierProduct' : 'other'} ${r.k}`, r.n]));
+  log('Day @ 500 orders — everything up, 60 at once at the start', { ...base500, requestsByProduct: supByMode, leaseWaitMs: await leaseFree() });
+}
+
+if (want('paced')) {
+  /* The same supplier product, but orders arriving one at a time, 3 s apart —
+     closer to a real evening than a burst. What matters: does every order that
+     the supplier can fill actually go to the supplier? */
+  const since = nowIso();
+  const cat = await catalogue('paced', { stock: 0 });
+  const ids = []; const t0 = Date.now();
+  for (let i = 0; i < 20; i++) {
+    const r = await placeGuest(cat.viaSupplier.id, { email: `paced${i}-${TAG}@example.com`, ip: freshIp() });
+    if (r.ok) { ids.push(r.order.id); await stripeCheckout(r.order); await paySession(r.order); }
+    await sleep(3000);
+  }
+  await quiesce(ids);
+  const byMode = Object.fromEntries((await all(`SELECT mode||':'||status AS k, COUNT(*)::int AS n FROM fulfillment_requests WHERE order_id = ANY(@ids) GROUP BY 1`, { ids })).map((r) => [r.k, r.n]));
+  log('Supplier product, 20 orders 3 s apart (paced), supplier up', { orders: ids.length, wallMs: Date.now() - t0, requests: byMode, ...(await outcome(ids, since)) });
+  /* Same, but the supplier takes 4 s per order — a slow API, not a dead one. */
+  SLOW_SUPPLIER_MS = 4000;
+  const cat2 = await catalogue('slow', { stock: 0 });
+  const ids2 = [];
+  for (let i = 0; i < 20; i++) {
+    const r = await placeGuest(cat2.viaSupplier.id, { email: `slow${i}-${TAG}@example.com`, ip: freshIp() });
+    if (r.ok) { ids2.push(r.order.id); await stripeCheckout(r.order); await paySession(r.order); }
+    await sleep(3000);
+  }
+  await quiesce(ids2, 120_000);
+  SLOW_SUPPLIER_MS = 0;
+  const byMode2 = Object.fromEntries((await all(`SELECT mode||':'||status AS k, COUNT(*)::int AS n FROM fulfillment_requests WHERE order_id = ANY(@ids) GROUP BY 1`, { ids: ids2 })).map((r) => [r.k, r.n]));
+  log('Supplier product, 20 orders 3 s apart, supplier answers in 4 s', { orders: ids2.length, requests: byMode2, ...(await outcome(ids2, since)), leaseWaitMs: await leaseFree() });
 }
 
 if (want('money')) {
@@ -418,6 +466,7 @@ if (want('supplier')) {
   const r = await day('supdown', 100, { stock: 0, stripeShare: 1, manualShare: 0, dearShare: 0 });
   MODE.supplier = 'up';
   const before = r.status;
+  await leaseFree();
   const passes = await recovery(r.ids, 8);
   log('Supplier down for a day (connection refused), 100 orders, no code stock', { ...strip(r), statusAtEndOfOutage: before,
     recovery: passes, afterRecovery: (await outcome(r.ids, '1970-01-01')).status });
@@ -427,10 +476,11 @@ if (want('supplierhang')) {
   MODE.supplier = 'hang';
   const r = await day('suphang', 12, { stock: 0, stripeShare: 1, manualShare: 0, dearShare: 0, concurrency: 12 });
   const supCalls = CALLS.supplier;
+  const leaseHeldMs = await leaseFree(180_000);
   MODE.supplier = 'up';
   const t = Date.now();
   const passes = await recovery(r.ids, 4);
-  log('Supplier hanging (accepts, never answers), 12 orders', { ...strip(r), supplierCalls: supCalls,
+  log('Supplier hanging (accepts, never answers), 12 orders', { ...strip(r), supplierCalls: supCalls, leaseHeldAfterLastPaymentMs: leaseHeldMs,
     recovery: passes, recoveryMs: Date.now() - t, afterRecovery: (await outcome(r.ids, '1970-01-01')).status });
 }
 
