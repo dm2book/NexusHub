@@ -17,7 +17,7 @@ const LABEL = {
 };
 
 export default function CommunityMilestones() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [list, setList] = useState([]);
   useEffect(() => {
     let live = true;
@@ -31,7 +31,7 @@ export default function CommunityMilestones() {
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {list.map((m) => (
           <div key={m.id} className="card p-4">
-            <div className="text-2xl text-white font-extrabold tabular-nums">{m.reached.toLocaleString('nl-NL')}+</div>
+            <div className="text-2xl text-white font-extrabold tabular-nums">{m.reached.toLocaleString(locale)}+</div>
             <div className="text-slate-400 text-sm">{t(...LABEL[m.id])}</div>
           </div>
         ))}

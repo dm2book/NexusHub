@@ -52,6 +52,131 @@ export const REFERRAL_LEVELS = [
 /* Milestone targets the shop as a whole moves through. */
 export const MILESTONE_STEPS = [10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 25000, 50000, 100000];
 
+
+/* English names for the owner's console (which is in English); customers get
+   their own language on the client, keyed by these same ids. */
+export const EN = {
+ "levels": {
+  "1": "Newcomer",
+  "2": "Player",
+  "3": "Regular",
+  "4": "Grinder",
+  "5": "Veteran",
+  "6": "Elite",
+  "7": "Champion",
+  "8": "Master",
+  "9": "Grandmaster",
+  "10": "Legend"
+ },
+ "ref": {
+  "none": "None yet",
+  "scout": "Scout",
+  "recruiter": "Recruiter",
+  "ambassador": "Ambassador",
+  "legend": "Legend"
+ },
+ "xp": {
+  "euro": "per whole euro spent",
+  "order": "per completed order",
+  "review": "per verified review",
+  "referral": "per friend who really ordered",
+  "claim": "per daily check-in",
+  "discord": "once: Discord linked"
+ },
+ "group": {
+  "Bestellingen": "Orders",
+  "Community": "Community",
+  "Streaks": "Streaks",
+  "Badges": "Badges"
+ },
+ "ach": {
+  "first-order": [
+   "First order",
+   "Your first completed order."
+  ],
+  "regular": [
+   "Regular",
+   "5 completed orders."
+  ],
+  "loyal": [
+   "Loyal",
+   "10 completed orders."
+  ],
+  "collector": [
+   "Collector",
+   "25 completed orders."
+  ],
+  "explorer": [
+   "Explorer",
+   "Bought in 3 different categories."
+  ],
+  "spend-100": [
+   "€100 club",
+   "€100 spent in total."
+  ],
+  "spend-500": [
+   "€500 club",
+   "€500 spent in total."
+  ],
+  "first-review": [
+   "First review",
+   "Wrote a verified review."
+  ],
+  "critic": [
+   "Critic",
+   "5 verified reviews."
+  ],
+  "first-referral": [
+   "First friend",
+   "A friend who really ordered through your link."
+  ],
+  "recruiter": [
+   "Recruiter",
+   "3 friends who really ordered."
+  ],
+  "ambassador": [
+   "Ambassador",
+   "10 friends who really ordered."
+  ],
+  "streak-7": [
+   "Full week",
+   "Checked in 7 days in a row."
+  ],
+  "streak-30": [
+   "Full month",
+   "Checked in 30 days in a row."
+  ],
+  "months-3": [
+   "Three months",
+   "Ordered 3 months in a row."
+  ],
+  "discord": [
+   "Discord",
+   "Discord linked to your account."
+  ],
+  "forge-plus": [
+   "Forge+",
+   "Forge+ member (now or before)."
+  ],
+  "early": [
+   "Early supporter",
+   "Ordered in the first 30 days after opening."
+  ],
+  "night-owl": [
+   "Night owl",
+   "Ordered between midnight and 05:00."
+  ]
+ },
+ "ms": {
+  "orders": "completed orders",
+  "buyers": "different buyers",
+  "items": "codes and top-ups delivered",
+  "reviews": "verified reviews",
+  "referrals": "friends who ordered through a friend",
+  "checkins": "daily check-ins"
+ }
+};
+
 export function levelFor(xp) {
   let cur = LEVELS[0];
   for (const l of LEVELS) if (xp >= l.min) cur = l;
@@ -288,13 +413,14 @@ export async function communityDashboard({ now = new Date() } = {}) {
   return {
     users: Number(users?.n || 0), participants: ids.size, xpTotal,
     avgXp: ids.size ? Math.round(xpTotal / ids.size) : 0,
-    levels: LEVELS.map((l) => ({ ...l, users: levelDist[l.level] })),
-    referralLevels: REFERRAL_LEVELS.map((l) => ({ ...l, users: refDist[l.id] })),
-    achievements: ACHIEVEMENTS.map((a) => ({ id: a.id, kind: a.kind, group: a.group, icon: a.icon, name: a.name, desc: a.desc, earnedBy: awardCount[a.id] })),
+    levels: LEVELS.map((l) => ({ ...l, nameEn: EN.levels[l.level], users: levelDist[l.level] })),
+    referralLevels: REFERRAL_LEVELS.map((l) => ({ ...l, nameEn: EN.ref[l.id], users: refDist[l.id] })),
+    achievements: ACHIEVEMENTS.map((a) => ({ id: a.id, kind: a.kind, group: a.group, groupEn: EN.group[a.group], icon: a.icon, name: a.name, desc: a.desc,
+      nameEn: EN.ach[a.id][0], descEn: EN.ach[a.id][1], earnedBy: awardCount[a.id] })),
     streaks: { activeDaily: activeStreaks, longestDaily: longestStreak, monthStreakers },
     /* Earned in the last 7 days: which award, when — not who. */
-    recent: recent.sort((a, b) => String(b.at).localeCompare(String(a.at))).slice(0, 25),
-    milestones: milestonesFrom(await milestoneCounts()),
-    xpRules: XP_RULES,
+    recent: recent.sort((a, b) => String(b.at).localeCompare(String(a.at))).slice(0, 25).map((r) => ({ ...r, nameEn: EN.ach[r.id][0] })),
+    milestones: milestonesFrom(await milestoneCounts()).map((m) => ({ ...m, labelEn: EN.ms[m.id] })),
+    xpRules: XP_RULES.map((r) => ({ ...r, labelEn: EN.xp[r.id] })),
   };
 }

@@ -1155,7 +1155,17 @@ export function loadDictionary(code) {
     .catch(() => { console.warn(`[i18n] could not load the ${code} dictionary — falling back to English`); });
 }
 
-const lookup = (lang, key, en) => DICTS[lang]?.[key] ?? en;
+/* Area dictionaries — strings for a part of the site only some visitors reach
+   (the signed-in account area), registered by that area's own chunk so they
+   never weigh on the storefront's first load. Same lookup order: the main
+   dictionary, then the area's, then the English written in the code. */
+const EXTRA = {};
+export function extendDictionary(lang, entries) {
+  EXTRA[lang] = { ...(EXTRA[lang] || {}), ...entries };
+  dictVersion += 1;
+  listeners.forEach((fn) => fn());
+}
+const lookup = (lang, key, en) => DICTS[lang]?.[key] ?? EXTRA[lang]?.[key] ?? en;
 
 function readStoredLang() {
   try {

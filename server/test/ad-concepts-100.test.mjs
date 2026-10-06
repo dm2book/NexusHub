@@ -114,7 +114,7 @@ console.log('\n— Wired into the admin —');
   const app = readFileSync(join(ROOT, 'src/App.jsx'), 'utf8');
   ok('the page has a route', /\/admin\/growth\/ad-concepts/.test(app));
   const page = readFileSync(join(ROOT, 'src/pages/admin/AdConcepts.jsx'), 'utf8');
-  ok('the page filters by format and lists what was not possible', /concept-formats/.test(page) && /Niet mogelijk/.test(page));
+  ok('the page filters by format and lists what was not possible', /concept-formats/.test(page) && /Not possible/.test(page));
 }
 
 console.log(`\n${fail ? '❌' : '✅'} ad-concepts-100: ${pass} passed, ${fail} failed`);
