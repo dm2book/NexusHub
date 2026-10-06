@@ -54,6 +54,9 @@ export const FAILOVER = {
   /** Consecutive failed deliveries, within ERROR_WINDOW_HOURS, that count as "erroring". */
   ERROR_STREAK: 2,
   ERROR_WINDOW_HOURS: 24,
+  /** After this long without a new failure, one order may try an erroring
+      supplier again (see fitness). */
+  PROBE_AFTER_MINUTES: 10,
   /** Below this fulfilment rate a supplier is only used when nothing else can. */
   MIN_RELIABILITY: 70,
   /** How much cheaper another supplier must be before "dearer" becomes a reason. */
@@ -82,7 +85,17 @@ export function fitness(m, { priceCents = null, vatPct, cfg } = {}) {
   if (m.lastSyncStatus === 'error') {
     return { ok: false, code: REASON.OFFLINE, reason: `${name}'s last catalogue sync failed — it is not answering` };
   }
-  if ((m.failStreak || 0) >= FAILOVER.ERROR_STREAK) {
+  /* A supplier is not barred for a day by two failures.
+     The streak only ends with a successful delivery — and a barred supplier is
+     never asked for one, so the bar held until both failures aged out of the
+     24-hour window. The launch-week simulation: two refused calls, the API back
+     a minute later, and every order of the next day went to a person. So once
+     PROBE_AFTER_MINUTES have passed since the last failure the supplier is fit
+     again for the next order: a success ends the streak, a failure starts the
+     wait over. The queue is serial, so this is one order at a time. */
+  const probeDue = m.lastFailAt != null
+    && Date.now() - Date.parse(m.lastFailAt) >= FAILOVER.PROBE_AFTER_MINUTES * 60_000;
+  if ((m.failStreak || 0) >= FAILOVER.ERROR_STREAK && !probeDue) {
     return { ok: false, code: REASON.ERRORS,
       reason: `${name}'s last ${m.failStreak} deliveries failed` };
   }
@@ -172,7 +185,7 @@ export async function mappingsFor(productId) {
        FROM fulfillment_requests WHERE supplier_id = ANY(@ids) GROUP BY supplier_id`, { ids }).catch(() => []);
   const since = new Date(Date.now() - FAILOVER.ERROR_WINDOW_HOURS * 3_600_000).toISOString();
   const recent = await all(
-    `SELECT supplier_id, status FROM fulfillment_requests
+    `SELECT supplier_id, status, updated_at FROM fulfillment_requests
       WHERE supplier_id = ANY(@ids) AND created_at >= @since AND status IN ('fulfilled','failed')
       ORDER BY created_at DESC`, { ids, since }).catch(() => []);
 
@@ -185,8 +198,11 @@ export async function mappingsFor(productId) {
   const streak = {};
   for (const r of recent) {
     if (streak[r.supplier_id]?.done) continue;
-    streak[r.supplier_id] ??= { n: 0, done: false };
-    if (r.status === 'failed') streak[r.supplier_id].n += 1;
+    streak[r.supplier_id] ??= { n: 0, done: false, lastFailAt: null };
+    if (r.status === 'failed') {
+      streak[r.supplier_id].n += 1;
+      streak[r.supplier_id].lastFailAt ??= r.updated_at;
+    }
     else streak[r.supplier_id].done = true;
   }
 
@@ -200,6 +216,7 @@ export async function mappingsFor(productId) {
     failed: stats[r.supplier_id]?.failed ?? 0,
     reliabilityPct: stats[r.supplier_id]?.reliabilityPct ?? null,
     failStreak: streak[r.supplier_id]?.n ?? 0,
+    lastFailAt: streak[r.supplier_id]?.lastFailAt ?? null,
   }));
 }
 
@@ -259,7 +276,7 @@ export async function evaluateProduct(productId, { trigger = 'sweep', orderId = 
     /* A supplier that just failed this delivery counts as erroring for this
        decision, whatever its history says. */
     mappings = mappings.map((m) => (exclude.includes(m.supplier_id)
-      ? { ...m, failStreak: Math.max(m.failStreak, FAILOVER.ERROR_STREAK) } : m));
+      ? { ...m, failStreak: Math.max(m.failStreak, FAILOVER.ERROR_STREAK), lastFailAt: nowIso() } : m));
   }
   const product = await get(`SELECT price FROM products WHERE id = @p`, { p: productId });
   const ctx = { priceCents: product ? Number(product.price) : null };

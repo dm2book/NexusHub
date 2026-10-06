@@ -922,9 +922,10 @@ router.get('/sitemap.xml', asyncHandler(async (_req, res) => {
 router.post('/track/:number/refund-request',
   rateLimit({ bucket: 'refund_request', windowMs: 60_000, max: 5, shared: true }),
   asyncHandler(async (req, res) => {
-    const { email, reason } = z.object({
+    const { email, reason, method } = z.object({
       email: z.string().email(),
       reason: z.string().max(2000).optional(),
+      method: z.enum(['money', 'credit']).optional(),
     }).parse(req.body || {});
 
     const order = await getOrderByNumber(req.params.number).catch(() => null);
@@ -945,7 +946,7 @@ router.post('/track/:number/refund-request',
     const existing = await getRefundRequestForOrder(order.id).catch(() => null);
     if (existing) return res.json({ alreadyRequested: true, requestedAt: existing.created_at });
 
-    const r = await requestRefund({ orderId: order.id, userId: order.userId || null, reason });
+    const r = await requestRefund({ orderId: order.id, userId: order.userId || null, reason, method: method || 'money' });
     await audit({
       action: 'refund.request', actor: { email: order.email }, targetType: 'order',
       targetId: order.id, metadata: { guest: !order.userId }, req,
@@ -965,6 +966,8 @@ router.get('/track/:number', asyncHandler(async (req, res) => {
     number: order.number, status: order.status, statusLabel: order.statusLabel,
     total: order.total, totalFormatted: order.totalFormatted, currency: order.currency,
     history: order.history.map((h) => ({ to: h.to_status, at: h.created_at })),
+    // Placed with an account, so a refund can also go to store credit.
+    creditRefund: !!order.userId,
     // The owner can attach a payment request with the exact amount already in
     // it; the buyer's page polls, so it appears without a refresh. Only while
     // the order is unpaid — a pay button on a paid order invites paying twice.

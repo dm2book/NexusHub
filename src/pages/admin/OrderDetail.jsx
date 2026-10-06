@@ -59,7 +59,14 @@ export default function AdminOrderDetail() {
             <button onClick={() => act('fulfill')} disabled={busy} className="btn-ghost text-sm"><Truck size={16} /> Fulfill</button>
           )}
           {hasPermission('orders.refund') && order.status !== 'refunded' && order.status !== 'cancelled' && (
-            <button onClick={() => confirmRefund(order) && act('refund')} disabled={busy} className="btn-ghost text-sm"><RotateCcw size={16} /> Refund</button>
+            <button onClick={() => confirmRefund(order) && act('refund', { method: 'money' })} disabled={busy} className="btn-ghost text-sm"><RotateCcw size={16} /> Refund</button>
+          )}
+          {/* Credit lives in a wallet, so only an order placed with an account can take it. */}
+          {hasPermission('orders.refund') && order.userId && order.status !== 'refunded' && order.status !== 'cancelled' && (
+            <button onClick={() => window.confirm(`Refund ${order.number} as store credit? The full amount goes into the customer's wallet right away.`) && act('refund', { method: 'credit' })}
+              disabled={busy} className="btn-ghost text-sm" title="Puts the full amount (including any store credit used) in their wallet">
+              <RotateCcw size={16} /> Refund as credit
+            </button>
           )}
         </div>
       </div>

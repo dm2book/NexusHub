@@ -32,7 +32,11 @@ async function stripe() {
   if (!config.payments.stripe.secretKey) return null;
   if (!client) {
     const { default: Stripe } = await import('stripe');
-    client = new Stripe(config.payments.stripe.secretKey);
+    /* The SDK's defaults are an 80-second timeout and two retries — four
+       minutes for a call inside a function Vercel ends at 30 s. Stripe answers
+       in well under a second when it is up; when it is not, a quick error the
+       checkout can show beats a request the platform kills mid-sentence. */
+    client = new Stripe(config.payments.stripe.secretKey, { timeout: 8_000, maxNetworkRetries: 1 });
   }
   return client;
 }
@@ -157,7 +161,14 @@ export async function paymentRisk(paymentIntentId) {
   const s = await stripe();
   if (!s || !/^pi_/.test(String(paymentIntentId || ''))) return null;
   try {
-    const pi = await s.paymentIntents.retrieve(paymentIntentId, { expand: ['latest_charge'] });
+    /* Three seconds at most. This runs inside the payment webhook, before the
+       order is marked paid: with Stripe's API slow the webhook ran 75 s in the
+       simulation and was killed, leaving a PAID order pending. A risk check that
+       cannot answer in time does not stop the sale — the same as when it errors. */
+    const pi = await Promise.race([
+      s.paymentIntents.retrieve(paymentIntentId, { expand: ['latest_charge'] }, { timeout: 3_000 }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Radar lookup timed out')), 3_000).unref?.()),
+    ]);
     const ch = pi.latest_charge || {};
     return {
       level: ch.outcome?.risk_level || null,             // normal | elevated | highest | not_assessed

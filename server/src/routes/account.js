@@ -310,8 +310,11 @@ router.get('/orders/:id/invoice', asyncHandler(async (req, res) => {
 // ── Refund requests ────────────────────────────────────────────────────────
 router.post('/orders/:id/refund-request', asyncHandler(async (req, res) => {
   const order = await ownedOrder(req, req.params.id);
-  const { reason } = z.object({ reason: z.string().max(2000).optional() }).parse(req.body);
-  const r = await support.requestRefund({ orderId: order.id, userId: req.user.id, reason });
+  const { reason, method } = z.object({
+    reason: z.string().max(2000).optional(),
+    method: z.enum(['money', 'credit']).optional(),
+  }).parse(req.body);
+  const r = await support.requestRefund({ orderId: order.id, userId: req.user.id, reason, method: method || 'money' });
   await audit({ actor: req.user, action: 'refund.request', targetType: 'order', targetId: order.id, req });
   res.status(201).json({ refundRequest: r });
 }));

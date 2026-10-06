@@ -110,9 +110,11 @@ function Refunds() {
   useEffect(() => { load(); }, []);
   if (!refunds) return <PageLoader />;
 
-  const decide = async (r, status, processOrder = false) => {
-    try { await api.post(`/api/admin/support/refunds/${r.id}/decide`, { status, processOrder });
-      toast.success(`Refund ${status}`); load(); }
+  const decide = async (r, status, processOrder = false, method) => {
+    try { await api.post(`/api/admin/support/refunds/${r.id}/decide`, { status, processOrder, method });
+      toast.success(status === 'rejected' ? 'Refund rejected'
+        : method === 'credit' ? 'Refunded as store credit' : 'Refund approved — money on its way back');
+      load(); }
     catch (err) { toast.error(err.message); }
   };
 
@@ -126,12 +128,23 @@ function Refunds() {
             <div className="text-white text-sm font-mono">{r.order_number}</div>
             <div className="text-slate-500 text-xs">{r.customer} · {date(r.created_at)} · {money(r.amount)}</div>
             {r.reason && <div className="text-slate-400 text-xs mt-1 max-w-md">“{r.reason}”</div>}
+            <div className="text-xs mt-1" style={{ color: r.method === 'credit' ? '#c4b5fd' : '#94a3b8' }}>
+              Customer chose: <strong>{r.method === 'credit' ? 'store credit' : 'money back'}</strong>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <span className={`text-xs px-2 py-1 rounded-md ${r.status === 'requested' ? 'bg-amber-500/15 text-amber-300' : r.status === 'rejected' ? 'bg-red-500/15 text-red-300' : 'bg-emerald-500/15 text-emerald-300'}`}>{r.status}</span>
             {r.status === 'requested' && (
               <>
-                <button onClick={() => decide(r, 'approved', true)} className="btn-ghost text-xs">Approve + refund</button>
+                <button onClick={() => decide(r, 'approved', true, r.method || 'money')} className="btn-ghost text-xs"
+                  title={r.method === 'credit' ? 'Puts the full amount in their wallet now' : 'Card/iDEAL payments go back through Stripe or Mollie; manual payments you send back yourself'}>
+                  Approve · {r.method === 'credit' ? 'store credit' : 'money back'}
+                </button>
+                {r.method === 'credit' && (
+                  <button onClick={() => decide(r, 'approved', true, 'money')} className="btn-ghost text-xs" style={{ opacity: 0.75 }}>
+                    Money back instead
+                  </button>
+                )}
                 <button onClick={() => decide(r, 'rejected')} className="btn-danger text-xs">Reject</button>
               </>
             )}

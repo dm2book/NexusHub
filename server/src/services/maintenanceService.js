@@ -75,6 +75,14 @@ export async function runMaintenance() {
   const startedAt = Date.now();
   const late = () => Date.now() - startedAt > 18_000;
 
+  /* 8a. The supplier queue BEFORE the sweep. A paid order waiting for the
+     queue is not stuck, and the sweep below has nothing to offer it but stock
+     or a person — so the queue gets the first eight seconds, and step 8 later
+     carries on with whatever budget is left. */
+  try {
+    summary.supplierQueue = (await drainSupplierQueue({ actorId: 'system' }, { budgetMs: 8_000 })).processed || 0;
+  } catch (e) { summary.supplierQueueError = e.message; }
+
   // 9. The net under the pipeline: any paid order nothing has picked up.
   //    Delivery is started without being awaited, so on a serverless host it can
   //    simply never run — the order sits paid, in stock and undelivered. The
@@ -90,7 +98,7 @@ export async function runMaintenance() {
   // 10. Re-send transactional emails that failed on a transient provider error
   //     (their full render context is persisted with the log row).
   try {
-    summary.emailsRetried = await retryFailedEmails({ limit: 20 });
+    summary.emailsRetried = await retryFailedEmails({ deadline: startedAt + 16_000 });
   } catch (e) { summary.emailRetryError = e.message; }
 
   // 0. Is the Discord bot still polling? (alerts the owner once per outage)
@@ -228,7 +236,8 @@ export async function runMaintenance() {
   //    interrupted): buys + delivers pending paid orders one at a time.
   if (late()) summary.supplierQueueSkipped = 'time budget';
   else try {
-    summary.supplierQueue = (await drainSupplierQueue({ actorId: 'system' })).processed || 0;
+    const more = (await drainSupplierQueue({ actorId: 'system' }, { budgetMs: Math.max(1_000, 24_000 - (Date.now() - startedAt)) })).processed || 0;
+    summary.supplierQueue = (summary.supplierQueue || 0) + more;
   } catch (e) { summary.supplierQueueError = e.message; }
 
 

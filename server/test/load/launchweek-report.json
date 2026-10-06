@@ -1,0 +1,848 @@
+{
+  "startedAt": "2026-10-06T11:53:49.150Z",
+  "hangCapMs": 45000,
+  "phases": {
+    "Day @ 100 orders — everything up": {
+      "label": "d100",
+      "orders": 100,
+      "wallMs": 2509,
+      "placed": 100,
+      "rejected": {},
+      "rejectedCgnat": 0,
+      "cgnatBuyers": 4,
+      "placeLatency": {
+        "n": 100,
+        "p50": 92,
+        "p95": 189,
+        "max": 208,
+        "overKill": 0
+      },
+      "checkoutLatency": {
+        "n": 74,
+        "p50": 24,
+        "p95": 76,
+        "max": 82,
+        "overKill": 0
+      },
+      "webhookLatency": {
+        "n": 74,
+        "p50": 81,
+        "p95": 126,
+        "max": 134,
+        "overKill": 0
+      },
+      "checkoutFailed": 0,
+      "manualProofs": 26,
+      "proofsSubmitted": 26,
+      "status": {
+        "payment_received": 6,
+        "completed": 82,
+        "awaiting_fulfillment": 12
+      },
+      "fraudHeld": 6,
+      "manualQueue": 12,
+      "failedSupplier": 0,
+      "email": {
+        "sent": 282
+      },
+      "discordOutboxByKind": {
+        "deals": 1,
+        "proof": 82
+      },
+      "ownerAlerts": {
+        "order.placed": 100,
+        "order.paid": 100
+      },
+      "codesOnTwoOrders": 0,
+      "leaseWaitMs": 0,
+      "supplierCallsSoFar": {
+        "POST /fulfill (up)": 39
+      }
+    },
+    "Day @ 500 orders — everything up, 60 at once at the start": {
+      "label": "d500",
+      "orders": 500,
+      "wallMs": 12106,
+      "placed": 495,
+      "rejected": {
+        "429 We have had an unusual number of orders from your connection today. Email us and a person ": 5
+      },
+      "rejectedCgnat": 5,
+      "cgnatBuyers": 20,
+      "placeLatency": {
+        "n": 500,
+        "p50": 125,
+        "p95": 564,
+        "max": 664,
+        "overKill": 0
+      },
+      "checkoutLatency": {
+        "n": 402,
+        "p50": 31,
+        "p95": 240,
+        "max": 263,
+        "overKill": 0
+      },
+      "webhookLatency": {
+        "n": 402,
+        "p50": 101,
+        "p95": 1840,
+        "max": 1930,
+        "overKill": 0
+      },
+      "checkoutFailed": 0,
+      "manualProofs": 93,
+      "proofsSubmitted": 93,
+      "status": {
+        "payment_received": 4,
+        "completed": 418,
+        "awaiting_fulfillment": 73
+      },
+      "fraudHeld": 4,
+      "manualQueue": 73,
+      "failedSupplier": 0,
+      "email": {
+        "sent": 1408
+      },
+      "discordOutboxByKind": {
+        "deals": 1,
+        "proof": 418
+      },
+      "ownerAlerts": {
+        "order.paid": 495,
+        "order.placed": 495
+      },
+      "codesOnTwoOrders": 0,
+      "requestsByProduct": {
+        "other auto:fulfilled": 8,
+        "other manual:pending": 73,
+        "supplierProduct auto:fulfilled": 189
+      },
+      "leaseWaitMs": 0,
+      "supplierCallsSoFar": {
+        "POST /fulfill (up)": 236
+      }
+    },
+    "Supplier product, 20 orders 3 s apart (paced), supplier up": {
+      "orders": 20,
+      "wallMs": 63776,
+      "requests": {
+        "auto:fulfilled": 20
+      },
+      "status": {
+        "completed": 20
+      },
+      "fraudHeld": 0,
+      "manualQueue": 0,
+      "failedSupplier": 0,
+      "email": {
+        "sent": 60
+      },
+      "discordOutboxByKind": {
+        "proof": 20
+      },
+      "ownerAlerts": {
+        "order.placed": 20,
+        "order.paid": 20
+      },
+      "codesOnTwoOrders": 0,
+      "supplierCallsSoFar": {
+        "POST /fulfill (up)": 256
+      }
+    },
+    "Supplier product, 20 orders 3 s apart, supplier answers in 4 s": {
+      "orders": 20,
+      "requests": {
+        "auto:fulfilled": 15,
+        "auto:requested": 1
+      },
+      "status": {
+        "awaiting_fulfillment": 1,
+        "completed": 15,
+        "payment_received": 4
+      },
+      "fraudHeld": 0,
+      "manualQueue": 0,
+      "failedSupplier": 0,
+      "email": {
+        "sent": 115
+      },
+      "discordOutboxByKind": {
+        "proof": 35
+      },
+      "ownerAlerts": {
+        "order.placed": 40,
+        "order.paid": 40
+      },
+      "codesOnTwoOrders": 0,
+      "leaseWaitMs": 2006,
+      "supplierCallsSoFar": {
+        "POST /fulfill (up)": 276
+      }
+    },
+    "Refunds (3%) and chargebacks (1%)": {
+      "refunds": 10,
+      "refundStatus": {
+        "refunded": 10
+      },
+      "refundWebhook": {
+        "n": 10,
+        "p50": 15,
+        "p95": 22,
+        "max": 22,
+        "overKill": 0
+      },
+      "refundMailsSent": null,
+      "chargebacks": 3,
+      "chargebackStatus": {
+        "refunded": 3
+      },
+      "chargebackWebhook": {
+        "n": 3,
+        "p50": 16,
+        "p95": 18,
+        "max": 18,
+        "overKill": 0
+      },
+      "ledgerRows": 3,
+      "codesAlreadyDeliveredOnThoseOrders": 13,
+      "repeatBuyerAfterChargeback": {
+        "placed": false,
+        "status": 400,
+        "error": "We could not accept this order. Nothing has been charged. If you think this is a mistake, email us and a person will place it for you.",
+        "afterPayment": null
+      },
+      "supplierCallsSoFar": {
+        "POST /fulfill (up)": 276
+      }
+    },
+    "Supplier down for a day (connection refused), 100 orders, no code stock": {
+      "label": "supdown",
+      "orders": 100,
+      "wallMs": 2506,
+      "placed": 100,
+      "rejected": {},
+      "rejectedCgnat": 0,
+      "cgnatBuyers": 6,
+      "placeLatency": {
+        "n": 100,
+        "p50": 88,
+        "p95": 127,
+        "max": 150,
+        "overKill": 0
+      },
+      "checkoutLatency": {
+        "n": 100,
+        "p50": 26,
+        "p95": 42,
+        "max": 57,
+        "overKill": 0
+      },
+      "webhookLatency": {
+        "n": 100,
+        "p50": 69,
+        "p95": 103,
+        "max": 111,
+        "overKill": 0
+      },
+      "checkoutFailed": 0,
+      "manualProofs": 0,
+      "proofsSubmitted": 0,
+      "status": {
+        "awaiting_fulfillment": 79,
+        "payment_received": 21
+      },
+      "fraudHeld": 0,
+      "manualQueue": 77,
+      "failedSupplier": 2,
+      "email": {
+        "sent": 200
+      },
+      "discordOutboxByKind": {},
+      "ownerAlerts": {
+        "fulfillment.failed": 2,
+        "order.paid": 100,
+        "order.placed": 100
+      },
+      "codesOnTwoOrders": 0,
+      "statusAtEndOfOutage": {
+        "awaiting_fulfillment": 79,
+        "payment_received": 21
+      },
+      "recovery": [
+        {
+          "run": 1,
+          "ms": 1163,
+          "stillOpen": 100
+        },
+        {
+          "run": 2,
+          "ms": 419,
+          "stillOpen": 100
+        },
+        {
+          "run": 3,
+          "ms": 425,
+          "stillOpen": 100
+        },
+        {
+          "run": 4,
+          "ms": 422,
+          "stillOpen": 100
+        },
+        {
+          "run": 5,
+          "ms": 440,
+          "stillOpen": 100
+        },
+        {
+          "run": 6,
+          "ms": 399,
+          "stillOpen": 100
+        },
+        {
+          "run": 7,
+          "ms": 436,
+          "stillOpen": 100
+        },
+        {
+          "run": 8,
+          "ms": 440,
+          "stillOpen": 100
+        }
+      ],
+      "afterRecovery": {
+        "awaiting_fulfillment": 100
+      },
+      "supplierCallsSoFar": {
+        "POST /fulfill (up)": 276,
+        "POST /fulfill (down)": 2
+      }
+    },
+    "Supplier hanging (accepts, never answers), 12 orders": {
+      "label": "suphang",
+      "orders": 12,
+      "wallMs": 198,
+      "placed": 12,
+      "rejected": {},
+      "rejectedCgnat": 0,
+      "cgnatBuyers": 2,
+      "placeLatency": {
+        "n": 12,
+        "p50": 77,
+        "p95": 86,
+        "max": 86,
+        "overKill": 0
+      },
+      "checkoutLatency": {
+        "n": 12,
+        "p50": 37,
+        "p95": 45,
+        "max": 45,
+        "overKill": 0
+      },
+      "webhookLatency": {
+        "n": 12,
+        "p50": 76,
+        "p95": 90,
+        "max": 90,
+        "overKill": 0
+      },
+      "checkoutFailed": 0,
+      "manualProofs": 0,
+      "proofsSubmitted": 0,
+      "status": {
+        "awaiting_fulfillment": 12
+      },
+      "fraudHeld": 0,
+      "manualQueue": 12,
+      "failedSupplier": 0,
+      "email": {
+        "sent": 24
+      },
+      "discordOutboxByKind": {},
+      "ownerAlerts": {
+        "order.paid": 12,
+        "order.placed": 12
+      },
+      "codesOnTwoOrders": 0,
+      "supplierCalls": 278,
+      "leaseHeldAfterLastPaymentMs": 1,
+      "recovery": [
+        {
+          "run": 1,
+          "ms": 425,
+          "stillOpen": 12
+        },
+        {
+          "run": 2,
+          "ms": 419,
+          "stillOpen": 12
+        },
+        {
+          "run": 3,
+          "ms": 419,
+          "stillOpen": 12
+        },
+        {
+          "run": 4,
+          "ms": 416,
+          "stillOpen": 12
+        }
+      ],
+      "recoveryMs": 1679,
+      "afterRecovery": {
+        "awaiting_fulfillment": 12
+      },
+      "supplierCallsSoFar": {
+        "POST /fulfill (up)": 276,
+        "POST /fulfill (down)": 2
+      }
+    },
+    "Email (Resend) down for a day — 503 on every send, 100 orders": {
+      "label": "maildown",
+      "orders": 100,
+      "wallMs": 2015,
+      "placed": 100,
+      "rejected": {},
+      "rejectedCgnat": 0,
+      "cgnatBuyers": 6,
+      "placeLatency": {
+        "n": 100,
+        "p50": 81,
+        "p95": 95,
+        "max": 109,
+        "overKill": 0
+      },
+      "checkoutLatency": {
+        "n": 81,
+        "p50": 20,
+        "p95": 26,
+        "max": 28,
+        "overKill": 0
+      },
+      "webhookLatency": {
+        "n": 81,
+        "p50": 63,
+        "p95": 80,
+        "max": 84,
+        "overKill": 0
+      },
+      "checkoutFailed": 0,
+      "manualProofs": 19,
+      "proofsSubmitted": 19,
+      "status": {
+        "payment_received": 2,
+        "completed": 50,
+        "awaiting_fulfillment": 48
+      },
+      "fraudHeld": 2,
+      "manualQueue": 48,
+      "failedSupplier": 0,
+      "email": {
+        "failed": 298
+      },
+      "discordOutboxByKind": {
+        "deals": 1,
+        "proof": 50
+      },
+      "ownerAlerts": {
+        "email.failed": 5,
+        "order.placed": 100,
+        "order.paid": 100
+      },
+      "codesOnTwoOrders": 0,
+      "guestsWithCodeOnlyByMail": 37,
+      "retryRunsNeeded": 2,
+      "retryProgress": [
+        {
+          "run": 1,
+          "retried": 200,
+          "unrecoveredFailed": 98
+        },
+        {
+          "run": 2,
+          "retried": 98,
+          "unrecoveredFailed": 0
+        }
+      ],
+      "supplierCallsSoFar": {
+        "POST /fulfill (up)": 276,
+        "POST /fulfill (down)": 2
+      }
+    },
+    "Email hanging (Resend accepts the connection, never answers), 10 orders": {
+      "label": "mailhang",
+      "orders": 10,
+      "wallMs": 20155,
+      "placed": 10,
+      "rejected": {},
+      "rejectedCgnat": 0,
+      "cgnatBuyers": 0,
+      "placeLatency": {
+        "n": 10,
+        "p50": 10067,
+        "p95": 10075,
+        "max": 10075,
+        "overKill": 0
+      },
+      "checkoutLatency": {
+        "n": 8,
+        "p50": 26,
+        "p95": 31,
+        "max": 31,
+        "overKill": 0
+      },
+      "webhookLatency": {
+        "n": 8,
+        "p50": 10057,
+        "p95": 10058,
+        "max": 10058,
+        "overKill": 0
+      },
+      "checkoutFailed": 0,
+      "manualProofs": 2,
+      "proofsSubmitted": 2,
+      "status": {
+        "awaiting_fulfillment": 5,
+        "completed": 5
+      },
+      "fraudHeld": 0,
+      "manualQueue": 5,
+      "failedSupplier": 0,
+      "email": {
+        "failed": 29
+      },
+      "discordOutboxByKind": {
+        "deals": 1,
+        "proof": 4
+      },
+      "ownerAlerts": {
+        "order.paid": 10,
+        "order.placed": 10
+      },
+      "codesOnTwoOrders": 0,
+      "supplierCallsSoFar": {
+        "POST /fulfill (up)": 276,
+        "POST /fulfill (down)": 2
+      }
+    },
+    "Discord down (refused), 40 orders, half the buyers linked": {
+      "label": "dcdown",
+      "orders": 40,
+      "wallMs": 902,
+      "placed": 40,
+      "rejected": {},
+      "rejectedCgnat": 0,
+      "cgnatBuyers": 2,
+      "placeLatency": {
+        "n": 40,
+        "p50": 88,
+        "p95": 109,
+        "max": 112,
+        "overKill": 0
+      },
+      "checkoutLatency": {
+        "n": 32,
+        "p50": 21,
+        "p95": 39,
+        "max": 44,
+        "overKill": 0
+      },
+      "webhookLatency": {
+        "n": 32,
+        "p50": 67,
+        "p95": 86,
+        "max": 98,
+        "overKill": 0
+      },
+      "checkoutFailed": 0,
+      "manualProofs": 8,
+      "proofsSubmitted": 8,
+      "status": {
+        "completed": 21,
+        "awaiting_fulfillment": 19
+      },
+      "fraudHeld": 0,
+      "manualQueue": 19,
+      "failedSupplier": 0,
+      "email": {
+        "sent": 101
+      },
+      "discordOutboxByKind": {
+        "deals": 1,
+        "leads": 69,
+        "proof": 21
+      },
+      "ownerAlerts": {
+        "order.paid": 40,
+        "order.placed": 40
+      },
+      "codesOnTwoOrders": 0,
+      "supplierCallsSoFar": {
+        "POST /fulfill (up)": 276,
+        "POST /fulfill (down)": 2
+      }
+    },
+    "Discord hanging (API accepts, never answers), 10 orders, all buyers linked": {
+      "label": "dchang",
+      "orders": 10,
+      "wallMs": 5196,
+      "placed": 10,
+      "rejected": {},
+      "rejectedCgnat": 0,
+      "cgnatBuyers": 0,
+      "placeLatency": {
+        "n": 10,
+        "p50": 5078,
+        "p95": 5089,
+        "max": 5089,
+        "overKill": 0
+      },
+      "checkoutLatency": {
+        "n": 9,
+        "p50": 39,
+        "p95": 45,
+        "max": 45,
+        "overKill": 0
+      },
+      "webhookLatency": {
+        "n": 9,
+        "p50": 69,
+        "p95": 83,
+        "max": 83,
+        "overKill": 0
+      },
+      "checkoutFailed": 0,
+      "manualProofs": 1,
+      "proofsSubmitted": 1,
+      "status": {
+        "awaiting_fulfillment": 6,
+        "completed": 4
+      },
+      "fraudHeld": 0,
+      "manualQueue": 6,
+      "failedSupplier": 0,
+      "email": {
+        "sent": 24
+      },
+      "discordOutboxByKind": {
+        "leads": 16,
+        "deals": 1,
+        "proof": 5
+      },
+      "ownerAlerts": {
+        "order.placed": 10,
+        "order.paid": 10
+      },
+      "codesOnTwoOrders": 0,
+      "unboundedDiscordHangs": 0,
+      "supplierCallsSoFar": {
+        "POST /fulfill (up)": 276,
+        "POST /fulfill (down)": 2
+      }
+    },
+    "Stripe down (connection reset), 20 checkouts": {
+      "label": "stdown",
+      "orders": 20,
+      "wallMs": 1198,
+      "placed": 20,
+      "rejected": {},
+      "rejectedCgnat": 0,
+      "cgnatBuyers": 1,
+      "placeLatency": {
+        "n": 20,
+        "p50": 65,
+        "p95": 73,
+        "max": 73,
+        "overKill": 0
+      },
+      "checkoutLatency": {
+        "n": 20,
+        "p50": 529,
+        "p95": 547,
+        "max": 547,
+        "overKill": 0
+      },
+      "webhookLatency": {
+        "n": 0,
+        "p50": 0,
+        "p95": 0,
+        "max": 0,
+        "overKill": 0
+      },
+      "checkoutFailed": 20,
+      "manualProofs": 0,
+      "proofsSubmitted": 0,
+      "status": {
+        "pending": 20
+      },
+      "fraudHeld": 0,
+      "manualQueue": 0,
+      "failedSupplier": 0,
+      "email": {
+        "sent": 20
+      },
+      "discordOutboxByKind": {
+        "deals": 1
+      },
+      "ownerAlerts": {
+        "order.placed": 20,
+        "system.error": 20
+      },
+      "codesOnTwoOrders": 0,
+      "supplierCallsSoFar": {
+        "POST /fulfill (up)": 276,
+        "POST /fulfill (down)": 2
+      }
+    },
+    "Stripe 503, 10 checkouts": {
+      "label": "st503",
+      "orders": 10,
+      "wallMs": 617,
+      "placed": 10,
+      "rejected": {},
+      "rejectedCgnat": 0,
+      "cgnatBuyers": 1,
+      "placeLatency": {
+        "n": 10,
+        "p50": 70,
+        "p95": 88,
+        "max": 88,
+        "overKill": 0
+      },
+      "checkoutLatency": {
+        "n": 10,
+        "p50": 533,
+        "p95": 537,
+        "max": 537,
+        "overKill": 0
+      },
+      "webhookLatency": {
+        "n": 0,
+        "p50": 0,
+        "p95": 0,
+        "max": 0,
+        "overKill": 0
+      },
+      "checkoutFailed": 10,
+      "manualProofs": 0,
+      "proofsSubmitted": 0,
+      "status": {
+        "pending": 10
+      },
+      "fraudHeld": 0,
+      "manualQueue": 0,
+      "failedSupplier": 0,
+      "email": {
+        "sent": 10
+      },
+      "discordOutboxByKind": {
+        "deals": 1
+      },
+      "ownerAlerts": {
+        "order.placed": 10,
+        "system.error": 10
+      },
+      "codesOnTwoOrders": 0,
+      "supplierCallsSoFar": {
+        "POST /fulfill (up)": 276,
+        "POST /fulfill (down)": 2
+      }
+    },
+    "Stripe hanging, 5 checkouts": {
+      "label": "sthang",
+      "orders": 5,
+      "wallMs": 16560,
+      "placed": 5,
+      "rejected": {},
+      "rejectedCgnat": 0,
+      "cgnatBuyers": 0,
+      "placeLatency": {
+        "n": 5,
+        "p50": 41,
+        "p95": 44,
+        "max": 44,
+        "overKill": 0
+      },
+      "checkoutLatency": {
+        "n": 5,
+        "p50": 16516,
+        "p95": 16518,
+        "max": 16518,
+        "overKill": 0
+      },
+      "webhookLatency": {
+        "n": 0,
+        "p50": 0,
+        "p95": 0,
+        "max": 0,
+        "overKill": 0
+      },
+      "checkoutFailed": 5,
+      "manualProofs": 0,
+      "proofsSubmitted": 0,
+      "status": {
+        "pending": 5
+      },
+      "fraudHeld": 0,
+      "manualQueue": 0,
+      "failedSupplier": 0,
+      "email": {
+        "sent": 5
+      },
+      "discordOutboxByKind": {
+        "deals": 1
+      },
+      "ownerAlerts": {
+        "order.placed": 5,
+        "system.error": 5
+      },
+      "codesOnTwoOrders": 0,
+      "supplierCallsSoFar": {
+        "POST /fulfill (up)": 276,
+        "POST /fulfill (down)": 2
+      }
+    },
+    "Stripe API hanging while its webhook still arrives (Radar lookup on the payment path)": {
+      "webhookMs": 3022,
+      "webhookStatus": 200,
+      "overKill": false,
+      "orderAfter": "payment_received",
+      "stillPendingWithNoWayToPay": 35,
+      "supplierCallsSoFar": {
+        "POST /fulfill (up)": 276,
+        "POST /fulfill (down)": 2
+      }
+    },
+    "Supplier back after an outage — is it used again?": {
+      "duringOutage": {
+        "orders": 4
+      },
+      "rightAfter_lessThan10min": {
+        "orders": 5,
+        "viaSupplier": 0
+      },
+      "after10min": {
+        "orders": 10,
+        "viaSupplier": 10,
+        "status": {
+          "completed": 10
+        }
+      }
+    }
+  },
+  "calls": {
+    "email": 2832,
+    "discord": 2459,
+    "supplier": 278,
+    "stripe": 1590
+  },
+  "unboundedHangs": {
+    "email": 0,
+    "discord": 0,
+    "supplier": 0,
+    "stripe": 0
+  },
+  "finishedAt": "2026-10-06T11:58:36.938Z"
+}

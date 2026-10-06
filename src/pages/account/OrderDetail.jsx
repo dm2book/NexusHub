@@ -5,6 +5,7 @@ import { api } from '../../lib/api.js';
 import { money, date } from '../../lib/format.js';
 import { PageLoader, StatusBadge, STATUS_META, Modal } from '../../components/ui.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
+import RefundMethodChoice from '../../components/store/RefundMethodChoice.jsx';
 import { useI18n } from '../../lib/i18n.jsx';
 
 export default function OrderDetail() {
@@ -13,6 +14,7 @@ export default function OrderDetail() {
   const { t } = useI18n();
   const [order, setOrder] = useState(null);
   const [refundOpen, setRefundOpen] = useState(false);
+  const [refundMethod, setRefundMethod] = useState('money');
   const [reason, setReason] = useState('');
   const [reveal, setReveal] = useState({});
   const [review, setReview] = useState(undefined);    // undefined=loading, null=none, object=exists
@@ -97,7 +99,7 @@ export default function OrderDetail() {
 
   const submitRefund = async () => {
     try {
-      await api.post(`/api/account/orders/${id}/refund-request`, { reason });
+      await api.post(`/api/account/orders/${id}/refund-request`, { reason, method: refundMethod });
       toast.success(t('acc.order.refundSubmitted', 'Refund request submitted.'));
       setRefundOpen(false); setReason('');
     } catch (err) { toast.error(err.message); }
@@ -251,6 +253,7 @@ export default function OrderDetail() {
           <button onClick={() => setRefundOpen(false)} className="btn-ghost">{t('acc.order.cancel', 'Cancel')}</button>
           <button onClick={submitRefund} className="btn-primary">{t('acc.order.submitRequest', 'Submit request')}</button>
         </>}>
+        <RefundMethodChoice value={refundMethod} onChange={setRefundMethod} />
         <p className="text-slate-400 text-sm mb-3">{t('acc.order.refundWhy', 'Tell us why you’d like a refund for {number}.', { number: order.number })}</p>
         <textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={4}
           className="input" placeholder={t('acc.order.reasonPlaceholder', 'Reason (optional)')} />

@@ -27,8 +27,13 @@ let transporter = null;
 async function getTransport() {
   if (transporter) return transporter;
   const { default: nodemailer } = await import('nodemailer');
+  /* Timeouts, because nodemailer's own are two minutes to connect and ten for
+     the socket: an SMTP server that accepts the connection and goes quiet held
+     the order request until Vercel killed it at 30 s. Eight seconds each is far
+     longer than a healthy server needs; settings in the URL still win. */
   transporter = config.email.smtpUrl
-    ? nodemailer.createTransport(config.email.smtpUrl)
+    ? nodemailer.createTransport({ url: config.email.smtpUrl,
+      connectionTimeout: 8_000, greetingTimeout: 8_000, socketTimeout: 8_000 })
     : nodemailer.createTransport({ jsonTransport: true });
   return transporter;
 }
@@ -401,28 +406,52 @@ export async function sendEmailAsync(eventKey, to, context = {}) {
  * An order mail is rebuilt from the order itself — the stored row holds only
  * its id — so the retried mail shows the order as it is NOW, codes included,
  * without the codes ever having been written to the log. Login codes are never
- * retried, and neither is anything stored with a secret cut out of it. Bounded:
- * at most `maxAttempts` rows per template+recipient in the window, so a
- * permanently-broken address ages out instead of looping.
+ * retried, and neither is anything stored with a secret cut out of it.
+ *
+ * ── SIZED FOR AN OUTAGE, NOT FOR ONE BAD SEND ──────────────────────────────
+ * It retried 20 mails a run, oldest first, for 24 hours, at most 4 times. The
+ * launch-week simulation took the mail provider down for one day of 100
+ * orders: 298 failed mails, 15 hourly runs to catch up. At 500 orders that is
+ * about 1,300 mails and 65 hours — so most of them aged out of the 24-hour
+ * window and were never sent, and the 4-attempt cap was spent in the first
+ * four hours of the outage. A guest's code exists only in that mail.
+ *
+ * Now: as many as fit in the time the caller allows (`deadline`), the mails
+ * that carry a code or a refund first, a 72-hour window, and attempts spaced
+ * out (now, 15 min, 1 h, 3 h, 6 h, 12 h, 24 h) so a long outage does not burn
+ * them all before the provider is back. Still bounded per template+recipient,
+ * so a permanently-broken address ages out instead of looping.
  */
-export async function retryFailedEmails({ limit = 20, maxAgeHours = 24, maxAttempts = 4 } = {}) {
+const FIRST = ['order_completed', 'refund_issued', 'payment_confirmed', 'order_on_hold'];
+const RETRY_AFTER_MIN = [0, 15, 60, 180, 360, 720, 1440];
+
+export async function retryFailedEmails({ limit = 200, maxAgeHours = 72, maxAttempts = RETRY_AFTER_MIN.length + 1,
+  deadline = Date.now() + 15_000 } = {}) {
   const cut = new Date(Date.now() - maxAgeHours * 3_600_000).toISOString();
   const rows = await all(
-    `SELECT id, template_id, to_email, context FROM email_log
+    `SELECT id, template_id, to_email, context, created_at FROM email_log
       WHERE status = 'failed' AND created_at > @cut AND context IS NOT NULL
         AND error NOT IN ('template disabled', 'template missing')
         AND template_id NOT IN ('login_otp', 'gift_card')
-      ORDER BY created_at ASC LIMIT @l`, { cut, l: limit });
+      ORDER BY CASE WHEN template_id = ANY(@first) THEN 0 ELSE 1 END, created_at ASC
+      LIMIT @l`, { cut, l: limit, first: FIRST });
   let resent = 0;
   for (const r of rows) {
+    if (Date.now() >= deadline) break;
     let ctx;
     try { ctx = JSON.parse(r.context || '{}') || {}; } catch { ctx = {}; }
     if (ctx._noRetry) continue;
-    const prior = await get(
-      `SELECT COUNT(*) AS n FROM email_log WHERE template_id=@t AND to_email=@to AND created_at > @cut`,
-      { t: r.template_id, to: r.to_email, cut });
-    if (Number(prior?.n || 0) >= maxAttempts) continue; // give up on this recipient
-    // Claim atomically so a concurrent cron run can't double-send.
+    const prior = Number((await get(
+      /* Failed attempts only. Counting every row also counted mails that WERE
+         delivered — a repeat buyer's earlier order confirmation — so a
+         returning customer's first failure already looked like a fourth. */
+      `SELECT COUNT(*) AS n FROM email_log WHERE template_id=@t AND to_email=@to AND created_at > @cut
+          AND status IN ('failed','retried')`,
+      { t: r.template_id, to: r.to_email, cut }))?.n || 0);
+    if (prior >= maxAttempts) continue; // give up on this recipient
+    // Not yet: the last attempt was too recent for the attempt it would be.
+    const waitMin = RETRY_AFTER_MIN[Math.min(Math.max(prior - 1, 0), RETRY_AFTER_MIN.length - 1)];
+    if (Date.now() - Date.parse(r.created_at) < waitMin * 60_000) continue;
     const claim = await run(`UPDATE email_log SET status='retried' WHERE id=@id AND status='failed'`, { id: r.id });
     if (!claim?.changes) continue;
     try {

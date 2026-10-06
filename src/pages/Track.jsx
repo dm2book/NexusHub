@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import PayFacts from '../components/store/PayFacts.jsx';
+import RefundMethodChoice from '../components/store/RefundMethodChoice.jsx';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
   Search, Loader2, ExternalLink, Copy, Check, CreditCard, Cog, PackageCheck,
@@ -414,7 +415,7 @@ export default function Track() {
               give back, and offering a refund on an unpaid order is a confusing
               answer to "I changed my mind" — that one is just: don't pay. */}
           {['payment_received', 'processing', 'awaiting_fulfillment', 'completed'].includes(result.status) && (
-            <GuestRefund number={result.number} t={t} />
+            <GuestRefund number={result.number} creditAllowed={!!result.creditRefund} t={t} />
           )}
 
           <Timeline history={result.history} t={t} />
@@ -517,11 +518,12 @@ function GuestReview({ number, t }) {
  * Collapsed by default. It is a real option, not a suggestion, and a refund form
  * sitting open under a delivered order reads as an invitation to use it.
  */
-function GuestRefund({ number, t }) {
+function GuestRefund({ number, creditAllowed = false, t }) {
   const toast = useToast();
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState('');
   const [reason, setReason] = useState('');
+  const [method, setMethod] = useState('money');
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState('');
 
@@ -530,7 +532,7 @@ function GuestRefund({ number, t }) {
     setBusy(true);
     try {
       const r = await api.post(`/api/track/${encodeURIComponent(number)}/refund-request`, {
-        email: email.trim(), reason: reason.trim() || undefined,
+        email: email.trim(), reason: reason.trim() || undefined, method,
       });
       if (r.notPaid) {
         toast.error(t('refundReq.notPaid', 'This order has not been paid, so there is nothing to refund.'));
@@ -584,6 +586,7 @@ function GuestRefund({ number, t }) {
       <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
         placeholder={t('refundReq.email', 'Email used for this order')}
         className="input mt-3 text-sm" />
+      <div className="mt-3 text-slate-200"><RefundMethodChoice value={method} onChange={setMethod} creditAllowed={creditAllowed} /></div>
       <textarea rows={2} maxLength={2000} value={reason} onChange={(e) => setReason(e.target.value)}
         placeholder={t('refundReq.reason', 'What went wrong? (optional, but it speeds things up)')}
         className="input mt-2 text-sm" />
