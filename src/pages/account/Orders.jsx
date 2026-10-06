@@ -4,6 +4,7 @@ import { ShoppingBag } from 'lucide-react';
 import { api } from '../../lib/api.js';
 import { money, dateShort } from '../../lib/format.js';
 import { PageLoader, StatusBadge, EmptyState } from '../../components/ui.jsx';
+import { useI18n } from '../../lib/i18n.jsx';
 
 // Customer-facing buckets over the internal order statuses.
 const BUCKET = {
@@ -12,16 +13,17 @@ const BUCKET = {
   delivered: ['completed'],
   refunded: ['refunded', 'cancelled'],
 };
-const TABS = [
-  { id: 'all', label: 'All' },
-  { id: 'pending', label: 'Pending' },
-  { id: 'processing', label: 'Processing' },
-  { id: 'delivered', label: 'Delivered' },
-  { id: 'refunded', label: 'Refunded' },
+const TABS = (t) => [
+  { id: 'all', label: t('acc.orders.tabAll', 'All') },
+  { id: 'pending', label: t('acc.orders.tabPending', 'Pending') },
+  { id: 'processing', label: t('acc.orders.tabProcessing', 'Processing') },
+  { id: 'delivered', label: t('acc.orders.tabDelivered', 'Delivered') },
+  { id: 'refunded', label: t('acc.orders.tabRefunded', 'Refunded') },
 ];
 const bucketOf = (status) => Object.keys(BUCKET).find((b) => BUCKET[b].includes(status)) || 'pending';
 
 export default function Orders() {
+  const { t } = useI18n();
   const [orders, setOrders] = useState(null);
   const [tab, setTab] = useState('all');
 
@@ -38,24 +40,24 @@ export default function Orders() {
 
   return (
     <div>
-      <h1 className="text-2xl text-white mb-5">Your orders</h1>
+      <h1 className="text-2xl text-white mb-5">{t('acc.orders.title', 'Your orders')}</h1>
 
       {/* Status tabs */}
       <div className="flex gap-2 overflow-x-auto pb-1 mb-5">
-        {TABS.map((t) => (
-          <button key={t.id} onClick={() => setTab(t.id)}
+        {TABS(t).map((tb) => (
+          <button key={tb.id} onClick={() => setTab(tb.id)}
             className={`shrink-0 px-3.5 py-2 rounded-xl text-sm transition border ${
-              tab === t.id ? 'bg-primary/20 border-primary/40 text-white' : 'border-white/10 text-slate-400 hover:text-white hover:bg-white/5'}`}>
-            {t.label} <span className={`ml-1 text-xs ${tab === t.id ? 'text-indigo-200' : 'text-slate-500'}`}>{counts[t.id]}</span>
+              tab === tb.id ? 'bg-primary/20 border-primary/40 text-white' : 'border-white/10 text-slate-400 hover:text-white hover:bg-white/5'}`}>
+            {tb.label} <span className={`ml-1 text-xs ${tab === tb.id ? 'text-indigo-200' : 'text-slate-500'}`}>{counts[tb.id]}</span>
           </button>
         ))}
       </div>
 
       {orders.length === 0 ? (
-        <EmptyState icon={ShoppingBag} title="No orders yet"
-          action={<Link to="/shop" className="btn-primary">Browse shop</Link>} />
+        <EmptyState icon={ShoppingBag} title={t('acc.orders.empty', 'No orders yet')}
+          action={<Link to="/shop" className="btn-primary">{t('acc.orders.browseShop', 'Browse shop')}</Link>} />
       ) : filtered.length === 0 ? (
-        <EmptyState icon={ShoppingBag} title={`No ${tab} orders`} />
+        <EmptyState icon={ShoppingBag} title={t(`acc.orders.empty_${tab}`, `No ${tab} orders`)} />
       ) : (
         <>
           {/* Mobile: cards */}
@@ -80,11 +82,11 @@ export default function Orders() {
             <table className="w-full text-sm">
               <thead className="text-left text-slate-400 border-b border-white/5">
                 <tr>
-                  <th className="px-5 py-3 font-medium">Order</th>
-                  <th className="px-5 py-3 font-medium">Product</th>
-                  <th className="px-5 py-3 font-medium">Date</th>
-                  <th className="px-5 py-3 font-medium">Amount</th>
-                  <th className="px-5 py-3 font-medium">Status</th>
+                  <th className="px-5 py-3 font-medium">{t('acc.orders.colOrder', 'Order')}</th>
+                  <th className="px-5 py-3 font-medium">{t('acc.orders.colProduct', 'Product')}</th>
+                  <th className="px-5 py-3 font-medium">{t('acc.orders.colDate', 'Date')}</th>
+                  <th className="px-5 py-3 font-medium">{t('acc.orders.colAmount', 'Amount')}</th>
+                  <th className="px-5 py-3 font-medium">{t('acc.orders.colStatus', 'Status')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">

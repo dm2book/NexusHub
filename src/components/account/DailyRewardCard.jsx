@@ -19,11 +19,13 @@ import { Flame, Gift, Check, Sparkles, Ticket } from 'lucide-react';
 import { api } from '../../lib/api.js';
 import { money } from '../../lib/format.js';
 import { useToast } from '../../context/ToastContext.jsx';
+import { useI18n } from '../../lib/i18n.jsx';
 
 const KIND_ICON = { boost: Sparkles, coupon: Ticket };
 
 export default function DailyRewardCard() {
   const toast = useToast();
+  const { t } = useI18n();
   const [d, setD] = useState(null);
   const [busy, setBusy] = useState(false);
   const [trading, setTrading] = useState(false);
@@ -33,7 +35,7 @@ export default function DailyRewardCard() {
 
   const copy = (code) => {
     navigator.clipboard?.writeText(code);
-    toast.success(`${code} copied.`);
+    toast.success(t('acc.daily.copied', '{code} copied.', { code }));
   };
 
   /* One entry per click, deliberately. A quantity box on a strip this size
@@ -43,9 +45,9 @@ export default function DailyRewardCard() {
     setTrading(true);
     try {
       const out = await api.post('/api/account/daily/redeem', { boosts: 1 });
-      toast.success(`Traded ${out.pointsSpent} points for an extra giveaway entry 🎟️`);
+      toast.success(t('acc.daily.traded', 'Traded {n} points for an extra giveaway entry', { n: out.pointsSpent }) + ' 🎟️');
       await load();
-    } catch (e) { toast.error(e.message || 'Could not trade your points.'); }
+    } catch (e) { toast.error(e.message || t('acc.daily.tradeFailed', 'Could not trade your points.')); }
     finally { setTrading(false); }
   };
 
@@ -57,12 +59,12 @@ export default function DailyRewardCard() {
       /* A milestone that is not a code was being claimed in silence: day 7 paid
          a giveaway boost and the member was told "+70 points". */
       toast.success(code
-        ? `Day ${out.streakDay} claimed — your code is ${code}`
+        ? t('acc.daily.claimedCode', 'Day {day} claimed — your code is {code}', { day: out.streakDay, code })
         : out.reward
-          ? `Day ${out.streakDay} claimed — +${out.points} points and ${out.reward.label} 🎉`
-          : `Day ${out.streakDay} claimed — +${out.points} points 🔥`);
+          ? t('acc.daily.claimedReward', 'Day {day} claimed — +{points} points and {reward}', { day: out.streakDay, points: out.points, reward: out.reward.label }) + ' 🎉'
+          : t('acc.daily.claimedPoints', 'Day {day} claimed — +{points} points', { day: out.streakDay, points: out.points }) + ' 🔥');
       await load();
-    } catch (e) { toast.error(e.message || 'Could not claim today.'); }
+    } catch (e) { toast.error(e.message || t('acc.daily.claimFailed', 'Could not claim today.')); }
     finally { setBusy(false); }
   };
 
@@ -90,21 +92,21 @@ export default function DailyRewardCard() {
           </span>
           <div className="min-w-0">
             <div className="text-[11px] uppercase tracking-widest text-slate-500 font-semibold">
-              Daily streak
+              {t('acc.daily.streak', 'Daily streak')}
             </div>
             <div className="flex items-baseline gap-2">
               <span className="text-3xl font-extrabold text-white tabular-nums">{d.currentStreak}</span>
               <span className="text-slate-400 text-sm">
-                {d.currentStreak === 1 ? 'day' : 'days'}
+                {d.currentStreak === 1 ? t('acc.daily.day', 'day') : t('acc.daily.days', 'days')}
                 {d.longestStreak > d.currentStreak && (
-                  <span className="text-slate-500"> · best {d.longestStreak}</span>
+                  <span className="text-slate-500"> · {t('acc.daily.best', 'best {n}', { n: d.longestStreak })}</span>
                 )}
               </span>
             </div>
             {/* Stated rather than left to be worked out from two dates. */}
             {d.streakLapsed && (
               <div className="text-[12px] text-slate-500 mt-0.5">
-                Your run ended — today starts a new one.
+                {t('acc.daily.lapsed', 'Your run ended — today starts a new one.')}
               </div>
             )}
           </div>
@@ -129,7 +131,7 @@ export default function DailyRewardCard() {
 
         <div className="lg:ml-auto flex flex-wrap items-center gap-5">
           <div>
-            <div className="text-[11px] uppercase tracking-wider text-slate-500">Points</div>
+            <div className="text-[11px] uppercase tracking-wider text-slate-500">{t('acc.daily.points', 'Points')}</div>
             {/* The balance, not the lifetime total: the number next to a button
                 that spends points has to be the number that gets spent. */}
             <div className="text-slate-200 font-semibold tabular-nums">
@@ -138,10 +140,10 @@ export default function DailyRewardCard() {
           </div>
           <div className="min-w-0">
             <div className="text-[11px] uppercase tracking-wider text-slate-500">
-              {d.claimedToday ? 'Tomorrow' : 'Today'}
+              {d.claimedToday ? t('acc.daily.tomorrow', 'Tomorrow') : t('acc.daily.today', 'Today')}
             </div>
             <div className="text-slate-200 font-semibold">
-              Day {d.nextClaimDay} · +{d.nextReward.points}
+              {t('acc.daily.dayN', 'Day {n}', { n: d.nextClaimDay })} · +{d.nextReward.points}
               {d.nextReward.kind && (
                 <span className="text-amber-300"> + {d.nextReward.label}</span>
               )}
@@ -151,7 +153,7 @@ export default function DailyRewardCard() {
           <button onClick={claim} disabled={!d.canClaim || busy}
             className={`text-sm font-semibold rounded-xl px-5 py-2.5 transition whitespace-nowrap
               ${d.canClaim ? 'btn-primary' : 'bg-white/5 text-slate-500 cursor-not-allowed'}`}>
-            {busy ? '…' : d.canClaim ? 'Claim today' : 'Claimed ✓'}
+            {busy ? '…' : d.canClaim ? t('acc.daily.claim', 'Claim today') : t('acc.daily.claimed', 'Claimed') + ' ✓'}
           </button>
         </div>
       </div>
@@ -162,11 +164,11 @@ export default function DailyRewardCard() {
           px-4 py-2.5 text-[13px]">
           <MilestoneIcon size={15} className="text-amber-300 shrink-0" />
           <span className="text-slate-300">
-            <b className="text-slate-100">{d.nextMilestone.label}</b> on day {d.nextMilestone.day}
+            <b className="text-slate-100">{d.nextMilestone.label}</b> {t('acc.daily.onDay', 'on day {n}', { n: d.nextMilestone.day })}
             <span className="text-slate-500">
-              {' — '}{d.nextMilestone.daysAway} {d.nextMilestone.daysAway === 1 ? 'day' : 'days'} away
+              {' — '}{d.nextMilestone.daysAway === 1 ? t('acc.daily.awayOne', '{n} day away', { n: 1 }) : t('acc.daily.awayMany', '{n} days away', { n: d.nextMilestone.daysAway })}
               {d.nextMilestone.kind === 'coupon' && d.nextMilestone.value
-                ? ` · worth ${money(d.nextMilestone.value)}` : ''}
+                ? ` · ${t('acc.daily.worth', 'worth {amount}', { amount: money(d.nextMilestone.value) })}` : ''}
             </span>
           </span>
         </div>
@@ -183,17 +185,17 @@ export default function DailyRewardCard() {
           bg-space-black/40 px-4 py-2.5 text-[13px]">
           <Ticket size={15} className="text-violet-300 shrink-0" />
           <span className="text-slate-300">
-            <b className="text-slate-100">{d.wallet.perBoost} points</b> = one extra giveaway entry
+            <b className="text-slate-100">{t('acc.daily.perBoostPoints', '{n} points', { n: d.wallet.perBoost })}</b> {t('acc.daily.perBoostEntry', '= one extra giveaway entry')}
             <span className="text-slate-500">
-              {' — one is used per draw'}
+              {' — '}{t('acc.daily.onePerDraw', 'one is used per draw')}
               {d.wallet.affordable > 0
-                ? `, and you can trade for ${d.wallet.affordable}`
-                : `. ${d.wallet.toNextBoost} points more for your first`}
+                ? t('acc.daily.canTrade', ', and you can trade for {n}', { n: d.wallet.affordable })
+                : t('acc.daily.moreForFirst', '. {n} points more for your first', { n: d.wallet.toNextBoost })}
             </span>
           </span>
           {d.boosts > 0 && (
             <span className="text-[12px] text-violet-300">
-              holding {d.boosts} — {d.boosts === 1 ? 'your next draw' : `your next ${d.boosts} draws`}
+              {t('acc.daily.holding', 'holding {n}', { n: d.boosts })} — {d.boosts === 1 ? t('acc.daily.nextDraw', 'your next draw') : t('acc.daily.nextDraws', 'your next {n} draws', { n: d.boosts })}
             </span>
           )}
           <button onClick={trade} disabled={d.wallet.affordable < 1 || trading}
@@ -201,7 +203,7 @@ export default function DailyRewardCard() {
               ${d.wallet.affordable > 0
                 ? 'bg-violet-500/20 text-violet-200 hover:bg-violet-500/30'
                 : 'bg-white/5 text-slate-600 cursor-not-allowed'}`}>
-            {trading ? '…' : 'Trade for an entry'}
+            {trading ? '…' : t('acc.daily.trade', 'Trade for an entry')}
           </button>
         </div>
       )}
@@ -209,17 +211,17 @@ export default function DailyRewardCard() {
       {/* What has already been won. A toast is not a place to keep a €5 code. */}
       {d.earned?.length > 0 && (
         <div className="relative mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1.5 px-1 text-[12.5px]">
-          <span className="text-slate-500">Won so far:</span>
+          <span className="text-slate-500">{t('acc.daily.wonSoFar', 'Won so far:')}</span>
           {d.earned.map((e) => (
             <span key={`${e.day}-${e.streakDay}`}
               className="inline-flex items-center gap-1.5 rounded-lg bg-white/5 px-2 py-1 text-slate-300">
               {e.kind === 'coupon' ? <Ticket size={12} className="text-amber-300" />
                 : <Sparkles size={12} className="text-amber-300" />}
-              Day {e.streakDay}
+              {t('acc.daily.dayN', 'Day {n}', { n: e.streakDay })}
               {e.code ? (
-                <button onClick={() => copy(e.code)} title="Copy this code"
+                <button onClick={() => copy(e.code)} title={t('acc.daily.copyCode', 'Copy this code')}
                   className="font-mono text-amber-300 hover:text-amber-200">{e.code}</button>
-              ) : <span className="text-slate-400">giveaway boost</span>}
+              ) : <span className="text-slate-400">{t('acc.daily.giveawayBoost', 'giveaway boost')}</span>}
             </span>
           ))}
         </div>

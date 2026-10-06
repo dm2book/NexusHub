@@ -8,9 +8,11 @@ import DailyRewardCard from '../../components/account/DailyRewardCard.jsx';
 import { money, dateShort } from '../../lib/format.js';
 import { StatusBadge, EmptyState, SkeletonStat, SkeletonRows, Skeleton } from '../../components/ui.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
+import { useI18n } from '../../lib/i18n.jsx';
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const { t } = useI18n();
   const [data, setData] = useState(null);
 
   useEffect(() => { api.get('/api/account/dashboard').then(setData).catch(() => {}); }, []);
@@ -29,10 +31,10 @@ export default function Dashboard() {
   const s = data.stats;
   const buckets = data.ordersByStatus || { pending: 0, processing: 0, delivered: 0, refunded: 0 };
   const statusCards = [
-    { icon: Clock, label: 'Pending', value: buckets.pending, tone: 'text-slate-300 bg-white/5', to: '/account/orders' },
-    { icon: Cog, label: 'Processing', value: buckets.processing, tone: 'text-indigo-300 bg-indigo-500/10', to: '/account/orders' },
-    { icon: CheckCircle2, label: 'Delivered', value: buckets.delivered, tone: 'text-emerald-300 bg-emerald-500/10', to: '/account/orders' },
-    { icon: RotateCcw, label: 'Refunded', value: buckets.refunded, tone: 'text-fuchsia-300 bg-fuchsia-500/10', to: '/account/orders' },
+    { icon: Clock, label: t('acc.dash.pending', 'Pending'), value: buckets.pending, tone: 'text-slate-300 bg-white/5', to: '/account/orders' },
+    { icon: Cog, label: t('acc.dash.processing', 'Processing'), value: buckets.processing, tone: 'text-indigo-300 bg-indigo-500/10', to: '/account/orders' },
+    { icon: CheckCircle2, label: t('acc.dash.delivered', 'Delivered'), value: buckets.delivered, tone: 'text-emerald-300 bg-emerald-500/10', to: '/account/orders' },
+    { icon: RotateCcw, label: t('acc.dash.refunded', 'Refunded'), value: buckets.refunded, tone: 'text-fuchsia-300 bg-fuchsia-500/10', to: '/account/orders' },
   ];
 
   const loyalty = data.loyalty;
@@ -46,7 +48,7 @@ export default function Dashboard() {
       <div className="fm-hero-brand relative overflow-hidden rounded-2xl p-6 mb-7 text-white shadow-lg shadow-violet-900/30"
         style={{ backgroundImage: 'linear-gradient(120deg,#4f46e5,#7c3aed 55%,#a21caf)' }}>
         <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-2xl font-bold">Welcome back{user?.displayName ? `, ${user.displayName}` : ''} 👋</h1>
+          <h1 className="text-2xl font-bold">{user?.displayName ? t('acc.dash.welcomeName', 'Welcome back, {name}', { name: user.displayName }) : t('acc.dash.welcome', 'Welcome back')} 👋</h1>
           {loyalty && (
             <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide rounded-full px-3 py-1 border"
               style={{ color: loyalty.color, borderColor: `${loyalty.color}66`, background: `${loyalty.color}1f` }}>
@@ -54,12 +56,12 @@ export default function Dashboard() {
             </span>
           )}
         </div>
-        <p className="text-white/75 mt-1 text-sm">Here’s everything happening on your account.</p>
+        <p className="text-white/75 mt-1 text-sm">{t('acc.dash.subtitle', 'Here’s everything happening on your account.')}</p>
         {loyalty?.next && (
           <div className="mt-4 max-w-md">
             <div className="flex justify-between text-[11.5px] text-white/70 mb-1.5">
               <span>{loyalty.tierName}</span>
-              <span>{money(loyalty.remainingToNext, 'EUR')} to {loyalty.next.name}</span>
+              <span>{t('acc.dash.toNextTier', '{amount} to {tier}', { amount: money(loyalty.remainingToNext, 'EUR'), tier: loyalty.next.name })}</span>
             </div>
             <div className="h-2 rounded-full bg-white/15 overflow-hidden">
               <div className="h-full rounded-full bg-gradient-to-r from-amber-300 to-amber-400 transition-all duration-700"
@@ -68,7 +70,7 @@ export default function Dashboard() {
           </div>
         )}
         {loyalty && !loyalty.next && (
-          <p className="mt-3 text-[12.5px] text-amber-200 font-semibold">💎 Highest tier reached — enjoy the perks!</p>
+          <p className="mt-3 text-[12.5px] text-amber-200 font-semibold">💎 {t('acc.dash.topTier', 'Highest tier reached — enjoy the perks!')}</p>
         )}
       </div>
 
@@ -78,20 +80,20 @@ export default function Dashboard() {
           style={{ backgroundImage: 'linear-gradient(135deg,#4f46e5,#7c3aed 60%,#a21caf)' }}>
           <div className="absolute -right-6 -top-6 w-28 h-28 rounded-full bg-white/10 blur-xl" />
           <div className="flex items-center justify-between"><Wallet size={20} /><ArrowRight size={16} className="opacity-0 group-hover:opacity-100 transition" /></div>
-          <div className="text-white/70 text-xs mt-3">Wallet balance</div>
+          <div className="text-white/70 text-xs mt-3">{t('acc.dash.walletBalance', 'Wallet balance')}</div>
           <div className="text-2xl font-display mt-0.5">{money(s.walletBalance || 0, 'EUR')}</div>
         </Link>
         <Link to="/account/referrals" className="card p-5 hover:border-primary/40 transition group">
           <div className="flex items-center justify-between"><Gift size={20} className="text-pink-400" /><ArrowRight size={16} className="text-slate-500 opacity-0 group-hover:opacity-100 transition" /></div>
-          <div className="text-slate-400 text-xs mt-3">Referral earnings</div>
+          <div className="text-slate-400 text-xs mt-3">{t('acc.dash.referralEarnings', 'Referral earnings')}</div>
           <div className="text-2xl font-display gradient-text mt-0.5">{money(s.referralEarnings || 0, 'EUR')}</div>
-          <div className="text-slate-500 text-xs mt-1">{s.referrals || 0} referral{s.referrals === 1 ? '' : 's'}</div>
+          <div className="text-slate-500 text-xs mt-1">{s.referrals === 1 ? t('acc.dash.referralOne', '{n} referral', { n: 1 }) : t('acc.dash.referralMany', '{n} referrals', { n: s.referrals || 0 })}</div>
         </Link>
         <Link to="/account/notifications" className="card p-5 hover:border-primary/40 transition group">
           <div className="flex items-center justify-between"><Bell size={20} className="text-amber-300" /><ArrowRight size={16} className="text-slate-500 opacity-0 group-hover:opacity-100 transition" /></div>
-          <div className="text-slate-400 text-xs mt-3">Unread notifications</div>
+          <div className="text-slate-400 text-xs mt-3">{t('acc.dash.unread', 'Unread notifications')}</div>
           <div className="text-2xl font-display text-white mt-0.5">{s.unreadNotifications || 0}</div>
-          <div className="text-slate-500 text-xs mt-1">{s.openTickets || 0} open ticket{s.openTickets === 1 ? '' : 's'}</div>
+          <div className="text-slate-500 text-xs mt-1">{s.openTickets === 1 ? t('acc.dash.ticketOne', '{n} open ticket', { n: 1 }) : t('acc.dash.ticketMany', '{n} open tickets', { n: s.openTickets || 0 })}</div>
         </Link>
       </div>
 
@@ -107,12 +109,12 @@ export default function Dashboard() {
       </div>
 
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg text-white">Recent orders</h2>
-        <Link to="/account/orders" className="text-sm text-indigo-400 hover:text-indigo-300">View all</Link>
+        <h2 className="text-lg text-white">{t('acc.dash.recentOrders', 'Recent orders')}</h2>
+        <Link to="/account/orders" className="text-sm text-indigo-400 hover:text-indigo-300">{t('acc.dash.viewAll', 'View all')}</Link>
       </div>
       {data.recentOrders.length === 0 ? (
-        <EmptyState icon={ShoppingBag} title="No orders yet"
-          action={<Link to="/shop" className="btn-primary">Browse shop</Link>} />
+        <EmptyState icon={ShoppingBag} title={t('acc.dash.noOrders', 'No orders yet')}
+          action={<Link to="/shop" className="btn-primary">{t('acc.dash.browseShop', 'Browse shop')}</Link>} />
       ) : (
         <div className="card divide-y divide-white/5">
           {data.recentOrders.map((o) => (

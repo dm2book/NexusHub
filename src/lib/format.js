@@ -21,8 +21,12 @@ const formatter = (cur) => {
 
 export const money = (cents, cur = 'EUR') => formatter(cur).format((cents || 0) / 100);
 
-export const date = (iso) => (iso ? new Date(iso).toLocaleString() : '—');
-export const dateShort = (iso) => (iso ? new Date(iso).toLocaleDateString() : '—');
+/* Dates in the shop's language, not the browser's: a Dutch page on an
+   English-language phone showed "10/6/2026". */
+const DATE_LOCALE = { nl: 'nl-NL', en: 'en-GB', de: 'de-DE', fr: 'fr-FR' };
+const dateLocale = () => { try { return DATE_LOCALE[document.documentElement.lang] || undefined; } catch { return undefined; } };
+export const date = (iso) => (iso ? new Date(iso).toLocaleString(dateLocale()) : '—');
+export const dateShort = (iso) => (iso ? new Date(iso).toLocaleDateString(dateLocale()) : '—');
 
 /* A refund sends real money back through Stripe or Mollie and cannot be
    undone — so it takes the order number, typed, not one stray click. */

@@ -5,23 +5,25 @@ import {
   Wallet, Bell, User, LogOut, Shield, Menu, Gift, Star, Coins, Trophy,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
+import { useI18n } from '../lib/i18n.jsx';
 
-const NAV = [
-  { to: '/account', icon: LayoutDashboard, label: 'Overview', end: true },
-  { to: '/account/orders', icon: ShoppingBag, label: 'Orders' },
-  { to: '/account/wallet', icon: Wallet, label: 'Wallet' },
-  { to: '/account/forge-shop', icon: Coins, label: 'Forge Shop' },
-  { to: '/account/referrals', icon: Gift, label: 'Referrals' },
-  { to: '/account/rewards', icon: Star, label: 'Rewards' },
-  { to: '/account/community', icon: Trophy, label: 'Community' },
-  { to: '/account/downloads', icon: Download, label: 'Downloads' },
-  { to: '/account/notifications', icon: Bell, label: 'Notifications' },
-  { to: '/account/tickets', icon: LifeBuoy, label: 'Support' },
-  { to: '/account/profile', icon: User, label: 'Profile' },
+const NAV = (t) => [
+  { to: '/account', icon: LayoutDashboard, label: t('acc.layout.overview', 'Overview'), end: true },
+  { to: '/account/orders', icon: ShoppingBag, label: t('acc.layout.orders', 'Orders') },
+  { to: '/account/wallet', icon: Wallet, label: t('acc.layout.wallet', 'Wallet') },
+  { to: '/account/forge-shop', icon: Coins, label: t('acc.layout.forgeShop', 'Forge Shop') },
+  { to: '/account/referrals', icon: Gift, label: t('acc.layout.referrals', 'Referrals') },
+  { to: '/account/rewards', icon: Star, label: t('acc.layout.rewards', 'Rewards') },
+  { to: '/account/community', icon: Trophy, label: t('acc.layout.community', 'Community') },
+  { to: '/account/downloads', icon: Download, label: t('acc.layout.downloads', 'Downloads') },
+  { to: '/account/notifications', icon: Bell, label: t('acc.layout.notifications', 'Notifications') },
+  { to: '/account/tickets', icon: LifeBuoy, label: t('acc.layout.support', 'Support') },
+  { to: '/account/profile', icon: User, label: t('acc.layout.profile', 'Profile') },
 ];
 
 export default function AccountLayout() {
   const { user, isStaff, logout } = useAuth();
+  const { t } = useI18n();
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const [open, setOpen] = useState(false);
@@ -37,7 +39,7 @@ export default function AccountLayout() {
         <span className="font-display text-white">ForgeMarket</span>
       </Link>
       <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-        {NAV.map(({ to, icon: Icon, label, end }) => (
+        {NAV(t).map(({ to, icon: Icon, label, end }) => (
           <NavLink key={to} to={to} end={end} onClick={onNavigate}
             className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition
               ${isActive ? 'bg-gradient-to-r from-primary/25 to-fuchsia-500/10 text-white ring-1 ring-primary/30' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}>
@@ -48,12 +50,12 @@ export default function AccountLayout() {
       <div className="p-3 border-t border-white/5 space-y-1 shrink-0">
         {isStaff && (
           <Link to="/admin" onClick={onNavigate} className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-indigo-300 hover:bg-white/5">
-            <Shield size={18} /> Admin Console
+            <Shield size={18} /> {t('acc.layout.admin', 'Admin Console')}
           </Link>
         )}
         <button onClick={() => { onNavigate(); logout().then(() => navigate('/')); }}
           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-slate-400 hover:text-white hover:bg-white/5">
-          <LogOut size={18} /> Sign out
+          <LogOut size={18} /> {t('acc.layout.signOut', 'Sign out')}
         </button>
       </div>
     </>
@@ -89,7 +91,7 @@ export default function AccountLayout() {
             <button onClick={() => setOpen(true)} className="md:hidden p-2 -ml-2 rounded-lg text-slate-200 hover:bg-white/5">
               <Menu size={20} />
             </button>
-            <span className="text-slate-400 text-sm">My Account</span>
+            <span className="text-slate-400 text-sm">{t('acc.layout.myAccount', 'My Account')}</span>
           </div>
           <div className="flex items-center gap-3">
             <span className="text-sm text-slate-300 hidden sm:block">{user?.email}</span>
