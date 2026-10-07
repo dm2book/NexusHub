@@ -18,7 +18,7 @@ import { makeZip } from '../../lib/zip.js';
  */
 const TEMPLATE = {
   price: 'Price', ladder: 'Amounts', myth: '"Free …" is fake', password: 'Username, not password',
-  code: 'Code by email', refund: 'Not delivered? Money back',
+  code: 'Code by email', refund: 'Not delivered? Money back', value: 'Price per 1,000', rating: 'Rating (real reviews only)',
 };
 const LANGS = { nl: 'Nederlands', en: 'English', de: 'Deutsch', fr: 'Français' };
 

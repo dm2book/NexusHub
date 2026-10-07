@@ -36,6 +36,12 @@ await mk(`4,500 Robux ${tag}`, 3899, 'robux');
 const fc = await mk(`2,800 FC Points PlayStation ${tag}`, 2299, 'eafc');
 const steam = await mk(`Steam Wallet €25 ${tag}`, 2699, 'giftcard');
 
+/* Twelve visible reviews, so the rating design has something real to show. */
+for (let i = 0; i < 12; i++) {
+  await run(`INSERT INTO reviews (id, author, stars, body, source, status, created_at, verified)
+             VALUES (@id, 'Koper', @s, 'Snel geleverd.', 'site', 'visible', @at, 1)`,
+    { id: `rv_cr_${tag}_${i}`, s: i < 10 ? 5 : 4, at: nowIso() }).catch(() => {});
+}
 const { staticAds, STATIC_FORMATS } = await import('../src/services/adStaticsService.js');
 const { buildStoryboard } = await import('../src/services/adStudioService.js');
 const { adTheme } = await import('../src/services/ads/adArt.js');
@@ -64,7 +70,7 @@ const R = await staticAds(rbx.id, 'nl');
 const F = await staticAds(fc.id, 'nl');
 const G = await staticAds(steam.id, 'nl');
 const ids = (a) => a.templates.map((t) => t.id);
-ok('Robux: price, amounts, "free Robux is fake", username-not-password, refund', ['price', 'ladder', 'myth', 'password', 'refund'].every((x) => ids(R).includes(x)), ids(R).join(','));
+ok('Robux: price, amounts, "free Robux is fake", username-not-password, refund, price per 1,000', ['price', 'ladder', 'myth', 'password', 'refund', 'value'].every((x) => ids(R).includes(x)), ids(R).join(','));
 ok('…the amounts are real sibling packs, this one lit', R.ladder?.length === 3 && R.ladder.filter((x) => x.self).length === 1 && R.ladder.map((x) => x.price).join(' ') === '€9,99 €17,99 €38,99', JSON.stringify(R.ladder?.map((x) => x.price)));
 ok('a code product gets "code by email", not "username"', ids(F).includes('code') && !ids(F).includes('password'), ids(F).join(','));
 ok('a gift card is not told "free … is fake"', !ids(G).includes('myth'));
@@ -78,6 +84,18 @@ ok('French prices are written the French way', /^9,99\s€$/.test((await staticA
 const allText = JSON.stringify([R, F, G].map((a) => a.templates));
 ok('no hype the shop cannot prove (cheapest, instant, #1, guaranteed, limited time)', !/cheapest|goedkoopst|instant|direct geleverd|#1|guaranteed|gegarandeerd|limited time|beperkte tijd/i.test(allText));
 ok('every link is tagged per design and format for the attribution report', /utm_content=\{template\}-\{format\}-nl/.test(R.link));
+{
+  const { get } = await import('../src/db/index.js');
+  const r = await get(`SELECT COUNT(*)::int AS n, AVG(stars) AS avg FROM reviews WHERE status='visible'`);
+  const rating = R.templates.find((t) => t.id === 'rating');
+  const should = r.n >= 10 && Math.round(Number(r.avg) * 10) / 10 >= 4;
+  const real = (Math.round(Number(r.avg) * 10) / 10).toFixed(1).replace('.', ',');
+  ok('a rating design only with 10+ real reviews averaging 4.0+, showing exactly that number',
+    should ? rating?.l1 === `${real}/5` && new RegExp(`^${r.n} `).test(rating.l2) : !rating, `${JSON.stringify(rating)} vs ${r.n} @ ${real}`);
+  const value = R.templates.find((t) => t.id === 'value');
+  ok('price per 1,000 from the shop\'s own packs, the lowest lit', value && value.rows.length === 3
+    && value.rows.filter((x) => x.self).length === 1 && value.rows[2].self, JSON.stringify(value?.rows?.map((x) => [x.name, x.price, x.self])));
+}
 
 console.log('\n— Stills: nothing outside the safe area, nothing on top of something else —');
 {

@@ -42,7 +42,10 @@ const T = {
   code2: { nl: 'En op je bestelpagina.', en: 'And on your order page.', de: 'Und auf deiner Bestellseite.', fr: 'Et sur ta page de commande.' },
   platform: { nl: (p) => `Voor ${p}`, en: (p) => `For ${p}`, de: (p) => `Für ${p}`, fr: (p) => `Pour ${p}` },
   guest: { nl: 'Zonder account', en: 'No account needed', de: 'Ohne Konto', fr: 'Sans compte' },
+  per: { nl: (u) => `Prijs per 1.000 ${u}`, en: (u) => `Price per 1,000 ${u}`, de: (u) => `Preis pro 1.000 ${u}`, fr: (u) => `Prix pour 1 000 ${u}` },
+  rating: { nl: (n) => `${n} beoordelingen van kopers`, en: (n) => `${n} reviews from buyers`, de: (n) => `${n} Bewertungen von Käufern`, fr: (n) => `${n} avis d’acheteurs` },
 };
+const MIN_REVIEWS = 10, MIN_RATING = 4.0;
 
 const parse = (m) => { try { return typeof m === 'string' ? JSON.parse(m || '{}') : (m || {}); } catch { return {}; } };
 
@@ -71,7 +74,7 @@ async function ladderFor(row, lang) {
   const pick = sorted.slice(Math.max(0, Math.min(i - 1, sorted.length - 3)), Math.max(0, Math.min(i - 1, sorted.length - 3)) + 3);
   return pick.map((r) => {
     const p = packOf(r.name);
-    return { id: r.id, name: p ? `${countText(p.n, lang)} ${p.unit}` : r.name, price: priceText(Number(r.price), lang),
+    return { id: r.id, name: p ? `${countText(p.n, lang)} ${p.unit}` : r.name, price: priceText(Number(r.price), lang), priceCents: Number(r.price), n: p?.n ?? null,
       image: adImage(r), self: r.id === row.id };
   });
 }
@@ -88,6 +91,21 @@ export async function staticAds(productId, lang = 'nl') {
   const price = priceText(Number(row.price), L);
   const base = { name, price, platform: plat ? T.platform[L](plat.label) : null };
 
+  const ladder = await ladderFor(row, L);
+  /* Bigger pack, lower price per 1,000 — from the shop's own packs, the one
+     price comparison it can always prove. Only when the numbers actually go
+     down, and the lowest is lit. */
+  let valueRows = null;
+  if (pack && ladder && ladder.length >= 2) {
+    const per = ladder.filter((x) => x.n >= 100)
+      .map((x) => ({ ...x, perCents: Math.round((x.priceCents / x.n) * 1000) }));
+    if (per.length >= 2 && per[per.length - 1].perCents < per[0].perCents) {
+      const best = Math.min(...per.map((x) => x.perCents));
+      valueRows = per.map((x) => ({ name: x.name, price: priceText(x.perCents, L), image: x.image, self: x.perCents === best }));
+    }
+  }
+  const st = f?.stats || {};
+  const ratingText = st.rating != null ? Number(st.rating).toFixed(1).replace('.', L === 'en' ? '.' : ',') : null;
   const candidates = [
     { id: 'price', why: 'the product, its price, the platform', lines: {} },
     { id: 'ladder', when: true, lines: { title: T.ladder[L] } },
@@ -95,19 +113,24 @@ export async function staticAds(productId, lang = 'nl') {
     { id: 'password', when: !!f?.accountField, lines: { l1: T.pw1[L], l2: T.pw2[L] } },
     { id: 'code', when: !!f?.codeByMail, lines: { l1: T.code1[L], l2: T.code2[L] } },
     { id: 'refund', when: true, lines: { l1: T.refund1[L], l2: T.refund2[L] } },
+    { id: 'value', when: !!valueRows, lines: { title: pack ? T.per[L](pack.unit) : '' } },
+    /* Only a real rating, with enough reviews behind it, printed to the tenth
+       (the claim gate checks the number against the reviews table). */
+    { id: 'rating', when: !!ratingText && Number(st.reviews) >= MIN_REVIEWS && Number(st.rating) >= MIN_RATING,
+      lines: { l1: `${ratingText}/5`, l2: T.rating[L](st.reviews) } },
   ];
-  const ladder = await ladderFor(row, L);
   const templates = []; const refused = [];
   for (const c of candidates) {
     if (c.when === false) continue;
     if (c.id === 'ladder' && !ladder) continue;
-    const strings = [...Object.values(c.lines), name, price, base.platform].filter((x) => typeof x === 'string' && x);
+    const rowStrings = c.id === 'value' ? (valueRows || []).flatMap((r) => [r.name, r.price]) : c.id === 'ladder' ? (ladder || []).flatMap((r) => [r.name, r.price]) : [];
+    const strings = [...Object.values(c.lines), ...rowStrings, name, price, base.platform].filter((x) => typeof x === 'string' && x);
     const bad = [
       ...strings.map((t) => [t, gate(t, f)]).filter(([, why]) => why),
       ...localRefusals(strings, L).map((t) => [t, ['a claim the shop cannot prove']]),
     ];
     if (bad.length) { refused.push({ template: c.id, lines: bad.map(([t, why]) => ({ text: t, why })) }); continue; }
-    templates.push({ id: c.id, ...c.lines });
+    templates.push({ id: c.id, ...c.lines, ...(c.id === 'value' ? { rows: valueRows } : {}) });
   }
   const site = (config.appUrl || 'https://www.forgemarket.nl').replace(/\/$/, '');
   return {

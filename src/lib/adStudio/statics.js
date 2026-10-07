@@ -163,6 +163,16 @@ function stamp(ctx, text, cx, cy, px) {
   ctx.restore();
 }
 
+function starShape(ctx, x, y, size) {
+  const cx = x + size / 2, cy = y + size / 2, R = size / 2, r = R * 0.45;
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const a = -Math.PI / 2 + (i * Math.PI) / 5, rad = i % 2 ? r : R;
+    ctx[i ? 'lineTo' : 'moveTo'](cx + rad * Math.cos(a), cy + rad * Math.sin(a));
+  }
+  ctx.closePath();
+}
+
 /**
  * Draw one static ad.
  * fmt: { w, h, safeTop, safeBottom }; ad: the server's answer; tpl: one of
@@ -208,14 +218,15 @@ export function drawStatic(ctx, fmt, ad, tpl, images) {
 
   const header = top + 40 * k + gap * 1.2;    // first line below the brand
 
-  if (tpl.id === 'ladder' && ad.ladder) {
+  const rowsOf = tpl.id === 'value' ? tpl.rows : tpl.id === 'ladder' ? ad.ladder : null;
+  if (rowsOf) {
     // Title, then one row per amount; this product's row lit.
     const ts = line(ctx, tpl.title, cx, header + 92 * k * z, { px: 96 * k * z, maxW });
     box('title', header, header + 92 * k * z);
     const rowsTop = header + 92 * k * z + gap * 1.4;
-    const n = ad.ladder.length;
+    const n = rowsOf.length;
     const rowH = Math.min(230 * k * z, (y - rowsTop - gap * (n - 1)) / n);
-    ad.ladder.forEach((r, i) => {
+    rowsOf.forEach((r, i) => {
       const ry = rowsTop + i * (rowH + gap);
       ctx.save();
       roundRect(ctx, left, ry, maxW, rowH, rowH * 0.18);
@@ -278,6 +289,26 @@ export function drawStatic(ctx, fmt, ad, tpl, images) {
     line(ctx, tpl.sub, cx, subY, { px: 44 * k * z, maxW, family: 'Inter', weight: '600', color: '#e7e3f8' });
     box('headline', hy, subY + 10 * k);
     hy = subY + 10 * k;
+  } else if (tpl.id === 'rating') {
+    /* The real rating, big, and five stars filled to exactly that number —
+       a drawn bar, not "★★★★★", which would say five. */
+    const r = parseFloat(String(tpl.l1).replace(',', '.'));
+    const s1 = line(ctx, tpl.l1, cx, hy + 120 * k * z, { px: 130 * k * z, maxW });
+    const sy = hy + 120 * k * z + 28 * k * z, sz = 64 * k * z, sg = 14 * k * z;
+    const sx = cx - (5 * sz + 4 * sg) / 2;
+    for (let i = 0; i < 5; i++) {
+      const fill = Math.max(0, Math.min(1, r - i));
+      starShape(ctx, sx + i * (sz + sg), sy, sz);
+      ctx.save(); ctx.fillStyle = 'rgba(255,255,255,0.18)'; ctx.fill(); ctx.restore();
+      if (fill > 0) {
+        ctx.save(); ctx.beginPath(); ctx.rect(sx + i * (sz + sg), sy, sz * fill, sz); ctx.clip();
+        starShape(ctx, sx + i * (sz + sg), sy, sz); ctx.fillStyle = '#facc15'; ctx.fill(); ctx.restore();
+      }
+    }
+    const s2 = line(ctx, tpl.l2, cx, sy + sz + 58 * k * z, { px: 46 * k * z, maxW, family: 'Inter', weight: '600', color: '#e7e3f8' });
+    box('headline', hy, sy + sz + 58 * k * z + s2 * 0.25);
+    hy = sy + sz + 58 * k * z + s2 * 0.25;
+    void s1;
   } else if (tpl.l1) {
     const s1 = line(ctx, tpl.l1, cx, hy + 92 * k * z, { px: 92 * k * z, maxW });
     const s2 = line(ctx, tpl.l2, cx, hy + 92 * k * z + s1 * 1.1, { px: 92 * k * z, maxW, color: accent });
