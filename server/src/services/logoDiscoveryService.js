@@ -131,7 +131,7 @@ const SUSPECT_NAME = /screenshot|screen-shot|mockup|photo|preview|watermark|thum
 /**
  * Judge one candidate. Returns { status, reason?, score, width, height, transparent }.
  */
-export function assess({ tier, mime, bytes, url = '', license = null }) {
+export function assess({ tier, mime, bytes, url = '', license = null, recentYear = false }) {
   const size = bytes?.length || 0;
   const { width, height, transparent } = inspect(mime, bytes || Buffer.alloc(0));
   const isSvg = mime === 'image/svg+xml';
@@ -147,7 +147,11 @@ export function assess({ tier, mime, bytes, url = '', license = null }) {
   score += transparent ? 15 : 0;
   score += 10;                                        // passed the size rule (vector, or ≥ 512)
   score += license ? 10 : 0;
-  return { status: 'ok', score: Math.min(100, score), width, height, transparent };
+  /* Current, not just free: Simple Icons follows the brands' logo changes;
+     a Commons file without a recent year in its name may be any vintage. */
+  if (tier === 'public_svg') score += 8;
+  if (tier === 'commons') score += recentYear ? 6 : -10;
+  return { status: 'ok', score: Math.max(0, Math.min(100, score)), width, height, transparent };
 }
 
 /* ── Fetching, politely ───────────────────────────────────────────────── */
@@ -219,18 +223,48 @@ async function commonsCandidates(brand, { fetchImpl = fetch } = {}) {
     return { title: p.title, mime: ii.mime, url: ii.mime === 'image/svg+xml' ? ii.url : (ii.thumburl || ii.url), page: ii.descriptionurl,
       licence: String(m.LicenseShortName?.value || '').replace(/<[^>]+>/g, '').trim() };
   });
-  const key = def.label.toLowerCase().split(/\s+/)[0];
-  const picked = files.filter((f) => FREE_LICENCE.test(f.licence) && /logo|icon/i.test(f.title) && f.title.toLowerCase().includes(key)
-    && !/\b(fan|unofficial|concept|parody|old|former|beta)\b/i.test(f.title)).slice(0, 3);
+  const judged = files.filter((f) => FREE_LICENCE.test(f.licence) && /\.(svg|png)$/i.test(f.title))
+    .map((f) => ({ ...f, v: commonsVerdict(f.title, def) }));
+  /* Newest first, vector first: Commons keeps every logo a brand ever had. */
+  const picked = judged.filter((f) => f.v.ok)
+    .sort((a, b) => (b.v.year || 0) - (a.v.year || 0) || (b.mime === 'image/svg+xml') - (a.mime === 'image/svg+xml') || a.title.length - b.title.length)
+    .slice(0, 3);
+  const turnedDown = judged.filter((f) => !f.v.ok).slice(0, 4)
+    .map((f) => ({ tier: 'commons', url: f.page || f.url, failed: null, rejected: f.v.reason, license: f.licence }));
   const out = [];
   for (const f of picked) {
     try {
       const { mime, bytes } = await download(f.url, { fetchImpl });
-      out.push({ tier: 'commons', url: f.page || f.url, mime: mime || f.mime, bytes, license: f.licence,
+      out.push({ tier: 'commons', url: f.page || f.url, mime: mime || f.mime, bytes, license: f.licence, recentYear: f.v.year >= RECENT_YEAR,
         logoType: /wordmark|text/i.test(f.title) ? 'wordmark' : /icon|symbol/i.test(f.title) ? 'brand icon' : (f.mime === 'image/svg+xml' ? 'svg logo' : 'png logo') });
     } catch (e) { out.push({ tier: 'commons', url: f.page || f.url, failed: e.message, license: f.licence }); }
   }
-  return out;
+  return [...out, ...turnedDown];
+}
+
+/* ── Is this Commons file the brand's CURRENT main logo? ──────────────────
+ * Commons is an archive: it keeps the logo from 2006, the one for the console
+ * from 2013, the logo of a spin-off and of a long-closed online service, all
+ * under the brand's name and all public domain. Its search ranks by words, not
+ * by which one is in use. Seen in production: Roblox's old wordmark, "Xbox
+ * One", "Nintendo Wi-Fi Connection" and League of Legends: Wild Rift chosen as
+ * the brand logos. So a title must be the brand and nothing else — every word
+ * left over after the brand, "logo", a year and a file type is a sub-brand or
+ * a variant — and a year before RECENT_YEAR in it is an old logo. */
+export const RECENT_YEAR = 2019;
+const NEUTRAL_WORDS = new Set(['logo', 'logotype', 'icon', 'symbol', 'wordmark', 'svg', 'png', 'official', 'new', 'current', 'primary', 'emblem', 'mark', 'and', 'the', 'file']);
+export function commonsVerdict(title, def) {
+  const t = String(title || '').replace(/^File:/i, '').replace(/\.(svg|png)$/i, '').toLowerCase().replace(/[_()[\],.–—-]+/g, ' ');
+  const brandWords = def.label.toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').split(/\s+/).filter(Boolean);
+  const words = t.split(/\s+/).filter(Boolean);
+  if (!brandWords.every((w) => words.includes(w))) return { ok: false, reason: `not ${def.label}'s own logo` };
+  const years = words.filter((w) => /^(19|20)\d{2}$/.test(w)).map(Number);
+  const year = years.length ? Math.max(...years) : null;
+  if (year && year < RECENT_YEAR) return { ok: false, reason: `an older logo (${year})`, year };
+  const extra = words.filter((w) => !brandWords.includes(w) && !NEUTRAL_WORDS.has(w) && !/^(19|20)\d{2}$/.test(w));
+  if (extra.length) return { ok: false, reason: `a variant or sub-brand ("${extra.join(' ')}"), not the main logo` };
+  if (!/logo|icon|symbol|wordmark|emblem|mark/.test(t)) return { ok: false, reason: 'not marked as a logo' };
+  return { ok: true, year };
 }
 
 function bundledCandidates(brand) {
@@ -259,7 +293,8 @@ export async function discoverBrand(brand, { fetchImpl = fetch, network = common
   cands.push(...bundledCandidates(brand));
   const at = nowIso();
   for (const c of cands) {
-    const verdict = c.failed ? { status: 'rejected', reason: `could not fetch: ${c.failed}`, score: 0 } : assess(c);
+    const verdict = c.rejected ? { status: 'rejected', reason: c.rejected, score: 0 }
+      : c.failed ? { status: 'rejected', reason: `could not fetch: ${c.failed}`, score: 0 } : assess(c);
     let imageUrl = null; let svgText = null;
     if (verdict.status === 'ok') {
       if (c.mime === 'image/svg+xml') svgText = sanitizeSvg(c.bytes.toString('utf8'));
@@ -289,6 +324,21 @@ export async function chooseBest(brand) {
   return rows[0] ? get(`SELECT * FROM brand_logos WHERE id=@id`, { id: rows[0].id }) : null;
 }
 
+/* Bumped when the way logos are judged changes. A new version drops the
+   choices the old rules made (the Commons ones are what changed) and looks
+   at every brand again — without waiting 30 days. */
+export const LOGIC_VERSION = 2;
+export async function ensureLogicVersion() {
+  const row = await get(`SELECT value FROM kv WHERE key='logo_discovery_version'`).catch(() => null);
+  if (Number(row?.value) === LOGIC_VERSION) return false;
+  await run(`DELETE FROM brand_logos WHERE tier = 'commons'`);
+  await run(`UPDATE brand_logos SET retrieved_at = '1970-01-01T00:00:00.000Z'`);
+  for (const b of Object.keys(BRANDS)) await chooseBest(b);
+  await run(`INSERT INTO kv (key, value, updated_at) VALUES ('logo_discovery_version', @v, @at)
+             ON CONFLICT (key) DO UPDATE SET value=@v, updated_at=@at`, { v: String(LOGIC_VERSION), at: nowIso() });
+  return true;
+}
+
 /** Brands whose newest look is older than the cache window (or never). */
 export async function staleBrands({ now = Date.now() } = {}) {
   const cut = new Date(now - CACHE_DAYS * 86_400_000).toISOString();
@@ -299,6 +349,7 @@ export async function staleBrands({ now = Date.now() } = {}) {
 
 /** Maintenance: a few stale brands per run, within a deadline. */
 export async function refreshStale({ limit = 4, deadline = Date.now() + 8_000, fetchImpl = fetch } = {}) {
+  await ensureLogicVersion();
   const todo = (await staleBrands()).slice(0, limit); const done = [];
   for (const b of todo) {
     if (Date.now() >= deadline) break;
@@ -336,6 +387,7 @@ export async function addSource({ brand, tier, url, license = null, guidelines =
 
 /** Everything for the Logo Library page, and the report. */
 export async function library() {
+  await ensureLogicVersion();
   const rows = await all(`SELECT id, brand, tier, logo_type, source_url, license, guidelines, retrieved_at, mime, width, height, transparent,
                                  image_url, (svg_text IS NOT NULL) AS has_svg, score, status, reject_reason, chosen, updated_at
                             FROM brand_logos ORDER BY brand, chosen DESC, score DESC`);
