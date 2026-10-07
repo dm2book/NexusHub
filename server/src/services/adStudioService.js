@@ -88,6 +88,11 @@ function words(f, lang, extra) {
         : { big: 'NOPE.', l1: 'Another account', l2: 'to sign up for?', voice: 'Another account to sign up for? Nope.' },
       refund: nl ? { big: 'BANG?', l1: 'Dat je code', l2: 'niet komt?', voice: 'Bang dat je code niet komt?' }
         : { big: 'WORRIED?', l1: 'That your code', l2: 'never arrives?', voice: 'Worried your code never arrives?' },
+      /* A code product asks for no password at all, so "never give out your
+         password" was an opening about something the ad's own product never
+         asks for. This one is about what it does: a code, by email. */
+      code: nl ? { big: 'GEEN GEDOE.', l1: 'Je code komt', l2: 'per mail.', voice: 'Geen gedoe. Je code komt gewoon per mail.' }
+        : { big: 'NO HASSLE.', l1: 'Your code comes', l2: 'by email.', voice: 'No hassle. Your code just comes by email.' },
     },
     myth: unit && (nl
       ? { title: `"Gratis ${unit}"`, stamp: 'NEP', sub: 'Ze willen maar één ding: je wachtwoord.',
@@ -176,7 +181,7 @@ export async function buildStoryboard({ productId, angles = [], platform = 'tikt
   const W = words(f, L, { range, catalogue, platform: platformTag?.label || null });
 
   /* The opening follows the first angle. */
-  const hookKey = { trust: 'pw', myth: 'pw', math: 'math', beforeafter: 'math', guest: 'guest', refund: 'refund' }[chosen[0]];
+  const hookKey = ({ trust: f.accountField ? 'pw' : 'code', myth: 'pw', math: 'math', beforeafter: 'math', guest: 'guest', refund: 'refund' })[chosen[0]];
   const target = LENGTHS.includes(Number(length)) ? Number(length) : 30;
   const scenes = [{ type: 'hook', data: W.hook[hookKey] }];
   /* The product scene is not optional: an ad that never shows what is for
@@ -203,7 +208,9 @@ export async function buildStoryboard({ productId, angles = [], platform = 'tikt
   const sentence = (t) => String(t || '').replace(/(^|[.!?]\s+)([a-zà-ÿ])/g, (m, a, b) => a + b.toUpperCase());
   const out = scenes.map((s, i) => ({
     id: `${i + 1}-${s.type}`, type: s.type,
-    accent: ['trust', 'offer', 'end'].includes(s.type) ? accent : SCENE_ACCENT[s.type],
+    /* Pink is the warning colour (the password hook, the myth); a hook that
+       says something good about the product speaks in the brand's colour. */
+    accent: ['trust', 'offer', 'end'].includes(s.type) || (s.type === 'hook' && hookKey === 'code') ? accent : SCENE_ACCENT[s.type],
     data: { ...s.data, image, images: s.type === 'guest' ? [image, ...others.slice(0, 2)].filter(Boolean) : undefined },
     voice: sentence(s.data.voice),
     minDur: BASE_DUR[s.type],

@@ -258,6 +258,14 @@ export const config = {
     })(),
   },
 
+  /* The ad platforms' own numbers (spend, impressions, clicks), pulled into
+     ad_spend by adSpendSyncService. Read-only tokens; each half is optional —
+     without them the owner imports the platform's CSV export instead. */
+  adPlatforms: {
+    meta: { token: env.META_ADS_TOKEN || '', accountId: String(env.META_AD_ACCOUNT_ID || '').replace(/^act_/, '') },
+    tiktok: { token: env.TIKTOK_ADS_TOKEN || '', advertiserId: env.TIKTOK_ADVERTISER_ID || '' },
+  },
+
   notify: {
     // Falls back to the ops webhook so an existing setup keeps working.
     discordWebhookUrl: env.NOTIFY_DISCORD_WEBHOOK_URL || '',
