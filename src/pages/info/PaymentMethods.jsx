@@ -70,7 +70,7 @@ export default function PaymentMethods() {
       <div className="grid sm:grid-cols-3 gap-4 mb-10">
         {[[Zap, t('pay.perk0t', 'Delivery you can follow'), t('pay.perk0', 'In stock is sent automatically once your payment is confirmed; the rest is delivered by hand, usually within a few hours.')],
           [ShieldCheck, t('pay.perk1t', 'Secure & fraud-screened'), t('pay.perk1', 'Every order is screened; we never see your card details.')],
-          [BadgeCheck, t('checkout.protection', 'Buyer protection'), t('pay.perk2', 'Issues? Open a ticket — eligible orders are money-back guaranteed.')]].map(([I, pt, d]) => (
+          [BadgeCheck, t('checkout.protection', 'Buyer protection'), t('pay.perk2', 'Issues? Open a ticket. If your order is not delivered, you get your money back in full.')]].map(([I, pt, d]) => (
           <div key={pt} className="glass rounded-2xl p-5">
             <I size={20} className="text-indigo-300 mb-2" />
             <h3 className="text-white text-sm font-medium">{pt}</h3>

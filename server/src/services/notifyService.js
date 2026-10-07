@@ -387,11 +387,14 @@ export async function notifyOwner(event, message) {
 
   const results = await Promise.allSettled(started.map((c) => c.p));
   const sent = [], failed = [];
+  let skipped = 0;
   results.forEach((r, i) => {
+    if (r.status === 'fulfilled' && r.value === null) { skipped += 1; return; } // channel not live (bot offline)
     (r.status === 'fulfilled' && r.value ? sent : failed).push(started[i].name);
   });
+  if (skipped === started.length) return { sent: [], failed: [], configured: 0 };
   if (failed.length) console.error(`[notify] ${event}: ${sent.length} sent, failed on ${failed.join(', ')}`);
-  return { sent, failed, configured: started.length };
+  return { sent, failed, configured: started.length - skipped };
 }
 
 // ── The durable layer ───────────────────────────────────────────────────────

@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Zap, Lock, ArrowLeft } from 'lucide-react';
 import { useI18n } from '../../lib/i18n.jsx';
+import { SUPPORT_EMAIL } from '../../lib/support.js';
 
 /**
  * The header of the checkout: the brand, "secure checkout", and the one way
@@ -41,7 +42,7 @@ export function CheckoutFooter() {
       <div className="mx-auto px-4 lg:px-8 py-4 flex flex-wrap items-center text-[12.5px] text-slate-500" style={{ maxWidth: 1152, columnGap: 16, rowGap: 4 }}>
         <span>© {new Date().getFullYear()} ForgeMarket</span>
         {links.map(([to, label]) => <Link key={to} to={to} className="hover:text-violet-700">{label}</Link>)}
-        <a href="mailto:support@forgemarket.nl" className="hover:text-violet-700">support@forgemarket.nl</a>
+        <a href={`mailto:${SUPPORT_EMAIL}`} className="hover:text-violet-700 break-all">{SUPPORT_EMAIL}</a>
       </div>
     </footer>
   );

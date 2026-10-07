@@ -36,6 +36,9 @@ router.get('/:file', asyncHandler(async (req, res) => {
     /* The bytes are a picture, whatever the row says the mime is. Without this
        a mislabelled upload could be sniffed into something executable. */
     'X-Content-Type-Options': 'nosniff',
+    /* An SVG opened on its own is a document that can run script. As an <img>
+       it never does; this keeps it that way when someone opens the link. */
+    'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; img-src data:; sandbox",
     'Content-Length': String(img.byte_size),
   });
   if (req.get('if-none-match') === etag) return res.status(304).end();

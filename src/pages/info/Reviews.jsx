@@ -125,7 +125,7 @@ export default function Reviews() {
   const avgDelivery = stats.avgDeliverySeconds == null ? '—'
     : stats.avgDeliverySeconds < 60 ? `< ${Math.max(1, Math.round(stats.avgDeliverySeconds))}s`
     : `${Math.round(stats.avgDeliverySeconds / 60)}m`;
-  const fmt = (n) => `${Number(n || 0).toLocaleString('en-US')}${Number(n || 0) >= 100 ? '+' : ''}`;
+  const fmt = (n) => `${Number(n || 0).toLocaleString(document.documentElement.lang || 'nl')}`;
 
   return (
     <InfoShell eyebrow={t('reviews.eyebrow', 'Loved by gamers')} title={t('reviews.title', 'Customer reviews')}
@@ -148,7 +148,7 @@ export default function Reviews() {
             <div className="text-center">
               <div className="text-4xl font-display gradient-text">{stats.rating}/5</div>
               <div className="flex gap-0.5 justify-center text-amber-400 mt-1">{Array.from({ length: 5 }).map((_, i) => <Star key={i} size={16} fill="currentColor" />)}</div>
-              <div className="text-slate-500 text-sm mt-1">{t('home.basedOn', 'Based on {n} reviews', { n: stats.reviews.toLocaleString('en-US') })}</div>
+              <div className="text-slate-500 text-sm mt-1">{t('home.basedOn', 'Based on {n} reviews', { n: stats.reviews.toLocaleString(document.documentElement.lang || 'nl') })}</div>
             </div>
             <div className="h-12 w-px bg-white/10 hidden sm:block" />
           </>

@@ -243,25 +243,25 @@ export async function runMaintenance() {
 
   // 4. Abandoned-payment recovery: remind customers whose order is still unpaid
   //    an hour after checkout (one reminder per order, includes the pay links).
-  try {
+  if (!late()) try {
     summary.remindersSent = await sendPaymentReminders({ afterMinutes: 60 });
   } catch (e) { summary.reminderError = e.message; }
 
   // 5. Post-delivery review request: one "how was your order?" email per
   //    completed order, a day after delivery (one per order, never repeated).
-  try {
+  if (!late()) try {
     summary.reviewRequestsSent = await sendReviewRequests({ afterHours: 24 });
   } catch (e) { summary.reviewError = e.message; }
 
   // 6. Abandoned-cart recovery: one reminder per idle cart (has items, no order
   //    placed since, not already reminded for this cart version).
-  try {
+  if (!late()) try {
     summary.cartRemindersSent = await sendCartReminders({ afterHours: 4 });
   } catch (e) { summary.cartError = e.message; }
 
   // 7. Re-poll async supplier fulfilments that returned a reference and are
   //    still in progress, so they complete without a manual nudge.
-  try {
+  if (!late()) try {
     summary.fulfillmentsRetried = await retryPendingFulfillments({ limit: 25 });
   } catch (e) { summary.fulfillmentError = e.message; }
 
@@ -281,7 +281,7 @@ export async function runMaintenance() {
    *     launch moment because the sweep is what already runs unattended, and a
    *     launch that slips by a day should still send the mail on the day it
    *     actually happened. */
-  try {
+  if (!late()) try {
     const ann = await sendLaunchAnnouncements({ limit: 40 });
     summary.launchAnnounced = ann.sent;
   } catch (e) { summary.launchAnnounceError = e.message; }
@@ -294,7 +294,7 @@ export async function runMaintenance() {
   //     received the role they had already earned — nothing ever came back for
   //     them. This also catches the other direction: a refund that happened
   //     while Discord was unreachable leaves a badge that should be gone.
-  try {
+  if (!late()) try {
     const swept = await sweepMemberRoles({ limit: 25 });
     summary.discordRolesChecked = swept.checked ?? 0;
     summary.discordRolesChanged = swept.changed ?? 0;
@@ -337,7 +337,7 @@ export async function runMaintenance() {
    *     The same pass closes out suppressed bursts: everything held back during
    *     a storm is summarised in one line per event, which is the only reason
    *     suppressing them is honest rather than just quieter. */
-  try {
+  if (!late()) try {
     const swept = await sweepAlerts({ limit: 20 });
     summary.alertsRetried = swept.retried;
     summary.alertsDelivered = swept.delivered;
@@ -360,7 +360,7 @@ export async function runMaintenance() {
      Customer-facing prices are untouched by all five. The most any of them does
      is write a recommendation with a status of requires_review; publishing is a
      separate, human, audited action. */
-  try {
+  if (!late()) try {
     const market = await import('./market/engine.js');
     summary.marketSources = (await market.refreshSources({ checkRobots: false })).length;
 

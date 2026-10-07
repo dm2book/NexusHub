@@ -57,6 +57,28 @@ function roll(rewards, luck = 1) {
   return rewards[rewards.length - 1];
 }
 
+/**
+ * The real odds, from the same weights roll() uses: per reward, the chance for
+ * one box and for an order big enough to reach the luck cap, and the average
+ * value of one box. Shown on the product page — a paid chance at prizes with
+ * money value must say what the chances are.
+ */
+export function oddsFor(rewards) {
+  const at = (luck) => {
+    const max = Math.max(1, ...rewards.map((r) => r.credit || 0));
+    const ws = rewards.map((r) => Math.max(1, r.weight) * (1 + (luck - 1) * ((r.credit || 0) / max)));
+    const total = ws.reduce((x, y) => x + y, 0) || 1;
+    return ws.map((w) => w / total);
+  };
+  const one = at(1), best = at(2);
+  const pct = (x) => Math.round(x * 1000) / 10;
+  return {
+    rewards: rewards.map((r, i) => ({ label: r.label, credit: r.credit, chance: pct(one[i]), chanceMax: pct(best[i]) })),
+    averageCredit: Math.round(rewards.reduce((s, r, i) => s + (r.credit || 0) * one[i], 0)),
+    maxLuckFromBoxes: 14,                                   // luckFor reaches 2× at 14 boxes in one order
+  };
+}
+
 /** Luck from how many boxes are opened in one order: +8% per extra box, capped 2×. */
 const luckFor = (units) => Math.min(2, 1 + 0.08 * Math.max(0, units - 1));
 

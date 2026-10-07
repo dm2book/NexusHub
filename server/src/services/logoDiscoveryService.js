@@ -36,6 +36,7 @@
  */
 import { all, get, run, nowIso } from '../db/index.js';
 import { newId } from '../utils/ids.js';
+import { publicFetch } from '../utils/imageUrl.js';
 import { config } from '../config/env.js';
 import { LIBRARY } from '../generated/brandLogos.js';
 import { ASSETS as SHOP_ASSETS } from '../generated/artAssets.js';
@@ -118,13 +119,21 @@ export function inspect(mime, buf) {
 
 /** Make an SVG safe to serve from this origin: no scripts, handlers or outside references. */
 export function sanitizeSvg(text) {
+  const ACTIVE = 'script|foreignObject|iframe|embed|object|animate|animateMotion|animateTransform|set|handler|listener';
   return String(text || '')
-    .replace(/<\?xml[\s\S]*?\?>/gi, '').replace(/<!DOCTYPE[\s\S]*?>/gi, '')
-    .replace(/<script[\s\S]*?<\/script>/gi, '').replace(/<foreignObject[\s\S]*?<\/foreignObject>/gi, '')
-    .replace(/\son[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
-    .replace(/(href|xlink:href)\s*=\s*["'](?!#|data:image\/(png|webp);)[^"']*["']/gi, '')
+    .replace(/<\?xml[\s\S]*?\?>/gi, '').replace(/<!DOCTYPE[\s\S]*?(\]\s*)?>/gi, '')
+    .replace(new RegExp(`<(${ACTIVE})\\b[\\s\\S]*?<\\/\\1\\s*>`, 'gi'), '')
+    .replace(new RegExp(`<(${ACTIVE})\\b[^>]*>`, 'gi'), '')
+    /* Event handlers, also written as <svg/onload=…>. */
+    .replace(/[\s/]on[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, ' ')
+    /* Links: only same-document (#id) and raster data — quoted or not. */
+    .replace(/(href|xlink:href)\s*=\s*("(?!#|data:image\/(png|webp);)[^"]*"|'(?!#|data:image\/(png|webp);)[^']*'|(?!["'#])[^\s>]+)/gi, '')
+    .replace(/@import[^;]*;?|javascript:/gi, '')
     .trim();
 }
+
+/** What must never be left in a file the shop serves, after sanitizeSvg. */
+const SVG_ACTIVE = /<script|<foreignObject|<animate|<set\b|[\s/]on[a-z]+\s*=|javascript:|<!ENTITY/i;
 
 const SUSPECT_NAME = /screenshot|screen-shot|mockup|photo|preview|watermark|thumbnail|banner|wallpaper|render\b/i;
 
@@ -141,7 +150,7 @@ export function assess({ tier, mime, bytes, url = '', license = null, recentYear
   if (SUSPECT_NAME.test(decodeURIComponent(String(url).split('?')[0]))) return reject('named like a screenshot, mockup, photo or preview, not a logo');
   if (!isSvg && (!width || !height || Math.min(width, height) < MIN_SIDE)) return reject(`${width || '?'}×${height || '?'} — a raster logo must be at least ${MIN_SIDE}×${MIN_SIDE}`);
   if (transparent === false) return reject('no transparent background');
-  if (isSvg && /<script/i.test(bytes.toString('utf8'))) return reject('contains a script');
+  if (isSvg && SVG_ACTIVE.test(bytes.toString('utf8'))) return reject('contains script or animation');
   let score = TIER_POINTS[tier] || 0;
   score += isSvg ? 25 : 10 + Math.min(10, Math.round((Math.min(width, height) - MIN_SIDE) / 100));
   score += transparent ? 15 : 0;
@@ -156,17 +165,21 @@ export function assess({ tier, mime, bytes, url = '', license = null, recentYear
 
 /* ── Fetching, politely ───────────────────────────────────────────────── */
 
+/* Every network wait is cut to what is left of the caller's budget: one brand
+   could otherwise spend 10 s searching Commons and 3 × 12 s downloading, and
+   "Refresh all brands" ran into Vercel's 30-second limit in production. */
+const left = (deadline, cap) => Math.max(1, Math.min(cap, (deadline || Infinity) - Date.now()));
 const UA = () => config.market?.userAgent || 'ForgeMarketBot/1.0 (+https://www.forgemarket.nl)';
 const robotsCache = new Map();
 
 /** Does the site's robots.txt let this bot fetch this path? Missing robots.txt = yes. */
-export async function robotsAllow(url, { fetchImpl = fetch } = {}) {
+export async function robotsAllow(url, { fetchImpl = fetch, deadline = Infinity } = {}) {
   const u = new URL(url);
   let rules = robotsCache.get(u.origin);
   if (!rules) {
     let text = '';
     try {
-      const r = await fetchImpl(`${u.origin}/robots.txt`, { headers: { 'User-Agent': UA() }, signal: AbortSignal.timeout(8_000) });
+      const r = await publicFetch(`${u.origin}/robots.txt`, { headers: { 'User-Agent': UA() }, signal: AbortSignal.timeout(left(deadline, 8_000)) }, fetchImpl);
       text = r.ok ? await r.text() : '';
     } catch { text = ''; }
     rules = []; let applies = false;
@@ -185,9 +198,10 @@ export async function robotsAllow(url, { fetchImpl = fetch } = {}) {
   return !hit || hit.allow;
 }
 
-async function download(url, { fetchImpl = fetch } = {}) {
-  if (!(await robotsAllow(url, { fetchImpl }))) throw new Error('robots.txt does not allow fetching this file');
-  const r = await fetchImpl(url, { headers: { 'User-Agent': UA(), Accept: 'image/svg+xml,image/png,image/webp' }, signal: AbortSignal.timeout(12_000) });
+async function download(url, { fetchImpl = fetch, deadline = Infinity } = {}) {
+  if (Date.now() >= deadline) throw new Error('out of time this run — next run');
+  if (!(await robotsAllow(url, { fetchImpl, deadline }))) throw new Error('robots.txt does not allow fetching this file');
+  const r = await publicFetch(url, { headers: { 'User-Agent': UA(), Accept: 'image/svg+xml,image/png,image/webp' }, signal: AbortSignal.timeout(left(deadline, 12_000)) }, fetchImpl);
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
   const mime = String(r.headers.get('content-type') || '').split(';')[0].trim().toLowerCase()
     || (/\.svg(\?|$)/i.test(url) ? 'image/svg+xml' : /\.png(\?|$)/i.test(url) ? 'image/png' : '');
@@ -211,11 +225,12 @@ async function officialCandidates(brand, opts) {
   return out;
 }
 
-async function commonsCandidates(brand, { fetchImpl = fetch } = {}) {
+async function commonsCandidates(brand, { fetchImpl = fetch, deadline = Infinity } = {}) {
+  if (deadline - Date.now() < 4_000) throw new Error('out of time this run — next run');
   const def = BRANDS[brand];
   const q = new URLSearchParams({ action: 'query', format: 'json', generator: 'search', gsrsearch: def.commons, gsrnamespace: '6', gsrlimit: '15',
     prop: 'imageinfo', iiprop: 'url|size|mime|extmetadata', iiextmetadatafilter: 'LicenseShortName|Artist', iiurlwidth: '1024' });
-  const r = await fetchImpl(`https://commons.wikimedia.org/w/api.php?${q}`, { headers: { 'User-Agent': UA(), Accept: 'application/json' }, signal: AbortSignal.timeout(10_000) });
+  const r = await fetchImpl(`https://commons.wikimedia.org/w/api.php?${q}`, { headers: { 'User-Agent': UA(), Accept: 'application/json' }, signal: AbortSignal.timeout(left(deadline, 10_000)) });
   if (!r.ok) throw new Error(`Commons HTTP ${r.status}`);
   const data = await r.json();
   const files = Object.values(data?.query?.pages || {}).map((p) => {
@@ -234,7 +249,7 @@ async function commonsCandidates(brand, { fetchImpl = fetch } = {}) {
   const out = [];
   for (const f of picked) {
     try {
-      const { mime, bytes } = await download(f.url, { fetchImpl });
+      const { mime, bytes } = await download(f.url, { fetchImpl, deadline });
       out.push({ tier: 'commons', url: f.page || f.url, mime: mime || f.mime, bytes, license: f.licence, recentYear: f.v.year >= RECENT_YEAR,
         logoType: /wordmark|text/i.test(f.title) ? 'wordmark' : /icon|symbol/i.test(f.title) ? 'brand icon' : (f.mime === 'image/svg+xml' ? 'svg logo' : 'png logo') });
     } catch (e) { out.push({ tier: 'commons', url: f.page || f.url, failed: e.message, license: f.licence }); }
@@ -286,13 +301,16 @@ function bundledCandidates(brand) {
 const commonsOn = () => (process.env.LOGO_DISCOVERY_NETWORK ? process.env.LOGO_DISCOVERY_NETWORK === 'on' : config.isProd);
 
 /** Look at every source for one brand, store what was found, choose the best. */
-export async function discoverBrand(brand, { fetchImpl = fetch, network = commonsOn() } = {}) {
+export async function discoverBrand(brand, { fetchImpl = fetch, network = commonsOn(), deadline = Date.now() + 20_000 } = {}) {
   if (!BRANDS[brand]) throw new Error(`Unknown brand ${brand}`);
-  const cands = [...await officialCandidates(brand, { fetchImpl })];
-  if (network) { try { cands.push(...await commonsCandidates(brand, { fetchImpl })); } catch (e) { cands.push({ tier: 'commons', url: 'https://commons.wikimedia.org', failed: e.message }); } }
+  const cands = [...await officialCandidates(brand, { fetchImpl, deadline })];
+  if (network) { try { cands.push(...await commonsCandidates(brand, { fetchImpl, deadline })); } catch (e) { cands.push({ tier: 'commons', url: 'https://commons.wikimedia.org', failed: e.message }); } }
   cands.push(...bundledCandidates(brand));
   const at = nowIso();
   for (const c of cands) {
+    /* Not reached this run: keep what was stored before, untouched. Writing it
+       down as "rejected" would demote a good official logo for a slow minute. */
+    if (/out of time this run/.test(c.failed || '')) continue;
     const verdict = c.rejected ? { status: 'rejected', reason: c.rejected, score: 0 }
       : c.failed ? { status: 'rejected', reason: `could not fetch: ${c.failed}`, score: 0 } : assess(c);
     let imageUrl = null; let svgText = null;
@@ -353,7 +371,7 @@ export async function refreshStale({ limit = 4, deadline = Date.now() + 8_000, f
   const todo = (await staleBrands()).slice(0, limit); const done = [];
   for (const b of todo) {
     if (Date.now() >= deadline) break;
-    try { await discoverBrand(b, { fetchImpl }); done.push(b); } catch (e) { console.error('[logos]', b, e.message); }
+    try { await discoverBrand(b, { fetchImpl, deadline }); done.push(b); } catch (e) { console.error('[logos]', b, e.message); }
   }
   return done;
 }

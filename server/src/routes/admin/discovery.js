@@ -7,6 +7,7 @@
  */
 import { Router } from 'express';
 import { z } from 'zod';
+import { httpUrl } from '../../utils/httpUrl.js';
 import { asyncHandler } from '../../middleware/error.js';
 import { requirePermission } from '../../middleware/rbac.js';
 import { rateLimit } from '../../middleware/rateLimit.js';
@@ -57,7 +58,7 @@ router.post('/full/step', requirePermission('products.write'), asyncHandler(asyn
 }));
 
 router.post('/evaluate', requirePermission('products.write'), scanLimit, asyncHandler(async (_req, res) => {
-  const out = await evaluateCandidates();
+  const out = await evaluateCandidates({ deadline: Date.now() + 22_000 });
   res.json({ evaluated: out.length });
 }));
 
@@ -90,7 +91,7 @@ router.post('/reference', requirePermission('products.write'), asyncHandler(asyn
     game: z.string().max(40), region: z.enum(['eu', 'nl', 'global']),
     platforms: z.array(z.enum(['playstation', 'xbox', 'pc', 'nintendo', 'ios', 'android', 'mobile', 'any', 'unknown'])).min(1).max(8),
     amounts: z.array(z.object({ denomination: z.number().positive().max(1_000_000), priceCents: z.number().int().positive().max(1_000_000) })).min(1).max(30),
-    sourceUrl: z.string().url().max(500),
+    sourceUrl: httpUrl(500),
   }).parse(req.body || {});
   try { res.json(await addReferenceDenominations({ ...body, currency: 'EUR', actor: actorOf(req) })); } catch (e) { fail(res, e); }
 }));

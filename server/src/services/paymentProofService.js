@@ -132,9 +132,13 @@ export async function confirmProof(proofId, ctx = {}) {
 async function dropScreenshot(proof) {
   const id = /\/api\/images\/([0-9a-f]{32})/.exec(String(proof.screenshot_url || ''))?.[1];
   await run(`UPDATE payment_proofs SET screenshot_url=NULL WHERE id=@id`, { id: proof.id }).catch(() => {});
-  /* Only an image no product uses and no other proof points at. */
+  /* Only an image that was uploaded AS a proof, that no product uses and no
+     other proof points at. Screenshots arrive inline (data URI), so an
+     /api/images/ id here is usually a pasted link to one of the shop's own
+     pictures — a category logo has product_id NULL too, and rejecting a proof
+     must never delete it. */
   if (id) {
-    await run(`DELETE FROM product_images WHERE id=@img AND product_id IS NULL
+    await run(`DELETE FROM product_images WHERE id=@img AND product_id IS NULL AND source = 'proof'
                  AND NOT EXISTS (SELECT 1 FROM payment_proofs WHERE screenshot_url LIKE @like)`,
       { img: id, like: `%${id}%` }).catch((e) => console.error('[proof] screenshot delete:', e.message));
   }

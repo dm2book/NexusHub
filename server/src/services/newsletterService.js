@@ -55,10 +55,10 @@ export async function subscribe(email, { source = 'prelaunch', consentText = nul
   }
   const existing = await get('SELECT id, unsubscribed_at FROM newsletter_signups WHERE email = @e', { e });
   if (existing) {
-    // Someone re-subscribing after opting out is asking to come back.
-    if (existing.unsubscribed_at) {
-      await run('UPDATE newsletter_signups SET unsubscribed_at = NULL WHERE id = @id', { id: existing.id });
-    }
+    /* An opt-out stays an opt-out. The form takes any address without a
+       confirmation mail, so "re-subscribing" could just as well be someone
+       else typing it in — and mailing a person who said stop is the one
+       thing the AVG does not forgive. Coming back goes via support. */
     return { ok: true, alreadySubscribed: true };
   }
   await run(

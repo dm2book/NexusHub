@@ -233,7 +233,7 @@ export default function Shop({ landingCategory = null, landingPath = null } = {}
             and it keeps the current choice visible while you browse. */}
         <div className="lg:hidden -mx-4 px-4 mb-6">
           <div className="fm-rail flex gap-2 overflow-x-auto pb-1 snap-x">
-            <Link to="/shop"
+            <Link to="/shop" aria-current={!category ? 'page' : undefined}
               className={`snap-start shrink-0 inline-flex items-center gap-2 h-11 px-3.5 rounded-xl border text-[14px] font-semibold transition fm-press ${
                 !category ? 'chip-active' : 'bg-white text-slate-600 border-slate-200'}`}>
               <LayoutGrid size={16} className={category ? 'text-violet-600' : ''}
@@ -244,7 +244,7 @@ export default function Shop({ landingCategory = null, landingPath = null } = {}
               const v = categoryVisual(c); const img = logoFor(categoryLogos, c); const Icon = v.icon;
               const on = category === c;
               return (
-                <Link key={c} to={landingPathFor(c)}
+                <Link key={c} to={landingPathFor(c)} aria-current={on ? 'page' : undefined}
                   className={`snap-start shrink-0 inline-flex items-center gap-2 h-11 pl-2 pr-3.5 rounded-xl border text-[14px] font-semibold transition fm-press ${
                     on ? 'chip-active' : 'bg-white text-slate-600 border-slate-200'}`}>
                   {img ? <img src={img} alt="" className="w-7 h-7 object-contain" />

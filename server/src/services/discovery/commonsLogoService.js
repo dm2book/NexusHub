@@ -77,13 +77,13 @@ export async function findLogoFile(gameKey, { fetchImpl = fetch } = {}) {
   if (!def) return null;
   const brand = BRAND[gameKey] || def.label;
   if (PREFERRED[gameKey]) {
-    const res = await fetchImpl(query({ titles: PREFERRED[gameKey].join('|') }), { headers: headers() });
+    const res = await fetchImpl(query({ titles: PREFERRED[gameKey].join('|') }), { headers: headers(), signal: AbortSignal.timeout(10_000) });
     if (res.ok) {
       const hit = pickLogo(filesOf(await res.json()), brand);
       if (hit) return hit;
     }
   }
-  const res = await fetchImpl(query({ generator: 'search', gsrnamespace: '6', gsrsearch: `${brand} logo`, gsrlimit: '15' }), { headers: headers() });
+  const res = await fetchImpl(query({ generator: 'search', gsrnamespace: '6', gsrsearch: `${brand} logo`, gsrlimit: '15' }), { headers: headers(), signal: AbortSignal.timeout(10_000) });
   if (!res.ok) throw new Error(`Wikimedia Commons API HTTP ${res.status}`);
   return pickLogo(filesOf(await res.json()), brand);
 }

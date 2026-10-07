@@ -1,6 +1,7 @@
 /** Admin product catalog management. */
 import { Router } from 'express';
 import { z } from 'zod';
+import { httpUrl } from '../../utils/httpUrl.js';
 import { asyncHandler } from '../../middleware/error.js';
 import { requirePermission } from '../../middleware/rbac.js';
 import { listProducts, getProduct, createProduct, updateProduct } from '../../services/productService.js';
@@ -125,7 +126,7 @@ router.post('/media/category-artwork', requirePermission('suppliers.manage'), as
   res.json(await applyCategoryArtwork({ actor: req.user, deadline: Date.now() + 18_000 }));
 }));
 router.post('/:id/media/official', requirePermission('suppliers.manage'), asyncHandler(async (req, res) => {
-  const { official, sourceUrl } = z.object({ official: z.boolean(), sourceUrl: z.string().url().max(500).optional() }).parse(req.body || {});
+  const { official, sourceUrl } = z.object({ official: z.boolean(), sourceUrl: httpUrl(500).optional() }).parse(req.body || {});
   try {
     res.json(await setOfficial(req.params.id, official, { actor: req.user, sourceUrl }));
   } catch (e) {

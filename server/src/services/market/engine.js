@@ -57,8 +57,8 @@ export async function refreshSources({ checkRobots = true } = {}) {
  * looks empty, which is the difference between "nobody sells this" and "we are
  * not allowed to ask".
  */
-export async function collectFromSources(queries, { fetchImpl = fetch } = {}) {
-  const result = { recorded: 0, unavailable: [], errors: [], bySource: {} };
+export async function collectFromSources(queries, { fetchImpl = fetch, deadline = Date.now() + 18_000 } = {}) {
+  const result = { recorded: 0, unavailable: [], errors: [], bySource: {}, skipped: 0 };
   const statuses = await sourceStatuses();
 
   for (const s of statuses) {
@@ -71,6 +71,8 @@ export async function collectFromSources(queries, { fetchImpl = fetch } = {}) {
     if (src.kind === 'search') continue;              // mentions, not offers: discovery/searchSource.js
 
     for (const q of queries) {
+      /* Inside one request's time; what is left over is asked for next run. */
+      if (deadline - Date.now() < 3_000) { result.skipped += 1; continue; }
       try {
         const offers = await fetchFromSource(s.key, q, { fetchImpl });
         for (const offer of offers) {

@@ -125,8 +125,15 @@ export default function LogoLibrary() {
   const refreshAll = async () => {
     setBusy(true);
     try {
+      /* Each request stays inside the platform's time limit and says what it
+         did not reach; the page simply asks again for the rest. */
       let r = await api.post('/api/admin/logos/refresh', {});
-      toast.success(`${r.done.length} brands looked at${r.remaining.length ? `, ${r.remaining.length} next time` : ''}`);
+      let done = r.done.length;
+      for (let round = 0; round < 8 && r.remaining.length; round++) {
+        r = await api.post('/api/admin/logos/refresh', { brands: r.remaining });
+        done += r.done.length;
+      }
+      toast.success(`${done} brands looked at${r.remaining.length ? `, ${r.remaining.length} next time` : ''}`);
     } catch (e) { toast.error(e.message); }
     finally { setBusy(false); load(); }
   };

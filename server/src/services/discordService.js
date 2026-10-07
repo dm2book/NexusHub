@@ -39,7 +39,9 @@ const TTL_MS = 60_000;
  * configured and delivers nothing, which is worse than the email it replaced.
  */
 export async function queueOwnerAlert({ title, lines = [], url = null, colour = 0x7c5cff }) {
-  if (!(await botSeenRecently(24))) return false;
+  /* null = "not a channel right now", not "failed": an offline bot would
+     otherwise mark every alert failed and have it retried until it is back. */
+  if (!(await botSeenRecently(24))) return null;
   return enqueueOutbox('alerts', {
     embeds: [{
       title: String(title || 'ForgeMarket'),

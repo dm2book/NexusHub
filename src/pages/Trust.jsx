@@ -56,7 +56,7 @@ export default function Trust() {
   const avgDelivery = stats.avgDeliverySeconds == null ? '—'
     : stats.avgDeliverySeconds < 60 ? `< ${Math.max(1, Math.round(stats.avgDeliverySeconds))}s`
     : `${Math.round(stats.avgDeliverySeconds / 60)}m`;
-  const fmt = (n) => `${Number(n || 0).toLocaleString('en-US')}${Number(n || 0) >= 100 ? '+' : ''}`;
+  const fmt = (n) => `${Number(n || 0).toLocaleString(document.documentElement.lang || 'nl')}`;
 
   return (
     <div className="max-w-[1100px] mx-auto px-4 lg:px-8 py-10">
@@ -96,13 +96,13 @@ export default function Trust() {
             ? { icon: ShieldCheck, value: `${stats.successRate}%`, label: t('trust.sSuccess', 'Successfully delivered'), color: 'text-emerald-600 bg-emerald-100' }
             : null,
           stats.reviews > 0
-            ? { icon: Star, value: `${stats.rating}/5`, label: `${stats.reviews.toLocaleString('en-US')} ${t('trust.sReviews', 'reviews')}`, color: 'text-amber-600 bg-amber-100' }
+            ? { icon: Star, value: `${stats.rating}/5`, label: `${stats.reviews.toLocaleString(document.documentElement.lang || 'nl')} ${t('trust.sReviews', 'reviews')}`, color: 'text-amber-600 bg-amber-100' }
             : null,
           // Was `: '24/7'` when the member count is unset (the default). One
           // person cannot staff 24/7, and presenting it as a statistic on the
           // page called Trust Center is the worst possible place to overreach.
           stats.discordMembers > 0
-            ? { icon: Users, value: stats.discordMembers.toLocaleString('en-US'), label: t('trust.sMembers', 'Discord members'), color: 'text-blue-600 bg-blue-100' }
+            ? { icon: Users, value: stats.discordMembers.toLocaleString(document.documentElement.lang || 'nl'), label: t('trust.sMembers', 'Discord members'), color: 'text-blue-600 bg-blue-100' }
             : null,
         ].filter(Boolean);
         if (!cards.length) return null;
@@ -148,7 +148,7 @@ export default function Trust() {
         <div className="flex-1">
           <h3 className="text-xl font-extrabold">
             {stats.discordMembers > 0
-              ? `${stats.discordMembers.toLocaleString('en-US')} ${t('trust.membersVouch', 'members can vouch for us')}`
+              ? `${stats.discordMembers.toLocaleString(document.documentElement.lang || 'nl')} ${t('trust.membersVouch', 'members can vouch for us')}`
               : t('trust.joinVouch', 'Ask real buyers before you buy')}
           </h3>
           <p className="text-white/85 text-sm mt-1">{t('trust.discordSub', 'Public reviews, proof of delivery, and buyers you can ask before you spend a cent.')}</p>

@@ -89,5 +89,5 @@ export function recentBroadcasts(limit = 20) {
             SUM(CASE WHEN status='failed' THEN 1 ELSE 0 END) AS failed,
             MAX(created_at) AS "sentAt"
        FROM email_log WHERE template_id='broadcast'
-      GROUP BY subject ORDER BY sentAt DESC LIMIT @l`, { l: limit });
+      GROUP BY subject ORDER BY "sentAt" DESC LIMIT @l`, { l: limit });
 }

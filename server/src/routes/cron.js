@@ -5,6 +5,7 @@ import { asyncHandler } from '../middleware/error.js';
 import { runMaintenance, runScheduledBackup } from '../services/maintenanceService.js';
 import { healthSummary } from '../services/diagnosticsService.js';
 import { forbidden } from '../utils/errors.js';
+import { createHash, timingSafeEqual } from 'node:crypto';
 
 const router = Router();
 
@@ -33,8 +34,14 @@ router.get('/health', asyncHandler(async (req, res) => {
 function assertCron(req) {
   const secret = config.security.cronSecret;
   const auth = req.get('authorization') || '';
+  /* Compared as hashes in constant time: `===` stops at the first wrong
+     character, which over enough requests tells a caller how much is right. */
+  const same = (given) => {
+    const h = (v) => createHash('sha256').update(String(v)).digest();
+    return timingSafeEqual(h(given), h(secret));
+  };
   const ok = secret
-    ? auth === `Bearer ${secret}` || req.get('x-cron-secret') === secret
+    ? same(auth.replace(/^Bearer /, '')) && /^Bearer /.test(auth) || same(req.get('x-cron-secret') || '')
     : !config.isProd;
   if (!ok) throw forbidden('Bad cron secret');
 }

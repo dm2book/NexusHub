@@ -2270,4 +2270,23 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS lang TEXT;
       CREATE UNIQUE INDEX IF NOT EXISTS logo_sources_brand_url ON logo_sources (brand, url);
     `,
   },
+  {
+    /* Indexes for queries that already run, found in the full review:
+       email_log had none at all (the retry sweep, the per-template dedupe and
+       the privacy export each scanned the whole log), the fulfilment queue is
+       read by mode/status on every maintenance run, and the privacy export
+       looks orders up by lower(email). */
+    id: '061_review_indexes',
+    sql: `
+      CREATE INDEX IF NOT EXISTS idx_email_log_status ON email_log (status, created_at);
+      CREATE INDEX IF NOT EXISTS idx_email_log_template_to ON email_log (template_id, to_email, created_at);
+      CREATE INDEX IF NOT EXISTS idx_email_log_created ON email_log (created_at);
+      CREATE INDEX IF NOT EXISTS idx_email_log_lower_to ON email_log (lower(to_email));
+      CREATE INDEX IF NOT EXISTS idx_fulfill_mode_status ON fulfillment_requests (mode, status);
+      CREATE INDEX IF NOT EXISTS idx_fulfill_status_updated ON fulfillment_requests (status, updated_at);
+      CREATE INDEX IF NOT EXISTS idx_fulfill_supplier ON fulfillment_requests (supplier_id);
+      CREATE INDEX IF NOT EXISTS idx_orders_lower_email ON orders (lower(email));
+      CREATE INDEX IF NOT EXISTS idx_market_obs_time ON market_observations (observed_at);
+    `,
+  },
 ];

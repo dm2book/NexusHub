@@ -126,7 +126,7 @@ export default function Checkout() {
     if (!code) return;
     try {
       const c = await api.get(`/api/coupons/${encodeURIComponent(code)}?subtotal=${subtotal}`);
-      setCoupon(c); toast.success(`Code applied — ${c.label || 'discount'}!`);
+      setCoupon(c); toast.success(t('checkout.codeApplied', 'Code applied — {label}!', { label: c.label || t('checkout.discountWord', 'discount') }));
     } catch (e) { setCoupon(null); toast.error(e.message || 'Invalid or expired code'); }
   };
 

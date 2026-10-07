@@ -163,6 +163,7 @@ export default function ProductDetail() {
   const [recs, setRecs] = useState({ crossSell: [], upsell: [] });
   const [others, setOthers] = useState([]);
   const [mysteryPool, setMysteryPool] = useState(null);
+  const [mysteryAvg, setMysteryAvg] = useState(null);
   const [priceHist, setPriceHist] = useState([]);
   const [heroBroken, setHeroBroken] = useState(false); // product image failed to load
   usePageMeta(product?.name || 'Product', product?.description || 'Digital top-ups and gift cards, delivered with your order number as the reference.');
@@ -293,7 +294,7 @@ export default function ProductDetail() {
   // Mystery box: load the reward pool + odds to show "what's inside".
   useEffect(() => {
     if (product?.kind !== 'mystery') { setMysteryPool(null); return; }
-    api.get(`/api/products/${product.id}/mystery`).then((r) => setMysteryPool(r.rewards || [])).catch(() => setMysteryPool([]));
+    api.get(`/api/products/${product.id}/mystery`).then((r) => { setMysteryPool(r.rewards || []); setMysteryAvg(r.averageCredit ?? null); }).catch(() => setMysteryPool([]));
   }, [product?.id, product?.kind]);
 
   // Price history for the chart.
@@ -519,7 +520,7 @@ export default function ProductDetail() {
                   ))}
                 </span>
                 <span>{t('pd.shopRating', '{r} across the shop · {n} reviews', {
-                  r: stats.rating, n: stats.reviews.toLocaleString('en-US') })}</span>
+                  r: stats.rating, n: stats.reviews.toLocaleString(document.documentElement.lang || 'nl') })}</span>
               </Link>
             ) : null /* No reviews yet: say nothing here rather than a line that reads as a warning, right under the name. */}
           </div>
@@ -707,7 +708,8 @@ export default function ProductDetail() {
         );
       })()}
 
-      {/* Mystery box — possible prizes (the odds stay a mystery on purpose) */}
+      {/* Mystery box — every prize with its real chance (never hidden: a paid
+          chance at prizes of different value must say what the chances are). */}
       {product.kind === 'mystery' && mysteryPool && mysteryPool.length > 0 && (
         <div className="bg-white border border-amber-200 rounded-2xl p-6 sm:p-8 mt-14 shadow-sm">
           <div className="flex items-center gap-3 mb-1">
@@ -715,17 +717,32 @@ export default function ProductDetail() {
               style={{ backgroundImage: 'linear-gradient(135deg,#f59e0b,#f43f5e)' }}>🎁</span>
             <div>
               <h2 className="text-xl font-extrabold text-slate-900">{t('mystery.whatsInside', 'What’s inside')}</h2>
-              <p className="text-slate-500 text-sm">{t('mystery.sub', 'Every box wins a real prize — could be any of these. Prizes pay out as store credit, instantly. The odds? That’s the mystery. 🤫')}</p>
+              <p className="text-slate-500 text-sm">{t('mystery.sub2', 'Every box pays out one of these prizes as store credit. The chances are listed — more boxes in one order raise the chance of the bigger prizes.')}</p>
             </div>
           </div>
-          <div className="grid sm:grid-cols-2 gap-2.5 mt-4">
-            {mysteryPool.map((r, i) => (
-              <div key={i} className="flex items-center gap-2.5 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5">
-                <span className="text-amber-500 shrink-0">🎁</span>
-                <span className="text-sm font-semibold text-slate-800">{r.label}</span>
-              </div>
-            ))}
-          </div>
+          <table className="w-full mt-4 text-sm" data-testid="mystery-odds">
+            <thead>
+              <tr className="text-slate-500 text-left">
+                <th className="py-2 font-semibold">{t('mystery.prize', 'Prize')}</th>
+                <th className="py-2 font-semibold text-right">{t('mystery.chance', 'Chance (1 box)')}</th>
+                <th className="py-2 font-semibold text-right">{t('mystery.chanceMax', 'Chance (14+ boxes in one order)')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {mysteryPool.map((r, i) => (
+                <tr key={i} className="border-t border-slate-100">
+                  <td className="py-2 font-semibold text-slate-800">🎁 {r.label}</td>
+                  <td className="py-2 text-right tabular-nums text-slate-700">{r.chance != null ? `${String(r.chance).replace('.', ',')}%` : '—'}</td>
+                  <td className="py-2 text-right tabular-nums text-slate-500">{r.chanceMax != null ? `${String(r.chanceMax).replace('.', ',')}%` : '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {mysteryAvg != null && (
+            <p className="text-slate-600 text-sm mt-3">
+              {t('mystery.avg', 'Average value of one box: {avg} store credit — the box costs {price}.', { avg: money(mysteryAvg, product.currency), price: money(product.price, product.currency) })}
+            </p>
+          )}
         </div>
       )}
 
@@ -762,9 +779,20 @@ export default function ProductDetail() {
               <path d={line} fill="none" stroke="#7c3aed" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
               <circle cx={pts[pts.length - 1][0]} cy={pts[pts.length - 1][1]} r="3.5" fill="#7c3aed" />
             </svg>
-            {now <= lowest && (
-              <p className="text-emerald-600 text-sm font-semibold mt-2">🔥 {t('price.atLowest', 'This is the lowest price we’ve offered!')}</p>
-            )}
+            {(() => {
+              /* Only after a real reduction, and only about the last 30 days —
+                 the reference EU price rules (Omnibus) allow. It said "lowest
+                 we've ever offered" whenever today's price was not above the
+                 minimum, which is also true of a price that never changed. */
+              const since = Date.now() - 30 * 86_400_000;
+              const window = priceHist.filter((h) => !h.at || Date.parse(h.at) >= since).map((h) => h.price);
+              const before = priceHist.filter((h) => h.at && Date.parse(h.at) < since).map((h) => h.price);
+              const ref = window.length ? window : prices;
+              const dropped = ref.some((p) => p > now) || before.some((p) => p > now);
+              return dropped && now <= Math.min(...ref) ? (
+                <p className="text-emerald-600 text-sm font-semibold mt-2">{t('price.lowest30', 'Lowest price of the last 30 days')}</p>
+              ) : null;
+            })()}
           </div>
         );
       })()}
@@ -789,7 +817,7 @@ export default function ProductDetail() {
                   <Star key={i} size={16} fill={i < Math.round(stats.rating || 0) ? 'currentColor' : 'none'} />
                 ))}</div>
                 <div className="text-white/85 text-sm mt-1">
-                  {stats.reviews.toLocaleString('en-US')} {t('product.verifiedCount', 'verified reviews')}
+                  {stats.reviews.toLocaleString(document.documentElement.lang || 'nl')} {t('product.verifiedCount', 'verified reviews')}
                 </div>
               </div>
               <span className="ml-auto hidden sm:inline-flex items-center gap-1.5 text-[11px] font-bold bg-white/15 border border-white/25 rounded-full px-2.5 py-1">

@@ -3,6 +3,8 @@
  * server-side fetches, and a resolver that turns a page link (e.g. a Pinterest
  * pin) into the real image URL behind it.
  */
+import { lookup } from 'node:dns/promises';
+import { isIP } from 'node:net';
 import { badRequest } from './errors.js';
 
 // Raster data URIs only (an <img> renders these inertly). SVG is intentionally
@@ -66,15 +68,15 @@ export async function resolveImageUrl(input, { fetchImpl = fetch, timeoutMs = 80
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   let res;
   try {
-    res = await fetchImpl(url, {
-      redirect: 'follow',
+    res = await publicFetch(url, {
       signal: ctrl.signal,
       headers: {
         'User-Agent': 'Mozilla/5.0 (compatible; ForgeMarketBot/1.0; +https://forgemarket.nl)',
         Accept: 'text/html,application/xhtml+xml,image/*;q=0.9,*/*;q=0.8',
       },
-    });
-  } catch {
+    }, fetchImpl);
+  } catch (e) {
+    if (e?.status === 400) throw e;
     throw badRequest('Could not open that link. Paste a direct image URL or upload the image.');
   } finally {
     clearTimeout(timer);
@@ -97,4 +99,49 @@ export async function resolveImageUrl(input, { fetchImpl = fetch, timeoutMs = 80
     throw badRequest('No image found on that page. Paste a direct image URL or upload the image.');
   }
   return finalUrl;
+}
+
+/* ── Server-side fetches of links someone typed in ─────────────────────────
+   The hostname check above is only text: `metadata.example.com` can resolve to
+   169.254.169.254, and a public page can redirect to http://127.0.0.1. These
+   resolve the name and check every hop of a redirect. */
+
+export function isPrivateAddress(ip) {
+  const a = String(ip || '').toLowerCase().replace(/^\[|\]$/g, '');
+  const v4 = a.startsWith('::ffff:') && isIP(a.slice(7)) === 4 ? a.slice(7) : a;
+  if (isIP(v4) === 4) {
+    const [x, y] = v4.split('.').map(Number);
+    return x === 0 || x === 10 || x === 127 || (x === 169 && y === 254) || (x === 172 && y >= 16 && y <= 31)
+      || (x === 192 && y === 168) || (x === 100 && y >= 64 && y <= 127) || x >= 224;
+  }
+  if (isIP(a) === 6) return a === '::' || a === '::1' || /^f[cd]/.test(a) || /^fe[89ab]/.test(a);
+  return true; // not an address at all — refuse rather than guess
+}
+
+/** Throws unless the link is http(s) AND its host resolves only to public addresses. */
+export async function assertPublicTarget(input) {
+  const u = assertPublicHttpUrl(input);
+  const host = u.hostname.replace(/^\[|\]$/g, '');
+  const addrs = isIP(host) ? [{ address: host }] : await lookup(host, { all: true }).catch(() => []);
+  if (!addrs.length) throw badRequest('That host could not be found.');
+  if (addrs.some((x) => isPrivateAddress(x.address))) throw badRequest('That host is not allowed.');
+  return u;
+}
+
+/**
+ * fetch() for a user-supplied link: every hop (max 4 redirects) is checked
+ * with assertPublicTarget. A test double passed as fetchImpl is trusted as is —
+ * the guard is about the real network.
+ */
+export async function publicFetch(url, init = {}, fetchImpl = fetch) {
+  if (fetchImpl !== globalThis.fetch) return fetchImpl(url, init);
+  let current = String(url);
+  for (let hop = 0; hop < 5; hop++) {
+    await assertPublicTarget(current);
+    const res = await fetchImpl(current, { ...init, redirect: 'manual' });
+    const loc = res.status >= 300 && res.status < 400 ? res.headers.get('location') : null;
+    if (!loc) return res;
+    current = new URL(loc, current).toString();
+  }
+  throw badRequest('Too many redirects.');
 }

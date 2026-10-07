@@ -121,11 +121,13 @@ const TRUST = [
 const HERO_FEATURES = TRUST;
 
 // Real counts only — append "+" once the number is large enough to round.
-const fmtCount = (n) => `${Number(n || 0).toLocaleString('en-US')}${Number(n || 0) >= 100 ? '+' : ''}`;
+/* The page's own notation ("1.234" in Dutch), and the exact number — a "+"
+   after an exact count suggested more than was counted. */
+const fmtCount = (n) => Number(n || 0).toLocaleString((typeof document !== 'undefined' && document.documentElement.lang) || 'nl-NL');
 export default function HomeStore() {
   const { count, add } = useCart();
   const { user, isStaff } = useAuth();
-  const { t: tr } = useI18n();
+  const { t: tr, lang } = useI18n();
   const stats = useStats();
   const reviews = useReviews();
   const categoryLogos = useCategoryLogos(); // owner-set logos (Admin → Categories)
@@ -582,13 +584,16 @@ export default function HomeStore() {
                   </p>
                 )}
                 {stats.reviews > 0 ? (
+                  /* The count of reviews, called reviews — it was labelled "happy
+                     customers" while counting every review, the bad ones too,
+                     next to four coloured dots that looked like customer faces. */
                   <div className="flex items-center gap-3 mt-7">
-                    <div className="flex -space-x-2.5">
-                      {['#f472b6', '#60a5fa', '#34d399', '#fbbf24'].map((c, i) => (
-                        <span key={i} className="w-9 h-9 rounded-full border-2 border-white/25" style={{ background: c }} />
-                      ))}
+                    {stats.rating != null && <span className="text-amber-300 text-lg" aria-hidden>★</span>}
+                    <div className="text-sm text-white">
+                      {stats.rating != null && <b className="fm-head">{String(stats.rating).replace('.', lang === 'en' ? '.' : ',')}</b>}
+                      {stats.rating != null ? ' · ' : ''}
+                      <b className="fm-head">{fmtCount(stats.reviews)}</b> <span className="text-slate-400">{tr('home.reviewsWord', 'reviews')}</span>
                     </div>
-                    <div className="text-sm text-white"><b className="fm-head">{fmtCount(stats.reviews)}</b> <span className="text-slate-400">{tr('home.happy', 'Happy Customers')}</span></div>
                   </div>
                 ) : (
                   /* Before the first review lands this space was simply empty —
@@ -670,7 +675,7 @@ export default function HomeStore() {
               <Rail>
                 {pillar.solo ? pillar.solo.map((p) => (
                   <div key={p.id} className="fm-pcard snap-start shrink-0 w-[212px] rounded-2xl p-4">
-                    <Link to={`/product/${p.id}`} className="block fm-logo-plinth rounded-xl h-[132px] grid place-items-center mb-3 overflow-hidden">
+                    <Link to={`/product/${p.id}`} aria-label={p.name} tabIndex={-1} className="block fm-logo-plinth rounded-xl h-[132px] grid place-items-center mb-3 overflow-hidden">
                       <img src={p.image} alt="" aria-hidden="true" loading="lazy" decoding="async"
                         className={carriesOwnBackground(p.image) ? 'w-full h-full object-contain' : 'fm-logo w-[84px] h-[84px]'} />
                     </Link>
@@ -827,7 +832,7 @@ export default function HomeStore() {
                     </div>
                     {stats.rating != null && <span className="fm-head text-slate-900">{stats.rating}</span>}
                     <span className="text-[13px] text-slate-500">
-                      {tr('home.basedOn', 'Based on {n} reviews', { n: stats.reviews.toLocaleString('en-US') })}
+                      {tr('home.basedOn', 'Based on {n} reviews', { n: fmtCount(stats.reviews) })}
                     </span>
                   </div>
                 )}

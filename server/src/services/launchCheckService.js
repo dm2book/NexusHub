@@ -187,14 +187,26 @@ export async function launchChecks() {
   }
 
   // 3. Catalog — something to sell, with codes ready for instant delivery.
-  const products = await get(`SELECT COUNT(*) AS n FROM products WHERE active = 1`);
+  /* Caught: one slow query here used to abort the whole readiness report
+     ("could not run the launch checks: Query read timeout" in production). */
+  const products = await get(`SELECT COUNT(*) AS n FROM products WHERE active = 1`).catch(() => null);
   const stocked = await get(
-    `SELECT COUNT(DISTINCT product_id) AS n FROM product_codes WHERE status = 'available'`);
+    `SELECT COUNT(DISTINCT product_id) AS n FROM product_codes WHERE status = 'available'`).catch(() => null);
   const nProducts = Number(products?.n || 0);
   const nStocked = Number(stocked?.n || 0);
   if (!nProducts) add('catalog', 'Catalog', 'fail', 'No active products.');
   else add('catalog', 'Catalog', nStocked ? 'ok' : 'warn',
     `${nProducts} active products, ${nStocked} with pre-loaded codes${nStocked ? '' : ' — without codes every order needs manual delivery'}.`);
+
+  /* 3a. A mystery box is a paid chance at prizes of different money value
+     (store credit). Under the Dutch Wet op de kansspelen that is very likely a
+     game of chance needing a licence, whatever the odds shown. Not a blocker
+     this code can decide — a warning the owner has to answer. */
+  const mystery = await get(`SELECT COUNT(*)::int AS n FROM products WHERE active = 1 AND kind = 'mystery'`).catch(() => null);
+  if (Number(mystery?.n || 0) > 0) {
+    add('mystery_gambling', 'Mystery box & gambling law', 'warn',
+      `${mystery.n} active mystery box(es): paid, random prizes worth different amounts of store credit are likely a game of chance under the Wet op de kansspelen (Kansspelautoriteit). The odds are now shown, but that does not make it legal — get legal advice, or switch the box to a fixed-value product or deactivate it.`);
+  }
 
   /* 3b. And the question the catalogue count does not answer: how many orders
      can actually be served tomorrow without anybody touching them.
