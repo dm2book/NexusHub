@@ -127,7 +127,7 @@ console.log('\n— Payment screenshots —');
   const { confirmProof } = await import('../src/services/paymentProofService.js');
   const imgId = 'a'.repeat(32);
   await run(`INSERT INTO product_images (id, product_id, mime, bytes, byte_size, sha256, source, created_at)
-             VALUES (@id, NULL, 'image/png', '\\x00'::bytea, 1, @sha, 'upload', @at) ON CONFLICT DO NOTHING`, { id: imgId, sha: `sha-${stamp}`, at: nowIso() });
+             VALUES (@id, NULL, 'image/png', '\\x00'::bytea, 1, @sha, 'proof', @at) ON CONFLICT DO NOTHING`, { id: imgId, sha: `sha-${stamp}`, at: nowIso() });
   const prod = await createProduct({ name: 'Proof Card', category: 'giftcard', price: 1000, announce: false });
   const oid = newId('ord');
   await run(`INSERT INTO orders (id, number, email, status, currency, subtotal, total, billing, created_at, updated_at)
