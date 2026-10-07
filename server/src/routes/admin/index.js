@@ -19,6 +19,7 @@ import discovery from './discovery.js';
 import daily from './daily.js';
 import community from './community.js';
 import seo from './seo.js';
+import logos from './logos.js';
 import money from './money.js';
 import { asyncHandler } from '../../middleware/error.js';
 import { audit } from '../../services/auditService.js';
@@ -193,6 +194,7 @@ router.use('/discovery', discovery);
 router.use('/daily', daily);
 router.use('/community', community);
 router.use('/seo', seo);
+router.use('/logos', logos);
 router.use('/money', money);
 
 export default router;

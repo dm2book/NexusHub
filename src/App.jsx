@@ -94,6 +94,7 @@ const AdminSeoPages = lazy(() => import('./pages/admin/SeoPages.jsx'));
 const AdminAdStudio = lazy(() => import('./pages/admin/AdStudio.jsx'));
 const AdminAdStatics = lazy(() => import('./pages/admin/AdStatics.jsx'));
 const AdminProductMedia = lazy(() => import('./pages/admin/ProductMedia.jsx'));
+const AdminLogoLibrary = lazy(() => import('./pages/admin/LogoLibrary.jsx'));
 const AdminProductContent = lazy(() => import('./pages/admin/ProductContent.jsx'));
 const AdminProductTrust = lazy(() => import('./pages/admin/ProductTrustAdmin.jsx'));
 const AdminTrending = lazy(() => import('./pages/admin/Trending.jsx'));
@@ -223,6 +224,7 @@ export default function App() {
           <Route path="/admin/growth/ad-studio" element={<AdminAdStudio />} />
           <Route path="/admin/growth/static-ads" element={<AdminAdStatics />} />
           <Route path="/admin/products/media" element={<AdminProductMedia />} />
+          <Route path="/admin/products/logos" element={<AdminLogoLibrary />} />
           <Route path="/admin/products/content" element={<AdminProductContent />} />
           <Route path="/admin/products/trust" element={<AdminProductTrust />} />
           <Route path="/admin/products/trending" element={<AdminTrending />} />
