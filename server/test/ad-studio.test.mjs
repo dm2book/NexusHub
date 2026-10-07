@@ -64,7 +64,7 @@ const steam = await P('Steam Wallet €10', 'giftcard', 1199);
 console.log('\n— The storyboard —');
 const R = await studio.buildStoryboard({ productId: robux.id, angles: ['trust', 'myth', 'refund'], length: 45, lang: 'nl' });
 {
-  ok('scenes: hook, the three chosen angles in order, end', R.scenes.map((s) => s.type).join() === 'hook,trust,myth,refund,end',
+  ok('scenes: hook, the three chosen angles in order, the product, end', R.scenes.map((s) => s.type).join() === 'hook,trust,myth,refund,offer,end',
     R.scenes.map((s) => s.type).join());
   ok('the hook follows the first angle: never your password', R.scenes[0].data.big === 'STOP.' && R.scenes[0].data.l2 === 'wachtwoord');
   const trust = R.scenes[1];
@@ -73,7 +73,7 @@ const R = await studio.buildStoryboard({ productId: robux.id, angles: ['trust', 
   ok('…with the real price on screen and spoken', trust.data.card[1] === '€9,99' && /negen euro negenennegentig/.test(trust.voice));
   ok('…and the pack counted out: "Duizend Robux", capitalised', /\. Duizend Robux, /.test(trust.voice), trust.voice);
   ok('the myth names the currency', R.scenes[2].data.title === '"Gratis Robux"' && R.scenes[2].data.stamp === 'NEP');
-  ok('the end card says the address, spoken', R.scenes[4].voice === 'Forgemarket punt n l. Link in bio.');
+  ok('the end card says the address, spoken', R.scenes[R.scenes.length - 1].voice === 'Forgemarket punt n l. Link in bio.');
   ok('a tracking link for the platform', /utm_source=tiktok&utm_campaign=ad-studio&utm_content=trust-myth-refund-45s/.test(R.link));
   ok('the disclaimer is there', /niet gelieerd/.test(R.disclaimer || ''));
   ok('nothing was refused', R.refused.length === 0, JSON.stringify(R.refused));
@@ -96,7 +96,7 @@ const R = await studio.buildStoryboard({ productId: robux.id, angles: ['trust', 
     (await studio.buildStoryboard({ productId: steam.id, angles: ['trust'], length: 15, lang: 'nl' })).scenes[1].data)));
 
   const short = await studio.buildStoryboard({ productId: vb.id, angles: ['math', 'beforeafter', 'guest', 'refund'], length: 15, lang: 'nl' });
-  ok('15 seconds keeps what fits and says what did not', short.scenes.length === 3
+  ok('15 seconds keeps what fits and says what did not', short.scenes.map((s) => s.type).join() === 'hook,math,offer,end'
     && short.angles.skipped.some((x) => /past niet in 15 seconden/.test(x.reason)), JSON.stringify(short.angles.skipped));
 
   const E = await studio.buildStoryboard({ productId: vb.id, angles: ['math'], length: 30, lang: 'en' });
@@ -108,7 +108,9 @@ console.log('\n— Only same-origin images reach the canvas —');
 {
   const all = R.scenes.flatMap((s) => [s.data.image, ...(s.data.images || [])]).filter(Boolean);
   ok('the external image on the Robux product is never used', !all.some((u) => /evil|^https?:/.test(u)), all.join(','));
-  ok('…the category icon is used instead', all.every((u) => /^\/(products|api\/images)\//.test(u)), all.join(','));
+  /* The product's own card (the store card, or the owner's artwork) replaced
+     the category icon: same-origin either way. */
+  ok('…the product\'s own card is used instead', all.every((u) => /^\/api\/products\/[^/]+\/tile\.svg$|^\/api\/images\//.test(u)), all.join(','));
   const G = (await studio.buildStoryboard({ productId: robux.id, angles: ['guest'], length: 15, lang: 'nl' })).scenes[1];
   ok('the guest scene shows the product and two other categories', G.data.images.length === 3 && new Set(G.data.images).size === 3, JSON.stringify(G.data.images));
 }
@@ -143,7 +145,8 @@ console.log('\n— The engine\'s timeline —');
     && Math.abs(engine.sceneAt(t1, t1.scenes[2].start + 0.5).u - 0.5) < 1e-9);
   const cues = engine.cuesOf(t1);
   ok('a whoosh on every cut', t1.scenes.slice(1).every((s) => cues.some(([k, at]) => k === 'whoosh' && Math.abs(at - s.start) < 1e-9)));
-  ok('a riser into the end card', cues.some(([k, at]) => k === 'riser' && Math.abs(at - (t1.scenes[4].start - 0.9)) < 1e-9));
+  const endScene = t1.scenes.find((s) => s.type === 'end');
+  ok('a riser into the end card', cues.some(([k, at]) => k === 'riser' && Math.abs(at - (endScene.start - 0.9)) < 1e-9));
   ok('the myth\'s typing ticks, one per letter', cues.filter(([k, at]) => k === 'tick' && at >= t1.scenes[2].start && at < t1.scenes[2].start + 2).length === 14);
   ok('cues are in time order', cues.every((c, i) => !i || cues[i - 1][1] <= c[1]));
 }

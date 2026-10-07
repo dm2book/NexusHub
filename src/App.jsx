@@ -92,6 +92,7 @@ const AdminAdConcepts = lazy(() => import('./pages/admin/AdConcepts.jsx'));
 const SeoCollection = lazy(() => import('./pages/SeoCollection.jsx'));
 const AdminSeoPages = lazy(() => import('./pages/admin/SeoPages.jsx'));
 const AdminAdStudio = lazy(() => import('./pages/admin/AdStudio.jsx'));
+const AdminAdStatics = lazy(() => import('./pages/admin/AdStatics.jsx'));
 const AdminProductMedia = lazy(() => import('./pages/admin/ProductMedia.jsx'));
 const AdminProductContent = lazy(() => import('./pages/admin/ProductContent.jsx'));
 const AdminProductTrust = lazy(() => import('./pages/admin/ProductTrustAdmin.jsx'));
@@ -220,6 +221,7 @@ export default function App() {
           <Route path="/admin/community" element={<AdminCommunity />} />
           <Route path="/admin/growth/seo" element={<AdminSeoPages />} />
           <Route path="/admin/growth/ad-studio" element={<AdminAdStudio />} />
+          <Route path="/admin/growth/static-ads" element={<AdminAdStatics />} />
           <Route path="/admin/products/media" element={<AdminProductMedia />} />
           <Route path="/admin/products/content" element={<AdminProductContent />} />
           <Route path="/admin/products/trust" element={<AdminProductTrust />} />

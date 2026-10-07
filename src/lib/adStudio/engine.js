@@ -232,9 +232,13 @@ function glass(ctx, G, y, left, right, { u, p0 = 0, accent = '#a855f7', strong =
   edge.addColorStop(0, `${accent}cc`); edge.addColorStop(0.5, 'rgba(255,255,255,0.12)'); edge.addColorStop(1, `${accent}55`);
   ctx.strokeStyle = edge; ctx.lineWidth = 2.5 * G.u; ctx.stroke();
   ctx.textBaseline = 'middle';
-  ctx.font = fontOf(44 * G.u, 'Inter', '600'); ctx.fillStyle = '#d9d4f2';
-  ctx.fillText(left, x + 38 * G.u, y + h / 2);
+  /* The value first, then the label in what is left — a long product name ran
+     straight under the price ("18,500 FC Points PlaySt€123,49"). */
   const vs = fit(ctx, right, 86 * G.u, w * 0.46);
+  ctx.font = fontOf(vs); const vw = ctx.measureText(right).width;
+  const ls = fit(ctx, left, 44 * G.u, w - vw - 38 * 3 * G.u, 'Inter', '600');
+  ctx.font = fontOf(ls, 'Inter', '600'); ctx.fillStyle = '#d9d4f2';
+  ctx.fillText(left, x + 38 * G.u, y + h / 2);
   ctx.font = fontOf(vs); ctx.fillStyle = '#ffffff'; ctx.textAlign = 'right';
   ctx.fillText(right, x + w - 38 * G.u, y + h / 2 + 4 * G.u);
   ctx.restore();
@@ -263,6 +267,58 @@ function hero(ctx, G, img, cx, cy, size, { u, p0 = 0, accent = '#a855f7', drop =
   ctx.restore();
 }
 
+/** Black or white, whichever reads on this colour (WCAG relative luminance). */
+function readableOn(hex) {
+  const n = parseInt(String(hex).replace('#', '').slice(0, 6), 16);
+  const ch = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; });
+  const L = 0.2126 * ch[0] + 0.7152 * ch[1] + 0.0722 * ch[2];
+  return L > 0.36 ? '#0b0a12' : '#ffffff';
+}
+
+/** A pill with a label: the platform a code works on, centred. */
+function chip(ctx, G, text, cx, y, { u, p0 = 0, accent = '#a855f7' } = {}) {
+  const p = at(u, p0, 0.35);
+  if (p <= 0 || !text) return;
+  ctx.save(); ctx.globalAlpha *= eo(p);
+  ctx.font = fontOf(42 * G.u, 'Inter', '700');
+  const w = ctx.measureText(text).width + 64 * G.u, h = 78 * G.u;
+  roundRect(ctx, cx - w / 2, y - h / 2, w, h, h / 2);
+  ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fill();
+  ctx.strokeStyle = accent; ctx.lineWidth = 3 * G.u; ctx.stroke();
+  ctx.fillStyle = '#ffffff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(text, cx, y + 2 * G.u);
+  ctx.restore();
+}
+
+/** The price, as big as the frame allows, on a slab in the brand colour. */
+function priceTag(ctx, G, text, cx, y, { u, p0 = 0, accent = '#a855f7', px = 180, name = null } = {}) {
+  const p = at(u, p0, 0.4);
+  if (p <= 0 || !text) return;
+  const size = fit(ctx, text, px * G.u, G.width * 0.8, 'Bric', '800');
+  ctx.save(); ctx.globalAlpha *= eo(p);
+  const s = 0.7 + 0.3 * back(p);
+  ctx.translate(cx, y); ctx.scale(s, s); ctx.rotate(-0.035);
+  ctx.font = fontOf(size, 'Bric', '800');
+  const w = ctx.measureText(text).width + 90 * G.u, h = size * 1.12;
+  roundRect(ctx, -w / 2, -h / 2, w, h, 26 * G.u);
+  ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 40 * G.u; ctx.shadowOffsetY = 14 * G.u;
+  ctx.fillStyle = accent; ctx.fill();
+  ctx.shadowColor = 'transparent';
+  ctx.fillStyle = readableOn(accent); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(text, 0, size * 0.05);
+  ctx.restore();
+  if (name) {
+    const pn = at(u, p0 + 0.15, 0.35);
+    if (pn > 0) {
+      ctx.save(); ctx.globalAlpha *= eo(pn);
+      const ns = fit(ctx, name, 56 * G.u, G.width, 'Inter', '700');
+      ctx.font = fontOf(ns, 'Inter', '700'); ctx.fillStyle = '#ffffff'; ctx.textAlign = 'center';
+      ctx.fillText(name, cx, y - size * 0.75);
+      ctx.restore();
+    }
+  }
+}
+
 /* ── Scenes ────────────────────────────────────────────────────────────── */
 /* y positions are fractions of the content box: one layout for 9:16, 4:5, 1:1. */
 /* A 7% lead-in from the top: the block sits in the visual middle of the frame,
@@ -273,16 +329,21 @@ const SCENES = {
   hook(ctx, G, d, u, A) {
     /* On screen from frame 0 — the thumbnail — and settling in, not arriving. */
     const settle = 1 + 0.18 * (1 - eo(u / 0.45));
-    words(ctx, G, d.big, Y(G, 0.40), { px: 270, color: A.accent, u: u + 10, scale: settle });
-    words(ctx, G, d.l1, Y(G, 0.555), { px: 112, u, p0: 0.22 });
+    /* The product is in the very first frame — the thumbnail a feed shows —
+       above the words, as every competitor ad does. Visible from frame 0. */
+    const img = A.img(d.image);
+    if (img) hero(ctx, G, img, G.W / 2, Y(G, 0.13), 430, { u: u + 10, accent: A.accent, t: A.t });
+    words(ctx, G, d.big, Y(G, img ? 0.50 : 0.40), { px: 250, color: A.accent, u: u + 10, scale: settle });
+    words(ctx, G, d.l1, Y(G, img ? 0.645 : 0.555), { px: 112, u, p0: 0.22 });
     const k = u - 1.55, shake = k > 0 && k < 0.35 ? Math.sin(k * 80) * 12 * G.u * (1 - k / 0.35) : 0;
     ctx.save(); ctx.translate(shake, 0);
-    const r = words(ctx, G, d.l2, Y(G, 0.665), { px: 142, color: A.accent, u, p0: 0.42 });
+    const l2y = img ? 0.755 : 0.665;
+    const r = words(ctx, G, d.l2, Y(G, l2y), { px: 142, color: A.accent, u, p0: 0.42 });
     ctx.restore();
     if (d.strike && r && u > 1.5) {
       ctx.save();
       ctx.fillStyle = '#ffffff'; ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 12 * G.u;
-      ctx.fillRect(G.left - 8 * G.u, Y(G, 0.665) - r.size * 0.36, (r.w + 16 * G.u) * eio(at(u, 1.5, 0.22)), 13 * G.u);
+      ctx.fillRect(G.left - 8 * G.u, Y(G, l2y) - r.size * 0.36, (r.w + 16 * G.u) * eio(at(u, 1.5, 0.22)), 13 * G.u);
       ctx.restore();
     }
   },
@@ -377,44 +438,65 @@ const SCENES = {
     if (p > 0) words(ctx, G, d.l2, Y(G, 0.62), { px: 152, color: A.accent, u: u + 10, scale: 1 + 0.45 * (1 - back(p)) });
     body(ctx, G, d.sub, Y(G, 0.72), { u, p0: 1.1 });
   },
-  end(ctx, G, d, u, A) {
+  /* The product, big: its own card, its name, the price, the platform. */
+  offer(ctx, G, d, u, A) {
     const cx = G.W / 2;
-    const p = at(u, 0.05, 0.55);
-    if (p > 0) {
-      ctx.save(); ctx.globalAlpha *= eo(p);
-      const s = 0.85 + 0.15 * back(p);
-      ctx.translate(cx, Y(G, 0.36)); ctx.scale(s, s);
-      const size = fit(ctx, 'FORGEMARKET', 124 * G.u, G.W - 160 * G.u, 'Raj', '600', 14 * G.u);
-      ctx.font = fontOf(size, 'Raj', '600'); ctx.letterSpacing = `${14 * G.u}px`;
-      const w1 = ctx.measureText('FORGE').width, w2 = ctx.measureText('MARKET').width;
-      ctx.shadowColor = `${A.accent}aa`; ctx.shadowBlur = 50 * G.u;
-      ctx.fillStyle = '#ffffff'; ctx.fillText('FORGE', -(w1 + w2) / 2, 0);
-      ctx.fillStyle = A.accent; ctx.fillText('MARKET', -(w1 + w2) / 2 + w1, 0);
+    const img = A.img(d.image);
+    hero(ctx, G, img, cx, Y(G, 0.27), 860, { u, p0: 0, accent: A.accent, pop: true, t: A.t });
+    if (d.platform) chip(ctx, G, d.platform, cx, Y(G, 0.715), { u, p0: 0.35, accent: A.accent });
+    const pn = at(u, 0.25, 0.4);
+    if (pn > 0 && d.name) {
+      ctx.save(); ctx.globalAlpha *= eo(pn);
+      const ns = fit(ctx, d.name, 84 * G.u, G.width, 'Bric', '800');
+      ctx.font = fontOf(ns, 'Bric', '800'); ctx.textAlign = 'center'; ctx.fillStyle = '#ffffff';
+      ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 24 * G.u;
+      ctx.fillText(d.name, cx, Y(G, 0.635) + (1 - eo(pn)) * 24 * G.u);
       ctx.restore();
     }
+    priceTag(ctx, G, d.price, cx, Y(G, d.platform ? 0.86 : 0.80), { u, p0: 0.45, accent: A.accent, px: 190 });
+  },
+
+  /* The close: the card again, the price, one button. Was a wordmark alone —
+     the viewer's last look at the ad did not show what it sold. */
+  end(ctx, G, d, u, A) {
+    const cx = G.W / 2;
+    const img = A.img(d.image);
+    if (img) hero(ctx, G, img, cx, Y(G, 0.17), 540, { u, p0: 0, accent: A.accent, t: A.t });
+    else {
+      const p = at(u, 0.05, 0.55);
+      if (p > 0) {
+        ctx.save(); ctx.globalAlpha *= eo(p);
+        ctx.translate(cx, Y(G, 0.30));
+        const size = fit(ctx, 'FORGEMARKET', 124 * G.u, G.W - 160 * G.u, 'Raj', '600', 14 * G.u);
+        ctx.font = fontOf(size, 'Raj', '600'); ctx.letterSpacing = `${14 * G.u}px`;
+        const w1 = ctx.measureText('FORGE').width, w2 = ctx.measureText('MARKET').width;
+        ctx.fillStyle = '#ffffff'; ctx.fillText('FORGE', -(w1 + w2) / 2, 0);
+        ctx.fillStyle = A.accent; ctx.fillText('MARKET', -(w1 + w2) / 2 + w1, 0);
+        ctx.restore();
+      }
+    }
+    if (d.price) priceTag(ctx, G, d.price, cx, Y(G, 0.555), { u, p0: 0.2, accent: A.accent, px: 150, name: d.name });
     const pc = at(u, 0.45, 0.45);
     if (pc > 0) {
       const pulse = 1 + 0.025 * Math.sin(Math.max(0, u - 0.9) * 5);
-      const w = G.W - 280 * G.u, h = 132 * G.u, x = cx - w / 2, y = Y(G, 0.50);
+      const w = G.W - 280 * G.u, h = 132 * G.u, x = cx - w / 2, y = Y(G, 0.69);
       ctx.save(); ctx.globalAlpha *= eo(pc);
       ctx.translate(cx, y + h / 2 + (1 - eo(pc)) * 30 * G.u); ctx.scale(pulse, pulse); ctx.translate(-cx, -(y + h / 2));
-      const g = ctx.createLinearGradient(x, 0, x + w, 0);
-      g.addColorStop(0, '#6366f1'); g.addColorStop(0.55, '#a855f7'); g.addColorStop(1, '#ec4899');
-      ctx.shadowColor = '#a855f799'; ctx.shadowBlur = 70 * G.u; ctx.shadowOffsetY = 16 * G.u;
-      roundRect(ctx, x, y, w, h, 66 * G.u); ctx.fillStyle = g; ctx.fill();
+      ctx.shadowColor = `${A.accent}99`; ctx.shadowBlur = 70 * G.u; ctx.shadowOffsetY = 16 * G.u;
+      roundRect(ctx, x, y, w, h, 66 * G.u); ctx.fillStyle = A.accent; ctx.fill();
       ctx.shadowColor = 'transparent';
-      ctx.fillStyle = '#fff'; ctx.font = fontOf(58 * G.u, 'Inter', '700'); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = readableOn(A.accent); ctx.font = fontOf(58 * G.u, 'Inter', '700'); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText(d.cta, cx, y + h / 2 + 3 * G.u);
       ctx.restore();
       sweep(ctx, x, y, w, h, u, 1.0, 66 * G.u);
       if (u > 2.2) sweep(ctx, x, y, w, h, u, 3.2, 66 * G.u);
     }
-    label(ctx, G, d.tag, Y(G, 0.66), { u, p0: 0.85, color: '#ffffff', px: 50, align: 'center', x: cx });
+    label(ctx, G, d.tag, Y(G, 0.86), { u, p0: 0.85, color: '#ffffff', px: 50, align: 'center', x: cx });
   },
 };
 
 /* The UGC beats (see ugc.js), drawn with the helpers above. */
-Object.assign(SCENES, makeUgcScenes({ cl, eo, eio, back, at, fit, fontOf, roundRect, sweep, hero, Y, VOICE_AT }));
+Object.assign(SCENES, makeUgcScenes({ cl, eo, eio, back, at, fit, fontOf, roundRect, sweep, hero, Y, VOICE_AT, readableOn }));
 
 /* ── Captions ──────────────────────────────────────────────────────────── */
 /** Word-by-word caption for the voice line, the spoken word lit — no box, an outline. */
@@ -461,12 +543,21 @@ function captions(ctx, G, scene, u, accent) {
 }
 
 /* ── Background ────────────────────────────────────────────────────────── */
-function background(ctx, G, t, accent, grain, frame) {
+function background(ctx, G, t, accent, grain, frame, theme = null) {
   const { W, H } = G;
-  ctx.fillStyle = '#06050d'; ctx.fillRect(0, 0, W, H);
+  /* The product's brand colours, edge to edge, when the board carries them
+     (adArt.js): every ad looked the same dark purple whatever it sold. */
+  if (theme) {
+    const base = ctx.createLinearGradient(0, 0, W * 0.35, H);
+    base.addColorStop(0, theme.bg); base.addColorStop(0.62, theme.deep); base.addColorStop(1, '#05040a');
+    ctx.fillStyle = base; ctx.fillRect(0, 0, W, H);
+  } else {
+    ctx.fillStyle = '#06050d'; ctx.fillRect(0, 0, W, H);
+  }
+  const glowA = theme ? theme.accent : accent;
   const blobs = [
-    [0.78 + 0.06 * Math.sin(t * 0.35), 0.24 + 0.04 * Math.cos(t * 0.3), 1.0, `${accent}5c`],
-    [0.12 + 0.05 * Math.cos(t * 0.27), 0.86 + 0.03 * Math.sin(t * 0.33), 1.05, '#7c3aed38'],
+    [0.78 + 0.06 * Math.sin(t * 0.35), 0.24 + 0.04 * Math.cos(t * 0.3), 1.0, `${glowA}${theme ? '66' : '5c'}`],
+    [0.12 + 0.05 * Math.cos(t * 0.27), 0.86 + 0.03 * Math.sin(t * 0.33), 1.05, theme ? `${theme.accent}2e` : '#7c3aed38'],
     [0.30 + 0.05 * Math.sin(t * 0.22 + 1), 0.52 + 0.05 * Math.cos(t * 0.25), 0.7, `${accent}1f`],
   ];
   for (const [x, y, r, c] of blobs) {
@@ -530,7 +621,7 @@ export function drawFrame(ctx, timeline, assets, t, { captions: showCaptions = t
   ctx.save();
   ctx.letterSpacing = '0px';
   if (assets.footage) footageLayer(ctx, G, assets.footage, accent);
-  else background(ctx, G, t, accent, assets.grain, Math.round(t * 30));
+  else background(ctx, G, t, accent, assets.grain, Math.round(t * 30), timeline.theme || null);
 
   /* Hand-over: the last scene zooms past and blurs out while this one
      settles in out of a blur. */
