@@ -2,6 +2,7 @@
 import express, { Router } from 'express';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
+import { httpUrl } from '../utils/httpUrl.js';
 import { config, manualPayMethods, commerceBlockers } from '../config/env.js';
 import { asyncHandler } from '../middleware/error.js';
 import { publicCache } from '../utils/httpCache.js';
@@ -90,7 +91,7 @@ router.post('/reviews/ingest',
   asyncHandler(async (req, res) => {
     const body = z.object({
       author: z.string().min(1).max(80),
-      avatarUrl: z.string().url().optional(),
+      avatarUrl: httpUrl(1000).optional(),
       stars: z.number().int().min(1).max(5).optional(),
       body: z.string().min(1).max(600),
       product: z.string().max(120).optional(),
@@ -359,12 +360,12 @@ router.post('/newsletter',
          the one they read the consent sentence in, rather than the shop's. */
       lang: z.string().max(5).optional(),
     }).parse(req.body || {});
-    const r = await subscribe(body.email, {
+    await subscribe(body.email, {
       source: body.source || 'prelaunch', consentText: body.consentText, lang: body.lang,
     });
     // Same answer either way: a different one would turn this into a way to ask
     // whether an address is already on the list.
-    res.status(201).json({ ok: true, subscribed: true, alreadySubscribed: r.alreadySubscribed });
+    res.status(201).json({ ok: true, subscribed: true });
   }));
 
 /* The payment links and keys an owner saves in the admin, fresh on this
@@ -585,14 +586,15 @@ router.get('/drops', asyncHandler(async (_req, res) => {
   res.json({ drops: await listUpcomingDrops() });
 }));
 
-// Mystery-box reward pool — shown on the product page so buyers see what
-// prizes are possible, but NOT the odds: the chances stay a mystery on purpose
-// (weights are never exposed to the client, not even via devtools).
+// Mystery-box reward pool WITH the real odds. They used to be kept secret
+// ("the odds? that's the mystery") — but a box bought with money that pays out
+// prizes of different value by chance has to say what the chances are; hidden
+// odds are what a regulator (here: the Kansspelautoriteit) looks for first.
 router.get('/products/:id/mystery', asyncHandler(async (req, res) => {
   const rewards = await getMysteryRewards(req.params.id);
-  res.json({
-    rewards: rewards.map((r) => ({ label: r.label, credit: r.credit })),
-  });
+  const { oddsFor } = await import('../services/mysteryBoxService.js');
+  const odds = oddsFor(rewards);
+  res.json({ rewards: odds.rewards, averageCredit: odds.averageCredit, maxLuckFromBoxes: odds.maxLuckFromBoxes });
 }));
 
 // Validate a discount code (checkout preview). Pass ?subtotal=cents for an exact

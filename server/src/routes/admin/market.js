@@ -12,6 +12,7 @@
  */
 import { Router } from 'express';
 import { z } from 'zod';
+import { httpUrl } from '../../utils/httpUrl.js';
 import { asyncHandler } from '../../middleware/error.js';
 import { requirePermission } from '../../middleware/rbac.js';
 import { audit } from '../../services/auditService.js';
@@ -55,7 +56,7 @@ const observationSchema = z.object({
   title: z.string().min(2).max(400),
   priceCents: z.number().int().positive(),
   currency: z.string().length(3),
-  url: z.string().url(),
+  url: httpUrl(1000),
   availability: z.enum(['in_stock', 'out_of_stock', 'unknown']).optional(),
   observedAt: z.string().optional(),
   sourceProductId: z.string().max(120).optional(),

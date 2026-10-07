@@ -5,6 +5,7 @@
  */
 import { Router } from 'express';
 import { z } from 'zod';
+import { httpUrl } from '../utils/httpUrl.js';
 import { asyncHandler } from '../middleware/error.js';
 import { requireAuth } from '../middleware/auth.js';
 import { rateLimit } from '../middleware/rateLimit.js';
@@ -189,16 +190,18 @@ router.post('/phone/request', asyncHandler(async (req, res) => {
   res.json({ sent: true, cooldownSeconds: r.cooldownSeconds });
 }));
 
-router.post('/phone/verify', asyncHandler(async (req, res) => {
+router.post('/phone/verify', rateLimit({ bucket: 'phone_verify', windowMs: 10 * 60_000, max: 10 }), asyncHandler(async (req, res) => {
   const { phone, code } = z.object({ phone: z.string().min(5).max(40), code: z.string().min(4).max(8) }).parse(req.body || {});
   const p = normalizePhone(phone);
   const rows = await all(
     `SELECT * FROM sms_verifications WHERE phone=@p AND consumed_at IS NULL ORDER BY created_at DESC LIMIT 10`, { p });
-  const live = rows.filter((x) => new Date(x.expires_at) >= new Date());
-  if (!live.length) throw badRequest('Code expired or not found. Request a new one.');
+  /* Five wrong guesses burn a code: a 6-digit code would otherwise fall to a
+     script within its lifetime. */
+  const live = rows.filter((x) => new Date(x.expires_at) >= new Date() && Number(x.attempts || 0) < 5);
+  if (!live.length) throw badRequest('Code expired or too many attempts. Request a new one.');
   const match = live.find((x) => safeEqual(x.code_hash, sha256(String(code).trim())));
   if (!match) {
-    await run('UPDATE sms_verifications SET attempts = attempts + 1 WHERE id=@id', { id: live[0].id });
+    await run(`UPDATE sms_verifications SET attempts = attempts + 1 WHERE id = ANY(@ids)`, { ids: live.map((x) => x.id) });
     throw badRequest('Incorrect code');
   }
   const taken = await get('SELECT id FROM users WHERE phone=@p AND phone_verified=1 AND id<>@me', { p, me: req.user.id });
@@ -543,7 +546,7 @@ router.patch('/wishlist/:productId/alert', asyncHandler(async (req, res) => {
 router.patch('/profile', asyncHandler(async (req, res) => {
   const { displayName, avatarUrl } = z.object({
     displayName: z.string().min(1).max(80).optional(),
-    avatarUrl: z.string().url().optional(),
+    avatarUrl: httpUrl(1000).optional(),
   }).parse(req.body);
   res.json({ user: await updateProfile(req.user.id, { displayName, avatarUrl }) });
 }));

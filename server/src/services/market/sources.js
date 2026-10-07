@@ -399,5 +399,8 @@ export async function fetchFromSource(key, query, { fetchImpl = fetch } = {}) {
   if (src.requiresCredentials && !src.enabledByKey && !config.market.enabledSources.includes(key)) {
     throw new SourceUnavailable(key, `not listed in MARKET_SOURCES`);
   }
-  return src.fetchOffers({ creds: creds || {}, query, fetchImpl });
+  /* A marketplace API that hangs must not hold a serverless request until the
+     platform kills it: every call gets 10 s unless the caller set its own. */
+  const timed = (url, init = {}) => fetchImpl(url, { signal: AbortSignal.timeout(10_000), ...init });
+  return src.fetchOffers({ creds: creds || {}, query, fetchImpl: timed });
 }

@@ -14,6 +14,10 @@ import { newId } from '../utils/ids.js';
 import { renderTemplate, renderTokens, wrapBranded, wrapAdmin, baseContext, EMAIL_THEMES } from './templateService.js';
 import { alertOwner } from './notifyService.js';
 
+/* Logs go to Vercel and whoever reads them — an address there is personal data
+   that has no business being kept. Enough is left to tell two failures apart. */
+const maskEmail = (e) => String(e || '').replace(/^(.)[^@]*(@.).*?(\.[a-z]+)?$/i, '$1***$2***$3');
+
 /**
  * nodemailer is loaded on the first SMTP send, not on import.
  *
@@ -360,7 +364,7 @@ export async function sendEmail(eventKey, to, context = {}) {
   } catch (err) {
     // Make the real reason visible in the function logs (e.g. Resend "you can
     // only send to your own address until you verify a domain").
-    console.error(`[email] ${eventKey} -> ${to} FAILED: ${err.message}`);
+    console.error(`[email] ${eventKey} -> ${maskEmail(to)} FAILED: ${err.message}`);
     await run(`INSERT INTO email_log (id, template_id, to_email, subject, status, error, context, created_at)
          VALUES (@id, @t, @to, @subj, 'failed', @err, @ctx, @at)`,
         { id, t: eventKey, to, subj: NO_RETRY.has(eventKey) ? `[${eventKey}]` : subject, err: err.message,
@@ -396,7 +400,7 @@ export async function sendEmailAsync(eventKey, to, context = {}) {
   try {
     await sendEmail(eventKey, to, context);
   } catch (err) {
-    console.error(`[email] ${eventKey} -> ${to} failed:`, err.message);
+    console.error(`[email] ${eventKey} -> ${maskEmail(to)} failed:`, err.message);
   }
 }
 

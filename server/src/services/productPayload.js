@@ -23,9 +23,30 @@ export const stockLeftFor = (product, count) =>
 // Everything else is fulfilled by hand and must say so.
 export const instantFor = (product, count) => product.deliveryMode === 'auto' && count > 0;
 
+/* What of a product's metadata a visitor may see — an allow-list, not a
+   block-list. The whole object used to go out on every public endpoint: the
+   discovery record with the OWNER'S EMAIL ADDRESS on every product it added,
+   review gates, market ids, image sources, pricing notes, and the generated
+   copy for four languages (286 KB of the 607 KB /api/products weighed in
+   production). The storefront reads only these. */
+export const PUBLIC_META = ['platform', 'deliveryMode', 'deliveryChoice', 'deliveryField', 'deliveryLabel', 'deliveryDetails',
+  'compareAt', 'region', 'denomination', 'denomUnit', 'edition', 'game', 'productType'];
+
+const publicMeta = (m) => {
+  const src = typeof m === 'string' ? (() => { try { return JSON.parse(m || '{}'); } catch { return {}; } })() : (m || {});
+  const out = {};
+  for (const k of PUBLIC_META) if (src[k] != null) out[k] = src[k];
+  return out;
+};
+
 /** The exact JSON body of `{ product }` on /api/products/:id. */
-export const productPayload = (product, count) => withCopy({
-  ...product,
-  stockLeft: stockLeftFor(product, count),
-  instant: instantFor(product, count),
-});
+export const productPayload = (product, count) => {
+  /* withCopy reads the full metadata (the per-language descriptions live
+     there) — so it runs first, and only then is the metadata cut down. */
+  const full = withCopy({
+    ...product,
+    stockLeft: stockLeftFor(product, count),
+    instant: instantFor(product, count),
+  });
+  return { ...full, metadata: publicMeta(product.metadata) };
+};

@@ -68,10 +68,10 @@ export default function Contact() {
           ) : (
             <form onSubmit={submit} className="space-y-4">
               <h3 className="text-white text-lg">{t('contact.formTitle', 'Send us a message')}</h3>
-              <div><label className="label">{t('contact.subject', 'Subject')}</label>
-                <input required className="input" value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} /></div>
-              <div><label className="label">{t('contact.message', 'Message')}</label>
-                <textarea required rows={5} className="input" value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} /></div>
+              <div><label className="label" htmlFor="contact-subject">{t('contact.subject', 'Subject')}</label>
+                <input id="contact-subject" required minLength={3} maxLength={150} className="input" value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} /></div>
+              <div><label className="label" htmlFor="contact-message">{t('contact.message', 'Message')}</label>
+                <textarea id="contact-message" required minLength={10} maxLength={5000} rows={5} className="input" value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} /></div>
               <button disabled={busy} className="btn-primary">{busy ? <Loader2 size={18} className="animate-spin" /> : <><Send size={16} /> {t('contact.send', 'Send message')}</>}</button>
             </form>
           )}

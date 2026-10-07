@@ -161,7 +161,12 @@ async function recordPricePoint(productId, price, currency = 'EUR', at = nowIso(
 
 /** Price history for a product (oldest → newest), for the product-page chart. */
 export function priceHistory(productId, limit = 60) {
+  /* The LATEST `limit` points, oldest first. ORDER BY ASC LIMIT took the
+     oldest ones, so after 60 changes the chart stopped at an old price and
+     "Now" on the product page was not the price on the button. */
   return all(
-    `SELECT price, currency, created_at AS at FROM price_history
-      WHERE product_id=@p ORDER BY created_at ASC LIMIT @l`, { p: productId, l: limit });
+    `SELECT price, currency, at FROM (
+       SELECT price, currency, created_at AS at FROM price_history
+        WHERE product_id=@p ORDER BY created_at DESC LIMIT @l) h
+      ORDER BY at ASC`, { p: productId, l: limit });
 }

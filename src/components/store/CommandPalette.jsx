@@ -84,9 +84,10 @@ export default function CommandPalette() {
     };
     const prods = products.map((p) => ({ p, s: score(p) })).filter((x) => x.s > 0)
       .sort((a, b) => b.s - a.s).slice(0, 7).map((x) => x.p);
-    const acts = ACTIONS.filter((a) => !term || normalizeSearch(a.label).includes(term) || normalizeSearch(a.kw).includes(term));
+    const acts = ACTIONS.map((a) => ({ ...a, label: t(`palette.${a.id}`, a.label) }))
+      .filter((a) => !term || normalizeSearch(a.label).includes(term) || normalizeSearch(a.kw).includes(term));
     return { prods, acts };
-  }, [q, products]);
+  }, [q, products, t]);
 
   const flat = useMemo(() => [
     ...results.prods.map((p) => ({ kind: 'product', p })),
@@ -116,7 +117,7 @@ export default function CommandPalette() {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[90] flex items-start justify-center pt-[12vh] px-4" role="dialog" aria-modal="true" aria-label="Search">
+    <div className="fixed inset-0 z-[90] flex items-start justify-center pt-[12vh] px-4" role="dialog" aria-modal="true" aria-label={t('palette.dialog', 'Search')}>
       <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setOpen(false)} />
       <div className="relative w-full max-w-xl bg-white rounded-2xl shadow-2xl border border-slate-200/80 overflow-hidden fm-pop">
         {/* Input */}
@@ -153,7 +154,7 @@ export default function CommandPalette() {
                 </span>
                 <span className="text-sm font-semibold text-violet-600 shrink-0">{money(p.price, p.currency)}</span>
                 <button onClick={(e) => { e.stopPropagation(); add(p); toast.success(`${p.name} added`); }}
-                  title="Add to cart" aria-label="Add to cart"
+                  title={t('palette.addToCart', 'Add to cart')} aria-label={t('palette.addToCart', 'Add to cart')}
                   className="w-7 h-7 rounded-md grid place-items-center text-slate-400 hover:text-violet-600 hover:bg-white shrink-0">
                   <ShoppingCart size={14} />
                 </button>

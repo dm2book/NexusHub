@@ -741,14 +741,16 @@ export async function transitionOrder(orderId, to, ctx = {}) {
       })
       .catch((e) => console.error('[autodispense]', e.message)));
     // Paid spend may push the buyer into a new loyalty tier → grant its bonus.
-    if (updated.userId) grantTierRewards(updated.userId).catch((e) => console.error('[loyalty]', e.message));
+    if (updated.userId) keepAlive(grantTierRewards(updated.userId).catch((e) => console.error('[loyalty]', e.message)));
     // Earn Forge Coins (€10 = 1 coin), idempotent per order.
-    if (updated.userId) awardCoinsForOrder(updated).catch((e) => console.error('[coins]', e.message));
+    if (updated.userId) keepAlive(awardCoinsForOrder(updated).catch((e) => console.error('[coins]', e.message)));
     // Open any mystery boxes in the order → roll rewards, grant store credit.
     // A pure mystery-box order is fully delivered by that payout, so complete
     // it right away instead of leaving it in the manual-fulfillment queue.
+    /* keepAlive on all three: the webhook answers Stripe before these finish,
+       and a frozen function would otherwise drop a won prize or coins. */
     if (updated.userId) {
-      settleMysteryForOrder(updated).then(async (won) => {
+      keepAlive(settleMysteryForOrder(updated).then(async (won) => {
         if (!won.length) return;
         const kinds = await Promise.all(updated.items.map((it) =>
           get('SELECT kind FROM products WHERE id=@id', { id: it.product_id })));
@@ -756,7 +758,7 @@ export async function transitionOrder(orderId, to, ctx = {}) {
           await transitionOrder(orderId, 'completed',
             { force: true, reason: 'Mystery box opened — prize paid out as store credit' });
         }
-      }).catch((e) => console.error('[mystery]', e.message));
+      }).catch((e) => console.error('[mystery]', e.message)));
     }
   }
   return updated;

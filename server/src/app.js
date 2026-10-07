@@ -57,8 +57,13 @@ function startBackgroundUpkeep(wasSeeded) {
     /* Once per deploy — see services/bootUpkeep.js for why. */
     const { deployKey, claimUpkeep, releaseUpkeep } = await import('./services/bootUpkeep.js');
     const deploy = deployKey();
-    const mine = await claimUpkeep(deploy).catch(() => true);
-    if (!mine) { await logReadiness(); return; }
+    /* A failed claim (database blip) means "not mine": every cold start
+       running the ~130 catalogue scans at once is exactly what the claim is
+       there to stop. And the readiness log — up to three Stripe calls — is
+       written by the instance that did the upkeep, once per deploy, not by
+       every instance that wakes up. */
+    const mine = await claimUpkeep(deploy).catch(() => false);
+    if (!mine) return;
     try {
       // Upgrade improved default email templates on already-seeded databases.
       // (A brand-new DB already got them synchronously via seed().)

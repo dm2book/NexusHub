@@ -1,6 +1,7 @@
 /** Admin: the Logo Library (services/logoDiscoveryService.js). */
 import { Router } from 'express';
 import { z } from 'zod';
+import { httpUrl } from '../../utils/httpUrl.js';
 import { asyncHandler } from '../../middleware/error.js';
 import { requirePermission } from '../../middleware/rbac.js';
 import { audit } from '../../services/auditService.js';
@@ -16,12 +17,14 @@ router.get('/', requirePermission('suppliers.read'), asyncHandler(async (_req, r
 
 /* Look again now — one brand, or every brand. Within one request's budget. */
 router.post('/refresh', requirePermission('suppliers.manage'), asyncHandler(async (req, res) => {
-  const { brand } = z.object({ brand: brandKey.optional() }).parse(req.body || {});
-  const keys = brand ? [brand] : Object.keys(BRANDS);
-  const deadline = Date.now() + 22_000; const done = []; const errors = [];
+  const { brand, brands } = z.object({ brand: brandKey.optional(), brands: z.array(brandKey).max(30).optional() }).parse(req.body || {});
+  const keys = brand ? [brand] : brands?.length ? brands : Object.keys(BRANDS);
+  /* 20 s for the whole request, and each brand only gets what is left of it
+     (every fetch inside is cut to that) — the 30-second limit is Vercel's. */
+  const deadline = Date.now() + 20_000; const done = []; const errors = [];
   for (const k of keys) {
-    if (Date.now() >= deadline) break;
-    try { await discoverBrand(k); done.push(k); } catch (e) { errors.push({ brand: k, error: e.message }); }
+    if (deadline - Date.now() < 3_000) break;
+    try { await discoverBrand(k, { deadline }); done.push(k); } catch (e) { errors.push({ brand: k, error: e.message }); }
   }
   await audit({ actor: req.user, action: 'logos.refresh', metadata: { brands: done.length, errors: errors.length }, req });
   res.json({ done, errors, remaining: keys.filter((k) => !done.includes(k) && !errors.some((e) => e.brand === k)) });
@@ -31,7 +34,7 @@ router.post('/refresh', requirePermission('suppliers.manage'), asyncHandler(asyn
 router.post('/sources', requirePermission('suppliers.manage'), asyncHandler(async (req, res) => {
   const body = z.object({
     brand: brandKey, tier: z.enum(['brand_assets', 'press_kit', 'developer_portal']),
-    url: z.string().url().max(1000), license: z.string().max(300).optional(), guidelines: z.string().url().max(1000).optional(),
+    url: httpUrl(1000), license: z.string().max(300).optional(), guidelines: httpUrl(1000).optional(),
     logoType: z.enum(LOGO_TYPES).optional(),
   }).parse(req.body || {});
   const sources = await addSource({ ...body, actor: req.user.id });

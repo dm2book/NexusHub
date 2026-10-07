@@ -128,7 +128,7 @@ export default function Login() {
   const resend = async () => {
     if (resendIn > 0 || busy) return;
     setBusy(true);
-    try { await sendCode(identifier); toast.success('New code sent.'); }
+    try { await sendCode(identifier); toast.success(t('login.codeResent', 'New code sent.')); }
     catch (err) { setError(friendlyError(err)); }
     finally { setBusy(false); }
   };

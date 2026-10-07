@@ -13,6 +13,32 @@ import { createConnector, availableKinds } from './registry.js';
 const parse = (s) => { try { return JSON.parse(s || '{}'); } catch { return {}; } };
 const hydrate = (row) => (row ? { ...row, config: parse(row.config) } : row);
 
+/* ── Secrets in a supplier's config ────────────────────────────────────────
+ * A connector's config holds live credentials — Kinguin's apiKey can buy
+ * against the wallet, G2A's apiHash/apiSecret, the generic API's auth.token —
+ * and GET /api/admin/suppliers returned them whole to every role with
+ * suppliers.read (a fulfilment manager included). Responses now carry a mask
+ * (last four characters); saving a form that sends the mask back keeps the
+ * stored value, so editing a supplier's name never wipes its key. */
+const SECRET_KEY = /(key|secret|token|hash|password|passwd|pass|credential)$/i;
+export const MASK = '••••••';
+function maskDeep(v, k = '') {
+  if (Array.isArray(v)) return v.map((x) => maskDeep(x));
+  if (v && typeof v === 'object') return Object.fromEntries(Object.entries(v).map(([kk, vv]) => [kk, maskDeep(vv, kk)]));
+  if (typeof v === 'string' && v && SECRET_KEY.test(k)) return `${MASK}${v.slice(-4)}`;
+  return v;
+}
+/** A supplier as an API response: secrets masked. */
+export const publicSupplier = (row) => (row ? { ...row, config: maskDeep(row.config || {}) } : row);
+/** Merge an edited config over the stored one: a masked value means "unchanged". */
+function unmask(next, prev) {
+  if (Array.isArray(next)) return next.map((x, i) => unmask(x, Array.isArray(prev) ? prev[i] : undefined));
+  if (next && typeof next === 'object') {
+    return Object.fromEntries(Object.entries(next).map(([k, v]) => [k, unmask(v, prev && typeof prev === 'object' ? prev[k] : undefined)]));
+  }
+  return typeof next === 'string' && next.startsWith(MASK) ? prev : next;
+}
+
 export async function listSuppliers() {
   return (await all('SELECT * FROM suppliers ORDER BY created_at DESC')).map(hydrate);
 }
@@ -42,7 +68,7 @@ export async function updateSupplier(id, patch = {}) {
         credentials_ref=@cred, updated_at=@at WHERE id=@id`, {
     name: patch.name ?? s.name,
     status: patch.status ?? s.status,
-    config: JSON.stringify(patch.config ?? s.config),
+    config: JSON.stringify(patch.config ? unmask(patch.config, s.config) : s.config),
     cred: patch.credentialsRef ?? s.credentials_ref,
     at: nowIso(), id,
   });

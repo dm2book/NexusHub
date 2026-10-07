@@ -47,12 +47,12 @@ const CONTENT = {
       ] },
       { title: 'Payments & refunds', items: [
         ['Which payment methods are supported?', `You order first and pay after, with your order number as the reference — nothing is charged automatically. ${PAY_NOW}`],
-        ['How do refunds work?', 'Request a refund from your order page or open a ticket in our Discord. Once approved, eligible orders are refunded to your original method.'],
+        ['How do refunds work?', 'Request a refund from your order page or open a ticket in our Discord. Once approved you choose: your money back on your original payment method, or the amount as store credit you can spend right away.'],
       ] },
       { title: 'Account & security', items: [
         ['Do I need an account?', 'You can track orders by number without one, but an account unlocks your dashboard, downloads and history.'],
         ['How do you keep my account safe?', 'Passwordless sign-in, encrypted sessions, automated fraud screening and full audit logging.'],
-        ['Can I sign in with Google or Discord?', 'Yes, when those providers are enabled — plus passwordless email codes.'],
+        ['Can I sign in with Google or Discord?', 'Yes, if the button is shown on the sign-in page — and always with a one-time code by email, no password needed.'],
       ] },
     ],
   },
@@ -66,12 +66,12 @@ const CONTENT = {
       ] },
       { title: 'Betalingen & terugbetalingen', items: [
         ['Welke betaalmethoden worden ondersteund?', `Je bestelt eerst en betaalt daarna, met je bestelnummer als referentie — er wordt niets automatisch afgeschreven. ${PAY_NOW}`],
-        ['Hoe werken terugbetalingen?', 'Vraag een terugbetaling aan via je bestelpagina of open een ticket in onze Discord. Na goedkeuring wordt het bedrag teruggestort via je oorspronkelijke betaalmethode.'],
+        ['Hoe werken terugbetalingen?', 'Vraag een terugbetaling aan via je bestelpagina of open een ticket in onze Discord. Na goedkeuring kies je zelf: je geld terug via je oorspronkelijke betaalmethode, of het bedrag als tegoed in de shop dat je meteen kunt besteden.'],
       ] },
       { title: 'Account & veiligheid', items: [
         ['Heb ik een account nodig?', 'Je kunt bestellingen volgen met alleen je bestelnummer, maar een account geeft je toegang tot je dashboard, downloads en geschiedenis.'],
         ['Hoe houden jullie mijn account veilig?', 'Wachtwoordloos inloggen, versleutelde sessies, automatische fraudecontrole en volledige audit-logging.'],
-        ['Kan ik inloggen met Google of Discord?', 'Ja, wanneer die providers zijn ingeschakeld — plus wachtwoordloze e-mailcodes.'],
+        ['Kan ik inloggen met Google of Discord?', 'Ja, als de knop op de inlogpagina staat — en altijd met een eenmalige code per e-mail, zonder wachtwoord.'],
       ] },
     ],
   },
@@ -85,12 +85,12 @@ const CONTENT = {
       ] },
       { title: 'Zahlungen & Rückerstattungen', items: [
         ['Welche Zahlungsmethoden werden unterstützt?', `Du bestellst zuerst und zahlst danach, mit deiner Bestellnummer als Verwendungszweck — es wird nichts automatisch abgebucht. ${PAY_NOW}`],
-        ['Wie funktionieren Rückerstattungen?', 'Beantrage eine Rückerstattung auf deiner Bestellseite oder öffne ein Ticket in unserem Discord. Nach der Freigabe wird der Betrag auf deinem ursprünglichen Zahlungsweg zurückerstattet.'],
+        ['Wie funktionieren Rückerstattungen?', 'Beantrage eine Rückerstattung auf deiner Bestellseite oder öffne ein Ticket in unserem Discord. Nach der Freigabe wählst du: dein Geld zurück auf deinem ursprünglichen Zahlungsweg oder den Betrag als Shop-Guthaben, das du sofort nutzen kannst.'],
       ] },
       { title: 'Konto & Sicherheit', items: [
         ['Brauche ich ein Konto?', 'Du kannst Bestellungen allein mit der Bestellnummer verfolgen, aber ein Konto gibt dir Zugang zu deinem Dashboard, deinen Downloads und deiner Historie.'],
         ['Wie haltet ihr mein Konto sicher?', 'Anmeldung ohne Passwort, verschlüsselte Sitzungen, automatische Betrugsprüfung und vollständige Audit-Protokolle.'],
-        ['Kann ich mich mit Google oder Discord anmelden?', 'Ja, wenn diese Anbieter aktiviert sind — dazu Anmeldecodes per E-Mail, ganz ohne Passwort.'],
+        ['Kann ich mich mit Google oder Discord anmelden?', 'Ja, wenn der Button auf der Anmeldeseite angezeigt wird — und immer mit einem einmaligen Code per E-Mail, ganz ohne Passwort.'],
       ] },
     ],
   },
@@ -104,12 +104,12 @@ const CONTENT = {
       ] },
       { title: 'Paiements & remboursements', items: [
         ['Quels moyens de paiement sont acceptés ?', `Tu commandes d’abord et tu paies ensuite, avec ton numéro de commande comme référence — rien n’est prélevé automatiquement. ${PAY_NOW}`],
-        ['Comment fonctionnent les remboursements ?', 'Demande un remboursement depuis ta page de commande ou ouvre un ticket sur notre Discord. Une fois approuvé, le montant est remboursé sur ton moyen de paiement d’origine.'],
+        ['Comment fonctionnent les remboursements ?', 'Demande un remboursement depuis ta page de commande ou ouvre un ticket sur notre Discord. Une fois approuvé, tu choisis : ton argent sur ton moyen de paiement d’origine, ou le montant en crédit boutique utilisable tout de suite.'],
       ] },
       { title: 'Compte & sécurité', items: [
         ['Ai-je besoin d’un compte ?', 'Tu peux suivre une commande avec son seul numéro, mais un compte te donne accès à ton tableau de bord, à tes téléchargements et à ton historique.'],
         ['Comment protégez-vous mon compte ?', 'Connexion sans mot de passe, sessions chiffrées, contrôle antifraude automatique et journalisation complète.'],
-        ['Puis-je me connecter avec Google ou Discord ?', 'Oui, quand ces fournisseurs sont activés — ainsi que par code e-mail, sans mot de passe.'],
+        ['Puis-je me connecter avec Google ou Discord ?', 'Oui, si le bouton apparaît sur la page de connexion — et toujours avec un code unique par e-mail, sans mot de passe.'],
       ] },
     ],
   },

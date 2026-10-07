@@ -1,6 +1,7 @@
 /** Admin supplier management + connector configuration + sync controls. */
 import { Router } from 'express';
 import { z } from 'zod';
+import { httpUrl } from '../../utils/httpUrl.js';
 import { asyncHandler } from '../../middleware/error.js';
 import { requirePermission } from '../../middleware/rbac.js';
 import * as suppliers from '../../services/supplier/supplierService.js';
@@ -41,7 +42,7 @@ router.get('/connector-kinds', requirePermission('suppliers.read'), (_req, res) 
 });
 
 router.get('/', requirePermission('suppliers.read'), asyncHandler(async (_req, res) => {
-  res.json({ suppliers: await suppliers.listSuppliers() });
+  res.json({ suppliers: (await suppliers.listSuppliers()).map(suppliers.publicSupplier) });
 }));
 
 // Performance dashboard: margin, reliability, fulfillment speed per supplier.
@@ -97,7 +98,7 @@ router.post('/best/scan', requirePermission('suppliers.read'), asyncHandler(asyn
  */
 const bestPick = z.object({
   supplierId: z.string(), supplierSku: z.string().min(1),
-  supplierUrl: z.string().url().max(500).nullish(), cost: z.number().int().min(0),
+  supplierUrl: httpUrl(500).nullish(), cost: z.number().int().min(0),
 });
 router.post('/best/map', requirePermission('suppliers.manage'), asyncHandler(async (req, res) => {
   const body = z.object({
@@ -140,7 +141,7 @@ router.post('/failover/run', requirePermission('suppliers.manage'), asyncHandler
 router.get('/:id', requirePermission('suppliers.read'), asyncHandler(async (req, res) => {
   const supplier = await suppliers.getSupplier(req.params.id);
   if (!supplier) throw notFound('Supplier not found');
-  res.json({ supplier, syncRuns: await suppliers.listSyncRuns(req.params.id) });
+  res.json({ supplier: suppliers.publicSupplier(supplier), syncRuns: await suppliers.listSyncRuns(req.params.id) });
 }));
 
 router.post('/', requirePermission('suppliers.manage'), asyncHandler(async (req, res) => {
@@ -162,7 +163,7 @@ router.post('/', requirePermission('suppliers.manage'), asyncHandler(async (req,
   const supplier = await suppliers.createSupplier(body);
   await audit({ actor: req.user, action: 'supplier.create', targetType: 'supplier',
     targetId: supplier.id, metadata: { kind: body.connectorKind }, req });
-  res.status(201).json({ supplier });
+  res.status(201).json({ supplier: suppliers.publicSupplier(supplier) });
 }));
 
 router.patch('/:id', requirePermission('suppliers.manage'), asyncHandler(async (req, res) => {
@@ -175,7 +176,7 @@ router.patch('/:id', requirePermission('suppliers.manage'), asyncHandler(async (
   const supplier = await suppliers.updateSupplier(req.params.id, body);
   await audit({ actor: req.user, action: 'supplier.update', targetType: 'supplier',
     targetId: supplier.id, req });
-  res.json({ supplier });
+  res.json({ supplier: suppliers.publicSupplier(supplier) });
 }));
 
 router.delete('/:id', requirePermission('suppliers.manage'), asyncHandler(async (req, res) => {
@@ -200,7 +201,7 @@ router.post('/:id/products', requirePermission('suppliers.manage'),
     const body = z.object({
       productId: z.string(),
       supplierSku: z.string(),
-      supplierUrl: z.string().url().max(500).optional(),
+      supplierUrl: httpUrl(500).optional(),
       cost: z.number().int().optional(),
       priority: z.number().int().optional(),
     }).parse(req.body);

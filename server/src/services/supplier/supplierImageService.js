@@ -29,6 +29,7 @@ import { all } from '../../db/index.js';
 import { scanSources, matchCheck } from './bestSourceService.js';
 import { searchCandidates } from './catalogScanService.js';
 import { storeImage, dimensions } from '../imageStoreService.js';
+import { publicFetch } from '../../utils/imageUrl.js';
 import { mediaRecord, mediaStatus } from '../productMediaService.js';
 import { audit } from '../auditService.js';
 
@@ -119,7 +120,7 @@ export async function downloadImage(url, { fetchImpl = fetch } = {}) {
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), FETCH_TIMEOUT_MS);
   try {
-    const res = await fetchImpl(url, { signal: ctl.signal, redirect: 'follow' });
+    const res = await publicFetch(url, { signal: ctl.signal }, fetchImpl);
     if (!res.ok) throw new Error(`the supplier's image answered ${res.status}`);
     const mime = String(res.headers?.get?.('content-type') || '').split(';')[0].trim().toLowerCase();
     if (!IMAGE_MIME.has(mime)) throw new Error(`not a photo (${mime || 'no type'})`);
