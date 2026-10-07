@@ -24,7 +24,7 @@ export const UGC_CUES = {
 };
 
 export function makeUgcScenes(h) {
-  const { cl, eo, eio, back, at, fit, fontOf, roundRect, sweep, hero, Y, VOICE_AT } = h;
+  const { cl, eo, eio, back, at, fit, fontOf, roundRect, sweep, hero, Y, VOICE_AT, readableOn } = h;
   const INK = '#0b0a12';
 
   /* Every word drawn inside a picture, per language. */
@@ -694,12 +694,11 @@ export function makeUgcScenes(h) {
         const bw = G.W - 300 * G.u, bh = 128 * G.u, bx = G.W / 2 - bw / 2, by = y + hh + 60 * G.u;
         ctx.save(); ctx.globalAlpha *= eo(pc);
         ctx.translate(G.W / 2, by + bh / 2); ctx.scale(pulse, pulse); ctx.translate(-G.W / 2, -(by + bh / 2));
-        const g = ctx.createLinearGradient(bx, 0, bx + bw, 0);
-        g.addColorStop(0, '#6366f1'); g.addColorStop(0.55, '#a855f7'); g.addColorStop(1, '#ec4899');
-        ctx.shadowColor = '#a855f799'; ctx.shadowBlur = 60 * G.u;
-        roundRect(ctx, bx, by, bw, bh, bh / 2); ctx.fillStyle = g; ctx.fill();
+        /* The brand's colour, like the rest of the frame — not the shop's purple. */
+        ctx.shadowColor = `${A.accent}99`; ctx.shadowBlur = 60 * G.u;
+        roundRect(ctx, bx, by, bw, bh, bh / 2); ctx.fillStyle = A.accent; ctx.fill();
         ctx.shadowColor = 'transparent';
-        ctx.fillStyle = '#fff'; ctx.font = fontOf(58 * G.u, 'Inter', '700'); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillStyle = readableOn(A.accent); ctx.font = fontOf(58 * G.u, 'Inter', '700'); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         ctx.fillText('forgemarket.nl', G.W / 2, by + bh / 2 + 3 * G.u);
         ctx.restore();
         sweep(ctx, bx, by, bw, bh, u, 1.1, bh / 2);

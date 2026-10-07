@@ -327,7 +327,7 @@ ${mark || `<circle cx="1160" cy="450" r="170" fill="#1b1636" stroke="${accent}" 
  * card: the game's or brand's own colours edge to edge, its logo as the hero,
  * and the product's own amount on a glass plate — a store card, not an icon
  * on a dark board. Shipped files keep mainSvg; this is the runtime look. */
-const THEMES = {
+export const THEMES = {
   eafc: ['#0b3d2e', '#00e676', '#062016'], cod: ['#3a2a12', '#ff9a1f', '#120c05'], valorant: ['#4a0d14', '#ff4655', '#14060a'],
   xbox: ['#0e3d0e', '#3ee03e', '#051405'], playstation: ['#06265e', '#2f8cff', '#030c1f'], steam: ['#122840', '#66c0f4', '#070f19'],
   nintendo: ['#5c0710', '#ff2a3d', '#1a0306'], netflix: ['#4d070b', '#ff2b36', '#140304'], googleplay: ['#083b33', '#34d399', '#03130f'],

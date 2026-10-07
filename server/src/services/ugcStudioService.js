@@ -12,7 +12,7 @@ import { PLATFORMS, DISCLAIMER } from './adStudioService.js';
 import { config } from '../config/env.js';
 import { number, price, priceText, countText, spokenSite } from '../../../src/lib/adStudio/speak.js';
 import { deliveryField } from '../../../src/lib/deliveryInfo.js';
-import { iconFor } from '../../../src/lib/sampleCatalog.js';
+import { adImage, adTheme } from './ads/adArt.js';
 import { ACCENT } from '../../../scripts/art/design.mjs';
 import { UGC_SCRIPTS, THEMES, BEATS, BEAT_DUR, skusOf } from './ugcScripts.js';
 import EN from './ugcScripts.en.js';
@@ -91,12 +91,9 @@ const FREE = { nl: (x) => `GRATIS ${x}`, en: (x) => `FREE ${x}`, de: (x) => `GRA
 const wordOf = (n) => (String(n).replace(/^[\d.,\s]+/, '').split(/\s+—\s+|\s+/)[0] || '').toUpperCase();
 
 const sentence = (t) => String(t || '').replace(/(^|[.!?…]\s+)([a-zà-ÿ])/g, (m, a, b) => a + b.toUpperCase());
-const imageOf = (row) => {
-  let meta = {};
-  try { meta = JSON.parse(row.metadata || '{}'); } catch { /* none */ }
-  const own = meta.image && /^\/(api\/images|products)\//.test(meta.image) ? meta.image : null;
-  return iconFor(String(row.category || '').toLowerCase()) || own || null;
-};
+/* The product's own card in its brand's colours, not the category icon —
+   see ads/adArt.js. */
+const imageOf = adImage;
 
 /** One script against the catalogue: its lines and pictures, or why it cannot run. */
 export function resolveScript(s, cat, lang = 'nl') {
@@ -182,7 +179,8 @@ export async function buildUgcBoard({ scriptId, platform = 'tiktok', lang = 'nl'
 
   const P = PLATFORMS[platform] ? platform : 'tiktok';
   const plat = PLATFORMS[P];
-  const accent = ACCENT[String(r.productRow.category || '').toLowerCase()] || '#a855f7';
+  const theme = adTheme(r.productRow);
+  const accent = theme.accent || ACCENT[String(r.productRow.category || '').toLowerCase()] || '#a855f7';
   const scenes = BEATS.map((b, i) => ({
     id: `${i + 1}-${b}`, type: `ugc-${b}`,
     accent: b === 'problem' ? '#f43f5e' : accent,
@@ -203,7 +201,7 @@ export async function buildUgcBoard({ scriptId, platform = 'tiktok', lang = 'nl'
     kind: 'ugc',
     script: { id: s.id, title: s.title, theme: s.theme },
     product: { id: r.productRow.id, name: r.productRow.name, price: r.productRow.price, image: r.product.image, category: r.productRow.category },
-    lang: L, platform: { id: P, ...plat }, length: 15,
+    lang: L, platform: { id: P, ...plat }, length: 15, theme,
     angles: { chosen: [], possible: [], skipped: [] },
     scenes,
     disclaimer: gate(DISCLAIMER[L], f) ? null : DISCLAIMER[L],

@@ -17,7 +17,7 @@ import { all, get } from '../db/index.js';
 import { factsFor, gate, packOf } from './adScriptService.js';
 import { config } from '../config/env.js';
 import { number, price, priceText, countText, domain } from '../../../src/lib/adStudio/speak.js';
-import { iconFor } from '../../../src/lib/sampleCatalog.js';
+import { adImage, adTheme, adPlatform } from './ads/adArt.js';
 import { ACCENT } from '../../../scripts/art/design.mjs';
 
 export const ANGLES = {
@@ -40,19 +40,14 @@ export const LENGTHS = [15, 30, 45, 60];
 export const LANGS = ['nl', 'en'];
 
 /* How long a scene needs without a voice, and how much it adds to a target length. */
-const BASE_DUR = { hook: 3, myth: 5, trust: 6, math: 7.5, beforeafter: 5.5, guest: 5, refund: 4.5, end: 5 };
+const BASE_DUR = { hook: 3, myth: 5, trust: 6, math: 7.5, beforeafter: 5.5, guest: 5, refund: 4.5, offer: 3, end: 4 };
 const ORDER = ['myth', 'trust', 'math', 'beforeafter', 'guest', 'refund'];
-const SCENE_ACCENT = { hook: '#ec4899', myth: '#ec4899', math: '#38bdf8', beforeafter: '#a855f7', guest: '#6366f1', refund: '#f97316', end: '#a855f7' };
+const SCENE_ACCENT = { hook: '#ec4899', myth: '#ec4899', math: '#38bdf8', beforeafter: '#a855f7', guest: '#6366f1', refund: '#f97316', offer: '#a855f7', end: '#a855f7' };
 
-/** Only images the canvas may read back: same-origin. An external link would taint the recording. */
-const sameOrigin = (u) => (u && /^\/(api\/images|products)\//.test(u) ? u : null);
-function imageOf(row) {
-  let meta = {};
-  try { meta = JSON.parse(row.metadata || '{}'); } catch { /* none */ }
-  /* The category's own 3D icon first: it is the shape a viewer recognises in a
-     feed. The product's tile second. */
-  return iconFor(String(row.category || '').toLowerCase()) || sameOrigin(meta.image) || null;
-}
+/* The product's own card (the owner's artwork, else the store card in the
+   brand's colours) — the generic category icon it used to be is what made
+   every ad look the same. See ads/adArt.js. Same-origin, so recordable. */
+const imageOf = adImage;
 
 /** The dearest and the cheapest price per 1.000 across the packs of one currency. */
 async function packRange(category, unit) {
@@ -130,9 +125,16 @@ function words(f, lang, extra) {
         voice: 'En niet geleverd? Dan krijg je je geld terug. Zwart op wit.' }
       : { l1: 'Not delivered?', l2: 'Money back.', sub: 'In writing: forgemarket.nl/refunds',
         voice: 'And if it is not delivered? You get your money back. In writing.' },
+    /* The product itself, big: its card, its name, its price, the platform
+       it works on. What a competitor's ad shows first. */
+    offer: nl
+      ? { name: thingText, price: priceText(p, lang), platform: extra.platform ? `Voor ${extra.platform}` : null,
+        voice: `${thingSpoken}. ${price(p, lang)}.` }
+      : { name: thingText, price: priceText(p, lang), platform: extra.platform ? `For ${extra.platform}` : null,
+        voice: `${thingSpoken}. ${price(p, lang)}.` },
     end: nl
-      ? { cta: 'forgemarket.nl', tag: 'Link in bio', voice: `${domain(lang)}. Link in bio.` }
-      : { cta: 'forgemarket.nl', tag: 'Link in bio', voice: `${domain(lang)}. Link in bio.` },
+      ? { cta: 'forgemarket.nl', tag: 'Link in bio', name: thingText, price: priceText(p, lang), voice: `${domain(lang)}. Link in bio.` }
+      : { cta: 'forgemarket.nl', tag: 'Link in bio', name: thingText, price: priceText(p, lang), voice: `${domain(lang)}. Link in bio.` },
   };
 }
 
@@ -169,33 +171,39 @@ export async function buildStoryboard({ productId, angles = [], platform = 'tikt
 
   const range = f.pack ? await packRange(f.product.category, f.pack.unit) : null;
   const catalogue = Math.floor(Number((await get(`SELECT COUNT(*) AS n FROM products WHERE active = 1`))?.n || 0) / 10) * 10;
-  const W = words(f, L, { range, catalogue });
+  const productRow = await get(`SELECT id, name, price, category, metadata FROM products WHERE id = @id`, { id: productId });
+  const platformTag = adPlatform(productRow);
+  const W = words(f, L, { range, catalogue, platform: platformTag?.label || null });
 
   /* The opening follows the first angle. */
   const hookKey = { trust: 'pw', myth: 'pw', math: 'math', beforeafter: 'math', guest: 'guest', refund: 'refund' }[chosen[0]];
   const target = LENGTHS.includes(Number(length)) ? Number(length) : 30;
   const scenes = [{ type: 'hook', data: W.hook[hookKey] }];
-  let budget = target - BASE_DUR.hook - BASE_DUR.end;
+  /* The product scene is not optional: an ad that never shows what is for
+     sale was the weakest thing about these. Its time is set aside first. */
+  let budget = target - BASE_DUR.hook - BASE_DUR.offer - BASE_DUR.end;
   for (const a of chosen) {
     if (budget < BASE_DUR[a] * 0.8 && scenes.length > 1) { skipped.push({ angle: a, reason: nl ? `past niet in ${target} seconden — kies een langere ad` : `does not fit in ${target} seconds` }); continue; }
     scenes.push({ type: a, data: W[a] });
     budget -= BASE_DUR[a];
   }
+  scenes.push({ type: 'offer', data: W.offer });
   scenes.push({ type: 'end', data: W.end });
 
   /* Images: the product's own, plus two other categories for the guest scene. */
-  const product = await get(`SELECT id, name, price, category, metadata FROM products WHERE id = @id`, { id: productId });
+  const product = productRow;
   const others = (await all(`SELECT DISTINCT ON (category) id, name, price, category, metadata FROM products
                                WHERE active = 1 AND category <> @c ORDER BY category, price`, { c: product.category }))
     .map(imageOf).filter(Boolean);
   const image = imageOf(product);
-  const accent = ACCENT[String(product.category || '').toLowerCase()] || '#22c55e';
+  const theme = adTheme(product);
+  const accent = theme.accent || ACCENT[String(product.category || '').toLowerCase()] || '#22c55e';
 
   /* Sentences start with a capital, also after a number was written out. */
   const sentence = (t) => String(t || '').replace(/(^|[.!?]\s+)([a-zà-ÿ])/g, (m, a, b) => a + b.toUpperCase());
   const out = scenes.map((s, i) => ({
     id: `${i + 1}-${s.type}`, type: s.type,
-    accent: s.type === 'trust' ? accent : SCENE_ACCENT[s.type],
+    accent: ['trust', 'offer', 'end'].includes(s.type) ? accent : SCENE_ACCENT[s.type],
     data: { ...s.data, image, images: s.type === 'guest' ? [image, ...others.slice(0, 2)].filter(Boolean) : undefined },
     voice: sentence(s.data.voice),
     minDur: BASE_DUR[s.type],
@@ -214,7 +222,7 @@ export async function buildStoryboard({ productId, angles = [], platform = 'tikt
   const base = (config.appUrl || 'https://www.forgemarket.nl').replace(/\/$/, '');
   return {
     product: { id: f.product.id, name: f.product.name, price: f.product.price, image, category: f.product.category },
-    lang: L, platform: { id: P, ...plat }, length: target,
+    lang: L, platform: { id: P, ...plat }, length: target, theme,
     angles: { chosen, possible, skipped },
     scenes: kept,
     disclaimer: disclaimerWhy ? null : DISCLAIMER[L],

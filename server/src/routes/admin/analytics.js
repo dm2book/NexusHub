@@ -13,6 +13,7 @@ import { generateConcepts, conceptProducts, conceptsMarkdown } from '../../servi
 import { ugcOptions, buildUgcBoard, UGC_LANGS } from '../../services/ugcStudioService.js';
 import { studioOptions, buildStoryboard, synthesizePremium, ANGLES, PLATFORMS, LENGTHS, LANGS, VOICE_PROVIDERS } from '../../services/adStudioService.js';
 import { notFound } from '../../utils/errors.js';
+import { staticAds, staticProducts, STATIC_LANGS } from '../../services/adStaticsService.js';
 import { z } from 'zod';
 import { audit } from '../../services/auditService.js';
 
@@ -160,6 +161,18 @@ router.get('/ad-concepts/:productId/script.md', asyncHandler(async (req, res) =>
  * Growth → Ad Studio: the storyboard of a video ad the browser renders.
  * Choose a product, what the ad is for, the platform, length and language.
  */
+/* Growth → Static ads: what each still image may say, per product and language;
+   the page draws them (src/lib/adStudio/statics.js). */
+router.get('/ad-statics', asyncHandler(async (_req, res) => {
+  res.json({ products: await staticProducts(), langs: STATIC_LANGS });
+}));
+router.get('/ad-statics/:productId', asyncHandler(async (req, res) => {
+  const lang = STATIC_LANGS.includes(req.query.lang) ? req.query.lang : 'nl';
+  const out = await staticAds(req.params.productId, lang);
+  if (!out) throw notFound('Product not found');
+  res.json(out);
+}));
+
 router.get('/ad-studio/options', asyncHandler(async (_req, res) => {
   res.json(await studioOptions());
 }));
