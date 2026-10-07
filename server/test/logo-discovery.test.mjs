@@ -20,6 +20,7 @@ const ok = (name, cond, extra = '') => {
 };
 await ensureReady();
 const L = await import('../src/services/logoDiscoveryService.js');
+let commonsFake = null;
 
 const png = (w, h, colorType, extra = Buffer.alloc(0)) => {
   const b = Buffer.alloc(33);
@@ -47,9 +48,20 @@ ok('a file named like a screenshot or mockup is refused', a({ mime: 'image/png',
 ok('over 5 MB is refused', a({ mime: 'image/png', bytes: Buffer.concat([png(1024, 1024, 6), Buffer.alloc(L.MAX_BYTES)]) }).status === 'rejected');
 const svgScore = a({ mime: 'image/svg+xml', bytes: svg() }).score, pngScore = a({ mime: 'image/png', bytes: png(1024, 1024, 6) }).score;
 ok('SVG scores above an equally good PNG', svgScore > pngScore, `${svgScore} vs ${pngScore}`);
-const s = (tier) => L.assess({ tier, mime: 'image/svg+xml', bytes: svg(), license: 'x' }).score;
-ok('official brand assets › press kit › developer portal › Commons › public SVG › shop file',
+const s = (tier, recentYear = true) => L.assess({ tier, mime: 'image/svg+xml', bytes: svg(), license: 'x', recentYear }).score;
+ok('official brand assets › press kit › developer portal › Commons (dated, recent) › public SVG › shop file',
   s('brand_assets') > s('press_kit') && s('press_kit') > s('developer_portal') && s('developer_portal') > s('commons') && s('commons') > s('public_svg') && s('public_svg') > s('shop_asset'));
+ok('…an undated Commons logo (any vintage) ranks below the maintained public SVG', s('commons', false) < s('public_svg'));
+
+console.log('\n— Commons: the brand\'s current main logo, nothing else —');
+{
+  const v = (t, b) => L.commonsVerdict(t, L.BRANDS[b]);
+  ok('an old logo is refused by its year', !v('File:Roblox logo 2017.svg', 'roblox').ok && v('File:Roblox Logo 2025.png', 'roblox').ok);
+  ok('a console or spin-off is not the brand (Xbox One, Wild Rift)', !v('File:Xbox One logo.svg', 'xbox').ok && !v('File:League of Legends Wild Rift logo.svg', 'league').ok);
+  ok('an old service is not the brand (Nintendo Wi-Fi Connection)', !v('File:Nintendo Wi-Fi Connection logo.svg', 'nintendo').ok && v('File:Nintendo logo.svg', 'nintendo').ok);
+  ok('a colour variant is not the main logo', !v('File:Valorant logo - pink color version.svg', 'valorant').ok);
+  ok('every brand word must be there (Riot Games, not just "Riot")', !v('File:Riot logo.svg', 'riot').ok && v('File:Riot Games logo.svg', 'riot').ok);
+}
 
 console.log('\n— Safe to serve, polite to fetch —');
 const dirty = '<?xml version="1.0"?><svg onload="alert(1)" xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script><a href="https://evil.example/"><path d="M0 0"/></a><image href="data:image/png;base64,AAA"/></svg>';
@@ -87,7 +99,7 @@ ok('Simple Icons and the shop file are candidates too', rows.some((r) => r.tier 
 console.log('\n— Wikimedia Commons: free licences only —');
 {
   await run(`DELETE FROM brand_logos WHERE brand='nintendo'`);
-  const commons = async (url) => {
+  commonsFake = async (url) => {
     const u = String(url);
     if (u.startsWith('https://commons.wikimedia.org/w/api.php')) return new Response(JSON.stringify({ query: { pages: {
       1: { title: 'File:Nintendo logo.svg', imageinfo: [{ mime: 'image/svg+xml', url: 'https://upload.test/Nintendo_logo.svg', descriptionurl: 'https://commons.wikimedia.org/wiki/File:Nintendo_logo.svg', extmetadata: { LicenseShortName: { value: 'Public domain' } } }] },
@@ -98,10 +110,23 @@ console.log('\n— Wikimedia Commons: free licences only —');
     if (u === 'https://upload.test/red.svg') throw new Error('a non-free file must not be downloaded');
     return new Response('', { status: 404 });
   };
-  const n = await L.discoverBrand('nintendo', { fetchImpl: commons, network: true });
+  const n = await L.discoverBrand('nintendo', { fetchImpl: commonsFake, network: true });
   ok('a public-domain Commons logo is found and chosen', n?.tier === 'commons' && /Nintendo_logo/.test(n.source_url) && n.license === 'Public domain');
   const nrows = await all(`SELECT source_url FROM brand_logos WHERE brand='nintendo'`);
   ok('…a CC BY-SA one is never even downloaded', !nrows.some((r) => /red\.svg/.test(r.source_url)));
+}
+
+console.log('\n— New rules re-judge at once —');
+{
+  await run(`INSERT INTO kv (key, value, updated_at) VALUES ('logo_discovery_version', '1', now()::text) ON CONFLICT (key) DO UPDATE SET value='1'`);
+  const before = await get(`SELECT COUNT(*)::int AS n FROM brand_logos WHERE tier='commons'`);
+  const changed = await L.ensureLogicVersion();
+  const after = await get(`SELECT COUNT(*)::int AS n FROM brand_logos WHERE tier='commons'`);
+  ok('choices made under older rules are dropped and every brand is due again', changed && before.n > 0 && after.n === 0
+    && (await L.staleBrands()).length === Object.keys(L.BRANDS).length);
+  ok('…and runs once, not on every call', (await L.ensureLogicVersion()) === false);
+  await L.discoverBrand('nintendo', { fetchImpl: commonsFake, network: true });
+  await L.discoverBrand('roblox', { fetchImpl: fake, network: false });
 }
 
 console.log('\n— Cache: 30 days, never on a page view —');
