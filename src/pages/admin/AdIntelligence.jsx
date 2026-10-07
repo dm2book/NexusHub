@@ -3,6 +3,7 @@ import { Megaphone, Trophy, TrendingDown, MousePointerClick, Euro, PiggyBank, In
 import { api } from '../../lib/api.js';
 import { PageLoader } from '../../components/ui.jsx';
 import AdPerformance from '../../components/admin/AdPerformance.jsx';
+import AdSpendImport from '../../components/admin/AdSpendImport.jsx';
 import { SERIES_COLOURS } from '../../components/admin/TimeSeriesPlot.jsx';
 
 /**
@@ -43,6 +44,7 @@ const HIGHLIGHTS = [
 
 export default function AdIntelligence() {
   const [days, setDays] = useState(30);
+  const [reload, setReload] = useState(0);
   const [data, setData] = useState(null);
   const [measure, setMeasure] = useState('revenueCents');
 
@@ -153,8 +155,11 @@ export default function AdIntelligence() {
           note: f.count == null ? 'not recorded — a platform number' : f.source }))} fmt={nfmt} measure="People" />
       </section>
 
+      {/* The platforms' numbers in: CSV export or API pull. */}
+      <AdSpendImport onDone={() => setReload((x) => x + 1)} />
+
       {/* Over time per advert, the per-advert table with profit, and spend entry. */}
-      <AdPerformance days={days} />
+      <AdPerformance key={reload} days={days} />
     </div>
   );
 }

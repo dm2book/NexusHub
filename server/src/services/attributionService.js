@@ -93,6 +93,10 @@ const SOURCE_NETWORKS = {
   reels: 'instagram',
   facebook: 'facebook',
   fb: 'facebook',
+  /* What Meta's {{site_source_name}} fills in for its other placements; the
+     spend import books them under facebook too (adSpendSyncService). */
+  an: 'facebook',
+  msg: 'facebook',
   meta: 'meta',
   shorts: 'youtube',
   discord: 'discord',

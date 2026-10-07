@@ -327,3 +327,70 @@ export function drawStatic(ctx, fmt, ad, tpl, images) {
 /** File name the owner gets: forgemarket-<product>-<template>-<format>-<lang>.png */
 export const staticFileName = (ad, tplId, fmtId) =>
   `forgemarket-${String(ad.product.name).toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}-${tplId}-${fmtId}-${ad.lang}.png`;
+
+/**
+ * The catalogue image for Meta / TikTok dynamic ads: 1080×1080, the card, the
+ * name and the platform — no price (the platform prints the feed's price over
+ * it, so the picture can never show an old one) and no language-bound words,
+ * so one image serves every language's feed. The lower fifth stays calm: that
+ * is where the platforms lay their price and button.
+ */
+export function drawCatalog(ctx, ad, images) {
+  const W = 1080, H = 1080, cx = W / 2, accent = ad.theme.accent;
+  ctx.save();
+  ctx.clearRect(0, 0, W, H);
+  background(ctx, W, H, ad.theme);
+  wordmark(ctx, 64, 92, 34, accent);
+  const img = images[ad.product.image];
+  card(ctx, img, cx, 470, 860, 600, accent);
+  const ns = line(ctx, ad.product.nameNeutral || ad.product.name, cx, 860, { px: 70, maxW: W - 140 });
+  void ns;
+  if (ad.product.platformLabel) pill(ctx, ad.product.platformLabel, cx, 930, { px: 30, accent, filled: false, maxW: 600 });
+  ctx.restore();
+}
+
+/**
+ * A carousel: one square card per amount (the same layout as the price ad,
+ * with that amount's own card and price) and a closing card. Meta shows 2–10
+ * of these side by side; each card gets its own link on the platform.
+ */
+export function carouselCards(ad) {
+  const ladder = ad.ladder || [];
+  if (ladder.length < 2) return [];
+  return ladder.map((x) => ({ kind: 'item', entry: x })).concat([{ kind: 'end' }]);
+}
+
+export function drawCarouselCard(ctx, ad, cardSpec, images, index, total) {
+  const fmt = { w: 1080, h: 1080, safeTop: 0.06, safeBottom: 0.06 };
+  if (cardSpec.kind === 'item') {
+    const e = cardSpec.entry;
+    const one = { ...ad, product: { ...ad.product, name: e.name, price: e.price, image: e.image, ownArt: false } };
+    drawStatic(ctx, fmt, one, { id: 'price' }, images);
+  } else {
+    // The close: the brand, the line, the button.
+    ctx.save();
+    background(ctx, 1080, 1080, ad.theme);
+    const accent = ad.theme.accent;
+    const t = (ad.templates.find((x) => x.id === 'ladder') || {}).title || '';
+    /* Sized to fit with a margin: at a fixed 150px it ran to both edges. */
+    let size = 150;
+    for (let i = 0; i < 30; i++) {
+      ctx.font = font(size, 'Raj', '600'); ctx.letterSpacing = `${size * 0.12}px`;
+      if (ctx.measureText('FORGEMARKET').width <= 820) break;
+      size *= 0.95;
+    }
+    const w1 = ctx.measureText('FORGE').width, w2 = ctx.measureText('MARKET').width;
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = '#ffffff'; ctx.fillText('FORGE', 540 - (w1 + w2) / 2, 430);
+    ctx.fillStyle = accent; ctx.fillText('MARKET', 540 - (w1 + w2) / 2 + w1, 430);
+    ctx.letterSpacing = '0px';
+    if (t) line(ctx, t, 540, 600, { px: 84, maxW: 940 });
+    pill(ctx, ad.cta, 540, 760, { px: 54, accent, maxW: 800 });
+    ctx.restore();
+  }
+  // Position, top right: "2/4".
+  ctx.save();
+  ctx.font = font(30, 'Inter', '700'); ctx.textAlign = 'right'; ctx.fillStyle = 'rgba(255,255,255,0.75)';
+  ctx.fillText(`${index + 1}/${total}`, 1080 - 64, 100);
+  ctx.restore();
+}

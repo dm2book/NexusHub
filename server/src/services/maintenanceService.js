@@ -109,6 +109,18 @@ export async function runMaintenance() {
     summary.emailsRetried = await retryFailedEmails({ deadline: startedAt + 16_000 });
   } catch (e) { summary.emailRetryError = e.message; }
 
+  /* 0a. The ad platforms' spend, impressions and clicks, every six hours,
+     when their read-only keys are set (adSpendSyncService.js). */
+  try {
+    const { metaConfigured, tiktokConfigured, syncAll } = await import('./adSpendSyncService.js');
+    if ((metaConfigured() || tiktokConfigured()) && !late()) {
+      const { claimInterval } = await import('./bootUpkeep.js');
+      if (await claimInterval('ads_sync', 6 * 3_600_000)) {
+        summary.adSpendSync = await syncAll({ days: 7, deadline: Math.min(Date.now() + 6_000, startedAt + 20_000) });
+      }
+    }
+  } catch (e) { summary.adSpendSyncError = e.message; }
+
   // 0. Is the Discord bot still polling? (alerts the owner once per outage)
   try {
     const { checkBotHeartbeat } = await import('./discordService.js');

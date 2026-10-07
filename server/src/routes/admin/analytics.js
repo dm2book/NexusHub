@@ -14,6 +14,7 @@ import { ugcOptions, buildUgcBoard, UGC_LANGS } from '../../services/ugcStudioSe
 import { studioOptions, buildStoryboard, synthesizePremium, ANGLES, PLATFORMS, LENGTHS, LANGS, VOICE_PROVIDERS } from '../../services/adStudioService.js';
 import { notFound } from '../../utils/errors.js';
 import { staticAds, staticProducts, STATIC_LANGS } from '../../services/adStaticsService.js';
+import { importCsv, syncAll, syncStatus } from '../../services/adSpendSyncService.js';
 import { z } from 'zod';
 import { audit } from '../../services/auditService.js';
 
@@ -166,6 +167,23 @@ router.get('/ad-concepts/:productId/script.md', asyncHandler(async (req, res) =>
 router.get('/ad-statics', asyncHandler(async (_req, res) => {
   res.json({ products: await staticProducts(), langs: STATIC_LANGS });
 }));
+/* The catalogue feed: how complete it is, and storing a product's drawn
+   1080×1080 catalogue image (JPEG from the Static ads page). */
+router.get('/ad-feed', asyncHandler(async (_req, res) => {
+  const { feedStatus } = await import('../../services/productFeedService.js');
+  res.json(await feedStatus());
+}));
+router.post('/ad-feed/:productId/image', requirePermission('analytics.write'), asyncHandler(async (req, res) => {
+  const { image } = z.object({ image: z.string().regex(/^data:image\/jpeg;base64,/).max(2_500_000) }).parse(req.body || {});
+  const bytes = Buffer.from(image.slice(image.indexOf(',') + 1), 'base64');
+  const { dimensions, storeImage } = await import('../../services/imageStoreService.js');
+  const { width, height } = dimensions('image/jpeg', bytes);
+  if (width < 500 || height < 500) return res.status(400).json({ error: { message: 'A catalogue image must be at least 500×500' } });
+  const stored = await storeImage('image/jpeg', bytes, { productId: req.params.productId, source: 'ad-feed' });
+  const { setFeedImage } = await import('../../services/productFeedService.js');
+  if (!(await setFeedImage(req.params.productId, stored.url))) throw notFound('Product not found');
+  res.json({ url: stored.url });
+}));
 router.get('/ad-statics/:productId', asyncHandler(async (req, res) => {
   const lang = STATIC_LANGS.includes(req.query.lang) ? req.query.lang : 'nl';
   const out = await staticAds(req.params.productId, lang);
@@ -236,6 +254,25 @@ router.get('/ads/timeseries', asyncHandler(async (req, res) => {
  * The only way impressions and spend get into this system: neither is
  * observable from here, and both are required before CTR or ROAS mean anything.
  */
+/* The platforms' own numbers, imported from their CSV export or pulled from
+   their reporting APIs (adSpendSyncService.js). */
+router.get('/ads/sync', asyncHandler(async (_req, res) => { res.json(await syncStatus()); }));
+router.post('/ads/sync', requirePermission('analytics.write'), asyncHandler(async (req, res) => {
+  const out = await syncAll({ days: 14, deadline: Date.now() + 22_000 });
+  await audit({ actor: req.user, action: 'ads.sync', metadata: { meta: out.meta?.written ?? out.meta, tiktok: out.tiktok?.written ?? out.tiktok }, req });
+  res.json(out);
+}));
+router.post('/ads/import', requirePermission('analytics.write'), asyncHandler(async (req, res) => {
+  const body = z.object({ network: z.enum(['meta', 'tiktok']), csv: z.string().min(1).max(5_000_000) }).parse(req.body || {});
+  try {
+    const out = await importCsv(body.csv, { network: body.network });
+    await audit({ actor: req.user, action: 'ads.import', metadata: { network: body.network, written: out.written, skipped: out.skippedCount }, req });
+    res.json(out);
+  } catch (e) {
+    res.status(400).json({ error: { message: e.message } });
+  }
+}));
+
 router.post('/ads/spend', requirePermission('analytics.write'), asyncHandler(async (req, res) => {
   const body = z.object({
     day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),

@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Image as ImageIcon, Download, Info, Archive } from 'lucide-react';
+import { Image as ImageIcon, Download, Info, Archive, Rss, Copy } from 'lucide-react';
 import { api } from '../../lib/api.js';
 import { PageLoader } from '../../components/ui.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
-import { loadStaticFonts, loadImage, drawStatic, staticFileName } from '../../lib/adStudio/statics.js';
+import { loadStaticFonts, loadImage, drawStatic, drawCatalog, carouselCards, drawCarouselCard, staticFileName } from '../../lib/adStudio/statics.js';
 import { makeZip } from '../../lib/zip.js';
 
 /**
@@ -21,6 +21,28 @@ const TEMPLATE = {
   code: 'Code by email', refund: 'Not delivered? Money back', value: 'Price per 1,000', rating: 'Rating (real reviews only)',
 };
 const LANGS = { nl: 'Nederlands', en: 'English', de: 'Deutsch', fr: 'Français' };
+
+function CarouselCard({ ad, spec, i, n, images }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!ref.current) return;
+    ref.current.width = 1080; ref.current.height = 1080;
+    drawCarouselCard(ref.current.getContext('2d'), ad, spec, images, i, n);
+  }, [ad, spec, images, i, n]);
+  const download = () => ref.current.toBlob((b) => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(b); a.download = staticFileName(ad, `carousel-${i + 1}`, 'square'); a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  }, 'image/png');
+  return (
+    <figure style={{ margin: 0 }}>
+      <canvas ref={ref} data-testid={`carousel-${i + 1}`} style={{ width: '100%', aspectRatio: '1 / 1', borderRadius: 12, display: 'block', background: '#000' }} />
+      <figcaption style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 6 }}>
+        <button type="button" onClick={download} className="btn-ghost text-xs"><Download size={13} /> PNG</button>
+      </figcaption>
+    </figure>
+  );
+}
 
 function Preview({ ad, tpl, fmtId, fmt, images }) {
   const ref = useRef(null);
@@ -43,6 +65,60 @@ function Preview({ ad, tpl, fmtId, fmt, images }) {
         <button type="button" onClick={download} className="btn-ghost text-xs"><Download size={13} /> PNG</button>
       </figcaption>
     </figure>
+  );
+}
+
+/**
+ * The catalogue feed for dynamic product ads: the feed URLs to paste into
+ * Meta Commerce Manager / TikTok Catalog / Google Merchant, and one button that
+ * draws every product's 1080×1080 catalogue image (no price — the platform
+ * prints the live price over it) and stores it in the shop.
+ */
+function FeedPanel({ products }) {
+  const toast = useToast();
+  const [st, setSt] = useState(null);
+  const [prog, setProg] = useState(null);
+  const load = () => api.get('/api/admin/analytics/ad-feed').then(setSt).catch(() => setSt(false));
+  useEffect(() => { load(); }, []);
+  const makeAll = async () => {
+    await loadStaticFonts();
+    let done = 0, failed = 0;
+    setProg({ done, total: products.length });
+    for (const p of products) {
+      try {
+        const ad = await api.get(`/api/admin/analytics/ad-statics/${p.id}?lang=nl`);
+        const img = await loadImage(ad.product.image);
+        const c = document.createElement('canvas'); c.width = 1080; c.height = 1080;
+        drawCatalog(c.getContext('2d'), ad, { [ad.product.image]: img });
+        await api.post(`/api/admin/analytics/ad-feed/${p.id}/image`, { image: c.toDataURL('image/jpeg', 0.9) });
+      } catch { failed++; }
+      done++; setProg({ done, total: products.length, failed });
+    }
+    toast.success(`${done - failed} catalogue images stored${failed ? `, ${failed} failed` : ''}`);
+    load();
+  };
+  const copy = (t) => navigator.clipboard?.writeText(t).then(() => toast.success('Copied')).catch(() => {});
+  if (!st) return null;
+  return (
+    <section className="card p-4" data-testid="ad-feed">
+      <h3 className="text-white text-sm mb-1" style={{ display: 'flex', gap: 6, alignItems: 'center' }}><Rss size={15} /> Catalogue feed — dynamic product ads</h3>
+      <p className="text-slate-400 text-xs mb-3" style={{ maxWidth: 760 }}>
+        Meta, TikTok and Google build ads from this list themselves (the product someone looked at, with today&rsquo;s price).
+        {` ${st.inFeed} of ${st.total} products are in the feed`}{st.withoutImage ? ` — ${st.withoutImage} still need a catalogue image.` : '.'}
+      </p>
+      <button type="button" onClick={makeAll} disabled={!!prog && prog.done < prog.total} className="btn-primary text-sm" data-testid="feed-images">
+        <ImageIcon size={15} /> {prog && prog.done < prog.total ? `Drawing ${prog.done}/${prog.total}…` : 'Draw catalogue images for all products'}
+      </button>
+      <div style={{ marginTop: 12 }}>
+        {Object.entries(st.urls).map(([n, u]) => (
+          <div key={n} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 6 }}>
+            <span className="text-slate-400 text-xs" style={{ width: 52, textTransform: 'capitalize' }}>{n}</span>
+            <code className="text-slate-300" style={{ fontSize: 12, flex: 1, overflowX: 'auto', whiteSpace: 'nowrap', padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.04)' }}>{u}</code>
+            <button type="button" onClick={() => copy(u)} className="btn-ghost text-xs" aria-label={`Copy ${n} feed URL`}><Copy size={13} /></button>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -84,6 +160,13 @@ export default function AdStatics() {
       const files = [];
       for (const L of Object.keys(LANGS)) {
         const a = L === lang ? ad : await api.get(`/api/admin/analytics/ad-statics/${productId}?lang=${L}`);
+        const cards = carouselCards(a);
+        for (let i = 0; i < cards.length; i++) {
+          const c = document.createElement('canvas'); c.width = 1080; c.height = 1080;
+          drawCarouselCard(c.getContext('2d'), a, cards[i], images, i, cards.length);
+          const blob = await new Promise((r) => c.toBlob(r, 'image/png'));
+          files.push({ name: `${L}/${staticFileName(a, `carousel-${i + 1}`, 'square')}`, bytes: new Uint8Array(await blob.arrayBuffer()) });
+        }
         for (const tpl of a.templates) {
           for (const [fid, fmt] of Object.entries(a.formats)) {
             const c = document.createElement('canvas'); c.width = fmt.w; c.height = fmt.h;
@@ -114,6 +197,8 @@ export default function AdStatics() {
           Every line comes from the catalogue and passes the claim gate; a design that would say something the shop cannot prove is left out.
         </p>
       </div>
+
+      <FeedPanel products={list} />
 
       <div className="card p-4" style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
         <label style={{ flex: '2 1 260px' }}>
@@ -149,6 +234,15 @@ export default function AdStatics() {
               </div>
             </section>
           ))}
+          {carouselCards(ad).length > 0 && (
+            <section className="card p-4" data-testid="carousel">
+              <h3 className="text-white text-sm mb-1">Carousel (Meta: 1:1 cards, one per amount)</h3>
+              <p className="text-slate-500 text-xs mb-3">Upload the cards in this order; give each card its product&rsquo;s own link.</p>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: 12 }}>
+                {carouselCards(ad).map((spec, i, all) => <CarouselCard key={i} ad={ad} spec={spec} i={i} n={all.length} images={images} />)}
+              </div>
+            </section>
+          )}
           <p className="text-slate-500 text-xs max-w-3xl">
             Link for the ad (fill in the network, design and format so the attribution report can tell which image sold):<br />
             <code className="text-slate-300 break-all">{ad.link}</code>

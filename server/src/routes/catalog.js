@@ -987,6 +987,16 @@ router.post('/track/:number/codes',
     res.json({ status: order.status, codes });
   }));
 
+/* The catalogue for Meta / TikTok / Google dynamic product ads
+   (productFeedService.js). Public, like the sitemap: the platforms fetch it. */
+router.get('/feeds/products.csv', asyncHandler(async (req, res) => {
+  const { feedCsv } = await import('../services/productFeedService.js');
+  const csv = await feedCsv({ network: String(req.query.network || 'meta'), lang: String(req.query.lang || 'nl') });
+  res.set('Content-Type', 'text/csv; charset=utf-8');
+  res.set('Cache-Control', 'public, max-age=0, s-maxage=3600');
+  res.send(csv);
+}));
+
 // Public tracking by order number (no PII beyond status timeline).
 router.get('/track/:number', asyncHandler(async (req, res) => {
   const order = await getOrderByNumber(req.params.number);

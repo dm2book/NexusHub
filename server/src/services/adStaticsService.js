@@ -134,7 +134,8 @@ export async function staticAds(productId, lang = 'nl') {
   }
   const site = (config.appUrl || 'https://www.forgemarket.nl').replace(/\/$/, '');
   return {
-    product: { id: row.id, ...base, image: adImage(row), ownArt: /^\/api\/images\//.test(adImage(row) || ''), category: row.category },
+    product: { id: row.id, ...base, image: adImage(row), ownArt: /^\/api\/images\//.test(adImage(row) || ''), category: row.category,
+      nameNeutral: row.name, platformLabel: plat?.label || null },
     theme: adTheme(row),
     lang: L,
     templates,
