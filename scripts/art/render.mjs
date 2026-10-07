@@ -24,6 +24,7 @@ import { RASTER_ICONS as RASTER, markPath } from '../../src/lib/brandMarks.js';
    wins whenever it has the file, so the shipped boards come out byte-for-byte
    as before. Kept current by scripts/gen-art-assets.mjs and its --check. */
 import { ASSETS as BUNDLED, INK as BUNDLED_INK } from '../../server/src/generated/artAssets.js';
+import { LOGOS as BRAND_LOGOS } from '../../server/src/generated/brandLogos.js';
 
 const PUBLIC = path.join(process.cwd(), 'public');
 
@@ -346,6 +347,27 @@ const CARD_UNITS = [[/\bRP\b/, 'RP'], [/crystals?/i, 'CRYSTALS'], [/\bUC\b/, 'UC
 const RASTER_MARK = new Set(['cod', 'discord-nitro', 'eafc', 'playstation', 'robux', 'steam', 'v-bucks', 'valorant', 'xbox']);
 const PLATFORMS = [[/playstation|\bps[45]?\b|\bpsn\b/i, 'PLAYSTATION'], [/xbox/i, 'XBOX'], [/\bpc\b/i, 'PC'], [/\bnl\b/i, 'NL'], [/\beu\b/i, 'EU']];
 
+/* ── Real brand marks (scripts/art/gen-brand-logos.mjs, Simple Icons, CC0) ── */
+const hexRgb = (h) => { const n = parseInt(String(h).slice(1, 7), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
+const rgbHex = (r) => `#${r.map((v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('')}`;
+const shade = (h, k) => rgbHex(hexRgb(h).map((v) => (k > 0 ? v + (255 - v) * k : v * (1 + k))));
+const lum = (h) => { const [r, g, b] = hexRgb(h).map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+
+/** The brand's mark as an app icon: its colour, a little depth, the mark in the middle. */
+function appTile(L, { x, y, size }) {
+  const base = lum(L.hex) < 0.02 ? '#1b1b22' : L.hex;          // a black brand colour reads as a dark tile
+  const glyph = lum(base) > 0.4 ? '#0b0a12' : '#ffffff';
+  const r = size * 0.22, g = size * 0.56, gx = x + (size - g) / 2, gy = y + (size - g) / 2;
+  return `<g filter="url(#cshadow)">
+<linearGradient id="apptile" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${shade(base, 0.22)}"/><stop offset=".55" stop-color="${base}"/><stop offset="1" stop-color="${shade(base, -0.28)}"/></linearGradient>
+<linearGradient id="appgloss" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".32"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+<rect x="${x}" y="${y}" width="${size}" height="${size}" rx="${r}" fill="url(#apptile)"/>
+<rect x="${x + 3}" y="${y + 3}" width="${size - 6}" height="${size * 0.46}" rx="${r - 3}" fill="url(#appgloss)"/>
+<rect x="${x}" y="${y}" width="${size}" height="${size}" rx="${r}" fill="none" stroke="#fff" stroke-opacity=".18" stroke-width="2"/>
+<svg x="${gx}" y="${gy}" width="${g}" height="${g}" viewBox="0 0 24 24"><path fill="${glyph}" d="${L.path}"/></svg>
+</g>`;
+}
+
 export function cardSvg(product, { logo = null, plate = null, brand = null, unit = null } = {}) {
   const W = 700, H = 600;
   const key = (brand && THEMES[brand]) ? brand : (THEMES[product.category] ? product.category : 'giftcard');
@@ -360,13 +382,19 @@ export function cardSvg(product, { logo = null, plate = null, brand = null, unit
   const slug = brand || product.category;
   const src = logo || (RASTER_MARK.has(slug) ? `/products/icons/${slug}.webp` : brandMark(slug) || markPath(product.category));
   const isData = /^data:image\//.test(String(src || ''));
+  /* The brand's real mark, where Simple Icons has it. A service whose mark is
+     the product (Spotify) gets it as the hero, unless the owner gave a logo;
+     a game or store keeps its card art and shows the mark beside its name. */
+  const L = BRAND_LOGOS[slug] || null;
+  const heroMark = L && L.role === 'hero' && !logo;
   /* Rasters go in whole and large; drawn icons through inlineMark, which
      trims them to their ink so they fill the same stage. */
   const raster = !isData && /\.webp$/.test(String(src)) && BUNDLED[String(src)];
   const href = isData ? src : raster ? `data:image/webp;base64,${raster.b64}` : null;
   /* A brand logo (a wordmark, often black or white on nothing) sits on a
      plate in the contrasting colour, like a sticker on the card. */
-  const hero = href && plate
+  const hero = heroMark ? appTile(L, { x: 205, y: 62, size: 290 })
+    : href && plate
     ? `<g filter="url(#cshadow)"><rect x="130" y="92" width="440" height="236" rx="40" fill="${plate === 'dark' ? '#0d0b16' : '#ffffff'}"/><rect x="130" y="92" width="440" height="236" rx="40" fill="none" stroke="${c2}" stroke-opacity=".55" stroke-width="3"/><image x="168" y="122" width="364" height="176" preserveAspectRatio="xMidYMid meet" href="${href}"/></g>`
     : href
     ? `<g filter="url(#cshadow)"><clipPath id="cherc"><rect x="195" y="62" width="310" height="290" rx="44"/></clipPath><image x="195" y="62" width="310" height="290" preserveAspectRatio="xMidYMid meet" clip-path="url(#cherc)" href="${href}"/></g>`
@@ -396,7 +424,8 @@ export function cardSvg(product, { logo = null, plate = null, brand = null, unit
 <path d="M-60 520 L320 -40 L420 -40 L40 520Z" fill="url(#csheen)"/>
 <path d="M300 640 L700 60 L760 60 L360 640Z" fill="url(#csheen)" opacity=".7"/>
 ${hero}
-${label ? `<text x="34" y="52" font-family="Inter, system-ui, sans-serif" font-size="22" font-weight="800" letter-spacing="3" fill="#fff" opacity=".85">${esc(label)}</text>` : ''}
+${L && L.role === 'badge' ? `<svg x="34" y="30" width="28" height="28" viewBox="0 0 24 24"><path fill="#fff" d="${L.path}"/></svg>` : ''}
+${label ? `<text x="${L && L.role === 'badge' ? 74 : 34}" y="52" font-family="Inter, system-ui, sans-serif" font-size="22" font-weight="800" letter-spacing="3" fill="#fff" opacity=".85">${esc(label)}</text>` : ''}
 ${plat ? `<g><rect x="${W - 34 - (plat.length * 15 + 34)}" y="26" rx="18" width="${plat.length * 15 + 34}" height="36" fill="#000" fill-opacity=".35" stroke="${c2}" stroke-opacity=".7" stroke-width="2"/><text x="${W - 34 - (plat.length * 15 + 34) / 2}" y="51" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="18" font-weight="800" letter-spacing="2" fill="#fff">${plat}</text></g>` : ''}
 <rect x="30" y="372" width="${W - 60}" height="196" rx="28" fill="url(#cplate)" stroke="#fff" stroke-opacity=".14" stroke-width="2"/>
 ${hl ? `<text x="350" y="${hl.small ? 486 : 502}" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="${bigSize}" font-weight="900" letter-spacing="-2" fill="${c2}" opacity=".45" filter="url(#cblur)">${esc(big)}</text>
