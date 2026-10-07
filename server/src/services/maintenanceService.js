@@ -121,6 +121,19 @@ export async function runMaintenance() {
     }
   } catch (e) { summary.adSpendSyncError = e.message; }
 
+  /* 0c. The Logo Library: brands not looked at for 30 days, a few per run.
+     Never on a page view. */
+  try {
+    if (!late()) {
+      const { claimInterval } = await import('./bootUpkeep.js');
+      if (await claimInterval('logo_discovery', 6 * 3_600_000)) {
+        const { refreshStale } = await import('./logoDiscoveryService.js');
+        const done = await refreshStale({ limit: 3, deadline: Math.min(Date.now() + 6_000, startedAt + 20_000) });
+        if (done.length) summary.logosRefreshed = done;
+      }
+    }
+  } catch (e) { summary.logoDiscoveryError = e.message; }
+
   // 0. Is the Discord bot still polling? (alerts the owner once per outage)
   try {
     const { checkBotHeartbeat } = await import('./discordService.js');

@@ -987,6 +987,20 @@ router.post('/track/:number/codes',
     res.json({ status: order.status, codes });
   }));
 
+/* A Logo Library SVG, sanitized when stored (logoDiscoveryService.sanitizeSvg)
+   and served so it cannot run anything even if something slipped through:
+   no scripts, no outside requests, no navigation. */
+router.get('/logos/:id.svg', asyncHandler(async (req, res) => {
+  const { get } = await import('../db/index.js');
+  const row = await get(`SELECT svg_text FROM brand_logos WHERE id=@id AND status='ok' AND svg_text IS NOT NULL`, { id: req.params.id });
+  if (!row) return res.status(404).end();
+  res.set('Content-Type', 'image/svg+xml; charset=utf-8');
+  res.set('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; sandbox");
+  res.set('X-Content-Type-Options', 'nosniff');
+  res.set('Cache-Control', 'public, max-age=86400, s-maxage=86400');
+  res.send(row.svg_text);
+}));
+
 /* The catalogue for Meta / TikTok / Google dynamic product ads
    (productFeedService.js). Public, like the sitemap: the platforms fetch it. */
 router.get('/feeds/products.csv', asyncHandler(async (req, res) => {

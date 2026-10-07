@@ -344,6 +344,23 @@ export async function tileLogo(product, { categoryLogos = null } = {}) {
     const own = !['giftcard', 'subscription'].includes(product?.category) ? await load(logos?.[product?.category]) : null;
     if (own) return asLogo(own, false);
     const brand = brandSlug(product?.name || '');
+    /* An official logo the owner added to the Logo Library (brand assets,
+       press kit, developer portal) — above everything but their own category
+       logo. Read from the database; nothing is fetched on a page view. */
+    try {
+      const L = await import('./logoDiscoveryService.js');
+      const lib = L.brandForCard(brand || product?.category);
+      const row = lib ? await L.chosenLogo(lib) : null;
+      if (row && L.OFFICIAL.has(row.tier)) {
+        if (row.image_url) { const img = await load(row.image_url); if (img) return asLogo(img, true); }
+        if (row.svg_text) {
+          /* A logo drawn in white needs the dark plate; anything else the light one. */
+          const whites = (row.svg_text.match(/fill\s*[=:]\s*["']?(#fff\b|#ffffff\b|white\b)/gi) || []).length;
+          const fills = (row.svg_text.match(/fill\s*[=:]/gi) || []).length || 1;
+          return { src: `data:image/svg+xml;base64,${Buffer.from(row.svg_text).toString('base64')}`, plate: whites / fills > 0.5 ? 'dark' : 'light' };
+        }
+      }
+    } catch { /* the library is optional */ }
     if (BUNDLED_ICON.has(brand) || (!brand && BUNDLED_ICON.has(product?.category === 'robux' ? 'robux' : product?.category))) return null;
     for (const src of [meta.imagePreviousSource === 'licensed' ? meta.imagePrevious : null, meta.imageSource === 'licensed' ? meta.image : null]) {
       // eslint-disable-next-line no-await-in-loop

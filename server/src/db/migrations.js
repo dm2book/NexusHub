@@ -2221,4 +2221,53 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS lang TEXT;
       ALTER TABLE refund_requests ADD COLUMN IF NOT EXISTS method TEXT NOT NULL DEFAULT 'money';
     `,
   },
+  {
+    id: '060_logo_library',
+    /*
+     * The Logo Library (services/logoDiscoveryService.js): every logo found for
+     * a brand, from which source, under which licence, when, its type and size,
+     * its quality score — and why one was rejected. One row per brand and source
+     * URL, refreshed at most every 30 days; the chosen one is flagged.
+     * logo_sources holds the official URLs the owner adds (brand assets page,
+     * press kit, developer portal) — fetched by the server, never guessed.
+     */
+    sql: `
+      CREATE TABLE IF NOT EXISTS brand_logos (
+        id            TEXT PRIMARY KEY,
+        brand         TEXT NOT NULL,
+        tier          TEXT NOT NULL,
+        logo_type     TEXT,
+        source_url    TEXT NOT NULL,
+        license       TEXT,
+        guidelines    TEXT,
+        retrieved_at  TEXT NOT NULL,
+        mime          TEXT,
+        width         INTEGER,
+        height        INTEGER,
+        transparent   INTEGER,
+        image_url     TEXT,
+        svg_text      TEXT,
+        score         INTEGER NOT NULL DEFAULT 0,
+        status        TEXT NOT NULL DEFAULT 'ok',
+        reject_reason TEXT,
+        chosen        INTEGER NOT NULL DEFAULT 0,
+        created_at    TEXT NOT NULL,
+        updated_at    TEXT NOT NULL
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS brand_logos_brand_source ON brand_logos (brand, source_url);
+      CREATE INDEX IF NOT EXISTS brand_logos_brand ON brand_logos (brand, chosen);
+      CREATE TABLE IF NOT EXISTS logo_sources (
+        id          TEXT PRIMARY KEY,
+        brand       TEXT NOT NULL,
+        tier        TEXT NOT NULL,
+        url         TEXT NOT NULL,
+        license     TEXT,
+        guidelines  TEXT,
+        logo_type   TEXT,
+        added_by    TEXT,
+        created_at  TEXT NOT NULL
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS logo_sources_brand_url ON logo_sources (brand, url);
+    `,
+  },
 ];
