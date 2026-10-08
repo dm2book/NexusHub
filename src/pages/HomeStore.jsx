@@ -192,6 +192,7 @@ export default function HomeStore() {
   // The homepage renders its own header, which had no mobile menu at all —
   // How it works, Reviews, Drops and Support were unreachable from '/'.
   const [menuOpen, setMenuOpen] = useState(false);
+  const menuButton = useRef(null);
   useEffect(() => { getConfig().then((c) => setAnnouncement(c.announcement || '')); }, []);
   // Real reviews only — an empty testimonial card costs more trust than it earns.
   const hasReviews = reviews.length > 0;
@@ -283,7 +284,8 @@ export default function HomeStore() {
             rendered its own name as "ForgeMar…". Four pixels off each gap
             hands back 28. */}
         <div className="max-w-[1400px] 2xl:max-w-[1560px] mx-auto px-4 lg:px-8 h-[68px] flex items-center gap-3 sm:gap-4 xl:gap-5">
-          <button onClick={() => setMenuOpen((v) => !v)} aria-label={tr('nav.menu', 'Menu')} aria-expanded={menuOpen}
+          <button ref={menuButton} onClick={() => setMenuOpen((v) => !v)} aria-label={tr('nav.menu', 'Menu')} aria-expanded={menuOpen}
+            aria-controls={menuOpen ? 'fm-home-menu' : undefined}
             className="min-[1152px]:hidden w-11 h-11 shrink-0 -ml-1.5 rounded-xl hover:bg-slate-100 grid place-items-center text-slate-700">
             {menuOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
@@ -332,7 +334,7 @@ export default function HomeStore() {
             <span className="text-sm whitespace-nowrap truncate hidden min-[1400px]:inline">{tr('nav.search', 'Search products…')}</span>
             <kbd className="ml-auto text-[11px] bg-white border border-slate-200 rounded px-1.5 py-0.5 text-slate-400">⌘K</kbd>
           </button>
-          <button onClick={() => window.dispatchEvent(new CustomEvent('forge:cmdk'))} aria-label="Search"
+          <button onClick={() => window.dispatchEvent(new CustomEvent('forge:cmdk'))} aria-label={tr('nav.search', 'Search products…')}
             className="md:hidden w-11 h-11 shrink-0 rounded-xl hover:bg-slate-100 grid place-items-center text-slate-700">
             <Search size={20} />
           </button>
@@ -388,7 +390,8 @@ export default function HomeStore() {
           )}
         </div>
         {/* Mobile menu — the pages below were otherwise unreachable from '/'. */}
-        <MobileDrawer open={menuOpen} className="px-4 py-3">
+        <MobileDrawer open={menuOpen} onClose={() => setMenuOpen(false)} openerRef={menuButton}
+          id="fm-home-menu" label={tr('nav.menu', 'Menu')} className="px-4 py-3">
           <nav className="space-y-0.5">
               {NAV.map((n) => (
                 <Link key={n.label} to={n.to} onClick={() => setMenuOpen(false)}
@@ -731,7 +734,10 @@ export default function HomeStore() {
                         className="fm-cta flex-1 text-center text-sm font-semibold rounded-lg h-11 grid place-items-center">
                         {tr('home.browseCat', 'Browse')}
                       </Link>
-                      <button aria-label={tr('home.addCheapest', 'Add the cheapest {n} pack to your cart', { n: c.label })}
+                      {/* The category's name in the page's language: c.label is
+                          the English one, so a Dutch screen reader heard "Gift
+                          cards" in the middle of a Dutch sentence. */}
+                      <button aria-label={tr('home.addCheapest', 'Add the cheapest {n} pack to your cart', { n: categoryLabel(c.slug, tr) })}
                         onClick={(e) => { flyToCart(e.currentTarget.closest('.snap-start')?.querySelector('img')); addToCart(c); }}
                         className="w-11 h-11 shrink-0 rounded-lg border border-slate-200 grid place-items-center text-slate-600 hover:bg-slate-50 hover:text-violet-700 active:scale-90 transition-transform">
                         <ShoppingCart size={16} />

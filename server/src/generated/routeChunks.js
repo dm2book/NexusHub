@@ -4,14 +4,14 @@
    after it. Hashed filenames, hence generated. */
 export const ROUTE_CHUNKS = {
   "product": [
-    "assets/ProductDetail-C8lN6ZJl.js",
+    "assets/ProductDetail-xqlBFmxs.js",
     "assets/deliveryInfo-BAt05Of-.js",
     "assets/catalog-C9VVaW-Q.js",
-    "assets/LightProductCard-BQOCu4pu.js",
+    "assets/LightProductCard-DqgH84e6.js",
     "assets/flyToCart-BW0JiXfo.js",
-    "assets/useReviews-7Mriqt-b.js",
-    "assets/useMeta-BsFcffqG.js",
+    "assets/useReviews-B4xfRQbO.js",
+    "assets/useMeta-DPk2LCYP.js",
     "assets/seed-za51MzoK.js",
-    "assets/PaymentBadges-CapsJF67.js"
+    "assets/PaymentBadges-Cie4ZYrf.js"
   ]
 };
