@@ -8,12 +8,12 @@ import { all } from '../../db/index.js';
 import { listAuditLogs, audit } from '../../services/auditService.js';
 import { listFlaggedOrders, heldOrderCount } from '../../services/fraudService.js';
 import {
-  releaseFraudHold, rejectFraudHold, getOrder, getOrderByNumber, getPspPayment, transitionOrder,
+  releaseFraudHold, rejectFraudHold, getOrder, getOrderByNumber,
 } from '../../services/orderService.js';
+import { refundOrder } from '../../services/refundService.js';
 import { recordChargeback, listChargebacks, chargebackSummary } from '../../services/chargebackService.js';
 import { currentLimits } from '../../services/orderLimitService.js';
 import { roleDiagnostics, ensureRolesExist, sweepMemberRoles } from '../../services/discordRolesService.js';
-import { refundPayment, isEnabled as mollieEnabled } from '../../services/mollieService.js';
 import { publicUser, setUserRoles, getUserById } from '../../services/userService.js';
 import { grantCoins } from '../../services/forgeCoinService.js';
 import { grantMembership, cancelMembership } from '../../services/membershipService.js';
@@ -61,10 +61,14 @@ router.post('/fraud/:id/approve', requirePermission('security.manage'),
 /**
  * Reject a held order — refund it and keep it held.
  *
- * The refund runs first and through the PSP, so the money genuinely goes back
- * rather than the order merely being labelled. A refund that Mollie refuses
- * leaves everything untouched and says so, instead of quietly marking an order
- * refunded while the shop still holds the money.
+ * The refund goes through refundOrder, the same path as the order page: sent
+ * to Stripe or Mollie first, and the order only becomes refunded once the
+ * provider accepted it. This route used to know Mollie alone — a held Stripe
+ * payment (Radar, a foreign card, a guest's big first order: exactly what gets
+ * held) was marked refunded and mailed as refunded while the money stayed in
+ * Stripe, for the cardholder's chargeback to take later plus a fee. A refusal
+ * leaves everything as it was, the hold included, and says so. An order paid
+ * by hand is marked refunded and the owner sends the money back the same way.
  */
 router.post('/fraud/:id/reject', requirePermission('security.manage'),
   asyncHandler(async (req, res) => {
@@ -80,19 +84,19 @@ router.post('/fraud/:id/reject', requirePermission('security.manage'),
     // Only when money actually arrived. Rejecting an unpaid order is just a
     // refusal — there is nothing to send back.
     if (refund && !['pending', 'refunded', 'cancelled', 'failed'].includes(order.status)) {
-      const psp = await getPspPayment(order.id);
-      if (psp?.provider === 'mollie' && mollieEnabled()) {
-        try {
-          refunded = await refundPayment(psp.paymentId, {
-            cents: order.total, currency: order.currency || 'EUR',
-            description: `Refund ${order.number}`,
-          });
-        } catch (e) {
-          throw badRequest(`Mollie refused the refund: ${e.message}`);
+      try {
+        refunded = (await refundOrder(order.id, { method: 'money', actorId: req.user.id, user: req.user,
+          reason: reason || 'Rejected in fraud review' })).refund;
+      } catch (e) {
+        if (e.pspFailure) {
+          await audit({ actor: req.user, action: 'order.refund_failed', targetType: 'order',
+            targetId: order.id, metadata: e.pspFailure, req }).catch(() => {});
         }
+        throw e;
       }
-      await transitionOrder(order.id, 'refunded',
-        { actorId: req.user.id, user: req.user, reason: reason || 'Rejected in fraud review' });
+      await audit({ actor: req.user, action: 'order.refund', targetType: 'order', targetId: order.id,
+        metadata: { reason: reason || 'Rejected in fraud review', method: 'money',
+          provider: refunded?.provider || null, refundId: refunded?.id || null }, req }).catch(() => {});
     }
 
     const updated = await rejectFraudHold(req.params.id,

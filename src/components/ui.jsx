@@ -9,8 +9,8 @@ import { useFocusTrap } from '../lib/useFocusTrap.js';
  * These pieces are shared with the console, which stays English, while the
  * storefront language is read from the same storage — so without the check an
  * owner who reads the shop in Dutch got "Laden" in an English console. Named
- * `t` at the call sites on purpose: i18n-coverage finds t('key', 'English')
- * calls and checks each key has its Dutch.
+ * `t` at the call sites on purpose: i18n-coverage finds every t(<key>, <English>)
+ * call and checks each key has its Dutch.
  */
 function useUiText() {
   const { t } = useI18n();

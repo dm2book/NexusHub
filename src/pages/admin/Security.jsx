@@ -137,13 +137,15 @@ function FraudReview() {
 
   const act = async (id, action) => {
     if (action === 'reject'
-      && !window.confirm('Refund this order and keep it held? The money goes back through the payment provider.')) return;
+      && !window.confirm('Refund this order and keep it held? A card or iDEAL payment goes back through Stripe or Mollie. '
+        + 'An order paid by hand is marked refunded and you send the money back by hand. '
+        + 'Store credit it used goes back to their wallet.')) return;
     setBusy(id);
     try {
       const r = await api.post(`/api/admin/security/fraud/${id}/${action}`, {});
       toast.success(action === 'approve'
         ? (r.delivered ? 'Released and delivered.' : 'Released — it will deliver on the normal path.')
-        : 'Rejected and refunded.');
+        : rejectedMessage(r.refund));
       load();
     } catch (e) { toast.error(e.message || 'That did not work.'); }
     finally { setBusy(''); }
@@ -218,6 +220,18 @@ function FraudReview() {
       <ChargebackLog rows={data.chargebacks || []} onAdded={load} />
     </div>
   );
+}
+
+/* What the reject did with the money. "Refunded" alone read as done even when
+   the money still had to be sent back by hand. */
+function rejectedMessage(refund) {
+  if (!refund) return 'Rejected. It was not paid, so there is nothing to send back.';
+  if (refund.provider === 'stripe' || refund.provider === 'mollie') {
+    return `Rejected and refunded through ${refund.provider === 'stripe' ? 'Stripe' : 'Mollie'}.`;
+  }
+  return refund.cents > 0
+    ? 'Rejected and marked refunded — now send the money back by hand, the way they paid.'
+    : 'Rejected. The store credit it used is back in their wallet.';
 }
 
 function Stat({ label, value, tone = 'plain' }) {

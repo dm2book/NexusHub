@@ -189,6 +189,7 @@ export default {
   "acc.downloads.reveal": "Tonen",
   "acc.downloads.title": "Downloads & leveringen",
   "acc.downloads.typeDelivery": "Levering: {type}",
+  "acc.layout.closeMenu": "Menu sluiten",
   "acc.layout.admin": "Beheerconsole",
   "acc.layout.community": "Community",
   "acc.layout.downloads": "Downloads",

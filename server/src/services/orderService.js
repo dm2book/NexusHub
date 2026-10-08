@@ -41,9 +41,9 @@ import { recordOrderCommission, reverseOrderCommission } from './affiliateServic
 import { recordPurchaseEvent } from './socialProofService.js';
 import { bustSocialCaches } from '../routes/social.js';
 import { balanceOf, debit, credit, hasOrderEntry, spentOnOrder } from './walletService.js';
-import { grantTierRewards } from './loyaltyService.js';
-import { awardCoinsForOrder } from './forgeCoinService.js';
-import { settleMysteryForOrder } from './mysteryBoxService.js';
+import { grantTierRewards, revokeTierRewards } from './loyaltyService.js';
+import { awardCoinsForOrder, reverseCoinsForOrder } from './forgeCoinService.js';
+import { settleMysteryForOrder, reverseMysteryForOrder } from './mysteryBoxService.js';
 import { evaluateCoupon, recordCouponRedemption, releaseCouponRedemption } from './couponService.js';
 /* The one detail a category needs from the buyer, from the same module the
    product page and the checkout read. */
@@ -130,6 +130,11 @@ export async function createOrder(input, ctx = {}) {
      "Roblox-gebruikersnaam" and the like. Collected while walking the items so
      a mixed order names each thing once. */
   const missingTargets = new Set();
+  /* The mystery boxes in this order, by product and by value. A box's price is
+     what its reward pool is set against, so no discount and no store credit
+     may touch it — see below. */
+  const mysteryIds = new Set();
+  let mysteryCents = 0;
 
   /* One line per product. Two lines of the same product claimed codes for the
      same order twice, got the same code back, and delivered one of two paid. */
@@ -186,6 +191,7 @@ export async function createOrder(input, ctx = {}) {
     const qty = Math.max(1, Number(li.quantity || 1));
     const unit = product.price;
     subtotal += unit * qty;
+    if (product.kind === 'mystery') { mysteryIds.add(product.id); mysteryCents += unit * qty; }
     lineItems.push({
       id: newId('oit'), product_id: product.id, name: product.name,
       quantity: qty, unit_price: unit,
@@ -195,21 +201,29 @@ export async function createOrder(input, ctx = {}) {
       metadata: { ...(li.metadata || {}), category: product.category },
     });
   }
+  /* Mystery boxes take no discount of any kind — member, coupon (a Forge-Coin
+     coupon too) or bundle. A box sold below its price can pay out more than it
+     took in, so every discount below is worked out on the rest of the order,
+     and so is the ceiling: a box in the cart must not raise how far the codes
+     next to it may be discounted. */
+  const discountable = subtotal - mysteryCents;
   // Apply a discount coupon if one was supplied and is valid (DB-backed; server
   // is authoritative — the discount is recomputed here, never trusted from client).
-  const couponEval = await evaluateCoupon(input.coupon, { subtotal, userId: input.userId, email });
+  const couponEval = await evaluateCoupon(input.coupon, { subtotal: discountable, userId: input.userId, email });
   /* A code the buyer typed and saw accepted, then refused here, used to be
      dropped without a word — and the full price charged. Say so instead. */
-  if (String(input.coupon || '').trim() && !couponEval.ok) {
-    throw conflict(`Kortingscode niet toegepast: ${couponEval.reason || 'ongeldig'}. Er is niets afgeschreven.`);
+  if (String(input.coupon || '').trim() && (!couponEval.ok || (mysteryCents && !discountable))) {
+    const why = !discountable && mysteryCents ? 'kortingscodes gelden niet voor mystery boxes'
+      : `${couponEval.reason || 'ongeldig'}${mysteryCents ? ' (mystery boxes tellen niet mee)' : ''}`;
+    throw conflict(`Kortingscode niet toegepast: ${why}. Er is niets afgeschreven.`);
   }
   const couponCode = couponEval.ok ? couponEval.code : null;
   const couponDiscount = couponEval.ok ? couponEval.discount : 0;
   // Forge+ members get a standing discount on top (stacked with any coupon).
   const memberPercent = input.userId ? await memberDiscountPercent(input.userId) : 0;
-  const memberDiscount = memberPercent ? Math.round(subtotal * memberPercent / 100) : 0;
+  const memberDiscount = memberPercent ? Math.round(discountable * memberPercent / 100) : 0;
   // Bundle discount: best single bundle whose products are all in the order.
-  const bundle = await bestBundleDiscount(lineItems);
+  const bundle = await bestBundleDiscount(lineItems.filter((it) => !mysteryIds.has(it.product_id)));
   const bundleDiscount = bundle.discount;
   /* One ceiling over the whole stack.
      These were summed and capped at the subtotal, which is not a cap: a 90%
@@ -219,12 +233,12 @@ export async function createOrder(input, ctx = {}) {
      Clamped rather than refused — a buyer who found a legitimate stack should
      still get the best discount the shop is willing to give, not an error. */
   const stacked = couponDiscount + memberDiscount + bundleDiscount;
-  const discountCeiling = Math.round(subtotal * Math.max(0, Math.min(100,
+  const discountCeiling = Math.round(discountable * Math.max(0, Math.min(100,
     config.market.maxTotalDiscountPercent)) / 100);
-  const discount = Math.min(subtotal, stacked, discountCeiling);
+  const discount = Math.min(discountable, stacked, discountCeiling);
   if (stacked > discount) {
     console.warn(`[order] discount stack ${stacked} clamped to ${discount} `
-      + `(${config.market.maxTotalDiscountPercent}% of ${subtotal})`);
+      + `(${config.market.maxTotalDiscountPercent}% of ${discountable})`);
   }
   const afterDiscount = Math.max(0, subtotal - discount);
   // Optionally pay part of the order with the customer's store credit.
@@ -232,6 +246,16 @@ export async function createOrder(input, ctx = {}) {
   if (input.userId && input.useCredit) {
     const bal = await balanceOf(input.userId);
     creditApplied = Math.max(0, Math.min(Math.round(Number(input.useCredit) || 0), bal, afterDiscount));
+  }
+  /* Store credit never pays for a mystery box. A box pays out in store credit,
+     so a box bought with credit is a loop: with a pool worth more than its
+     price the wallet grew every round, and the credit bought real codes.
+     Refused rather than quietly charged in money instead — the buyer was shown
+     a total with the credit taken off, and must not be charged another one.
+     Gift cards and daily rewards land in the same wallet, so this covers them. */
+  if (creditApplied && mysteryCents) {
+    throw badRequest('Winkeltegoed kan niet gebruikt worden voor mystery boxes. Zet "Winkeltegoed gebruiken" uit, '
+      + 'of bestel de mystery box los van de rest. Er is niets afgeschreven.');
   }
   /* Card payments have a floor: Stripe refuses a charge under €0.50, and it
      would refuse it only after the store credit was already spent. Say it now,
@@ -289,7 +313,9 @@ export async function createOrder(input, ctx = {}) {
   // an order is; this decides whether it is plausible at all. A stolen card that
   // trips no rule can still place forty orders overnight — these bound that
   // without needing to be clever about it.
-  await assertOrderLimits({ email, ip: ctx.ip || null, total, currency });
+  // `value` is the order before store credit: an order paid in full with credit
+  // has a total of 0, and the ceilings must still see what it is worth.
+  await assertOrderLimits({ email, ip: ctx.ip || null, total, value: afterDiscount, currency });
 
   await tx(async () => {
     await run(`INSERT INTO orders
@@ -632,6 +658,16 @@ export async function transitionOrder(orderId, to, ctx = {}) {
     bustSocialCaches();
   }
 
+  /* The prizes its mystery boxes paid out go back with the sale, like the
+     commission above: a refunded box otherwise left its prize in the wallet on
+     top of the refund. Here, at the state machine, so a cancel from the admin
+     and a chargeback from the webhook are covered too; idempotent, so
+     refundService and chargebackService may call it as well. */
+  if (['refunded', 'cancelled', 'failed'].includes(to) && updated.userId) {
+    await reverseMysteryForOrder(updated.id, ctx.chargeback ? 'charged back' : to).catch((e) =>
+      console.error('[order] mystery prize reversal', e.message));
+  }
+
   /* An order cancelled or failed before it was ever paid did not use its
      coupon: the use goes back, or one abandoned cart burns a one-time code. */
   if (['cancelled', 'failed'].includes(to)) {
@@ -651,11 +687,32 @@ export async function transitionOrder(orderId, to, ctx = {}) {
      never a number stored on the order, which is only a copy. */
   /* `failed` too: an order the fraud engine blocks took the buyer's credit and
      never gave it back. */
-  if (['refunded', 'cancelled', 'failed'].includes(to) && updated.userId) {
+  /* Not for a chargeback (ctx.chargeback, from the PSP webhooks). The buyer
+     took the card part back through their bank and keeps what was delivered;
+     handing the credit part back as well paid them for the order on top. */
+  if (['refunded', 'cancelled', 'failed'].includes(to) && updated.userId && !ctx.chargeback) {
     const spent = await spentOnOrder(orderId).catch(() => 0);
     if (spent > 0 && !(await hasOrderEntry(orderId, 'refund').catch(() => true))) {
       await credit(updated.userId, spent, 'refund',
         `Store credit returned · order ${updated.number}`, { orderId }).catch((e) => console.error('[wallet refund]', e.message));
+    }
+  }
+
+  /* What the payment earned goes back with the sale, like the commission and
+     the mystery prizes above: the Forge Coins it awarded, and a tier bonus the
+     buyer no longer reaches without it. Kept after paying a refunded order
+     before delivery, the coins came back every round. Only for an order that
+     was paid (an unpaid one earned nothing and must not touch an old bonus),
+     and after the credit return above, so the statement does not dip below
+     zero in between. Both are idempotent per order. */
+  if (['refunded', 'cancelled', 'failed'].includes(to) && updated.userId) {
+    const wasSale = await get(`SELECT 1 AS x FROM order_status_history WHERE order_id=@id
+      AND to_status IN ('payment_received','processing','awaiting_fulfillment','completed') LIMIT 1`, { id: orderId })
+      .catch(() => null);
+    if (wasSale) {
+      await reverseCoinsForOrder(updated).catch((e) => console.error('[coins] reversal', e.message));
+      await revokeTierRewards(updated.userId, `order ${updated.number} ${ctx.chargeback ? 'charged back' : to}`)
+        .catch((e) => console.error('[loyalty] tier bonus reversal', e.message));
     }
   }
   if (to === 'refunded') await postOrderEvent(updated, 'refunded').catch(() => {});
@@ -750,18 +807,38 @@ export async function transitionOrder(orderId, to, ctx = {}) {
     /* keepAlive on all three: the webhook answers Stripe before these finish,
        and a frozen function would otherwise drop a won prize or coins. */
     if (updated.userId) {
-      keepAlive(settleMysteryForOrder(updated).then(async (won) => {
-        if (!won.length) return;
-        const kinds = await Promise.all(updated.items.map((it) =>
-          get('SELECT kind FROM products WHERE id=@id', { id: it.product_id })));
-        if (kinds.length && kinds.every((k) => k?.kind === 'mystery')) {
-          await transitionOrder(orderId, 'completed',
-            { force: true, reason: 'Mystery box opened — prize paid out as store credit' });
-        }
-      }).catch((e) => console.error('[mystery]', e.message)));
+      keepAlive(openMysteryBoxes(orderId).catch((e) => console.error('[mystery]', e.message)));
     }
   }
   return updated;
+}
+
+/**
+ * Open the mystery boxes on a paid order, and complete it when boxes are all
+ * it holds — the store credit is the delivery.
+ *
+ * Nothing while the order is held for fraud review: settleMysteryForOrder
+ * refuses a held order, and releaseFraudHold calls this again once a person
+ * has approved it. The force-complete asks about the hold once more, the same
+ * refusal deliverOrder has, because a forced transition is the one door that
+ * does not look at the hold itself.
+ */
+export async function openMysteryBoxes(orderId) {
+  const order = await getOrder(orderId);
+  if (!order?.userId || order.fraudHold) return [];
+  const won = await settleMysteryForOrder(order);
+  if (!won.length) return won;
+  const kinds = await Promise.all(order.items.map((it) =>
+    get('SELECT kind FROM products WHERE id=@id', { id: it.product_id })));
+  if (kinds.length && kinds.every((k) => k?.kind === 'mystery')) {
+    if ((await getOrderRow(orderId))?.fraud_hold) {
+      console.warn(`[mystery] ${order.number} is held for review — not completing it`);
+      return won;
+    }
+    await transitionOrder(orderId, 'completed',
+      { force: true, reason: 'Mystery box opened — prize paid out as store credit' });
+  }
+  return won;
 }
 
 /** If every item has enough pre-loaded stock, claim codes and complete the order.
@@ -1086,6 +1163,9 @@ async function hydrate(row) {
     pspProvider: row.psp_provider || null,
     pspPaymentId: row.psp_payment_id || null,
     pspStatus: row.psp_status || null,
+    // Money the PSP already sent back (a partial refund in its dashboard): a
+    // later refund only returns the rest, and the admin and the mail say so.
+    refundedCents: Number(row.refunded_cents || 0),
     // Resolved once, on the server: each configured method with the amount (and
     // where the provider allows it, the reference) already in the URL.
     payMethods: payMethodsFor(manualPayMethods(), {
@@ -1138,6 +1218,7 @@ async function summarize(row) {
     id: row.id, number: row.number, customer: row.email, userId: row.user_id,
     product: productLabel, itemCount: items.length,
     amount: row.total, amountFormatted: formatMoney(row.total, row.currency),
+    refundedCents: Number(row.refunded_cents || 0),
     currency: row.currency, status: row.status, statusLabel: labelFor(row.status),
     fraudStatus: row.fraud_status, fraudScore: row.fraud_score, fraudHold: !!row.fraud_hold,
     date: row.created_at,
@@ -1257,6 +1338,13 @@ export async function releaseFraudHold(orderId, ctx = {}) {
   if (!['pending', 'refunded', 'cancelled', 'failed', 'completed'].includes(order.status)) {
     delivered = await autoDispenseFromStock(orderId, { ...ctx, reason: 'Released after fraud review' })
       .catch((e) => { console.error('[fraud] release dispense:', e.message); return false; });
+  }
+  /* Mystery boxes stay shut while an order is held (openMysteryBoxes) —
+     approving it is what opens them, and completes an order of only boxes. */
+  if (!['pending', 'refunded', 'cancelled', 'failed'].includes(order.status)) {
+    const won = await openMysteryBoxes(orderId)
+      .catch((e) => { console.error('[fraud] release mystery:', e.message); return []; });
+    if (won.length && !delivered) delivered = (await getOrderRow(orderId))?.status === 'completed';
   }
   return { order: await getOrder(orderId), delivered };
 }
@@ -1654,6 +1742,23 @@ export function orderUrlFor(order) {
 }
 
 /**
+ * The amount a refund mail leads with, in its subject and first line.
+ *
+ * As store credit: what went into the wallet (refundAmount when the refund
+ * passed it — less than total + credit once part went back at the provider).
+ * As money: what went back, and for an order paid entirely with store credit
+ * that is the credit, not the €0 total — the mail said "€0,00 refunded" while
+ * €50 went back into the wallet.
+ */
+function refundHeadline(order, ctx = {}) {
+  const total = Number(order.total || 0);
+  const credit = Number(order.billing?.creditApplied || 0);
+  if (ctx.refundAmount != null) return Number(ctx.refundAmount);
+  if (ctx.refundAs === 'credit') return total + credit;
+  return total > 0 ? total : credit;
+}
+
+/**
  * What came back, how, and what is left — for the refund mail.
  *
  * It used to say "a bank transfer usually lands within 1–3 working days" to
@@ -1665,18 +1770,17 @@ function refundDetailsHtml(order, lang, refundCents, refundAs = null) {
   const c = emailCopy(lang);
   const cur = order.currency;
   const total = Number(order.total || 0);
-  const refunded = refundCents != null ? Number(refundCents) : total;
-  const remaining = Math.max(0, total - refunded);
   const credit = Number(order.billing?.creditApplied || 0);
+  const refunded = refundCents != null ? Number(refundCents) : refundHeadline(order, { refundAs });
+  const remaining = Math.max(0, total - refunded);
   const method = String(order.billing?.paymentMethod || '').toLowerCase();
   /* Refunded as store credit at the buyer's choice: all of it is in the
      wallet already, whatever they paid with. */
   if (refundAs === 'credit') {
-    const all = total + credit;
     const row = (label, value) => `<tr><td style="padding:6px 0;color:#9aa3b8;font-size:13.5px">${escapeHtml(label)}</td>`
       + `<td style="padding:6px 0;color:#ffffff;font-size:13.5px;text-align:right">${escapeHtml(value)}</td></tr>`;
     return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:0 0 14px">`
-      + `${row(c.refundRefunded, formatMoney(all, cur, lang))}${row(c.refundVia, c.refundMethods.credit)}</table>`
+      + `${row(c.refundRefunded, formatMoney(refunded, cur, lang))}${row(c.refundVia, c.refundMethods.credit)}</table>`
       + `<p>${escapeHtml(c.refundTiming.creditAll)}</p>`;
   }
   const kind = order.pspProvider ? 'card'
@@ -1687,7 +1791,8 @@ function refundDetailsHtml(order, lang, refundCents, refundAs = null) {
   const rows = [
     row(c.refundRefunded, formatMoney(refunded, cur, lang)),
     ...(remaining > 0 && refundCents != null ? [row(c.refundRemaining, formatMoney(remaining, cur, lang))] : []),
-    ...(total > 0 ? [row(c.refundVia, c.refundMethods[kind])] : []),
+    // Paid entirely with credit (kind 'credit'): that is the way it came back.
+    ...(total > 0 || credit > 0 ? [row(c.refundVia, c.refundMethods[kind])] : []),
   ];
   const timing = [total > 0 ? c.refundTiming[kind] : '', credit > 0 ? c.refundTiming.credit : '']
     .filter(Boolean).map((t) => `<p>${escapeHtml(t)}</p>`).join('');
@@ -1767,9 +1872,7 @@ function emailContext(order, ctx = {}) {
       url: orderUrlFor(order),
     },
     refund: {
-      amount: formatMoney(ctx.refundAs === 'credit'
-        ? Number(order.total || 0) + Number(order.billing?.creditApplied || 0)
-        : ctx.refundAmount != null ? ctx.refundAmount : order.total, order.currency, lang),
+      amount: formatMoney(refundHeadline(order, ctx), order.currency, lang),
       detailsHtml: refundDetailsHtml(order, lang, ctx.refundAmount, ctx.refundAs),
     },
     cancel: { reasonHtml: cancelReasonHtml(order, lang, ctx.reason) },

@@ -2311,4 +2311,19 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS lang TEXT;
       CREATE INDEX IF NOT EXISTS idx_totp_tickets_expiry ON totp_tickets (expires_at);
     `,
   },
+  {
+    /* Money that already went back, and coins that were taken back.
+       refunded_cents is what the payment provider has refunded on an order so
+       far — Stripe's amount_refunded, Mollie's amountRefunded. A partial refund
+       made in their dashboard lands here, so a later refund (money or store
+       credit) only returns what is left instead of the whole order again.
+       The index makes taking back an order's Forge Coins happen once, however
+       many paths undo the order (a refund, then its chargeback). */
+    id: '063_money_integrity',
+    sql: `
+      ALTER TABLE orders ADD COLUMN IF NOT EXISTS refunded_cents BIGINT NOT NULL DEFAULT 0;
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_forge_coins_reversal_ref
+        ON forge_coin_ledger (ref) WHERE reason = 'order_reversal';
+    `,
+  },
 ];

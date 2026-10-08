@@ -80,6 +80,7 @@ export default function Checkout() {
   const [bundles, setBundles] = useState([]);
   const [deliveryFields, setDeliveryFields] = useState({});   // productId → label (e.g. "Roblox username")
   const [deliveryChoices, setDeliveryChoices] = useState({}); // productId → offers a code/account choice
+  const [mysteryIds, setMysteryIds] = useState({});           // productId → is a mystery box
   const [deliveryDetail, setDeliveryDetail] = useState('');
   const [deliveryMethod, setDeliveryMethod] = useState('code'); // 'code' | 'account' (buyer's pick)
   // Server-owned; 100 until /api/config answers, so a slow config never invents
@@ -118,7 +119,11 @@ export default function Checkout() {
      that gives way, because it is the one the buyer chose to add. */
   const couponShown = stacked > discount ? Math.max(0, couponDiscount - (stacked - discount)) : couponDiscount;
   const afterDiscount = Math.max(0, subtotal - discount);
-  const creditToApply = useCredit ? Math.min(creditBalance, afterDiscount) : 0;
+  /* A mystery box pays out in store credit, so credit never pays for one — the
+     server refuses an order that tries. The toggle makes way for a line saying
+     so, rather than letting the buyer meet that refusal at the last step. */
+  const hasMystery = items.some((i) => mysteryIds[i.id] || i.category === 'mystery');
+  const creditToApply = useCredit && !hasMystery ? Math.min(creditBalance, afterDiscount) : 0;
   const grandTotal = Math.max(0, afterDiscount - creditToApply);
 
   const applyCoupon = async () => {
@@ -160,12 +165,13 @@ export default function Checkout() {
   useEffect(() => { api.get('/api/bundles').then((r) => setBundles(r.bundles || [])).catch(() => {}); }, []);
   useEffect(() => {
     api.get('/api/products').then((r) => {
-      const m = {}, choices = {};
+      const m = {}, choices = {}, boxes = {};
       (r.products || []).forEach((p) => {
         if (p.deliveryField) m[p.id] = p.deliveryField;
         if (p.deliveryChoice) choices[p.id] = true;
+        if (p.kind === 'mystery') boxes[p.id] = true;
       });
-      setDeliveryFields(m); setDeliveryChoices(choices);
+      setDeliveryFields(m); setDeliveryChoices(choices); setMysteryIds(boxes);
     }).catch(() => {});
   }, []);
 
@@ -584,7 +590,13 @@ export default function Checkout() {
           </div>
           )}
           {/* Store credit */}
-          {creditBalance > 0 && (
+          {creditBalance > 0 && hasMystery && (
+            <p data-testid="credit-no-mystery" className="flex items-start gap-2 mb-4 rounded-xl bg-space-black border border-white/10 px-3.5 py-3 text-[13px] text-slate-300">
+              <Wallet size={15} className="text-indigo-300 shrink-0 mt-0.5" aria-hidden="true" />
+              <span>{t('checkout.creditNoMystery', 'Store credit can’t be used on an order with a mystery box. Order the box on its own to use your credit on the rest.')}</span>
+            </p>
+          )}
+          {creditBalance > 0 && !hasMystery && (
             <label className="flex items-center justify-between gap-2 mb-4 cursor-pointer rounded-xl bg-space-black border border-white/10 px-3.5 py-3">
               <span className="flex items-center gap-2 text-sm text-slate-200">
                 <Wallet size={15} className="text-indigo-300" /> {t('checkout.useCredit', 'Use store credit')}

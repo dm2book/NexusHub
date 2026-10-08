@@ -189,6 +189,7 @@ export default {
   "acc.downloads.reveal": "Anzeigen",
   "acc.downloads.title": "Downloads & Lieferungen",
   "acc.downloads.typeDelivery": "Lieferung: {type}",
+  "acc.layout.closeMenu": "Menü schließen",
   "acc.layout.admin": "Admin-Konsole",
   "acc.layout.community": "Community",
   "acc.layout.downloads": "Downloads",

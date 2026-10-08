@@ -78,9 +78,10 @@ async function lockUser(userId) {
  */
 export async function coinTotals(userId) {
   if (!userId) return { earned: 0, spent: 0 };
+  // Coins taken back with a refunded order were never earned, not spent.
   const r = await get(
-    `SELECT COALESCE(SUM(delta) FILTER (WHERE delta > 0), 0) AS earned,
-            COALESCE(SUM(-delta) FILTER (WHERE delta < 0), 0) AS spent
+    `SELECT COALESCE(SUM(delta) FILTER (WHERE delta > 0 OR reason = 'order_reversal'), 0) AS earned,
+            COALESCE(SUM(-delta) FILTER (WHERE delta < 0 AND reason <> 'order_reversal'), 0) AS spent
        FROM forge_coin_ledger WHERE user_id = @u`, { u: userId });
   return { earned: Number(r?.earned || 0), spent: Number(r?.spent || 0) };
 }
@@ -91,21 +92,67 @@ export function coinHistory(userId, limit = 20) {
       WHERE user_id=@u ORDER BY created_at DESC LIMIT @l`, { u: userId, l: limit });
 }
 
+/** Where an order is while it still counts as a sale. */
+const SALE_STATUSES = ['payment_received', 'processing', 'awaiting_fulfillment', 'completed'];
+
 /**
  * Award coins for a paid order — idempotent: the unique (reason,ref) index means
  * a retried payment never double-awards. €10 → 1 coin (floor).
+ *
+ * Under the buyer's lock, and only while the order is still a sale: this runs
+ * in the background after the payment, and a refund that got there first found
+ * nothing to take back — the coins would have landed after it, for good.
  */
 export async function awardCoinsForOrder(order) {
   if (!order?.userId) return 0;
   const coins = Math.floor(Number(order.total || 0) / COINS_PER_EURO_CENTS);
   if (coins <= 0) return 0;
   try {
-    await run(
-      `INSERT INTO forge_coin_ledger (id, user_id, delta, reason, ref, created_at)
-       VALUES (@id, @u, @d, 'order', @ref, @at)`,
-      { id: newId('coin'), u: order.userId, d: coins, ref: order.id, at: nowIso() });
-    return coins;
+    return await tx(async () => {
+      await lockUser(order.userId);
+      const live = await get('SELECT status FROM orders WHERE id=@id', { id: order.id });
+      if (!SALE_STATUSES.includes(live?.status)) return 0;
+      await run(
+        `INSERT INTO forge_coin_ledger (id, user_id, delta, reason, ref, created_at)
+         VALUES (@id, @u, @d, 'order', @ref, @at)`,
+        { id: newId('coin'), u: order.userId, d: coins, ref: order.id, at: nowIso() });
+      return coins;
+    });
   } catch { return 0; } // unique-index clash = already awarded
+}
+
+/**
+ * Take back the coins an order earned once it stops being a sale — refunded,
+ * charged back, or cancelled after payment. Without this, paying and having
+ * the order refunded before delivery left the coins behind, again every round.
+ *
+ * One negative 'order_reversal' row per order: checked here, and backed by the
+ * unique index from migration 063, so a second path undoing the same order
+ * takes nothing more. Coins already spent leave the balance below zero — owed,
+ * the same as a reversed referral commission. The lock is taken BEFORE looking,
+ * the same one the award holds, so an award still in flight is either found
+ * here or sees the refund itself and awards nothing.
+ */
+export async function reverseCoinsForOrder(order) {
+  if (!order?.id || !order.userId) return 0;
+  try {
+    return await tx(async () => {
+      await lockUser(order.userId);
+      const earned = await get(
+        `SELECT user_id, delta FROM forge_coin_ledger WHERE reason='order' AND ref=@o AND delta > 0`, { o: order.id });
+      if (!earned) return 0;
+      const done = await get(`SELECT 1 AS x FROM forge_coin_ledger WHERE reason='order_reversal' AND ref=@o`, { o: order.id });
+      if (done) return 0;
+      await run(
+        `INSERT INTO forge_coin_ledger (id, user_id, delta, reason, ref, created_at)
+         VALUES (@id, @u, @d, 'order_reversal', @ref, @at)`,
+        { id: newId('coin'), u: earned.user_id, d: -Number(earned.delta), ref: order.id, at: nowIso() });
+      return Number(earned.delta);
+    });
+  } catch (e) {
+    if (e?.code === '23505') return 0;   // the unique index: another path reversed it first
+    throw e;
+  }
 }
 
 /**

@@ -137,7 +137,9 @@ function Refunds() {
             {r.status === 'requested' && (
               <>
                 <button onClick={() => decide(r, 'approved', true, r.method || 'money')} className="btn-ghost text-xs"
-                  title={r.method === 'credit' ? 'Puts the full amount in their wallet now' : 'Card/iDEAL payments go back through Stripe or Mollie; manual payments you send back yourself'}>
+                  title={r.method === 'credit'
+                    ? 'Puts what the order took in their wallet now — less anything already refunded through Stripe or Mollie; mystery prizes it paid out are taken back'
+                    : 'Card/iDEAL payments go back through Stripe or Mollie (only what is not refunded there yet); manual payments you send back yourself'}>
                   Approve · {r.method === 'credit' ? 'store credit' : 'money back'}
                 </button>
                 {r.method === 'credit' && (

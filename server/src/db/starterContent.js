@@ -2,20 +2,21 @@
  * One-time starter content, so the store is fully stocked with the engagement
  * features the moment it deploys — zero admin work needed:
  *
- *  - ONE mystery box (€49.99) with a balanced, profitable reward pool
- *    (expected payout ≈ €38.75 in store credit → ~22% margin, and the payout
- *    is store credit so it comes back as future orders).
+ *  - ONE mystery box (€49.99) whose reward pool pays out clearly less than
+ *    the box costs, counted the way a buyer can best play it — see
+ *    STARTER_POOL.
  *  - ONE starter bundle (two shooter top-ups at 10% off) as a live example.
  *
  * Strictly idempotent and respectful of the admin: each piece is only created
- * if NOTHING of its kind exists yet, so it never overwrites real config.
- * Best-effort: a failure here never blocks boot.
+ * if NOTHING of its kind exists yet, so it never overwrites real config. The
+ * one correction (healStarterPool) touches only a pool still exactly as this
+ * file once seeded it. Best-effort: a failure here never blocks boot.
  */
-import { get, all, run, nowIso } from './index.js';
+import { get, all, run, nowIso, tx } from './index.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { setRewards } from '../services/mysteryBoxService.js';
+import { setRewards, poolVerdict } from '../services/mysteryBoxService.js';
 import { createBundle } from '../services/bundleService.js';
 
 // Fixed primary key → concurrent cold starts can never create duplicates
@@ -30,11 +31,73 @@ const boxArt = () => {
     : '/products/icons/mystery.svg'; } catch { return '/products/icons/mystery.svg'; }
 };
 
+/*
+ * The starter reward pool, and the one it replaced.
+ *
+ * The old pool's comment said "≈ €38.75 per €49.99 box" — the first roll
+ * alone. But every box also has a free reroll that keeps the higher prize, and
+ * an order of 14+ boxes rolls at double luck. Counted that way it paid out
+ * €50.32 for a single box and €53.10 at the cap: more than the box costs, so
+ * store credit spent on boxes came back with interest and bought real codes.
+ *
+ * This one pays €29.50 on the first roll, €37.20 with the reroll and €39.54 at
+ * the cap — 79% of the price at worst. Every box still wins at least €20 and
+ * the jackpot is still €150, so the box's description stays true.
+ */
+const STARTER_POOL = [
+  { label: '€20 store credit', weight: 65, credit: 2000 },
+  { label: '€30 store credit', weight: 20, credit: 3000 },
+  { label: '€50 store credit', weight: 9, credit: 5000 },
+  { label: '€75 store credit', weight: 4, credit: 7500 },
+  { label: '€150 JACKPOT 💎', weight: 2, credit: 15000 },
+];
+const OLD_STARTER_POOL = [
+  { label: '€20 store credit', weight: 40, credit: 2000 },
+  { label: '€35 store credit', weight: 30, credit: 3500 },
+  { label: '€50 store credit', weight: 18, credit: 5000 },
+  { label: '€75 store credit', weight: 9, credit: 7500 },
+  { label: '€150 JACKPOT 💎', weight: 3, credit: 15000 },
+];
+
 export async function seedStarterContent() {
   await dedupeMysteryBoxes().catch((e) => console.error('[starter] dedupe:', e.message));
   await dedupeBundles().catch((e) => console.error('[starter] bundle dedupe:', e.message));
   await mysteryBox().catch((e) => console.error('[starter] mystery box:', e.message));
+  await healStarterPool().catch((e) => console.error('[starter] mystery pool:', e.message));
   await starterBundle().catch((e) => console.error('[starter] bundle:', e.message));
+}
+
+/**
+ * Replace the old starter pool where a shop still has it exactly as seeded.
+ *
+ * Every label, weight and prize has to match, and the pool has to pay out as
+ * much as the box costs at today's price — a pool the owner has touched is
+ * theirs, and is left for the launch check to name. Not only the fixed-id box:
+ * before it existed the seeder gave boxes random ids, and the dedupe keeps the
+ * oldest, so the surviving box may be one of those.
+ */
+async function healStarterPool() {
+  const key = (pool) => JSON.stringify(pool
+    .map((r) => [String(r.label), Number(r.weight), Number(r.credit)])
+    .sort((a, b) => a[2] - b[2] || a[1] - b[1] || a[0].localeCompare(b[0])));
+  const old = key(OLD_STARTER_POOL);
+  const boxes = await all(`SELECT id, name, price FROM products WHERE kind = 'mystery'`);
+  for (const box of boxes) {
+    const pool = () => all(
+      `SELECT label, weight, credit_cents AS credit FROM mystery_box_rewards WHERE box_id=@b`, { b: box.id });
+    if (key(await pool()) !== old) continue;
+    // Locked and read again: two cold starts must not both rewrite the same pool.
+    // A box priced below even the new pool is refused by setRewards; it keeps
+    // its pool, the launch check names it, and the next box is still looked at.
+    const healed = await tx(async () => {
+      await get('SELECT id FROM products WHERE id=@b FOR UPDATE', { b: box.id });
+      const now = await pool();
+      if (key(now) !== old || poolVerdict(now, box.price).safe) return false;
+      await setRewards(box.id, STARTER_POOL);
+      return true;
+    }).catch((e) => { console.error(`[starter] ${box.name}: reward pool not replaced:`, e.message); return false; });
+    if (healed) console.log(`[starter] ${box.name}: replaced the original reward pool, which paid out more than the box costs`);
+  }
 }
 
 /**
@@ -151,14 +214,7 @@ async function mysteryBox() {
       at,
     });
   if (!inserted.changes) return; // another instance just created it
-  // Expected payout ≈ €38.75 per €49.99 box (≈22% margin, credit-based).
-  await setRewards(BOX_ID, [
-    { label: '€20 store credit', weight: 40, credit: 2000 },
-    { label: '€35 store credit', weight: 30, credit: 3500 },
-    { label: '€50 store credit', weight: 18, credit: 5000 },
-    { label: '€75 store credit', weight: 9, credit: 7500 },
-    { label: '€150 JACKPOT 💎', weight: 3, credit: 15000 },
-  ]);
+  await setRewards(BOX_ID, STARTER_POOL);
   await run(`INSERT INTO price_history (id, product_id, price, currency, created_at)
              VALUES (@id, @p, 4999, 'EUR', @at) ON CONFLICT (id) DO NOTHING`,
     { id: `ph_${BOX_ID}`, p: BOX_ID, at }).catch(() => {});

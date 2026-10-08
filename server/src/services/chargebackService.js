@@ -12,6 +12,7 @@
  */
 import { run, get, all, nowIso } from '../db/index.js';
 import { reverseOrderCommission } from './affiliateService.js';
+import { addEntry } from './walletService.js';
 import { newId } from '../utils/ids.js';
 import { audit } from './auditService.js';
 import { alertOwner } from './notifyService.js';
@@ -84,9 +85,37 @@ export async function recordChargeback({
   if (order?.id) {
     await reverseOrderCommission(order.id, 'charged back')
       .catch((e) => console.error('[chargeback] commission reversal', e.message));
+    await reverseCreditRefund(order, amount)
+      .catch((e) => console.error('[chargeback] credit refund reversal', e.message));
   }
 
   return { id, duplicate: false };
+}
+
+/**
+ * An order refunded as store credit and then charged back as well.
+ *
+ * The credit refund already gave the buyer the order's value; the chargeback
+ * hands them the card part again, from their bank. The webhook stops at "this
+ * order is already refunded", so nothing undid either — €100 of value for a
+ * €50 order. What the bank returned comes off that refund credit (never more
+ * than the refund was), as a debt if they already spent it: allowNegative, the
+ * same as a reversed referral commission. Tagged per order, so a dispute the
+ * bank reports twice, or staff recording one the webhook already did, takes it
+ * once. An order refunded as money has no such entry and is left alone — that
+ * double payment is the provider's to settle with the bank.
+ */
+async function reverseCreditRefund(order, chargedBack) {
+  const entry = await get(
+    `SELECT user_id, amount FROM credit_transactions WHERE order_id=@o AND type='refund' AND tag=@t`,
+    { o: order.id, t: `refund-credit:${order.id}` });
+  if (!entry || !(Number(entry.amount) > 0)) return null;
+  const take = Math.min(Number(entry.amount), Math.abs(Number(chargedBack)) || Number(order.total) || 0);
+  if (!(take > 0)) return null;
+  const done = await addEntry({ userId: entry.user_id, amount: -take, type: 'adjustment',
+    description: `Store-credit refund taken back · order ${order.number || order.id} was charged back`,
+    orderId: order.id, tag: `chargeback-credit:${order.id}`, allowNegative: true });
+  return done.deduped ? null : { reversed: take };
 }
 
 /** How many chargebacks this email has, ever. The strongest signal there is. */

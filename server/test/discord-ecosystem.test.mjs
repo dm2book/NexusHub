@@ -468,8 +468,12 @@ console.log('— Wiring —');
   ok('…and purges spent link intents', /purgeExpiredLinkIntents/.test(maint));
 
   const auth = fs.readFileSync('src/routes/auth.js', 'utf8');
+  /* Not requireAuth any more: the account page starts linking by navigating,
+     and a navigation never carries the bearer token. The route reads the
+     session cookie instead and binds the state to this browser (see
+     auth-hardening.test.mjs for the behaviour). */
   ok('linking requires an authenticated session',
-    /oauth\/discord\/link\/start', requireAuth/.test(auth));
+    /link\/start'[\s\S]{0,1200}userFromSessionCookie[\s\S]{0,400}if \(!user\) return res\.redirect/.test(auth));
   ok('the link callback is separate from the login callback',
     /oauth\/discord\/link\/callback/.test(auth));
 

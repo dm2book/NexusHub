@@ -6,7 +6,7 @@ import { asyncHandler } from '../../middleware/error.js';
 import { requirePermission } from '../../middleware/rbac.js';
 import { listProducts, getProduct, createProduct, updateProduct } from '../../services/productService.js';
 import { addProductCodes, availableCounts, availableCount } from '../../services/codeStockService.js';
-import { getRewards, setRewards } from '../../services/mysteryBoxService.js';
+import { getRewards, setRewards, assertPoolBelowPrice } from '../../services/mysteryBoxService.js';
 import { audit } from '../../services/auditService.js';
 import { assertSafeImageValue, resolveImageUrl } from '../../utils/imageUrl.js';
 import { normalizeImageValue } from '../../services/imageStoreService.js';
@@ -287,6 +287,21 @@ router.post('/', requirePermission('suppliers.manage'), asyncHandler(async (req,
 router.patch('/:id', requirePermission('suppliers.manage'), asyncHandler(async (req, res) => {
   const body = productSchema.partial().parse(req.body);
   guardImage(body.metadata);
+  /* A box's price is what its reward pool is set against: cutting the price
+     below what the pool pays out is the same money printer as saving such a
+     pool, so it is refused the same way (and so is turning a product that has
+     a pool into a box at a price that pool beats). Only a change that makes it
+     worse: the form sends the price on every save, and an owner fixing the
+     name of — or switching off — a box the launch check flagged must not be
+     stopped by that very flag. */
+  if (body.price != null || body.kind === 'mystery') {
+    const current = await getProduct(req.params.id);
+    const price = body.price ?? current?.price;
+    const becomesBox = body.kind === 'mystery' && current?.kind !== 'mystery';
+    if (current && (body.kind ?? current.kind) === 'mystery' && (becomesBox || price < current.price)) {
+      assertPoolBelowPrice(await getRewards(req.params.id), price);
+    }
+  }
   if (body.metadata) body.metadata = await storeUpload(body.metadata, req.params.id);
   const product = await updateProduct(req.params.id, body);
   await audit({ actor: req.user, action: 'product.update', targetType: 'product',
@@ -365,8 +380,11 @@ router.put('/:id/mystery', requirePermission('suppliers.manage'), asyncHandler(a
       credit: z.number().int().min(0).max(1_000_000),
     })).max(40),
   }).parse(req.body || {});
+  // Saved first: setRewards refuses a pool that pays out more than the box
+  // costs, and a refused save is not a change worth an audit entry.
+  const saved = await setRewards(req.params.id, rewards);
   await audit({ actor: req.user, action: 'product.mystery_rewards', targetType: 'product', targetId: req.params.id, req });
-  res.json({ rewards: await setRewards(req.params.id, rewards) });
+  res.json({ rewards: saved });
 }));
 
 export default router;

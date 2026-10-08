@@ -25,6 +25,8 @@ import { sellerIdentity } from './sellerIdentityService.js';
 import { capacityLine } from './capacityService.js';
 import { auditCatalog } from './catalogAuditService.js';
 import { appUrlVerdict } from './servedHostService.js';
+import { poolVerdict } from './mysteryBoxService.js';
+import { formatMoney } from '../utils/money.js';
 
 export async function launchChecks() {
   const checks = [];
@@ -201,11 +203,36 @@ export async function launchChecks() {
   /* 3a. A mystery box is a paid chance at prizes of different money value
      (store credit). Under the Dutch Wet op de kansspelen that is very likely a
      game of chance needing a licence, whatever the odds shown. Not a blocker
-     this code can decide — a warning the owner has to answer. */
-  const mystery = await get(`SELECT COUNT(*)::int AS n FROM products WHERE active = 1 AND kind = 'mystery'`).catch(() => null);
-  if (Number(mystery?.n || 0) > 0) {
-    add('mystery_gambling', 'Mystery box & gambling law', 'warn',
-      `${mystery.n} active mystery box(es): paid, random prizes worth different amounts of store credit are likely a game of chance under the Wet op de kansspelen (Kansspelautoriteit). The odds are now shown, but that does not make it legal — get legal advice, or switch the box to a fixed-value product or deactivate it.`);
+     this code can decide — a warning the owner has to answer.
+
+     What IS a blocker: a box whose pool pays out as much as the box costs,
+     counted with the free reroll and the 14-box luck bonus. Every one sold
+     loses money, and the credit it pays out buys real codes. Saving such a
+     pool is refused, but one from before that rule — or rows written by hand —
+     only shows up here. */
+  const boxRows = await all(
+    `SELECT p.id, p.name, p.price, r.label, r.weight, r.credit_cents AS credit
+       FROM products p LEFT JOIN mystery_box_rewards r ON r.box_id = p.id
+      WHERE p.active = 1 AND p.kind = 'mystery'`).catch(() => null);
+  if (boxRows?.length) {
+    const boxes = new Map();
+    for (const row of boxRows) {
+      const b = boxes.get(row.id) || { name: row.name, price: Number(row.price), pool: [] };
+      if (row.label != null) b.pool.push({ label: row.label, weight: Number(row.weight), credit: Number(row.credit) });
+      boxes.set(row.id, b);
+    }
+    const losing = [...boxes.values()]
+      .map((b) => ({ ...b, verdict: poolVerdict(b.pool, b.price) }))
+      .filter((b) => !b.verdict.safe);
+    const law = 'paid, random prizes worth different amounts of store credit are likely a game of chance under the Wet op de kansspelen (Kansspelautoriteit). The odds are now shown, but that does not make it legal — get legal advice, or switch the box to a fixed-value product or deactivate it.';
+    add('mystery_gambling', 'Mystery box & gambling law', losing.length ? 'fail' : 'warn',
+      losing.length
+        ? `${losing.length} of ${boxes.size} active mystery box(es) pay out more store credit than they cost `
+          + '(free reroll and the 14-box luck bonus included): '
+          + losing.map((b) => `${b.name} — ${formatMoney(b.verdict.worst)} on average for ${formatMoney(b.price)}`).join('; ')
+          + '. Every one sold loses money and the credit buys real codes — lower the prizes in its reward pool or '
+          + `deactivate it. And all ${boxes.size}: ${law}`
+        : `${boxes.size} active mystery box(es): ${law}`);
   }
 
   /* 3b. And the question the catalogue count does not answer: how many orders
