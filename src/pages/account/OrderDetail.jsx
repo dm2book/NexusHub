@@ -144,12 +144,15 @@ export default function OrderDetail() {
                 <span className="font-semibold">{m.label}</span>
                 <div className="flex items-center gap-2 shrink-0">
                   {m.credit > 0 && <span className="text-sm font-bold bg-white/20 rounded-full px-2.5 py-0.5">{t('acc.order.credit', '+{amount} credit', { amount: money(m.credit) })}</span>}
-                  {!m.rerolledAt ? (
+                  {/* The server only rerolls a completed order that is not held or
+                      refunded — the button only shows when it would work. */}
+                  {m.rerolledAt ? <span className="text-[11px] text-white/70">{t('acc.order.rerolled', 'rerolled')}</span>
+                    : order.status === 'completed' && !order.fraudHold ? (
                     <button onClick={() => reroll(m.id)} disabled={rerolling === m.id}
                       className="text-xs font-bold bg-white text-rose-600 rounded-full px-3 py-1 hover:bg-white/90 transition disabled:opacity-60">
                       {rerolling === m.id ? '…' : `🎲 ${t('acc.order.reroll', 'Reroll')}`}
                     </button>
-                  ) : <span className="text-[11px] text-white/70">{t('acc.order.rerolled', 'rerolled')}</span>}
+                  ) : null}
                 </div>
               </div>
             ))}
