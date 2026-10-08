@@ -5,20 +5,23 @@ import { config } from '../config/env.js';
 import { asyncHandler } from '../middleware/error.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 import { requireAuth } from '../middleware/auth.js';
-import { randomToken } from '../utils/crypto.js';
+import { randomToken, safeEqual } from '../utils/crypto.js';
 import {
   requestEmailOtp, verifyEmailOtp, requestPhoneOtp, verifyPhoneOtp,
-  refreshSession, revokeSession, finalizeLogin, resolveTotpTicket,
-  listSessions, revokeOtherSessions, revokeUserSession,
+  refreshSession, revokeSession, finalizeLogin, claimTotpTicketAttempt, consumeTotpTicket,
+  userFromSessionCookie, listSessions, revokeOtherSessions, revokeUserSession,
 } from '../services/authService.js';
 import {
-  totpStatus, startTotpEnrollment, confirmTotpEnrollment, disableTotp, verifyUserTotp,
+  totpStatus, startTotpEnrollment, confirmTotpEnrollment, disableTotp, checkUserTotp,
+  TOTP_REUSED_MESSAGE,
 } from '../services/totpService.js';
 import {
   listEnabledProviders, buildAuthUrl, handleOAuthCallback,
 } from '../services/oauthService.js';
 import { publicUser, getUserByEmail, getUserById } from '../services/userService.js';
-import { beginLink, completeLink } from '../services/discordLinkService.js';
+import {
+  beginLink, completeLink, linkEnabled, linkCallbackPath, INTENT_TTL_MS,
+} from '../services/discordLinkService.js';
 import {
   createTrustedDevice, resolveTrustedDevice, listTrustedDevices, renameTrustedDevice,
   revokeTrustedDevice, revokeAllTrustedDevices, recordLoginAttempt, recentFailures,
@@ -291,12 +294,26 @@ router.post('/totp/login', otpLimiter, asyncHandler(async (req, res) => {
     remember: z.boolean().optional(),
   }).parse(req.body);
   const ctx = ctxOf(req);
-  const user = await resolveTotpTicket(ticket);
-  if (!(await verifyUserTotp(user.id, code))) {
+  /* Three things are spent here, each exactly once: one of the ticket's five
+     attempts (claimed before the code is even looked at), the code itself when
+     it is right (checkUserTotp — the same six digits cannot sign in twice), and
+     the ticket when it signs in. The per-IP limiter above cannot do the first
+     job: whoever holds the emailed code can change address between guesses. */
+  const { user, ticketId, attemptsLeft } = await claimTotpTicketAttempt(ticket);
+  const check = await checkUserTotp(user.id, code);
+  if (!check.ok) {
     await recordLoginAttempt({ userId: user.id, identifier: user.email, channel: 'totp',
-      success: false, reason: 'bad totp code', ctx });
-    throw badRequest('Incorrect authenticator code');
+      success: false, reason: check.reason === 'reused' ? 'reused totp code' : 'bad totp code', ctx });
+    if (attemptsLeft <= 0) {
+      // The last wrong code ends the ticket. 401 is what sends the login page
+      // back to the start, where the first factor has to be passed again.
+      await audit({ actor: { id: user.id, email: user.email }, action: 'auth.totp_ticket_exhausted',
+        metadata: { ip: ctx.ip }, req });
+      throw unauthorized('Too many incorrect codes — sign in again.');
+    }
+    throw badRequest(check.reason === 'reused' ? TOTP_REUSED_MESSAGE : 'Incorrect authenticator code');
   }
+  await consumeTotpTicket(ticketId);
   const session = await finalizeLogin(user, ctx);
   const suspicious = await isSuspiciousLogin(user.id, ctx);
   await recordLoginAttempt({ userId: user.id, identifier: user.email, channel: 'totp',
@@ -332,7 +349,13 @@ router.post('/totp/enable', requireAuth, asyncHandler(async (req, res) => {
   res.json(result);
 }));
 
-router.post('/totp/disable', requireAuth, asyncHandler(async (req, res) => {
+/* Switching 2FA off takes a current code, which is the one thing standing
+   between a stolen session and an account without its second factor — and the
+   general API limit let that session guess about two a second, per warm
+   instance. Five a minute per account, counted across instances. */
+const totpDisableLimiter = rateLimit({ bucket: 'auth_totp_disable', windowMs: 60_000, max: 5, shared: true });
+
+router.post('/totp/disable', requireAuth, totpDisableLimiter, asyncHandler(async (req, res) => {
   const { code } = z.object({ code: z.string().min(6).max(8) }).parse(req.body);
   const result = await disableTotp(req.user.id, code);
   await audit({ actor: { id: req.user.id, email: req.user.email }, action: 'auth.totp_disabled', req });
@@ -411,18 +434,56 @@ router.get('/oauth/:provider/callback', asyncHandler(async (req, res) => {
 const linkBack = (status, extra = '') =>
   `${config.appUrl}/account/profile?discord=${status}${extra ? `&reason=${encodeURIComponent(extra)}` : ''}`;
 
-router.get('/oauth/discord/link/start', requireAuth, asyncHandler(async (req, res) => {
+/* The browser half of a link (see discordLinkService): the state, httpOnly,
+   sent to the callback path only, gone when the intent is. Lax is what lets it
+   ride along on Discord's redirect back, which is a top-level GET. Named under
+   oauth_state_ so the cookie table on the privacy page already covers it. */
+const LINK_STATE_COOKIE = 'oauth_state_discord_link';
+const linkStateCookie = () => ({
+  httpOnly: true, secure: config.isProd, sameSite: 'lax', path: linkCallbackPath(),
+});
+
+// Both link routes are entered by navigating, so — like the sign-in routes
+// above — every failure is a redirect back to the account page, never JSON.
+router.get('/oauth/discord/link/start', asyncHandler(async (req, res) => {
+  if (!linkEnabled()) return res.redirect(linkBack('failed', 'Connecting Discord is not available right now.'));
+  /* No requireAuth: that reads the bearer token, and a navigation (the account
+     page sets window.location) never carries one — every real click got a JSON
+     "Authentication required" page. The session cookie is scoped to /api/auth,
+     so it does arrive here, and it says who this browser is signed in as. A
+     bearer token still works for anything that fetches. */
+  const user = req.user || await userFromSessionCookie(req.cookies?.[config.auth.cookieName]);
+  if (!user) return res.redirect(linkBack('failed', 'Sign in again to connect Discord.'));
   // The state is the only thing that travels; it resolves to this user id
   // server-side, so the callback cannot be pointed at somebody else's account.
   const state = randomToken(24);
-  res.redirect(await beginLink(req.user.id, state));
+  let url;
+  try {
+    url = await beginLink(user.id, state);
+  } catch {
+    return res.redirect(linkBack('failed', 'Could not connect Discord. Try again.'));
+  }
+  res.cookie(LINK_STATE_COOKIE, state, { ...linkStateCookie(), maxAge: INTENT_TTL_MS });
+  res.redirect(url);
 }));
 
 router.get('/oauth/discord/link/callback', asyncHandler(async (req, res) => {
-  const { code, state } = req.query;
-  if (!code || !state) return res.redirect(linkBack('failed', 'Discord did not send a code back'));
+  // Strings only: a repeated parameter arrives as an array.
+  const code = typeof req.query.code === 'string' ? req.query.code : '';
+  const state = typeof req.query.state === 'string' ? req.query.state : '';
+  /* The state must come back to the browser that started the link. Checked
+     before anything else, so a state from somebody else's browser costs no
+     token exchange and spends no intent — the account it belongs to can still
+     finish its own link. Constant-time, like every other secret compared here. */
+  const expected = req.cookies?.[LINK_STATE_COOKIE];
+  if (!state || !expected || !safeEqual(state, expected)) {
+    return res.redirect(linkBack('failed',
+      'That link request has expired or was started in another browser. Try connecting again.'));
+  }
+  res.clearCookie(LINK_STATE_COOKIE, linkStateCookie());
+  if (!code) return res.redirect(linkBack('failed', 'Discord did not send a code back'));
   try {
-    await completeLink(String(state), String(code));
+    await completeLink(state, code);
     return res.redirect(linkBack('linked'));
   } catch (e) {
     // These messages are written to be read by the person: "already connected to

@@ -232,25 +232,97 @@ export async function verifyPhoneOtp(phone, code, ctx = {}) {
 
 // ── TOTP second-factor challenge ─────────────────────────────────────────────
 
-/** Short-lived proof that the first factor (email/phone OTP) succeeded. */
+/**
+ * Wrong authenticator codes one ticket survives. The ticket is the proof that
+ * the first factor passed, and it used to take unlimited guesses for its five
+ * minutes — the only brake was a per-IP limiter, which an attacker holding the
+ * emailed code sidesteps by changing address. Five, then back to the start:
+ * every further batch of guesses costs a fresh first factor.
+ */
+export const TOTP_TICKET_ATTEMPTS = 5;
+const TICKET_SPENT = 'Too many incorrect codes, or this login was already used — sign in again.';
+
+/**
+ * Short-lived proof that the first factor (email/phone OTP) succeeded.
+ *
+ * Stays synchronous — the OAuth callback hands it straight into a redirect.
+ * The `jti` names the ticket's row in totp_tickets, which is created on its
+ * first use; the signature already guarantees nobody can mint a fresh jti to
+ * get a fresh counter.
+ */
 export function issueTotpTicket(user) {
   /* Its own audience: the ticket proves the FIRST factor only, and must never
      be accepted where a signed-in session is (verifyAccess refuses it). */
-  return jwt.sign({ sub: user.id, purpose: 'totp' }, config.auth.jwtSecret, { expiresIn: '5m', audience: 'totp-ticket' });
+  return jwt.sign({ sub: user.id, purpose: 'totp' }, config.auth.jwtSecret,
+    { expiresIn: '5m', audience: 'totp-ticket', jwtid: randomToken(16) });
 }
 
-/** Validate a challenge ticket → the user row it belongs to (or throws). */
-export async function resolveTotpTicket(ticket) {
+/** Signature, audience, expiry and shape — no database. */
+function readTotpTicket(ticket) {
   let payload;
   try {
-    payload = jwt.verify(ticket, config.auth.jwtSecret, { audience: 'totp-ticket' });
+    payload = jwt.verify(String(ticket || ''), config.auth.jwtSecret, { audience: 'totp-ticket' });
   } catch {
     throw unauthorized('Your login expired — sign in again.');
   }
-  if (payload.purpose !== 'totp') throw unauthorized('Invalid login ticket');
+  // No jti: issued before attempts were counted, so it has no counter to keep.
+  if (payload.purpose !== 'totp' || !payload.jti) throw unauthorized('Invalid login ticket');
+  return payload;
+}
+
+async function ticketUser(payload) {
   const user = await get('SELECT * FROM users WHERE id = @id', { id: payload.sub });
   if (!user || user.status !== 'active') throw unauthorized('Account unavailable');
   return user;
+}
+
+/**
+ * Validate a challenge ticket → the user row it belongs to (or throws).
+ * Read-only: a ticket that has signed in once, or has run out of attempts, is
+ * refused even while its signature is still good.
+ */
+export async function resolveTotpTicket(ticket) {
+  const payload = readTotpTicket(ticket);
+  const row = await get('SELECT attempts, consumed_at FROM totp_tickets WHERE id = @id', { id: payload.jti });
+  if (row && (row.consumed_at || row.attempts >= TOTP_TICKET_ATTEMPTS)) throw unauthorized(TICKET_SPENT);
+  return ticketUser(payload);
+}
+
+/**
+ * Spend one of a ticket's attempts, BEFORE its code is looked at.
+ *
+ * Claimed first and atomically — one upsert that only counts while attempts
+ * are left — because checking the count and bumping it afterwards let a burst
+ * of parallel requests all read "0 used" and each get a guess. Returns the
+ * user, the ticket id (for consumeTotpTicket) and how many attempts remain
+ * after this one; a ticket with none left throws 401, which the login page
+ * answers by starting over.
+ */
+export async function claimTotpTicketAttempt(ticket) {
+  const payload = readTotpTicket(ticket);
+  const user = await ticketUser(payload);
+  /* Housekeeping, so the table stays "logins of the last few minutes" without a
+     job of its own. The hour of slack is deliberate: a row deleted while its
+     ticket still verified would hand that ticket a fresh set of attempts. */
+  await run('DELETE FROM totp_tickets WHERE expires_at < @cutoff',
+    { cutoff: new Date(Date.now() - 3_600_000).toISOString() });
+  const row = await get(
+    `INSERT INTO totp_tickets (id, user_id, attempts, expires_at, created_at)
+          VALUES (@id, @u, 1, @exp, @at)
+     ON CONFLICT (id) DO UPDATE SET attempts = totp_tickets.attempts + 1
+          WHERE totp_tickets.attempts < @max AND totp_tickets.consumed_at IS NULL
+     RETURNING attempts`,
+    { id: payload.jti, u: user.id, exp: new Date(payload.exp * 1000).toISOString(),
+      at: nowIso(), max: TOTP_TICKET_ATTEMPTS });
+  if (!row) throw unauthorized(TICKET_SPENT);
+  return { user, ticketId: payload.jti, attemptsLeft: TOTP_TICKET_ATTEMPTS - Number(row.attempts) };
+}
+
+/** A ticket signs in once: the second request carrying it is refused. */
+export async function consumeTotpTicket(ticketId) {
+  const r = await run('UPDATE totp_tickets SET consumed_at = @at WHERE id = @id AND consumed_at IS NULL',
+    { at: nowIso(), id: ticketId });
+  if (!r.changes) throw unauthorized(TICKET_SPENT);
 }
 
 // ── Sessions / tokens ────────────────────────────────────────────────────
@@ -329,6 +401,27 @@ export async function refreshSession(refreshToken, ctx = {}) {
       { rh: sha256(newSecret), at: nowIso(), exp: slide, ip: ctx.ip || null, ua: ctx.userAgent || null, id: sessionId });
 
   return { accessToken: await signAccess(user, sessionId), refreshToken: `${sessionId}.${newSecret}` };
+}
+
+/**
+ * Who a browser is signed in as, read from its refresh-session cookie WITHOUT
+ * rotating it (→ the user row, or null).
+ *
+ * For the routes the SPA reaches by navigating rather than by fetch: a
+ * navigation carries cookies but never the Authorization header, so the bearer
+ * token the rest of the API runs on is simply not there. A secret that does not
+ * match is just "not signed in" here — unlike /refresh, which owns rotation and
+ * treats a stale secret as theft, a read-only check has no business revoking.
+ */
+export async function userFromSessionCookie(refreshToken) {
+  const [sessionId, secret] = String(refreshToken || '').split('.');
+  if (!sessionId || !secret) return null;
+  const session = await get(
+    'SELECT user_id, refresh_hash, revoked_at, expires_at FROM sessions WHERE id = @id', { id: sessionId });
+  if (!session || session.revoked_at || new Date(session.expires_at) < new Date()) return null;
+  if (!safeEqual(session.refresh_hash, sha256(secret))) return null;
+  const user = await get('SELECT * FROM users WHERE id = @id', { id: session.user_id });
+  return user && user.status === 'active' ? user : null;
 }
 
 export async function revokeSession(sessionId) {

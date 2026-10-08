@@ -103,11 +103,15 @@ const chal = await fetch(`${base}/api/auth/otp/verify`, {
   method: 'POST', headers: { 'content-type': 'application/json' },
   body: JSON.stringify({ email, code: '654321' }) }).then(jr);
 ok('login now returns totp challenge', chal.totpRequired === true && !!chal.ticket);
+/* A code works once: the one that switched 2FA on is spent, so the login uses
+   the next one (still inside the ±1 step drift window). */
 const done = await fetch(`${base}/api/auth/totp/login`, {
   method: 'POST', headers: { 'content-type': 'application/json' },
-  body: JSON.stringify({ ticket: chal.ticket, code: totpCode(setup.secret) }) }).then(jr);
+  body: JSON.stringify({ ticket: chal.ticket, code: totpCode(setup.secret, { at: Date.now() + 30_000 }) }) }).then(jr);
 ok('totp/login issues session', !!done.accessToken && done.user.totpEnabled === true);
-// cleanup: disable so future runs are unaffected
+// cleanup: disable so future runs are unaffected (both codes above are spent,
+// so forget the last step first — this is the test tidying up, not a login)
+await run(`UPDATE users SET totp_last_step = NULL WHERE email = @e`, { e: email });
 await fetch(`${base}/api/auth/totp/disable`, { method: 'POST',
   headers: { authorization: `Bearer ${done.accessToken}`, 'content-type': 'application/json' },
   body: JSON.stringify({ code: totpCode(setup.secret) }) });

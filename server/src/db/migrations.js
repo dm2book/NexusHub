@@ -2289,4 +2289,26 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS lang TEXT;
       CREATE INDEX IF NOT EXISTS idx_market_obs_time ON market_observations (observed_at);
     `,
   },
+  {
+    /* Authenticator codes work once, and a 2FA login ticket takes five guesses.
+       totp_last_step is the newest TOTP time-step this account has accepted;
+       any code for that step or an earlier one is refused, so the six digits
+       on the screen cannot be replayed in the minute or so they stay valid.
+       totp_tickets counts the attempts on each login ticket (one row per
+       ticket jti, created on its first use) and marks it spent once it signs
+       in — expired rows are cleared as new attempts come in. */
+    id: '062_auth_hardening',
+    sql: `
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_last_step BIGINT;
+      CREATE TABLE IF NOT EXISTS totp_tickets (
+        id           TEXT PRIMARY KEY,
+        user_id      TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        attempts     INTEGER NOT NULL DEFAULT 0,
+        consumed_at  TEXT,
+        expires_at   TEXT NOT NULL,
+        created_at   TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_totp_tickets_expiry ON totp_tickets (expires_at);
+    `,
+  },
 ];
