@@ -167,9 +167,15 @@ export default function Login() {
       navigate(dest, { replace: true });
     } catch (err) {
       track('otp_failed', { phase: 'totp', status: err?.status });
-      setError(err?.status === 401
-        ? 'Your login expired — start over and try again.'
-        : friendlyError(err));
+      if (err?.status === 401) {
+        /* The ticket is spent: it expired, or the fifth wrong code ended it. The
+           server refuses every further code on it, so asking for another one
+           here would only collect more refusals — back to the first step. */
+        setStep('id'); setTotpTicket(null);
+        setError(t('login.totpRestart', 'Too many wrong codes, or this login expired — sign in again.'));
+      } else {
+        setError(friendlyError(err));
+      }
       setOtpKey((k) => k + 1);
     } finally { setBusy(false); }
   };

@@ -1009,6 +1009,7 @@ const NL = {
   'cookie.body': 'Wat de winkel nodig heeft slaan we altijd op: ingelogd blijven, je winkelwagen en je taal. Daarnaast willen we graag meten welke pagina\u2019s bezocht worden. Dat deel is aan jou — de winkel werkt hoe dan ook.',
   'cookie.accept': 'Accepteren',
   'cookie.reject': 'Alleen het noodzakelijke',
+  'login.totpRestart': 'Te veel foute codes, of deze inlogpoging is verlopen — log opnieuw in.',
   // Afrekenen: de bedragen komen van de server (POST /api/checkout/quote).
   'checkout.priceChanged': 'Er is een prijs veranderd sinds je dit in je winkelwagen legde. Je betaalt de prijs van vandaag — in totaal {amount}.',
   'checkout.totalChanged': 'Je totaal is veranderd van {was} naar {now}: er is net een prijs aangepast. Er is niets afgeschreven — check het besteloverzicht en druk dan nog een keer op de knop om te betalen.',

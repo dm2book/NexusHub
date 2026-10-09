@@ -799,6 +799,7 @@ export default {
   'cookie.body': 'Was der Shop braucht, speichern wir immer: angemeldet bleiben, dein Warenkorb und deine Sprache. Darüber hinaus würden wir gern messen, welche Seiten besucht werden. Dieser Teil liegt bei dir — der Shop funktioniert so oder so.',
   'cookie.accept': 'Akzeptieren',
   'cookie.reject': 'Nur das Nötige',
+  'login.totpRestart': 'Zu viele falsche Codes oder diese Anmeldung ist abgelaufen — melde dich neu an.',
   'checkout.priceChanged': 'Ein Preis hat sich geändert, seit du den Artikel in den Warenkorb gelegt hast. Du zahlst den heutigen Preis — insgesamt {amount}.',
   'checkout.totalChanged': 'Dein Gesamtbetrag hat sich von {was} auf {now} geändert: Ein Preis wurde gerade angepasst. Es wurde nichts abgebucht — prüf die Bestellübersicht und drück dann noch einmal auf den Button, um zu bezahlen.',
   'checkout.couponCapped': 'Rabatte enden bei {n}% einer Bestellung, deshalb zieht dieser Code hier {amount} ab statt {full}.',

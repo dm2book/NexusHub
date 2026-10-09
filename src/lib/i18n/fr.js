@@ -799,6 +799,7 @@ export default {
   'cookie.body': 'Ce dont la boutique a besoin, nous le gardons toujours : rester connecté, ton panier et ta langue. En plus de cela, nous aimerions mesurer quelles pages sont visitées. Cette partie dépend de toi — la boutique fonctionne dans tous les cas.',
   'cookie.accept': 'Accepter',
   'cookie.reject': 'Seulement l’essentiel',
+  'login.totpRestart': 'Trop de codes erronés, ou cette connexion a expiré — reconnecte-toi.',
   'checkout.priceChanged': 'Un prix a changé depuis que tu as ajouté l’article à ton panier. Tu paies le prix du jour — {amount} au total.',
   'checkout.totalChanged': 'Ton total est passé de {was} à {now} : un prix vient d’être mis à jour. Rien n’a été débité — vérifie le récapitulatif, puis appuie de nouveau sur le bouton pour payer.',
   'checkout.couponCapped': 'Les réductions s’arrêtent à {n}% d’une commande, donc ce code retire ici {amount} au lieu de {full}.',
