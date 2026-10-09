@@ -170,6 +170,10 @@ export function createApp({ lazyReady = false } = {}) {
 
   // CORS: allow the storefront origin. Same-origin deploys don't need it but it
   // is harmless and supports split frontend/api domains.
+  /* When this invocation began — before readiness, migrations and the route.
+     Vercel's 30 s counts from here, and work that rides along on a request
+     (the self-scheduled maintenance) has to plan against it. */
+  app.use((req, _res, next) => { req.startedAt = Date.now(); next(); });
   app.use(cors({ origin: config.appUrl, credentials: true }));
   // Stripe webhook needs the raw body for signature verification — mount it
   // BEFORE the JSON parser.
@@ -242,13 +246,15 @@ export function createApp({ lazyReady = false } = {}) {
   //   (claimInterval), once for the whole shop. The in-process check stays as
   //   a cheap filter so a busy instance does not ask the database per request.
   let lastMaintenanceAt = 0;
-  app.use((_req, _res, next) => {
+  app.use((req, _res, next) => {
     const now = Date.now();
     if (now - lastMaintenanceAt > 3_600_000) {
       lastMaintenanceAt = now;
+      // Finished well inside the invocation's 30 s, counted from its start.
+      const deadline = (req.startedAt || now) + 26_000;
       waitUntil(import('./services/bootUpkeep.js')
         .then(({ claimInterval }) => claimInterval('maintenance_auto', 3_600_000))
-        .then((mine) => (mine ? runMaintenance()
+        .then((mine) => (mine ? runMaintenance({ deadline })
           .then((s) => console.log('[maintenance:auto]', JSON.stringify(s))) : null))
         .catch((e) => console.error('[maintenance:auto]', e.message)));
     }

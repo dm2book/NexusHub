@@ -76,7 +76,8 @@ console.log('— 1. A burst of payments all reach the supplier —');
 console.log('\n— 2. Maintenance: supplier queue before the sweep —');
 {
   const m = src('services/maintenanceService.js');
-  const q = m.indexOf("drainSupplierQueue({ actorId: 'system' }, { budgetMs: 8_000 })");
+  // The first drain gets the first eight seconds of the run's own budget (by()).
+  const q = m.indexOf("drainSupplierQueue({ actorId: 'system' }, { budgetMs: Math.max(1_000, by(8_000) - Date.now()) })");
   const sweep = m.indexOf('sweepUnfulfilledPaidOrders({ limit: 50 })');
   ok('the queue runs first', q > 0 && sweep > 0 && q < sweep, `${q} / ${sweep}`);
 }

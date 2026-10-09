@@ -80,6 +80,21 @@ console.log('— robots.txt —');
   ok('an unexpected discovery error is a logged 500, not a 400', /console\.error\('\[discovery\]'/.test(src) && /status\(e\?\.status \|\| 500\)/.test(src));
 }
 
+console.log('— Maintenance finishes inside the time it is given —');
+{
+  const { runMaintenance, LAST_RUN_KEY } = await import('../src/services/maintenanceService.js');
+  const { getSetting } = await import('../src/services/settingsService.js');
+  const t = Date.now();
+  await runMaintenance({ deadline: t + 9_000 });
+  const took = Date.now() - t;
+  const rec = await getSetting(LAST_RUN_KEY, null);
+  ok('a run given 9 s is done within them', took < 9_500, `${took} ms`);
+  ok('…and leaves its receipt (so the sweep does not look stopped)', !!rec?.finishedAt && Date.parse(rec.finishedAt) >= t, JSON.stringify(rec || {}).slice(0, 200));
+  const app = (await import('node:fs')).readFileSync(new URL('../src/app.js', import.meta.url), 'utf8');
+  ok('the self-scheduled run plans from the request\u2019s start, not its own',
+    /req\.startedAt = Date\.now\(\)/.test(app) && /runMaintenance\(\{ deadline \}\)/.test(app));
+}
+
 console.log('— SVG —');
 {
   const { sanitizeSvg, assess } = await import('../src/services/logoDiscoveryService.js');

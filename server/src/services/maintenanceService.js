@@ -64,7 +64,7 @@ export async function lastMaintenanceRun({ now = Date.now(), staleAfterHours = D
   };
 }
 
-export async function runMaintenance() {
+export async function runMaintenance({ deadline = Date.now() + 26_000 } = {}) {
   const summary = { otpPurged: 0, ipsForgotten: 0, sessionsExpired: 0, ordersCancelled: 0, remindersSent: 0, reviewRequestsSent: 0, cartRemindersSent: 0, fulfillmentsRetried: 0, launchAnnounced: 0, at: nowIso() };
 
   /* Money first. The function has 30 seconds and this list grew to fifteen
@@ -73,14 +73,24 @@ export async function runMaintenance() {
      slowest one (the supplier queue) is skipped when the budget is nearly
      spent rather than starving everything after it. */
   const startedAt = Date.now();
-  const late = () => Date.now() - startedAt > 18_000;
+  /* Every checkpoint below was written for a run with ~26 s of its own. It is
+     not always given that: the self-scheduled run rides on a request whose
+     function started earlier (a cold start, the request itself), and Vercel's
+     30 s counts from there. A run that is cut off never writes its receipt
+     (LAST_RUN_KEY, last) and keeps the hourly claim — so the sweep looked
+     "stopped" for days while it was starting every hour and dying near the
+     end. by(ms) puts each checkpoint at the same fraction of the time this run
+     really has, up to the deadline its caller computed from the request's start. */
+  const budget = Math.max(5_000, deadline - startedAt);
+  const by = (ms) => startedAt + Math.round(ms * Math.min(1, budget / 26_000));
+  const late = () => Date.now() > by(18_000);
 
   /* 8a. The supplier queue BEFORE the sweep. A paid order waiting for the
      queue is not stuck, and the sweep below has nothing to offer it but stock
      or a person — so the queue gets the first eight seconds, and step 8 later
      carries on with whatever budget is left. */
   try {
-    summary.supplierQueue = (await drainSupplierQueue({ actorId: 'system' }, { budgetMs: 8_000 })).processed || 0;
+    summary.supplierQueue = (await drainSupplierQueue({ actorId: 'system' }, { budgetMs: Math.max(1_000, by(8_000) - Date.now()) })).processed || 0;
   } catch (e) { summary.supplierQueueError = e.message; }
 
   /* 8b. Stripe payments whose webhook never arrived: paid at Stripe, pending
@@ -106,7 +116,7 @@ export async function runMaintenance() {
   // 10. Re-send transactional emails that failed on a transient provider error
   //     (their full render context is persisted with the log row).
   try {
-    summary.emailsRetried = await retryFailedEmails({ deadline: startedAt + 16_000 });
+    summary.emailsRetried = await retryFailedEmails({ deadline: by(16_000) });
   } catch (e) { summary.emailRetryError = e.message; }
 
   /* 0a. The ad platforms' spend, impressions and clicks, every six hours,
@@ -116,7 +126,7 @@ export async function runMaintenance() {
     if ((metaConfigured() || tiktokConfigured()) && !late()) {
       const { claimInterval } = await import('./bootUpkeep.js');
       if (await claimInterval('ads_sync', 6 * 3_600_000)) {
-        summary.adSpendSync = await syncAll({ days: 7, deadline: Math.min(Date.now() + 6_000, startedAt + 20_000) });
+        summary.adSpendSync = await syncAll({ days: 7, deadline: Math.min(Date.now() + 6_000, by(20_000)) });
       }
     }
   } catch (e) { summary.adSpendSyncError = e.message; }
@@ -128,7 +138,7 @@ export async function runMaintenance() {
       const { claimInterval } = await import('./bootUpkeep.js');
       if (await claimInterval('logo_discovery', 6 * 3_600_000)) {
         const { refreshStale } = await import('./logoDiscoveryService.js');
-        const done = await refreshStale({ limit: 3, deadline: Math.min(Date.now() + 6_000, startedAt + 20_000) });
+        const done = await refreshStale({ limit: 3, deadline: Math.min(Date.now() + 6_000, by(20_000)) });
         if (done.length) summary.logosRefreshed = done;
       }
     }
@@ -147,15 +157,15 @@ export async function runMaintenance() {
   try {
     const { applyCategoryArtwork, artworkEnabled } = await import('./discovery/categoryArtService.js');
     if (artworkEnabled()) {
-      const a = await applyCategoryArtwork({ deadline: startedAt + 8_000 });
+      const a = await applyCategoryArtwork({ deadline: by(8_000) });
       if (a.applied) summary.artworkApplied = a.applied;
       if (a.remaining) summary.artworkRemaining = a.remaining;
     }
     /* The free brand logos the product cards draw (one Commons search per
        brand, cached 30 days — production only). */
     const { logosEnabled, warmLogos } = await import('./discovery/commonsLogoService.js');
-    if (logosEnabled() && Date.now() < startedAt + 10_000) {
-      const w = await warmLogos({ deadline: startedAt + 10_000 });
+    if (logosEnabled() && Date.now() < by(10_000)) {
+      const w = await warmLogos({ deadline: by(10_000) });
       if (w.found) summary.brandLogos = w.found;
     }
   } catch (e) { summary.artworkError = e.message; }
@@ -262,14 +272,14 @@ export async function runMaintenance() {
   // 7. Re-poll async supplier fulfilments that returned a reference and are
   //    still in progress, so they complete without a manual nudge.
   if (!late()) try {
-    summary.fulfillmentsRetried = await retryPendingFulfillments({ limit: 25, deadline: Math.min(Date.now() + 8_000, startedAt + 20_000) });
+    summary.fulfillmentsRetried = await retryPendingFulfillments({ limit: 25, deadline: Math.min(Date.now() + 8_000, by(20_000)) });
   } catch (e) { summary.fulfillmentError = e.message; }
 
   // 8. Drain the serial supplier queue (safety net if a payment-time drain was
   //    interrupted): buys + delivers pending paid orders one at a time.
   if (late()) summary.supplierQueueSkipped = 'time budget';
   else try {
-    const more = (await drainSupplierQueue({ actorId: 'system' }, { budgetMs: Math.max(1_000, 24_000 - (Date.now() - startedAt)) })).processed || 0;
+    const more = (await drainSupplierQueue({ actorId: 'system' }, { budgetMs: Math.max(1_000, by(24_000) - Date.now()) })).processed || 0;
     summary.supplierQueue = (summary.supplierQueue || 0) + more;
   } catch (e) { summary.supplierQueueError = e.message; }
 
@@ -394,7 +404,7 @@ export async function runMaintenance() {
   if (!late()) {
     try {
       const { scheduledDiscovery } = await import('./discovery/discoveryPipeline.js');
-      const d = await scheduledDiscovery({ deadline: startedAt + 24_000 });
+      const d = await scheduledDiscovery({ deadline: by(24_000) });
       summary.discoveryQueries = d.categories?.queries?.length || 0;
       if (d.research?.mentions) summary.discoveryResearchMentions = d.research.mentions;
       if (d.firstEvaluation) summary.discoveryFirstEvaluated = d.firstEvaluation;
