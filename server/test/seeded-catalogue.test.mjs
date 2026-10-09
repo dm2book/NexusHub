@@ -46,8 +46,10 @@ console.log('— A stale label can never become a wrong charge —');
      started trusting a price from the browser, seeding the browser with a
      price from last week would become a way to buy at last week's price. */
   const order = read('server/src/services/orderService.js');
+  /* The pricing lives in priceOrder (shared by createOrder and the checkout
+     quote); the rule is the same — the unit price is the product row's. */
   ok('the server prices an order from its own row',
-    /const unit = product\.price;/.test(order), 'the checkout may be trusting the client');
+    /const unit(?:Price)? = product\.price;/.test(order), 'the checkout may be trusting the client');
   ok('…for a product it looked up by id, not one it was handed',
     /const product = await getProduct\(li\.productId\)/.test(order));
   ok('…and refuses an inactive one', /if \(!product\.active\)/.test(order));
