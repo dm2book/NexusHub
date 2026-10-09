@@ -142,6 +142,14 @@ export const config = {
        so a leak of the general bot secret must not be enough to redirect money.
        Unset = the command is off. */
     paylinkSecret: env.DISCORD_PAYLINK_SECRET || '',
+    /* Whether the bot's OLD signatures are still accepted (see
+       middleware/ingestSignature.js). On by default, because the bot already
+       running on its host sends them until it is redeployed, and the bot is
+       deployed separately from this site. Once the new bot is live and kv
+       'bot_legacy_signature_seen_at' has stopped moving, set
+       BOT_LEGACY_SIGNATURES=off. Only an explicit off/0/false/no turns it off:
+       an empty value pasted into the dashboard must not cut a running bot off. */
+    legacyBotSignatures: !/^(off|0|false|no)$/i.test(String(env.BOT_LEGACY_SIGNATURES ?? '').trim()),
   },
 
   // SMS / phone OTP via Twilio. Without credentials, phone codes are logged to
