@@ -102,17 +102,17 @@ export class G2AConnector extends SupplierConnector {
   }
 
   /** Poll the order; once the key is issued, deliver it. */
-  async checkFulfillment(externalRef) {
+  async checkFulfillment(externalRef, { deadline } = {}) {
     let status = '';
     try {
-      const details = await this.#request(`/v3/order/details/${encodeURIComponent(externalRef)}`);
+      const details = await this.#request(`/v3/order/details/${encodeURIComponent(externalRef)}`, { deadline });
       status = String(details?.status || '').toLowerCase();
       if (['canceled', 'cancelled', 'refunded', 'failed', 'error'].includes(status)) {
         return { status: 'failed', externalRef, raw: details };
       }
     } catch { /* details may be briefly unavailable right after pay */ }
     try {
-      const keyResp = await this.#request(`/v3/order/key/${encodeURIComponent(externalRef)}`);
+      const keyResp = await this.#request(`/v3/order/key/${encodeURIComponent(externalRef)}`, { deadline });
       // Accept a single key or a list (multi-unit orders return several).
       const rawKeys = Array.isArray(keyResp?.keys) ? keyResp.keys
         : Array.isArray(keyResp?.data) ? keyResp.data

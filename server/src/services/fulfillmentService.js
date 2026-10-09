@@ -305,7 +305,7 @@ export async function refreshFulfillment(requestId, ctx = {}) {
   const supplier = await getSupplier(req.supplier_id);
   const order = await getOrder(req.order_id);
   const item = order.items.find((i) => i.id === req.order_item_id) || { id: req.order_item_id };
-  const result = await createConnector(supplier).checkFulfillment(req.external_ref);
+  const result = await createConnector(supplier).checkFulfillment(req.external_ref, { deadline: ctx.deadline });
   await persistResult(requestId, order, item, result);
   await logFulfillment('retried', { requestId, orderId: req.order_id, actor: ctx.actorId,
     detail: { status: result.status } });
@@ -781,14 +781,18 @@ export async function supplierQueueOwns(orderId) {
  * Re-poll supplier fulfilments that are still in progress (async suppliers that
  * return a reference and complete later). Runs from maintenance.
  */
-export async function retryPendingFulfillments({ limit = 25 } = {}) {
+export async function retryPendingFulfillments({ limit = 25, deadline = Infinity } = {}) {
   const rows = await all(
     `SELECT id FROM fulfillment_requests
       WHERE mode='auto' AND status='in_progress' AND external_ref IS NOT NULL
       ORDER BY updated_at ASC LIMIT @l`, { l: limit });
   let refreshed = 0;
   for (const r of rows) {
-    try { await refreshFulfillment(r.id, { actorId: 'system' }); refreshed++; }
+    /* Each poll can wait up to a supplier's 15 s; 25 of them never fitted in a
+       30 s function. A poll is a read, so cutting it short loses nothing — the
+       oldest are asked first and the rest wait for the next run. */
+    if (deadline - Date.now() < 3_000) break;
+    try { await refreshFulfillment(r.id, { actorId: 'system', deadline }); refreshed++; }
     catch (e) { console.error('[fulfillment:retry]', e.message); }
   }
   return refreshed;

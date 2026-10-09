@@ -122,11 +122,11 @@ export class ApiConnector extends SupplierConnector {
     return this.#normalizeResult(data);
   }
 
-  async checkFulfillment(externalRef) {
+  async checkFulfillment(externalRef, { deadline } = {}) {
     const tmpl = this.config.endpoints?.status;
     if (!tmpl) throw new Error('No status endpoint configured');
     const path = tmpl.replace('{ref}', encodeURIComponent(externalRef));
-    return this.#normalizeResult(await this.#request(path));
+    return this.#normalizeResult(await this.#request(path, { deadline }));
   }
 
   #normalizeResult(data) {

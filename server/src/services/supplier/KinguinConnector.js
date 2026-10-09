@@ -145,12 +145,12 @@ export class KinguinConnector extends SupplierConnector {
   }
 
   /** Poll the order; once completed, fetch the real serials and deliver them. */
-  async checkFulfillment(externalRef) {
-    const order = await this.#request(`/v2/order/${encodeURIComponent(externalRef)}`);
+  async checkFulfillment(externalRef, { deadline } = {}) {
+    const order = await this.#request(`/v2/order/${encodeURIComponent(externalRef)}`, { deadline });
     const status = String(order?.status || '').toLowerCase();
     if (status === 'completed' || status === 'complete') {
       let keys = [];
-      try { keys = await this.#request(`/v2/order/${encodeURIComponent(externalRef)}/keys`); } catch { keys = []; }
+      try { keys = await this.#request(`/v2/order/${encodeURIComponent(externalRef)}/keys`, { deadline }); } catch { keys = []; }
       const arr = Array.isArray(keys) ? keys : (keys?.results || []);
       const deliveries = arr
         .map((k) => ({ type: k.type && /image/i.test(k.type) ? 'image' : 'code', content: k.serial || k.key || '' }))

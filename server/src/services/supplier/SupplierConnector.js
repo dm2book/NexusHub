@@ -117,7 +117,7 @@ export class SupplierConnector {
    * @param {string} externalRef
    * @returns {Promise<object>} fulfillment result
    */
-  async checkFulfillment(externalRef) {
+  async checkFulfillment(externalRef, _opts = {}) {
     throw new Error(`${this.constructor.kind} connector does not support status polling`);
   }
 }

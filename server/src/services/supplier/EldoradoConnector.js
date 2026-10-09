@@ -98,8 +98,8 @@ export class EldoradoConnector extends SupplierConnector {
     return this.#mapOrder(order);
   }
 
-  async checkFulfillment(externalRef) {
-    const order = await this.#request(`/v1/orders/${encodeURIComponent(externalRef)}`);
+  async checkFulfillment(externalRef, { deadline } = {}) {
+    const order = await this.#request(`/v1/orders/${encodeURIComponent(externalRef)}`, { deadline });
     return this.#mapOrder(order);
   }
 
