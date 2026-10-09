@@ -14,6 +14,7 @@
  * workflow (handled by the fulfillment service when supportsFulfillment=false).
  */
 import { SupplierConnector } from './SupplierConnector.js';
+import { supplierFetch } from './supplierHttp.js';
 import { parseMoney } from '../../utils/money.js';
 
 export class CsvConnector extends SupplierConnector {
@@ -25,7 +26,8 @@ export class CsvConnector extends SupplierConnector {
     const src = this.config.source || {};
     if (src.type === 'inline') return src.content || '';
     if (src.type === 'url' || src.url) {
-      const res = await fetch(src.url, { headers: this.config.headers || {}, signal: AbortSignal.timeout(30_000) });
+      // The feed URL is typed in by an admin: checked like any supplier host (supplierHttp.js).
+      const res = await supplierFetch(src.url, { headers: this.config.headers || {} }, { timeoutMs: 30_000 });
       if (!res.ok) throw new Error(`CSV fetch failed: HTTP ${res.status}`);
       return res.text();
     }

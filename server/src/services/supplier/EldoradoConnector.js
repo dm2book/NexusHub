@@ -22,8 +22,7 @@
  * fulfilment to the manual workflow (status: in_progress) — never throwing.
  */
 import { SupplierConnector } from './SupplierConnector.js';
-
-const SUPPLIER_TIMEOUT_MS = Number(process.env.SUPPLIER_TIMEOUT_MS || 15_000);
+import { supplierFetch } from './supplierHttp.js';
 
 const DEFAULT_BASE = 'https://api.eldorado.gg';
 
@@ -35,20 +34,19 @@ export class EldoradoConnector extends SupplierConnector {
 
   get #base() { return (this.config.baseUrl || DEFAULT_BASE).replace(/\/$/, ''); }
 
-  async #request(path, { method = 'GET', body } = {}) {
+  async #request(path, { method = 'GET', body, deadline } = {}) {
     if (!this.config.apiKey) throw new Error('Eldorado: no apiKey configured');
-    const res = await fetch(`${this.#base}${path}`, {
+    /* Time-limited, and the host checked when it is a configured baseUrl
+       rather than Eldorado's own (supplierHttp.js). */
+    const res = await supplierFetch(`${this.#base}${path}`, {
       method,
-      /* A supplier that never answers must not hold a paid order — or the
-         function — until the platform kills it mid-purchase. */
-      signal: AbortSignal.timeout(SUPPLIER_TIMEOUT_MS),
       headers: {
         'Authorization': `Bearer ${this.config.apiKey}`,
         'Content-Type': 'application/json',
         'Accept': 'application/json',
       },
       body: body ? JSON.stringify(body) : undefined,
-    });
+    }, { deadline, checkHost: !!this.config.baseUrl });
     const text = await res.text();
     const data = text ? safeJson(text) : null;
     if (!res.ok) {
@@ -95,6 +93,7 @@ export class EldoradoConnector extends SupplierConnector {
         deliveryDetails: req.deliveryDetails || req.metadata || {},
         externalReference: req.orderId,
       },
+      deadline: req.deadline,
     });
     return this.#mapOrder(order);
   }

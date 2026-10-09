@@ -35,6 +35,7 @@ import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'node:
 import { all, get, run, nowIso } from '../db/index.js';
 import { config } from '../config/env.js';
 import { audit } from './auditService.js';
+import { isDiscordWebhookUrl } from '../utils/discordWebhook.js';
 
 /**
  * Whether the keyring is worth anything.
@@ -150,7 +151,11 @@ export const SECRETS = [
   { id: 'notify.discordWebhookUrl', label: 'Discord alert webhook', env: 'NOTIFY_DISCORD_WEBHOOK_URL',
     /* Secret: whoever holds the URL can post as the shop. */
     path: ['notify', 'discordWebhookUrl'], group: 'Alerts', secret: true,
-    why: 'Where a chargeback or a failed delivery reaches you in seconds instead of by email.' },
+    why: 'Where a chargeback or a failed delivery reaches you in seconds instead of by email.',
+    /* The server POSTs to it: only a real Discord webhook, never an address
+       inside the hosting network. */
+    validate: (v) => (isDiscordWebhookUrl(v) ? null
+      : 'That is not a Discord webhook link (https://discord.com/api/webhooks/…).') },
   { id: 'notify.telegram.botToken', label: 'Telegram bot token', env: 'TELEGRAM_BOT_TOKEN',
     path: ['notify', 'telegram', 'botToken'], group: 'Alerts',
     why: 'An alternative alert channel.' },
@@ -286,6 +291,9 @@ export async function setSecret(id, value, { actor = null } = {}) {
   if (v && !strength.safe) {
     console.warn(`[secrets] storing "${id}" under a weak keyring — ${strength.reason}`);
   }
+
+  const invalid = v && spec.validate ? spec.validate(v) : null;
+  if (invalid) { const e = new Error(invalid); e.status = 400; throw e; }
 
   if (!v) {
     await run(`DELETE FROM app_secrets WHERE key = @k`, { k: id });

@@ -12,7 +12,6 @@ import { iconFor } from '../lib/sampleCatalog.js';
 import { navigateWithTransition } from '../lib/viewTransition.js';
 import LightProductCard from '../components/store/LightProductCard.jsx';
 import { usePageMeta } from '../lib/useMeta.js';
-import { matchBundle } from '../lib/bundles.js';
 import { useStickyBarLift } from '../lib/useStickyBarLift.js';
 
 export default function Cart() {
@@ -22,24 +21,40 @@ export default function Cart() {
      German. */
   usePageMeta();
   useStickyBarLift(); // keep the chat bubble off the sticky checkout bar
-  const { items, setQty, remove, subtotal, currency, add } = useCart();
+  const { items, setQty, remove, subtotal, currency, add, quote: priceCart } = useCart();
   const { user } = useAuth();
   const { t } = useI18n();
   const navigate = useNavigate();
-  // The cart used to show the plain subtotal, so a bundle looked more expensive
-  // here than on the card that sold it — and than what the server actually
-  // charges. Same rule as checkout, from one place.
-  const [bundles, setBundles] = useState([]);
-  useEffect(() => { api.get('/api/bundles').then((r) => setBundles(r.bundles || [])).catch(() => {}); }, []);
-  const bundle = matchBundle(items, bundles);
-  /* The server also takes a standing percentage off for Forge+ members
-     (createOrder → memberDiscountPercent). This total left it out, so a member
-     saw €4.49 here and was billed €4.27 — the same class of mismatch as the
-     bundle bug: the client recomputing a total the server owns. Mirrors the
-     server's order: percentage off the SUBTOTAL, then the bundle. */
-  const memberPercent = user?.memberPercent || 0;
-  const memberDiscount = memberPercent ? Math.round(subtotal * memberPercent / 100) : 0;
-  const total = Math.max(0, subtotal - memberDiscount - (bundle?.discount || 0));
+  /* The summary is the server's — the pricing the order itself runs
+     (POST /api/checkout/quote). This page worked it out: the Forge+ percentage
+     off the whole subtotal and the bundle by its own rule, mystery boxes
+     included although the order leaves them out, no 40% ceiling, and all of it
+     on the prices saved when each item was added. Until the first answer
+     lands, the cart's own prices are shown without discounts, dimmed. */
+  const [quote, setQuote] = useState(null);
+  const [quoteKey, setQuoteKey] = useState('');
+  const [priceNotice, setPriceNotice] = useState([]);
+  const cartKey = items.map((i) => `${i.id}:${i.qty}`).join(',');
+  const askKey = `${cartKey}|${user?.id || ''}`;
+  useEffect(() => {
+    if (!cartKey) return undefined;
+    let live = true;
+    const timer = setTimeout(() => {
+      priceCart().then((r) => {
+        if (!live || !r) return;
+        setQuote(r.quote);
+        setQuoteKey(askKey);
+        // The cart now holds today's prices; the lines that moved are named below.
+        if (r.changed.length) {
+          setPriceNotice((cur) => [...cur.filter((c) => !r.changed.some((x) => x.id === c.id)), ...r.changed]);
+        }
+      }).catch(() => {});
+    }, 250);
+    return () => { live = false; clearTimeout(timer); };
+  }, [askKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const updating = quoteKey !== askKey;
+  const lineFor = (it) => quote?.lines.find((l) => l.productId === it.id);
+  const total = quote ? quote.total : subtotal;
 
   if (items.length === 0) {
     return (
@@ -78,7 +93,7 @@ export default function Cart() {
                 </div>
                 <div className="min-w-0 sm:flex-1 self-center">
                   <Link to={`/product/${it.id}`} className="font-semibold text-slate-900 py-1 -my-1 hover:text-violet-600 transition line-clamp-2">{it.name}</Link>
-                  <div className="text-slate-400 text-sm">{money(it.price, it.currency)} {t('cart.each', 'each')}</div>
+                  <div className="text-slate-400 text-sm">{money(lineFor(it)?.unitPrice ?? it.price, it.currency)} {t('cart.each', 'each')}</div>
                 </div>
                 <button onClick={() => remove(it.id)} aria-label={t('cart.remove', 'Remove')}
                   className="w-11 h-11 shrink-0 self-start sm:self-center grid place-items-center rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 sm:order-last"><Trash2 size={17} /></button>
@@ -90,7 +105,7 @@ export default function Cart() {
                     <button onClick={() => setQty(it.id, it.qty + 1)} aria-label={t('cart.more', 'One more')}
                       className="w-11 h-11 grid place-items-center text-slate-500 hover:text-slate-900 rounded-r-xl active:scale-95 transition-transform"><Plus size={16} /></button>
                   </div>
-                  <div className="sm:w-24 text-right font-bold text-[17px] sm:text-base text-slate-900 tabular-nums">{money(it.price * it.qty, it.currency)}</div>
+                  <div className="sm:w-24 text-right font-bold text-[17px] sm:text-base text-slate-900 tabular-nums">{money((lineFor(it)?.unitPrice ?? it.price) * it.qty, it.currency)}</div>
                 </div>
               </div>
             );
@@ -99,29 +114,48 @@ export default function Cart() {
 
         <div style={{ viewTransitionName: 'order-summary' }} className="bg-white rounded-2xl border border-slate-200/70 shadow-sm p-6 h-fit">
           <h3 className="font-bold text-slate-900 mb-5">{t('cart.summary', 'Order summary')}</h3>
-          <div className="flex justify-between text-sm text-slate-500 mb-2">
-            <span>{t('cart.subtotal', 'Subtotal')}</span><span className="text-slate-900 font-medium">{money(subtotal, currency)}</span>
-          </div>
-          {bundle && (
-            <div className="flex justify-between text-sm mb-2">
-              <span className="text-violet-600 font-medium">
-                {t('cart.bundleApplied', 'Bundle')} · {bundle.name} (−{bundle.percent}%)
-              </span>
-              <span className="text-violet-600 font-semibold">−{money(bundle.discount, currency)}</span>
+          {/* A price that moved since the item went into the cart: the cart
+              now holds today's price, and says which one changed. */}
+          {priceNotice.length > 0 && (
+            <div role="status" className="rounded-xl border border-amber-300 bg-amber-50 p-3 mb-4">
+              <p className="text-amber-800 text-[12.5px] font-semibold">
+                {t('checkout.priceChanged', 'A price changed since you added it to your cart. You pay today’s price — {amount} in total.',
+                  { amount: money(total, currency) })}
+              </p>
+              <ul className="mt-1.5 space-y-0.5 text-[12.5px] text-slate-600">
+                {priceNotice.map((c) => (
+                  <li key={c.id} className="break-words">
+                    {c.name}: <s className="text-slate-400">{money(c.was, currency)}</s> → <span className="text-slate-900">{money(c.now, currency)}</span>
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
-          {memberDiscount > 0 && (
-            <div className="flex justify-between text-sm mb-2">
-              <span className="text-violet-600 font-medium">{t('cart.memberOff', 'Forge+ member — {n}% off', { n: memberPercent })}</span>
-              <span className="text-violet-600 font-medium">−{money(memberDiscount, currency)}</span>
+          <div aria-busy={updating} className={`transition-opacity ${updating ? 'opacity-60' : ''}`}>
+            <div className="flex justify-between text-sm text-slate-500 mb-2">
+              <span>{t('cart.subtotal', 'Subtotal')}</span><span className="text-slate-900 font-medium">{money(quote ? quote.subtotal : subtotal, currency)}</span>
             </div>
-          )}
-          <div className="flex justify-between text-sm text-slate-500 mb-4">
-            <span>{t('cart.delivery', 'Delivery')}</span><span className="text-emerald-600 font-medium">{t('cart.deliveryFree', 'Free')}</span>
-          </div>
-          <div className="flex justify-between text-lg border-t border-slate-100 pt-4 mb-6">
-            <span className="text-slate-600">{t('cart.total', 'Total')}</span>
-            <span className="text-slate-900 font-bold">{money(total, currency)}</span>
+            {quote?.bundleDiscount > 0 && (
+              <div className="flex justify-between text-sm mb-2">
+                <span className="text-violet-600 font-medium">
+                  {t('cart.bundleApplied', 'Bundle')} · {quote.bundle?.name} (−{quote.bundle?.percent}%)
+                </span>
+                <span className="text-violet-600 font-semibold">−{money(quote.bundleDiscount, currency)}</span>
+              </div>
+            )}
+            {quote?.memberDiscount > 0 && (
+              <div className="flex justify-between text-sm mb-2">
+                <span className="text-violet-600 font-medium">{t('cart.memberOff', 'Forge+ member — {n}% off', { n: quote.memberPercent })}</span>
+                <span className="text-violet-600 font-medium">−{money(quote.memberDiscount, currency)}</span>
+              </div>
+            )}
+            <div className="flex justify-between text-sm text-slate-500 mb-4">
+              <span>{t('cart.delivery', 'Delivery')}</span><span className="text-emerald-600 font-medium">{t('cart.deliveryFree', 'Free')}</span>
+            </div>
+            <div className="flex justify-between text-lg border-t border-slate-100 pt-4 mb-6">
+              <span className="text-slate-600">{t('cart.total', 'Total')}</span>
+              <span className="text-slate-900 font-bold">{money(total, currency)}</span>
+            </div>
           </div>
           <button onClick={() => navigateWithTransition(navigate, '/checkout')} className="btn-primary w-full py-3">
             {t('cart.checkout', 'Checkout')} <ArrowRight size={18} />

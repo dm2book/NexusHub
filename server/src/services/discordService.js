@@ -15,6 +15,7 @@ import { config } from '../config/env.js';
 import { bannerUrl } from '../../../src/lib/discordBanners.js';
 import { run, get, all, nowIso } from '../db/index.js';
 import { newId } from '../utils/ids.js';
+import { isDiscordWebhookUrl } from '../utils/discordWebhook.js';
 
 let cache = { at: 0, data: null };
 const TTL_MS = 60_000;
@@ -444,6 +445,12 @@ export async function postFraudHoldAlert(order, { score, signals = [] } = {}) {
  */
 async function postWebhook(url, payload) {
   if (!url) return false;
+  // Discord's own hosts only in production: these URLs come from settings,
+  // not from code (locally a test stub on 127.0.0.1 stands in for Discord).
+  if (config.isProd && !isDiscordWebhookUrl(url)) {
+    console.error('[discord] webhook setting is not a discord.com webhook link — not posting');
+    return false;
+  }
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 5_000);
   try {

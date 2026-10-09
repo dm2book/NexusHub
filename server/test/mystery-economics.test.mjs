@@ -189,12 +189,20 @@ console.log('— A box takes no discount —');
   const coinRefused = await throws(() => createOrder({ email: c.email, userId: c.id, coupon: couponCode,
     items: [{ productId: box20.id, quantity: 1 }], ...consent }));
   ok('a €5 Forge-Coin coupon does not pay for a box', !!coinRefused, coinRefused?.message || 'accepted');
+  /* New coin codes carry a minimum order of value / 0.40 on the discountable
+     part (pricing-integrity #11): €12.50 for the €5 code. The box does not
+     count toward it, so a €10 card next to the box is refused without using
+     the code up, and a €12.50 card gets the code's full €5 — nothing off the box. */
+  const coinTooSmall = await throws(() => createOrder({ email: c.email, userId: c.id, coupon: couponCode,
+    items: [{ productId: box20.id, quantity: 1 }, { productId: card10.id, quantity: 1 }], ...consent }));
+  ok('…the box does not count toward a coin code\'s minimum order', !!coinTooSmall && /12[.,]50/.test(coinTooSmall.message || ''),
+    coinTooSmall?.message || 'accepted');
+  const card1250 = await makeCard(1250);
   const coinMixed = await createOrder({ email: c.email, userId: c.id, coupon: couponCode,
-    items: [{ productId: box20.id, quantity: 1 }, { productId: card10.id, quantity: 1 }], ...consent })
+    items: [{ productId: box20.id, quantity: 1 }, { productId: card1250.id, quantity: 1 }], ...consent })
     .catch((e) => ({ total: NaN, error: e.message }));
-  const ceiling = Math.round(1000 * config.market.maxTotalDiscountPercent / 100);
-  ok('…and on a mixed cart takes no more than the ceiling of the code it discounts',
-    coinMixed.total === 4999 + 1000 - Math.min(500, ceiling), `${coinMixed.total} ≠ ${4999 + 1000 - Math.min(500, ceiling)}`);
+  ok('…and on a mixed cart it discounts the code only, in full',
+    coinMixed.total === 4999 + 1250 - 500, `${coinMixed.total} ≠ ${4999 + 1250 - 500} ${coinMixed.error || ''}`);
 
   const b = await newUser();
   const card3 = await makeCard(2500);

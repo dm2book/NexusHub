@@ -15,7 +15,7 @@ import { newId } from '../utils/ids.js';
 import { notFound, conflict, badRequest } from '../utils/errors.js';
 import { createConnector } from './supplier/registry.js';
 import { resolveFulfillmentSupplier, getSupplier } from './supplier/supplierService.js';
-import { getOrder, transitionOrder, canTransition, autoDispenseFromStock, insertDeliveries } from './orderService.js';
+import { getOrder, transitionOrder, canTransition, autoDispenseFromStock, insertDeliveries, openMysteryBoxes } from './orderService.js';
 import { notify } from './notificationService.js';
 import { alertOwner } from './notifyService.js';
 import { config } from '../config/env.js';
@@ -59,9 +59,30 @@ export async function fulfillOrder(orderId, ctx = {}) {
     order = await getOrder(orderId);
   }
 
-  const summary = { auto: 0, manual: 0, requests: [] };
+  const summary = { auto: 0, manual: 0, skipped: [], requests: [] };
   for (const item of order.items) {
+    /* One purchase per item. The admin's Fulfil button runs this too, and it
+       used to open a fresh request for every item every time it was pressed:
+       a second click, or a click while the queue was buying the same order,
+       bought the code twice. An item with a request in flight or delivered is
+       left alone; so is one whose earlier purchase got no answer (it may have
+       been bought — a person checks at the supplier first); and an item
+       already waiting in the hand-delivery queue gets no second manual task. */
+    const prior = await all(`SELECT mode, status, result FROM fulfillment_requests
+                              WHERE order_id=@o AND order_item_id=@i`, { o: order.id, i: item.id });
+    const live = prior.find((r) => ['requested', 'in_progress', 'fulfilled'].includes(r.status));
+    const unanswered = prior.find((r) => /"outcome"\s*:\s*"unknown"/.test(String(r.result || '')));
+    if (live || unanswered) {
+      summary.skipped.push({ item: item.id, reason: live
+        ? `already ${live.status === 'fulfilled' ? 'delivered' : 'being bought'}`
+        : 'an earlier purchase got no answer — check at the supplier before buying it again' });
+      continue;
+    }
     const resolved = item.product_id ? await resolveFulfillmentSupplier(item.product_id, { orderId: order.id }) : null;
+    if (!resolved && prior.some((r) => r.mode === 'manual' && r.status === 'pending')) {
+      summary.skipped.push({ item: item.id, reason: 'already in the hand-delivery queue' });
+      continue;
+    }
     if (resolved) {
       summary.requests.push(await runAutoFulfillment(order, item, resolved, ctx));
       summary.auto++;
@@ -73,6 +94,29 @@ export async function fulfillOrder(orderId, ctx = {}) {
 
   await maybeCompleteOrder(orderId, ctx);
   return summary;
+}
+
+/**
+ * The admin's Fulfil button.
+ *
+ * Takes the supplier queue's lease for the duration, so a click cannot run
+ * beside the payment webhook or the maintenance drain buying the same order
+ * (fulfillOrder's per-item check then sees what they bought), and refuses an
+ * order held for fraud review — buying first and reviewing afterwards spends
+ * real money on an order that may be refused, the reason the queue skips held
+ * orders too.
+ */
+export async function fulfillOrderByHand(orderId, ctx = {}) {
+  const row = await get('SELECT fraud_hold FROM orders WHERE id=@id', { id: orderId });
+  if (!row) throw notFound('Order not found');
+  if (row.fraud_hold) throw conflict('This order is held for fraud review — approve it under Security first.');
+  const token = await acquireLease();
+  if (!token) throw conflict('A supplier purchase is running right now — try again in a minute.');
+  try {
+    return await fulfillOrder(orderId, ctx);
+  } finally {
+    await releaseLease(token);
+  }
 }
 
 async function runAutoFulfillment(order, item, { supplier, supplierProduct }, ctx) {
@@ -88,6 +132,8 @@ async function runAutoFulfillment(order, item, { supplier, supplierProduct }, ct
 
   try {
     const connector = createConnector(supplier);
+    // Out of time before the call: nothing is sent, and nobody else can be asked in this run either.
+    if (ctx.deadline && Date.now() >= ctx.deadline) throw new Error('Not sent: the time for this run was used up');
     await logFulfillment('dispatched', { requestId: reqId, orderId: order.id, actor: supplier.id,
       detail: { sku: supplierProduct.supplier_sku, quantity: item.quantity } });
 
@@ -99,6 +145,7 @@ async function runAutoFulfillment(order, item, { supplier, supplierProduct }, ct
       quantity: item.quantity,
       customerEmail: order.email,
       metadata: item.metadata,
+      deadline: ctx.deadline || null,                    // the drain's: the call is cut off there
     });
 
     await persistResult(reqId, order, item, result);
@@ -108,18 +155,29 @@ async function runAutoFulfillment(order, item, { supplier, supplierProduct }, ct
        as one that threw — same path, so it gets the same failover. */
     if (result.status === 'failed') throw new Error(result.error || 'the supplier reported the delivery as failed');
   } catch (err) {
+    /* No answer is not a "no". A call cut off by its time limit — the
+       connector's own, or the deadline of the drain it is part of — may well
+       have reached the supplier and been bought. Another supplier, or the
+       queue later on, would then buy it a second time. So such an item is
+       never tried again automatically: it goes to a person, who looks at the
+       supplier's own order list first. */
+    const unanswered = err?.name === 'TimeoutError' || err?.name === 'AbortError';
+    const failure = { error: err.message, ...(unanswered ? { outcome: 'unknown' } : {}) };
     await run(`UPDATE fulfillment_requests SET status='failed', result=@r, updated_at=@at WHERE id=@id`,
-        { r: JSON.stringify({ error: err.message }), at: nowIso(), id: reqId });
+        { r: JSON.stringify(failure), at: nowIso(), id: reqId });
     await logFulfillment('error', { requestId: reqId, orderId: order.id, actor: supplier.id,
-      detail: { error: err.message } });
+      detail: failure });
 
     /* Failover: try the next best supplier for this item before the owner has
        to. Bounded — at most two hops — and the suppliers that already failed
        this order are excluded, so it cannot loop. The switch itself is logged
-       by the failover service with the reason "errors". */
+       by the failover service with the reason "errors". Not after a call with
+       no answer (above), and not once the drain is out of time: the next
+       supplier would only be cut off too. */
     const excluded = [...(ctx.excluded || []), supplier.id];
     const depth = ctx.failoverDepth || 0;
-    if (item.product_id && depth < 2) {
+    const timeLeft = !ctx.deadline || Date.now() < ctx.deadline;
+    if (!unanswered && timeLeft && item.product_id && depth < 2) {
       const { resolveFulfillmentSupplier: next } = await import('./supplier/supplierService.js');
       const alt = await next(item.product_id, { orderId: order.id, exclude: excluded }).catch(() => null);
       if (alt && !excluded.includes(alt.supplier.id)) {
@@ -129,29 +187,48 @@ async function runAutoFulfillment(order, item, { supplier, supplierProduct }, ct
       }
     }
 
-    /* Tell the owner, because nobody else will.
-
-       A failed fulfilment is the quietest expensive thing this shop does: the
-       buyer has paid, the order sits in the queue, and the first sign is a
-       ticket some hours later asking where the code is. Every other failure
-       here already had a log line, and a log line is only read by someone who
-       already suspects there is a problem.
-
-       Keyed on the request, so the maintenance sweep re-reading the same failed
-       request does not page again for a failure that has not changed. */
-    await alertOwner('fulfillment.failed', {
-      title: `${order.number} · ${item.name || 'item'} could not be fulfilled`,
-      lines: [
-        `Supplier: ${supplier.name || supplier.id}`,
-        `Error: ${String(err.message || 'unknown').slice(0, 200)}`,
-        `Customer: ${order.email}`,
-        'The order stays in the queue — deliver it by hand or refund it.',
-      ],
-      url: `${config.appUrl}/admin/orders/${order.id}`,
-      key: reqId,
-    }).catch(() => {});
+    await handToPerson(order, item, { requestId: reqId, supplier, error: err.message, unanswered }, ctx);
   }
   return get('SELECT * FROM fulfillment_requests WHERE id=@id', { id: reqId });
+}
+
+/**
+ * An item no supplier delivered goes to a person — now, and per item.
+ *
+ * It used to stay a failed request and an alert. The order then waited for
+ * the sweep, whose net (ensureManualFulfillment) only sees whole orders: an
+ * item that failed beside one that was delivered was never queued at all, and
+ * one that failed alone was kept out by "a supplier would still take it" —
+ * while the queue never takes an order that already has a request. The alert
+ * said "the order stays in the queue"; now it does.
+ */
+async function handToPerson(order, item, { requestId, supplier, error, unanswered }, ctx = {}) {
+  await openManualFulfillment(order, item, ctx, unanswered
+    ? `No answer from ${supplier?.name || 'the supplier'} in time — it may have been bought there`
+    : `No supplier could deliver it: ${String(error || 'unknown').slice(0, 200)}`);
+
+  /* Tell the owner, because nobody else will.
+
+     A failed fulfilment is the quietest expensive thing this shop does: the
+     buyer has paid, the order sits in the queue, and the first sign is a
+     ticket some hours later asking where the code is. Every other failure
+     here already had a log line, and a log line is only read by someone who
+     already suspects there is a problem.
+
+     Keyed on the request, so the maintenance sweep re-reading the same failed
+     request does not page again for a failure that has not changed. */
+  await alertOwner('fulfillment.failed', {
+    title: `${order.number} · ${item.name || 'item'} could not be fulfilled`,
+    lines: [
+      `Supplier: ${supplier?.name || supplier?.id || 'unknown'}`,
+      `Error: ${String(error || 'unknown').slice(0, 200)}`,
+      ...(unanswered ? ['No answer in time — it may have been bought at the supplier. Check there before buying it again.'] : []),
+      `Customer: ${order.email}`,
+      'The order stays in the queue — deliver it by hand or refund it.',
+    ],
+    url: `${config.appUrl}/admin/orders/${order.id}`,
+    key: requestId,
+  }).catch(() => {});
 }
 
 async function persistResult(reqId, order, item, result) {
@@ -169,7 +246,7 @@ async function persistResult(reqId, order, item, result) {
   await insertDeliveries(order.id, (result.deliveries || []).map((d) => ({ ...d, orderItemId: item.id })));
 }
 
-async function openManualFulfillment(order, item, ctx) {
+async function openManualFulfillment(order, item, ctx, reason = 'No supplier integration available') {
   const reqId = newId('ful');
   const at = nowIso();
   await run(`INSERT INTO fulfillment_requests
@@ -177,7 +254,7 @@ async function openManualFulfillment(order, item, ctx) {
        VALUES (@id, @oid, @iid, 'manual', 'pending', @at, @at)`,
       { id: reqId, oid: order.id, iid: item.id, at });
   await logFulfillment('created', { requestId: reqId, orderId: order.id, actor: ctx.actorId,
-    detail: { mode: 'manual', item: item.id, reason: 'No supplier integration available' } });
+    detail: { mode: 'manual', item: item.id, reason } });
   return get('SELECT * FROM fulfillment_requests WHERE id=@id', { id: reqId });
 }
 
@@ -310,15 +387,23 @@ export async function listManualQueue() {
 
 /**
  * Ensure a paid order that can't be delivered automatically becomes visible for
- * hand-delivery. Opens a manual fulfillment request per item when the order has
- * NO fulfillment requests yet and no item resolves to an auto supplier (so the
- * serial queue isn't already going to buy it). Idempotent — safe to re-run.
+ * hand-delivery. Opens a manual fulfillment request per item when nothing is
+ * delivering the order: no request in progress, and either an automatic one
+ * already failed or no item resolves to an auto supplier (so the serial queue
+ * isn't going to buy it). A boxes-only order is left to its box opening.
+ * Idempotent — safe to re-run.
  * This closes the gap where a paid order with no stock and no auto-supplier
  * (e.g. a P2P Robux/V-Bucks top-up) would otherwise sit invisible.
  */
 export async function ensureManualFulfillment(orderId, ctx = {}) {
   const order = await getOrder(orderId);
   if (!order || ['completed', 'refunded', 'cancelled'].includes(order.status)) return false;
+  /* A boxes-only order is delivered by opening its boxes (openMysteryBoxes),
+     which the payment starts right beside this one and which completes the
+     order. Queueing it for a person as well raced that: staff got a "deliver
+     this" task for a prize already paid out, or the queue tried to move the
+     completed order back ("Cannot move order from completed to processing"). */
+  if (await opensItself(order)) return false;
   /* A FAILED request is not "already handled".
      This guard asked whether any row existed, so an order whose automatic
      fulfilment had failed looked handled to every caller — including the
@@ -328,10 +413,29 @@ export async function ensureManualFulfillment(orderId, ctx = {}) {
   const existing = await get(
     `SELECT id FROM fulfillment_requests WHERE order_id=@o AND status <> 'failed' LIMIT 1`, { o: orderId });
   if (existing) return false; // already handled (auto in-flight or manual queued)
-  for (const item of order.items) {
-    if (item.product_id && await resolveFulfillmentSupplier(item.product_id)) return false; // queue owns it
+  /* "A supplier would take it" only means the queue owns an order it has not
+     tried yet: nextSupplierOrder never picks up one that already has a request.
+     Asked of a failed order, it kept that order out of both — paid,
+     undelivered, and nobody's. */
+  const tried = await get(`SELECT id FROM fulfillment_requests WHERE order_id=@o LIMIT 1`, { o: orderId });
+  if (!tried) {
+    for (const item of order.items) {
+      if (item.product_id && await resolveFulfillmentSupplier(item.product_id)) return false; // queue owns it
+    }
   }
   return queueForHandDelivery(order, ctx);
+}
+
+/** Every item a mystery box that opening it will deliver: an account to credit
+ *  and a prize to roll — the same test openMysteryBoxes completes the order on.
+ *  A box with no prizes cannot deliver itself; that order stays a person's. */
+async function opensItself(order) {
+  if (!order?.userId || !order.items?.length) return false;
+  const rows = await all(
+    `SELECT p.kind, EXISTS (SELECT 1 FROM mystery_box_rewards r WHERE r.box_id = p.id) AS "hasPrizes"
+       FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id
+      WHERE oi.order_id = @o`, { o: order.id });
+  return rows.length > 0 && rows.every((r) => r.kind === 'mystery') && rows.some((r) => r.hasPrizes);
 }
 
 /** Open manual fulfillment requests for every item of a paid order, advancing
@@ -355,6 +459,10 @@ async function queueForHandDelivery(order, ctx = {}) {
     detail: { reason: 'not auto-deliverable — queued for hand delivery', items: order.items.length } });
   return true;
 }
+
+/* How long a boxes-only order may stay paid before the sweep opens its boxes
+   itself — the payment's own opening has long finished by then. */
+const BOX_RETRY_AFTER_MS = 5 * 60_000;
 
 /**
  * Backfill sweep (maintenance): paid orders that nothing has picked up.
@@ -386,8 +494,12 @@ export async function sweepUnfulfilledPaidOrders({ limit = 50 } = {}) {
      retry, no queue, no second alert. The customer's next move is a chargeback.
      A failed request does not go back through autoDispenseFromStock — that is
      the path that just failed — it goes straight to a person. */
+  const interrupted = await recoverInterruptedPurchases({ limit }).catch((e) => {
+    console.error('[fulfillment:sweep] interrupted purchases', e.message);
+    return 0;
+  });
   const rows = await all(
-    `SELECT o.id, EXISTS (
+    `SELECT o.id, o.updated_at AS "updatedAt", EXISTS (
               SELECT 1 FROM fulfillment_requests fr
                WHERE fr.order_id = o.id AND fr.status = 'failed') AS "hadFailure"
        FROM orders o
@@ -396,7 +508,7 @@ export async function sweepUnfulfilledPaidOrders({ limit = 50 } = {}) {
               SELECT 1 FROM fulfillment_requests fr
                WHERE fr.order_id = o.id AND fr.status <> 'failed')
       ORDER BY o.created_at ASC LIMIT @l`, { l: limit });
-  let queued = 0, dispensed = 0, recovered = 0;
+  let queued = interrupted, dispensed = 0, recovered = interrupted, opened = 0;
   for (const r of rows) {
     try {
       if (r.hadFailure) {
@@ -407,12 +519,66 @@ export async function sweepUnfulfilledPaidOrders({ limit = 50 } = {}) {
         dispensed++;
         continue;
       }
+      /* A boxes-only order is delivered by opening its boxes, which the payment
+         starts beside all of this. Still paid minutes later, that opening
+         failed or never ran — so it is retried here, the way stock is above.
+         openMysteryBoxes does not roll a box twice; the minutes keep this from
+         running at the same moment as the payment's own opening. */
+      if (Date.parse(r.updatedAt) < Date.now() - BOX_RETRY_AFTER_MS
+        && await opensItself(await getOrder(r.id)) && (await openMysteryBoxes(r.id)).length) {
+        opened++;
+        continue;
+      }
       if (await ensureManualFulfillment(r.id, { actorId: 'system' })) queued++;
     } catch (e) { console.error('[fulfillment:sweep]', e.message); }
   }
   if (dispensed) console.log(`[fulfillment:sweep] auto-delivered ${dispensed} stuck order(s) from stock`);
+  if (opened) console.log(`[fulfillment:sweep] opened the mystery boxes of ${opened} paid order(s)`);
   if (recovered) console.log(`[fulfillment:sweep] ${recovered} failed fulfilment(s) handed to the manual queue`);
-  return { queued, dispensed, recovered };
+  return { queued, dispensed, recovered, opened };
+}
+
+/* Far beyond the longest a purchase can be in flight: a drain's budget, or a
+   connector's own timeouts and two failover hops when staff press "Fulfil". */
+const INTERRUPTED_AFTER_MS = 10 * 60_000;
+
+/**
+ * Purchases a function was killed in the middle of.
+ *
+ * runAutoFulfillment writes the request, calls the supplier, then records the
+ * answer. A function killed in between — Vercel's 30-second limit did exactly
+ * that from the payment webhook — leaves the request at 'requested' forever.
+ * The order is then paid, undelivered and invisible: the sweep above skips an
+ * order with a request, the queue skips it, and nothing re-polls a request
+ * without an answer. Whether the supplier bought it is unknown, so it is not
+ * bought again: it goes to a person, marked as such.
+ */
+async function recoverInterruptedPurchases({ limit = 50 } = {}) {
+  const rows = await all(
+    `SELECT fr.id, fr.order_id, fr.order_item_id, fr.supplier_id
+       FROM fulfillment_requests fr JOIN orders o ON o.id = fr.order_id
+      WHERE fr.mode = 'auto' AND fr.status = 'requested' AND fr.updated_at < @cut
+        AND o.status IN ('payment_received','processing','awaiting_fulfillment')
+      ORDER BY fr.updated_at ASC LIMIT @l`,
+    { cut: new Date(Date.now() - INTERRUPTED_AFTER_MS).toISOString(), l: limit });
+  const error = 'The purchase was interrupted before the supplier\'s answer was recorded';
+  let handed = 0;
+  for (const r of rows) {
+    // The status flip is the claim: two sweeps at once hand it over once.
+    const claimed = await run(`UPDATE fulfillment_requests SET status='failed', result=@res, updated_at=@at
+                                WHERE id=@id AND status='requested'`,
+      { res: JSON.stringify({ error, outcome: 'unknown' }), at: nowIso(), id: r.id });
+    if (!claimed?.changes) continue;
+    const order = await getOrder(r.order_id);
+    const item = order?.items.find((i) => i.id === r.order_item_id);
+    if (!item) continue;
+    await logFulfillment('error', { requestId: r.id, orderId: order.id, actor: 'system',
+      detail: { error, outcome: 'unknown' } });
+    const supplier = r.supplier_id ? await getSupplier(r.supplier_id).catch(() => null) : null;
+    await handToPerson(order, item, { requestId: r.id, supplier, error, unanswered: true }, { actorId: 'system' });
+    handed++;
+  }
+  return handed;
 }
 
 /**
@@ -534,6 +700,9 @@ async function nextSupplierOrder(skip = new Set()) {
   return null;
 }
 
+/* The end of a drain's budget in which no new purchase is started (see below). */
+const MIN_PURCHASE_MS = 2_000;
+
 /**
  * Drain the supplier queue serially: process paid orders one after another,
  * oldest first, buying + delivering each fully before the next. Only one worker
@@ -554,9 +723,20 @@ async function nextSupplierOrder(skip = new Set()) {
  * holder looks once more: anything that arrived in that moment is either taken
  * by its own payment (the lease is free now) or by this worker going round
  * again.
+ *
+ * ── THE BUDGET IS A DEADLINE ────────────────────────────────────────────────
+ * It used to be looked at only between orders, so one purchase that took 15 s
+ * ran straight past it — from inside the payment webhook, past the 30 s Vercel
+ * gives the whole invocation ("Task timed out after 30 seconds"). Now it is
+ * handed down to the supplier call, which is cut off when it runs out
+ * (supplierFetch). No new order is started in its last MIN_PURCHASE_MS: a
+ * purchase cut off has no answer, and that order goes to a person instead of
+ * being bought again (runAutoFulfillment).
  */
 export async function drainSupplierQueue(ctx = {}, { maxOrders = 500, budgetMs = 22_000 } = {}) {
   const start = Date.now();
+  const deadline = start + budgetMs;
+  const hasTime = () => deadline - Date.now() > Math.min(MIN_PURCHASE_MS, budgetMs / 2);
   const attempted = new Set();
   let processed = 0;
   let rounds = 0;
@@ -566,19 +746,19 @@ export async function drainSupplierQueue(ctx = {}, { maxOrders = 500, budgetMs =
     rounds++;
     let emptied = false;
     try {
-      while (attempted.size < maxOrders && Date.now() - start < budgetMs) {
+      while (attempted.size < maxOrders && hasTime()) {
         const id = await nextSupplierOrder(attempted);
         if (!id) { emptied = true; break; }
         attempted.add(id); // mark before working so a no-op (margin guard) advances
         // Fully source + deliver THIS one order before looking at the next.
-        const did = await autoFulfillFromSuppliers(id, { ...ctx, actorId: ctx.actorId || 'system' })
+        const did = await autoFulfillFromSuppliers(id, { ...ctx, actorId: ctx.actorId || 'system', deadline })
           .catch((e) => { console.error('[supplier-queue]', id, e.message); return false; });
         if (did) processed++;
       }
     } finally {
       await releaseLease(token);
     }
-    if (!emptied || Date.now() - start >= budgetMs || rounds >= 5) break;
+    if (!emptied || !hasTime() || rounds >= 5) break;
     if (!(await nextSupplierOrder(attempted))) break;
   }
   return { processed };

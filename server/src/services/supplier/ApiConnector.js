@@ -15,9 +15,8 @@
  * for flexibility a literal token in config is also supported.
  */
 import { SupplierConnector } from './SupplierConnector.js';
+import { supplierFetch } from './supplierHttp.js';
 import { parseMoney } from '../../utils/money.js';
-
-const SUPPLIER_TIMEOUT_MS = Number(process.env.SUPPLIER_TIMEOUT_MS || 15_000);
 
 export class ApiConnector extends SupplierConnector {
   static kind = 'api';
@@ -37,15 +36,15 @@ export class ApiConnector extends SupplierConnector {
     return `${base}/${String(path || '').replace(/^\//, '')}`;
   }
 
-  async #request(path, { method = 'GET', body } = {}) {
-    const res = await fetch(this.#url(path), {
+  async #request(path, { method = 'GET', body, deadline } = {}) {
+    /* The base URL is whatever an admin typed in, so its host is checked on
+       every request and redirect; the call ends at the connector's timeout or
+       the caller's deadline, whichever comes first (supplierHttp.js). */
+    const res = await supplierFetch(this.#url(path), {
       method,
-      /* A supplier that never answers must not hold a paid order — or the
-         function — until the platform kills it mid-purchase. */
-      signal: AbortSignal.timeout(SUPPLIER_TIMEOUT_MS),
       headers: this.#headers(),
       body: body ? JSON.stringify(body) : undefined,
-    });
+    }, { deadline });
     const text = await res.text();
     let data; try { data = text ? JSON.parse(text) : null; } catch { data = text; }
     if (!res.ok) {
@@ -118,6 +117,7 @@ export class ApiConnector extends SupplierConnector {
         customerEmail: req.customerEmail,
         metadata: req.metadata,
       },
+      deadline: req.deadline,
     });
     return this.#normalizeResult(data);
   }

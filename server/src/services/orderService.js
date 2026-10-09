@@ -89,6 +89,145 @@ export function canTransition(from, to) {
 
 // ── Creation ───────────────────────────────────────────────────────────────
 
+/**
+ * What an order costs — worked out once, here.
+ *
+ * createOrder charges it and POST /api/checkout/quote shows it, both from this
+ * function, so the amount on the checkout's pay button is the amount of the
+ * order. The checkout used to do the arithmetic itself, on the prices saved in
+ * the cart when each item was added: a price changed since then was quoted at
+ * the old one, the €0.50 card minimum was missing, and the discounts were taken
+ * off mystery boxes that the order leaves alone.
+ *
+ * Only product ids and quantities come in; every price comes from the
+ * catalogue. Refusals a buyer can do something about — a code that does not
+ * apply, store credit next to a mystery box, an order under the card minimum —
+ * come back in `problems` instead of being thrown: the quote shows them next to
+ * the figures, and createOrder throws the first one, worded as it always was.
+ * Nothing is written here: no code is used up and no credit is spent.
+ */
+export async function priceOrder({ items = [], coupon = '', userId = null, email = '', useCredit = 0 } = {}) {
+  /* One line per product. Two lines of the same product claimed codes for the
+     same order twice, got the same code back, and delivered one of two paid. */
+  const merged = new Map();
+  for (const li of items) {
+    const q = Math.max(1, Math.round(Number(li.quantity) || 1));
+    const prev = merged.get(li.productId);
+    if (prev) prev.quantity += q;
+    else merged.set(li.productId, { ...li, quantity: q });
+  }
+  const lines = [];
+  let subtotal = 0;
+  /* The mystery boxes in this order, by value. A box's price is what its reward
+     pool is set against, so no discount and no store credit may touch it. */
+  let mysteryCents = 0;
+  for (const li of merged.values()) {
+    const product = await getProduct(li.productId);
+    if (!product) throw badRequest(`Unknown product: ${li.productId}`);
+    if (!product.active) throw conflict(`Product not available: ${product.name}`);
+    const quantity = Math.max(1, Number(li.quantity || 1));
+    const unitPrice = product.price;
+    const mystery = product.kind === 'mystery';
+    subtotal += unitPrice * quantity;
+    if (mystery) mysteryCents += unitPrice * quantity;
+    lines.push({ product, quantity, unitPrice, mystery, metadata: li.metadata });
+  }
+  /* Mystery boxes take no discount of any kind — member, coupon (a Forge-Coin
+     coupon too) or bundle. A box sold below its price can pay out more than it
+     took in, so every discount below is worked out on the rest of the order,
+     and so is the ceiling: a box in the cart must not raise how far the codes
+     next to it may be discounted. */
+  const discountable = subtotal - mysteryCents;
+  const problems = [];
+  // Apply a discount coupon if one was supplied and is valid (DB-backed; server
+  // is authoritative — the discount is recomputed here, never trusted from client).
+  const typed = String(coupon || '').trim();
+  const couponEval = typed ? await evaluateCoupon(typed, { subtotal: discountable, userId, email }) : { ok: false };
+  /* A code the buyer typed and saw accepted, then refused at the order, used to
+     be dropped without a word — and the full price charged. Say so instead. */
+  if (typed && (!couponEval.ok || (mysteryCents && !discountable))) {
+    const boxesOnly = !discountable && mysteryCents;
+    const why = boxesOnly ? 'kortingscodes gelden niet voor mystery boxes'
+      : `${couponEval.reason || 'ongeldig'}${mysteryCents ? ' (mystery boxes tellen niet mee)' : ''}`;
+    problems.push({
+      code: 'coupon', status: 409, reason: boxesOnly ? 'mystery_only' : (couponEval.rule || 'invalid'),
+      ...(couponEval.minSubtotal != null ? { minSubtotal: couponEval.minSubtotal } : {}),
+      message: `Kortingscode niet toegepast: ${why}. Er is niets afgeschreven.`,
+    });
+  }
+  const couponOffered = couponEval.ok ? couponEval.discount : 0;
+  // Forge+ members get a standing discount on top (stacked with any coupon).
+  const memberPercent = userId ? await memberDiscountPercent(userId) : 0;
+  const memberOffered = memberPercent ? Math.round(discountable * memberPercent / 100) : 0;
+  // Bundle discount: best single bundle, complete sets only, boxes left out.
+  const bundle = await bestBundleDiscount(lines.filter((l) => !l.mystery)
+    .map((l) => ({ product_id: l.product.id, unit_price: l.unitPrice, quantity: l.quantity })));
+  const bundleOffered = bundle.discount;
+  /* One ceiling over the whole stack.
+     These were summed and capped at the subtotal, which is not a cap: a 90%
+     coupon, a 20% bundle and the 5% Forge+ discount is 115%, so the order came
+     to €0 and the shop delivered a code it had paid for. Each source is
+     individually sane; nothing was looking at the total.
+     Clamped rather than refused — a buyer who found a legitimate stack should
+     still get the best discount the shop is willing to give, not an error. */
+  const stacked = couponOffered + memberOffered + bundleOffered;
+  const maxDiscountPercent = Math.max(0, Math.min(100, config.market.maxTotalDiscountPercent));
+  const discountCeiling = Math.round(discountable * maxDiscountPercent / 100);
+  const discount = Math.min(discountable, stacked, discountCeiling);
+  /* What each discount actually gave once the ceiling cut the stack. The uncut
+     amounts were stored, so a 50% code on €9.99 read "−€5,00" on the receipt
+     above a €5.99 total, and the CSV export and the reports overstated it the
+     same way. The coupon gives way first — it is the one the buyer chose to
+     add — then the bundle, then the Forge+ discount a member pays for. */
+  let over = stacked - discount;
+  const giveWay = (offered) => { const cut = Math.min(offered, over); over -= cut; return offered - cut; };
+  const couponDiscount = giveWay(couponOffered);
+  const bundleDiscount = giveWay(bundleOffered);
+  const memberDiscount = giveWay(memberOffered);
+  const afterDiscount = Math.max(0, subtotal - discount);
+  // Optionally pay part of the order with the customer's store credit.
+  let creditApplied = 0;
+  if (userId && useCredit) {
+    const bal = await balanceOf(userId);
+    creditApplied = Math.max(0, Math.min(Math.round(Number(useCredit) || 0), bal, afterDiscount));
+  }
+  /* Store credit never pays for a mystery box. A box pays out in store credit,
+     so a box bought with credit is a loop: with a pool worth more than its
+     price the wallet grew every round, and the credit bought real codes.
+     Refused rather than quietly charged in money instead — the buyer was shown
+     a total with the credit taken off, and must not be charged another one.
+     Gift cards and daily rewards land in the same wallet, so this covers them. */
+  if (creditApplied && mysteryCents) {
+    problems.push({ code: 'credit_mystery', status: 400,
+      message: 'Winkeltegoed kan niet gebruikt worden voor mystery boxes. Zet "Winkeltegoed gebruiken" uit, '
+        + 'of bestel de mystery box los van de rest. Er is niets afgeschreven.' });
+  }
+  /* Card payments have a floor: Stripe refuses a charge under €0.50, and it
+     would refuse it only after the store credit was already spent. Say it now,
+     before anything is written. */
+  if (afterDiscount - creditApplied > 0 && afterDiscount - creditApplied < MIN_CHARGE_CENTS) {
+    /* With credit: use a little less of it, so €0.50 is left to pay and the
+       rest of the credit stays in the wallet. Without: the order itself is
+       too small to charge. */
+    if (afterDiscount >= MIN_CHARGE_CENTS) creditApplied = afterDiscount - MIN_CHARGE_CENTS;
+    else problems.push({ code: 'min_charge', status: 400, message: 'Het minimale bedrag om af te rekenen is €0,50.' });
+  }
+  const total = Math.max(0, afterDiscount - creditApplied);
+  return {
+    currency: 'EUR', lines, subtotal, mysteryCents, discountable,
+    /* `offered` is what the code is worth on this order, `applied` what it
+       gives after the ceiling — the checkout warns when they differ. */
+    coupon: couponEval.ok ? {
+      code: couponEval.code, kind: couponEval.kind, percent: couponEval.percent, value: couponEval.value,
+      offered: couponOffered, applied: couponDiscount,
+    } : null,
+    couponDiscount, memberPercent, memberDiscount,
+    bundle: bundleDiscount ? bundle.bundle : null, bundleDiscount,
+    stacked, maxDiscountPercent, discount, clamped: stacked > discount,
+    afterDiscount, creditApplied, total, minCharge: MIN_CHARGE_CENTS, problems,
+  };
+}
+
 export async function createOrder(input, ctx = {}) {
   /* The pre-launch gate, at the choke point rather than at the routes.
 
@@ -121,7 +260,6 @@ export async function createOrder(input, ctx = {}) {
   const orderId = newId('ord');
   const number = newOrderNumber();
   const at = nowIso();
-  let subtotal = 0;
   /* Every price in the catalogue is in euro cents. The currency is never the
      buyer's to choose: an order in KRW would charge 5000 won for a €50 card. */
   const currency = 'EUR';
@@ -130,25 +268,12 @@ export async function createOrder(input, ctx = {}) {
      "Roblox-gebruikersnaam" and the like. Collected while walking the items so
      a mixed order names each thing once. */
   const missingTargets = new Set();
-  /* The mystery boxes in this order, by product and by value. A box's price is
-     what its reward pool is set against, so no discount and no store credit
-     may touch it — see below. */
-  const mysteryIds = new Set();
-  let mysteryCents = 0;
 
-  /* One line per product. Two lines of the same product claimed codes for the
-     same order twice, got the same code back, and delivered one of two paid. */
-  const merged = new Map();
-  for (const li of input.items) {
-    const q = Math.max(1, Math.round(Number(li.quantity) || 1));
-    const prev = merged.get(li.productId);
-    if (prev) prev.quantity += q;
-    else merged.set(li.productId, { ...li, quantity: q });
-  }
-  for (const li of merged.values()) {
-    const product = await getProduct(li.productId);
-    if (!product) throw badRequest(`Unknown product: ${li.productId}`);
-    if (!product.active) throw conflict(`Product not available: ${product.name}`);
+  /* What it costs, from the function the checkout's quote reads as well — see
+     priceOrder. The products are loaded and priced there, one line each. */
+  const priced = await priceOrder({ items: input.items, coupon: input.coupon,
+    userId: input.userId || null, email, useCredit: input.useCredit });
+  for (const { product, quantity, unitPrice, metadata } of priced.lines) {
     /* A mystery box pays out as store credit, and store credit lives in an
        account. A guest could buy one: the checkout takes the money, and then
        settleMysteryForOrder() begins `if (!order.userId) return []` — no roll,
@@ -188,86 +313,28 @@ export async function createOrder(input, ctx = {}) {
     if (String(product.category).toLowerCase() === 'robux' && target && !ROBLOX_USERNAME.test(target)) {
       throw badRequest('Dit is geen geldige Roblox-gebruikersnaam (3–20 letters of cijfers, hooguit één _ in het midden).');
     }
-    const qty = Math.max(1, Number(li.quantity || 1));
-    const unit = product.price;
-    subtotal += unit * qty;
-    if (product.kind === 'mystery') { mysteryIds.add(product.id); mysteryCents += unit * qty; }
     lineItems.push({
       id: newId('oit'), product_id: product.id, name: product.name,
-      quantity: qty, unit_price: unit,
+      quantity, unit_price: unitPrice,
       // Snapshot the category: the delivery email picks its redeem instructions
       // from it, and it must stay correct even if the product is later re-filed
       // or deleted. Client-supplied metadata never overrides it.
-      metadata: { ...(li.metadata || {}), category: product.category },
+      metadata: { ...(metadata || {}), category: product.category },
     });
   }
-  /* Mystery boxes take no discount of any kind — member, coupon (a Forge-Coin
-     coupon too) or bundle. A box sold below its price can pay out more than it
-     took in, so every discount below is worked out on the rest of the order,
-     and so is the ceiling: a box in the cart must not raise how far the codes
-     next to it may be discounted. */
-  const discountable = subtotal - mysteryCents;
-  // Apply a discount coupon if one was supplied and is valid (DB-backed; server
-  // is authoritative — the discount is recomputed here, never trusted from client).
-  const couponEval = await evaluateCoupon(input.coupon, { subtotal: discountable, userId: input.userId, email });
-  /* A code the buyer typed and saw accepted, then refused here, used to be
-     dropped without a word — and the full price charged. Say so instead. */
-  if (String(input.coupon || '').trim() && (!couponEval.ok || (mysteryCents && !discountable))) {
-    const why = !discountable && mysteryCents ? 'kortingscodes gelden niet voor mystery boxes'
-      : `${couponEval.reason || 'ongeldig'}${mysteryCents ? ' (mystery boxes tellen niet mee)' : ''}`;
-    throw conflict(`Kortingscode niet toegepast: ${why}. Er is niets afgeschreven.`);
+  /* What pricing refused — a code that does not apply, credit next to a box,
+     an order under the card minimum — in the order and words it always had. */
+  const refusal = priced.problems[0];
+  if (refusal) throw refusal.status === 409 ? conflict(refusal.message) : badRequest(refusal.message);
+  if (priced.clamped) {
+    console.warn(`[order] discount stack ${priced.stacked} clamped to ${priced.discount} `
+      + `(${priced.maxDiscountPercent}% of ${priced.discountable})`);
   }
-  const couponCode = couponEval.ok ? couponEval.code : null;
-  const couponDiscount = couponEval.ok ? couponEval.discount : 0;
-  // Forge+ members get a standing discount on top (stacked with any coupon).
-  const memberPercent = input.userId ? await memberDiscountPercent(input.userId) : 0;
-  const memberDiscount = memberPercent ? Math.round(discountable * memberPercent / 100) : 0;
-  // Bundle discount: best single bundle whose products are all in the order.
-  const bundle = await bestBundleDiscount(lineItems.filter((it) => !mysteryIds.has(it.product_id)));
-  const bundleDiscount = bundle.discount;
-  /* One ceiling over the whole stack.
-     These were summed and capped at the subtotal, which is not a cap: a 90%
-     coupon, a 20% bundle and the 5% Forge+ discount is 115%, so the order came
-     to €0 and the shop delivered a code it had paid for. Each source is
-     individually sane; nothing was looking at the total.
-     Clamped rather than refused — a buyer who found a legitimate stack should
-     still get the best discount the shop is willing to give, not an error. */
-  const stacked = couponDiscount + memberDiscount + bundleDiscount;
-  const discountCeiling = Math.round(discountable * Math.max(0, Math.min(100,
-    config.market.maxTotalDiscountPercent)) / 100);
-  const discount = Math.min(discountable, stacked, discountCeiling);
-  if (stacked > discount) {
-    console.warn(`[order] discount stack ${stacked} clamped to ${discount} `
-      + `(${config.market.maxTotalDiscountPercent}% of ${discountable})`);
-  }
-  const afterDiscount = Math.max(0, subtotal - discount);
-  // Optionally pay part of the order with the customer's store credit.
-  let creditApplied = 0;
-  if (input.userId && input.useCredit) {
-    const bal = await balanceOf(input.userId);
-    creditApplied = Math.max(0, Math.min(Math.round(Number(input.useCredit) || 0), bal, afterDiscount));
-  }
-  /* Store credit never pays for a mystery box. A box pays out in store credit,
-     so a box bought with credit is a loop: with a pool worth more than its
-     price the wallet grew every round, and the credit bought real codes.
-     Refused rather than quietly charged in money instead — the buyer was shown
-     a total with the credit taken off, and must not be charged another one.
-     Gift cards and daily rewards land in the same wallet, so this covers them. */
-  if (creditApplied && mysteryCents) {
-    throw badRequest('Winkeltegoed kan niet gebruikt worden voor mystery boxes. Zet "Winkeltegoed gebruiken" uit, '
-      + 'of bestel de mystery box los van de rest. Er is niets afgeschreven.');
-  }
-  /* Card payments have a floor: Stripe refuses a charge under €0.50, and it
-     would refuse it only after the store credit was already spent. Say it now,
-     before anything is written. */
-  if (afterDiscount - creditApplied > 0 && afterDiscount - creditApplied < MIN_CHARGE_CENTS) {
-    /* With credit: use a little less of it, so €0.50 is left to pay and the
-       rest of the credit stays in the wallet. Without: the order itself is
-       too small to charge. */
-    if (afterDiscount >= MIN_CHARGE_CENTS) creditApplied = afterDiscount - MIN_CHARGE_CENTS;
-    else throw badRequest('Het minimale bedrag om af te rekenen is €0,50.');
-  }
-  const total = Math.max(0, afterDiscount - creditApplied);
+  const { subtotal, afterDiscount, creditApplied, total } = priced;
+  /* A code is used up only when it took something off. With the 40% ceiling
+     already filled by a bundle and Forge+, it gave €0 — and a single-use or
+     once-per-customer code was gone for nothing. */
+  const couponCode = priced.coupon?.applied ? priced.coupon.code : null;
   /* Only what the buyer may tell us. Every money field on `billing` (credit,
      discounts, coupon) is set by the server below; copying the client's object
      whole let a buyer write `creditApplied` and be paid it back on cancel. */
@@ -304,9 +371,11 @@ export async function createOrder(input, ctx = {}) {
   if (missingTargets.size && !suppliedTarget) {
     billing.needsFromBuyer = [...missingTargets].join(' / ');
   }
-  if (couponCode) { billing.coupon = couponCode; billing.discount = couponDiscount; }
-  if (memberDiscount) { billing.memberDiscount = memberDiscount; billing.memberPercent = memberPercent; }
-  if (bundleDiscount) { billing.bundle = bundle.bundle?.name; billing.bundleDiscount = bundleDiscount; }
+  /* What each discount actually gave, after the ceiling (see priceOrder), so
+     the mail, the CSV export and the reports add up to the total charged. */
+  if (couponCode) { billing.coupon = couponCode; billing.discount = priced.couponDiscount; }
+  if (priced.memberDiscount) { billing.memberDiscount = priced.memberDiscount; billing.memberPercent = priced.memberPercent; }
+  if (priced.bundleDiscount) { billing.bundle = priced.bundle?.name; billing.bundleDiscount = priced.bundleDiscount; }
   if (creditApplied) billing.creditApplied = creditApplied;
 
   // Ceilings, checked before anything is written. Scoring decides how suspicious
@@ -791,7 +860,13 @@ export async function transitionOrder(orderId, to, ctx = {}) {
         const held = await get('SELECT fraud_hold FROM orders WHERE id=@id', { id: orderId });
         if (held?.fraud_hold) return;
         const { drainSupplierQueue, ensureManualFulfillment } = await import('./fulfillmentService.js');
-        await drainSupplierQueue(ctx);
+        /* Eight seconds, and the supplier call is held to them. This runs in the
+           payment webhook's own invocation, which Vercel ends at 30 s after the
+           webhook has already used some of it; the queue's default 22 s, with a
+           15 s purchase on top, ran past that ("Task timed out after 30
+           seconds"). What does not fit waits for the next payment or the
+           maintenance sweep. */
+        await drainSupplierQueue(ctx, { budgetMs: 8_000 });
         // Still nothing auto (no stock, no auto-supplier, e.g. a P2P top-up)?
         // Queue it for hand delivery so it never sits invisible.
         await ensureManualFulfillment(orderId, ctx);

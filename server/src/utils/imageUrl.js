@@ -106,15 +106,56 @@ export async function resolveImageUrl(input, { fetchImpl = fetch, timeoutMs = 80
    169.254.169.254, and a public page can redirect to http://127.0.0.1. These
    resolve the name and check every hop of a redirect. */
 
+/* An IPv6 address as its eight 16-bit groups, or null. */
+function ipv6Groups(a) {
+  if (isIP(a) !== 6) return null;
+  let s = a;
+  // A dotted IPv4 tail (::ffff:127.0.0.1) becomes its two hex groups.
+  const tail = /(\d+\.\d+\.\d+\.\d+)$/.exec(s);
+  if (tail) {
+    const [p, q, r, t] = tail[1].split('.').map(Number);
+    s = s.slice(0, -tail[1].length) + `${((p << 8) | q).toString(16)}:${((r << 8) | t).toString(16)}`;
+  }
+  const [head, rest] = s.split('::');
+  const h = head ? head.split(':') : [];
+  const r = rest !== undefined ? (rest ? rest.split(':') : []) : null;
+  const groups = r === null ? h : [...h, ...Array(8 - h.length - r.length).fill('0'), ...r];
+  return groups.length === 8 ? groups.map((g) => parseInt(g || '0', 16)) : null;
+}
+
+/* The IPv4 address an IPv6 one carries, if it is one of the forms that reach
+   an IPv4 host: mapped (::ffff:a.b.c.d), compatible (::a.b.c.d) and NAT64
+   (64:ff9b::a.b.c.d). A URL parser writes [::ffff:127.0.0.1] as
+   [::ffff:7f00:1], which a dotted-only check reads as a public address — the
+   cloud metadata service at [::ffff:a9fe:a9fe] included. */
+function embeddedIPv4(g) {
+  const zero5 = g.slice(0, 5).every((x) => x === 0);
+  const mapped = zero5 && g[5] === 0xffff;
+  const compatible = zero5 && g[5] === 0 && (g[6] || g[7] > 1); // not :: or ::1
+  const nat64 = g[0] === 0x64 && g[1] === 0xff9b && g.slice(2, 6).every((x) => x === 0);
+  if (!mapped && !compatible && !nat64) return null;
+  return [g[6] >> 8, g[6] & 255, g[7] >> 8, g[7] & 255].join('.');
+}
+
 export function isPrivateAddress(ip) {
-  const a = String(ip || '').toLowerCase().replace(/^\[|\]$/g, '');
-  const v4 = a.startsWith('::ffff:') && isIP(a.slice(7)) === 4 ? a.slice(7) : a;
-  if (isIP(v4) === 4) {
-    const [x, y] = v4.split('.').map(Number);
+  const a = String(ip || '').toLowerCase().replace(/^\[|\]$/g, '').replace(/%.*$/, '');
+  if (isIP(a) === 4) {
+    const [x, y] = a.split('.').map(Number);
     return x === 0 || x === 10 || x === 127 || (x === 169 && y === 254) || (x === 172 && y >= 16 && y <= 31)
       || (x === 192 && y === 168) || (x === 100 && y >= 64 && y <= 127) || x >= 224;
   }
-  if (isIP(a) === 6) return a === '::' || a === '::1' || /^f[cd]/.test(a) || /^fe[89ab]/.test(a);
+  const g = ipv6Groups(a);
+  if (g) {
+    const v4 = embeddedIPv4(g);
+    if (v4) return isPrivateAddress(v4);
+    if (g.every((x) => x === 0) || (g.slice(0, 7).every((x) => x === 0) && g[7] === 1)) return true; // :: and ::1
+    const first = g[0];
+    return (first & 0xfe00) === 0xfc00 // fc00::/7 unique local
+      || (first & 0xffc0) === 0xfe80 // fe80::/10 link-local
+      || (first & 0xffc0) === 0xfec0 // fec0::/10 old site-local
+      || (first & 0xff00) === 0xff00 // multicast
+      || (first === 0x2001 && g[1] === 0x0db8); // documentation
+  }
   return true; // not an address at all — refuse rather than guess
 }
 
@@ -141,6 +182,13 @@ export async function publicFetch(url, init = {}, fetchImpl = fetch) {
     const res = await fetchImpl(current, { ...init, redirect: 'manual' });
     const loc = res.status >= 300 && res.status < 400 ? res.headers.get('location') : null;
     if (!loc) return res;
+    /* What fetch itself would do: a 303, or a 301/302 after a POST, continues
+       as a GET without the body — never the same POST again at a new address. */
+    const method = String(init.method || 'GET').toUpperCase();
+    if (res.status === 303 || ((res.status === 301 || res.status === 302) && method === 'POST')) {
+      const { body: _drop, ...rest } = init;
+      init = { ...rest, method: 'GET' };
+    }
     current = new URL(loc, current).toString();
   }
   throw badRequest('Too many redirects.');

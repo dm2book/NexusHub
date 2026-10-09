@@ -9,6 +9,8 @@ import { getProduct } from './productService.js';
 import { badRequest, notFound } from '../utils/errors.js';
 import { postDropEvent } from './discordService.js';
 import { bundleCopyAll } from '../../../src/lib/bundleCopy.js';
+/* The complete-sets arithmetic, from the module the storefront uses. */
+import { setDiscount } from '../../../src/lib/bundles.js';
 
 const parseIds = (s) => { try { const a = JSON.parse(s || '[]'); return Array.isArray(a) ? a : []; } catch { return []; } };
 const parseCopy = (s) => { try { const o = JSON.parse(s || '{}'); return o && typeof o === 'object' ? o : {}; } catch { return {}; } };
@@ -52,18 +54,24 @@ export async function pricedBundles() {
  * Best bundle discount for a set of order line items.
  * `items`: [{ product_id, unit_price, quantity }]. Returns the single best-matching
  * bundle's discount (cents) so bundles never stack confusingly.
+ *
+ * Complete sets only (see setDiscount): the sum of everything in the cart was
+ * discounted, so one B next to ten A's took the bundle's percentage off all
+ * eleven — up to the order cap.
  */
 export async function bestBundleDiscount(items) {
   if (!items?.length) return { discount: 0, bundle: null };
-  const present = new Map();
-  for (const it of items) if (it.product_id) present.set(it.product_id, (present.get(it.product_id) || 0) + it.unit_price * it.quantity);
+  const qty = new Map();
+  const price = new Map();
+  for (const it of items) {
+    if (!it.product_id) continue;
+    qty.set(it.product_id, (qty.get(it.product_id) || 0) + Number(it.quantity || 0));
+    if (!price.has(it.product_id)) price.set(it.product_id, Number(it.unit_price || 0));
+  }
   const bundles = await listBundles({ activeOnly: true });
   let best = { discount: 0, bundle: null };
   for (const b of bundles) {
-    if (b.discountPercent <= 0 || b.productIds.length < 2) continue;
-    if (!b.productIds.every((id) => present.has(id))) continue;
-    const base = b.productIds.reduce((s, id) => s + (present.get(id) || 0), 0);
-    const discount = Math.round(base * b.discountPercent / 100);
+    const discount = setDiscount(b.productIds, b.discountPercent, (id) => qty.get(id), (id) => price.get(id));
     if (discount > best.discount) best = { discount, bundle: { id: b.id, name: b.name, percent: b.discountPercent } };
   }
   return best;

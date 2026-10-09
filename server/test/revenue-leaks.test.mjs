@@ -48,9 +48,13 @@ console.log('— A discount stack cannot reach 100% —');
      90 + 20 + 5 was a €0 order on which the shop still handed over a code it
      had paid for. */
   const src = read('server', 'src', 'services', 'orderService.js');
+  /* The pricing lives in priceOrder (shared by the checkout quote and
+     createOrder) and works on the discountable part of the order — mystery
+     boxes take no discount — but the rule is the same: one ceiling over the
+     sum of every discount. */
   ok('the ceiling is applied to the whole stack',
-    /const stacked = couponDiscount \+ memberDiscount \+ bundleDiscount;/.test(src)
-    && /Math\.min\(subtotal, stacked, discountCeiling\)/.test(src));
+    /const stacked = couponOffered \+ memberOffered \+ bundleOffered;/.test(src)
+    && /Math\.min\(discountable, stacked, discountCeiling\)/.test(src));
   ok('and it is configurable', /maxTotalDiscountPercent/.test(read('server', 'src', 'config', 'env.js')));
   ok('with a ceiling well under a free order',
     config.market.maxTotalDiscountPercent > 0 && config.market.maxTotalDiscountPercent <= 60,

@@ -20,28 +20,30 @@ function discountOf(row, subtotal) {
 /**
  * Evaluate a code for a given subtotal/customer. Returns a normalized result the
  * checkout + order pipeline both use. Never throws for "invalid" — returns ok:false.
+ *
+ * A refusal carries `rule` next to the English `reason`: the checkout says it
+ * in the buyer's language from that, and the minimum comes along as a number.
  */
 export async function evaluateCoupon(code, { subtotal = 0, userId = null, email = null } = {}) {
   const c = up(code);
-  if (!c) return { ok: false, reason: 'Enter a code' };
+  if (!c) return { ok: false, reason: 'Enter a code', rule: 'empty' };
 
   const row = await get('SELECT * FROM coupons WHERE code = @c', { c });
   if (row) {
-    if (!row.active) return { ok: false, reason: 'This code is no longer active' };
+    if (!row.active) return { ok: false, reason: 'This code is no longer active', rule: 'inactive' };
     const now = Date.now();
-    if (row.starts_at && new Date(row.starts_at).getTime() > now) return { ok: false, reason: 'This code is not active yet' };
-    if (row.expires_at && new Date(row.expires_at).getTime() < now) return { ok: false, reason: 'This code has expired' };
+    if (row.starts_at && new Date(row.starts_at).getTime() > now) return { ok: false, reason: 'This code is not active yet', rule: 'not_started' };
+    if (row.expires_at && new Date(row.expires_at).getTime() < now) return { ok: false, reason: 'This code has expired', rule: 'expired' };
     if (subtotal < Number(row.min_subtotal || 0)) {
-      return { ok: false, reason: `Spend at least ${(row.min_subtotal / 100).toFixed(2)} to use this code` };
+      return { ok: false, reason: `Spend at least €${(row.min_subtotal / 100).toFixed(2)} to use this code`,
+        rule: 'min_subtotal', minSubtotal: Number(row.min_subtotal) };
     }
     if (row.max_redemptions != null && row.redeemed_count >= row.max_redemptions) {
-      return { ok: false, reason: 'This code has reached its limit' };
+      return { ok: false, reason: 'This code has reached its limit', rule: 'used_up' };
     }
-    if (row.per_user_limit != null && (userId || email)) {
-      const used = await get(
-        `SELECT COUNT(*) AS n FROM coupon_redemptions WHERE code=@c AND (user_id=@u OR (email IS NOT NULL AND email=@e))`,
-        { c, u: userId, e: email ? canonicalEmail(email) : null });
-      if (Number(used?.n || 0) >= row.per_user_limit) return { ok: false, reason: "You've already used this code" };
+    if (row.per_user_limit != null && (userId || email)
+        && (await usesBy(c, userId, email)) >= row.per_user_limit) {
+      return { ok: false, reason: "You've already used this code", rule: 'already_used' };
     }
     const discount = discountOf(row, subtotal);
     return {
@@ -57,7 +59,15 @@ export async function evaluateCoupon(code, { subtotal = 0, userId = null, email 
     const discount = Math.min(subtotal, Math.round(subtotal * env.percent / 100));
     return { ok: true, code: env.code, kind: 'percent', value: env.percent, percent: env.percent, discount, label: `${env.percent}% off`, source: 'env' };
   }
-  return { ok: false, reason: 'Invalid or expired code' };
+  return { ok: false, reason: 'Invalid or expired code', rule: 'invalid' };
+}
+
+/** How often this person used a code: by account, or by mailbox however it is spelled. */
+async function usesBy(c, userId, email) {
+  const used = await get(
+    `SELECT COUNT(*) AS n FROM coupon_redemptions WHERE code=@c AND (user_id=@u OR (email IS NOT NULL AND email=@e))`,
+    { c, u: userId, e: email ? canonicalEmail(email) : null });
+  return Number(used?.n || 0);
 }
 
 /**
@@ -74,20 +84,30 @@ export function canonicalEmail(email) {
 }
 
 /**
- * Take one use of a coupon for an order — atomically. The count is raised
- * only while it is under the limit, in the same statement that checks it, so
- * six orders at once cannot all take a code meant for one. Called inside the
+ * Take one use of a coupon for an order — atomically. Called inside the
  * order's transaction: a refusal rolls the order back with it.
+ *
+ * The coupon row is locked first, and both limits are counted again under the
+ * lock. The per-customer limit was only ever counted in evaluateCoupon, before
+ * the transaction — so five checkouts sent at the same moment by one account
+ * each found no earlier use of a once-per-customer code, and all five got the
+ * discount. Now the second order waits for the first to commit, then counts
+ * the use the first one recorded.
  */
 export async function recordCouponRedemption({ code, userId = null, email = null, orderId = null, ip = null }) {
   const c = up(code);
   if (!c) return;
-  const exists = await get('SELECT id FROM coupons WHERE code = @c', { c });
-  if (exists) {
-    const took = await get(`UPDATE coupons SET redeemed_count = redeemed_count + 1
-                             WHERE code = @c AND (max_redemptions IS NULL OR redeemed_count < max_redemptions)
-                             RETURNING id`, { c });
-    if (!took) throw conflict('This code has reached its limit');
+  const row = await get(
+    `SELECT id, max_redemptions, per_user_limit, redeemed_count FROM coupons WHERE code = @c FOR UPDATE`, { c });
+  if (row) {
+    if (row.max_redemptions != null && Number(row.redeemed_count) >= Number(row.max_redemptions)) {
+      throw conflict('This code has reached its limit');
+    }
+    if (row.per_user_limit != null && (userId || email)
+        && (await usesBy(c, userId, email)) >= Number(row.per_user_limit)) {
+      throw conflict("You've already used this code");
+    }
+    await run('UPDATE coupons SET redeemed_count = redeemed_count + 1 WHERE id = @id', { id: row.id });
   }
   await run(
     `INSERT INTO coupon_redemptions (id, code, user_id, email, ip, order_id, created_at)

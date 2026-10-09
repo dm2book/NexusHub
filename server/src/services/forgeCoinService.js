@@ -20,11 +20,25 @@ export const COINS_PER_EURO_CENTS = 1000; // €10 = 1 coin
  *  represents €(N×10) of spend. These costs keep the effective payback around
  *  3–3.5% (sustainable against the store's ~18% margin) — a big reward is a
  *  little better value to reward saving up. Don't drop them below ~1.5 coins per
- *  €1 of discount or you give margin away. */
+ *  €1 of discount or you give margin away.
+ *
+ *  Minimum order: a code is single-use, and every order's discounts together
+ *  stop at 40% (MAX_TOTAL_DISCOUNT_PERCENT). The €25 code said "€25 off any
+ *  order", so on a €30 order it gave €12 and was gone — 65 coins for €12. A
+ *  code now needs the order on which 40% is its whole value (value / 0.40:
+ *  €12.50, €25, €62.50), and the reward text says so. The minimum counts what
+ *  the code can discount, so a mystery box does not count towards it.
+ *  Exempting coin codes from the 40% was the other way out, but no product has
+ *  a cost price (see the ceiling in config/env.js), so what a code that empties
+ *  an order would cost cannot be checked; the 40% stays the bound for every
+ *  code. These amounts are written for the default 40% — the reward texts in
+ *  the storefront dictionaries (acc.shop.item.<id>.blurb) name them too, so a
+ *  different ceiling means changing both. Codes already sold keep the terms
+ *  they were sold with. */
 export const FORGE_SHOP = [
-  { id: 'coupon5', kind: 'coupon', cost: 15, value: 500, label: '€5 discount code', blurb: '€5 off your next order.' },
-  { id: 'coupon10', kind: 'coupon', cost: 28, value: 1000, label: '€10 discount code', blurb: '€10 off your next order — saves you a coin.' },
-  { id: 'coupon25', kind: 'coupon', cost: 65, value: 2500, label: '€25 discount code', blurb: '€25 off any order — best value.' },
+  { id: 'coupon5', kind: 'coupon', cost: 15, value: 500, minSubtotal: 1250, label: '€5 discount code', blurb: '€5 off an order of €12.50 or more.' },
+  { id: 'coupon10', kind: 'coupon', cost: 28, value: 1000, minSubtotal: 2500, label: '€10 discount code', blurb: '€10 off an order of €25.00 or more — saves you a coin.' },
+  { id: 'coupon25', kind: 'coupon', cost: 65, value: 2500, minSubtotal: 6250, label: '€25 discount code', blurb: '€25 off an order of €62.50 or more — best value.' },
   { id: 'boost', kind: 'boost', cost: 8, value: 1, label: 'Giveaway boost', blurb: '+1 bonus entry in this week’s giveaway (claim in Discord).' },
 ];
 
@@ -216,6 +230,8 @@ export async function redeemReward(userId, rewardId) {
     if (code) {
       await createCoupon({
         code, kind: reward.couponKind || 'fixed', value: reward.value, perUserLimit: 1, maxRedemptions: 1,
+        // The order the code is worth its whole value on — see FORGE_SHOP.
+        minSubtotal: reward.minSubtotal || 0,
         active: true, announce: false,
       }, userId);
       return { reward, couponCode: code };

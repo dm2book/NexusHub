@@ -29,6 +29,7 @@
  * order does not settle.
  */
 import { config } from '../config/env.js';
+import { isDiscordWebhookUrl } from '../utils/discordWebhook.js';
 
 /** One attempt gets this long before we stop waiting for it. */
 const TIMEOUT_MS = 5_000;
@@ -227,6 +228,13 @@ async function sendOnce(name, fn) {
 function discord(event, { title, lines, url }) {
   const hook = config.notify.discordWebhookUrl || config.discord.orderWebhookUrl;
   if (!hook) return null;
+  /* In production only ever POST to Discord itself, whatever the setting says
+     (it can come from the admin or an env var) — see utils/discordWebhook.js.
+     Locally a test stub on 127.0.0.1 stands in for Discord. */
+  if (config.isProd && !isDiscordWebhookUrl(hook)) {
+    console.error('[notify] the Discord alert webhook is not a discord.com webhook link — not sent');
+    return Promise.resolve(false);
+  }
   const meta = EVENTS[event];
   return sendOnce('discord', (ms) => timedFetch(hook, {
     method: 'POST',

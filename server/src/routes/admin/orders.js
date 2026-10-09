@@ -13,7 +13,7 @@ import {
 } from '../../services/orderService.js';
 import { refundOrder } from '../../services/refundService.js';
 import { PayLinkError } from '../../utils/payLink.js';
-import { fulfillOrder, listFulfillment, listFulfillmentLogs } from '../../services/fulfillmentService.js';
+import { fulfillOrderByHand, listFulfillment, listFulfillmentLogs } from '../../services/fulfillmentService.js';
 import * as analytics from '../../services/analyticsService.js';
 import { listPendingProofs, confirmProof, rejectProof } from '../../services/paymentProofService.js';
 import { sendEmail } from '../../services/emailService.js';
@@ -100,7 +100,7 @@ router.post('/:id/payment-received', requirePermission('orders.update'),
 // Fulfill Order — runs the fulfillment engine (auto or manual per item).
 router.post('/:id/fulfill', requirePermission('orders.fulfill'),
   asyncHandler(async (req, res) => {
-    const summary = await fulfillOrder(req.params.id, actor(req));
+    const summary = await fulfillOrderByHand(req.params.id, actor(req));
     await audit({ actor: req.user, action: 'order.fulfill', targetType: 'order',
       targetId: req.params.id, metadata: { auto: summary.auto, manual: summary.manual }, req });
     res.json({ order: await getOrder(req.params.id), summary });
