@@ -333,35 +333,43 @@ export async function syncCatalogImages() {
   if (updated) console.log(`[catalog] product art synced on ${updated} product(s)`);
 }
 
-export async function seedDemoCatalog() {
+/**
+ * Create the catalogue products that do not exist yet (by sku), backfill a
+ * missing cover image, and — only when asked (`npm run seed:demo`, after a
+ * repricing pass) — set prices back to the catalogue defaults.
+ *
+ * One read for every existing row instead of two queries per product: the boot
+ * path ran this on cold starts. Prices are never touched on boot: the owner's
+ * admin edits and the pricing engine's published prices are the live prices.
+ */
+export async function seedDemoCatalog({ resyncPrices = true } = {}) {
   await migrate();
   let created = 0;
-  let updated = 0;
+  let imaged = 0;
+  let repriced = 0;
+  const existing = new Map((await all('SELECT id, sku, price, metadata FROM products WHERE sku = ANY(@skus)',
+    { skus: CATALOG.map((p) => p.sku) })).map((r) => [r.sku, r]));
   for (const p of CATALOG) {
     const img = imageFor(p);
-    const existing = await get('SELECT id, metadata FROM products WHERE sku = @sku', { sku: p.sku });
+    const row = existing.get(p.sku);
     const at = nowIso();
 
-    if (existing) {
+    if (row) {
       // Backfill the default cover ONLY when the product has no image — never
       // clobber an image the owner set in the admin.
-      const meta = parse(existing.metadata);
-      let dirty = false;
-      if (img && !meta.image) { meta.image = img; dirty = true; }
-      if (dirty) {
+      const meta = parse(row.metadata);
+      if (img && !meta.image) {
+        meta.image = img;
         await run('UPDATE products SET metadata = @m, updated_at = @at WHERE id = @id',
-          { m: JSON.stringify(meta), at, id: existing.id });
-        updated++;
+          { m: JSON.stringify(meta), at, id: row.id });
+        imaged++;
       }
-      // Explicit re-seed (SEED_DEMO=true / npm run seed:demo): also re-sync the
-      // PRICE to the current defaults — used after a repricing pass. Products
-      // keep admin-set prices on normal boots because this branch only runs
-      // when the seeder was explicitly invoked.
-      const row = await get('SELECT price FROM products WHERE id = @id', { id: existing.id });
-      if (Number(row?.price) !== p.price) {
+      // Explicit re-seed only (npm run seed:demo): re-sync the PRICE to the
+      // current defaults — used after a repricing pass.
+      if (resyncPrices && Number(row.price) !== p.price) {
         await run('UPDATE products SET price = @p, updated_at = @at WHERE id = @id',
-          { p: p.price, at, id: existing.id });
-        updated++;
+          { p: p.price, at, id: row.id });
+        repriced++;
       }
       continue;
     }
@@ -374,8 +382,8 @@ export async function seedDemoCatalog() {
     });
     created++;
   }
-  console.log(`Demo catalog: ${created} created, ${updated} image-backfilled ` +
-    `(${CATALOG.length - created - updated} unchanged).`);
+  console.log(`Demo catalog: ${created} created, ${imaged} image-backfilled`
+    + `${resyncPrices ? `, ${repriced} repriced` : ''} (${CATALOG.length - created} existed).`);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
