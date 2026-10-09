@@ -33,7 +33,16 @@
  * makes a downloaded snapshot a file of personal data, which is the owner's to
  * handle, and the admin says so where they download it.
  */
-import { gzipSync, gunzipSync } from 'node:zlib';
+import { gzip, gunzip } from 'node:zlib';
+import { promisify } from 'node:util';
+
+/* Asynchronous and at level 6. The backup runs inside a 30-second function:
+   synchronous level-9 compression held the event loop for the whole of it
+   (every other request on the instance waited) and bought a few percent of
+   size over level 6 for several times the CPU. */
+const gzipAsync = promisify(gzip);
+const gunzipAsync = promisify(gunzip);
+const pack = async (json) => (await gzipAsync(Buffer.from(json, 'utf8'), { level: 6 })).toString('base64');
 import { all, get, run, nowIso } from '../db/index.js';
 import { newId } from '../utils/ids.js';
 import { audit } from './auditService.js';
@@ -110,7 +119,7 @@ export async function takeBackup({ actor = null, reason = 'scheduled' } = {}) {
   }
 
   const json = JSON.stringify({ takenAt: at, schema: 1, counts, data });
-  const payload = gzipSync(Buffer.from(json, 'utf8'), { level: 9 }).toString('base64');
+  const payload = await pack(json);
   const bytes = Buffer.byteLength(payload, 'utf8');
 
   if (bytes > MAX_BYTES) {
@@ -173,7 +182,7 @@ export async function readBackup(id, { actor = null } = {}) {
     metadata: { bytes: Number(row.byte_size || 0) } });
   return {
     id: row.id, kind: row.kind, createdAt: row.created_at,
-    json: gunzipSync(Buffer.from(row.payload, 'base64')).toString('utf8'),
+    json: (await gunzipAsync(Buffer.from(row.payload, 'base64'))).toString('utf8'),
   };
 }
 
@@ -227,7 +236,7 @@ export async function backupStatus({ everyDays = 7 } = {}) {
  */
 export async function storeGuildBackup(snapshot, { guildId = null } = {}) {
   const json = JSON.stringify({ takenAt: nowIso(), schema: 1, guildId, snapshot });
-  const payload = gzipSync(Buffer.from(json, 'utf8'), { level: 9 }).toString('base64');
+  const payload = await pack(json);
   const bytes = Buffer.byteLength(payload, 'utf8');
   if (bytes > MAX_BYTES) {
     const err = new Error('That Discord snapshot is too large to store.');
