@@ -3,20 +3,50 @@
  * migrations.js) not yet recorded in schema_migrations, in order. Idempotent and
  * safe to call on serverless cold start.
  */
-import { pool, run, all, nowIso } from './index.js';
+import { pool, run, all, get, nowIso } from './index.js';
 import { MIGRATIONS } from './migrations.js';
+import { randomBytes } from 'node:crypto';
 
-const LOCK_ID = 778899;
 const allApplied = async () => {
   const applied = new Set((await all('SELECT id FROM schema_migrations')).map((r) => r.id));
   return MIGRATIONS.every((m) => applied.has(m.id));
 };
 
-export async function migrate() {
+/* Who is migrating, as a row rather than a session lock.
+   This used to be pg_try_advisory_lock on one pooled connection. A session
+   lock assumes the same server connection for the lock and the unlock, which
+   a transaction-mode pooler (Neon's) does not promise: the unlock could land
+   on another backend and do nothing, and a lock left behind that way kept
+   every later deploy from migrating at all. A row with a time on it works
+   through any pooler, and a holder that was frozen or killed mid-way (Vercel
+   stops a function at 30 s) simply ages out. Each migration is its own
+   transaction, so taking over from a dead holder never sees half of one. */
+const LEASE_MS = 60_000;
+async function takeLease(token) {
+  await run(`CREATE TABLE IF NOT EXISTS schema_migration_lock (
+    id INTEGER PRIMARY KEY, holder TEXT NOT NULL, taken_at TEXT NOT NULL)`);
+  const row = await get(
+    `INSERT INTO schema_migration_lock (id, holder, taken_at) VALUES (1, @t, @at)
+     ON CONFLICT (id) DO UPDATE SET holder = @t, taken_at = @at
+       WHERE schema_migration_lock.taken_at < @stale
+     RETURNING holder`,
+    { t: token, at: nowIso(), stale: new Date(Date.now() - LEASE_MS).toISOString() });
+  return row?.holder === token;
+}
+const dropLease = (token) => run('DELETE FROM schema_migration_lock WHERE id = 1 AND holder = @t', { t: token })
+  .catch(() => {});
+
+/**
+ * Apply pending migrations. Exactly one instance migrates; the others wait up to
+ * `waitMs` for it and then refuse to serve on a schema that is not there yet —
+ * a 503 the next request retries (ensureReady forgets a failed start), instead
+ * of the "proceed, the schema is likely ready" that answered with errors about
+ * missing columns until the migrating instance had finished.
+ */
+export async function migrate({ waitMs = 10_000 } = {}) {
   // Fast path — the common case on every serverless cold start. Check whether
-  // any migration is still pending WITHOUT taking the advisory lock. If the
-  // schema is already current we return immediately, so a cold start never
-  // blocks on a lock that a frozen sibling instance might be holding.
+  // any migration is still pending WITHOUT taking the lease. If the schema is
+  // already current we return immediately.
   //
   // Ask first, and create only if the answer is "no such table". The
   // unconditional CREATE TABLE IF NOT EXISTS was a second serialized round trip
@@ -31,21 +61,23 @@ export async function migrate() {
       id TEXT PRIMARY KEY, applied_at TEXT NOT NULL)`);
   }
 
-  // There is real work to do. Serialize with a NON-BLOCKING advisory lock: a
-  // blocking pg_advisory_lock is dangerous on serverless because Vercel freezes
-  // instances and Neon's pooler doesn't drop the session lock promptly, so
-  // other instances would hang the full 30s (→ 504s). If another instance is
-  // already migrating, poll for the schema to become ready instead of blocking.
-  const lock = await pool.connect();
-  try {
-    let got = (await lock.query('SELECT pg_try_advisory_lock($1) AS ok', [LOCK_ID])).rows[0]?.ok;
-    for (let i = 0; !got && i < 20; i++) {
-      if (await allApplied()) return 0;            // another instance finished
-      await new Promise((r) => setTimeout(r, 500));
-      got = (await lock.query('SELECT pg_try_advisory_lock($1) AS ok', [LOCK_ID])).rows[0]?.ok;
+  // There is real work to do. Never block on it: poll for the lease, and for the
+  // schema to become ready because another instance finished first.
+  const token = randomBytes(12).toString('hex');
+  const until = Date.now() + waitMs;
+  let got = await takeLease(token);
+  while (!got) {
+    if (await allApplied()) return 0;            // another instance finished
+    if (Date.now() >= until) {
+      const err = new Error('The shop is being updated — try again in a moment.');
+      err.status = 503;
+      throw err;
     }
-    if (!got) return 0; // couldn't get the lock in time — proceed; schema is likely ready
+    await new Promise((r) => setTimeout(r, 500));
+    got = await takeLease(token);
+  }
 
+  try {
     const applied = new Set((await all('SELECT id FROM schema_migrations')).map((r) => r.id));
     let count = 0;
     for (const m of MIGRATIONS) {
@@ -69,8 +101,7 @@ export async function migrate() {
     if (!count) console.log('Schema already up to date.');
     return count;
   } finally {
-    await lock.query('SELECT pg_advisory_unlock($1)', [LOCK_ID]).catch(() => {});
-    lock.release();
+    await dropLease(token);
   }
 }
 
