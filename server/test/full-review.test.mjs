@@ -40,6 +40,46 @@ console.log('— Links —');
   ok('a name resolving to loopback is refused', refused);
 }
 
+console.log('— IPv4 inside IPv6, Discord webhooks —');
+{
+  const { isPrivateAddress } = await import('../src/utils/imageUrl.js');
+  ok('IPv4-mapped IPv6 in the form a URL parser writes is private ([::ffff:7f00:1] = 127.0.0.1)',
+    isPrivateAddress('::ffff:7f00:1') && isPrivateAddress('[::ffff:a9fe:a9fe]') && isPrivateAddress('0:0:0:0:0:ffff:7f00:1'));
+  ok('…and NAT64 / compatible forms of private addresses too', isPrivateAddress('64:ff9b::a9fe:a9fe') && isPrivateAddress('::7f00:1'));
+  ok('…while a mapped public address stays public', !isPrivateAddress('::ffff:8.8.8.8') && !isPrivateAddress('64:ff9b::808:808'));
+  const { isDiscordWebhookUrl } = await import('../src/utils/discordWebhook.js');
+  ok('a real Discord webhook link is accepted', isDiscordWebhookUrl('https://discord.com/api/webhooks/123/abc_DEF-1'));
+  ok('look-alike hosts, http, ports and other paths are not',
+    ['https://discord.com.evil.io/api/webhooks/1/x', 'http://discord.com/api/webhooks/1/x',
+      'https://discord.com:8443/api/webhooks/1/x', 'https://169.254.169.254/latest/meta-data', 'https://discord.com/login']
+      .every((u) => !isDiscordWebhookUrl(u)));
+  const { setSecret } = await import('../src/services/secretStore.js');
+  let refused = null;
+  try { await setSecret('notify.discordWebhookUrl', 'http://169.254.169.254/latest/meta-data'); } catch (e) { refused = e; }
+  ok('the admin cannot save a non-Discord address as the alert webhook', refused?.status === 400, refused?.message || 'saved');
+}
+
+console.log('— robots.txt —');
+{
+  const { isAllowed, clearRobotsCache } = await import('../src/services/market/robots.js');
+  clearRobotsCache();
+  let calls = 0;
+  const down = async () => { calls++; throw new Error('connect ECONNRESET'); };
+  const first = await isAllowed('https://shop.example/catalog', { fetchImpl: down });
+  ok('a robots.txt that cannot be read means "not allowed"', first.allowed === false && calls === 1, first.reason);
+  const realNow = Date.now;
+  Date.now = () => realNow() + 11 * 60_000;
+  const up = async () => { calls++; return new Response('', { status: 404 }); };
+  const later = await isAllowed('https://shop.example/catalog', { fetchImpl: up });
+  Date.now = realNow;
+  ok('…but a network blip is asked again after ten minutes, not six hours', later.allowed === true && calls === 2, `${calls} calls, ${later.reason}`);
+  let sawSignal = null;
+  await isAllowed('https://other.example/x', { fetchImpl: async (u, init) => { sawSignal = init.signal; return new Response('User-agent: *\nDisallow:', { status: 200 }); } });
+  ok('the request carries a timeout signal that also covers reading the body', !!sawSignal && typeof sawSignal.aborted === 'boolean');
+  const src = (await import('node:fs')).readFileSync(new URL('../src/routes/admin/discovery.js', import.meta.url), 'utf8');
+  ok('an unexpected discovery error is a logged 500, not a 400', /console\.error\('\[discovery\]'/.test(src) && /status\(e\?\.status \|\| 500\)/.test(src));
+}
+
 console.log('— SVG —');
 {
   const { sanitizeSvg, assess } = await import('../src/services/logoDiscoveryService.js');

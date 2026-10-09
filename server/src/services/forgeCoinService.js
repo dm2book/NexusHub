@@ -6,6 +6,7 @@
  *   Earn:  1 coin per €10 of paid spend (floor), awarded once per order.
  *   Spend: redeem coins for a personal discount coupon (or a giveaway boost).
  */
+import { randomBytes } from 'node:crypto';
 import { get, all, run, tx, nowIso } from '../db/index.js';
 import { newId } from '../utils/ids.js';
 import { badRequest } from '../utils/errors.js';
@@ -20,11 +21,25 @@ export const COINS_PER_EURO_CENTS = 1000; // €10 = 1 coin
  *  represents €(N×10) of spend. These costs keep the effective payback around
  *  3–3.5% (sustainable against the store's ~18% margin) — a big reward is a
  *  little better value to reward saving up. Don't drop them below ~1.5 coins per
- *  €1 of discount or you give margin away. */
+ *  €1 of discount or you give margin away.
+ *
+ *  Minimum order: a code is single-use, and every order's discounts together
+ *  stop at 40% (MAX_TOTAL_DISCOUNT_PERCENT). The €25 code said "€25 off any
+ *  order", so on a €30 order it gave €12 and was gone — 65 coins for €12. A
+ *  code now needs the order on which 40% is its whole value (value / 0.40:
+ *  €12.50, €25, €62.50), and the reward text says so. The minimum counts what
+ *  the code can discount, so a mystery box does not count towards it.
+ *  Exempting coin codes from the 40% was the other way out, but no product has
+ *  a cost price (see the ceiling in config/env.js), so what a code that empties
+ *  an order would cost cannot be checked; the 40% stays the bound for every
+ *  code. These amounts are written for the default 40% — the reward texts in
+ *  the storefront dictionaries (acc.shop.item.<id>.blurb) name them too, so a
+ *  different ceiling means changing both. Codes already sold keep the terms
+ *  they were sold with. */
 export const FORGE_SHOP = [
-  { id: 'coupon5', kind: 'coupon', cost: 15, value: 500, label: '€5 discount code', blurb: '€5 off your next order.' },
-  { id: 'coupon10', kind: 'coupon', cost: 28, value: 1000, label: '€10 discount code', blurb: '€10 off your next order — saves you a coin.' },
-  { id: 'coupon25', kind: 'coupon', cost: 65, value: 2500, label: '€25 discount code', blurb: '€25 off any order — best value.' },
+  { id: 'coupon5', kind: 'coupon', cost: 15, value: 500, minSubtotal: 1250, label: '€5 discount code', blurb: '€5 off an order of €12.50 or more.' },
+  { id: 'coupon10', kind: 'coupon', cost: 28, value: 1000, minSubtotal: 2500, label: '€10 discount code', blurb: '€10 off an order of €25.00 or more — saves you a coin.' },
+  { id: 'coupon25', kind: 'coupon', cost: 65, value: 2500, minSubtotal: 6250, label: '€25 discount code', blurb: '€25 off an order of €62.50 or more — best value.' },
   { id: 'boost', kind: 'boost', cost: 8, value: 1, label: 'Giveaway boost', blurb: '+1 bonus entry in this week’s giveaway (claim in Discord).' },
 ];
 
@@ -78,9 +93,10 @@ async function lockUser(userId) {
  */
 export async function coinTotals(userId) {
   if (!userId) return { earned: 0, spent: 0 };
+  // Coins taken back with a refunded order were never earned, not spent.
   const r = await get(
-    `SELECT COALESCE(SUM(delta) FILTER (WHERE delta > 0), 0) AS earned,
-            COALESCE(SUM(-delta) FILTER (WHERE delta < 0), 0) AS spent
+    `SELECT COALESCE(SUM(delta) FILTER (WHERE delta > 0 OR reason = 'order_reversal'), 0) AS earned,
+            COALESCE(SUM(-delta) FILTER (WHERE delta < 0 AND reason <> 'order_reversal'), 0) AS spent
        FROM forge_coin_ledger WHERE user_id = @u`, { u: userId });
   return { earned: Number(r?.earned || 0), spent: Number(r?.spent || 0) };
 }
@@ -91,21 +107,67 @@ export function coinHistory(userId, limit = 20) {
       WHERE user_id=@u ORDER BY created_at DESC LIMIT @l`, { u: userId, l: limit });
 }
 
+/** Where an order is while it still counts as a sale. */
+const SALE_STATUSES = ['payment_received', 'processing', 'awaiting_fulfillment', 'completed'];
+
 /**
  * Award coins for a paid order — idempotent: the unique (reason,ref) index means
  * a retried payment never double-awards. €10 → 1 coin (floor).
+ *
+ * Under the buyer's lock, and only while the order is still a sale: this runs
+ * in the background after the payment, and a refund that got there first found
+ * nothing to take back — the coins would have landed after it, for good.
  */
 export async function awardCoinsForOrder(order) {
   if (!order?.userId) return 0;
   const coins = Math.floor(Number(order.total || 0) / COINS_PER_EURO_CENTS);
   if (coins <= 0) return 0;
   try {
-    await run(
-      `INSERT INTO forge_coin_ledger (id, user_id, delta, reason, ref, created_at)
-       VALUES (@id, @u, @d, 'order', @ref, @at)`,
-      { id: newId('coin'), u: order.userId, d: coins, ref: order.id, at: nowIso() });
-    return coins;
+    return await tx(async () => {
+      await lockUser(order.userId);
+      const live = await get('SELECT status FROM orders WHERE id=@id', { id: order.id });
+      if (!SALE_STATUSES.includes(live?.status)) return 0;
+      await run(
+        `INSERT INTO forge_coin_ledger (id, user_id, delta, reason, ref, created_at)
+         VALUES (@id, @u, @d, 'order', @ref, @at)`,
+        { id: newId('coin'), u: order.userId, d: coins, ref: order.id, at: nowIso() });
+      return coins;
+    });
   } catch { return 0; } // unique-index clash = already awarded
+}
+
+/**
+ * Take back the coins an order earned once it stops being a sale — refunded,
+ * charged back, or cancelled after payment. Without this, paying and having
+ * the order refunded before delivery left the coins behind, again every round.
+ *
+ * One negative 'order_reversal' row per order: checked here, and backed by the
+ * unique index from migration 063, so a second path undoing the same order
+ * takes nothing more. Coins already spent leave the balance below zero — owed,
+ * the same as a reversed referral commission. The lock is taken BEFORE looking,
+ * the same one the award holds, so an award still in flight is either found
+ * here or sees the refund itself and awards nothing.
+ */
+export async function reverseCoinsForOrder(order) {
+  if (!order?.id || !order.userId) return 0;
+  try {
+    return await tx(async () => {
+      await lockUser(order.userId);
+      const earned = await get(
+        `SELECT user_id, delta FROM forge_coin_ledger WHERE reason='order' AND ref=@o AND delta > 0`, { o: order.id });
+      if (!earned) return 0;
+      const done = await get(`SELECT 1 AS x FROM forge_coin_ledger WHERE reason='order_reversal' AND ref=@o`, { o: order.id });
+      if (done) return 0;
+      await run(
+        `INSERT INTO forge_coin_ledger (id, user_id, delta, reason, ref, created_at)
+         VALUES (@id, @u, @d, 'order_reversal', @ref, @at)`,
+        { id: newId('coin'), u: earned.user_id, d: -Number(earned.delta), ref: order.id, at: nowIso() });
+      return Number(earned.delta);
+    });
+  } catch (e) {
+    if (e?.code === '23505') return 0;   // the unique index: another path reversed it first
+    throw e;
+  }
 }
 
 /**
@@ -158,8 +220,11 @@ export async function redeemReward(userId, rewardId) {
     if (balance < reward.cost) throw badRequest(`Not enough Forge Coins — you need ${reward.cost}, you have ${balance}.`);
     // For coupons, the generated code doubles as the ledger ref so the buyer
     // can always find it back in their history (a toast is easy to miss).
+    /* Ten characters from the crypto source (not Math.random's five): the code
+       is also bound to this account below, so even a seen code is useless to
+       anyone else, but it should not be guessable either. */
     const code = reward.kind === 'coupon'
-      ? `FORGE${Math.random().toString(36).slice(2, 7).toUpperCase()}` : null;
+      ? `FORGE${randomBytes(8).toString('base64').replace(/[^A-Za-z0-9]/g, '').slice(0, 10).toUpperCase().padEnd(10, 'X')}` : null;
     // Debit first (inside the transaction) so concurrent redeems can't overspend.
     await run(
       `INSERT INTO forge_coin_ledger (id, user_id, delta, reason, ref, created_at)
@@ -169,6 +234,9 @@ export async function redeemReward(userId, rewardId) {
     if (code) {
       await createCoupon({
         code, kind: reward.couponKind || 'fixed', value: reward.value, perUserLimit: 1, maxRedemptions: 1,
+        // The order the code is worth its whole value on — see FORGE_SHOP.
+        minSubtotal: reward.minSubtotal || 0,
+        ownerUserId: userId,
         active: true, announce: false,
       }, userId);
       return { reward, couponCode: code };

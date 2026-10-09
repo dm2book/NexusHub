@@ -8,18 +8,19 @@ import { all } from '../../db/index.js';
 import { listAuditLogs, audit } from '../../services/auditService.js';
 import { listFlaggedOrders, heldOrderCount } from '../../services/fraudService.js';
 import {
-  releaseFraudHold, rejectFraudHold, getOrder, getOrderByNumber, getPspPayment, transitionOrder,
+  releaseFraudHold, rejectFraudHold, getOrder, getOrderByNumber,
 } from '../../services/orderService.js';
+import { refundOrder } from '../../services/refundService.js';
 import { recordChargeback, listChargebacks, chargebackSummary } from '../../services/chargebackService.js';
 import { currentLimits } from '../../services/orderLimitService.js';
 import { roleDiagnostics, ensureRolesExist, sweepMemberRoles } from '../../services/discordRolesService.js';
-import { refundPayment, isEnabled as mollieEnabled } from '../../services/mollieService.js';
 import { publicUser, setUserRoles, getUserById } from '../../services/userService.js';
 import { grantCoins } from '../../services/forgeCoinService.js';
 import { grantMembership, cancelMembership } from '../../services/membershipService.js';
 import { addEntry, balanceOf, walletSummary } from '../../services/walletService.js';
 import { notify } from '../../services/notificationService.js';
 import { notFound, badRequest } from '../../utils/errors.js';
+import { staffCreditCap } from '../../services/giftCardService.js';
 
 const router = Router();
 
@@ -61,10 +62,14 @@ router.post('/fraud/:id/approve', requirePermission('security.manage'),
 /**
  * Reject a held order — refund it and keep it held.
  *
- * The refund runs first and through the PSP, so the money genuinely goes back
- * rather than the order merely being labelled. A refund that Mollie refuses
- * leaves everything untouched and says so, instead of quietly marking an order
- * refunded while the shop still holds the money.
+ * The refund goes through refundOrder, the same path as the order page: sent
+ * to Stripe or Mollie first, and the order only becomes refunded once the
+ * provider accepted it. This route used to know Mollie alone — a held Stripe
+ * payment (Radar, a foreign card, a guest's big first order: exactly what gets
+ * held) was marked refunded and mailed as refunded while the money stayed in
+ * Stripe, for the cardholder's chargeback to take later plus a fee. A refusal
+ * leaves everything as it was, the hold included, and says so. An order paid
+ * by hand is marked refunded and the owner sends the money back the same way.
  */
 router.post('/fraud/:id/reject', requirePermission('security.manage'),
   asyncHandler(async (req, res) => {
@@ -80,19 +85,19 @@ router.post('/fraud/:id/reject', requirePermission('security.manage'),
     // Only when money actually arrived. Rejecting an unpaid order is just a
     // refusal — there is nothing to send back.
     if (refund && !['pending', 'refunded', 'cancelled', 'failed'].includes(order.status)) {
-      const psp = await getPspPayment(order.id);
-      if (psp?.provider === 'mollie' && mollieEnabled()) {
-        try {
-          refunded = await refundPayment(psp.paymentId, {
-            cents: order.total, currency: order.currency || 'EUR',
-            description: `Refund ${order.number}`,
-          });
-        } catch (e) {
-          throw badRequest(`Mollie refused the refund: ${e.message}`);
+      try {
+        refunded = (await refundOrder(order.id, { method: 'money', actorId: req.user.id, user: req.user,
+          reason: reason || 'Rejected in fraud review' })).refund;
+      } catch (e) {
+        if (e.pspFailure) {
+          await audit({ actor: req.user, action: 'order.refund_failed', targetType: 'order',
+            targetId: order.id, metadata: e.pspFailure, req }).catch(() => {});
         }
+        throw e;
       }
-      await transitionOrder(order.id, 'refunded',
-        { actorId: req.user.id, user: req.user, reason: reason || 'Rejected in fraud review' });
+      await audit({ actor: req.user, action: 'order.refund', targetType: 'order', targetId: order.id,
+        metadata: { reason: reason || 'Rejected in fraud review', method: 'money',
+          provider: refunded?.provider || null, refundId: refunded?.id || null }, req }).catch(() => {});
     }
 
     const updated = await rejectFraudHold(req.params.id,
@@ -244,6 +249,8 @@ router.post('/users/:id/membership', requirePermission('users.manage'),
     const { days, cancel } = z.object({ days: z.number().int().min(1).max(3650).optional(), cancel: z.boolean().optional() })
       .parse(req.body || {});
     if (!(await getUserById(req.params.id))) throw notFound('User not found');
+    // Forge+ is a standing discount: granting it to yourself is paying yourself.
+    if (req.params.id === req.user.id && !cancel) throw badRequest('You cannot grant Forge+ to yourself');
     const membership = cancel ? await cancelMembership(req.params.id) : await grantMembership(req.params.id, days || 30);
     await audit({ actor: req.user, action: cancel ? 'membership.cancel' : 'membership.grant',
       targetType: 'user', targetId: req.params.id, metadata: { days }, req });
@@ -255,6 +262,8 @@ router.post('/users/:id/coins', requirePermission('users.manage'),
   asyncHandler(async (req, res) => {
     const { amount } = z.object({ amount: z.number().int().min(-1000).max(1000) }).parse(req.body || {});
     if (!(await getUserById(req.params.id))) throw notFound('User not found');
+    // Coins buy discount codes: the same rule as store credit — not to yourself.
+    if (req.params.id === req.user.id && amount > 0) throw badRequest('You cannot grant Forge Coins to yourself');
     const result = await grantCoins(req.params.id, amount, req.user.id);
     await audit({ actor: req.user, action: 'coins.grant', targetType: 'user',
       targetId: req.params.id, metadata: { amount }, req });
@@ -270,7 +279,7 @@ router.get('/users/:id/wallet', requirePermission('wallet.manage'),
 
 /* The most one grant may give: €100 for staff, €1,000 for an owner (env STAFF_CREDIT_MAX_CENTS). */
 const MAX_GRANT = 100_000;
-const staffGrantCap = () => Number(process.env.STAFF_CREDIT_MAX_CENTS || 10_000);
+const staffGrantCap = staffCreditCap;
 
 // Grant or deduct store credit for a user (e.g. goodwill, manual payout).
 router.post('/users/:id/credit', requirePermission('wallet.manage'),

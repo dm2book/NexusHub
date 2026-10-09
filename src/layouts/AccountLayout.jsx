@@ -1,12 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Outlet, NavLink, Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   Zap, LayoutDashboard, ShoppingBag, Download, LifeBuoy,
-  Wallet, Bell, User, LogOut, Shield, Menu, Gift, Star, Coins, Trophy,
+  Wallet, Bell, User, LogOut, Shield, Menu, Gift, Star, Coins, Trophy, X,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useI18n, extendDictionary } from '../lib/i18n.jsx';
 import { PageLoader } from '../components/ui.jsx';
+import { useFocusTrap } from '../lib/useFocusTrap.js';
 
 /* The account area's own strings, one file per language, fetched only for the
    language being read — the storefront never downloads them. English needs
@@ -56,8 +57,18 @@ export default function AccountLayout() {
   const { pathname } = useLocation();
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
+  const menuButton = useRef(null);
+  const drawer = useRef(null);
+  /* The phone drawer covers the page with a backdrop, so it is a real modal:
+     focus goes in, stays in, Escape closes it and focus comes back to the menu
+     button. Before, Tab walked on through the page behind the backdrop. */
+  useFocusTrap(open, drawer, { onEscape: close, openerRef: menuButton });
 
-  const Sidebar = ({ onNavigate = () => {} }) => (
+  /* Called as a function, not rendered as <Sidebar />. Declared inside this
+     component, a component would be a NEW type on every render, so React tore
+     the whole menu down and rebuilt it each time the layout re-rendered —
+     taking keyboard focus with it, back to the top of the page. */
+  const sidebar = (onNavigate = () => {}) => (
     <>
       <Link to="/" onClick={onNavigate} className="flex items-center gap-2 px-6 h-16 border-b border-white/5 shrink-0">
         <div className="w-8 h-8 rounded-lg flex items-center justify-center"
@@ -99,15 +110,23 @@ export default function AccountLayout() {
           until one of them grew. */}
       <aside className="w-64 shrink-0 border-r border-white/5 bg-elevated/50
         hidden md:flex flex-col sticky top-0 self-start h-screen">
-        <Sidebar />
+        {sidebar()}
       </aside>
 
       {/* Mobile drawer */}
       {open && (
         <div className="fixed inset-0 z-50 md:hidden">
           <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={close} />
-          <aside className="absolute left-0 top-0 bottom-0 w-72 max-w-[82%] bg-elevated border-r border-white/10 flex flex-col animate-fade-in">
-            <Sidebar onNavigate={close} />
+          <aside className="absolute left-0 top-0 bottom-0 w-72 max-w-[82%] bg-elevated border-r border-white/10 flex flex-col animate-fade-in"
+            ref={drawer} id="fm-account-menu" role="dialog" aria-modal="true" aria-label={t('nav.menu', 'Menu')}
+            tabIndex={-1} style={{ outline: 'none' }}>
+            {sidebar(close)}
+            {/* A way out inside the dialog. The backdrop closes it for a
+                mouse, but it is not a control a screen reader can reach. */}
+            <button type="button" onClick={close} aria-label={t('acc.layout.closeMenu', 'Close menu')}
+              className="absolute top-3 right-3 p-2 rounded-lg text-slate-300 hover:bg-white/5">
+              <X size={18} />
+            </button>
           </aside>
         </div>
       )}
@@ -117,14 +136,19 @@ export default function AccountLayout() {
         <header className="sticky top-0 z-30 h-16 border-b border-white/5 flex items-center
           justify-between px-4 sm:px-6 bg-space-black/95 backdrop-blur-md">
           <div className="flex items-center gap-2">
-            <button onClick={() => setOpen(true)} className="md:hidden p-2 -ml-2 rounded-lg text-slate-200 hover:bg-white/5">
+            <button ref={menuButton} onClick={() => setOpen(true)} aria-label={t('nav.menu', 'Menu')}
+              aria-expanded={open} aria-controls={open ? 'fm-account-menu' : undefined}
+              className="md:hidden p-2 -ml-2 rounded-lg text-slate-200 hover:bg-white/5">
               <Menu size={20} />
             </button>
             <span className="text-slate-400 text-sm">{t('acc.layout.myAccount', 'My Account')}</span>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-slate-300 hidden sm:block">{user?.email}</span>
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-fuchsia-500 flex items-center justify-center text-white text-sm font-semibold">
+          <div className="flex items-center gap-3 min-w-0">
+            {/* Cut short rather than wrapped: an address has no spaces to break
+                at, and a long one pushed the avatar out of a fixed-height bar. */}
+            <span className="text-sm text-slate-300 hidden sm:block truncate" style={{ maxWidth: '40vw' }}
+              title={user?.email}>{user?.email}</span>
+            <div aria-hidden="true" className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-fuchsia-500 flex items-center justify-center text-white text-sm font-semibold">
               {(user?.displayName || user?.email || '?')[0].toUpperCase()}
             </div>
           </div>

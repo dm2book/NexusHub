@@ -34,13 +34,19 @@ const DAY = 86_400_000;
  * Only counts orders that were actually placed — cancelled and failed ones are
  * excluded, so a buyer whose payment kept failing is not locked out for a day
  * because of it.
+ *
+ * The value ceilings look at what an order is WORTH — `value`, the amount
+ * before store credit — not at what is left to pay. They looked at `total`,
+ * and an order paid in full with credit has a total of 0: any amount went
+ * through in one go, as often as the count allowed. `total` alone still works
+ * for callers without credit, where the two are the same.
  */
-export async function assertOrderLimits({ email, ip, total, currency = 'EUR' }) {
+export async function assertOrderLimits({ email, ip, total, value = total, currency = 'EUR' }) {
   const L = config.security.orderLimits;
   const since = new Date(Date.now() - DAY).toISOString();
   const addr = String(email || '').toLowerCase();
 
-  if (L.maxOrderValue > 0 && total > L.maxOrderValue) {
+  if (L.maxOrderValue > 0 && value > L.maxOrderValue) {
     throw badRequest(
       `This order is larger than we accept in one go (max ${formatMoney(L.maxOrderValue, currency)}). `
       + 'Split it into smaller orders, or email us and we will arrange it by hand.');
@@ -59,11 +65,13 @@ export async function assertOrderLimits({ email, ip, total, currency = 'EUR' }) 
   }
 
   if (L.valuePerEmailPerDay > 0) {
+    // Earlier orders counted the same way: the money part plus the credit used.
     const r = await get(
-      `SELECT COALESCE(SUM(total), 0) AS sum FROM orders
+      `SELECT COALESCE(SUM(total + COALESCE((billing::jsonb ->> 'creditApplied')::numeric, 0)), 0) AS sum
+         FROM orders
         WHERE email=@e AND created_at>@since AND status NOT IN ('cancelled','failed')`,
       { e: addr, since });
-    if (Number(r?.sum || 0) + total > L.valuePerEmailPerDay) {
+    if (Number(r?.sum || 0) + value > L.valuePerEmailPerDay) {
       throw badRequest(
         `This would take you over ${formatMoney(L.valuePerEmailPerDay, currency)} of orders in 24 hours, `
         + 'which is our daily ceiling per customer. Email us and we will sort out anything larger by hand.');

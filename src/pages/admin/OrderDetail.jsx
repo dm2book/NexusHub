@@ -23,6 +23,11 @@ export default function AdminOrderDetail() {
   useEffect(() => { load(); }, [load]);
   if (!data) return <PageLoader />;
   const { order, fulfillment, fulfillmentLogs } = data;
+  /* Part of the money may already be back with the buyer — refunded in the
+     Stripe or Mollie dashboard. A refund from here only sends the rest. */
+  const refundedAtPsp = Number(order.refundedCents || 0);
+  const refundable = Math.max(0, Number(order.total || 0) - refundedAtPsp);
+  const pspName = order.pspProvider === 'mollie' ? 'Mollie' : order.pspProvider === 'stripe' ? 'Stripe' : 'the payment provider';
 
   const act = async (action, body) => {
     setBusy(true);
@@ -59,12 +64,14 @@ export default function AdminOrderDetail() {
             <button onClick={() => act('fulfill')} disabled={busy} className="btn-ghost text-sm"><Truck size={16} /> Fulfill</button>
           )}
           {hasPermission('orders.refund') && order.status !== 'refunded' && order.status !== 'cancelled' && (
-            <button onClick={() => confirmRefund(order) && act('refund', { method: 'money' })} disabled={busy} className="btn-ghost text-sm"><RotateCcw size={16} /> Refund</button>
+            <button onClick={() => confirmRefund({ ...order, total: refundable }) && act('refund', { method: 'money' })} disabled={busy} className="btn-ghost text-sm"><RotateCcw size={16} /> Refund</button>
           )}
           {/* Credit lives in a wallet, so only an order placed with an account can take it. */}
           {hasPermission('orders.refund') && order.userId && order.status !== 'refunded' && order.status !== 'cancelled' && (
-            <button onClick={() => window.confirm(`Refund ${order.number} as store credit? The full amount goes into the customer's wallet right away.`) && act('refund', { method: 'credit' })}
-              disabled={busy} className="btn-ghost text-sm" title="Puts the full amount (including any store credit used) in their wallet">
+            <button onClick={() => window.confirm(`Refund ${order.number} as store credit? What the order took goes into the customer's wallet right away`
+              + `${refundedAtPsp ? `, less the ${money(refundedAtPsp, order.currency)} already refunded through ${pspName}` : ''}. `
+              + 'Mystery prizes, Forge Coins and a tier bonus it earned are taken back.') && act('refund', { method: 'credit' })}
+              disabled={busy} className="btn-ghost text-sm" title="Puts what the order took in their wallet: store credit used included, anything already refunded through Stripe or Mollie left out">
               <RotateCcw size={16} /> Refund as credit
             </button>
           )}
@@ -96,6 +103,15 @@ export default function AdminOrderDetail() {
               <span className="text-slate-400">Total · {order.paymentStatus}</span>
               <span className="text-white font-semibold">{money(order.total, order.currency)}</span>
             </div>
+            {refundedAtPsp > 0 && (
+              <div className="flex flex-wrap justify-between gap-x-3 pt-2 text-sm">
+                <span className="text-amber-300">Already refunded through {pspName}</span>
+                <span className="text-amber-300">
+                  −{money(refundedAtPsp, order.currency)}
+                  {order.status !== 'refunded' && ` · ${money(refundable, order.currency)} left to refund`}
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Payment is manual: the shared checkout link cannot carry an amount,

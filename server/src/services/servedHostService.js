@@ -79,6 +79,10 @@ export async function noteServedHost(raw) {
   try {
     const seen = await getSetting(KEY, []);
     const list = Array.isArray(seen) ? seen.filter((x) => cleanHost(x?.host)) : [];
+    /* The throttle above is per instance, and every cold start begins with an
+       empty one — so every new instance wrote the same row again. When the
+       database already has this host on top, recently, there is nothing to say. */
+    if (list[0]?.host === host && now - Date.parse(list[0].at || 0) < WRITE_EVERY_MS) return;
     const rest = list.filter((x) => x.host !== host);
     // Most recent first, and bounded — a poisoned Host cannot grow this.
     await setSetting(KEY, [{ host, at: new Date(now).toISOString() }, ...rest].slice(0, MAX));

@@ -137,13 +137,16 @@ export async function requestRefund({ orderId, userId, reason, amount, method = 
   if (method === 'credit' && !order.userId) {
     throw badRequest('Store credit needs an account — this order was placed without one.');
   }
-  const { creditRefundAmount } = await import('./refundService.js');
+  const { creditRefundAmount, moneyRefundAmount } = await import('./refundService.js');
   const id = newId('ref');
   const at = nowIso();
   await run(`INSERT INTO refund_requests (id, order_id, user_id, reason, amount, method, created_at, updated_at)
        VALUES (@id, @oid, @uid, @reason, @amt, @method, @at, @at)`,
       { id, oid: orderId, uid: userId || null, reason: reason || null,
-        amt: amount ?? (method === 'credit' ? await creditRefundAmount(order) : order.total), method, at });
+        /* What is still refundable: after a partial refund in the Stripe or
+           Mollie dashboard, order.total overstates it (moneyRefundAmount
+           subtracts what the provider already sent back). */
+        amt: amount ?? (method === 'credit' ? await creditRefundAmount(order) : await moneyRefundAmount(order)), method, at });
   return get('SELECT * FROM refund_requests WHERE id=@id', { id });
 }
 

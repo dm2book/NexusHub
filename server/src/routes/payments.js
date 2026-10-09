@@ -34,6 +34,7 @@ import { constructEvent } from '../services/stripeService.js';
 import { setPspPayment } from '../services/orderService.js';
 import { orderFor, markPaid } from '../services/stripeSettlement.js';
 import { settleAsRefunded } from '../services/refundSettlement.js';
+import { recordPspRefund } from '../services/refundService.js';
 import { recordChargeback } from '../services/chargebackService.js';
 import { audit } from '../services/auditService.js';
 import { run, get, nowIso } from '../db/index.js';
@@ -146,6 +147,10 @@ router.post('/stripe/webhook', async (req, res) => {
         const order = await orderFor(obj);
         orderId = order?.id ?? null;
         if (!order) { outcome = 'refund for an unknown order'; break; }
+        /* Written on the order, part or whole: a partial refund made in the
+           dashboard was only audited, and a later store-credit refund then paid
+           the whole order again on top of it. */
+        await recordPspRefund(order.id, obj.amount_refunded);
         /* Partial refunds do not make an order `refunded`. Saying they do would
            tell the shop it gave everything back when it gave part of it. */
         const full = obj.amount_refunded != null && obj.amount != null
@@ -174,8 +179,10 @@ router.post('/stripe/webhook', async (req, res) => {
           provider: 'stripe', paymentId: obj.payment_intent || obj.charge || obj.id,
           reason: obj.reason || null, source: 'psp',
         }).catch((e) => console.error('[stripe] chargeback ledger:', e.message));
+        /* chargeback: the buyer took the card part back and keeps what was
+           delivered, so the store credit the order used stays spent. */
         const done = await settleAsRefunded(order.id, `Chargeback: ${obj.reason || 'disputed'}`,
-          { actorId: 'stripe', silent: true });
+          { actorId: 'stripe', silent: true, chargeback: true });
         outcome = done ? 'chargeback recorded and order refunded' : 'chargeback recorded';
         break;
       }

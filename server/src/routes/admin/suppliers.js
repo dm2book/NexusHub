@@ -14,6 +14,7 @@ import { scanProducts, summarise } from '../../services/supplier/catalogScanServ
 import { scanBest, scanSources, mapBest } from '../../services/supplier/bestSourceService.js';
 import { listSwitches, sweepFailover } from '../../services/supplier/supplierFailoverService.js';
 import { supplierProfitCenter } from '../../services/supplier/supplierProfitService.js';
+import { assertSupplierConfigUrls } from '../../services/supplier/supplierHttp.js';
 import { audit } from '../../services/auditService.js';
 import { notFound } from '../../utils/errors.js';
 import { get, all } from '../../db/index.js';
@@ -160,6 +161,12 @@ router.post('/', requirePermission('suppliers.manage'), asyncHandler(async (req,
     config: z.record(z.any()).optional(),
     credentialsRef: z.string().optional(),
   }).parse(req.body);
+  /* Every link in a supplier's config is a place this server will fetch from
+     on an admin's word, so one pointing inside — localhost, the private
+     network, the cloud metadata service, by address or through DNS — is
+     refused here. The connectors check again at every request, which also
+     covers a config saved before this check existed. */
+  await assertSupplierConfigUrls(body.config);
   const supplier = await suppliers.createSupplier(body);
   await audit({ actor: req.user, action: 'supplier.create', targetType: 'supplier',
     targetId: supplier.id, metadata: { kind: body.connectorKind }, req });
@@ -173,6 +180,7 @@ router.patch('/:id', requirePermission('suppliers.manage'), asyncHandler(async (
     config: z.record(z.any()).optional(),
     credentialsRef: z.string().optional(),
   }).parse(req.body);
+  await assertSupplierConfigUrls(body.config); // see POST /
   const supplier = await suppliers.updateSupplier(req.params.id, body);
   await audit({ actor: req.user, action: 'supplier.update', targetType: 'supplier',
     targetId: supplier.id, req });

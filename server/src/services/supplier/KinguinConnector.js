@@ -21,8 +21,7 @@
  * Docs: https://github.com/kinguinltdhk/Kinguin-eCommerce-API
  */
 import { SupplierConnector } from './SupplierConnector.js';
-
-const SUPPLIER_TIMEOUT_MS = Number(process.env.SUPPLIER_TIMEOUT_MS || 15_000);
+import { supplierFetch } from './supplierHttp.js';
 
 const DEFAULT_BASE = 'https://gateway.kinguin.net/esa/api';
 const safeJson = (t) => { try { return JSON.parse(t); } catch { return null; } };
@@ -35,20 +34,19 @@ export class KinguinConnector extends SupplierConnector {
 
   get #base() { return (this.config.baseUrl || DEFAULT_BASE).replace(/\/$/, ''); }
 
-  async #request(path, { method = 'GET', body } = {}) {
+  async #request(path, { method = 'GET', body, deadline } = {}) {
     if (!this.config.apiKey) throw new Error('Kinguin: no apiKey configured');
-    const res = await fetch(`${this.#base}${path}`, {
+    /* Time-limited, and the host checked when it is a configured baseUrl
+       rather than Kinguin's own (supplierHttp.js). */
+    const res = await supplierFetch(`${this.#base}${path}`, {
       method,
-      /* A supplier that never answers must not hold a paid order — or the
-         function — until the platform kills it mid-purchase. */
-      signal: AbortSignal.timeout(SUPPLIER_TIMEOUT_MS),
       headers: {
         'X-Api-Key': this.config.apiKey,
         'Content-Type': 'application/json',
         'Accept': 'application/json',
       },
       body: body ? JSON.stringify(body) : undefined,
-    });
+    }, { deadline, checkHost: !!this.config.baseUrl });
     const text = await res.text();
     const data = text ? safeJson(text) : null;
     if (!res.ok) throw new Error(`Kinguin API: ${data?.message || data?.error || `HTTP ${res.status}`}`);
@@ -139,6 +137,7 @@ export class KinguinConnector extends SupplierConnector {
         products: [{ kinguinId: Number(req.supplierSku), qty: req.quantity || 1, ...(price != null ? { price } : {}) }],
         orderExternalId: req.orderNumber || req.orderId,
       },
+      deadline: req.deadline,
     });
     const externalRef = String(order?.orderId ?? order?.id ?? '');
     if (!externalRef) throw new Error('Kinguin: order created but no orderId returned');
@@ -146,12 +145,12 @@ export class KinguinConnector extends SupplierConnector {
   }
 
   /** Poll the order; once completed, fetch the real serials and deliver them. */
-  async checkFulfillment(externalRef) {
-    const order = await this.#request(`/v2/order/${encodeURIComponent(externalRef)}`);
+  async checkFulfillment(externalRef, { deadline } = {}) {
+    const order = await this.#request(`/v2/order/${encodeURIComponent(externalRef)}`, { deadline });
     const status = String(order?.status || '').toLowerCase();
     if (status === 'completed' || status === 'complete') {
       let keys = [];
-      try { keys = await this.#request(`/v2/order/${encodeURIComponent(externalRef)}/keys`); } catch { keys = []; }
+      try { keys = await this.#request(`/v2/order/${encodeURIComponent(externalRef)}/keys`, { deadline }); } catch { keys = []; }
       const arr = Array.isArray(keys) ? keys : (keys?.results || []);
       const deliveries = arr
         .map((k) => ({ type: k.type && /image/i.test(k.type) ? 'image' : 'code', content: k.serial || k.key || '' }))

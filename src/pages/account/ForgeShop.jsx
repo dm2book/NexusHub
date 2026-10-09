@@ -7,7 +7,8 @@ import { PageLoader } from '../../components/ui.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
 import { useI18n } from '../../lib/i18n.jsx';
 
-const REASON = { order: 'Earned from an order', redeem: 'Redeemed in Forge Shop' };
+const REASON = { order: 'Earned from an order', redeem: 'Redeemed in Forge Shop',
+  order_reversal: 'Taken back — the order was refunded or cancelled' };
 
 export default function ForgeShop() {
   const toast = useToast();

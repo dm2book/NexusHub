@@ -23,6 +23,7 @@ import { getOrder, markPaymentReceived, transitionOrder, setPspPayment } from '.
 import { audit } from '../services/auditService.js';
 import { recordChargeback } from '../services/chargebackService.js';
 import { settleAsRefunded } from '../services/refundSettlement.js';
+import { recordPspRefund } from '../services/refundService.js';
 import { get } from '../db/index.js';
 import { alertOwner } from '../services/notifyService.js';
 
@@ -71,6 +72,14 @@ export async function applyPayment(paymentId, ctx = {}) {
 
   const { effect, reason } = orderEffect(payment);
 
+  /* What Mollie has refunded so far, part or whole, goes on the order: a
+     partial refund was only audited, and a later store-credit refund then
+     paid the whole order again on top of it. */
+  if (payment.refundedCents > 0) {
+    await recordPspRefund(order.id, payment.refundedCents)
+      .catch((e) => console.error('[mollie] could not record the refund:', e.message));
+  }
+
   if (effect === 'paid') {
     // Idempotent by construction: the state machine refuses to move an order
     // that has already left `pending`, so a replayed webhook is a no-op.
@@ -98,8 +107,10 @@ export async function applyPayment(paymentId, ctx = {}) {
       }).catch((e) => console.error('[mollie] chargeback ledger:', e.message));
     }
     if (order.status === 'refunded') return { ok: true, effect, skipped: 'already refunded' };
-    // A chargeback is not a refund from us: no "refund issued" mail for it.
-    const refunded = await settleAsRefunded(order.id, reason, { actorId: 'mollie', silent: effect === 'chargeback' });
+    // A chargeback is not a refund from us: no "refund issued" mail for it, and
+    // the store credit the order used stays spent (see transitionOrder).
+    const refunded = await settleAsRefunded(order.id, reason,
+      { actorId: 'mollie', silent: effect === 'chargeback', chargeback: effect === 'chargeback' });
     if (!refunded) {
       // Reported rather than swallowed: an order that Mollie has refunded but we
       // still show as live is a code we hand out for money we no longer have.

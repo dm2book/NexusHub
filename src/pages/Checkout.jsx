@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { PayMark } from '../components/store/PaymentBadges.jsx';
 import { Lock, ShieldCheck, Loader2, ShoppingBag, ExternalLink, Copy, CheckCircle2, Wallet } from 'lucide-react';
@@ -15,7 +15,6 @@ import { money } from '../lib/catalog.js';
 import { EmptyState } from '../components/ui.jsx';
 import { usePageMeta } from '../lib/useMeta.js';
 import { deliveryField } from '../lib/deliveryInfo.js';
-import { matchBundle } from '../lib/bundles.js';
 import { useStickyBarLift } from '../lib/useStickyBarLift.js';
 import { rememberOrder, recallOrder, forgetOrder } from '../lib/lastOrder.js';
 import { rememberMyOrder } from '../lib/myOrders.js';
@@ -34,7 +33,7 @@ export default function Checkout() {
      threw a ReferenceError on every render and the checkout was a blank page
      for everybody, gate open or closed. Found by driving a real purchase
      through it rather than by reading it. */
-  const { items, subtotal, currency, clear, prelaunch } = useCart();
+  const { items, subtotal, currency, clear, prelaunch, quote: priceCart } = useCart();
   const { user } = useAuth();
   const toast = useToast();
   const navigate = useNavigate();
@@ -74,60 +73,101 @@ export default function Checkout() {
   const [placed, setPlaced] = useState(() => recallOrder(
     new URLSearchParams(window.location.search).get('order')));
   const [couponInput, setCouponInput] = useState('');
-  const [coupon, setCoupon] = useState(null);           // { code, kind, percent, value, label }
+  const [couponCode, setCouponCode] = useState('');      // the code the server accepted
   const [creditBalance, setCreditBalance] = useState(0); // store credit (cents)
   const [useCredit, setUseCredit] = useState(false);
-  const [bundles, setBundles] = useState([]);
+  // The server's figures for this cart (POST /api/checkout/quote), and what they were asked for.
+  const [quote, setQuote] = useState(null);
+  const [quoteKey, setQuoteKey] = useState('');
+  const [priceNotice, setPriceNotice] = useState([]);     // lines whose price moved since they were added
+  const [totalNotice, setTotalNotice] = useState(null);   // { was, now }: the total moved at the button
+  const [pendingOrder, setPendingOrder] = useState(null); // placed at a total the buyer has yet to confirm
   const [deliveryFields, setDeliveryFields] = useState({});   // productId → label (e.g. "Roblox username")
   const [deliveryChoices, setDeliveryChoices] = useState({}); // productId → offers a code/account choice
+  const [mysteryIds, setMysteryIds] = useState({});           // productId → is a mystery box
   const [deliveryDetail, setDeliveryDetail] = useState('');
   const [deliveryMethod, setDeliveryMethod] = useState('code'); // 'code' | 'account' (buyer's pick)
-  // Server-owned; 100 until /api/config answers, so a slow config never invents
-  // a cap the order does not apply.
-  const [maxDiscountPercent, setMaxDiscountPercent] = useState(100);
+  /* Every figure in the summary is the server's: priceOrder(), the function
+     createOrder runs, answering POST /api/checkout/quote. This page worked the
+     total out itself — from the prices saved in the cart when each item was
+     added, with the coupon, the Forge+ discount, the bundle and the 40% ceiling
+     recomputed here, mystery boxes included although the order leaves them
+     out, and without the €0.50 card minimum — so the amount on the pay button
+     was not the amount of the order. Until the first answer lands, the cart's
+     own prices are shown without discounts, dimmed. */
+  /* A mystery box pays out in store credit, so credit never pays for one — the
+     server refuses an order that tries. The toggle makes way for a line saying
+     so, rather than letting the buyer meet that refusal at the last step. */
+  const hasMystery = quote ? quote.lines.some((l) => l.mystery)
+    : items.some((i) => mysteryIds[i.id] || i.category === 'mystery');
+  // Sent the same way to the quote and to the order, so both take the same credit.
+  const creditWanted = useCredit && !hasMystery ? creditBalance : 0;
+  const cartKey = items.map((i) => `${i.id}:${i.qty}`).join(',');
+  const askKey = `${cartKey}|${couponCode}|${creditWanted}|${user?.id || ''}`;
+  const updating = quoteKey !== askKey;
+  const creditToApply = quote?.creditApplied || 0;
+  const grandTotal = pendingOrder ? pendingOrder.total : (quote ? quote.total : subtotal);
+  const lineTotal = (i) => {
+    const l = quote?.lines.find((x) => x.productId === i.id);
+    return l && l.quantity === i.qty ? l.lineTotal : i.price * i.qty;
+  };
+  const couponLine = couponCode && quote?.coupon?.code === couponCode ? quote.coupon : null;
+  /* Credit left in the wallet while exactly the card minimum is still to pay:
+     the €0.50 floor took a little less credit, and the buyer should know why. */
+  const atCardMinimum = creditToApply > 0 && quote?.total === quote?.minCharge && creditBalance > creditToApply;
+  const totalChangedText = (was, now) => t('checkout.totalChanged',
+    'Your total changed from {was} to {now}: a price was updated just now. Nothing has been charged — check the summary, then press the button again to pay.',
+    { was: money(was, currency), now: money(now, currency) });
 
-  // Same rule as the cart, from one place — they used to disagree.
-  const matchedBundle = matchBundle(items, bundles);
-  const bundleDiscount = matchedBundle?.discount || 0;
+  /* Why a code was refused, in the buyer's language. */
+  const couponProblem = (p) => {
+    if (p?.reason === 'min_subtotal') {
+      return t('checkout.couponMin', 'This code works on orders from {amount}. Mystery boxes don’t count towards that.',
+        { amount: money(p.minSubtotal || 0, currency) });
+    }
+    if (p?.reason === 'mystery_only') return t('checkout.couponNoBoxes', 'Discount codes don’t work on mystery boxes.');
+    if (p?.reason === 'already_used') return t('checkout.couponUsed', 'You’ve already used this code.');
+    if (p?.reason === 'used_up') return t('checkout.couponGone', 'This code has been used up.');
+    return t('checkout.couponInvalid', 'This code isn’t valid (any more).');
+  };
 
-  /* The server already told us what this coupon is worth on this subtotal —
-     /api/coupons/:code?subtotal= returns `discount` — and recomputing it here
-     is how the two came to disagree. Kept as a fallback for a cached coupon
-     object from before this field was read. */
-  const couponDiscount = coupon
-    ? (Number.isFinite(coupon.discount) ? coupon.discount
-      : (coupon.percent ? Math.round(subtotal * coupon.percent / 100) : Math.min(subtotal, coupon.value || 0)))
-    : 0;
-  /* Forge+ takes a standing percentage off every order server-side. Leaving it
-     out here meant the summary quoted more than the buyer was charged. */
-  const memberPercent = user?.memberPercent || 0;
-  const memberDiscount = memberPercent ? Math.round(subtotal * memberPercent / 100) : 0;
-  /* One ceiling over the whole stack, the same one createOrder applies.
+  /* Every answer also brings the cart's saved prices up to date; the lines
+     that moved are kept, to be shown until the buyer has paid. */
+  const notePriceChanges = (r) => {
+    if (!r?.changed?.length) return;
+    setPriceNotice((cur) => [...cur.filter((c) => !r.changed.some((x) => x.id === c.id)), ...r.changed]);
+  };
 
-     This clamped at the subtotal only, which is not the rule the order uses:
-     createOrder caps the total discount at MAX_TOTAL_DISCOUNT_PERCENT (40).
-     Measured — a 50% coupon on a €9.99 product showed −€5.00 and a €4.99 total
-     here, and the order charged €5.99. The buyer read one price and paid
-     another, which is a dispute and a support ticket per order. */
-  const discountCeiling = Math.round(subtotal * maxDiscountPercent / 100);
-  const stacked = couponDiscount + memberDiscount + bundleDiscount;
-  const discount = Math.min(subtotal, stacked, discountCeiling);
-  /* When the ceiling bites, the lines below must still add up to the total the
-     buyer is charged — three lines summing to more than the discount shown is
-     the same broken arithmetic in a different place. The coupon is the line
-     that gives way, because it is the one the buyer chose to add. */
-  const couponShown = stacked > discount ? Math.max(0, couponDiscount - (stacked - discount)) : couponDiscount;
-  const afterDiscount = Math.max(0, subtotal - discount);
-  const creditToApply = useCredit ? Math.min(creditBalance, afterDiscount) : 0;
-  const grandTotal = Math.max(0, afterDiscount - creditToApply);
+  /* Ask the server what this order costs. Only the newest answer counts. */
+  const quoteSeq = useRef(0);
+  const refreshQuote = async () => {
+    const mine = ++quoteSeq.current;
+    const key = askKey;
+    const r = await priceCart({ coupon: couponCode, useCredit: creditWanted });
+    notePriceChanges(r);
+    if (!r || mine !== quoteSeq.current) return r;
+    setQuote(r.quote);
+    setQuoteKey(key);
+    /* A code that stopped applying — the cart changed under it, or someone
+       else took its last use — comes off, and the buyer is told why. */
+    const lost = couponCode && r.quote.problems?.find((p) => p.code === 'coupon');
+    if (lost) { setCouponCode(''); toast.error(couponProblem(lost)); }
+    return r;
+  };
 
   const applyCoupon = async () => {
     const code = couponInput.trim();
     if (!code) return;
     try {
-      const c = await api.get(`/api/coupons/${encodeURIComponent(code)}?subtotal=${subtotal}`);
-      setCoupon(c); toast.success(t('checkout.codeApplied', 'Code applied — {label}!', { label: c.label || t('checkout.discountWord', 'discount') }));
-    } catch (e) { setCoupon(null); toast.error(e.message || 'Invalid or expired code'); }
+      const r = await priceCart({ coupon: code, useCredit: creditWanted });
+      notePriceChanges(r);
+      const p = r?.quote?.problems?.find((x) => x.code === 'coupon');
+      if (p || !r?.quote?.coupon) { toast.error(couponProblem(p)); return; }
+      setCouponCode(r.quote.coupon.code);
+      const c = r.quote.coupon;
+      toast.success(t('checkout.codeApplied', 'Code applied — {label}!',
+        { label: c.percent ? `−${c.percent}%` : `−${money(c.value, currency)}` }));
+    } catch (e) { toast.error(e.message || couponProblem(null)); }
   };
 
   // A shared or bookmarked pay link must work on a device that has never seen
@@ -157,15 +197,24 @@ export default function Checkout() {
     if (!user) { setCreditBalance(0); return; }
     api.get('/api/account/wallet').then((w) => setCreditBalance(w.balance || 0)).catch(() => {});
   }, [user]);
-  useEffect(() => { api.get('/api/bundles').then((r) => setBundles(r.bundles || [])).catch(() => {}); }, []);
+  /* The server's figures, asked again whenever what the order would be sent
+     changes: the lines, the code, the credit, who is signed in. A changed
+     order also drops one that was waiting for the buyer to confirm its total. */
+  useEffect(() => {
+    if (!cartKey || prelaunch || placed) return undefined;
+    setPendingOrder(null);
+    const timer = setTimeout(() => { refreshQuote().catch(() => {}); }, 120);
+    return () => clearTimeout(timer);
+  }, [askKey, prelaunch, placed]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     api.get('/api/products').then((r) => {
-      const m = {}, choices = {};
+      const m = {}, choices = {}, boxes = {};
       (r.products || []).forEach((p) => {
         if (p.deliveryField) m[p.id] = p.deliveryField;
         if (p.deliveryChoice) choices[p.id] = true;
+        if (p.kind === 'mystery') boxes[p.id] = true;
       });
-      setDeliveryFields(m); setDeliveryChoices(choices);
+      setDeliveryFields(m); setDeliveryChoices(choices); setMysteryIds(boxes);
     }).catch(() => {});
   }, []);
 
@@ -201,7 +250,6 @@ export default function Checkout() {
       // payments still on, a Mollie test key). Say it here rather than letting
       // someone fill in their details and meet a 503 at the last step.
       setPaused(!!c.orderingPaused);
-      if (Number.isFinite(c.maxDiscountPercent)) setMaxDiscountPercent(c.maxDiscountPercent);
       if ((c.paymentMethods || []).length) setMethodId(c.paymentMethods[0].id);
     }).catch(() => {});
   }, []);
@@ -241,40 +289,74 @@ export default function Checkout() {
     if (!consent) { setTriedConsent(true); jumpToConsent(); return; }
     setBusy(true);
     try {
-      const { order } = await api.post('/api/orders', {
-        email,
-        items: items.map((i) => ({ productId: i.id, quantity: i.qty })),
-        billing: { full_name: fullName, city, email,
-          /* The language this buyer read the shop in.
-             The order emails are Dutch — one set of templates, one language —
-             so a French buyer gets a Dutch mail and then writes a ticket in
-             French. Recording it does not translate anything; it tells the
-             person answering which language to answer in, which is the part a
-             human can actually act on today. */
-          lang,
-          deliveryMethod: method,
-          ...(needsTarget ? { deliveryDetails: deliveryDetail, deliveryLabel: deliveryLabels.join(' / ') } : {}) },
-        currency,
-        coupon: coupon?.code,
-        useCredit: creditToApply || undefined,
-        paymentMethod: methodId || undefined,
-        // Sent, not just checked in the browser: the server records it against
-        // the order, which is what a chargeback dispute actually needs. The
-        // sentence travels with it because the wording is what was agreed to.
-        consent: true,
-        consentText: consentSentence,
-        /* Which advert this sale belongs to, when the visitor allowed us to
-           remember. Spread rather than set: with marketing refused this is an
-           empty object and the order carries no attribution at all, which is
-           the honest outcome — an unattributed sale, not a guessed one. */
-        ...attributionForOrder(),
-      });
+      /* Placed already, at a total the buyer has now been shown: pay that one. */
+      let order = pendingOrder;
+      if (order) { setPendingOrder(null); setTotalNotice(null); }
+      else {
+        /* The price on the button is the price of the order. Asked once more
+           right before ordering, with exactly what the order is sent: a price
+           that changed while this page was open stops here, before any order
+           exists — the new total is shown and the buyer presses again. */
+        const shownTotal = grandTotal;
+        const fresh = await refreshQuote().catch(() => null);
+        const quoted = fresh?.quote;
+        /* What the order would refuse, said before it is asked. A code that
+           stopped applying was already taken off, with its reason. */
+        if (quoted?.problems?.some((p) => p.code === 'coupon')) return;
+        const blocked = quoted?.problems?.[0];
+        if (blocked) { toast.error(blocked.message); return; }
+        if (quoted && quoted.total !== shownTotal) {
+          setTotalNotice({ was: shownTotal, now: quoted.total });
+          toast.error(totalChangedText(shownTotal, quoted.total));
+          return;
+        }
+        setTotalNotice(null);
+        ({ order } = await api.post('/api/orders', {
+          email,
+          items: items.map((i) => ({ productId: i.id, quantity: i.qty })),
+          billing: { full_name: fullName, city, email,
+            /* The language this buyer read the shop in.
+               The order emails are Dutch — one set of templates, one language —
+               so a French buyer gets a Dutch mail and then writes a ticket in
+               French. Recording it does not translate anything; it tells the
+               person answering which language to answer in, which is the part a
+               human can actually act on today. */
+            lang,
+            deliveryMethod: method,
+            ...(needsTarget ? { deliveryDetails: deliveryDetail, deliveryLabel: deliveryLabels.join(' / ') } : {}) },
+          currency,
+          coupon: couponCode || undefined,
+          useCredit: creditWanted || undefined,
+          paymentMethod: methodId || undefined,
+          // Sent, not just checked in the browser: the server records it against
+          // the order, which is what a chargeback dispute actually needs. The
+          // sentence travels with it because the wording is what was agreed to.
+          consent: true,
+          consentText: consentSentence,
+          /* Which advert this sale belongs to, when the visitor allowed us to
+             remember. Spread rather than set: with marketing refused this is an
+             empty object and the order carries no attribution at all, which is
+             the honest outcome — an unattributed sale, not a guessed one. */
+          ...attributionForOrder(),
+        }));
 
-      /* Remembered here, once, rather than in each of the five branches below:
-         a guest buyer's order number otherwise lives only in the URL they are
-         about to be redirected away from and in an email that has not arrived
-         yet. This is what lets /track offer it back to them tomorrow. */
-      rememberMyOrder(order.number);
+        /* Remembered here, once, rather than in each of the five branches below:
+           a guest buyer's order number otherwise lives only in the URL they are
+           about to be redirected away from and in an email that has not arrived
+           yet. This is what lets /track offer it back to them tomorrow. */
+        rememberMyOrder(order.number);
+
+        /* The order priced itself once more. If a price moved in the moment
+           between that last quote and the order, the buyer sees the order's
+           own total — and confirms it — before any money is asked for. */
+        const expected = quoted ? quoted.total : shownTotal;
+        if (order.total !== expected) {
+          setPendingOrder(order);
+          setTotalNotice({ was: expected, now: order.total });
+          toast.error(totalChangedText(expected, order.total));
+          return;
+        }
+      }
 
       if (provider === 'mollie') {
         // The payment is created BEFORE the cart is cleared: if Mollie refuses,
@@ -563,13 +645,30 @@ export default function Checkout() {
             {items.map((i) => (
               <div key={i.id} className="flex justify-between text-sm">
                 <span className="text-slate-300 truncate pr-2">{i.qty}× {i.name}</span>
-                <span className="text-white shrink-0">{money(i.price * i.qty, i.currency)}</span>
+                <span className="text-white shrink-0">{money(lineTotal(i), i.currency)}</span>
               </div>
             ))}
           </div>
+          {/* A price that moved since the item went into the cart, said before
+              the buyer pays rather than discovered on the payment page. */}
+          {priceNotice.length > 0 && (
+            <div role="status" className="rounded-xl border border-amber-400/30 bg-amber-400/10 p-3 mb-4">
+              <p className="text-amber-200 text-[12.5px] font-semibold">
+                {t('checkout.priceChanged', 'A price changed since you added it to your cart. You pay today’s price — {amount} in total.',
+                  { amount: money(grandTotal, currency) })}
+              </p>
+              <ul className="mt-1.5 space-y-0.5 text-[12.5px] text-slate-300">
+                {priceNotice.map((c) => (
+                  <li key={c.id} className="break-words">
+                    {c.name}: <s className="text-slate-500">{money(c.was, currency)}</s> → <span className="text-white">{money(c.now, currency)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           {/* Coupon — a link until someone has one. An open "discount code"
               field sends a buyer off to search for codes and not come back. */}
-          {!(showCoupon || coupon) ? (
+          {!(showCoupon || couponCode) ? (
             <button type="button" onClick={() => setShowCoupon(true)}
               className="text-[13px] font-semibold text-violet-700 hover:underline mb-4">
               {t('checkout.haveCoupon', 'Have a discount code?')}
@@ -584,7 +683,13 @@ export default function Checkout() {
           </div>
           )}
           {/* Store credit */}
-          {creditBalance > 0 && (
+          {creditBalance > 0 && hasMystery && (
+            <p data-testid="credit-no-mystery" className="flex items-start gap-2 mb-4 rounded-xl bg-space-black border border-white/10 px-3.5 py-3 text-[13px] text-slate-300">
+              <Wallet size={15} className="text-indigo-300 shrink-0 mt-0.5" aria-hidden="true" />
+              <span>{t('checkout.creditNoMystery', 'Store credit can’t be used on an order with a mystery box. Order the box on its own to use your credit on the rest.')}</span>
+            </p>
+          )}
+          {creditBalance > 0 && !hasMystery && (
             <label className="flex items-center justify-between gap-2 mb-4 cursor-pointer rounded-xl bg-space-black border border-white/10 px-3.5 py-3">
               <span className="flex items-center gap-2 text-sm text-slate-200">
                 <Wallet size={15} className="text-indigo-300" /> {t('checkout.useCredit', 'Use store credit')}
@@ -596,14 +701,48 @@ export default function Checkout() {
               </button>
             </label>
           )}
-          <div className="border-t border-white/5 pt-4 mb-6 space-y-1.5">
-            <div className="flex justify-between text-sm text-slate-400"><span>{t('cart.subtotal', 'Subtotal')}</span><span>{money(subtotal, currency)}</span></div>
-            {matchedBundle && <div className="flex justify-between text-sm text-amber-300"><span>Bundle ({matchedBundle.name} · {matchedBundle.percent}%)</span><span>−{money(bundleDiscount, currency)}</span></div>}
-            {memberDiscount > 0 && <div className="flex justify-between text-sm text-violet-300"><span>{t('checkout.memberOff', 'Forge+ member — {n}% off', { n: memberPercent })}</span><span>−{money(memberDiscount, currency)}</span></div>}
-            {coupon && <div className="flex justify-between text-sm text-emerald-300"><span>{t('checkout.coupon', 'Coupon')} ({coupon.code}{coupon.percent ? ` · ${coupon.percent}%` : ''})</span><span>−{money(couponShown, currency)}</span></div>}
+          {/* The server's figures (see priceOrder): they add up to the total the
+              order charges. Dimmed while a newer answer is on its way. */}
+          <div aria-busy={updating} className={`border-t border-white/5 pt-4 mb-6 space-y-1.5 transition-opacity ${updating ? 'opacity-60' : ''}`}>
+            <div className="flex justify-between text-sm text-slate-400"><span>{t('cart.subtotal', 'Subtotal')}</span><span>{money(quote ? quote.subtotal : subtotal, currency)}</span></div>
+            {quote?.bundleDiscount > 0 && <div className="flex justify-between text-sm text-amber-300"><span>{t('cart.bundleApplied', 'Bundle')} ({quote.bundle?.name} · {quote.bundle?.percent}%)</span><span>−{money(quote.bundleDiscount, currency)}</span></div>}
+            {quote?.memberDiscount > 0 && <div className="flex justify-between text-sm text-violet-300"><span>{t('checkout.memberOff', 'Forge+ member — {n}% off', { n: quote.memberPercent })}</span><span>−{money(quote.memberDiscount, currency)}</span></div>}
+            {couponLine && (
+              <div className="flex justify-between gap-2 text-sm text-emerald-300">
+                <span className="min-w-0 break-words">
+                  {t('checkout.coupon', 'Coupon')} ({couponLine.code}{couponLine.percent ? ` · ${couponLine.percent}%` : ''})
+                  <button type="button" onClick={() => setCouponCode('')}
+                    className="ml-2 text-[12px] text-slate-400 underline hover:text-slate-200">{t('cart.remove', 'Remove')}</button>
+                </span>
+                <span className="shrink-0">−{money(couponLine.applied, currency)}</span>
+              </div>
+            )}
+            {/* The 40% ceiling took part of the code — or all of it. Said here,
+                where the buyer can still keep a single-use code for a bigger
+                order, instead of finding out from the receipt. */}
+            {couponLine && couponLine.applied < couponLine.offered && (
+              <p className="text-[12px] text-slate-400">
+                {couponLine.applied > 0
+                  ? t('checkout.couponCapped', 'Discounts stop at {n}% of an order, so this code takes {amount} off here instead of {full}.',
+                    { n: quote.maxDiscountPercent, amount: money(couponLine.applied, currency), full: money(couponLine.offered, currency) })
+                  : t('checkout.couponUnused', 'Discounts stop at {n}% of an order and this one is already there, so the code isn’t used — you keep it.',
+                    { n: quote.maxDiscountPercent })}
+              </p>
+            )}
             {creditToApply > 0 && <div className="flex justify-between text-sm text-indigo-300"><span>{t('checkout.credit', 'Store credit')}</span><span>−{money(creditToApply, currency)}</span></div>}
+            {atCardMinimum && (
+              <p className="text-[12px] text-slate-400">
+                {t('checkout.minCharge', 'A payment has to be at least {amount}, so that much is left to pay — the rest of your credit stays in your wallet.',
+                  { amount: money(quote.minCharge, currency) })}
+              </p>
+            )}
             <div className="flex justify-between text-lg pt-1"><span className="text-slate-300">{t('cart.total', 'Total')}</span><span className="text-white font-semibold">{money(grandTotal, currency)}</span></div>
           </div>
+          {totalNotice && (
+            <div role="alert" className="rounded-xl border border-amber-400/40 bg-amber-400/10 p-3 mb-3 text-[12.5px] text-amber-100">
+              {totalChangedText(totalNotice.was, totalNotice.now)}
+            </div>
+          )}
           <label id="fm-consent" className="hidden lg:flex items-start gap-2.5 mb-3 text-[12.5px] text-slate-400 cursor-pointer scroll-mt-24"
             style={triedConsent && !consent ? { outline: '2px solid #f59e0b', outlineOffset: 4, borderRadius: 8 } : undefined}>
             <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)}

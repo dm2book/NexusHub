@@ -21,7 +21,12 @@
 import { config } from '../../config/env.js';
 
 const TTL_MS = 6 * 60 * 60 * 1000;      // re-read robots.txt every six hours
+/* A robots.txt we could not READ (timeout, connection reset) is asked again
+   much sooner: one network blip used to stop a source for six hours. A file
+   that answered — with rules, a 404, or an error status — keeps the full TTL. */
+const UNREACHABLE_TTL_MS = 10 * 60 * 1000;
 const cache = new Map();                 // origin → { rules, fetchedAt, ok, error }
+const MAX_ORIGINS = 500;                 // origins come from data: keep the map bounded
 
 /** Turn a robots.txt path pattern into an anchored regular expression. */
 function toRegex(pattern) {
@@ -102,7 +107,7 @@ export async function isAllowed(url, { userAgent = config.market.userAgent, fetc
 
   const origin = u.origin;
   const hit = cache.get(origin);
-  if (hit && Date.now() - hit.fetchedAt < TTL_MS) {
+  if (hit && Date.now() - hit.fetchedAt < (hit.unreachable ? UNREACHABLE_TTL_MS : TTL_MS)) {
     if (!hit.ok) return { allowed: false, reason: hit.error, crawlDelay: null };
     const d = decide(hit.groups, u.pathname + u.search, userAgent);
     return { allowed: d.allowed, reason: d.allowed ? 'allowed by robots.txt' : `robots.txt disallows ${d.rule}`,
@@ -110,12 +115,14 @@ export async function isAllowed(url, { userAgent = config.market.userAgent, fetc
   }
 
   try {
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 10_000);
+    /* One signal for the request AND the body: the timer used to be cleared as
+       soon as the headers arrived, so a server that sent headers and then
+       trickled the file held the caller with no limit at all (and a failed
+       fetch left the timer running). */
+    const signal = AbortSignal.timeout(10_000);
     const res = await fetchImpl(`${origin}/robots.txt`, {
-      headers: { 'user-agent': userAgent, accept: 'text/plain' }, signal: ctrl.signal,
+      headers: { 'user-agent': userAgent, accept: 'text/plain' }, signal,
     });
-    clearTimeout(timer);
 
     /* A 404 genuinely means "no rules published", which the convention reads as
        allow-all. Any other non-OK status is a robots.txt we could not read, and
@@ -130,13 +137,14 @@ export async function isAllowed(url, { userAgent = config.market.userAgent, fetc
       return { allowed: false, reason: error, crawlDelay: null };
     }
     const groups = parseRobots(await res.text());
+    if (cache.size >= MAX_ORIGINS) cache.delete(cache.keys().next().value);
     cache.set(origin, { ok: true, groups, fetchedAt: Date.now() });
     const d = decide(groups, u.pathname + u.search, userAgent);
     return { allowed: d.allowed, reason: d.allowed ? 'allowed by robots.txt' : `robots.txt disallows ${d.rule}`,
       crawlDelay: d.crawlDelay };
   } catch (err) {
     const error = `could not read robots.txt: ${err.message}`;
-    cache.set(origin, { ok: false, error, fetchedAt: Date.now() });
+    cache.set(origin, { ok: false, error, fetchedAt: Date.now(), unreachable: true });
     return { allowed: false, reason: error, crawlDelay: null };
   }
 }

@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useFocusTrap } from '../../lib/useFocusTrap.js';
 
 /**
  * The phone menu, as a panel that actually covers the page.
@@ -18,10 +19,20 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
  *
  * One component rather than the same four fixes twice, because the two drawers
  * had already drifted apart once.
+ *
+ * And it owns the keyboard while open (see useFocusTrap): focus moves into the
+ * menu, Tab cycles through it and the X button that closes it, Escape closes
+ * it, and focus returns to that button. It used to stay on the button and Tab
+ * walked on through the page hidden underneath.
+ *
+ * A dialog, but not aria-modal. The X that closes it lives in the header above,
+ * outside this element, and aria-modal would hide it from VoiceOver on a phone
+ * — where there is no Escape key to fall back on.
  */
-export default function MobileDrawer({ open, children, className = '' }) {
+export default function MobileDrawer({ open, children, className = '', onClose, openerRef, id, label }) {
   const ref = useRef(null);
   const [height, setHeight] = useState(null);
+  useFocusTrap(open, ref, { onEscape: onClose, openerRef, includeOpener: true });
 
   /**
    * Fill exactly the viewport below the header.
@@ -77,8 +88,12 @@ export default function MobileDrawer({ open, children, className = '' }) {
 
   if (!open) return null;
 
+  /* outline: none — focus lands on the panel itself only for the instant
+     before the first Tab, and a focus ring around the whole menu reads as a
+     rendering fault. Every control inside keeps its own ring. */
   return (
-    <div ref={ref} style={height ? { height } : undefined}
+    <div ref={ref} id={id} role="dialog" aria-label={label} tabIndex={-1}
+      style={height ? { height, outline: 'none' } : { outline: 'none' }}
       className={`lg:hidden overflow-y-auto overscroll-contain border-t border-slate-200/70 bg-white fm-page fm-clears-tabbar ${className}`}>
       {children}
     </div>

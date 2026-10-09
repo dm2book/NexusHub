@@ -22,8 +22,7 @@
  */
 import { createHash } from 'node:crypto';
 import { SupplierConnector } from './SupplierConnector.js';
-
-const SUPPLIER_TIMEOUT_MS = Number(process.env.SUPPLIER_TIMEOUT_MS || 15_000);
+import { supplierFetch } from './supplierHttp.js';
 
 // Base host only — every request path below already carries its /v3 prefix, so
 // keeping /v3 here too would double it (https://api.g2a.com/v3/v3/order → 404).
@@ -50,20 +49,19 @@ export class G2AConnector extends SupplierConnector {
     return `${apiHash}, ${token}`;
   }
 
-  async #request(path, { method = 'GET', body } = {}) {
+  async #request(path, { method = 'GET', body, deadline } = {}) {
     if (!this.#configured) throw new Error('G2A: apiHash, email and apiKey are required');
-    const res = await fetch(`${this.#base}${path}`, {
+    /* Time-limited, and the host checked when it is a configured baseUrl
+       rather than G2A's own (supplierHttp.js). */
+    const res = await supplierFetch(`${this.#base}${path}`, {
       method,
-      /* A supplier that never answers must not hold a paid order — or the
-         function — until the platform kills it mid-purchase. */
-      signal: AbortSignal.timeout(SUPPLIER_TIMEOUT_MS),
       headers: {
         'Authorization': this.#authHeader(),
         'Content-Type': 'application/json',
         'Accept': 'application/json',
       },
       body: body ? JSON.stringify(body) : undefined,
-    });
+    }, { deadline, checkHost: !!this.config.baseUrl });
     const text = await res.text();
     const data = text ? safeJson(text) : null;
     if (!res.ok) throw new Error(`G2A API: ${data?.message || data?.error || `HTTP ${res.status}`}`);
@@ -95,25 +93,26 @@ export class G2AConnector extends SupplierConnector {
       method: 'POST',
       body: { product_id: String(req.supplierSku), currency, quantity: qty,
         ...(maxPrice != null ? { max_price: maxPrice } : {}) },
+      deadline: req.deadline,
     });
     const orderId = String(added?.order_id ?? added?.orderId ?? '');
     if (!orderId) throw new Error('G2A: order added but no order_id returned');
-    await this.#request('/v3/order/pay', { method: 'PUT', body: { order_id: orderId } });
+    await this.#request('/v3/order/pay', { method: 'PUT', body: { order_id: orderId }, deadline: req.deadline });
     return { status: 'in_progress', externalRef: orderId, raw: added };
   }
 
   /** Poll the order; once the key is issued, deliver it. */
-  async checkFulfillment(externalRef) {
+  async checkFulfillment(externalRef, { deadline } = {}) {
     let status = '';
     try {
-      const details = await this.#request(`/v3/order/details/${encodeURIComponent(externalRef)}`);
+      const details = await this.#request(`/v3/order/details/${encodeURIComponent(externalRef)}`, { deadline });
       status = String(details?.status || '').toLowerCase();
       if (['canceled', 'cancelled', 'refunded', 'failed', 'error'].includes(status)) {
         return { status: 'failed', externalRef, raw: details };
       }
     } catch { /* details may be briefly unavailable right after pay */ }
     try {
-      const keyResp = await this.#request(`/v3/order/key/${encodeURIComponent(externalRef)}`);
+      const keyResp = await this.#request(`/v3/order/key/${encodeURIComponent(externalRef)}`, { deadline });
       // Accept a single key or a list (multi-unit orders return several).
       const rawKeys = Array.isArray(keyResp?.keys) ? keyResp.keys
         : Array.isArray(keyResp?.data) ? keyResp.data

@@ -452,14 +452,20 @@ export async function queriesFor(categories = null, { cap = LIMITS.maxQueries } 
 }
 
 /** Ask the permitted sources, classify, evaluate, and (if on) add what is safe. */
-export async function scanCategories({ categories = null, fetchImpl = fetch, autoAdd = autoAddEnabled(), ...deps } = {}) {
+export async function scanCategories({ categories = null, fetchImpl = fetch, autoAdd = autoAddEnabled(),
+  deadline = Date.now() + 22_000, ...deps } = {}) {
+  /* One deadline for the whole scan — it runs inside an admin request with
+     Vercel's 30 s limit. Each stage used to bring its own (the source
+     collection 18 s from ITS start, the evaluation none at all), so together
+     they could run well past the limit. What does not fit waits for the next
+     scan or the scheduled discovery. */
   const { collectFromSources } = await import('../market/engine.js');
   const queries = await queriesFor(categories);
   const f = throttledFetch(fetchImpl);
-  const collected = await collectFromSources(queries, { fetchImpl: f });
-  const searched = await collectMentions(queries, { fetchImpl: f, credentials: deps.searchCredentials });
+  const collected = await collectFromSources(queries, { fetchImpl: f, deadline: deadline - 8_000 });
+  const searched = await collectMentions(queries, { fetchImpl: f, credentials: deps.searchCredentials, deadline: deadline - 6_000 });
   const classified = await runDiscovery();
-  const evaluated = await evaluateCandidates(deps);
+  const evaluated = await evaluateCandidates({ ...deps, deadline });
   const added = autoAdd ? await addAllSafe() : { added: 0, results: [] };
   return { queries: queries.length, collected, searched, classified, evaluated: evaluated.length, added: added.added,
     byGate: Object.fromEntries(Object.values(GATE).map((g) => [g, evaluated.filter((e) => e.status === g).length])) };
@@ -650,7 +656,7 @@ export async function addReferenceDenominations({ game, platforms = ['unknown'],
   await runDiscovery();
   const ids = (await all(`SELECT id FROM market_candidates WHERE market_product_id = ANY(@ids) AND status <> ALL(@final)`,
     { ids: [...new Set(keys)], final: FINAL })).map((r) => r.id);
-  const evaluated = ids.length ? await evaluateCandidates({ ids, ...deps }) : [];
+  const evaluated = ids.length ? await evaluateCandidates({ ids, deadline: Date.now() + 20_000, ...deps }) : [];
   await audit({ actor, action: 'discovery.reference_added', targetType: 'market', targetId: game,
     metadata: { platforms, region, amounts: amounts.map((a) => a.denomination), sourceUrl } }).catch(() => {});
   return { recorded: keys.length, evaluated: evaluated.map((e) => ({ id: e.id, title: e.title, status: e.status, reasons: e.reasons })) };

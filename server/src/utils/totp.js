@@ -3,7 +3,7 @@
  * dependencies. SHA-1 / 6 digits / 30s period: the parameters every major
  * authenticator app (Google Authenticator, Authy, 1Password, Bitwarden) uses.
  */
-import { createHmac, randomBytes } from 'node:crypto';
+import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
 
@@ -50,15 +50,33 @@ export function totpCode(secret, { step = 30, at = Date.now() } = {}) {
   return hotp(secret, Math.floor(at / 1000 / step));
 }
 
-/** Verify a user-supplied code with ±`window` steps of clock drift tolerance. */
-export function verifyTotp(secret, code, { window = 1, step = 30, at = Date.now() } = {}) {
+/**
+ * Which time-step a user-supplied code belongs to, allowing ±`window` steps of
+ * clock drift — or null when it matches none.
+ *
+ * The step is what makes replay protection possible (RFC 6238 §5.2): a code
+ * stays valid for up to a minute and a half, so "is it right?" alone lets the
+ * same six digits work again — shoulder-surfed, phished in real time, or simply
+ * submitted twice. `after` is the step of the last code this account had
+ * accepted; every step at or before it is skipped, so a code works once.
+ */
+export function matchTotpStep(secret, code, { window = 1, step = 30, at = Date.now(), after = null } = {}) {
   const c = String(code || '').replace(/\D/g, '');
-  if (!secret || c.length !== 6) return false;
+  if (!secret || c.length !== 6) return null;
+  const supplied = Buffer.from(c);
   const counter = Math.floor(at / 1000 / step);
   for (let i = -window; i <= window; i++) {
-    if (hotp(secret, counter + i) === c) return true;
+    const s = counter + i;
+    if (after != null && s <= after) continue;
+    // Constant-time: equal-length digit strings, so this cannot throw.
+    if (timingSafeEqual(Buffer.from(hotp(secret, s)), supplied)) return s;
   }
-  return false;
+  return null;
+}
+
+/** Verify a user-supplied code with ±`window` steps of clock drift tolerance. */
+export function verifyTotp(secret, code, opts = {}) {
+  return matchTotpStep(secret, code, opts) !== null;
 }
 
 /** otpauth:// provisioning URI — encode as a QR or tap-to-open on mobile. */

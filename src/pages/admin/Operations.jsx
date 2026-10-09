@@ -230,12 +230,15 @@ export default function Operations() {
         footer={refund && <>
           <button onClick={() => setRefund(null)} className="btn-ghost">Cancel</button>
           <button disabled={busy} className="btn-primary bg-fuchsia-600 hover:bg-fuchsia-500" onClick={() => act(refund, 'refund', { reason: refundReason })}>
-            <RotateCcw size={16} /> Refund {refund && money(refund.amount, refund.currency)}
+            <RotateCcw size={16} /> Refund {refund && money(Math.max(0, refund.amount - (refund.refundedCents || 0)), refund.currency)}
           </button>
         </>}>
         {refund && (
           <div className="space-y-3">
-            <p className="text-slate-300">Refund <span className="font-mono text-white">{refund.number}</span> ({money(refund.amount, refund.currency)}). Any store credit applied to this order is returned automatically.</p>
+            <p className="text-slate-300">Refund <span className="font-mono text-white">{refund.number}</span> ({money(Math.max(0, refund.amount - (refund.refundedCents || 0)), refund.currency)}). Any store credit applied to this order is returned automatically.</p>
+            {refund.refundedCents > 0 && (
+              <p className="text-amber-300 text-sm">{money(refund.refundedCents, refund.currency)} of {money(refund.amount, refund.currency)} was already refunded at the payment provider — only the rest goes back now.</p>
+            )}
             <div><label className="label">Reason (optional)</label>
               <input className="input" value={refundReason} onChange={(e) => setRefundReason(e.target.value)} placeholder="e.g. customer request" /></div>
           </div>

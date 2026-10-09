@@ -88,7 +88,8 @@ export function queryFor(gameKey) {
 /** Brave's web search, through the given fetch (throttled by the caller). */
 export async function braveSearch(query, { apiKey, fetchImpl = fetch, count = 20 } = {}) {
   const url = `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=${count}`;
-  const res = await fetchImpl(url, { headers: { Accept: 'application/json', 'X-Subscription-Token': apiKey } });
+  const res = await fetchImpl(url, { headers: { Accept: 'application/json', 'X-Subscription-Token': apiKey },
+    signal: AbortSignal.timeout(10_000) });
   if (res.status === 429) throw new Error('Brave Search rate limit reached (429)');
   if (!res.ok) throw new Error(`Brave Search API HTTP ${res.status}`);
   const data = await res.json();
@@ -99,12 +100,14 @@ export async function braveSearch(query, { apiKey, fetchImpl = fetch, count = 20
  * Search for each game label and record the packs the results name.
  * Returns { searched, mentions, skipped?, errors[] }.
  */
-export async function collectMentions(labels, { fetchImpl = fetch, credentials = null } = {}) {
+export async function collectMentions(labels, { fetchImpl = fetch, credentials = null, deadline = Infinity } = {}) {
   const creds = credentials || await credentialsFor('brave');
   if (!creds?.apiKey) return { searched: 0, mentions: 0, skipped: 'no Brave Search API key', errors: [] };
   const { upsertMarketProduct } = await import('../market/observations.js');
   const out = { searched: 0, mentions: 0, errors: [] };
   for (const label of labels) {
+    // Inside the caller's request: what is left is searched on the next scan.
+    if (deadline - Date.now() < 3_000) { out.skipped = 'time budget'; break; }
     const def = GAMES.find((g) => g.label === label || g.key === label);
     const q = def && queryFor(def.key);
     if (!q) continue;

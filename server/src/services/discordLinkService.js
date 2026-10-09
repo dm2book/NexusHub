@@ -19,6 +19,15 @@
  * The intent lives in the database rather than in a cookie so the callback can
  * never be talked into attaching someone else's account: the state resolves to a
  * user id here, and nothing about the target user crosses the network.
+ *
+ * That alone left the opposite attack open. The state is a bearer: start a link
+ * for YOUR account, send the Discord consent URL to somebody else, and when they
+ * approve, THEIR Discord lands on YOUR ForgeMarket account — collecting the
+ * roles their purchases earn, with them none the wiser. So the route that starts
+ * a link also drops the state into an httpOnly cookie scoped to the callback
+ * path (see routes/auth.js), and the callback refuses a state that did not come
+ * back to the browser that asked for it — the same binding the login flow's
+ * oauth_state cookie gives sign-ins.
  */
 import { config } from '../config/env.js';
 import { run, get, nowIso } from '../db/index.js';
@@ -28,8 +37,12 @@ import { PROVIDERS } from './oauthService.js';
 import { syncMemberRoles, stripManagedRoles, discordUidForUser } from './discordRolesService.js';
 import { audit } from './auditService.js';
 
-const INTENT_TTL_MS = 10 * 60_000;
+export const INTENT_TTL_MS = 10 * 60_000;
 const linkRedirectUri = () => `${config.apiUrl}/api/auth/oauth/discord/link/callback`;
+
+/** The callback's path as the browser sees it — what the state cookie is scoped to,
+    derived from the redirect URI so the two cannot drift apart. */
+export const linkCallbackPath = () => new URL(linkRedirectUri()).pathname;
 
 export const linkEnabled = () => PROVIDERS.discord.enabled();
 

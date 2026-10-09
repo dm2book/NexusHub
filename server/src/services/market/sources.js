@@ -401,6 +401,8 @@ export async function fetchFromSource(key, query, { fetchImpl = fetch } = {}) {
   }
   /* A marketplace API that hangs must not hold a serverless request until the
      platform kills it: every call gets 10 s unless the caller set its own. */
-  const timed = (url, init = {}) => fetchImpl(url, { signal: AbortSignal.timeout(10_000), ...init });
+  const timed = (url, init = {}) => fetchImpl(url, { ...init,
+    // Both limits apply: ours, and whatever the caller passed (its deadline).
+    signal: init.signal ? AbortSignal.any([AbortSignal.timeout(10_000), init.signal]) : AbortSignal.timeout(10_000) });
   return src.fetchOffers({ creds: creds || {}, query, fetchImpl: timed });
 }

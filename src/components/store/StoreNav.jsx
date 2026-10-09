@@ -19,10 +19,11 @@ import { useWishlist } from '../../lib/wishlist.js';
  * French does not read "Frans".
  */
 export function LangSwitch({ className = '' }) {
-  const { lang, setLang } = useI18n();
+  const { lang, setLang, t } = useI18n();
   const [open, setOpen] = useState(false);
   const box = useRef(null);
   const panel = useRef(null);
+  const toggle = useRef(null);
   const [place, setPlace] = useState(null);
   const current = LANGUAGES.find((l) => l.code === lang) || LANGUAGES[0];
 
@@ -83,10 +84,18 @@ export function LangSwitch({ className = '' }) {
 
   // Click outside and Escape both close it — a menu that traps you is worse
   // than no menu.
+  /* Escape is marked as handled, and focus goes back to the button: inside the
+     phone drawer the same key would otherwise also close the drawer around
+     this list, and the option that had focus is gone the moment the list is. */
   useEffect(() => {
     if (!open) return undefined;
     const onDown = (e) => { if (box.current && !box.current.contains(e.target)) setOpen(false); };
-    const onKey = (e) => { if (e.key === 'Escape') setOpen(false); };
+    const onKey = (e) => {
+      if (e.key !== 'Escape') return;
+      e.preventDefault();
+      setOpen(false);
+      toggle.current?.focus();
+    };
     document.addEventListener('pointerdown', onDown);
     document.addEventListener('keydown', onKey);
     return () => { document.removeEventListener('pointerdown', onDown); document.removeEventListener('keydown', onKey); };
@@ -94,21 +103,24 @@ export function LangSwitch({ className = '' }) {
 
   return (
     <div ref={box} className={`relative ${className}`}>
-      <button onClick={() => setOpen((v) => !v)}
+      <button ref={toggle} onClick={() => setOpen((v) => !v)}
         aria-haspopup="listbox" aria-expanded={open}
-        aria-label={`Language: ${current.label}`}
+        aria-label={`${t('nav.language', 'Language')}: ${current.label}`}
         className="inline-flex items-center gap-1 h-10 px-2.5 rounded-xl text-[13px] font-bold tracking-wide text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition">
-        🌐 {current.short}
+        <span aria-hidden="true">🌐</span> {current.short}
       </button>
       {open && (
-        <ul ref={panel} role="listbox" aria-label="Language"
+        <ul ref={panel} role="listbox" aria-label={t('nav.language', 'Language')}
           style={place == null ? undefined
             : { left: place.left, right: 'auto', top: place.top, maxHeight: place.maxHeight }}
           className="absolute right-0 top-11 z-50 min-w-[164px] max-w-[calc(100vw-24px)] overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg py-1">
+          {/* role="none" on the list item: an option has to sit directly in
+              its listbox, and a bare <li> puts a listitem between them that
+              hides the options from a screen reader's count. */}
           {LANGUAGES.map((l) => (
-            <li key={l.code}>
+            <li key={l.code} role="none">
               <button role="option" aria-selected={l.code === lang} lang={l.code}
-                onClick={() => { setLang(l.code); setOpen(false); }}
+                onClick={() => { setLang(l.code); setOpen(false); toggle.current?.focus(); }}
                 className={`w-full text-left px-3 py-2 text-[14px] transition ${
                   l.code === lang ? 'font-bold text-violet-700 bg-violet-50' : 'text-slate-700 hover:bg-slate-50'}`}>
                 <span className="inline-block w-7 text-[11px] font-bold tracking-wide text-slate-400">{l.short}</span>
@@ -144,6 +156,7 @@ export default function StoreNav() {
   const { pathname } = useLocation();
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
+  const menuButton = useRef(null);
   const active = (to) => (to === '/' ? pathname === '/' : pathname.startsWith(to));
   useEffect(() => { setOpen(false); }, [pathname]);
 
@@ -180,7 +193,8 @@ export default function StoreNav() {
         {/* shrink-0 is load-bearing: this row is over-full at 390px, and without
             it the browser squeezes these 40px buttons down to 20-27px — measured.
             w-11 puts them on the 44px thumb target instead of just under it. */}
-        <button onClick={() => setOpen((v) => !v)} aria-label={t('nav.menu', 'Menu')}
+        <button ref={menuButton} onClick={() => setOpen((v) => !v)} aria-label={t('nav.menu', 'Menu')}
+          aria-expanded={open} aria-controls={open ? 'fm-store-menu' : undefined}
           className="min-[1152px]:hidden w-11 h-11 shrink-0 -ml-1.5 rounded-xl hover:bg-slate-100 grid place-items-center text-slate-700">
           {open ? <X size={20} /> : <Menu size={20} />}
         </button>
@@ -213,7 +227,7 @@ export default function StoreNav() {
             thresholds move together for that reason. */}
         <nav className="hidden min-[1152px]:flex items-center gap-4 text-[14.5px] font-medium text-slate-600 min-w-0 overflow-hidden">
           {NAV.map((n) => (
-            <Link key={n.label} to={n.to}
+            <Link key={n.label} to={n.to} aria-current={active(n.to) ? 'page' : undefined}
               className={`relative py-1 whitespace-nowrap hover:text-slate-900 transition ${active(n.to) ? 'text-violet-600' : ''}`}>
               {n.label}
               {active(n.to) && <span className="absolute -bottom-[22px] left-0 right-0 h-0.5 bg-violet-600 rounded-full" />}
@@ -307,9 +321,10 @@ export default function StoreNav() {
       </div>
 
       {/* Mobile drawer */}
-      <MobileDrawer open={open} className="px-4 py-3 space-y-1">
+      <MobileDrawer open={open} onClose={() => setOpen(false)} openerRef={menuButton}
+        id="fm-store-menu" label={t('nav.menu', 'Menu')} className="px-4 py-3 space-y-1">
           {NAV.map((n) => (
-            <Link key={n.label} to={n.to}
+            <Link key={n.label} to={n.to} aria-current={active(n.to) ? 'page' : undefined}
               className={`block px-3 py-2.5 rounded-xl text-[15px] font-medium ${active(n.to) ? 'bg-violet-50 text-violet-700' : 'text-slate-700 hover:bg-slate-50'}`}>
               {n.label}
             </Link>

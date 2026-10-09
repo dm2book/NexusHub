@@ -18,7 +18,7 @@ import { evaluateCoupon } from '../services/couponService.js';
 import { recommendationsFor } from '../services/recommendationService.js';
 import { pricedBundles } from '../services/bundleService.js';
 import { peekGiftCard } from '../services/giftCardService.js';
-import { createOrder, getOrderByNumber, getOrder, markPaymentReceived, getPspPayment, setPspPayment } from '../services/orderService.js';
+import { createOrder, getOrderByNumber, getOrder, markPaymentReceived, getPspPayment, setPspPayment, customerView } from '../services/orderService.js';
 import { requestRefund, getRefundRequestForOrder } from '../services/supportService.js';
 import { CHAT_LANGS, answer } from '../services/assistantService.js';
 /* The landing pages, from the one place that declares them. Shared with the
@@ -599,12 +599,65 @@ router.get('/products/:id/mystery', asyncHandler(async (req, res) => {
 
 // Validate a discount code (checkout preview). Pass ?subtotal=cents for an exact
 // discount + min-spend / limit checks; the order endpoint re-validates server-side.
-router.get('/coupons/:code', asyncHandler(async (req, res) => {
+/* Kept for older clients — the checkout itself now asks /api/checkout/quote.
+   One answer for every refusal (an expired, used-up and non-existent code all
+   look the same) and its own tight limit, counted across instances: otherwise
+   this is a free way to try codes until one is real. */
+router.get('/coupons/:code', rateLimit({ bucket: 'coupon_lookup', windowMs: 10 * 60_000, max: 20, shared: true }),
+  asyncHandler(async (req, res) => {
   const subtotal = Math.max(0, Number(req.query.subtotal) || 0);
   const r = await evaluateCoupon(req.params.code, { subtotal, userId: req.user?.id, email: req.user?.email });
-  if (!r.ok) throw new ApiError(404, r.reason || 'Invalid or expired code');
+  if (!r.ok) throw new ApiError(404, 'Invalid or expired code');
   res.json({ code: r.code, kind: r.kind, percent: r.percent, value: r.value, discount: r.discount, label: r.label });
 }));
+
+/**
+ * The price of a cart, from the function that charges it.
+ *
+ * The checkout and the cart page show these figures instead of working them
+ * out themselves: priceOrder() is what createOrder runs, so the amount on the
+ * pay button is the amount of the order — today's catalogue prices, the
+ * discounts the order gives (none on a mystery box), the 40% ceiling, the
+ * store credit and the €0.50 card minimum. A refusal the order would make comes
+ * back in `problems`, with its reason, rather than as an error, so the page can
+ * show the figures and say what to change.
+ *
+ * Signed in, the buyer's own Forge+ discount, credit and once-per-customer
+ * codes count. The account's e-mail is used, never one from the request, so
+ * the quote cannot be asked whether some other address has used a code.
+ * Nothing is written: no code is used up, no credit is spent.
+ */
+router.post('/checkout/quote',
+  rateLimit({ bucket: 'quote', windowMs: 60_000, max: 60 }),
+  asyncHandler(async (req, res) => {
+    const body = z.object({
+      items: z.array(z.object({
+        productId: z.string().max(80),
+        quantity: z.number().int().positive().max(999).optional(),
+      })).min(1).max(100),
+      coupon: z.string().max(40).optional(),
+      useCredit: z.number().int().nonnegative().max(100_000_00).optional(),
+    }).parse(req.body);
+    const { priceOrder } = await import('../services/orderService.js');
+    const q = await priceOrder({
+      items: body.items, coupon: body.coupon, useCredit: body.useCredit || 0,
+      userId: req.user?.id || null, email: req.user?.email || '',
+    });
+    res.json({
+      currency: q.currency,
+      lines: q.lines.map((l) => ({
+        productId: l.product.id, name: l.product.name, quantity: l.quantity,
+        unitPrice: l.unitPrice, lineTotal: l.unitPrice * l.quantity, mystery: l.mystery,
+      })),
+      subtotal: q.subtotal, discountable: q.discountable,
+      coupon: q.coupon, memberPercent: q.memberPercent, memberDiscount: q.memberDiscount,
+      bundle: q.bundle ? { id: q.bundle.id, name: q.bundle.name, percent: q.bundle.percent } : null,
+      bundleDiscount: q.bundleDiscount,
+      discount: q.discount, maxDiscountPercent: q.maxDiscountPercent, clamped: q.clamped,
+      creditApplied: q.creditApplied, total: q.total, minCharge: q.minCharge,
+      problems: q.problems.map(({ status, ...p }) => p),
+    });
+  }));
 
 // Cross-sell + upsell recommendations for a product.
 router.get('/products/:id/recommendations', asyncHandler(async (req, res) => {
@@ -701,7 +754,7 @@ router.post('/orders',
        created, and attachOrder swallows its own errors for the same reason. */
     await attachOrder(order.id, { visitId: body.adVisit, sessionId: body.adSession });
 
-    res.status(201).json({ order });
+    res.status(201).json({ order: customerView(order) });
   }));
 
 // Create a Stripe Checkout Session for an order and return its redirect URL.
@@ -756,10 +809,10 @@ router.post('/orders/:id/pay', rateLimit({ bucket: 'pay', windowMs: 60_000, max:
     if (!order) throw new ApiError(404, 'Order not found');
     const { email } = z.object({ email: z.string().email().optional() }).parse(req.body || {});
     await assertOwnsOrder(req, order, email);
-    if (order.status !== 'pending') return res.json({ order });
+    if (order.status !== 'pending') return res.json({ order: customerView(order) });
     const updated = await markPaymentReceived(order.id, `demo_${Date.now()}`,
       { actorId: req.user?.id || 'customer', reason: 'Demo payment' });
-    res.json({ order: updated });
+    res.json({ order: customerView(updated) });
   }));
 
 // Customer submits proof of payment for a manual-payment order.

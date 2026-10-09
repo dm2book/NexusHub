@@ -262,7 +262,7 @@ export async function runMaintenance() {
   // 7. Re-poll async supplier fulfilments that returned a reference and are
   //    still in progress, so they complete without a manual nudge.
   if (!late()) try {
-    summary.fulfillmentsRetried = await retryPendingFulfillments({ limit: 25 });
+    summary.fulfillmentsRetried = await retryPendingFulfillments({ limit: 25, deadline: Math.min(Date.now() + 8_000, startedAt + 20_000) });
   } catch (e) { summary.fulfillmentError = e.message; }
 
   // 8. Drain the serial supplier queue (safety net if a payment-time drain was

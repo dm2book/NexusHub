@@ -1,10 +1,27 @@
-import { useEffect } from 'react';
+import { useId, useRef } from 'react';
 import { X } from 'lucide-react';
 import { useI18n } from '../lib/i18n.jsx';
+import { useFocusTrap } from '../lib/useFocusTrap.js';
+
+/**
+ * The dictionary, except in the admin console.
+ *
+ * These pieces are shared with the console, which stays English, while the
+ * storefront language is read from the same storage — so without the check an
+ * owner who reads the shop in Dutch got "Laden" in an English console. Named
+ * `t` at the call sites on purpose: i18n-coverage finds every t(<key>, <English>)
+ * call and checks each key has its Dutch.
+ */
+function useUiText() {
+  const { t } = useI18n();
+  const admin = typeof window !== 'undefined' && window.location.pathname.startsWith('/admin');
+  return (key, en) => (admin ? en : t(key, en));
+}
 
 /** Premium orbit spinner (two counter-rotating arcs). Size is in px. */
 export function Spinner({ size = 20, className = '' }) {
-  return <span className={`fm-orbit ${className}`} style={{ fontSize: `${size}px` }} role="status" aria-label="Loading" />;
+  const t = useUiText();
+  return <span className={`fm-orbit ${className}`} style={{ fontSize: `${size}px` }} role="status" aria-label={t('ui.loading', 'Loading')} />;
 }
 
 /** Inline three-dot "thinking" pulse — for buttons / inline loading. */
@@ -25,32 +42,38 @@ export function Dots({ className = '' }) {
  * A viewport rather than a pixel value: the point is that the footer stays off
  * screen until there is something above it, and that is a viewport question.
  */
-export function PageLoader({ label = 'Loading' }) {
+export function PageLoader({ label }) {
+  const t = useUiText();
   return (
     <div className="flex flex-col items-center justify-center min-h-screen py-24 text-slate-400 gap-4 fm-page">
       <Spinner size={30} className="text-primary" />
-      <span className="text-sm tracking-wide text-slate-500 flex items-center gap-1.5">{label}<Dots className="text-slate-500" /></span>
+      <span className="text-sm tracking-wide text-slate-500 flex items-center gap-1.5">{label ?? t('ui.loading', 'Loading')}<Dots className="text-slate-500" /></span>
     </div>
   );
 }
 
+/**
+ * A modal dialog: named by its title, focus kept inside while it is open and
+ * handed back to whatever opened it, Escape to close (see useFocusTrap). It
+ * used to be a styled box — a screen reader was never told a dialog had
+ * opened, and Tab walked on through the page behind the backdrop.
+ */
 export function Modal({ open, onClose, title, children, footer, size = 'md' }) {
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e) => e.key === 'Escape' && onClose?.();
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
+  const t = useUiText();
+  const panel = useRef(null);
+  const titleId = useId();
+  useFocusTrap(open, panel, { onEscape: () => onClose?.() });
 
   if (!open) return null;
   const widths = { sm: 'max-w-sm', md: 'max-w-lg', lg: 'max-w-2xl', xl: 'max-w-4xl' };
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className={`relative card w-full ${widths[size]} animate-fade-up shadow-2xl`}>
+      <div ref={panel} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} style={{ outline: 'none' }}
+        className={`relative card w-full ${widths[size]} animate-fade-up shadow-2xl`}>
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/5">
-          <h3 className="text-lg font-semibold text-white">{title}</h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-white">
+          <h3 id={titleId} className="text-lg font-semibold text-white">{title}</h3>
+          <button type="button" onClick={onClose} aria-label={t('ui.close', 'Close')} className="text-slate-400 hover:text-white">
             <X size={20} />
           </button>
         </div>

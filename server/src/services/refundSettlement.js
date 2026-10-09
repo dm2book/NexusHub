@@ -31,12 +31,15 @@ export const REFUND_BACKOFF_MS = [0, 120, 350, 900];
 /** Statuses from which `refunded` is unreachable, so retrying is pointless. */
 const TERMINAL = ['cancelled', 'failed'];
 
+/* `chargeback`: the bank took the money back, the shop did not refund it.
+   transitionOrder then keeps the store credit the order used, see there. */
 export async function settleAsRefunded(orderId, reason, {
   actorId = 'psp', backoff = REFUND_BACKOFF_MS, sleep = (ms) => new Promise((r) => setTimeout(r, ms)), silent = false,
+  chargeback = false,
 } = {}) {
   for (const wait of backoff) {
     if (wait) await sleep(wait);
-    const result = await transitionOrder(orderId, 'refunded', { actorId, reason, silent })
+    const result = await transitionOrder(orderId, 'refunded', { actorId, reason, silent, chargeback })
       .catch((e) => { console.warn(`[${actorId}] refund transition: ${e.message}`); return null; });
     if (result?.status === 'refunded') return true;
     if (result && TERMINAL.includes(result.status)) return false;

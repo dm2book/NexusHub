@@ -6,8 +6,9 @@ import { asyncHandler } from '../../middleware/error.js';
 import { requirePermission } from '../../middleware/rbac.js';
 import { listProducts, getProduct, createProduct, updateProduct } from '../../services/productService.js';
 import { addProductCodes, availableCounts, availableCount } from '../../services/codeStockService.js';
-import { getRewards, setRewards } from '../../services/mysteryBoxService.js';
+import { getRewards, setRewards, assertPoolBelowPrice } from '../../services/mysteryBoxService.js';
 import { audit } from '../../services/auditService.js';
+import { all, run, nowIso } from '../../db/index.js';
 import { assertSafeImageValue, resolveImageUrl } from '../../utils/imageUrl.js';
 import { normalizeImageValue } from '../../services/imageStoreService.js';
 import { backfillArt, proposedCategories, artFor } from '../../services/productFitService.js';
@@ -220,7 +221,9 @@ router.post('/images/migrate', requirePermission('suppliers.manage'), asyncHandl
       const { value } = await normalizeImageValue(image, { productId: p.id, source: 'migrated' });
       const next = { ...p.metadata, image: value };
       delete next.imageLegacy;    // never keep a base64 copy — that is the problem
-      await updateProduct(p.id, { metadata: next });
+      // Only the metadata changes: one write, not updateProduct's read-write-read.
+      await run('UPDATE products SET metadata = @m, updated_at = @at WHERE id = @id',
+        { m: JSON.stringify(next), at: nowIso(), id: p.id });
       moved += 1;
     } catch (err) { failed.push({ name: p.name, error: err.message }); }
   }
@@ -287,6 +290,21 @@ router.post('/', requirePermission('suppliers.manage'), asyncHandler(async (req,
 router.patch('/:id', requirePermission('suppliers.manage'), asyncHandler(async (req, res) => {
   const body = productSchema.partial().parse(req.body);
   guardImage(body.metadata);
+  /* A box's price is what its reward pool is set against: cutting the price
+     below what the pool pays out is the same money printer as saving such a
+     pool, so it is refused the same way (and so is turning a product that has
+     a pool into a box at a price that pool beats). Only a change that makes it
+     worse: the form sends the price on every save, and an owner fixing the
+     name of — or switching off — a box the launch check flagged must not be
+     stopped by that very flag. */
+  if (body.price != null || body.kind === 'mystery') {
+    const current = await getProduct(req.params.id);
+    const price = body.price ?? current?.price;
+    const becomesBox = body.kind === 'mystery' && current?.kind !== 'mystery';
+    if (current && (body.kind ?? current.kind) === 'mystery' && (becomesBox || price < current.price)) {
+      assertPoolBelowPrice(await getRewards(req.params.id), price);
+    }
+  }
   if (body.metadata) body.metadata = await storeUpload(body.metadata, req.params.id);
   const product = await updateProduct(req.params.id, body);
   await audit({ actor: req.user, action: 'product.update', targetType: 'product',
@@ -312,44 +330,55 @@ router.post('/bulk', requirePermission('suppliers.manage'), asyncHandler(async (
     value: z.union([z.boolean(), z.enum(['auto', 'manual']), z.string()]),
   }).parse(req.body);
 
+  /* One read and one write for the whole selection. Each product used to cost
+     four round trips (getProduct here, then updateProduct's read, write and
+     re-read) — two thousand for a 500-product selection, inside a 30-second
+     function on a five-connection pool. A bulk action never changes a price,
+     so updateProduct's only side effect (price history, price alerts) cannot
+     apply, and writing the rows directly loses nothing. */
+  const rows = await all(`SELECT id, metadata FROM products WHERE id = ANY(@ids)`, { ids });
+  const at = nowIso();
+
+  if (action === 'active') {
+    const r = await run(`UPDATE products SET active = @a, updated_at = @at WHERE id = ANY(@ids)`,
+      { a: value ? 1 : 0, at, ids: rows.map((p) => p.id) });
+    const updated = r?.changes ?? rows.length;
+    await audit({ actor: req.user, action: 'product.bulk_update', metadata: { action, value, count: updated }, req });
+    return res.json({ updated });
+  }
+
   // Set (or clear) the same product image across a whole selection — e.g. one
   // logo for every Robux / V-Bucks variant at once. Accepts a link or upload.
+  let url = '';
   if (action === 'image') {
-    let url = String(value || '').trim();
+    url = String(value || '').trim();
     if (url) assertSafeImageValue(url);
     /* Stored once for the whole selection rather than per product: the same
        picture across forty variants is one row, not forty. */
     if (url) ({ value: url } = await normalizeImageValue(url, { source: 'upload' }));
-    let updated = 0;
-    for (const id of ids) {
-      const p = await getProduct(id);
-      if (!p) continue;
-      const metadata = { ...p.metadata };
-      if (url) metadata.image = url; else delete metadata.image;
-      await updateProduct(id, { metadata });
-      updated++;
-    }
-    await audit({ actor: req.user, action: 'product.bulk_update', metadata: { action, count: updated }, req });
-    return res.json({ updated });
   }
-
-  let updated = 0;
-  for (const id of ids) {
-    const p = await getProduct(id);
-    if (!p) continue;
-    if (action === 'active') {
-      await updateProduct(id, { active: !!value });
+  const next = rows.map((p) => {
+    let metadata = {};
+    try { metadata = typeof p.metadata === 'string' ? JSON.parse(p.metadata || '{}') : { ...(p.metadata || {}) }; } catch { metadata = {}; }
+    if (action === 'image') {
+      if (url) metadata.image = url; else delete metadata.image;
     } else if (action === 'featured') {
-      await updateProduct(id, { metadata: { ...p.metadata, featured: !!value } });
+      metadata.featured = !!value;
     } else if (action === 'deliveryMode') {
-      const metadata = { ...p.metadata };
       if (value === 'manual') metadata.deliveryMode = 'manual';
       else delete metadata.deliveryMode; // 'auto' is the default → keep metadata clean
-      await updateProduct(id, { metadata });
     }
-    updated++;
+    return { id: p.id, metadata: JSON.stringify(metadata) };
+  });
+  if (next.length) {
+    await run(`UPDATE products p SET metadata = v.meta, updated_at = @at
+                 FROM unnest(@ids::text[], @metas::text[]) AS v(id, meta)
+                WHERE p.id = v.id`,
+      { at, ids: next.map((x) => x.id), metas: next.map((x) => x.metadata) });
   }
-  await audit({ actor: req.user, action: 'product.bulk_update', metadata: { action, value, count: updated }, req });
+  const updated = next.length;
+  await audit({ actor: req.user, action: 'product.bulk_update',
+    metadata: action === 'image' ? { action, count: updated } : { action, value, count: updated }, req });
   res.json({ updated });
 }));
 
@@ -365,8 +394,11 @@ router.put('/:id/mystery', requirePermission('suppliers.manage'), asyncHandler(a
       credit: z.number().int().min(0).max(1_000_000),
     })).max(40),
   }).parse(req.body || {});
+  // Saved first: setRewards refuses a pool that pays out more than the box
+  // costs, and a refused save is not a change worth an audit entry.
+  const saved = await setRewards(req.params.id, rewards);
   await audit({ actor: req.user, action: 'product.mystery_rewards', targetType: 'product', targetId: req.params.id, req });
-  res.json({ rewards: await setRewards(req.params.id, rewards) });
+  res.json({ rewards: saved });
 }));
 
 export default router;

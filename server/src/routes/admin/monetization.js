@@ -85,7 +85,7 @@ router.post('/gift-cards', asyncHandler(async (req, res) => {
     amount: z.number().int().positive(), currency: z.string().length(3).optional(),
     note: z.string().max(200).optional(), recipientEmail: z.string().email().optional(),
   }).parse(req.body);
-  const card = await issueGiftCard(body, req.user.id);
+  const card = await issueGiftCard(body, req.user.id, { isOwner: (req.user.roles || []).includes('owner') });
   await audit({ actor: req.user, action: 'giftcard.issue', targetType: 'gift_card', targetId: card.id,
     metadata: { amount: body.amount, emailedTo: card.emailedTo || null }, req });
   res.status(201).json({ giftCard: card, emailedTo: card.emailedTo || null });

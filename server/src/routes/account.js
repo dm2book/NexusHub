@@ -15,7 +15,7 @@ import { earnedRolesFor, syncMemberRoles } from '../services/discordRolesService
 import { getLiveInviteUrl } from '../services/discordService.js';
 import { run, get, all, tx } from '../db/index.js';
 import { notFound, forbidden, badRequest } from '../utils/errors.js';
-import { listOrders, getOrder } from '../services/orderService.js';
+import { listOrders, getOrder, customerView, customerSummary } from '../services/orderService.js';
 import { addVerifiedReview } from '../services/reviewsService.js';
 import { updateProfile, updatePreferences, publicUser } from '../services/userService.js';
 import { loyaltyFor } from '../services/loyaltyService.js';
@@ -265,18 +265,18 @@ router.get('/dashboard', asyncHandler(async (req, res) => {
 router.get('/orders', asyncHandler(async (req, res) => {
   const byId = (await listOrders({ userId: req.user.id, limit: 100 })).orders;
   const byEmail = (await listOrders({ email: req.user.email, limit: 100 })).orders;
-  res.json({ orders: dedupe([...byId, ...byEmail]) });
+  res.json({ orders: dedupe([...byId, ...byEmail]).map(customerSummary) });
 }));
 
 router.get('/orders/:id', asyncHandler(async (req, res) => {
-  res.json({ order: await ownedOrder(req, req.params.id) });
+  res.json({ order: customerView(await ownedOrder(req, req.params.id)) });
 }));
 
 router.get('/orders/:id/track', asyncHandler(async (req, res) => {
   const order = await ownedOrder(req, req.params.id);
   res.json({
     status: order.status, statusLabel: order.statusLabel,
-    history: order.history, deliveries: order.deliveries,
+    history: customerView(order).history, deliveries: order.deliveries,
     updatedAt: order.updatedAt,
   });
 }));

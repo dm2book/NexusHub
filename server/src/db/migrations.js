@@ -2289,4 +2289,51 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS lang TEXT;
       CREATE INDEX IF NOT EXISTS idx_market_obs_time ON market_observations (observed_at);
     `,
   },
+  {
+    /* Authenticator codes work once, and a 2FA login ticket takes five guesses.
+       totp_last_step is the newest TOTP time-step this account has accepted;
+       any code for that step or an earlier one is refused, so the six digits
+       on the screen cannot be replayed in the minute or so they stay valid.
+       totp_tickets counts the attempts on each login ticket (one row per
+       ticket jti, created on its first use) and marks it spent once it signs
+       in — expired rows are cleared as new attempts come in. */
+    id: '062_auth_hardening',
+    sql: `
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_last_step BIGINT;
+      CREATE TABLE IF NOT EXISTS totp_tickets (
+        id           TEXT PRIMARY KEY,
+        user_id      TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        attempts     INTEGER NOT NULL DEFAULT 0,
+        consumed_at  TEXT,
+        expires_at   TEXT NOT NULL,
+        created_at   TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_totp_tickets_expiry ON totp_tickets (expires_at);
+    `,
+  },
+  {
+    /* Money that already went back, and coins that were taken back.
+       refunded_cents is what the payment provider has refunded on an order so
+       far — Stripe's amount_refunded, Mollie's amountRefunded. A partial refund
+       made in their dashboard lands here, so a later refund (money or store
+       credit) only returns what is left instead of the whole order again.
+       The index makes taking back an order's Forge Coins happen once, however
+       many paths undo the order (a refund, then its chargeback). */
+    id: '063_money_integrity',
+    sql: `
+      ALTER TABLE orders ADD COLUMN IF NOT EXISTS refunded_cents BIGINT NOT NULL DEFAULT 0;
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_forge_coins_reversal_ref
+        ON forge_coin_ledger (ref) WHERE reason = 'order_reversal';
+    `,
+  },
+  {
+    /* A code someone paid for belongs to them: Forge-Coin reward codes are
+       bound to the account that bought them (couponService refuses the code
+       on any other account), so a code seen over a shoulder or in a shared
+       screenshot cannot be spent by somebody else. */
+    id: '064_coupon_owner',
+    sql: `
+      ALTER TABLE coupons ADD COLUMN IF NOT EXISTS owner_user_id TEXT;
+    `,
+  },
 ];

@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../lib/api.js';
 import { useAuth } from './AuthContext.jsx';
 import { useLaunch } from '../lib/useLaunch.js';
@@ -69,7 +69,16 @@ export function CartProvider({ children }) {
     if (gated) return false;
     setItems((cur) => {
       const found = cur.find((i) => i.id === product.id);
-      if (found) return cur.map((i) => (i.id === product.id ? { ...i, qty: i.qty + qty } : i));
+      /* Today's price, not the one saved when the line was first added. The
+         product page showed €12.99 and "Buy now" only raised the quantity of a
+         line still priced at €9.99, so the checkout quoted €9.99 for both. */
+      if (found) {
+        return cur.map((i) => (i.id === product.id ? {
+          ...i, qty: i.qty + qty,
+          price: Number.isFinite(product.price) ? product.price : i.price,
+          name: product.name || i.name,
+        } : i));
+      }
       return [...cur, {
         id: product.id, name: product.name, price: product.price,
         currency: product.currency || 'EUR', category: product.category, qty,
@@ -82,12 +91,45 @@ export function CartProvider({ children }) {
   const remove = (id) => setItems((cur) => cur.filter((i) => i.id !== id));
   const clear = () => setItems([]);
 
+  /**
+   * The server's price for this cart — what the order will charge.
+   *
+   * A line keeps the price it was added at, and nothing refreshed it: the cart
+   * lives in localStorage with no expiry, so a product repriced since then was
+   * quoted at the old price while the order charged the new one. This asks
+   * POST /api/checkout/quote, which runs the same pricing as the order, and
+   * writes the prices it answers with back into the cart. `changed` lists every
+   * line whose price moved, so the page can say so before the buyer pays.
+   */
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
+  const quote = useCallback(async ({ coupon, useCredit } = {}) => {
+    const lines = itemsRef.current;
+    if (!lines.length) return null;
+    const q = await api.post('/api/checkout/quote', {
+      items: lines.map((i) => ({ productId: i.id, quantity: i.qty })),
+      ...(coupon ? { coupon } : {}),
+      ...(useCredit ? { useCredit } : {}),
+    });
+    const fresh = new Map((q.lines || []).map((l) => [l.productId, l]));
+    const changed = lines
+      .filter((i) => fresh.has(i.id) && fresh.get(i.id).unitPrice !== i.price)
+      .map((i) => ({ id: i.id, name: fresh.get(i.id).name || i.name, was: i.price, now: fresh.get(i.id).unitPrice }));
+    if (changed.length) {
+      setItems((cur) => cur.map((i) => {
+        const l = fresh.get(i.id);
+        return l && l.unitPrice !== i.price ? { ...i, price: l.unitPrice, name: l.name || i.name } : i;
+      }));
+    }
+    return { quote: q, changed };
+  }, []);
+
   const count = useMemo(() => items.reduce((n, i) => n + i.qty, 0), [items]);
   const subtotal = useMemo(() => items.reduce((n, i) => n + i.price * i.qty, 0), [items]);
   const currency = items[0]?.currency || 'EUR';
 
   return (
-    <CartContext.Provider value={{ items, add, setQty, remove, clear, count, subtotal, currency, prelaunch: gated }}>
+    <CartContext.Provider value={{ items, add, setQty, remove, clear, quote, count, subtotal, currency, prelaunch: gated }}>
       {children}
     </CartContext.Provider>
   );

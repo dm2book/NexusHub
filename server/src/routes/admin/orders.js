@@ -6,20 +6,21 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { asyncHandler } from '../../middleware/error.js';
-import { requirePermission } from '../../middleware/rbac.js';
+import { requirePermission, holdsPermission } from '../../middleware/rbac.js';
 import {
   listOrders, getOrder, transitionOrder, markPaymentReceived, setOrderNotes, deliverOrder,
   exportOrdersCsv, orderUrlFor, setOrderPayLink, clearOrderPayLink, getPspPayment,
 } from '../../services/orderService.js';
 import { refundOrder } from '../../services/refundService.js';
 import { PayLinkError } from '../../utils/payLink.js';
-import { fulfillOrder, listFulfillment, listFulfillmentLogs } from '../../services/fulfillmentService.js';
+import { fulfillOrderByHand, listFulfillment, listFulfillmentLogs } from '../../services/fulfillmentService.js';
 import * as analytics from '../../services/analyticsService.js';
 import { listPendingProofs, confirmProof, rejectProof } from '../../services/paymentProofService.js';
 import { sendEmail } from '../../services/emailService.js';
 import { notify } from '../../services/notificationService.js';
 import { audit } from '../../services/auditService.js';
-import { notFound, badRequest } from '../../utils/errors.js';
+import { get } from '../../db/index.js';
+import { notFound, badRequest, forbidden } from '../../utils/errors.js';
 
 const router = Router();
 const actor = (req) => ({ actorId: req.user.id, user: req.user });
@@ -100,7 +101,7 @@ router.post('/:id/payment-received', requirePermission('orders.update'),
 // Fulfill Order — runs the fulfillment engine (auto or manual per item).
 router.post('/:id/fulfill', requirePermission('orders.fulfill'),
   asyncHandler(async (req, res) => {
-    const summary = await fulfillOrder(req.params.id, actor(req));
+    const summary = await fulfillOrderByHand(req.params.id, actor(req));
     await audit({ actor: req.user, action: 'order.fulfill', targetType: 'order',
       targetId: req.params.id, metadata: { auto: summary.auto, manual: summary.manual }, req });
     res.json({ order: await getOrder(req.params.id), summary });
@@ -171,10 +172,28 @@ router.post('/:id/refund', requirePermission('orders.refund'),
     res.json({ order: out.order, refund: out.refund });
   }));
 
+/* A status that moves money is a refund, whatever the button is called.
+   'refunded' — and 'cancelled' or 'failed' on an order that was ever paid —
+   returns the store credit the order spent to the buyer's wallet and undoes
+   coins, tier bonuses, commission and mystery prizes. orders.update is a
+   fulfilment-level grant: a fulfilment manager, who may not refund, could
+   reach all of that through the status dropdown or Cancel. Those targets now
+   need orders.refund, like the Refund button. */
+async function assertMayMoveMoney(req, orderId, to) {
+  if (holdsPermission(req.user, 'orders.refund')) return;
+  if (to === 'refunded') throw forbidden('Requires permission: orders.refund');
+  if (['cancelled', 'failed'].includes(to)) {
+    const paid = await get(`SELECT 1 AS x FROM order_status_history WHERE order_id=@id
+      AND to_status IN ('payment_received','processing','awaiting_fulfillment','completed') LIMIT 1`, { id: orderId });
+    if (paid) throw forbidden('This order was paid — cancelling it is a refund. Requires permission: orders.refund');
+  }
+}
+
 // Cancel.
 router.post('/:id/cancel', requirePermission('orders.update'),
   asyncHandler(async (req, res) => {
     const { reason } = z.object({ reason: z.string().optional() }).parse(req.body);
+    await assertMayMoveMoney(req, req.params.id, 'cancelled');
     const order = await transitionOrder(req.params.id, 'cancelled',
       { ...actor(req), reason: reason || 'Cancelled by staff' });
     await audit({ actor: req.user, action: 'order.cancel', targetType: 'order',
@@ -187,6 +206,7 @@ router.post('/:id/transition', requirePermission('orders.update'),
   asyncHandler(async (req, res) => {
     const { to, reason } = z.object({ to: z.string(), reason: z.string().optional() })
       .parse(req.body);
+    await assertMayMoveMoney(req, req.params.id, to);
     const order = await transitionOrder(req.params.id, to, { ...actor(req), reason });
     await audit({ actor: req.user, action: 'order.transition', targetType: 'order',
       targetId: order.id, metadata: { to, reason }, req });

@@ -169,7 +169,7 @@ export default function AdminOrders() {
                       )}
                       {hasPermission('orders.refund') && ['completed', 'payment_received', 'processing', 'awaiting_fulfillment'].includes(o.status) && (
                         <IconBtn title="Refund" icon={RotateCcw} color="text-fuchsia-400"
-                          onClick={() => confirmRefund(o) && act(o, 'refund')} />
+                          onClick={() => confirmRefund({ ...o, total: Math.max(0, o.amount - (o.refundedCents || 0)) }) && act(o, 'refund')} />
                       )}
                       {hasPermission('orders.contact') && (
                         <IconBtn title="Contact customer" icon={Mail}
