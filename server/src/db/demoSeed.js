@@ -18,7 +18,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { run, get, nowIso } from './index.js';
+import { run, get, all, nowIso } from './index.js';
 import { migrate } from './migrate.js';
 import { newId } from '../utils/ids.js';
 import { markPath } from '../../../src/lib/brandMarks.js';
@@ -262,26 +262,19 @@ export async function syncCatalogImages() {
   // (.svg), and a category can switch between the two. Repoint any product
   // stored against the wrong extension so it never renders a broken image.
   // Only rewrites our own icon paths — owner uploads and links are untouched.
-  let repointed = 0;
+  // Every extension this icon has ever been stored as, so a row written by an
+  // older build heals instead of rendering a broken image forever. The .png
+  // entry matters most: those files are gone, and an earlier version of this
+  // code actively rewrote WORKING .svg paths into that dead .png.
+  const iconFixes = [];
   for (const cat of CATS_WITH_ICON) {
     const right = iconFor(cat);
     if (!right) continue;
-    // Every extension this icon has ever been stored as, so a row written by an
-    // older build heals instead of rendering a broken image forever. The .png
-    // entry matters most: those files are gone, and the previous version of this
-    // loop actively rewrote WORKING .svg paths into that dead .png.
-    const stale = ['.svg', '.png', '.webp']
-      .map((ext) => `/products/icons/${cat}${ext}`)
-      .filter((u) => u !== right);
-    for (const wrong of stale) {
-      const r = await run(
-        `UPDATE products SET metadata = REPLACE(metadata, @wrong, @right), updated_at = @at
-          WHERE metadata LIKE @like`,
-        { wrong, right, at: nowIso(), like: `%${wrong}%` }).catch(() => null);
-      repointed += r?.changes || 0;
+    for (const ext of ['.svg', '.png', '.webp']) {
+      const wrong = `/products/icons/${cat}${ext}`;
+      if (wrong !== right) iconFixes.push([wrong, right]);
     }
   }
-  if (repointed) console.log(`[catalog] icon paths repointed on ${repointed} product(s)`);
 
   /* Retire the six flat banners under /products/.
      They predate the icon set and are not part of it: a gradient rectangle with
@@ -300,31 +293,43 @@ export async function syncCatalogImages() {
     '/products/vbucks.svg': '/products/icons/v-bucks.webp',
     '/products/nitro.svg': '/products/icons/discord-nitro.webp',
   };
-  let retired = 0;
-  for (const [was, now] of Object.entries(LEGACY_ART)) {
-    const r = await run(
-      `UPDATE products SET metadata = REPLACE(metadata, @was, @now), updated_at = @at
-        WHERE metadata LIKE @like`,
-      { was, now, at: nowIso(), like: `%"${was}"%` }).catch(() => null);
-    retired += r?.changes || 0;
-  }
-  if (retired) console.log(`[catalog] ${retired} product(s) moved off the old flat banners`);
 
-  let updated = 0;
-  for (const p of CATALOG) {
-    const img = imageFor(p);
-    if (!img) continue;
-    const existing = await get('SELECT id, metadata FROM products WHERE sku = @sku', { sku: p.sku });
-    if (!existing) continue;
-    const meta = parse(existing.metadata);
+  /* One read, the rewrites in memory, and a write only for a row that actually
+     changes. This used to be ~130 LIKE-scanning UPDATEs plus a SELECT per
+     catalogue product on every deploy, almost all of them changing nothing —
+     two hundred round trips to a database in another region, holding one of
+     five pool connections, to rediscover that the catalogue was fine. */
+  const bySku = new Map(CATALOG.map((p) => [p.sku, p]));
+  const rows = await all('SELECT id, sku, metadata FROM products');
+  let repointed = 0; let retired = 0; let updated = 0;
+  for (const row of rows) {
+    let text = typeof row.metadata === 'string' ? row.metadata : JSON.stringify(row.metadata || {});
+    const before = text;
+    let iconHit = false; let legacyHit = false;
+    for (const [wrong, right] of iconFixes) {
+      if (text.includes(wrong)) { text = text.split(wrong).join(right); iconHit = true; }
+    }
+    for (const [was, now] of Object.entries(LEGACY_ART)) {
+      if (text.includes(`"${was}"`)) { text = text.split(was).join(now); legacyHit = true; }
+    }
     // Backfill only: never overwrite an image the owner set in the admin (clear
     // the Image URL field to fall back to the default icon on the next boot).
-    if (meta.image) continue;
-    meta.image = img;
+    const p = row.sku ? bySku.get(row.sku) : null;
+    const img = p ? imageFor(p) : null;
+    let filled = false;
+    if (img) {
+      const meta = parse(text);
+      if (!meta.image) { meta.image = img; text = JSON.stringify(meta); filled = true; }
+    }
+    if (text === before) continue;
     await run('UPDATE products SET metadata = @m, updated_at = @at WHERE id = @id',
-      { m: JSON.stringify(meta), at: nowIso(), id: existing.id });
-    updated++;
+      { m: text, at: nowIso(), id: row.id }).catch(() => null);
+    if (iconHit) repointed++;
+    if (legacyHit) retired++;
+    if (filled) updated++;
   }
+  if (repointed) console.log(`[catalog] icon paths repointed on ${repointed} product(s)`);
+  if (retired) console.log(`[catalog] ${retired} product(s) moved off the old flat banners`);
   if (updated) console.log(`[catalog] product art synced on ${updated} product(s)`);
 }
 
