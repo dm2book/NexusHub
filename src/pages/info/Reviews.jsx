@@ -10,6 +10,7 @@ import { useStats } from '../../lib/useStats.js';
 import { useI18n } from '../../lib/i18n.jsx';
 import { usePageMeta } from '../../lib/useMeta.js';
 import { useTrustpilot, useTrustpilotLinks } from '../../lib/useTrustpilot.js';
+import StarPicker from '../../components/StarPicker.jsx';
 
 /** "Write a review" — verified buyers pick one of their delivered orders. */
 function WriteReview({ t }) {
@@ -87,17 +88,13 @@ function WriteReview({ t }) {
         </p>
       ) : (
         <div className="space-y-3 mt-3">
-          <select value={orderId} onChange={(e) => setOrderId(e.target.value)} className="input w-full">
+          <select value={orderId} onChange={(e) => setOrderId(e.target.value)} className="input w-full"
+            aria-label={t('reviews.wOrder', 'Which order are you reviewing?')}>
             {orders.map((o) => <option key={o.id} value={o.id}>{o.number}{o.item ? ` — ${o.item}` : ''}</option>)}
           </select>
-          <div className="flex gap-1">
-            {[1, 2, 3, 4, 5].map((n) => (
-              <button key={n} onClick={() => setStars(n)} aria-label={`${n} stars`}>
-                <Star size={22} className={n <= stars ? 'text-amber-400' : 'text-slate-600'} fill={n <= stars ? 'currentColor' : 'none'} />
-              </button>
-            ))}
-          </div>
+          <StarPicker value={stars} onChange={setStars} className="flex gap-1" />
           <textarea rows={3} className="input w-full" placeholder={t('reviews.wPh', 'Tell other buyers about your experience…')}
+            aria-label={t('reviews.wPh', 'Tell other buyers about your experience…')}
             value={body} onChange={(e) => setBody(e.target.value)} maxLength={600} />
           <button onClick={submit} disabled={busy} className="btn-primary w-full py-2.5">
             {busy ? '…' : t('reviews.wSubmit', 'Post verified review')}
@@ -147,7 +144,7 @@ export default function Reviews() {
           <>
             <div className="text-center">
               <div className="text-4xl font-display gradient-text">{stats.rating}/5</div>
-              <div className="flex gap-0.5 justify-center text-amber-400 mt-1">{Array.from({ length: 5 }).map((_, i) => <Star key={i} size={16} fill="currentColor" />)}</div>
+              <div aria-hidden="true" className="flex gap-0.5 justify-center text-amber-400 mt-1">{Array.from({ length: 5 }).map((_, i) => <Star key={i} size={16} fill="currentColor" />)}</div>
               <div className="text-slate-500 text-sm mt-1">{t('home.basedOn', 'Based on {n} reviews', { n: stats.reviews.toLocaleString(document.documentElement.lang || 'nl') })}</div>
             </div>
             <div className="h-12 w-px bg-white/10 hidden sm:block" />
@@ -185,7 +182,8 @@ export default function Reviews() {
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5 max-w-5xl mx-auto">
         {reviews.map((r) => (
           <div key={r.id} className="card p-6 fm-lift">
-            <div className="flex gap-0.5 mb-3 text-amber-400">{Array.from({ length: r.stars || 5 }).map((_, i) => <Star key={i} size={14} fill="currentColor" />)}</div>
+            <div role="img" aria-label={t('stars.outOf5', '{n} out of 5 stars', { n: r.stars || 5 })}
+              className="flex gap-0.5 mb-3 text-amber-400">{Array.from({ length: r.stars || 5 }).map((_, i) => <Star key={i} size={14} fill="currentColor" />)}</div>
             <p className="text-slate-200">“{r.body}”</p>
             <div className="flex items-center gap-3 mt-5">
               {r.avatarUrl

@@ -15,8 +15,10 @@ import { useToast } from '../context/ToastContext.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { feedback } from '../lib/feedback.js';
 import Confetti from '../components/Confetti.jsx';
+import StarPicker from '../components/StarPicker.jsx';
 import { usePageMeta } from '../lib/useMeta.js';
 import { myOrders, rememberMyOrder, forgetMyOrder } from '../lib/myOrders.js';
+import { date } from '../lib/format.js';
 
 const METHOD_ICON = { tikkie: '🟢', revolut: '⚫', paypal: '🔵', bunq: '🟡' };
 // No URL building here on purpose: the server resolves every method for this
@@ -154,7 +156,10 @@ export default function Track() {
                   <span key={o.number} className="group inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition-colors ps-3 pe-1.5 py-1.5">
                     <button type="button" onClick={() => { setNumber(o.number); prevStatus.current = null; lookup(o.number); }}
                       className="inline-flex items-center gap-2">
-                      <span className="font-mono text-sm text-white">{o.number}</span>
+                      {/* Allowed to break: number, status and the X are one chip,
+                          and in German or French the status alone can take half
+                          a 360px row. */}
+                      <span className="font-mono text-sm text-white" style={{ overflowWrap: 'anywhere' }}>{o.number}</span>
                       <StatusBadge status={o.status} />
                     </button>
                     <button type="button" aria-label={t('track.mineForget', 'Forget this order')}
@@ -204,7 +209,7 @@ export default function Track() {
                   </span>
                 )}
               </div>
-              <div className="text-white text-lg font-mono">{result.number}</div>
+              <div className="text-white text-lg font-mono" style={{ overflowWrap: 'anywhere' }}>{result.number}</div>
             </div>
             <StatusBadge status={result.status} />
           </div>
@@ -327,7 +332,7 @@ export default function Track() {
                         )}
                       </span>
                     )
-                    : <span key={m.id} className="btn-ghost text-sm cursor-default">{METHOD_ICON[m.id] || '💳'} {m.label}: {m.target}</span>
+                    : <span key={m.id} className="btn-ghost text-sm cursor-default" style={{ overflowWrap: 'anywhere' }}>{METHOD_ICON[m.id] || '💳'} {m.label}: {m.target}</span>
                 ))}
               </div>
               <p className="text-slate-600 text-xs mt-3">
@@ -487,18 +492,19 @@ function GuestReview({ number, t }) {
     <form onSubmit={submit} className="rounded-2xl border border-white/10 bg-white/5 p-5 mb-6">
       <div className="text-white font-semibold">{t('review.title', 'How was your order?')}</div>
       <p className="text-slate-500 text-xs mt-0.5">{t('review.sub', 'Leave a verified review — takes 20 seconds.')}</p>
-      <div className="flex gap-1.5 mt-3">
-        {[1, 2, 3, 4, 5].map((n) => (
-          <button key={n} type="button" onClick={() => setStars(n)} aria-label={`${n} stars`}
-            className={`text-2xl transition-transform hover:scale-110 ${n <= stars ? 'grayscale-0' : 'grayscale opacity-40'}`}>⭐</button>
-        ))}
-      </div>
+      <StarPicker value={stars} onChange={setStars} className="flex gap-1.5 mt-3"
+        buttonClass={(on) => `text-2xl transition-transform hover:scale-110 ${on ? 'grayscale-0' : 'grayscale opacity-40'}`}
+        renderStar={() => <span aria-hidden="true">⭐</span>} />
+      {/* A placeholder is not a name: it disappears on the first keystroke and
+          not every screen reader reads it, so each field says what it is. */}
       <textarea required minLength={3} maxLength={600} rows={2} value={body}
         onChange={(e) => setBody(e.target.value)}
+        aria-label={t('review.placeholder', 'Fast delivery? Good price? Tell other buyers…')}
         placeholder={t('review.placeholder', 'Fast delivery? Good price? Tell other buyers…')}
         className="input mt-3 text-sm" />
       <div className="flex flex-col sm:flex-row gap-2 mt-2">
         <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
+          aria-label={t('review.email', 'Email used for this order (verification)')}
           placeholder={t('review.email', 'Email used for this order (verification)')}
           className="input text-sm flex-1" />
         <button disabled={busy || body.trim().length < 3} className="btn-primary text-sm px-5">
@@ -574,6 +580,7 @@ function GuestCodes({ number, t }) {
       <p className="text-slate-400 text-xs mt-0.5">{t('trackCodes.sub', 'Enter the email you ordered with. We only show the codes when it matches this order.')}</p>
       <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
         <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
+          aria-label={t('refundReq.email', 'Email used for this order')}
           placeholder={t('refundReq.email', 'Email used for this order')} className="input text-sm" style={{ flex: '1 1 200px' }} />
         <button disabled={busy || !email.trim()} className="btn-primary text-sm px-5">
           {busy ? <Loader2 size={15} className="animate-spin" /> : <ShieldCheck size={15} />}
@@ -650,10 +657,12 @@ function GuestRefund({ number, creditAllowed = false, t }) {
         {t('refundReq.sub', 'No account needed. Confirm the email you ordered with, and tell us briefly what went wrong.')}
       </p>
       <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
+        aria-label={t('refundReq.email', 'Email used for this order')}
         placeholder={t('refundReq.email', 'Email used for this order')}
         className="input mt-3 text-sm" />
       <div className="mt-3 text-slate-200"><RefundMethodChoice value={method} onChange={setMethod} creditAllowed={creditAllowed} /></div>
       <textarea rows={2} maxLength={2000} value={reason} onChange={(e) => setReason(e.target.value)}
+        aria-label={t('refundReq.reason', 'What went wrong? (optional, but it speeds things up)')}
         placeholder={t('refundReq.reason', 'What went wrong? (optional, but it speeds things up)')}
         className="input mt-2 text-sm" />
       <div className="flex flex-wrap gap-2 mt-3">
@@ -679,7 +688,9 @@ function Timeline({ history, t }) {
         <li key={i} className="ml-5">
           <span className={`absolute -left-[7px] w-3.5 h-3.5 rounded-full ${i === history.length - 1 ? 'bg-primary' : 'bg-white/20'}`} />
           <div className="text-white text-sm">{t(`status.${h.to}`, STATUS_META[h.to]?.label || h.to)}</div>
-          <div className="text-slate-500 text-xs">{new Date(h.at).toLocaleString()}</div>
+          {/* format.js `date`: the shop's language, not the phone's — a Dutch
+              page on an English phone read "10/9/2026". */}
+          <div className="text-slate-500 text-xs">{date(h.at)}</div>
         </li>
       ))}
     </ol>
