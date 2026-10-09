@@ -1,4 +1,16 @@
-/** Public Discord community info + the bot's staff digest endpoint. */
+/**
+ * Public Discord community info + the endpoints the community bot calls.
+ *
+ * Every POST below is signed by the bot and checked by verifyIngest
+ * (middleware/ingestSignature.js). The current bot signs with v2: timestamp,
+ * method, path and the whole body, one rule for every endpoint, so what each
+ * route reads from req.body is covered without the route saying so.
+ *
+ * The `canonical…` string next to each route is the OLD signature, kept only
+ * for the bot that is still running until it is redeployed (and refused
+ * once BOT_LEGACY_SIGNATURES=off). Each covers just the fields its route
+ * chose; where a route acts on more than that, the comment says so.
+ */
 import { Router } from 'express';
 import { asyncHandler } from '../middleware/error.js';
 import { getServerInfo, claimOutbox, ackOutbox, stampBotSeen, setLiveInviteUrl } from '../services/discordService.js';
@@ -22,7 +34,8 @@ router.get('/server', asyncHandler(async (_req, res) => {
 
 // Relay outbox: the bot polls this for queued events (sales pings, drops,
 // stock alerts, delivery DMs) so Discord automation needs NO Discord secrets
-// on the hosting side. Same HMAC scheme as the digest.
+// on the hosting side. Reads nothing from the body; it does lease the events
+// it hands out, which is why a signature here is good for one poll only.
 export const canonicalOutbox = () => 'outbox';
 router.post('/outbox',
   verifyIngest(canonicalOutbox)(config.discord.reviewIngestSecret),
@@ -58,9 +71,11 @@ router.post('/outbox/ack',
  * ever drawn.
  *
  * This is the store the shop already has, reached over the channel the bot
- * already uses, on the table the settings service already owns. The key is
- * bound into the signature, so a captured write cannot be replayed against a
- * different key.
+ * already uses, on the table the settings service already owns. Key and value
+ * are both inside the signature (old and v2 alike), so a captured write cannot
+ * be pointed at a different key or carry a different value — and since a
+ * signature works once, it cannot be sent again later to put an older value
+ * back either.
  */
 const STATE_PREFIX = 'discord_bot_state:';
 // Named keys only. Without this an attacker who ever saw one signed request
@@ -76,8 +91,10 @@ const STATE_KEYS = new Set(['xp', 'giveaways', 'meta']);
  * takes an evening to rebuild after a deletion or a raid, and the thing nobody
  * has written down. Messages are Discord's own and are not this shop's to hold.
  *
- * The snapshot itself is bound into the signature, so a captured request cannot
- * be replayed with different contents.
+ * The old signature covers only the guild id and `takenAt` — not the snapshot,
+ * which is the one thing stored (and `takenAt` is not even read). Until
+ * BOT_LEGACY_SIGNATURES=off, a request intercepted on its way here could
+ * carry any snapshot. v2 covers the snapshot like every other field.
  */
 export const canonicalGuildBackup = (b = {}) =>
   `guildbackup:${b.guildId || ''}:${b.takenAt || ''}`;
@@ -122,7 +139,9 @@ router.post('/state/set',
  * amount / forgot the reference" problems.
  *
  * Both the order number and the URL are bound into the signature, so a captured
- * request cannot be replayed against a different order or with a different link.
+ * request cannot be replayed against a different order or with a different link
+ * — nor, now that a signature works once, sent again to put back a link the
+ * owner had just corrected.
  */
 export const canonicalPayLink = (b = {}) => `paylink:${b.number || ''}:${b.url || ''}`;
 router.post('/pay-link',
@@ -141,9 +160,6 @@ router.post('/pay-link',
     }
   }));
 
-// Member balance for the bot's /saldo command: given a Discord user id, return
-// the linked account's Forge Coins, store credit and loyalty tier. The uid is
-// bound into the signature so a request can't be replayed for another member.
 /**
  * Claim giveaway boosts for the people who entered one draw.
  *
@@ -159,6 +175,9 @@ router.post('/pay-link',
  *
  * The giveaway id is bound into the signature, so a captured request cannot be
  * replayed against a different draw.
+ *
+ * The bot in this repository no longer calls it: its draw gives every entrant
+ * one equal chance (discord/src/giveaway.js).
  */
 export const canonicalBoosts = (b = {}) =>
   `boosts:${b.giveawayId || ''}:${[...(b.uids || [])].sort().join(',')}`;
@@ -187,6 +206,9 @@ router.post('/boosts/claim',
     res.json({ boosts });
   }));
 
+// Member balance for the bot's /saldo command: given a Discord user id, return
+// the linked account's Forge Coins, store credit and loyalty tier. The uid is
+// bound into the signature so a request can't be replayed for another member.
 export const canonicalBalance = (b = {}) => `balance:${b.uid || ''}`;
 router.post('/balance',
   verifyIngest(canonicalBalance)(config.discord.reviewIngestSecret),
@@ -270,8 +292,11 @@ router.post('/invite',
   }));
 
 // Staff digest for the bot (/digest, /stock and the weekly Monday post).
-// Same HMAC scheme as review ingest; canonical string is the fixed word
-// "digest" so the signature still binds to timestamp + secret.
+// It reads nothing from the body, so the old signature is over the fixed word
+// "digest": secret and timestamp, nothing about the request. That much is
+// enough here, but it meant one captured signature could fetch the week's
+// revenue again and again for five minutes. Now a signature (old or v2) works
+// once, and a v2 one names this method and path.
 export const canonicalDigest = () => 'digest';
 router.post('/digest',
   verifyIngest(canonicalDigest)(config.discord.reviewIngestSecret),

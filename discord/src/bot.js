@@ -12,7 +12,7 @@
  */
 import 'dotenv/config';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
-import { createHmac } from 'node:crypto';
+import { signRequestV2 } from './signing.js';
 import {
   Client, GatewayIntentBits, Partials, Events, PermissionFlagsBits, ChannelType,
   EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, AttachmentBuilder,
@@ -55,6 +55,52 @@ const onHome = (c, fn) => { const g = homeGuild(c); if (g) fn(g); };
 
 /** Every outbound HTTP call carries a deadline: a hanging API must not stall the bot. */
 const deadline = () => AbortSignal.timeout(8000);
+
+/* ── Signed calls to the store ────────────────────────────────────────────────
+   Every call to the store's private endpoints goes through signedPost(), and
+   is signed one way.
+
+   Each call used to sign its own hand-picked string — `state:set:<key>:<json>`,
+   `invite:<url>:<guild>`, the bare word `outbox` — and the store checked that
+   same string. Whatever a call sent beyond its string could be changed on the
+   way without the signature noticing: the whole server snapshot in a backup,
+   the avatar and product on a review. And no string named the endpoint it was
+   made for.
+
+   v2 signs the timestamp, the method, the path and a SHA-256 of the whole body
+   with its keys sorted, so both ends hash the same text. That is everything
+   the store can act on, for every endpoint, with nothing to keep in step per
+   call. It must match verifyIngest() in server/src/middleware/ingestSignature.js
+   and canonicalJson() in server/src/utils/crypto.js; the tests run these exact
+   functions against both (discord/test/signing.test.mjs,
+   server/test/bot-signature.test.mjs). */
+
+/* The store accepts each signature once. Two identical calls in the same
+   millisecond (a save on shutdown racing the timed one, say) would sign
+   identically and the second would bounce, so the timestamp only ever moves
+   forward within this process. */
+let lastSignedAt = 0;
+
+/**
+ * POST `body` as JSON to `path` on the store, signed.
+ * Resolves to the Response; rejects on a network error or the deadline.
+ * /pay-link passes its own secret.
+ */
+function signedPost(path, body = {}, { secret = REVIEW_INGEST_SECRET } = {}) {
+  lastSignedAt = Math.max(Date.now(), lastSignedAt + 1);
+  const ts = String(lastSignedAt);
+  const raw = JSON.stringify(body);
+  return fetch(`${FORGEMARKET_API_URL.replace(/\/$/, '')}${path}`, {
+    method: 'POST',
+    signal: deadline(),
+    headers: {
+      'content-type': 'application/json',
+      'x-timestamp': ts,
+      'x-signature': signRequestV2(secret, ts, 'POST', path, raw),
+    },
+    body: raw,
+  });
+}
 
 // Delivery explanation for a product category (falls back to a generic one).
 
@@ -110,15 +156,7 @@ const isTicketChannel = (ch) =>
 async function stateGet(key, file) {
   if (FORGEMARKET_API_URL && REVIEW_INGEST_SECRET) {
     try {
-      const ts = String(Date.now());
-      const signature = createHmac('sha256', REVIEW_INGEST_SECRET)
-        .update(`${ts}.state:get:${key}`).digest('hex');
-      const res = await fetch(`${FORGEMARKET_API_URL.replace(/\/$/, '')}/api/discord/state/get`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', 'x-timestamp': ts, 'x-signature': signature },
-        body: JSON.stringify({ key }),
-        signal: deadline(),
-      });
+      const res = await signedPost('/api/discord/state/get', { key });
       if (res.ok) {
         const { value } = await res.json();
         if (value !== null && value !== undefined) return value;
@@ -138,15 +176,7 @@ async function stateSet(key, value, file) {
   try { if (file) writeFileSync(file, JSON.stringify(value)); } catch { /* ignore */ }
   if (!FORGEMARKET_API_URL || !REVIEW_INGEST_SECRET) return;
   try {
-    const ts = String(Date.now());
-    const signature = createHmac('sha256', REVIEW_INGEST_SECRET)
-      .update(`${ts}.state:set:${key}:${JSON.stringify(value ?? null)}`).digest('hex');
-    const res = await fetch(`${FORGEMARKET_API_URL.replace(/\/$/, '')}/api/discord/state/set`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-timestamp': ts, 'x-signature': signature },
-      body: JSON.stringify({ key, value }),
-      signal: deadline(),
-    });
+    const res = await signedPost('/api/discord/state/set', { key, value: value ?? null });
     if (!res.ok && res.status !== 404) console.error(`[state] set ${key}: ${res.status}`);
   } catch (e) { console.error(`[state] set ${key} failed:`, e.message); }
 }
@@ -282,35 +312,16 @@ const TRUSTPILOT_REVIEW_URL = cleanUrl(process.env.TRUSTPILOT_REVIEW_URL, '') ||
 })();
 
 // Push a /vouch to the website so it appears on the storefront reviews section.
-// Signed with HMAC-SHA256 (x-timestamp + x-signature) so the API can verify
-// authenticity and reject replays — must match the server's canonicalReview().
+// Signed (signedPost) so the API can verify it came from this bot and refuse a
+// replay. Every field is inside the signature — the author's Discord id, which
+// decides who gets the reviewer role, and the avatar shown next to the review
+// included; the old per-field signature left the avatar out.
 async function pushReviewToSite({ author, avatarUrl, stars, body, externalId, discordUid }) {
   if (!FORGEMARKET_API_URL || !REVIEW_INGEST_SECRET) return;
   try {
     const payload = { author, avatarUrl, stars, body, externalId, ...(discordUid ? { discordUid } : {}) };
-    const ts = String(Date.now());
-    // NUL separator — must byte-match the server's canonicalReview() exactly,
-    // or the HMAC never verifies and vouches fall back to the legacy header.
-    //
-    // The Discord id is appended ONLY when present, matching the server: that
-    // keeps this compatible both ways during a rollout, and it puts the id that
-    // decides who gets the reviewer role inside the signature rather than
-    // beside it.
-    const parts = [author, stars ?? 5, body, externalId || ''];
-    if (discordUid) parts.push(String(discordUid));
-    const canonical = parts.join('\u0000');
-    const signature = createHmac('sha256', REVIEW_INGEST_SECRET).update(`${ts}.${canonical}`).digest('hex');
-    await fetch(`${FORGEMARKET_API_URL.replace(/\/$/, '')}/api/reviews/ingest`, {
-      method: 'POST',
-      signal: deadline(),
-      headers: {
-        'content-type': 'application/json',
-        'x-timestamp': ts,
-        'x-signature': signature,
-        // Signed path only — never send the raw shared secret over the wire.
-      },
-      body: JSON.stringify(payload),
-    });
+    const res = await signedPost('/api/reviews/ingest', payload);
+    if (!res.ok) console.error(`[review->site] ${res.status}`);
   } catch (e) { console.error('[review->site]', e?.message || e); }
 }
 
@@ -482,19 +493,13 @@ async function ensurePermanentInvite(guild) {
         reason: 'Permanent storefront invite (never expires)' });
     }
     PERMANENT_INVITE = invite.url;
-    // Push the live link to the site (HMAC-signed; URL bound into the signature).
+    // Push the live link to the site (signed, so the URL cannot be swapped on the way).
     if (FORGEMARKET_API_URL && REVIEW_INGEST_SECRET) {
-      const ts = String(Date.now());
       /* The guild id travels with the invite, inside the signature, so the
          store can refuse an invite to any server but ours. */
-      const signature = createHmac('sha256', REVIEW_INGEST_SECRET)
-        .update(`${ts}.invite:${invite.url}:${guild.id}`).digest('hex');
-      await fetch(`${FORGEMARKET_API_URL.replace(/\/$/, '')}/api/discord/invite`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', 'x-timestamp': ts, 'x-signature': signature },
-        body: JSON.stringify({ url: invite.url, guildId: guild.id }),
-        signal: AbortSignal.timeout(8000),
-      }).catch((e) => console.error('[invite->site]', e?.message));
+      await signedPost('/api/discord/invite', { url: invite.url, guildId: guild.id })
+        .then((res) => { if (!res.ok) console.error(`[invite->site] ${res.status}`); })
+        .catch((e) => console.error('[invite->site]', e?.message));
     }
     console.log(`[invite] permanent invite ready: ${invite.url}`);
   } catch (e) { console.error('[invite]', e?.message || e); }
@@ -2181,15 +2186,7 @@ function gameRoleFor(guild, body) {
 /** Tell the store which events really landed, so the rest can be retried. */
 async function ackOutbox(ids) {
   try {
-    const ts = String(Date.now());
-    const canonical = `ack:${[...new Set(ids.map(String))].sort().join(',')}`;
-    const signature = createHmac('sha256', REVIEW_INGEST_SECRET).update(`${ts}.${canonical}`).digest('hex');
-    const res = await fetch(`${FORGEMARKET_API_URL.replace(/\/$/, '')}/api/discord/outbox/ack`, {
-      method: 'POST',
-      signal: deadline(),
-      headers: { 'content-type': 'application/json', 'x-timestamp': ts, 'x-signature': signature },
-      body: JSON.stringify({ ids }),
-    });
+    const res = await signedPost('/api/discord/outbox/ack', { ids });
     // A store that has not deployed the ack endpoint yet returns 404. Say so
     // once rather than silently: without it every event is retried forever.
     if (!res.ok) console.error(`[outbox] ack ${res.status} — events will be re-offered`);
@@ -2198,14 +2195,7 @@ async function ackOutbox(ids) {
 async function pollOutbox(c) {
   if (!FORGEMARKET_API_URL || !REVIEW_INGEST_SECRET) return;
   try {
-    const ts = String(Date.now());
-    const signature = createHmac('sha256', REVIEW_INGEST_SECRET).update(`${ts}.outbox`).digest('hex');
-    const res = await fetch(`${FORGEMARKET_API_URL.replace(/\/$/, '')}/api/discord/outbox`, {
-      method: 'POST',
-      signal: deadline(),
-      headers: { 'content-type': 'application/json', 'x-timestamp': ts, 'x-signature': signature },
-      body: '{}',
-    });
+    const res = await signedPost('/api/discord/outbox', {});
     if (!res.ok) throw new Error(`outbox ${res.status}`);
     const { events = [] } = await res.json();
     // Only ids that genuinely reached Discord are acknowledged. Anything that
@@ -2338,14 +2328,7 @@ const vouchLastAt = new Map(); // userId → ts of their last vouch (anti-spam)
 async function hasCompletedOrder(uid) {
   if (!FORGEMARKET_API_URL || !REVIEW_INGEST_SECRET) return false;
   try {
-    const ts = String(Date.now());
-    const signature = createHmac('sha256', REVIEW_INGEST_SECRET).update(`${ts}.balance:${uid}`).digest('hex');
-    const res = await fetch(`${FORGEMARKET_API_URL.replace(/\/$/, '')}/api/discord/balance`, {
-      method: 'POST',
-      signal: deadline(),
-      headers: { 'content-type': 'application/json', 'x-timestamp': ts, 'x-signature': signature },
-      body: JSON.stringify({ uid }),
-    });
+    const res = await signedPost('/api/discord/balance', { uid });
     if (!res.ok) return false;
     const d = await res.json();
     return !!d?.linked && Number(d.completedOrders) > 0;
@@ -2846,15 +2829,8 @@ async function sendGuildBackup(c) {
       })),
     };
     const takenAt = new Date().toISOString();
-    const ts = String(Date.now());
-    const canonical = `guildbackup:${guild.id}:${takenAt}`;
-    const signature = createHmac('sha256', REVIEW_INGEST_SECRET).update(`${ts}.${canonical}`).digest('hex');
-    const res = await fetch(`${FORGEMARKET_API_URL.replace(/\/$/, '')}/api/discord/backup`, {
-      method: 'POST',
-      signal: deadline(),
-      headers: { 'content-type': 'application/json', 'x-timestamp': ts, 'x-signature': signature },
-      body: JSON.stringify({ guildId: guild.id, takenAt, snapshot }),
-    });
+    // The snapshot is what gets stored, so it is what most needs signing.
+    const res = await signedPost('/api/discord/backup', { guildId: guild.id, takenAt, snapshot });
     if (!res.ok) throw new Error(`backup ${res.status}`);
     const out = await res.json();
     // `log` is an object (runtime.js); calling it threw, so every successful backup logged a failure.
@@ -2867,14 +2843,7 @@ async function sendGuildBackup(c) {
 async function fetchDigest() {
   if (!FORGEMARKET_API_URL || !REVIEW_INGEST_SECRET) return null;
   try {
-    const ts = String(Date.now());
-    const signature = createHmac('sha256', REVIEW_INGEST_SECRET).update(`${ts}.digest`).digest('hex');
-    const res = await fetch(`${FORGEMARKET_API_URL.replace(/\/$/, '')}/api/discord/digest`, {
-      method: 'POST',
-      signal: deadline(),
-      headers: { 'content-type': 'application/json', 'x-timestamp': ts, 'x-signature': signature },
-      body: '{}',
-    });
+    const res = await signedPost('/api/discord/digest', {});
     if (!res.ok) throw new Error(`digest ${res.status}`);
     return await res.json();
   } catch (e) { console.error('[digest]', e.message); return null; }
@@ -2931,15 +2900,7 @@ async function refCmd(i) {
   }
   let d = null;
   try {
-    const ts = String(Date.now());
-    const signature = createHmac('sha256', REVIEW_INGEST_SECRET)
-      .update(`${ts}.referral:${i.user.id}`).digest('hex');
-    const res = await fetch(`${FORGEMARKET_API_URL.replace(/\/$/, '')}/api/discord/referral`, {
-      method: 'POST',
-      signal: deadline(),
-      headers: { 'content-type': 'application/json', 'x-timestamp': ts, 'x-signature': signature },
-      body: JSON.stringify({ uid: i.user.id }),
-    });
+    const res = await signedPost('/api/discord/referral', { uid: i.user.id });
     if (res.ok) d = await res.json();
   } catch (e) { console.error('[ref]', e.message); }
   if (!d) return i.editReply('Couldn’t reach the store right now — try again in a minute.');
@@ -2981,15 +2942,7 @@ async function balanceCmd(i) {
   }
   let d = null;
   try {
-    const ts = String(Date.now());
-    const signature = createHmac('sha256', REVIEW_INGEST_SECRET)
-      .update(`${ts}.balance:${i.user.id}`).digest('hex');
-    const res = await fetch(`${FORGEMARKET_API_URL.replace(/\/$/, '')}/api/discord/balance`, {
-      method: 'POST',
-      signal: deadline(),
-      headers: { 'content-type': 'application/json', 'x-timestamp': ts, 'x-signature': signature },
-      body: JSON.stringify({ uid: i.user.id }),
-    });
+    const res = await signedPost('/api/discord/balance', { uid: i.user.id });
     if (res.ok) d = await res.json();
   } catch (e) { console.error('[balance]', e.message); }
   if (!d) return i.editReply('Couldn’t reach the store right now — try again in a minute.');
@@ -3170,15 +3123,8 @@ async function payLinkCmd(i) {
   const problem = payLinkProblem(url);
   if (problem) return i.editReply(`⚠️ ${problem}`);
   try {
-    const ts = String(Date.now());
-    const signature = createHmac('sha256', PAYLINK_SECRET)
-      .update(`${ts}.paylink:${number}:${url}`).digest('hex');
-    const res = await fetch(`${FORGEMARKET_API_URL.replace(/\/$/, '')}/api/discord/pay-link`, {
-      method: 'POST',
-      signal: deadline(),
-      headers: { 'content-type': 'application/json', 'x-timestamp': ts, 'x-signature': signature },
-      body: JSON.stringify({ number, url }),
-    });
+    // Its own secret: a leak of the general bot secret must not be enough to redirect money.
+    const res = await signedPost('/api/discord/pay-link', { number, url }, { secret: PAYLINK_SECRET });
     const d = await res.json().catch(() => ({}));
     if (!res.ok) return i.editReply(`⚠️ ${d.error || `Couldn’t attach that link (${res.status}).`}`);
     return i.editReply(

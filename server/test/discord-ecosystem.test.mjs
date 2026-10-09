@@ -447,8 +447,12 @@ console.log('— The Discord id is signed, not just sent —');
     canonicalReview({ ...base, discordUid: '9999' }) !== withUid);
 
   const bot = await import('node:fs').then((fs) => fs.readFileSync('../discord/src/bot.js', 'utf8'));
-  ok('the bot appends the id only when present, exactly like the server',
-    /if \(discordUid\) parts\.push\(String\(discordUid\)\)/.test(bot));
+  /* The bot signs v2 now: the whole body — the Discord id included when
+     present — is inside the signature (discord/src/signing.js), so the id
+     cannot be swapped on the way; old-style vouches still verify against
+     canonicalReview above until the bot is redeployed. */
+  ok('the bot sends the id inside the signed body',
+    /const payload = \{[^}]*\.\.\.\(discordUid \? \{ discordUid \} : \{\}\)[^}]*\};\s*const res = await signedPost\('\/api\/reviews\/ingest', payload\)/.test(bot));
   ok('the /vouch command sends the author id', /discordUid: i\.user\.id/.test(bot));
 }
 
