@@ -52,5 +52,20 @@ await syncCatalogImages();
 const again = (await all('SELECT id, updated_at FROM products')).filter((r) => r.updated_at !== snap.get(r.id));
 ok('a second run writes nothing', again.length === 0, `${again.length} rows`);
 
+console.log('— The demo seeder never resets a price on boot —');
+{
+  const { seedDemoCatalog } = await import('../src/db/demoSeed.js');
+  const p = await get(`SELECT id, sku, price FROM products WHERE sku IS NOT NULL ORDER BY sku LIMIT 1`);
+  await run(`UPDATE products SET price = @p WHERE id = @id`, { p: Number(p.price) + 123, id: p.id });
+  await seedDemoCatalog({ resyncPrices: false });
+  ok('the owner\u2019s price survives the boot-time seeder', Number((await get(`SELECT price FROM products WHERE id=@id`, { id: p.id })).price) === Number(p.price) + 123);
+  await seedDemoCatalog();
+  ok('…while an explicit `npm run seed:demo` still resets it to the catalogue default', Number((await get(`SELECT price FROM products WHERE id=@id`, { id: p.id })).price) === Number(p.price));
+  const app = (await import('node:fs')).readFileSync(new URL('../src/app.js', import.meta.url), 'utf8');
+  ok('booting seeds only an empty shop (not on every cold start with SEED_DEMO)',
+    /if \(Number\(products\.n\) === 0\) \{\s*await \(await import\('\.\/db\/demoSeed\.js'\)\)\.seedDemoCatalog\(\{ resyncPrices: false \}\)/.test(app)
+    && !/config\.seedDemo \|\| Number\(products\.n\)/.test(app));
+}
+
 console.log(`\n${fail ? '❌' : '✅'} catalog-image-sync: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

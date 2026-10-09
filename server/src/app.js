@@ -70,6 +70,8 @@ function startBackgroundUpkeep(wasSeeded) {
       // Off the request path already, so paying the import here costs nobody.
       if (wasSeeded) await (await import('./db/seed.js')).syncEmailTemplates();
       await (await import('./db/starterContent.js')).seedStarterContent();
+      // SEED_DEMO: products a new build's catalogue adds — never prices.
+      if (config.seedDemo) await (await import('./db/demoSeed.js')).seedDemoCatalog({ resyncPrices: false });
       await (await import('./db/demoSeed.js')).syncCatalogImages();
       console.log('[boot] background upkeep done in', Date.now() - t, 'ms');
     } catch (e) {
@@ -141,9 +143,15 @@ export function ensureReady() {
       ]);
       if (!seeded) await (await import('./db/seed.js')).seed(); // empty DB needs roles/permissions/templates first
       // Zero-config: an empty shop must have products before we serve it, else
-      // the storefront is blank. An already-stocked store skips this entirely.
-      if (config.seedDemo || Number(products.n) === 0) {
-        await (await import('./db/demoSeed.js')).seedDemoCatalog();
+      // the storefront is blank. An already-stocked store skips this entirely —
+      // SEED_DEMO included. With SEED_DEMO=true this used to run on EVERY cold
+      // start: ~140 sequential queries (15 s before the first byte on a new
+      // instance) and, worse, every catalogue price reset to the seed default,
+      // so a price the owner changed in the admin quietly came back minutes
+      // later. Adding catalogue products a deploy introduced now happens once
+      // per deploy in the background upkeep below, and never touches a price.
+      if (Number(products.n) === 0) {
+        await (await import('./db/demoSeed.js')).seedDemoCatalog({ resyncPrices: false });
       }
       // Non-critical upkeep runs AFTER we're ready to serve.
       startBackgroundUpkeep(seeded);
