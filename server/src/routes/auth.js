@@ -342,9 +342,16 @@ router.post('/totp/setup', requireAuth, asyncHandler(async (req, res) => {
 router.post('/totp/enable', requireAuth, asyncHandler(async (req, res) => {
   const { code } = z.object({ code: z.string().min(6).max(8) }).parse(req.body);
   const result = await confirmTotpEnrollment(req.user.id, code);
+  /* Everything that signed in before there was a second factor is signed out
+     now: other sessions, and every "remember this device" — a trusted device is
+     a login without a code, so one created before 2FA (a phished email code,
+     say) would otherwise keep skipping the factor that was just switched on.
+     This browser stays signed in. */
+  await revokeOtherSessions(req.user.id, req.auth?.sid);
+  await revokeAllTrustedDevices(req.user.id);
   await audit({ actor: { id: req.user.id, email: req.user.email }, action: 'auth.totp_enabled', req });
   await notify(req.user.id, { type: 'security', title: 'Two-factor authentication enabled',
-    body: 'Logins now require a code from your authenticator app. Nice — your account is safer.',
+    body: 'Logins now require a code from your authenticator app, and your other devices were signed out. Nice — your account is safer.',
     link: '/account/settings' }).catch(() => {});
   res.json(result);
 }));
@@ -358,6 +365,9 @@ const totpDisableLimiter = rateLimit({ bucket: 'auth_totp_disable', windowMs: 60
 router.post('/totp/disable', requireAuth, totpDisableLimiter, asyncHandler(async (req, res) => {
   const { code } = z.object({ code: z.string().min(6).max(8) }).parse(req.body);
   const result = await disableTotp(req.user.id, code);
+  // The same for switching it off: whoever else is signed in signs in again.
+  await revokeOtherSessions(req.user.id, req.auth?.sid);
+  await revokeAllTrustedDevices(req.user.id);
   await audit({ actor: { id: req.user.id, email: req.user.email }, action: 'auth.totp_disabled', req });
   await notify(req.user.id, { type: 'security', title: 'Two-factor authentication disabled',
     body: 'Your account no longer requires an authenticator code at login. If this wasn’t you, contact support immediately.',

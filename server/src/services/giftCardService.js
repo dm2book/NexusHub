@@ -27,9 +27,21 @@ const shape = (r) => r && ({
 });
 
 // ── Admin: issue / manage ────────────────────────────────────────────────────
-export async function issueGiftCard({ amount, currency = 'EUR', note = null, recipientEmail = null }, issuedBy = null) {
+/* The most a staff member (not the owner) may hand out in one go, as store
+   credit or as a gift card — the same ceiling, because a gift card IS store
+   credit once redeemed (env STAFF_CREDIT_MAX_CENTS, default €100). */
+export const staffCreditCap = () => Number(process.env.STAFF_CREDIT_MAX_CENTS || 10_000);
+
+export async function issueGiftCard({ amount, currency = 'EUR', note = null, recipientEmail = null }, issuedBy = null,
+  { isOwner = false } = {}) {
   const cents = Math.round(Number(amount));
   if (!cents || cents < 1) throw badRequest('Enter a gift-card amount');
+  /* Gift cards went around the store-credit rules: an admin could issue a card
+     of any amount and redeem it into their own wallet — the very thing the
+     credit grant refuses ("not to yourself", "above €100 needs the Owner"). */
+  if (cents > staffCreditCap() && !isOwner) {
+    throw badRequest(`Gift cards above €${(staffCreditCap() / 100).toFixed(2)} need the Owner`);
+  }
   const rec = recipientEmail ? String(recipientEmail).trim().toLowerCase() : null;
   let code;
   for (let i = 0; i < 6; i++) { code = makeCode(); if (!(await get('SELECT id FROM gift_cards WHERE code=@c', { c: code }))) break; }
@@ -91,6 +103,7 @@ export async function redeemGiftCard(code, userId) {
     if (!g) throw notFound('Gift card not found');
     if (g.status === 'disabled') throw badRequest('This gift card has been disabled');
     if (g.status === 'redeemed' || Number(g.balance) <= 0) throw badRequest('This gift card has already been redeemed');
+    if (g.issued_by && g.issued_by === userId) throw badRequest('You cannot redeem a gift card you issued yourself');
     const amount = Number(g.balance);
     await run('UPDATE gift_cards SET balance=0, status=\'redeemed\', redeemed_by=@u, redeemed_at=@at WHERE id=@id',
       { u: userId, at: nowIso(), id: g.id });

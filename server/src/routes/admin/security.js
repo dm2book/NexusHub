@@ -20,6 +20,7 @@ import { grantMembership, cancelMembership } from '../../services/membershipServ
 import { addEntry, balanceOf, walletSummary } from '../../services/walletService.js';
 import { notify } from '../../services/notificationService.js';
 import { notFound, badRequest } from '../../utils/errors.js';
+import { staffCreditCap } from '../../services/giftCardService.js';
 
 const router = Router();
 
@@ -248,6 +249,8 @@ router.post('/users/:id/membership', requirePermission('users.manage'),
     const { days, cancel } = z.object({ days: z.number().int().min(1).max(3650).optional(), cancel: z.boolean().optional() })
       .parse(req.body || {});
     if (!(await getUserById(req.params.id))) throw notFound('User not found');
+    // Forge+ is a standing discount: granting it to yourself is paying yourself.
+    if (req.params.id === req.user.id && !cancel) throw badRequest('You cannot grant Forge+ to yourself');
     const membership = cancel ? await cancelMembership(req.params.id) : await grantMembership(req.params.id, days || 30);
     await audit({ actor: req.user, action: cancel ? 'membership.cancel' : 'membership.grant',
       targetType: 'user', targetId: req.params.id, metadata: { days }, req });
@@ -259,6 +262,8 @@ router.post('/users/:id/coins', requirePermission('users.manage'),
   asyncHandler(async (req, res) => {
     const { amount } = z.object({ amount: z.number().int().min(-1000).max(1000) }).parse(req.body || {});
     if (!(await getUserById(req.params.id))) throw notFound('User not found');
+    // Coins buy discount codes: the same rule as store credit — not to yourself.
+    if (req.params.id === req.user.id && amount > 0) throw badRequest('You cannot grant Forge Coins to yourself');
     const result = await grantCoins(req.params.id, amount, req.user.id);
     await audit({ actor: req.user, action: 'coins.grant', targetType: 'user',
       targetId: req.params.id, metadata: { amount }, req });
@@ -274,7 +279,7 @@ router.get('/users/:id/wallet', requirePermission('wallet.manage'),
 
 /* The most one grant may give: €100 for staff, €1,000 for an owner (env STAFF_CREDIT_MAX_CENTS). */
 const MAX_GRANT = 100_000;
-const staffGrantCap = () => Number(process.env.STAFF_CREDIT_MAX_CENTS || 10_000);
+const staffGrantCap = staffCreditCap;
 
 // Grant or deduct store credit for a user (e.g. goodwill, manual payout).
 router.post('/users/:id/credit', requirePermission('wallet.manage'),

@@ -18,7 +18,7 @@ import { evaluateCoupon } from '../services/couponService.js';
 import { recommendationsFor } from '../services/recommendationService.js';
 import { pricedBundles } from '../services/bundleService.js';
 import { peekGiftCard } from '../services/giftCardService.js';
-import { createOrder, getOrderByNumber, getOrder, markPaymentReceived, getPspPayment, setPspPayment } from '../services/orderService.js';
+import { createOrder, getOrderByNumber, getOrder, markPaymentReceived, getPspPayment, setPspPayment, customerView } from '../services/orderService.js';
 import { requestRefund, getRefundRequestForOrder } from '../services/supportService.js';
 import { CHAT_LANGS, answer } from '../services/assistantService.js';
 /* The landing pages, from the one place that declares them. Shared with the
@@ -599,10 +599,15 @@ router.get('/products/:id/mystery', asyncHandler(async (req, res) => {
 
 // Validate a discount code (checkout preview). Pass ?subtotal=cents for an exact
 // discount + min-spend / limit checks; the order endpoint re-validates server-side.
-router.get('/coupons/:code', asyncHandler(async (req, res) => {
+/* Kept for older clients — the checkout itself now asks /api/checkout/quote.
+   One answer for every refusal (an expired, used-up and non-existent code all
+   look the same) and its own tight limit, counted across instances: otherwise
+   this is a free way to try codes until one is real. */
+router.get('/coupons/:code', rateLimit({ bucket: 'coupon_lookup', windowMs: 10 * 60_000, max: 20, shared: true }),
+  asyncHandler(async (req, res) => {
   const subtotal = Math.max(0, Number(req.query.subtotal) || 0);
   const r = await evaluateCoupon(req.params.code, { subtotal, userId: req.user?.id, email: req.user?.email });
-  if (!r.ok) throw new ApiError(404, r.reason || 'Invalid or expired code');
+  if (!r.ok) throw new ApiError(404, 'Invalid or expired code');
   res.json({ code: r.code, kind: r.kind, percent: r.percent, value: r.value, discount: r.discount, label: r.label });
 }));
 
@@ -749,7 +754,7 @@ router.post('/orders',
        created, and attachOrder swallows its own errors for the same reason. */
     await attachOrder(order.id, { visitId: body.adVisit, sessionId: body.adSession });
 
-    res.status(201).json({ order });
+    res.status(201).json({ order: customerView(order) });
   }));
 
 // Create a Stripe Checkout Session for an order and return its redirect URL.
@@ -804,10 +809,10 @@ router.post('/orders/:id/pay', rateLimit({ bucket: 'pay', windowMs: 60_000, max:
     if (!order) throw new ApiError(404, 'Order not found');
     const { email } = z.object({ email: z.string().email().optional() }).parse(req.body || {});
     await assertOwnsOrder(req, order, email);
-    if (order.status !== 'pending') return res.json({ order });
+    if (order.status !== 'pending') return res.json({ order: customerView(order) });
     const updated = await markPaymentReceived(order.id, `demo_${Date.now()}`,
       { actorId: req.user?.id || 'customer', reason: 'Demo payment' });
-    res.json({ order: updated });
+    res.json({ order: customerView(updated) });
   }));
 
 // Customer submits proof of payment for a manual-payment order.

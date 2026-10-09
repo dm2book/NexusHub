@@ -1193,6 +1193,32 @@ export async function getOrderByNumber(number) {
   return row ? hydrate(row) : null;
 }
 
+/**
+ * An order as its buyer may see it.
+ *
+ * hydrate() builds the staff view: internal notes, the fraud score and the
+ * exact rules that flagged the order, the buyer's IP, and a history whose rows
+ * carry the staff member and their reason. The account pages and the checkout
+ * answered with all of it — while the public tracking page is careful not to
+ * say which signal held an order, because that is a free tuning loop for the
+ * next attempt. Whether it is held stays visible (the order page says so).
+ */
+export function customerView(order) {
+  if (!order) return order;
+  const { notes, fraudScore, fraudStatus, fraudHoldReason, fraudReviewedAt, ip, ...rest } = order;
+  return {
+    ...rest,
+    history: (order.history || []).map((h) => ({ id: h.id, to_status: h.to_status, created_at: h.created_at })),
+  };
+}
+
+/** The list row as its buyer may see it (summarize() is the admin list's). */
+export function customerSummary(row) {
+  if (!row) return row;
+  const { fraudScore, fraudStatus, ...rest } = row;
+  return rest;
+}
+
 async function hydrate(row) {
   const [items, history, deliveries] = await Promise.all([
     all('SELECT * FROM order_items WHERE order_id=@id', { id: row.id }),

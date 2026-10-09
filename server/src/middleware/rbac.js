@@ -16,6 +16,13 @@ export function requirePermission(...permissions) {
   };
 }
 
+/** The same rule as requirePermission, as a question (for checks that depend on the request). */
+export function holdsPermission(user, permission) {
+  if (!user) return false;
+  if ((user.roles || []).includes('owner')) return true;
+  return (user.permissions || []).includes(permission);
+}
+
 /** Require any one of several roles. */
 export function requireRole(...roles) {
   return (req, _res, next) => {

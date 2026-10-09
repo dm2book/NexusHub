@@ -30,6 +30,11 @@ export async function evaluateCoupon(code, { subtotal = 0, userId = null, email 
 
   const row = await get('SELECT * FROM coupons WHERE code = @c', { c });
   if (row) {
+    /* Bound to its buyer (Forge-Coin reward codes): on any other account it is
+       answered like a code that does not exist — nothing to learn from it. */
+    if (row.owner_user_id && row.owner_user_id !== userId) {
+      return { ok: false, reason: 'Invalid or expired code', rule: 'invalid' };
+    }
     if (!row.active) return { ok: false, reason: 'This code is no longer active', rule: 'inactive' };
     const now = Date.now();
     if (row.starts_at && new Date(row.starts_at).getTime() > now) return { ok: false, reason: 'This code is not active yet', rule: 'not_started' };
@@ -132,12 +137,12 @@ export async function createCoupon(input, actorId) {
   const value = kind === 'fixed' ? Math.max(1, Math.round(input.value)) : clampPercent(input.value);
   const id = newId('cpn');
   await run(
-    `INSERT INTO coupons (id, code, kind, value, min_subtotal, max_redemptions, per_user_limit, starts_at, expires_at, active, created_at)
-     VALUES (@id, @code, @kind, @value, @min, @max, @per, @starts, @exp, @active, @at)`,
+    `INSERT INTO coupons (id, code, kind, value, min_subtotal, max_redemptions, per_user_limit, starts_at, expires_at, active, owner_user_id, created_at)
+     VALUES (@id, @code, @kind, @value, @min, @max, @per, @starts, @exp, @active, @owner, @at)`,
     { id, code, kind, value, min: Math.max(0, Math.round(input.minSubtotal || 0)),
       max: input.maxRedemptions ?? null, per: input.perUserLimit ?? null,
       starts: input.startsAt || null, exp: input.expiresAt || null,
-      active: input.active === false ? 0 : 1, at: nowIso(), actorId });
+      active: input.active === false ? 0 : 1, owner: input.ownerUserId || null, at: nowIso(), actorId });
   const created = await getCoupon(id);
   // Share fresh public discount codes in #drops-and-deals (best-effort).
   if (created?.active && input.announce !== false) {

@@ -6,6 +6,7 @@
  *   Earn:  1 coin per €10 of paid spend (floor), awarded once per order.
  *   Spend: redeem coins for a personal discount coupon (or a giveaway boost).
  */
+import { randomBytes } from 'node:crypto';
 import { get, all, run, tx, nowIso } from '../db/index.js';
 import { newId } from '../utils/ids.js';
 import { badRequest } from '../utils/errors.js';
@@ -219,8 +220,11 @@ export async function redeemReward(userId, rewardId) {
     if (balance < reward.cost) throw badRequest(`Not enough Forge Coins — you need ${reward.cost}, you have ${balance}.`);
     // For coupons, the generated code doubles as the ledger ref so the buyer
     // can always find it back in their history (a toast is easy to miss).
+    /* Ten characters from the crypto source (not Math.random's five): the code
+       is also bound to this account below, so even a seen code is useless to
+       anyone else, but it should not be guessable either. */
     const code = reward.kind === 'coupon'
-      ? `FORGE${Math.random().toString(36).slice(2, 7).toUpperCase()}` : null;
+      ? `FORGE${randomBytes(8).toString('base64').replace(/[^A-Za-z0-9]/g, '').slice(0, 10).toUpperCase().padEnd(10, 'X')}` : null;
     // Debit first (inside the transaction) so concurrent redeems can't overspend.
     await run(
       `INSERT INTO forge_coin_ledger (id, user_id, delta, reason, ref, created_at)
@@ -232,6 +236,7 @@ export async function redeemReward(userId, rewardId) {
         code, kind: reward.couponKind || 'fixed', value: reward.value, perUserLimit: 1, maxRedemptions: 1,
         // The order the code is worth its whole value on — see FORGE_SHOP.
         minSubtotal: reward.minSubtotal || 0,
+        ownerUserId: userId,
         active: true, announce: false,
       }, userId);
       return { reward, couponCode: code };

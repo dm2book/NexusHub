@@ -2326,4 +2326,14 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS lang TEXT;
         ON forge_coin_ledger (ref) WHERE reason = 'order_reversal';
     `,
   },
+  {
+    /* A code someone paid for belongs to them: Forge-Coin reward codes are
+       bound to the account that bought them (couponService refuses the code
+       on any other account), so a code seen over a shoulder or in a shared
+       screenshot cannot be spent by somebody else. */
+    id: '064_coupon_owner',
+    sql: `
+      ALTER TABLE coupons ADD COLUMN IF NOT EXISTS owner_user_id TEXT;
+    `,
+  },
 ];
