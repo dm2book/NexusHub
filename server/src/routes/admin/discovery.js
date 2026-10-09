@@ -21,7 +21,15 @@ import { sourceStatuses } from '../../services/market/sources.js';
 
 const router = Router();
 const actorOf = (req) => req.user?.email || req.user?.id || 'admin';
-const fail = (res, e) => res.status(e.status || 400).json({ error: { message: e.message } });
+/* A deliberate refusal (ApiError, a zod validation) keeps its 4xx. Anything
+   else is OUR failure — the database, a bug — and used to come back as a 400,
+   which reads as "you did something wrong" and is never logged. */
+const fail = (res, e) => {
+  if (e?.name === 'ZodError') return res.status(400).json({ error: { message: 'Validation failed' } });
+  if (e?.status && e.status < 500) return res.status(e.status).json({ error: { message: e.message } });
+  console.error('[discovery]', e);
+  return res.status(e?.status || 500).json({ error: { message: e?.status ? e.message : 'Something went wrong on our side — try again.' } });
+};
 const scanLimit = rateLimit({ bucket: 'discovery-scan', windowMs: 10 * 60_000, max: 6 });
 
 router.get('/', requirePermission('products.read'), asyncHandler(async (req, res) => {

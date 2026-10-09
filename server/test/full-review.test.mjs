@@ -59,6 +59,27 @@ console.log('— IPv4 inside IPv6, Discord webhooks —');
   ok('the admin cannot save a non-Discord address as the alert webhook', refused?.status === 400, refused?.message || 'saved');
 }
 
+console.log('— robots.txt —');
+{
+  const { isAllowed, clearRobotsCache } = await import('../src/services/market/robots.js');
+  clearRobotsCache();
+  let calls = 0;
+  const down = async () => { calls++; throw new Error('connect ECONNRESET'); };
+  const first = await isAllowed('https://shop.example/catalog', { fetchImpl: down });
+  ok('a robots.txt that cannot be read means "not allowed"', first.allowed === false && calls === 1, first.reason);
+  const realNow = Date.now;
+  Date.now = () => realNow() + 11 * 60_000;
+  const up = async () => { calls++; return new Response('', { status: 404 }); };
+  const later = await isAllowed('https://shop.example/catalog', { fetchImpl: up });
+  Date.now = realNow;
+  ok('…but a network blip is asked again after ten minutes, not six hours', later.allowed === true && calls === 2, `${calls} calls, ${later.reason}`);
+  let sawSignal = null;
+  await isAllowed('https://other.example/x', { fetchImpl: async (u, init) => { sawSignal = init.signal; return new Response('User-agent: *\nDisallow:', { status: 200 }); } });
+  ok('the request carries a timeout signal that also covers reading the body', !!sawSignal && typeof sawSignal.aborted === 'boolean');
+  const src = (await import('node:fs')).readFileSync(new URL('../src/routes/admin/discovery.js', import.meta.url), 'utf8');
+  ok('an unexpected discovery error is a logged 500, not a 400', /console\.error\('\[discovery\]'/.test(src) && /status\(e\?\.status \|\| 500\)/.test(src));
+}
+
 console.log('— SVG —');
 {
   const { sanitizeSvg, assess } = await import('../src/services/logoDiscoveryService.js');
