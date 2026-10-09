@@ -68,8 +68,9 @@ console.log('\n— 1b. Background work is kept alive, and runs once for the whol
 
   const app = read('src/app.js');
   const sweep = app.slice(app.indexOf('let lastMaintenanceAt'), app.indexOf('// Structured request logging'));
-  ok('the traffic sweep is wrapped in waitUntil', /waitUntil\(/.test(sweep) && /runMaintenance\(\)/.test(sweep));
-  ok('…and claims its hour in the database first', sweep.indexOf("claimInterval('maintenance_auto'") < sweep.indexOf('runMaintenance()'));
+  // runMaintenance takes the deadline computed from the request's start now.
+  ok('the traffic sweep is wrapped in waitUntil', /waitUntil\(/.test(sweep) && /runMaintenance\(\{ deadline \}\)/.test(sweep));
+  ok('…and claims its hour in the database first', sweep.indexOf("claimInterval('maintenance_auto'") < sweep.indexOf('runMaintenance({ deadline })'));
   ok('the boot upkeep is kept alive too', /waitUntil\(Promise\.resolve\(\)\.then\(async/.test(app));
   ok('waitUntil comes from Vercel\'s own package, a dependency of the deployed bundle',
     /from '@vercel\/functions'/.test(app) && /"@vercel\/functions"/.test(read('../package.json')));
