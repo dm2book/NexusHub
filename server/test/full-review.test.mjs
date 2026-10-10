@@ -1,7 +1,8 @@
 /**
  * The full review round: the fixes it made, each pinned so it stays fixed.
  *
- *   honesty    product API carries no internal metadata; mystery odds published
+ *   honesty    product API carries no internal metadata; mystery odds were
+ *              published (boxes are retired since — their odds page is gone)
  *   security   http(s)-only links; DNS-aware SSRF guard; supplier secrets masked
  *              (and not wiped by saving the mask back); stricter SVG sanitizer;
  *              phone codes burn after 5 wrong guesses; opt-outs stay opted out;
@@ -116,12 +117,16 @@ console.log('— Product API —');
 
 console.log('— Mystery odds —');
 {
-  const { oddsFor } = await import('../src/services/mysteryBoxService.js');
-  const o = oddsFor([{ label: 'A', credit: 100, weight: 90 }, { label: 'B', credit: 1000, weight: 10 }]);
-  const sum = o.rewards.reduce((s, r) => s + r.chance, 0);
-  ok('the chances add up to 100%', Math.abs(sum - 100) < 0.6, String(sum));
-  ok('more luck makes the big prize likelier, never certain', o.rewards[1].chanceMax > o.rewards[1].chance && o.rewards[1].chanceMax < 100);
-  ok('the average value is published', o.averageCredit > 100 && o.averageCredit < 1000);
+  /* The odds were published so a paid box said what its chances were. Boxes
+     are retired since (paid random prizes are very likely a game of chance
+     under the Dutch Wet op de kansspelen), so there are no odds left to show:
+     the page answers 410 Gone, and nothing computes them any more. */
+  const mbs = await import('../src/services/mysteryBoxService.js');
+  ok('nothing computes box odds any more', typeof mbs.oddsFor === 'undefined');
+  const s = createApp().listen(0);
+  const r = await fetch(`http://127.0.0.1:${s.address().port}/api/products/prd_any/mystery`);
+  s.close();
+  ok('the odds page answers 410 Gone', r.status === 410, String(r.status));
 }
 
 console.log('— Admin API —');

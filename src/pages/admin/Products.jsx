@@ -189,19 +189,6 @@ export default function AdminProducts() {
     }
   };
 
-  const saveRewards = async () => {
-    setBusy(true);
-    try {
-      await api.put(`/api/admin/products/${editing.id}/mystery`, {
-        rewards: (rewards || []).filter((r) => r.label.trim()).map((r) => ({
-          label: r.label.trim(), weight: Math.max(1, parseInt(r.weight, 10) || 1),
-          credit: Math.max(0, Math.round(parseFloat(r.creditEuro || '0') * 100)),
-        })),
-      });
-      toast.success('Mystery rewards saved.');
-    } catch (err) { toast.error(err.message); } finally { setBusy(false); }
-  };
-
   const save = async () => {
     setBusy(true);
     try {
@@ -619,44 +606,43 @@ export default function AdminProducts() {
           <label className="flex items-center gap-2 text-sm text-slate-300">
             <input type="checkbox" checked={form.featured} onChange={(e) => setForm({ ...form, featured: e.target.checked })} /> Featured
           </label>
-          <label className="flex items-center gap-2 text-sm text-slate-300 sm:col-span-2">
-            <input type="checkbox" checked={form.kind === 'mystery'}
-              onChange={(e) => setForm({ ...form, kind: e.target.checked ? 'mystery' : 'digital' })} />
-            🎁 Mystery box (buyers win a random reward — set the pool below after saving)
-          </label>
-
-          {/* Mystery reward pool — only for saved mystery products */}
+          {/* The "Mystery box" checkbox that stood here is gone: no product can
+              be made into a box any more. A paid box with random prizes is very
+              likely a game of chance under the Dutch Wet op de kansspelen, which
+              needs a licence this shop does not have — and the server refuses
+              it too. An old box can still be opened, renamed or switched off;
+              its pool is shown read-only, as the record its past orders were
+              rolled against. */}
           {form.kind === 'mystery' && editing !== 'new' && (
             <div className="sm:col-span-2 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
-              <div className="flex items-center justify-between mb-3">
-                <div className="text-sm font-bold text-amber-300">🎁 Reward pool</div>
-                <button type="button" onClick={() => setRewards([...(rewards || []), { label: '', weight: 10, creditEuro: '' }])}
-                  className="text-xs font-semibold text-amber-300 hover:text-amber-200">+ Add reward</button>
-              </div>
-              {rewards === null ? <p className="text-slate-500 text-sm">Loading…</p> : (
-                <>
-                  {rewards.length === 0 && <p className="text-slate-500 text-sm mb-2">No rewards yet — add a few. Weight = relative odds; credit = what the winner gets as store credit.</p>}
-                  <div className="space-y-2">
-                    {rewards.map((r, i) => (
-                      <div key={i} className="grid grid-cols-[1fr_70px_90px_auto] gap-2 items-center">
-                        <input className="input py-1.5 text-sm" placeholder="e.g. €50 JACKPOT" value={r.label}
-                          onChange={(e) => setRewards(rewards.map((x, j) => j === i ? { ...x, label: e.target.value } : x))} />
-                        <input className="input py-1.5 text-sm" type="number" min="1" placeholder="odds" value={r.weight}
-                          onChange={(e) => setRewards(rewards.map((x, j) => j === i ? { ...x, weight: e.target.value } : x))} />
-                        <input className="input py-1.5 text-sm" type="number" min="0" step="0.01" placeholder="€ credit" value={r.creditEuro}
-                          onChange={(e) => setRewards(rewards.map((x, j) => j === i ? { ...x, creditEuro: e.target.value } : x))} />
-                        <button type="button" onClick={() => setRewards(rewards.filter((_, j) => j !== i))} className="text-slate-500 hover:text-red-400 text-lg px-1">×</button>
-                      </div>
-                    ))}
-                  </div>
-                  <button type="button" onClick={saveRewards} disabled={busy}
-                    className="btn-primary mt-3 py-2 text-sm">Save rewards</button>
-                </>
-              )}
+              <div className="text-sm font-bold text-amber-300 mb-1">🎁 Retired mystery box</div>
+              <p className="text-xs text-slate-400 mb-3">
+                Mystery boxes are no longer sold: paid random prizes are very likely a game of chance under the Dutch
+                Wet op de kansspelen. This one cannot be switched back on. Prizes already won stay on their orders
+                and in the buyers' wallets. The pool below is what those orders were rolled against.
+              </p>
+              {rewards === null ? <p className="text-slate-500 text-sm">Loading…</p>
+                : rewards.length === 0 ? <p className="text-slate-500 text-sm">No reward pool on record.</p> : (
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-slate-500 text-left">
+                        <th className="py-1 font-semibold">Prize</th>
+                        <th className="py-1 font-semibold text-right">Weight</th>
+                        <th className="py-1 font-semibold text-right">Credit</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rewards.map((r, i) => (
+                        <tr key={i} className="border-t border-white/5 text-slate-300">
+                          <td className="py-1">{r.label}</td>
+                          <td className="py-1 text-right tabular-nums">{r.weight}</td>
+                          <td className="py-1 text-right tabular-nums">€{r.creditEuro}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
             </div>
-          )}
-          {form.kind === 'mystery' && editing === 'new' && (
-            <p className="sm:col-span-2 text-xs text-amber-300/80">Save the product first, then reopen it to set the reward pool.</p>
           )}
         </div>
       </Modal>

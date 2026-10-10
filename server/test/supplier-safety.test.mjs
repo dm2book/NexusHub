@@ -378,19 +378,34 @@ console.log('\n— (a) The connectors hold their call to the caller\'s deadline 
   }
 }
 
-console.log('\n— (b) A boxes-only order is delivered by opening its boxes —');
+console.log('\n— (b) A boxes-only order from before is delivered by opening its boxes —');
+/* Boxes are retired: nothing makes or sells one any more, so these are the
+   boxes and orders an older release left behind — the row written straight to
+   the table, the order placed for a stand-in card at the box's price and its
+   line then pointed at the box. Paid now, they still have to be delivered. */
 const makeBox = async (credit) => {
-  const p = await createProduct({ name: `Safety Box ${stamp}-${++n}`, category: 'mystery', kind: 'mystery', price: 4999, announce: false });
+  const p = { id: newId('prd'), name: `Safety Box ${stamp}-${++n}`, price: 4999 };
+  await run(`INSERT INTO products (id, name, category, price, currency, kind, active, metadata, created_at, updated_at)
+             VALUES (@id, @nm, 'mystery', @p, 'EUR', 'mystery', 0, '{}', @at, @at)`,
+    { id: p.id, nm: p.name, p: p.price, at: nowIso() });
   if (credit) {
     await run(`INSERT INTO mystery_box_rewards (id, box_id, label, weight, credit_cents, created_at)
                VALUES (@id, @b, '€20 store credit', 1, @c, @at)`, { id: newId('mbr'), b: p.id, c: credit, at: nowIso() });
   }
   return p;
 };
+const standIn = await createProduct({ name: `Box stand-in ${stamp}`, category: 'giftcard', price: 4999, announce: false });
+const buyBox = async (user, boxProduct, extra = []) => {
+  const o = await createOrder({ ...consent, email: user.email, userId: user.id,
+    items: [{ productId: standIn.id, quantity: 1 }, ...extra.map((p) => ({ productId: p.id, quantity: 1 }))] });
+  await run(`UPDATE order_items SET product_id=@b, name=@nm, metadata=@m WHERE order_id=@o AND product_id=@s`,
+    { b: boxProduct.id, nm: boxProduct.name, m: JSON.stringify({ category: 'mystery' }), o: o.id, s: standIn.id });
+  return o;
+};
 const box = await makeBox(2000);
 {
   const user = await newUser();
-  const o = await buy(user, box.id);
+  const o = await buyBox(user, box);
   await paidQuietly(o.id);
   const queued = await fulfil.ensureManualFulfillment(o.id, { actorId: 'system' });
   ok('a paid boxes-only order is not queued for a person', queued === false && (await manualOf(o.id)).length === 0,
@@ -399,7 +414,7 @@ const box = await makeBox(2000);
 }
 {
   const user = await newUser();
-  const o = await buy(user, box.id);
+  const o = await buyBox(user, box);
   const errors = [];
   const realError = console.error;
   console.error = (...args) => { errors.push(args.join(' ')); realError(...args); };
@@ -420,7 +435,7 @@ const box = await makeBox(2000);
   /* The opening never ran — the payment's background work died. The sweep
      retries the delivery that belongs to the order, as it does for stock. */
   const user = await newUser();
-  const o = await buy(user, box.id);
+  const o = await buyBox(user, box);
   await paidQuietly(o.id, 10);
   await fulfil.sweepUnfulfilledPaidOrders({ limit: 50 });
   const pulls = await all(`SELECT id FROM mystery_pulls WHERE order_id=@o`, { o: o.id });
@@ -436,13 +451,12 @@ const box = await makeBox(2000);
   // A box with no prizes cannot deliver itself: that order still needs a person.
   const empty = await makeBox(0);
   const user = await newUser();
-  const o = await buy(user, empty.id);
+  const o = await buyBox(user, empty);
   await paidQuietly(o.id);
   ok('a box that cannot pay out is still queued for a person', await fulfil.ensureManualFulfillment(o.id, { actorId: 'system' }) === true);
   // A box next to a code: the code still has to be delivered by somebody.
   const card = await createProduct({ name: `Safety Card ${stamp}`, category: 'giftcard', price: 1500, announce: false });
-  const mixed = await createOrder({ ...consent, email: user.email, userId: user.id,
-    items: [{ productId: box.id, quantity: 1 }, { productId: card.id, quantity: 1 }] });
+  const mixed = await buyBox(user, box, [card]);
   await paidQuietly(mixed.id);
   ok('a box next to a code is still queued for a person', await fulfil.ensureManualFulfillment(mixed.id, { actorId: 'system' }) === true);
 }

@@ -27,10 +27,11 @@ export default function Cart() {
   const navigate = useNavigate();
   /* The summary is the server's — the pricing the order itself runs
      (POST /api/checkout/quote). This page worked it out: the Forge+ percentage
-     off the whole subtotal and the bundle by its own rule, mystery boxes
-     included although the order leaves them out, no 40% ceiling, and all of it
-     on the prices saved when each item was added. Until the first answer
-     lands, the cart's own prices are shown without discounts, dimmed. */
+     off the whole subtotal and the bundle by its own rule, no 40% ceiling, and
+     all of it on the prices saved when each item was added. Until the first
+     answer lands, the cart's own prices are shown without discounts, dimmed.
+     A bundle put in from /bundles or a product page shows up here as the
+     server's bundle line, the same figure its card promised. */
   const [quote, setQuote] = useState(null);
   const [quoteKey, setQuoteKey] = useState('');
   const [priceNotice, setPriceNotice] = useState([]);

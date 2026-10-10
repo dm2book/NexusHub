@@ -105,6 +105,26 @@ export const PAGES = {
       description: 'Tout le catalogue : Robux, V-Bucks, Valorant Points, Steam, Discord Nitro et cartes cadeaux. Le prix que tu vois est le prix que tu paies — sans frais cachés.',
     },
   },
+  /* Took the mystery box's place in the shop. Says how the discount works
+     rather than how big it is: the size is per bundle, and the page lists it. */
+  '/bundles': {
+    nl: {
+      title: 'Bundels — samen goedkoper',
+      description: 'Producten die bij elkaar horen, als set voor minder. Leg de hele set in je winkelwagen en de korting gaat er vanzelf af — je ziet hem voordat je betaalt.',
+    },
+    en: {
+      title: 'Bundles — cheaper together',
+      description: 'Products that belong together, at a lower price as a set. Put the whole set in your cart and the discount comes off by itself — you see it before you pay.',
+    },
+    de: {
+      title: 'Bündel — zusammen günstiger',
+      description: 'Produkte, die zusammengehören, als Set günstiger. Leg das ganze Set in den Warenkorb und der Rabatt geht automatisch ab — du siehst ihn vor dem Bezahlen.',
+    },
+    fr: {
+      title: 'Packs — moins cher ensemble',
+      description: 'Des produits qui vont ensemble, moins chers en pack. Mets le pack complet dans ton panier et la remise s’applique toute seule — tu la vois avant de payer.',
+    },
+  },
   '/how-it-works': {
     nl: {
       title: 'Hoe het werkt — bestellen en geleverd krijgen',

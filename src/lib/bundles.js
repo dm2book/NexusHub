@@ -63,3 +63,58 @@ export function matchBundle(items = [], bundles = []) {
     .filter((b) => b.discount > 0)
     .sort((a, b) => b.discount - a.discount)[0] || null;
 }
+
+/* ── Showing and adding a bundle ─────────────────────────────────────────
+   Plain functions, no React: the storefront calls them, and keeping them
+   here lets a test run them in Node exactly as the browser does. */
+
+/**
+ * A bundle's name and line in the language the page is in.
+ *
+ * The response carries both in all four languages (nameDe, descriptionFr…), so
+ * this is a lookup rather than a second request — falling back to the base
+ * fields, which is what a bundle cached before that shipped still has.
+ */
+export function bundleText(b, lang) {
+  const suffix = lang && lang !== 'en' ? lang[0].toUpperCase() + lang.slice(1) : '';
+  return {
+    name: b[`name${suffix}`] || b.name || '',
+    description: b[`description${suffix}`] || b.description
+      || (b.products || []).map((p) => p.name).join(' + '),
+  };
+}
+
+/**
+ * Put one complete set of a bundle in the cart, through the cart's own add().
+ *
+ * The discount is the server's to give and it gives it per complete set, so
+ * this adds exactly a set. With `inCart` (the cart's lines) it adds only what
+ * is missing from one set — the product page, where the product being looked
+ * at may already be in the cart and adding it again would buy two of it.
+ * Without it a whole set goes in, so a second press is a second set, which the
+ * server discounts too.
+ *
+ * A product listed twice in a bundle needs two in the cart per set, which is
+ * why this counts rather than checks for presence.
+ *
+ * @returns 'added' | 'already' (nothing was missing) | 'closed' (the cart
+ *          refused — before launch)
+ */
+export function addBundleToCart(bundle, add, inCart = null) {
+  const need = new Map();
+  for (const p of bundle?.products || []) {
+    need.set(p.id, { p, n: (need.get(p.id)?.n || 0) + 1 });
+  }
+  let added = 0;
+  for (const { p, n } of need.values()) {
+    const have = inCart ? inCart.filter((i) => i.id === p.id).reduce((s, i) => s + (i.qty || 0), 0) : 0;
+    const missing = n - have;
+    if (missing <= 0) continue;
+    // add() refuses before launch, and says so by returning false.
+    if (!add({ id: p.id, name: p.name, price: p.price, currency: bundle.currency, category: p.category }, missing)) {
+      return 'closed';
+    }
+    added += missing;
+  }
+  return added ? 'added' : 'already';
+}

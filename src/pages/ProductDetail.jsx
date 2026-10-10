@@ -29,6 +29,7 @@ import { DeliveryFacts, TrustRow } from '../components/store/ProductDelivery.jsx
 import PaymentBadges from '../components/store/PaymentBadges.jsx';
 import { platformOf } from '../lib/platform.js';
 import ProductTrust from '../components/store/ProductTrust.jsx';
+import BundleOffer from '../components/store/BundleOffer.jsx';
 
 // Built per product, not per site: what a buyer asks about a Robux top-up that
 // needs their username is not what they ask about a Steam code. Answers a
@@ -162,8 +163,6 @@ export default function ProductDetail() {
   const [unavailable, setUnavailable] = useState(false);
   const [recs, setRecs] = useState({ crossSell: [], upsell: [] });
   const [others, setOthers] = useState([]);
-  const [mysteryPool, setMysteryPool] = useState(null);
-  const [mysteryAvg, setMysteryAvg] = useState(null);
   const [priceHist, setPriceHist] = useState([]);
   const [heroBroken, setHeroBroken] = useState(false); // product image failed to load
   usePageMeta(product?.name || 'Product', product?.description || 'Digital top-ups and gift cards, delivered with your order number as the reference.');
@@ -263,12 +262,12 @@ export default function ProductDetail() {
     api.get('/api/products/trending').then((r) => setOthers(r.products || [])).catch(() => setOthers([]));
   }, [id]);
 
-  /* These three used to depend on the product OBJECT, which was fine while the
+  /* These used to depend on the product OBJECT, which was fine while the
      object arrived exactly once. It now arrives twice — the server's copy on
      first render, then the revalidating fetch — and a new object identity for
      the same product fired every one of them again: two /price-history calls,
-     two /mystery calls, two recorded views of one visit. Depending on the id is
-     what was always meant; the object was standing in for it. */
+     two recorded views of one visit. Depending on the id is what was always
+     meant; the object was standing in for it. */
   // Record this visit in the customer's own recently-viewed history.
   const recentlyViewed = useRecentlyViewed();
   useEffect(() => {
@@ -290,12 +289,6 @@ export default function ProductDetail() {
   },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [product?.id, product?.sample]);
-
-  // Mystery box: load the reward pool + odds to show "what's inside".
-  useEffect(() => {
-    if (product?.kind !== 'mystery') { setMysteryPool(null); return; }
-    api.get(`/api/products/${product.id}/mystery`).then((r) => { setMysteryPool(r.rewards || []); setMysteryAvg(r.averageCredit ?? null); }).catch(() => setMysteryPool([]));
-  }, [product?.id, product?.kind]);
 
   // Price history for the chart.
   useEffect(() => {
@@ -659,12 +652,16 @@ export default function ProductDetail() {
           <TrustRow t={t} />
           {/* Measured facts from real orders; draws nothing until there are some. */}
           {!product.sample && <ProductTrust productId={product.id} t={t} locale={locale} />}
+          {/* "Cheaper together": the bundles this product is in, with the
+              server's prices. Draws nothing for a product in none — and for
+              the offline showcase, which no bundle can contain. */}
+          {!product.sample && <BundleOffer product={product} />}
         </div>
       </div>
 
-      {/* Moved above the mystery pool and the price chart: "how does this
-          actually reach me?" is the question a buyer has BEFORE deciding,
-          and it was sitting three screens down, under a graph. */}
+      {/* Moved above the price chart: "how does this actually reach me?" is
+          the question a buyer has BEFORE deciding, and it was sitting three
+          screens down, under a graph. */}
       {/* How this is delivered — category-specific, the #1 pre-purchase question */}
       {(() => {
         const d = deliveryInfo(product.category, lang);
@@ -707,44 +704,6 @@ export default function ProductDetail() {
           </div>
         );
       })()}
-
-      {/* Mystery box — every prize with its real chance (never hidden: a paid
-          chance at prizes of different value must say what the chances are). */}
-      {product.kind === 'mystery' && mysteryPool && mysteryPool.length > 0 && (
-        <div className="bg-white border border-amber-200 rounded-2xl p-6 sm:p-8 mt-14 shadow-sm">
-          <div className="flex items-center gap-3 mb-1">
-            <span className="w-10 h-10 rounded-xl grid place-items-center text-white shrink-0"
-              style={{ backgroundImage: 'linear-gradient(135deg,#f59e0b,#f43f5e)' }}>🎁</span>
-            <div>
-              <h2 className="text-xl font-extrabold text-slate-900">{t('mystery.whatsInside', 'What’s inside')}</h2>
-              <p className="text-slate-500 text-sm">{t('mystery.sub2', 'Every box pays out one of these prizes as store credit. The chances are listed — more boxes in one order raise the chance of the bigger prizes.')}</p>
-            </div>
-          </div>
-          <table className="w-full mt-4 text-sm" data-testid="mystery-odds">
-            <thead>
-              <tr className="text-slate-500 text-left">
-                <th className="py-2 font-semibold">{t('mystery.prize', 'Prize')}</th>
-                <th className="py-2 font-semibold text-right">{t('mystery.chance', 'Chance (1 box)')}</th>
-                <th className="py-2 font-semibold text-right">{t('mystery.chanceMax', 'Chance (14+ boxes in one order)')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {mysteryPool.map((r, i) => (
-                <tr key={i} className="border-t border-slate-100">
-                  <td className="py-2 font-semibold text-slate-800">🎁 {r.label}</td>
-                  <td className="py-2 text-right tabular-nums text-slate-700">{r.chance != null ? `${String(r.chance).replace('.', ',')}%` : '—'}</td>
-                  <td className="py-2 text-right tabular-nums text-slate-500">{r.chanceMax != null ? `${String(r.chanceMax).replace('.', ',')}%` : '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {mysteryAvg != null && (
-            <p className="text-slate-600 text-sm mt-3">
-              {t('mystery.avg', 'Average value of one box: {avg} store credit — the box costs {price}.', { avg: money(mysteryAvg, product.currency), price: money(product.price, product.currency) })}
-            </p>
-          )}
-        </div>
-      )}
 
       {/* Price history */}
       {priceHist.length >= 2 && (() => {

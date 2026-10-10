@@ -7,7 +7,9 @@
  *   settleMysteryForOrder() begins `if (!order.userId) return []` — no roll, no
  *   prize, no pull recorded, and nothing a human in the fulfillment queue could
  *   do either, because store credit needs an account to live in. The product
- *   page meanwhile promised that every box wins a real prize.
+ *   page meanwhile promised that every box wins a real prize. (Boxes have
+ *   since been retired altogether — nobody can buy one — see
+ *   mystery-retired.test.mjs.)
  *
  *   Every product page carried TWO Product blocks of structured data saying
  *   different things: the server-rendered one said PreOrder (honest — no code in
@@ -93,37 +95,15 @@ console.log('\n— Money taken, nothing deliverable —');
   }, 'art:missing');
 }
 
-console.log('\n— A mystery box that cannot pay out —');
+console.log('\n— No mystery box on the shelf —');
 {
-  const box = await get(`SELECT id, description FROM products WHERE kind='mystery' AND active=1 LIMIT 1`);
-  ok('there is a mystery box in the catalogue', !!box);
-
-  const pool = await all(`SELECT * FROM mystery_box_rewards WHERE box_id=@id`, { id: box.id });
-  const restorePool = async () => {
-    await run(`DELETE FROM mystery_box_rewards WHERE box_id=@id`, { id: box.id });
-    for (const r of pool) {
-      await run(`INSERT INTO mystery_box_rewards (id, box_id, label, credit_cents, weight, created_at)
-                 VALUES (@id,@b,@l,@c,@w,@at)`,
-        { id: r.id, b: r.box_id, l: r.label, c: r.credit_cents, w: r.weight, at: r.created_at });
-    }
-  };
-
-  await withBreakage('an empty reward pool', async () => {
-    await run(`DELETE FROM mystery_box_rewards WHERE box_id=@id`, { id: box.id });
-    return restorePool;
-  }, 'mystery:empty');
-
-  await withBreakage('a reward worth nothing', async () => {
-    await run(`INSERT INTO mystery_box_rewards (id, box_id, label, credit_cents, weight, created_at)
-               VALUES (@id,@b,'Better luck next time',0,5,@at)`,
-      { id: newId('mrw'), b: box.id, at: nowIso() });
-    return restorePool;
-  }, 'mystery:zero-prize');
-
-  await withBreakage('a jackpot bigger than the pool', async () => {
-    await run(`UPDATE mystery_box_rewards SET credit_cents=100 WHERE box_id=@id`, { id: box.id });
-    return restorePool;
-  }, 'mystery:overclaim');
+  /* The audit used to break the seeded box's reward pool three ways here.
+     Boxes are retired — paid random prizes are very likely a game of chance
+     under the Dutch Wet op de kansspelen — so nothing seeds one, and the shelf
+     the audit reads has none to break. */
+  const live = await get(`SELECT COUNT(*)::int AS n FROM products WHERE kind='mystery' AND active=1`);
+  ok('the seeded catalogue holds no mystery box', Number(live?.n) === 0, `${live?.n} active`);
+  ok('…so the audit has nothing to say about one', !(await codes()).some((c) => c.startsWith('mystery:')));
 }
 
 console.log('\n— A bundle whose parts cannot be bought —');
@@ -151,28 +131,34 @@ console.log('\n— A bundle whose parts cannot be bought —');
   await run(`DELETE FROM bundles WHERE id=@id`, { id: bid });
 }
 
-console.log('\n— A guest cannot buy something only an account can receive —');
+console.log('\n— Nobody can buy a mystery box —');
 {
+  /* This was "a guest cannot buy something only an account can receive": a
+     box pays out in store credit, which needs an account. Boxes are retired
+     now, so the order refuses one for a guest AND for an account — even a box
+     switched back on by hand, as this one is. */
   const { createOrder } = await import('../src/services/orderService.js');
-  const box = await get(`SELECT id, name FROM products WHERE kind='mystery' AND active=1 LIMIT 1`);
+  const boxId = newId('prd');
+  await run(`INSERT INTO products (id, name, category, price, currency, kind, active, metadata, created_at, updated_at)
+             VALUES (@id, 'Audit Box', 'mystery', 4999, 'EUR', 'mystery', 1, '{}', @at, @at)`, { id: boxId, at: nowIso() });
   const order = {
     email: 'guest@example.com', consent: true, consentText: 'x',
-    items: [{ productId: box.id, quantity: 1 }],
+    items: [{ productId: boxId, quantity: 1 }],
   };
   let refused = null;
   try { await createOrder(order); } catch (e) { refused = e; }
   ok('a guest mystery-box order is refused', !!refused, 'the order went through');
-  ok('…and the reason names the account, not a generic error',
-    /account|sign in/i.test(refused?.message || ''), refused?.message);
+  ok('…and the reason says boxes are retired, not a generic error',
+    /retired/i.test(refused?.message || ''), refused?.message);
 
-  // The same order with an account behind it must still work.
   const uid = newId('usr');
   await run(`INSERT INTO users (id, email, created_at, updated_at) VALUES (@id,@e,@at,@at)`,
     { id: uid, e: `audit-${uid}@example.com`, at: nowIso() }).catch(() => {});
   let placed = null, err = null;
   try { placed = await createOrder({ ...order, userId: uid, email: `audit-${uid}@example.com` }); }
   catch (e) { err = e; }
-  ok('the same order with an account is accepted', !!placed, err?.message);
+  ok('…and so is the same order with an account', !placed && /retired/i.test(err?.message || ''), err?.message || 'the order went through');
+  await run(`UPDATE products SET active=0 WHERE id=@id`, { id: boxId });
 }
 
 console.log('\n— One availability claim per page —');

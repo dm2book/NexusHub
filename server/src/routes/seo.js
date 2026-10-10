@@ -19,7 +19,7 @@
 import { Router } from 'express';
 import { asyncHandler } from '../middleware/error.js';
 import { config } from '../config/env.js';
-import { getProduct } from '../services/productService.js';
+import { getProduct, isSellable } from '../services/productService.js';
 import { availableCount } from '../services/codeStockService.js';
 import { reviewStats } from '../services/reviewsService.js';
 import { productPayload } from '../services/productPayload.js';
@@ -264,7 +264,8 @@ router.get('/product/:id', asyncHandler(async (req, res, next) => {
   const product = await getProduct(req.params.id).catch(() => null);
   // An unknown id still renders the app, which shows its own not-found screen.
   // Prerendering a title for a product that does not exist would be worse.
-  if (!product || !product.active) {
+  // A retired mystery box gets the same: no title, no price, no Product block.
+  if (!isSellable(product)) {
     res.set('Cache-Control', 'public, max-age=0, s-maxage=60');
     return res.type('html').send(html);
   }

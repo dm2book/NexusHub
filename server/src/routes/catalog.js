@@ -10,9 +10,8 @@ import { requireLaunched, launchAtIso } from '../services/launchGateService.js';
 import { subscribe, unsubscribe, tokenMatches } from '../services/newsletterService.js';
 import { unsubscribeTokenOk, applyUnsubscribe, UNSUBSCRIBE_SCOPES } from '../services/emailService.js';
 import { rateLimit } from '../middleware/rateLimit.js';
-import { listProducts, getProduct, priceHistory } from '../services/productService.js';
+import { listProducts, getProduct, priceHistory, isSellable } from '../services/productService.js';
 import { availableCounts, availableCount } from '../services/codeStockService.js';
-import { getRewards as getMysteryRewards } from '../services/mysteryBoxService.js';
 import { listUpcoming as listUpcomingDrops } from '../services/dropService.js';
 import { evaluateCoupon } from '../services/couponService.js';
 import { recommendationsFor } from '../services/recommendationService.js';
@@ -507,7 +506,7 @@ router.get('/products/trending', asyncHandler(async (_req, res) => {
   publicCache(res, 60);
   if (!trendingCache.data || Date.now() - trendingCache.at > 60_000) {
     const rail = await trendingRail({ limit: 8 });
-    const products = (await Promise.all(rail.map((r) => getProduct(r.id)))).filter((p) => p?.active);
+    const products = (await Promise.all(rail.map((r) => getProduct(r.id)))).filter(isSellable);
     const counts = await availableCounts(products.map((p) => p.id));
     const label = new Map(rail.map((r) => [r.id, r.label]));
     trendingCache = { at: Date.now(), data: products.map((p) => ({ ...productPayload(p, counts[p.id] || 0), trend: label.get(p.id) || null })) };
@@ -521,7 +520,7 @@ router.post('/products/:id/view',
   rateLimit({ bucket: 'pview', windowMs: 60_000, max: 60 }),
   asyncHandler(async (req, res) => {
     const p = await getProduct(req.params.id);
-    if (p?.active) await recordView(p.id).catch(() => {});
+    if (isSellable(p)) await recordView(p.id).catch(() => {});
     res.status(204).end();
   }));
 
@@ -559,7 +558,8 @@ router.get('/products/:id/tile.svg', asyncHandler(async (req, res) => {
 router.get('/products/:id', asyncHandler(async (req, res) => {
   publicCache(res, 60);
   const p = await getProduct(req.params.id);
-  if (!p || !p.active) throw new ApiError(404, 'Product not found');
+  // A retired mystery box reads as gone, even one switched back on by hand.
+  if (!isSellable(p)) throw new ApiError(404, 'Product not found');
   const count = await availableCount(p.id);
   res.json({ product: productPayload(p, count) });
 }));
@@ -570,7 +570,7 @@ router.get('/products/:id', asyncHandler(async (req, res) => {
 router.get('/products/:id/trust', asyncHandler(async (req, res) => {
   publicCache(res, 300);
   const p = await getProduct(req.params.id);
-  if (!p || !p.active) throw new ApiError(404, 'Product not found');
+  if (!isSellable(p)) throw new ApiError(404, 'Product not found');
   res.json({ trust: await productTrust(p, await availableCount(p.id)) });
 }));
 
@@ -586,15 +586,13 @@ router.get('/drops', asyncHandler(async (_req, res) => {
   res.json({ drops: await listUpcomingDrops() });
 }));
 
-// Mystery-box reward pool WITH the real odds. They used to be kept secret
-// ("the odds? that's the mystery") — but a box bought with money that pays out
-// prizes of different value by chance has to say what the chances are; hidden
-// odds are what a regulator (here: the Kansspelautoriteit) looks for first.
-router.get('/products/:id/mystery', asyncHandler(async (req, res) => {
-  const rewards = await getMysteryRewards(req.params.id);
-  const { oddsFor } = await import('../services/mysteryBoxService.js');
-  const odds = oddsFor(rewards);
-  res.json({ rewards: odds.rewards, averageCredit: odds.averageCredit, maxLuckFromBoxes: odds.maxLuckFromBoxes });
+/* The reward pool and odds a mystery box's page used to show. Boxes are
+   retired — paid random prizes are very likely a game of chance under the Dutch
+   Wet op de kansspelen — so there is no box to describe any more. 410 rather
+   than 404: the address existed and is gone for good, which is also what a
+   page or crawler that kept the link should learn from it. */
+router.get('/products/:id/mystery', asyncHandler(async () => {
+  throw new ApiError(410, 'Mystery boxes are retired', 'mystery_retired');
 }));
 
 // Validate a discount code (checkout preview). Pass ?subtotal=cents for an exact
@@ -617,7 +615,7 @@ router.get('/coupons/:code', rateLimit({ bucket: 'coupon_lookup', windowMs: 10 *
  * The checkout and the cart page show these figures instead of working them
  * out themselves: priceOrder() is what createOrder runs, so the amount on the
  * pay button is the amount of the order — today's catalogue prices, the
- * discounts the order gives (none on a mystery box), the 40% ceiling, the
+ * discounts the order gives (a bundle's included), the 40% ceiling, the
  * store credit and the €0.50 card minimum. A refusal the order would make comes
  * back in `problems`, with its reason, rather than as an error, so the page can
  * show the figures and say what to change.
@@ -888,6 +886,8 @@ router.get('/sitemap.xml', asyncHandler(async (_req, res) => {
   const staticPages = [
     ['', '1.0', 'daily'],
     ['/shop', '0.9', 'daily'],
+    // The bundle deals, which took the retired mystery box's place in the shop.
+    ['/bundles', '0.8', 'weekly'],
     ['/how-it-works', '0.7', 'monthly'],
     ['/payment-methods', '0.7', 'monthly'],
     ['/reviews', '0.7', 'weekly'],

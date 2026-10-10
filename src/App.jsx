@@ -57,6 +57,7 @@ const Legal = lazy(() => import('./pages/info/Legal.jsx'));
 const NotFound = lazy(() => import('./pages/NotFound.jsx'));
 const Wishlist = lazy(() => import('./pages/Wishlist.jsx'));
 const Trust = lazy(() => import('./pages/Trust.jsx'));
+const Bundles = lazy(() => import('./pages/Bundles.jsx'));
 
 const Dashboard = lazy(() => import('./pages/account/Dashboard.jsx'));
 const Orders = lazy(() => import('./pages/account/Orders.jsx'));
@@ -147,6 +148,9 @@ export default function App() {
             <Route key={path} path={path} element={
               <Shop landingCategory={def.category} landingPath={path} />} />
           ))}
+          {/* Products sold together at a lower price — where the mystery box
+              was, until paid random prizes had to go. */}
+          <Route path="/bundles" element={<Bundles />} />
           <Route path="/wishlist" element={<Wishlist />} />
           {/* Generated catalogue pages (src/lib/seoCatalog.js). */}
           {['/games/:slug', '/giftcards/:slug', '/platform/:slug', '/cadeau/:slug'].map((p) => (

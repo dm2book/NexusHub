@@ -163,7 +163,11 @@ export default function StoreNav() {
   const NAV = [
     { label: t('nav.home', 'Home'), to: '/' },
     { label: t('nav.products', 'All Products'), to: '/shop' },
-    { label: t('nav.drops', 'Drops'), to: '/drops' },
+    /* Bundles took the deals slot Drops held. A seventh link does not fit:
+       measured at 1152–1536px in all four languages, it cut "Support" off the
+       end of this row at four of six widths. So Drops moved to the footer's
+       Shop column, where it is still one click from every page. */
+    { label: t('nav.bundles', 'Bundles'), to: '/bundles' },
     { label: t('nav.reviews', 'Reviews'), to: '/reviews' },
     { label: t('nav.howShort', 'How it works'), to: '/how-it-works' },
     { label: t('nav.support', 'Support'), to: '/contact' },

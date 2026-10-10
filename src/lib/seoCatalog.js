@@ -252,7 +252,7 @@ export function buildSeoPages(products, { landing = {}, payMethods = [] } = {}) 
   }
   // Budget gift pages: codes under a price, where there is a real choice.
   for (const cap of BUDGETS) {
-    const list = active.filter((p) => p.price <= cap && p.category !== 'mystery');
+    const list = active.filter((p) => p.price <= cap);
     if (list.length < 4) continue;
     const games = [...new Set(list.map((p) => GAMES[p.category]?.name || brandOf(p)?.name).filter(Boolean))].slice(0, 5);
     pages.push({ type: 'budget', key: `under-${cap / 100}`, path: `/cadeau/onder-${cap / 100}-euro`, subject: { cap },

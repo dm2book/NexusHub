@@ -62,6 +62,10 @@ export default function StoreFooter() {
       [t('footer.gameCurrency', 'Game currency'), '/game-currency']] },
     { title: t('footer.shop', 'Shop'), links: [
       [t('footer.allProducts', 'All Products'), '/shop'],
+      // The deals: bundles, which took the retired mystery box's place, and
+      // the drops calendar, which gave its header slot to them.
+      [t('nav.bundles', 'Bundles'), '/bundles'],
+      [t('nav.drops', 'Drops'), '/drops'],
       [t('footer.wishlist', 'Wishlist'), '/wishlist'],
       [t('footer.track', 'Track Order'), '/track'],
       [t('footer.payments', 'Payment Methods'), '/payment-methods']] },

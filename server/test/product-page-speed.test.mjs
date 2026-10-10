@@ -207,7 +207,11 @@ console.log('\n— The page asks for each thing once —');
      revalidating fetch. Effects keyed on the OBJECT fired again for the same
      product — two /price-history calls, two recorded views of one visit. */
   ok('price history keys on the product id', /\[product\?\.id, product\?\.sample\]/.test(page));
-  ok('the mystery pool keys on the product id', /\[product\?\.id, product\?\.kind\]/.test(page));
+  /* There was a third: the mystery-box odds, keyed on [product?.id,
+     product?.kind]. The block went with the boxes (paid random prizes are very
+     likely a game of chance under the Dutch Wet op de kansspelen), so what is
+     pinned now is that the page no longer asks for them at all. */
+  ok('the page no longer asks for mystery-box odds', !/\/mystery`/.test(page) && !/mysteryPool/.test(page));
   ok('no effect depends on the product object any more',
     !/\}, \[product\]\);/.test(page), 'an effect still keys on the whole object');
   ok('the boot payload is read once and dropped',

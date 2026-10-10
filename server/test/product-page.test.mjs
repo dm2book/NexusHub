@@ -80,10 +80,14 @@ console.log('\n— Delivery information and the steps —');
   // It used to sit below the mystery pool and the price chart — three screens
   // down — even though "how does this reach me?" precedes the decision.
   const iDelivery = code.indexOf('howDelivered');
-  const iMystery = code.indexOf('mysteryPool && mysteryPool.length');
   const iHistory = code.indexOf('price.history');
-  ok('delivery is explained before the mystery pool', iDelivery !== -1 && iDelivery < iMystery);
   ok('delivery is explained before the price chart', iDelivery !== -1 && iDelivery < iHistory);
+  /* The mystery pool this was also ordered against is gone with the boxes:
+     a paid box with random prizes is very likely a game of chance under the
+     Dutch Wet op de kansspelen, and the shop no longer sells one. So the pin
+     is now that nothing on this page asks for a box's odds again. */
+  ok('the page shows no mystery-box odds any more',
+    !/mysteryPool|mystery-odds|\/mystery`/.test(code), 'a mystery block is back');
 }
 
 console.log('\n— A FAQ about THIS product —');

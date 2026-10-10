@@ -101,6 +101,9 @@ const P = [
 ];
 
 // Premium 3D icon tiles (public/products/icons) — one unique icon per category.
+// `mystery` stays although boxes are no longer sold: boxes already sold still
+// appear under that category in the /sales feed, and the seeder keeps the same
+// list (server/src/db/demoSeed.js, held together by icon-manifest.test.mjs).
 const CATS_WITH_ICON = [
   'albion', 'amazon', 'amongus', 'apex', 'battlenet', 'battlepass', 'bloodstrike', 'brawl',
   'bundle', 'chest', 'clash', 'clashroyale', 'cod', 'coin', 'crunchyroll', 'csgo',

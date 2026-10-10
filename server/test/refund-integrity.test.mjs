@@ -331,13 +331,23 @@ console.log('— #5 What an order earned goes back with it —');
   ok('…and an award that arrives after the refund awards nothing', (await fcs.awardCoinsForOrder(await getOrder(quick.id))) === 0
     && (await coinBalance(r.id)) === 0);
 
-  // A mystery box: €49.99 that always pays €20 of credit.
-  const box = await createProduct({ name: `Refund Box ${stamp}`, category: 'mystery', kind: 'mystery', price: 4999, announce: false });
+  /* A mystery box: €49.99 that always pays €20 of credit. Boxes are retired —
+     nothing makes or sells one any more — so this is one sold before: the row
+     written straight to the table, the order placed for a stand-in card at the
+     box's price and its line then pointed at the box, as an older release left
+     them. Its refund and chargeback must still take the prize back. */
+  const box = { id: newId('prd'), name: `Refund Box ${stamp}`, price: 4999 };
+  await run(`INSERT INTO products (id, name, category, price, currency, kind, active, metadata, created_at, updated_at)
+             VALUES (@id, @n, 'mystery', @p, 'EUR', 'mystery', 0, '{}', @at, @at)`,
+    { id: box.id, n: box.name, p: box.price, at: nowIso() });
   await run(`INSERT INTO mystery_box_rewards (id, box_id, label, weight, credit_cents, created_at)
              VALUES (@id, @b, '€20 credit', 1, 2000, @at)`, { id: newId('mbr'), b: box.id, at: nowIso() });
+  const standIn = await createProduct({ name: `Box stand-in ${stamp}`, category: 'giftcard', price: box.price, announce: false });
   const opened = async (pi) => {
     const who = await newUser();
-    const ob = await order(who, box);
+    const ob = await order(who, standIn);
+    await run(`UPDATE order_items SET product_id=@b, name=@nm, metadata=@m WHERE order_id=@o`,
+      { b: box.id, nm: box.name, m: JSON.stringify({ category: 'mystery' }), o: ob.id });
     await payStripe(ob, pi);
     await waitFor(async () => (await statusOf(ob.id)) === 'completed' && (await balanceOf(who.id)) === 2000);
     return { who, ob };
