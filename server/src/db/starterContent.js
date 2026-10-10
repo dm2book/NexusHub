@@ -1,103 +1,102 @@
 /**
- * One-time starter content, so the store is fully stocked with the engagement
- * features the moment it deploys — zero admin work needed:
+ * One-time starter content, so a new shop opens with deals worth showing next
+ * to the catalogue — zero admin work needed: a small curated set of bundles
+ * (STARTER_BUNDLES), game-currency packs that belong together at 10% off.
  *
- *  - ONE mystery box (€49.99) whose reward pool pays out clearly less than
- *    the box costs, counted the way a buyer can best play it — see
- *    STARTER_POOL.
- *  - ONE starter bundle (two shooter top-ups at 10% off) as a live example.
+ * The mystery box this file used to create is retired (migration 065): paid
+ * random prizes are very likely a game of chance under the Dutch Wet op de
+ * kansspelen. Bundles took its place in the shop.
  *
- * Strictly idempotent and respectful of the admin: each piece is only created
- * if NOTHING of its kind exists yet, so it never overwrites real config. The
- * one correction (healStarterPool) touches only a pool still exactly as this
- * file once seeded it. Best-effort: a failure here never blocks boot.
+ * Respectful of the admin: the set is seeded once per version of the list (a
+ * flag in kv), each bundle under a fixed id with ON CONFLICT DO NOTHING — so a
+ * bundle the owner edited keeps the edit, and one they deleted stays deleted.
+ * Best-effort: a failure here never blocks boot.
  */
-import { get, all, run, nowIso, tx } from './index.js';
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { setRewards, poolVerdict } from '../services/mysteryBoxService.js';
-import { createBundle } from '../services/bundleService.js';
+import { get, all, run, nowIso } from './index.js';
 
-// Fixed primary key → concurrent cold starts can never create duplicates
-// (plain "check then create" raced when Vercel booted several instances at
-// once, which is exactly how two identical €49.99 boxes appeared).
-const BOX_ID = 'prd_starter_mystery_box';
-
-const boxArt = () => {
-  const file = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..',
-    'public', 'products', 'art', `${BOX_ID.replace(/_/g, '-')}.svg`);
-  try { return fs.existsSync(file) ? `/products/art/${BOX_ID.replace(/_/g, '-')}.svg`
-    : '/products/icons/mystery.svg'; } catch { return '/products/icons/mystery.svg'; }
-};
+/* Bump the version when the list below gains a bundle that existing shops
+   should get too. Bundles already made are never touched again either way. */
+const STARTER_BUNDLES_FLAG = 'starter_bundles:v2';
 
 /*
- * The starter reward pool, and the one it replaced.
- *
- * The old pool's comment said "≈ €38.75 per €49.99 box" — the first roll
- * alone. But every box also has a free reroll that keeps the higher prize, and
- * an order of 14+ boxes rolls at double luck. Counted that way it paid out
- * €50.32 for a single box and €53.10 at the cap: more than the box costs, so
- * store credit spent on boxes came back with interest and bought real codes.
- *
- * This one pays €29.50 on the first roll, €37.20 with the reroll and €39.54 at
- * the cap — 79% of the price at worst. Every box still wins at least €20 and
- * the jackpot is still €150, so the box's description stays true.
+ * The starter set. Each one is a price promise, so:
+ *  - Game currency only. Never a face-value card (Steam, PSN, Xbox, Nintendo,
+ *    Netflix, Spotify, Amazon, Google Play, iTunes…) or a subscription: 10%
+ *    off a €25 card sells it below the €25 it is worth everywhere else.
+ *  - Packs that belong together: one publisher (Riot, Supercell), or what the
+ *    same player buys (two shooters).
+ *  - The cheapest active pack of each game that works on an EU account, so
+ *    the set stays the entry price.
+ *  - 10% off, worked out by the server on complete sets only (pricedBundles,
+ *    bestBundleDiscount) — nothing here states a price.
+ *  - Made only when every member exists and is on sale.
+ * Names are short, and translated where the words are not the same in every
+ * language (the `copy` the storefront picks a language from). Descriptions
+ * are left to src/lib/bundleCopy.js, which writes them per language from the
+ * members and the discount, so they stay true whatever the owner changes.
  */
-const STARTER_POOL = [
-  { label: '€20 store credit', weight: 65, credit: 2000 },
-  { label: '€30 store credit', weight: 20, credit: 3000 },
-  { label: '€50 store credit', weight: 9, credit: 5000 },
-  { label: '€75 store credit', weight: 4, credit: 7500 },
-  { label: '€150 JACKPOT 💎', weight: 2, credit: 15000 },
+const STARTER_BUNDLES = [
+  /* The first starter bundle, exactly as earlier releases made it: existing
+     shops already have this row, and a new one gets the same. Earlier releases
+     made it only in a shop with no bundle at all, so a shop that has bundles
+     but not this one deleted it — `firstSeed` keeps it deleted. */
+  { id: 'bnd_starter_fps_duo', name: 'FPS Duo Pack — Apex + Valorant',
+    description: 'Top up both your shooters in one go and save 10%.',
+    categories: ['apex', 'valorant'], firstSeed: true },
+  { id: 'bnd_starter_riot', name: 'Riot Pack — Valorant + League',
+    copy: { nameNl: 'Riot-pakket — Valorant + League', nameDe: 'Riot-Paket — Valorant + League',
+      nameFr: 'Pack Riot — Valorant + League' },
+    categories: ['valorant', 'league'] },
+  { id: 'bnd_starter_supercell', name: 'Supercell Pack — Clash of Clans, Clash Royale & Brawl Stars',
+    copy: { nameNl: 'Supercell-pakket — Clash of Clans, Clash Royale & Brawl Stars',
+      nameDe: 'Supercell-Paket — Clash of Clans, Clash Royale & Brawl Stars',
+      nameFr: 'Pack Supercell — Clash of Clans, Clash Royale et Brawl Stars' },
+    categories: ['clash', 'clashroyale', 'brawl'] },
 ];
-const OLD_STARTER_POOL = [
-  { label: '€20 store credit', weight: 40, credit: 2000 },
-  { label: '€35 store credit', weight: 30, credit: 3500 },
-  { label: '€50 store credit', weight: 18, credit: 5000 },
-  { label: '€75 store credit', weight: 9, credit: 7500 },
-  { label: '€150 JACKPOT 💎', weight: 3, credit: 15000 },
-];
+const STARTER_DISCOUNT = 10;
 
-export async function seedStarterContent() {
-  await dedupeMysteryBoxes().catch((e) => console.error('[starter] dedupe:', e.message));
-  await dedupeBundles().catch((e) => console.error('[starter] bundle dedupe:', e.message));
-  await mysteryBox().catch((e) => console.error('[starter] mystery box:', e.message));
-  await healStarterPool().catch((e) => console.error('[starter] mystery pool:', e.message));
-  await starterBundle().catch((e) => console.error('[starter] bundle:', e.message));
-}
+/* Shelves that hold cards and subscriptions, never game currency. */
+const CARD_CATEGORIES = new Set(['giftcard', 'steam', 'playstation', 'psn', 'psplus', 'xbox', 'gamepass',
+  'nintendo', 'netflix', 'spotify', 'amazon', 'googleplay', 'itunes', 'paysafecard', 'discord-nitro']);
 
 /**
- * Replace the old starter pool where a shop still has it exactly as seeded.
- *
- * Every label, weight and prize has to match, and the pool has to pay out as
- * much as the box costs at today's price — a pool the owner has touched is
- * theirs, and is left for the launch check to name. Not only the fixed-id box:
- * before it existed the seeder gave boxes random ids, and the dedupe keeps the
- * oldest, so the surviving box may be one of those.
+ * Is this product game currency — the only thing a starter bundle discounts?
+ * Read from what the product says about itself, because an owner can file a
+ * card on any shelf: discovery records the unit (EUR for a card, months for a
+ * subscription) and the type, and a card made by hand names its euros.
  */
-async function healStarterPool() {
-  const key = (pool) => JSON.stringify(pool
-    .map((r) => [String(r.label), Number(r.weight), Number(r.credit)])
-    .sort((a, b) => a[2] - b[2] || a[1] - b[1] || a[0].localeCompare(b[0])));
-  const old = key(OLD_STARTER_POOL);
-  const boxes = await all(`SELECT id, name, price FROM products WHERE kind = 'mystery'`);
-  for (const box of boxes) {
-    const pool = () => all(
-      `SELECT label, weight, credit_cents AS credit FROM mystery_box_rewards WHERE box_id=@b`, { b: box.id });
-    if (key(await pool()) !== old) continue;
-    // Locked and read again: two cold starts must not both rewrite the same pool.
-    // A box priced below even the new pool is refused by setRewards; it keeps
-    // its pool, the launch check names it, and the next box is still looked at.
-    const healed = await tx(async () => {
-      await get('SELECT id FROM products WHERE id=@b FOR UPDATE', { b: box.id });
-      const now = await pool();
-      if (key(now) !== old || poolVerdict(now, box.price).safe) return false;
-      await setRewards(box.id, STARTER_POOL);
-      return true;
-    }).catch((e) => { console.error(`[starter] ${box.name}: reward pool not replaced:`, e.message); return false; });
-    if (healed) console.log(`[starter] ${box.name}: replaced the original reward pool, which paid out more than the box costs`);
-  }
+export function isGameCurrency(row) {
+  if (!row || CARD_CATEGORIES.has(String(row.category || '').toLowerCase())) return false;
+  let meta = row.metadata;
+  if (typeof meta === 'string') { try { meta = JSON.parse(meta || '{}'); } catch { meta = {}; } }
+  meta = meta || {};
+  if (['EUR', 'months'].includes(meta.denomUnit)) return false;
+  if (meta.productType && meta.productType !== 'points') return false;
+  return !/€\s?\d|\d\s?€|\d\s?(?:eur|euros?)\b|gift\s*card|wallet/i.test(String(row.name || ''));
+}
+
+/* A pack locked to another region (TR, BR, US…) cannot be topped up onto the
+   EU accounts this shop's buyers have; no region, or 'unknown', means the
+   product does not say, which is how the catalogue's own packs are filed. */
+const USABLE_REGIONS = new Set(['eu', 'nl', 'global', 'any', 'unknown']);
+const usableHere = (row) => {
+  let meta = row.metadata;
+  if (typeof meta === 'string') { try { meta = JSON.parse(meta || '{}'); } catch { meta = {}; } }
+  return !meta?.region || USABLE_REGIONS.has(String(meta.region).toLowerCase());
+};
+
+/** The cheapest pack on sale in a category that is game currency, or null. */
+async function entryPack(category) {
+  const rows = await all(
+    `SELECT id, name, category, price, metadata FROM products
+      WHERE category = @c AND active = 1 AND price > 0 AND kind = 'digital'
+      ORDER BY price ASC, created_at ASC, id ASC`, { c: category });
+  return rows.find((r) => isGameCurrency(r) && usableHere(r)) || null;
+}
+
+export async function seedStarterContent() {
+  await dedupeBundles().catch((e) => console.error('[starter] bundle dedupe:', e.message));
+  await starterBundles().catch((e) => console.error('[starter] bundles:', e.message));
 }
 
 /**
@@ -119,123 +118,42 @@ async function dedupeBundles() {
   }
 }
 
-/** Heal the earlier race: keep the oldest 'Forge Mystery Box', remove extras. */
-async function dedupeMysteryBoxes() {
-  const dupes = await all(
-    `SELECT id FROM products
-      WHERE kind = 'mystery' AND name = 'Forge Mystery Box'
-      ORDER BY created_at ASC OFFSET 1`);
-  for (const d of dupes) {
-    // Delete when nothing references it; otherwise just hide it from the shop.
-    try {
-      const used = await get('SELECT id FROM order_items WHERE product_id=@p LIMIT 1', { p: d.id });
-      if (used) await run('UPDATE products SET active=0 WHERE id=@p', { p: d.id });
-      else await run('DELETE FROM products WHERE id=@p', { p: d.id });
-      console.log(`[starter] removed duplicate mystery box ${d.id}`);
-    } catch {
-      await run('UPDATE products SET active=0 WHERE id=@p', { p: d.id }).catch(() => {});
+/**
+ * Make the starter set, once per version of it.
+ *
+ * The flag is written after the attempt whether or not every bundle could be
+ * made: one whose game is missing from the catalogue is skipped, not retried
+ * on every deploy — otherwise a bundle the owner deleted would come back the
+ * next time the catalogue happened to have that game. Fixed ids make two cold
+ * starts running this at once harmless.
+ */
+async function starterBundles() {
+  if (await get('SELECT key FROM kv WHERE key = @k', { k: STARTER_BUNDLES_FLAG })) return;
+  const hadBundles = !!(await get('SELECT id FROM bundles LIMIT 1'));
+  const made = [];
+  for (const def of STARTER_BUNDLES) {
+    if (def.firstSeed && hadBundles) continue;
+    // An owner's bundle (or an old copy) by the same name: one is enough.
+    if (await get('SELECT id FROM bundles WHERE name = @n', { n: def.name })) continue;
+    const packs = await Promise.all(def.categories.map(entryPack));
+    if (packs.some((p) => !p)) {
+      console.log(`[starter] ${def.name}: skipped — not every game has a currency pack on sale`);
+      continue;
     }
+    const inserted = await run(
+      `INSERT INTO bundles (id, name, description, copy, product_ids, discount_percent, active, created_at)
+       VALUES (@id, @name, @desc, @copy, @pids, @pct, 1, @at)
+       ON CONFLICT (id) DO NOTHING`,
+      { id: def.id, name: def.name, desc: def.description || null,
+        copy: def.copy ? JSON.stringify(def.copy) : null,
+        pids: JSON.stringify(packs.map((p) => p.id)), pct: STARTER_DISCOUNT, at: nowIso() });
+    if (inserted.changes) made.push(def.id);
   }
+  await run(
+    `INSERT INTO kv (key, value, updated_at) VALUES (@k, @v, @at) ON CONFLICT (key) DO NOTHING`,
+    { k: STARTER_BUNDLES_FLAG, v: JSON.stringify(made), at: nowIso() });
+  if (made.length) console.log(`[starter] created starter bundles: ${made.join(', ')} (${STARTER_DISCOUNT}% off)`);
 }
 
-/**
- * The mystery box's own words, in all four languages.
- *
- * Every other product in the shop describes itself from a per-category recipe
- * (src/lib/productCopy.js). This one cannot: its description is the terms of
- * the product — that every box pays out, what the ceiling is, that more boxes
- * in one order improve the odds, and that a free reroll is included. A
- * generated line loses all four, and a buyer who reads the shop in German
- * should not be agreeing to terms they were shown in English.
- */
-const BOX_COPY = {
-  description:
-    'Every box wins a real prize, paid out instantly as store credit — up to a €150 jackpot. ' +
-    'Buy more boxes in one order for better odds, and every box comes with one free risk-free reroll.',
-  translations: {
-    descriptionNl:
-      'Elke box wint een echte prijs, direct uitbetaald als winkeltegoed — tot een jackpot van €150. ' +
-      'Meer boxen in één bestelling geeft betere kansen, en bij elke box zit één gratis reroll zonder risico.',
-    descriptionDe:
-      'Jede Box gewinnt einen echten Preis, sofort ausgezahlt als Shop-Guthaben — bis zu einem Jackpot von 150 €. ' +
-      'Mehr Boxen in einer Bestellung verbessern die Chancen, und zu jeder Box gehört ein kostenloser Reroll ohne Risiko.',
-    descriptionFr:
-      'Chaque boîte gagne un vrai lot, versé immédiatement en crédit boutique — jusqu’à un jackpot de 150 €. ' +
-      'Plus de boîtes dans une même commande améliorent les chances, et chaque boîte inclut un relancement gratuit et sans risque.',
-  },
-};
-
-/**
- * Give a box that already exists the words it was created without.
- *
- * The seeder only runs for a shop that has no box, so a shop created before
- * the translations existed would keep the English terms in every language
- * forever. It fills gaps only: anything typed in the admin is left alone,
- * because the owner's wording outranks this file's.
- */
-async function backfillBoxCopy(row) {
-  let meta;
-  try { meta = JSON.parse(row.metadata || '{}'); } catch { return; }
-  const missing = Object.entries(BOX_COPY.translations)
-    .filter(([field]) => !String(meta[field] || '').trim());
-  if (!missing.length) return;
-  for (const [field, text] of missing) meta[field] = text;
-  await run('UPDATE products SET metadata = @m, updated_at = @at WHERE id = @id',
-    { m: JSON.stringify(meta), at: nowIso(), id: row.id });
-  console.log(`[starter] mystery box: added ${missing.map(([f]) => f).join(', ')}`);
-}
-
-async function mysteryBox() {
-  const existing = await get(`SELECT id, metadata FROM products WHERE kind = 'mystery' AND active = 1 LIMIT 1`);
-  if (existing) return backfillBoxCopy(existing);
-  const at = nowIso();
-  const inserted = await run(
-    `INSERT INTO products (id, name, category, description, price, currency, kind, active, metadata, created_at, updated_at)
-     VALUES (@id, @name, 'mystery', @desc, 4999, 'EUR', 'mystery', 1, @meta, @at, @at)
-     ON CONFLICT (id) DO NOTHING`,
-    {
-      id: BOX_ID,
-      name: 'Forge Mystery Box',
-      desc: BOX_COPY.description,
-      // The one seeded product that shipped without a cover, so it rendered the
-      // generic gradient placeholder while all 71 others had real art — on the
-      // highest-margin item in the shop. mystery.svg has been sitting in
-      // public/products/icons the whole time.
-      /* The generated artboard when it exists, the plain icon otherwise. Same
-         rule as demoSeed's imageFor — without it this one product was the only
-         thing in a 72-product grid still on the old art. */
-      /* The three other languages carried as typed copy, because this is the
-         one product whose description is not decoration: it states the odds,
-         the payout and the free reroll. The generated per-category sentence
-         says only "every box pays out real store credit", which is true and
-         drops every term that matters — and a Dutch reader was already getting
-         that shorter line on the shop's highest-margin item. */
-      meta: JSON.stringify({ featured: true, image: boxArt(), ...BOX_COPY.translations }),
-      at,
-    });
-  if (!inserted.changes) return; // another instance just created it
-  await setRewards(BOX_ID, STARTER_POOL);
-  await run(`INSERT INTO price_history (id, product_id, price, currency, created_at)
-             VALUES (@id, @p, 4999, 'EUR', @at) ON CONFLICT (id) DO NOTHING`,
-    { id: `ph_${BOX_ID}`, p: BOX_ID, at }).catch(() => {});
-  console.log('[starter] created the €49.99 Forge Mystery Box + reward pool');
-}
-
-async function starterBundle() {
-  // Fixed id → race-proof, same as the mystery box.
-  const existing = await get('SELECT id FROM bundles LIMIT 1');
-  if (existing) return;
-  // Cheapest active pack from two shooter categories → a believable duo deal.
-  const pick = (cat) => get(
-    `SELECT id, name FROM products WHERE category = @c AND active = 1 ORDER BY price ASC LIMIT 1`, { c: cat });
-  const [apex, valorant] = await Promise.all([pick('apex'), pick('valorant')]);
-  if (!apex || !valorant) return; // catalog doesn't have both — skip quietly
-  const inserted = await run(
-    `INSERT INTO bundles (id, name, description, product_ids, discount_percent, active, created_at)
-     VALUES ('bnd_starter_fps_duo', @name, @desc, @pids, 10, 1, @at)
-     ON CONFLICT (id) DO NOTHING`,
-    { name: 'FPS Duo Pack — Apex + Valorant',
-      desc: 'Top up both your shooters in one go and save 10%.',
-      pids: JSON.stringify([apex.id, valorant.id]), at: nowIso() });
-  if (inserted.changes) console.log('[starter] created the FPS Duo starter bundle (10% off)');
-}
+/* Exported for the tests: the list and its flag are the contract. */
+export { STARTER_BUNDLES, STARTER_BUNDLES_FLAG };

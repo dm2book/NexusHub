@@ -2336,4 +2336,22 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS lang TEXT;
       ALTER TABLE coupons ADD COLUMN IF NOT EXISTS owner_user_id TEXT;
     `,
   },
+  {
+    /* Mystery boxes are switched off for good. A paid box that pays out prizes
+       of different value by chance is very likely a game of chance under the
+       Dutch Wet op de kansspelen, and that needs a licence this shop does not
+       have — so the owner retired them and bundles took their place. Every box
+       goes off the shelf here; the code refuses to sell, list or switch one
+       back on (productService.isSellable, the admin routes, priceOrder).
+       The rows stay: past orders still show what their boxes paid out, and a
+       refund still takes the prize back. Only rows still on are touched, so
+       running this twice changes nothing. */
+    id: '065_retire_mystery_boxes',
+    sql: `
+      UPDATE products
+         SET active = 0,
+             updated_at = to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
+       WHERE kind = 'mystery' AND active <> 0;
+    `,
+  },
 ];

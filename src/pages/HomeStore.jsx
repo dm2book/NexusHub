@@ -38,6 +38,10 @@ import { SUPPORT_EMAIL } from '../lib/support.js';
 import { allowed, onConsentChange } from '../lib/consent.js';
 import CookieConsent from '../components/CookieConsent.jsx';
 const ChatWidget = lazy(() => import('../components/ChatWidget.jsx'));
+/* Its own chunk, mounted when the page is idle: the row sits below the three
+   shelves, so nobody is looking at it while the first screen is being drawn. */
+const BundlesShowcase = lazy(() => import('../components/store/BundlesShowcase.jsx'));
+import { BUNDLE_ROW_SPACE, expectBundles } from '../lib/useBundles.jsx';
 
 const ICON = iconPath;
 
@@ -103,6 +107,9 @@ const labelFor = (slug) => SLUG_LABEL[slug]
 const NAV = [
   { key: 'nav.home', label: 'Home', to: '/' },
   { key: 'nav.products', label: 'All Products', to: '/shop' },
+  /* A sixth link fits this row: measured at 1152–1536px in all four
+     languages, nothing clipped and the wordmark whole. */
+  { key: 'nav.bundles', label: 'Bundles', to: '/bundles' },
   { key: 'nav.reviews', label: 'Reviews', to: '/reviews' },
   { key: 'nav.howShort', label: 'How it works', to: '/how-it-works' },
   { key: 'nav.support', label: 'Support', to: '/contact' },
@@ -261,6 +268,11 @@ export default function HomeStore() {
     return { count: live.length, from: cheapest.price, currency: cheapest.currency || 'EUR' };
   }, [products]);
   const addToCart = (c) => add(c.cheapest);
+  /* The bundle row arrives after the page is drawn. Its space is held from the
+     first frame when this shop had bundles last time (or on a first visit), so
+     "How it works" and everything under it stay where they were drawn. */
+  const [bundleSpace] = useState(() => (expectBundles()
+    ? <div className={BUNDLE_ROW_SPACE} aria-hidden /> : null));
 
   return (
     <div className="min-h-screen overflow-x-clip bg-[#f6f7fb] text-slate-900 fm-page" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
@@ -748,6 +760,16 @@ export default function HomeStore() {
               </Rail>
             </section>
           ))}
+
+          {/* ── Bundles ───────────────────────────────────────────────────
+              Where the mystery box used to be offered: products that belong
+              together, sold as a set for less, with every figure the server's.
+              After the shelves, because a bundle is a reason to buy two of the
+              things above, not a substitute for finding them. The row hides
+              itself when the shop has no active bundles. */}
+          <DeferUntilIdle fallback={bundleSpace}>
+            <Suspense fallback={bundleSpace}><BundlesShowcase variant="row" /></Suspense>
+          </DeferUntilIdle>
 
           {/* How it works — a manual-payment store has to answer "what happens
               after I pay?" before it asks for money. Below the shelves, not

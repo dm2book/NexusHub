@@ -73,9 +73,47 @@ const hydrate = (r) => {
   };
 };
 
+/**
+ * Kinds of product the shop no longer sells, whatever a row's `active` says.
+ *
+ * Mystery boxes are retired. A paid box that pays out prizes of different
+ * value by chance is very likely a game of chance under the Dutch Wet op de
+ * kansspelen, which needs a licence this shop does not have. Migration 065
+ * switched every box off and the admin refuses to switch one back on; this is
+ * the lock behind both, for a row written straight into the database.
+ */
+export const RETIRED_KINDS = Object.freeze(['mystery']);
+export const MYSTERY_RETIRED = 'Mystery boxes are switched off: paid random prizes are a game of chance '
+  + 'under the Dutch Wet op de kansspelen';
+
+/** May a customer see and buy this product? Active, and not a retired kind. */
+export function isSellable(p) {
+  return !!p && !!p.active && !RETIRED_KINDS.includes(p.kind);
+}
+
+/**
+ * Would this write put a retired kind back on sale? Creating one (no
+ * `current`), turning another product into one, or switching one on. A box
+ * that stays off may still be edited — renamed, given another picture — so the
+ * owner can tidy the old row; the admin form sends its kind on every save,
+ * which is why an unchanged kind on its own is not refused.
+ */
+export function revivesRetired(current, patch = {}) {
+  const kind = patch.kind ?? current?.kind;
+  if (!RETIRED_KINDS.includes(kind)) return false;
+  return !current || kind !== current.kind || (patch.active != null && !!patch.active);
+}
+
+/**
+ * `activeOnly` is the shop's shelf: what a customer may see and buy. A retired
+ * kind stays off it even when its row says active — so the storefront, the
+ * sitemap, recommendations, the SEO pages and the assistant never show a
+ * mystery box, without each of them having to remember to ask.
+ */
 export async function listProducts({ activeOnly = false } = {}) {
-  const clause = activeOnly ? 'WHERE active = 1' : '';
-  const rows = await all(`SELECT * FROM products ${clause} ORDER BY created_at DESC`);
+  const clause = activeOnly ? 'WHERE active = 1 AND kind <> ALL(@retired)' : '';
+  const rows = await all(`SELECT * FROM products ${clause} ORDER BY created_at DESC`,
+    { retired: [...RETIRED_KINDS] });
   return rows.map(hydrate);
 }
 
@@ -85,6 +123,8 @@ export async function getProduct(id) {
 
 export async function createProduct(p = {}) {
   if (!p.name) throw badRequest('Product name is required');
+  // No new boxes, not even switched off — see RETIRED_KINDS.
+  if (revivesRetired(null, p)) throw badRequest(MYSTERY_RETIRED);
   const id = newId('prd');
   const at = nowIso();
   await run(`INSERT INTO products (id, sku, name, category, description, price, currency, kind, stock, active, metadata, created_at, updated_at)
@@ -107,6 +147,8 @@ export async function createProduct(p = {}) {
 export async function updateProduct(id, patch = {}) {
   const cur = await getProduct(id);
   if (!cur) throw notFound('Product not found');
+  // A product does not become a box, and a box is not switched back on.
+  if (revivesRetired(cur, patch)) throw badRequest(MYSTERY_RETIRED);
   await run(`UPDATE products SET name=@name, sku=@sku, category=@cat, description=@desc,
         price=@price, currency=@currency, kind=@kind, stock=@stock, active=@active,
         metadata=@meta, updated_at=@at WHERE id=@id`, {

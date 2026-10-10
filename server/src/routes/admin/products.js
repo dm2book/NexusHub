@@ -4,9 +4,11 @@ import { z } from 'zod';
 import { httpUrl } from '../../utils/httpUrl.js';
 import { asyncHandler } from '../../middleware/error.js';
 import { requirePermission } from '../../middleware/rbac.js';
-import { listProducts, getProduct, createProduct, updateProduct } from '../../services/productService.js';
+import { listProducts, getProduct, createProduct, updateProduct, revivesRetired, RETIRED_KINDS, MYSTERY_RETIRED }
+  from '../../services/productService.js';
 import { addProductCodes, availableCounts, availableCount } from '../../services/codeStockService.js';
-import { getRewards, setRewards, assertPoolBelowPrice } from '../../services/mysteryBoxService.js';
+import { getRewards } from '../../services/mysteryBoxService.js';
+import { badRequest } from '../../utils/errors.js';
 import { audit } from '../../services/auditService.js';
 import { all, run, nowIso } from '../../db/index.js';
 import { assertSafeImageValue, resolveImageUrl } from '../../utils/imageUrl.js';
@@ -266,6 +268,9 @@ const productSchema = z.object({
 
 router.post('/', requirePermission('suppliers.manage'), asyncHandler(async (req, res) => {
   const body = productSchema.parse(req.body);
+  /* No new mystery boxes (productService.RETIRED_KINDS) — said before an
+     uploaded picture is stored for a product that will not exist. */
+  if (revivesRetired(null, body)) throw badRequest(MYSTERY_RETIRED);
   guardImage(body.metadata);
   if (body.metadata) body.metadata = await storeUpload(body.metadata);
   let product = await createProduct(body);
@@ -289,22 +294,13 @@ router.post('/', requirePermission('suppliers.manage'), asyncHandler(async (req,
 
 router.patch('/:id', requirePermission('suppliers.manage'), asyncHandler(async (req, res) => {
   const body = productSchema.partial().parse(req.body);
-  guardImage(body.metadata);
-  /* A box's price is what its reward pool is set against: cutting the price
-     below what the pool pays out is the same money printer as saving such a
-     pool, so it is refused the same way (and so is turning a product that has
-     a pool into a box at a price that pool beats). Only a change that makes it
-     worse: the form sends the price on every save, and an owner fixing the
-     name of — or switching off — a box the launch check flagged must not be
-     stopped by that very flag. */
-  if (body.price != null || body.kind === 'mystery') {
-    const current = await getProduct(req.params.id);
-    const price = body.price ?? current?.price;
-    const becomesBox = body.kind === 'mystery' && current?.kind !== 'mystery';
-    if (current && (body.kind ?? current.kind) === 'mystery' && (becomesBox || price < current.price)) {
-      assertPoolBelowPrice(await getRewards(req.params.id), price);
-    }
+  /* No product becomes a mystery box and no box is switched back on. The form
+     sends kind 'mystery' with every save of the old box, so editing it while it
+     stays off — its name, its picture, switching it off — still works. */
+  if ((body.kind != null || body.active) && revivesRetired(await getProduct(req.params.id), body)) {
+    throw badRequest(MYSTERY_RETIRED);
   }
+  guardImage(body.metadata);
   if (body.metadata) body.metadata = await storeUpload(body.metadata, req.params.id);
   const product = await updateProduct(req.params.id, body);
   await audit({ actor: req.user, action: 'product.update', targetType: 'product',
@@ -336,8 +332,16 @@ router.post('/bulk', requirePermission('suppliers.manage'), asyncHandler(async (
      function on a five-connection pool. A bulk action never changes a price,
      so updateProduct's only side effect (price history, price alerts) cannot
      apply, and writing the rows directly loses nothing. */
-  const rows = await all(`SELECT id, metadata FROM products WHERE id = ANY(@ids)`, { ids });
+  const rows = await all(`SELECT id, name, kind, metadata FROM products WHERE id = ANY(@ids)`, { ids });
   const at = nowIso();
+
+  /* Written straight to the rows, so updateProduct's refusal never sees it:
+     switching a retired mystery box back on is refused here, for the whole
+     selection, so nothing is half-applied. Switching off is always fine. */
+  const boxes = rows.filter((p) => RETIRED_KINDS.includes(p.kind));
+  if (action === 'active' && value && boxes.length) {
+    throw badRequest(`${MYSTERY_RETIRED}. Leave ${boxes.map((p) => p.name).join(', ')} out of the selection.`);
+  }
 
   if (action === 'active') {
     const r = await run(`UPDATE products SET active = @a, updated_at = @at WHERE id = ANY(@ids)`,
@@ -382,23 +386,14 @@ router.post('/bulk', requirePermission('suppliers.manage'), asyncHandler(async (
   res.json({ updated });
 }));
 
-// Mystery-box reward pool (for kind='mystery' products).
+/* A retired box's reward pool, read-only: what its past orders were rolled
+   against. Saving a pool is refused — boxes are switched off for good, so
+   there is nothing left for a new pool to pay out. */
 router.get('/:id/mystery', requirePermission('orders.read'), asyncHandler(async (req, res) => {
   res.json({ rewards: await getRewards(req.params.id) });
 }));
-router.put('/:id/mystery', requirePermission('suppliers.manage'), asyncHandler(async (req, res) => {
-  const { rewards } = z.object({
-    rewards: z.array(z.object({
-      label: z.string().min(1).max(80),
-      weight: z.number().int().min(1).max(100000),
-      credit: z.number().int().min(0).max(1_000_000),
-    })).max(40),
-  }).parse(req.body || {});
-  // Saved first: setRewards refuses a pool that pays out more than the box
-  // costs, and a refused save is not a change worth an audit entry.
-  const saved = await setRewards(req.params.id, rewards);
-  await audit({ actor: req.user, action: 'product.mystery_rewards', targetType: 'product', targetId: req.params.id, req });
-  res.json({ rewards: saved });
+router.put('/:id/mystery', requirePermission('suppliers.manage'), asyncHandler(async () => {
+  throw badRequest(MYSTERY_RETIRED);
 }));
 
 export default router;

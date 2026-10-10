@@ -84,24 +84,17 @@ export default function Checkout() {
   const [pendingOrder, setPendingOrder] = useState(null); // placed at a total the buyer has yet to confirm
   const [deliveryFields, setDeliveryFields] = useState({});   // productId → label (e.g. "Roblox username")
   const [deliveryChoices, setDeliveryChoices] = useState({}); // productId → offers a code/account choice
-  const [mysteryIds, setMysteryIds] = useState({});           // productId → is a mystery box
   const [deliveryDetail, setDeliveryDetail] = useState('');
   const [deliveryMethod, setDeliveryMethod] = useState('code'); // 'code' | 'account' (buyer's pick)
   /* Every figure in the summary is the server's: priceOrder(), the function
      createOrder runs, answering POST /api/checkout/quote. This page worked the
      total out itself — from the prices saved in the cart when each item was
      added, with the coupon, the Forge+ discount, the bundle and the 40% ceiling
-     recomputed here, mystery boxes included although the order leaves them
-     out, and without the €0.50 card minimum — so the amount on the pay button
-     was not the amount of the order. Until the first answer lands, the cart's
-     own prices are shown without discounts, dimmed. */
-  /* A mystery box pays out in store credit, so credit never pays for one — the
-     server refuses an order that tries. The toggle makes way for a line saying
-     so, rather than letting the buyer meet that refusal at the last step. */
-  const hasMystery = quote ? quote.lines.some((l) => l.mystery)
-    : items.some((i) => mysteryIds[i.id] || i.category === 'mystery');
+     recomputed here, and without the €0.50 card minimum — so the amount on the
+     pay button was not the amount of the order. Until the first answer lands,
+     the cart's own prices are shown without discounts, dimmed. */
   // Sent the same way to the quote and to the order, so both take the same credit.
-  const creditWanted = useCredit && !hasMystery ? creditBalance : 0;
+  const creditWanted = useCredit ? creditBalance : 0;
   const cartKey = items.map((i) => `${i.id}:${i.qty}`).join(',');
   const askKey = `${cartKey}|${couponCode}|${creditWanted}|${user?.id || ''}`;
   const updating = quoteKey !== askKey;
@@ -122,10 +115,9 @@ export default function Checkout() {
   /* Why a code was refused, in the buyer's language. */
   const couponProblem = (p) => {
     if (p?.reason === 'min_subtotal') {
-      return t('checkout.couponMin', 'This code works on orders from {amount}. Mystery boxes don’t count towards that.',
+      return t('checkout.couponMin', 'This code works on orders from {amount}.',
         { amount: money(p.minSubtotal || 0, currency) });
     }
-    if (p?.reason === 'mystery_only') return t('checkout.couponNoBoxes', 'Discount codes don’t work on mystery boxes.');
     if (p?.reason === 'already_used') return t('checkout.couponUsed', 'You’ve already used this code.');
     if (p?.reason === 'used_up') return t('checkout.couponGone', 'This code has been used up.');
     return t('checkout.couponInvalid', 'This code isn’t valid (any more).');
@@ -208,13 +200,12 @@ export default function Checkout() {
   }, [askKey, prelaunch, placed]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     api.get('/api/products').then((r) => {
-      const m = {}, choices = {}, boxes = {};
+      const m = {}, choices = {};
       (r.products || []).forEach((p) => {
         if (p.deliveryField) m[p.id] = p.deliveryField;
         if (p.deliveryChoice) choices[p.id] = true;
-        if (p.kind === 'mystery') boxes[p.id] = true;
       });
-      setDeliveryFields(m); setDeliveryChoices(choices); setMysteryIds(boxes);
+      setDeliveryFields(m); setDeliveryChoices(choices);
     }).catch(() => {});
   }, []);
 
@@ -683,13 +674,7 @@ export default function Checkout() {
           </div>
           )}
           {/* Store credit */}
-          {creditBalance > 0 && hasMystery && (
-            <p data-testid="credit-no-mystery" className="flex items-start gap-2 mb-4 rounded-xl bg-space-black border border-white/10 px-3.5 py-3 text-[13px] text-slate-300">
-              <Wallet size={15} className="text-indigo-300 shrink-0 mt-0.5" aria-hidden="true" />
-              <span>{t('checkout.creditNoMystery', 'Store credit can’t be used on an order with a mystery box. Order the box on its own to use your credit on the rest.')}</span>
-            </p>
-          )}
-          {creditBalance > 0 && !hasMystery && (
+          {creditBalance > 0 && (
             <label className="flex items-center justify-between gap-2 mb-4 cursor-pointer rounded-xl bg-space-black border border-white/10 px-3.5 py-3">
               <span className="flex items-center gap-2 text-sm text-slate-200">
                 <Wallet size={15} className="text-indigo-300" /> {t('checkout.useCredit', 'Use store credit')}

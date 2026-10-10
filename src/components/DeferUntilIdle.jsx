@@ -14,8 +14,12 @@ import { useEffect, useState } from 'react';
  *
  * The timeout option matters: without it a page that never goes idle — one with
  * a poll or an animation running — would never mount these at all.
+ *
+ * `fallback` is what stands in until then. Nothing, for a floating bubble; for
+ * something in the flow of the page, the space it is about to take, so what
+ * sits below it does not jump when it arrives.
  */
-export default function DeferUntilIdle({ children, timeout = 2000 }) {
+export default function DeferUntilIdle({ children, timeout = 2000, fallback = null }) {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -30,5 +34,5 @@ export default function DeferUntilIdle({ children, timeout = 2000 }) {
     return () => { cancelled = true; clearTimeout(t); };
   }, [timeout]);
 
-  return ready ? children : null;
+  return ready ? children : fallback;
 }

@@ -21,6 +21,7 @@ import { all, run, get } from '../db/index.js';
 import { config } from '../config/env.js';
 import { availableCounts } from './codeStockService.js';
 import { brandSlug } from './productFitService.js';
+import { RETIRED_KINDS } from './productService.js';
 
 const parse = (m) => { try { return typeof m === 'string' ? JSON.parse(m || '{}') : (m || {}); } catch { return {}; } };
 const site = () => String(config.appUrl || 'https://www.forgemarket.nl').replace(/\/+$/, '');
@@ -50,12 +51,18 @@ const describe = (row, lang) => {
   return text.slice(0, 4900);
 };
 
-/** Every active product with a catalogue image, as feed rows. */
+/**
+ * Every active product with a catalogue image, as feed rows.
+ *
+ * Never a retired mystery box, even one switched back on by hand: an advert
+ * for a paid chance at prizes is the one ad this shop must not run.
+ */
 export async function feedRows({ network = 'meta', lang = 'nl' } = {}) {
   const L = FEED_LANGS.includes(lang) ? lang : 'nl';
   const net = NETWORKS.includes(network) ? network : 'meta';
   const rows = await all(`SELECT id, name, description, price, currency, category, metadata
-                            FROM products WHERE active = 1 AND price > 0 ORDER BY category, price`);
+                            FROM products WHERE active = 1 AND price > 0 AND kind <> ALL(@retired)
+                           ORDER BY category, price`, { retired: [...RETIRED_KINDS] });
   const stock = await availableCounts(rows.map((r) => r.id)).catch(() => ({}));
   const out = []; let withoutImage = 0;
   for (const r of rows) {

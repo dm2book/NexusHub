@@ -14,7 +14,7 @@ import { linkStatus, unlinkDiscord } from '../services/discordLinkService.js';
 import { earnedRolesFor, syncMemberRoles } from '../services/discordRolesService.js';
 import { getLiveInviteUrl } from '../services/discordService.js';
 import { run, get, all, tx } from '../db/index.js';
-import { notFound, forbidden, badRequest } from '../utils/errors.js';
+import { notFound, forbidden, badRequest, ApiError } from '../utils/errors.js';
 import { listOrders, getOrder, customerView, customerSummary } from '../services/orderService.js';
 import { addVerifiedReview } from '../services/reviewsService.js';
 import { updateProfile, updatePreferences, publicUser } from '../services/userService.js';
@@ -25,7 +25,7 @@ import { coinBalance, coinHistory, coinProgress, redeemReward, spendCoins }
   from '../services/forgeCoinService.js';
 import { dailyStatus, claimDaily, redeemPointsForBoosts, redemptionHistory }
   from '../services/dailyRewardService.js';
-import { pullsForOrder, rerollPull } from '../services/mysteryBoxService.js';
+import { pullsForOrder } from '../services/mysteryBoxService.js';
 import { getMembership, grantMembership, FORGE_PLUS, MEMBERSHIP_DAYS } from '../services/membershipService.js';
 import { saveCart, getCart } from '../services/cartService.js';
 import { requireLaunched } from '../services/launchGateService.js';
@@ -328,11 +328,11 @@ router.get('/orders/:id/mystery', asyncHandler(async (req, res) => {
   res.json({ pulls: await pullsForOrder(req.params.id) });
 }));
 
-// Reroll one box once (risk-free — keep the higher prize).
-router.post('/orders/:id/mystery/:pullId/reroll', asyncHandler(async (req, res) => {
-  await ownedOrder(req, req.params.id);
-  const result = await rerollPull(req.user.id, req.params.id, req.params.pullId);
-  res.json({ ...result, pulls: await pullsForOrder(req.params.id) });
+/* The free reroll was a second roll for a better prize — the same game of
+   chance as the box itself, and mystery boxes are retired. What a box already
+   paid out stays on the order (above) and in the wallet. */
+router.post('/orders/:id/mystery/:pullId/reroll', asyncHandler(async () => {
+  throw new ApiError(410, 'Mystery boxes are retired', 'mystery_retired');
 }));
 
 // ── Daily login rewards ──────────────────────────────────────────────────────

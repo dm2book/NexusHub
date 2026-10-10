@@ -22,7 +22,6 @@ export default function OrderDetail() {
   const [reviewBody, setReviewBody] = useState('');
   const [reviewBusy, setReviewBusy] = useState(false);
   const [mystery, setMystery] = useState([]);
-  const [rerolling, setRerolling] = useState('');
   const [payBusy, setPayBusy] = useState(false);
 
   /**
@@ -44,22 +43,14 @@ export default function OrderDetail() {
     finally { setPayBusy(false); }
   };
 
-  const reroll = async (pullId) => {
-    setRerolling(pullId);
-    try {
-      const r = await api.post(`/api/account/orders/${id}/mystery/${pullId}/reroll`);
-      setMystery(r.pulls || []);
-      toast.success(r.improved ? t('acc.order.rerollUpgraded', 'Nice! Upgraded to {label}.', { label: r.label }) : t('acc.order.rerollKept', 'Rolled {rolled} — you kept your {label}.', { rolled: r.rolled, label: r.label }));
-    } catch (e) { toast.error(e.message || t('acc.order.rerollFailed', 'Reroll failed.')); }
-    finally { setRerolling(''); }
-  };
-
   const load = useCallback(() => {
     api.get(`/api/account/orders/${id}`).then((r) => setOrder(r.order)).catch(() => {});
   }, [id]);
   useEffect(() => { load(); }, [load]);
 
-  // Mystery-box winnings (if any) for the reveal card.
+  /* What a mystery box on this order paid out, if it had one. The shop no
+     longer sells boxes, but a prize already won is part of the buyer's record —
+     and the credit it put in their wallet is real — so it stays on the order. */
   useEffect(() => {
     api.get(`/api/account/orders/${id}/mystery`).then((r) => setMystery(r.pulls || [])).catch(() => {});
   }, [id]);
@@ -133,7 +124,10 @@ export default function OrderDetail() {
         </div>
       </div>
 
-      {/* Mystery-box reveal */}
+      {/* A mystery box this order paid out — the record, not an offer. The
+          reroll that used to sit here was a second roll for a better prize,
+          the same game of chance as the box, and it went with the boxes. A
+          prize that was rerolled back then still says so. */}
       {mystery.length > 0 && (
         <div className="rounded-2xl p-5 mb-6 text-white shadow-lg shadow-amber-500/20"
           style={{ backgroundImage: 'linear-gradient(120deg,#f59e0b,#f43f5e)' }}>
@@ -144,20 +138,12 @@ export default function OrderDetail() {
                 <span className="font-semibold">{m.label}</span>
                 <div className="flex items-center gap-2 shrink-0">
                   {m.credit > 0 && <span className="text-sm font-bold bg-white/20 rounded-full px-2.5 py-0.5">{t('acc.order.credit', '+{amount} credit', { amount: money(m.credit) })}</span>}
-                  {/* The server only rerolls a completed order that is not held or
-                      refunded — the button only shows when it would work. */}
-                  {m.rerolledAt ? <span className="text-[11px] text-white/70">{t('acc.order.rerolled', 'rerolled')}</span>
-                    : order.status === 'completed' && !order.fraudHold ? (
-                    <button onClick={() => reroll(m.id)} disabled={rerolling === m.id}
-                      className="text-xs font-bold bg-white text-rose-600 rounded-full px-3 py-1 hover:bg-white/90 transition disabled:opacity-60">
-                      {rerolling === m.id ? '…' : `🎲 ${t('acc.order.reroll', 'Reroll')}`}
-                    </button>
-                  ) : null}
+                  {m.rerolledAt && <span className="text-[11px] text-white/70">{t('acc.order.rerolled', 'rerolled')}</span>}
                 </div>
               </div>
             ))}
           </div>
-          <p className="text-white/85 text-xs mt-2.5">{t('acc.order.rerollInfo', 'Risk-free reroll: 1× per box, you keep the higher prize. Credit lands in your')} <Link to="/account/wallet" className="underline font-semibold">{t('acc.order.wallet', 'wallet')}</Link> {t('acc.order.automatically', 'automatically.')}</p>
+          <p className="text-white/85 text-xs mt-2.5">{t('acc.order.prizeCredit', 'Prize credit lands in your')} <Link to="/account/wallet" className="underline font-semibold">{t('acc.order.wallet', 'wallet')}</Link> {t('acc.order.automatically', 'automatically.')}</p>
         </div>
       )}
 

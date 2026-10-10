@@ -35,7 +35,7 @@ const ACCENT = {
   brawl: '#fbbf24', genshin: '#22d3ee', gta: '#f472b6', league: '#38bdf8',
   mlbb: '#818cf8', pubg: '#fb923c', freefire: '#f87171', minecraft: '#84cc16',
   pokemongo: '#facc15', 'discord-nitro': '#818cf8', giftcard: '#c084fc',
-  gamepass: '#4ade80', spotify: '#22c55e', mystery: '#a855f7',
+  gamepass: '#4ade80', spotify: '#22c55e',
 };
 export const accentFor = (category) => ACCENT[category] || '#a855f7';
 

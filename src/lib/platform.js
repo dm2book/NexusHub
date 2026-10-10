@@ -13,7 +13,7 @@ const PLATFORMS = [
   ['pc', 'PC', /\bpc\b/i, '#334155'],
   ['switch', 'Nintendo Switch', /\b(nintendo\s*)?switch\b/i, '#e60012'],
 ];
-const NOT_PLATFORM_BOUND = new Set(['giftcard', 'gamepass', 'subscription', 'discord-nitro', 'spotify', 'mystery']);
+const NOT_PLATFORM_BOUND = new Set(['giftcard', 'gamepass', 'subscription', 'discord-nitro', 'spotify']);
 
 /** { id, label, color } or null. metadata.platform wins over the name. */
 export function platformOf(product) {

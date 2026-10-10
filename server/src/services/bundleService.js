@@ -5,7 +5,7 @@
  */
 import { run, get, all, nowIso } from '../db/index.js';
 import { newId } from '../utils/ids.js';
-import { getProduct } from './productService.js';
+import { getProduct, isSellable, RETIRED_KINDS, MYSTERY_RETIRED } from './productService.js';
 import { badRequest, notFound } from '../utils/errors.js';
 import { postDropEvent } from './discordService.js';
 import { bundleCopyAll } from '../../../src/lib/bundleCopy.js';
@@ -33,7 +33,9 @@ export async function pricedBundles() {
   const bundles = await listBundles({ activeOnly: true });
   const out = [];
   for (const b of bundles) {
-    const products = (await Promise.all(b.productIds.map((id) => getProduct(id)))).filter((p) => p && p.active);
+    /* Every member on sale, or no card: a set the buyer cannot complete is not
+       an offer. isSellable, so a retired mystery box never rides along. */
+    const products = (await Promise.all(b.productIds.map((id) => getProduct(id)))).filter(isSellable);
     if (products.length < 2 || products.length !== b.productIds.length) continue; // need the full set
     const subtotal = products.reduce((s, p) => s + p.price, 0);
     const discount = Math.round(subtotal * b.discountPercent / 100);
@@ -77,12 +79,24 @@ export async function bestBundleDiscount(items) {
   return best;
 }
 
+/**
+ * Refuse a set that holds a retired mystery box. Such a bundle could never be
+ * shown or bought (pricedBundles skips it, the checkout refuses the box), so
+ * saving one would only leave the owner wondering where it went.
+ */
+async function assertNoRetired(productIds) {
+  const hit = await get(`SELECT name FROM products WHERE id = ANY(@ids) AND kind = ANY(@retired) LIMIT 1`,
+    { ids: productIds, retired: [...RETIRED_KINDS] });
+  if (hit) throw badRequest(`${MYSTERY_RETIRED}. Take ${hit.name} out of the bundle.`);
+}
+
 // ── Admin CRUD ───────────────────────────────────────────────────────────────
 export async function createBundle(input, _actorId) {
   const name = String(input.name || '').trim();
   const productIds = Array.isArray(input.productIds) ? input.productIds.slice(0, 20) : [];
   if (!name) throw badRequest('Name is required');
   if (productIds.length < 2) throw badRequest('A bundle needs at least 2 products');
+  await assertNoRetired(productIds);
   const id = newId('bnd');
   await run(
     `INSERT INTO bundles (id, name, description, product_ids, discount_percent, active, created_at)
@@ -103,7 +117,10 @@ export async function updateBundle(id, patch) {
   const fields = {};
   if (patch.name != null) fields.name = String(patch.name).trim();
   if ('description' in patch) fields.description = patch.description || null;
-  if (patch.productIds) fields.product_ids = JSON.stringify(patch.productIds.slice(0, 20));
+  if (patch.productIds) {
+    await assertNoRetired(patch.productIds.slice(0, 20));
+    fields.product_ids = JSON.stringify(patch.productIds.slice(0, 20));
+  }
   if (patch.discountPercent != null) fields.discount_percent = Math.max(1, Math.min(90, Math.round(patch.discountPercent)));
   if (patch.active != null) fields.active = patch.active ? 1 : 0;
   const keys = Object.keys(fields);

@@ -179,19 +179,27 @@ console.log('— #7 The price at the order button is the price of the order —'
   const of = await createOrder({ email: w.email, userId: w.id, items: lines([fifty]), useCredit: 4980, ...consent });
   ok('…exactly what the order then takes', sameFigures(qf.body, of).same, sameFigures(qf.body, of).why);
 
-  // A mystery box next to a code: no discount touches the box, in the quote too.
-  const box = await createProduct({ name: `Quote Box ${stamp}`, category: 'mystery', kind: 'mystery', price: 4999, announce: false });
-  await run(`INSERT INTO mystery_box_rewards (id, box_id, label, weight, credit_cents, created_at)
-             VALUES (@id, @b, '€20', 1, 2000, @at)`, { id: newId('mbr'), b: box.id, at: nowIso() });
+  /* A mystery box next to a code used to be quoted with no discount on the box,
+     like the order. Boxes are retired now (paid random prizes are very likely a
+     game of chance under the Dutch Wet op de kansspelen): the quote refuses one
+     exactly as the order does — same status, same words — even a box switched
+     back on by hand, as this one is. */
+  const boxId = newId('prd');
+  await run(`INSERT INTO products (id, name, category, price, currency, kind, active, metadata, created_at, updated_at)
+             VALUES (@id, @n, 'mystery', 4999, 'EUR', 'mystery', 1, '{}', @at, @at)`,
+    { id: boxId, n: `Quote Box ${stamp}`, at: nowIso() });
   const mm = await newUser();
   await grantMembership(mm.id, 30);
   const tenCode = `QBOX${stamp % 100000}`;
   await createCoupon({ code: tenCode, kind: 'percent', value: 10, announce: false }, 'test');
-  const mixed = { items: lines([box], [a]), coupon: tenCode };
+  const mixed = { items: lines([{ id: boxId }], [a]), coupon: tenCode };
   const qm = await quote(mixed, mm.token);
-  const om = await createOrder({ email: mm.email, userId: mm.id, ...mixed, ...consent });
-  ok('box + code for a member: the quote leaves the box alone, like the order',
-    qm.body.discountable === 2000 && sameFigures(qm.body, om).same, `${qm.body.discountable} ${sameFigures(qm.body, om).why}`);
+  const om = await throws(() => createOrder({ email: mm.email, userId: mm.id, ...mixed, ...consent }));
+  ok('box + code for a member: the quote refuses the box, like the order',
+    qm.status === 409 && om?.status === 409 && qm.body.error?.message === om.message && /retired/.test(om.message),
+    `${qm.status} ${qm.body.error?.message} / ${om?.status} ${om?.message}`);
+  ok('…and nothing of the code was used', Number((await get('SELECT redeemed_count FROM coupons WHERE code=@c', { c: tenCode }))?.redeemed_count) === 0);
+  await run(`UPDATE products SET active=0 WHERE id=@id`, { id: boxId });
 
   // A single-use code is not used up by asking for a quote.
   const once = `QONCE${stamp % 100000}`;

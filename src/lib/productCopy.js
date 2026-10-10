@@ -149,12 +149,6 @@ const COPY = {
     de: (n) => `${n} — offizieller Code, den du auf deinem eigenen Konto einlöst.`,
     fr: (n) => `${n} — code officiel, à utiliser sur ton propre compte.`,
   },
-  mystery: {
-    en: (n) => `${n} — every box pays out real store credit.`,
-    nl: (n) => `${n} — elke box keert echt winkeltegoed uit.`,
-    de: (n) => `${n} — jede Box zahlt echtes Shop-Guthaben aus.`,
-    fr: (n) => `${n} — chaque boîte verse un vrai crédit boutique.`,
-  },
 };
 
 const FALLBACK = {

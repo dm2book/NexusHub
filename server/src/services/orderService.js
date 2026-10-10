@@ -124,6 +124,10 @@ export async function priceOrder({ items = [], coupon = '', userId = null, email
   for (const li of merged.values()) {
     const product = await getProduct(li.productId);
     if (!product) throw badRequest(`Unknown product: ${li.productId}`);
+    /* Mystery boxes are retired (productService.RETIRED_KINDS): never priced
+       and never sold, even one switched back on by hand — here, so the quote
+       and the order both refuse it. Ahead of `active`, so the buyer reads why. */
+    if (product.kind === 'mystery') throw conflict(`${product.name} is no longer sold: mystery boxes are retired.`);
     if (!product.active) throw conflict(`Product not available: ${product.name}`);
     const quantity = Math.max(1, Number(li.quantity || 1));
     const unitPrice = product.price;
@@ -274,20 +278,6 @@ export async function createOrder(input, ctx = {}) {
   const priced = await priceOrder({ items: input.items, coupon: input.coupon,
     userId: input.userId || null, email, useCredit: input.useCredit });
   for (const { product, quantity, unitPrice, metadata } of priced.lines) {
-    /* A mystery box pays out as store credit, and store credit lives in an
-       account. A guest could buy one: the checkout takes the money, and then
-       settleMysteryForOrder() begins `if (!order.userId) return []` — no roll,
-       no prize, no pull recorded, and nothing a human in the fulfillment queue
-       can do about it either, because there is no wallet to credit. The product
-       page meanwhile promises that every box wins a real prize.
-
-       Refused here rather than hidden in the UI: this is the choke point every
-       purchase passes through, and a product that cannot be fulfilled must not
-       be sellable, not merely hard to reach. */
-    if (product.kind === 'mystery' && !input.userId) {
-      throw badRequest(
-        `${product.name} pays out as store credit, so it needs an account — please sign in or create one first.`);
-    }
     /* A top-up we cannot address stalls until somebody asks for the address.
 
        Robux goes onto an account, not into a code, and the product page says
