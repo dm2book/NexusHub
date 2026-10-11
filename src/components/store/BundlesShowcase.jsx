@@ -126,7 +126,7 @@ export default function BundlesShowcase({ variant = 'grid' }) {
             <div className="flex -space-x-3 mb-3">
               {b.products.slice(0, 4).map((p, i) => (
                 <span key={`${p.id}-${i}`} className="w-12 h-12 rounded-xl bg-slate-50 border-2 border-white grid place-items-center shadow-sm">
-                  <img src={p.image || iconFor(p.category)} alt="" className="w-8 h-8 object-contain" />
+                  <img src={p.image || iconFor(p.category)} alt="" className="w-8 h-8 object-contain" loading="lazy" decoding="async" />
                 </span>
               ))}
             </div>

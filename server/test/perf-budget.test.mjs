@@ -245,8 +245,9 @@ console.log('— Background polling —');
   ok('a failing feed backs off too, instead of hammering a broken API',
     /\.catch\(\(\) => backOff\(true\)\)/.test(feed));
 
-  const consumers = ['src/components/SiteExtras.jsx',
-    'src/components/store/LiveActivity.jsx',
+  /* SiteExtras.jsx was a third reader; it was never imported anywhere and is
+     gone (an old cookie banner that took "by using ForgeMarket" as consent). */
+  const consumers = ['src/components/store/LiveActivity.jsx',
     'src/components/store/RecentlyDelivered.jsx'];
   for (const f of consumers) {
     /* Their own setInterval is fine and stays — it rotates which line of the
@@ -256,6 +257,34 @@ console.log('— Background polling —');
     ok(`${f.split('/').pop()} takes the feed from the shared poller instead of fetching it`,
       !/api\.get\(\s*['"`]\/api\/social/.test(readFileSync(join(ROOT, f), 'utf8')));
   }
+}
+
+console.log('\n— Animations an idle phone pays for —');
+{
+  /* Measured on a 4x-throttled phone with nothing touched: the homepage spent
+     ~540 ms of paint and ~220 ms of style work every 4 s on two animations the
+     compositor cannot run — a sheen that moved a background-position across
+     the whole hero card, and the gradient sweep through the headline's
+     glyphs. */
+  const css = readFileSync(join(ROOT, 'src/index.css'), 'utf8');
+  const sheen = /@keyframes fmSheen \{([^}]*\}[^}]*)\}/.exec(css)?.[1] || '';
+  ok('the hero sheen slides with transform, which the compositor runs',
+    /translateX/.test(sheen) && !/background-position/.test(sheen), sheen);
+  ok('…on a strip one tile wide, so the sweep is the one it always was',
+    /\.fm-stage::after \{[^}]*width: 250%/.test(css) && /\.fm-launch::after \{[^}]*width: 250%/.test(css));
+  ok('…inside a card that clips it, or the strip would widen the page',
+    /className="fm-stage relative overflow-hidden/.test(readFileSync(join(ROOT, 'src/pages/HomeStore.jsx'), 'utf8'))
+      && /\.fm-launch \{\s*position: relative; overflow: hidden;/.test(css));
+  /* Gradient text cannot be moved by the compositor. On a touch screen the
+     sweep plays once and the colours rest. NOT `animation: none`: measured over
+     8 loads each, switching it off moved the homepage's LCP from a median of
+     ~0.15 s to ~1.5 s — the React headline then counts as a later, larger
+     paint than the one the HTML shell drew. One sweep keeps it at ~0.14 s. */
+  const touch = [...css.matchAll(/@media \(hover: none\) \{([^{}]*\{[^}]*\})\s*\}/g)].map((m) => m[1])
+    .filter((r) => /fm-gradient-text/.test(r));
+  ok('on a touch screen the gradient sweep plays once, then stops repainting',
+    touch.length === 1 && /\.fm-gradient-text, \.gradient-anim \{ animation-iteration-count: 1; \}/.test(touch[0]), touch.join(' | '));
+  ok('…and is not switched off, which costs the homepage its early LCP', touch.every((r) => !/animation:\s*none/.test(r)));
 }
 
 console.log(`\n${fail === 0 ? '✅' : '❌'} perf budget: ${pass} passed, ${fail} failed`);

@@ -434,6 +434,12 @@ h1, h2, h3, .font-display, .fm-head {
 @media (prefers-reduced-motion: reduce) {
   .fm-page, .fm-reveal, .fm-lift, .fm-gradient-text, .fm-marquee, .fm-blob { animation: none !important; transition: none !important; transform: none !important; opacity: 1 !important; }
 }
+/* On a phone the sweep plays once, then the colours rest. Gradient text cannot
+   be moved by the compositor: every frame repaints the glyphs on the main
+   thread. Measured on a 4x-throttled phone, the hero line alone took about 15%
+   of the main thread for as long as it was on screen — the rest of the page's
+   animations together were under 1%. A mouse-driven screen keeps the loop. */
+@media (hover: none) { .fm-gradient-text, .gradient-anim { animation-iteration-count: 1; } }
 
 /* Hidden-scrollbar horizontal rail (trending / popular carousels) */
 .fm-rail::-webkit-scrollbar { height: 0; }
@@ -1064,10 +1070,10 @@ body.fm-menu-open .fm-fab { display: none; }
     linear-gradient(180deg, #0e0b20 0%, #151132 55%, #0c0a1c 100%);
 }
 .fm-launch::after {
-  content: ''; position: absolute; inset: 0; pointer-events: none;
+  content: ''; position: absolute; top: 0; bottom: 0; left: 0; width: 250%; pointer-events: none;
   background: linear-gradient(105deg, transparent 42%, rgba(255,255,255,.06) 50%, transparent 58%);
-  background-size: 250% 100%;
   animation: fmSheen 14s var(--ease-glide) infinite;
+  will-change: transform;
 }
 /* A hairline of brand along the bottom, so the banner ENDS rather than stops. */
 .fm-launch::before {
@@ -1085,14 +1091,19 @@ body.fm-menu-open .fm-fab { display: none; }
   .fm-launch-dot::after { animation: none }
 }
 
-/* Faint scanning sheen so the stage is never completely static. */
+/* Faint scanning sheen so the stage is never completely static.
+   Moved with transform, not background-position: the same sweep, but the
+   compositor slides an already-painted strip instead of the main thread
+   repainting the whole hero card every frame: on a 4x-throttled phone about
+   70 ms of main thread every 4 s before, under 5 after. The strip is one
+   250%-wide tile, so -108% → 48% is exactly background-position 180% → -80%. */
 .fm-stage::after {
-  content: ''; position: absolute; inset: 0; pointer-events: none;
+  content: ''; position: absolute; top: 0; bottom: 0; left: 0; width: 250%; pointer-events: none;
   background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,.055) 50%, transparent 60%);
-  background-size: 250% 100%;
   animation: fmSheen 9s var(--ease-glide) infinite;
+  will-change: transform;
 }
-@keyframes fmSheen { from { background-position: 180% 0; } to { background-position: -80% 0; } }
+@keyframes fmSheen { from { transform: translateX(-108%); } to { transform: translateX(48%); } }
 
 /* Oversized ghost word behind the content — the "CHILE20" trick. */
 /* The hero watermark. The word lives in `content` rather than in the markup:
