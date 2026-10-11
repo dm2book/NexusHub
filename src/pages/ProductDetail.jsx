@@ -30,6 +30,7 @@ import PaymentBadges from '../components/store/PaymentBadges.jsx';
 import { platformOf } from '../lib/platform.js';
 import ProductTrust from '../components/store/ProductTrust.jsx';
 import BundleOffer from '../components/store/BundleOffer.jsx';
+import { isLowestOf30Days } from '../lib/priceHistory.js';
 
 // Built per product, not per site: what a buyer asks about a Robux top-up that
 // needs their username is not what they ask about a Steam code. Answers a
@@ -325,6 +326,10 @@ export default function ProductDetail() {
 
   const { icon: Icon, grad, label } = categoryVisual(product.category);
   const desc = productDescription(product, lang);
+  /* The struck-through price. The server already replaced the "was" price the
+     owner typed with the one the rules allow — see lawfulSalePrices — so a
+     value here is a real earlier price, and its absence means no reduction. */
+  const wasPrice = product.compareAtPrice > product.price ? product.compareAtPrice : null;
   /* "Frequently bought together" showed 1,600 and 4,600 FC Points under 12,000
      FC Points — nobody buys three sizes of one thing; those are the pack
      switcher above. Only other products here: real co-purchases first, then
@@ -520,12 +525,10 @@ export default function ProductDetail() {
 
           <div className="flex items-center gap-3 mt-4">
             <span className="text-3xl font-semibold gradient-text gradient-anim">{money(product.price, product.currency)}</span>
-            {/* A sale the owner switched on (compareAtPrice), shown against the
-                price the rules allow: the lowest of the 30 days before today's
-                price began, read from the price history (priorPrice). The
+            {/* A sale the owner switched on, shown against the price the rules
+                allow: the lowest of the 30 days before today's price began. The
                 struck-through figure used to be whatever "was" price had been
-                typed in, with nothing behind it — and when the history cannot
-                show a higher earlier price, no reduction is announced. */}
+                typed in, with nothing behind it. */}
             {wasPrice && (
               <>
                 <span className="text-xl text-slate-500 line-through">{money(wasPrice, product.currency)}</span>
@@ -749,12 +752,9 @@ export default function ProductDetail() {
                  the reference EU price rules (Omnibus) allow. It said "lowest
                  we've ever offered" whenever today's price was not above the
                  minimum, which is also true of a price that never changed. */
-              const since = Date.now() - 30 * 86_400_000;
-              const window = priceHist.filter((h) => !h.at || Date.parse(h.at) >= since).map((h) => h.price);
-              const before = priceHist.filter((h) => h.at && Date.parse(h.at) < since).map((h) => h.price);
-              const ref = window.length ? window : prices;
-              const dropped = ref.some((p) => p > now) || before.some((p) => p > now);
-              return dropped && now <= Math.min(...ref) ? (
+              /* The price already in effect when the 30 days opened counts too:
+                 €6 for weeks, €10 for a few days, then €8 is not the lowest. */
+              return isLowestOf30Days(priceHist, product.price) ? (
                 <p className="text-emerald-600 text-sm font-semibold mt-2">{t('price.lowest30', 'Lowest price of the last 30 days')}</p>
               ) : null;
             })()}

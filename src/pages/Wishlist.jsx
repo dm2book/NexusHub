@@ -107,7 +107,9 @@ function PricePanel({ row, t, onAlert }) {
         </div>
         <div>
           <div className="text-slate-400 text-[11px]">{t('wish.previous', 'Previous')}</div>
-          <div className="text-slate-500 line-through">
+          {/* Plain, not struck through: a price this item had before is not an
+              announced reduction, and a strike says it is. */}
+          <div className="text-slate-500">
             {row.previousPrice == null ? '—' : money(row.previousPrice)}
           </div>
         </div>

@@ -108,7 +108,7 @@ export default function Bundles() {
                     <dl className="mt-auto pt-4 border-t border-slate-100 space-y-1.5 text-sm">
                       <div className="flex items-center justify-between gap-3">
                         <dt className="text-slate-500">{t('bundles.separately', 'Bought separately')}</dt>
-                        <dd className="text-slate-500 line-through tabular-nums">{money(b.subtotal, b.currency)}</dd>
+                        <dd className="text-slate-500 tabular-nums">{money(b.subtotal, b.currency)}</dd>
                       </div>
                       <div className="flex items-center justify-between gap-3">
                         <dt className="text-emerald-700 font-semibold">{t('bundles.youSave', 'You save')}</dt>

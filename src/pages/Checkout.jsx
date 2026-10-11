@@ -744,13 +744,15 @@ export default function Checkout() {
               </p>
             </div>
           )}
+          {/* Every label says that pressing it means paying (art. 6:230v lid 3 BW,
+              § 312j BGB): a plain "Bestelling plaatsen" showed while the payment
+              settings were still loading, and in demo mode. */}
           <button disabled={busy || paused} className="btn-primary w-full py-3">
             {busy ? <Loader2 size={18} className="animate-spin" />
               : paused ? <>{t('checkout.pausedBtn', 'Ordering paused')}</>
               : provider === 'mollie' ? <>{t('checkout.payNow', 'Pay {amount} securely', { amount: money(grandTotal, currency) })}</>
               : provider === 'stripe' ? <>{t('checkout.payCard', 'Pay with card')}</>
-              : provider === 'manual' ? <>{t('checkout.placePay', 'Place order & pay')}</>
-              : <>{t('checkout.placeOrder', 'Place order')}</>}
+              : <>{t('checkout.placePay', 'Place order & pay')}</>}
           </button>
           {triedConsent && !consent && !busy && (
             <p className="text-amber-300 text-[12.5px] mt-2 text-center">
@@ -782,8 +784,7 @@ export default function Checkout() {
               {busy ? <Loader2 size={18} className="animate-spin" />
                 : provider === 'mollie' ? <>{t('checkout.payNowShort', 'Pay securely')}</>
                 : provider === 'stripe' ? <>{t('checkout.payCard', 'Pay with card')}</>
-                : provider === 'manual' ? <>{t('checkout.placePay', 'Place order & pay')}</>
-                : <>{t('checkout.placeOrder', 'Place order')}</>}
+                : <>{t('checkout.placePay', 'Place order & pay')}</>}
             </button>
           </div>
           {/* The legally required tick, in the bar, next to the button it unlocks.

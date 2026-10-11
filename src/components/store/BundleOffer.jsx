@@ -82,7 +82,9 @@ export default function BundleOffer({ product }) {
                 <div className="text-[12px] text-slate-500">{t('bundles.price', 'Bundle price')}</div>
                 <div className="flex items-baseline gap-2">
                   <span className="text-xl font-extrabold text-violet-700 tabular-nums">{money(b.total, b.currency)}</span>
-                  <s className="text-sm text-slate-500 tabular-nums">{money(b.subtotal, b.currency)}</s>
+                  {/* Today's separate prices, in words — not struck through as if
+                      the bundle had once cost that. */}
+                  <span className="text-sm text-slate-500 tabular-nums">{t('bundles.separately', 'Bought separately')} {money(b.subtotal, b.currency)}</span>
                 </div>
                 <div className="text-[13px] font-semibold text-emerald-700">
                   {t('bundles.youSave', 'You save')} {money(b.discount, b.currency)}
