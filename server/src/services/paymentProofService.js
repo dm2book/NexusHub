@@ -144,6 +144,27 @@ async function dropScreenshot(proof) {
   }
 }
 
+/**
+ * Screenshots nobody is going to review any more.
+ *
+ * Confirming or rejecting a proof drops its picture. But an order can stop
+ * waiting on its proof without either: staff marked it paid by hand, it was
+ * cancelled for not being paid, or the buyer paid some other way. Those
+ * pictures — name, IBAN, balance — stayed for good, while the privacy policy
+ * says they go once the payment has been checked. Run by maintenance.
+ */
+export async function forgetStaleScreenshots({ days = 30, limit = 200 } = {}) {
+  const cutoff = new Date(Date.now() - days * 86_400_000).toISOString();
+  const stale = await all(
+    `SELECT p.id, p.screenshot_url FROM payment_proofs p
+       LEFT JOIN orders o ON o.id = p.order_id
+      WHERE p.screenshot_url IS NOT NULL
+        AND (p.status <> 'pending' OR o.id IS NULL OR o.status NOT IN ('pending', 'failed') OR p.created_at < @cutoff)
+      LIMIT @limit`, { cutoff, limit });
+  for (const proof of stale) await dropScreenshot(proof);
+  return stale.length;
+}
+
 /** Admin rejects a proof — order stays pending so the customer can resubmit. */
 export async function rejectProof(proofId, reason = '', ctx = {}) {
   const proof = await get('SELECT * FROM payment_proofs WHERE id=@id', { id: proofId });

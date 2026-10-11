@@ -11,7 +11,15 @@
  * name, address, email, IP or delivery target. Everything that exists only
  * because of the person (sessions, devices, carts, wishlists, notifications,
  * login codes, the newsletter row, linked logins) is deleted. Chargebacks are
- * kept: evidence for a legal claim is an exception the AVG itself names.
+ * kept: evidence for a legal claim is an exception the AVG itself names. So is
+ * the unsubscribe list — it is what stops the address being mailed again.
+ *
+ * Both lists were drawn up from the schema rather than from memory: every
+ * table with an email, phone, IP, name or free-text column. The first version
+ * missed the live-feed row that shows the buyer's first name and city to every
+ * visitor, the payment screenshot (a banking app, name and IBAN included), the
+ * phone numbers kept by SMS sign-in, gift cards addressed to the person,
+ * support conversations, and the referral code built from their address.
  */
 import { all, get, run, tx, nowIso } from '../db/index.js';
 import { audit } from './auditService.js';
@@ -30,7 +38,8 @@ export async function exportPersonalData(email) {
                                  (totp_enabled_at IS NOT NULL) AS two_factor
                             FROM users WHERE lower(email) = @e`, { e });
   const uid = user?.id || '__none__';
-  const orders = await tryAll(`SELECT id, number, status, currency, subtotal, total, billing, created_at, updated_at
+  const orders = await tryAll(`SELECT id, number, status, currency, subtotal, total, billing, country,
+                                        consent_at, consent_text, created_at, updated_at
                                  FROM orders WHERE user_id = @u OR lower(email) = @e ORDER BY created_at`, { u: uid, e });
   const ids = orders.map((o) => o.id);
   const items = ids.length ? await tryAll(`SELECT order_id, name, quantity, unit_price FROM order_items WHERE order_id = ANY(@ids)`, { ids }) : [];
@@ -53,6 +62,27 @@ export async function exportPersonalData(email) {
     linkedLogins: await tryAll(`SELECT provider, created_at FROM oauth_accounts WHERE user_id = @u`, { u: uid }),
     loginHistory: await tryAll(`SELECT channel, success, reason, created_at FROM login_attempts WHERE user_id = @u OR lower(identifier) = @e ORDER BY created_at DESC LIMIT 200`, { u: uid, e }),
     emailsSent: await tryAll(`SELECT template_id, subject, status, created_at FROM email_log WHERE lower(to_email) = @e ORDER BY created_at DESC LIMIT 500`, { e }),
+    /* The rest of what is held, found by walking the schema: the payment
+       proofs they sent (whether a screenshot is still on file, not the image),
+       saved addresses, where they are signed in, codes they used, check-ins,
+       their referral code, gift cards sent to them and messages shown in
+       their account. Tokens and code hashes stay out. */
+    paymentProofs: ids.length ? await tryAll(`SELECT order_id, method, transaction_id, amount, status, note, ip,
+                                                     (screenshot_url IS NOT NULL) AS screenshot_on_file, created_at
+                                                FROM payment_proofs WHERE order_id = ANY(@ids) ORDER BY created_at`, { ids }) : [],
+    billingDetails: await tryAll(`SELECT label, full_name, email, line1, line2, city, postal_code, country, vat_number, created_at
+                                    FROM billing_details WHERE user_id = @u`, { u: uid }),
+    signedIn: await tryAll(`SELECT device, user_agent, ip, created_at, last_used_at, expires_at, revoked_at
+                              FROM sessions WHERE user_id = @u ORDER BY created_at DESC LIMIT 200`, { u: uid }),
+    trustedDevices: await tryAll(`SELECT name, user_agent, ip, created_at, last_used_at, expires_at, revoked_at
+                                    FROM trusted_devices WHERE user_id = @u`, { u: uid }),
+    couponsUsed: await tryAll(`SELECT code, order_id, created_at FROM coupon_redemptions WHERE user_id = @u OR lower(email) = @e`, { u: uid, e }),
+    dailyCheckIns: await tryAll(`SELECT day, streak_day, points, milestone, created_at FROM daily_claims WHERE user_id = @u ORDER BY day`, { u: uid }),
+    referralCodes: await tryAll(`SELECT code, created_at FROM referrals WHERE user_id = @u`, { u: uid }),
+    giftCardsReceived: await tryAll(`SELECT right(code, 4) AS code_ends_with, initial_balance, balance, currency, status, created_at
+                                       FROM gift_cards WHERE lower(recipient_email) = @e`, { e }),
+    notifications: await tryAll(`SELECT title, body, link, read_at, created_at FROM notifications WHERE user_id = @u ORDER BY created_at DESC LIMIT 500`, { u: uid }),
+    chargebacks: await tryAll(`SELECT order_number, amount, currency, reason, created_at FROM chargebacks WHERE lower(email) = @e`, { e }),
   };
   return data;
 }
@@ -68,7 +98,7 @@ const MONEY_KEYS = ['coupon', 'discount', 'memberDiscount', 'memberPercent', 'bu
 export async function erasePersonalData(email, { actor = null } = {}) {
   const e = norm(email);
   if (!e) throw badRequest('An email address is needed');
-  const user = await get(`SELECT id FROM users WHERE lower(email) = @e`, { e });
+  const user = await get(`SELECT id, phone FROM users WHERE lower(email) = @e`, { e });
   if (user) {
     const staff = await get(`SELECT 1 FROM user_roles WHERE user_id = @u AND role_id <> 'customer' LIMIT 1`, { u: user.id });
     if (staff) throw badRequest('This is a staff account — remove its roles first');
@@ -88,19 +118,54 @@ export async function erasePersonalData(email, { actor = null } = {}) {
       await run(`UPDATE orders SET email = @a, billing = @b, ip = NULL WHERE id = @id`, { a: anon, b: JSON.stringify(kept), id: o.id });
     }
     const del = async (name, sql, p) => { const r = await run(sql, p).catch(() => null); counts[name] = r?.changes ?? 0; };
+    const ids = orders.map((o) => o.id);
+    if (ids.length) {
+      /* "Sam uit Utrecht kocht 1.000 Robux" — first name and city, on the live
+         feed, to every visitor. The order is kept; this line about it is not. */
+      await del('liveFeed', `DELETE FROM social_events WHERE order_id = ANY(@ids)`, { ids });
+      /* A payment screenshot is a banking app: name, IBAN, balance. The proof
+         stays as bookkeeping (method, amount, transaction id); the picture, the
+         buyer's note and the address it came from do not. */
+      const shots = await tryAll(`SELECT screenshot_url FROM payment_proofs
+                                    WHERE order_id = ANY(@ids) AND screenshot_url IS NOT NULL`, { ids });
+      const imageIds = shots.map((p) => /\/api\/images\/([0-9a-f]{32})/.exec(String(p.screenshot_url))?.[1]).filter(Boolean);
+      await del('paymentProofs', `UPDATE payment_proofs SET screenshot_url = NULL, note = NULL, ip = NULL
+                                   WHERE order_id = ANY(@ids)`, { ids });
+      if (imageIds.length) {
+        await del('screenshots', `DELETE FROM product_images p WHERE p.id = ANY(@imgs) AND p.product_id IS NULL AND p.source = 'proof'
+                                    AND NOT EXISTS (SELECT 1 FROM payment_proofs x WHERE x.screenshot_url LIKE '%' || p.id || '%')`,
+          { imgs: imageIds });
+      }
+    }
+    /* A gift card sent to this address: the card keeps working, it just no
+       longer says who it was for. */
+    await del('giftCards', `UPDATE gift_cards SET recipient_email = NULL WHERE lower(recipient_email) = @e`, { e });
     await del('newsletter', `DELETE FROM newsletter_signups WHERE lower(email) = @e`, { e });
     await del('loginCodes', `DELETE FROM otp_codes WHERE lower(email) = @e`, { e });
     await del('emailLog', `UPDATE email_log SET to_email = @a, context = NULL WHERE lower(to_email) = @e`, { e, a: anon });
     await del('couponUses', `UPDATE coupon_redemptions SET email = NULL, ip = NULL WHERE lower(email) = @e`, { e });
     await del('reviews', `UPDATE reviews SET author = 'Anonieme koper', email = NULL, discord_uid = NULL WHERE lower(email) = @e ${user ? 'OR user_id = @u' : ''}`, { e, u: user?.id });
     await del('loginHistory', `DELETE FROM login_attempts WHERE lower(identifier) = @e ${user ? 'OR user_id = @u' : ''}`, { e, u: user?.id });
+    /* The security log keeps its rows (and drops their IPs on its own
+       schedule) but not the address of a customer who acted in it. */
+    await del('auditActor', `UPDATE audit_logs SET actor_email = @a WHERE lower(actor_email) = @e`, { e, a: anon });
     if (user) {
       const u = { u: user.id };
       for (const [name, table] of [['sessions', 'sessions'], ['devices', 'trusted_devices'], ['linkedLogins', 'oauth_accounts'],
         ['linkIntents', 'oauth_link_intents'], ['cart', 'saved_carts'], ['wishlist', 'wishlist_items'],
-        ['notifications', 'notifications'], ['billingDetails', 'billing_details']]) {
+        ['notifications', 'notifications'], ['billingDetails', 'billing_details'], ['twoFactorTickets', 'totp_tickets'],
+        // The code is the first letters of their email address ("SAMJA7K2Q").
+        ['referralCode', 'referrals']]) {
         await del(name, `DELETE FROM ${table} WHERE user_id = @u`, u);
       }
+      await run(`UPDATE referral_events SET code = 'ERASED' WHERE referrer_id = @u`, u).catch(() => {});
+      /* Support conversations are theirs, in their own words. Deleted whole —
+         the staff replies in them are about this person and nothing else. */
+      await del('ticketMessages', `DELETE FROM ticket_messages WHERE ticket_id IN (SELECT id FROM support_tickets WHERE user_id = @u)`, u);
+      await del('tickets', `DELETE FROM support_tickets WHERE user_id = @u`, u);
+      // The phone number SMS sign-in kept, and the address each check-in came from.
+      if (user.phone) await del('smsCodes', `DELETE FROM sms_verifications WHERE phone = @p`, { p: user.phone });
+      await run(`UPDATE daily_claims SET ip = NULL WHERE user_id = @u`, u).catch(() => {});
       await run(`UPDATE page_views SET user_id = NULL WHERE user_id = @u`, u).catch(() => {});
       await run(`UPDATE users SET email = @a, display_name = 'Verwijderd', avatar_url = NULL, phone = NULL,
                    totp_secret = NULL, totp_pending_secret = NULL, totp_enabled_at = NULL,
