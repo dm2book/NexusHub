@@ -35,6 +35,12 @@ import { createLimiter, createDailyCap, createRecentIds, accountOldEnough } from
 import { drawWinners, entrantsFingerprint } from './giveaway.js';
 import { registerCommands } from './commands.js';
 import { buildLaunchAnnouncement, launchDue, DEFAULT_LAUNCH_DATE } from './panels.js';
+/* The ticket table and its helpers. Used by every ticket button below and
+   never imported: since the eight-lane rework each one stopped at a
+   ReferenceError — open, claim, close and the idle sweep alike. */
+import {
+  ticketType, ticketLabel, priorityOf, ticketChannelName, parseTopic, buildTopic, isOwnedBy,
+} from './tickets.js';
 
 /**
  * The one guild this bot serves.

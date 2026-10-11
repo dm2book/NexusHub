@@ -4,8 +4,8 @@ import { api } from './api.js';
 // Neutral defaults — never fabricated numbers. Real values arrive from /api/stats;
 // until then (and on error) the UI shows zeros / hides empty counters.
 const FALLBACK = {
-  delivered: 0, customers: 0, products: 0, avgDeliverySeconds: null,
-  successRate: null, rating: null, reviews: 0, discordMembers: 0, recent: [],
+  delivered: 0, customers: 0, products: 0, medianDeliverySeconds: null, deliverySample: 0,
+  successRate: null, successSample: 0, rating: null, reviews: 0, discordOnline: null, recent: [],
 };
 
 let cache = null;

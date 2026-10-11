@@ -1,13 +1,20 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { CheckCircle2, Zap } from 'lucide-react';
-import { useLiveFeed, deliveryPhrase, timeAgo } from '../../lib/useSocialProof.js';
+import { useLiveFeed, timeAgo } from '../../lib/useSocialProof.js';
 import { iconFor } from '../../lib/sampleCatalog.js';
 import { useI18n } from '../../lib/i18n.jsx';
+import { durationText } from '../../lib/trustLines.js';
 
 /**
  * Floating live social-proof ticker — "John from Amsterdam got 1,700 Robux ·
  * delivered in 34s". Real delivered orders only (privacy-safe: first name + city
- * only). Renders nothing until the store has real activity. Rotates in/out.
+ * only). Renders nothing until the store has real activity.
+ *
+ * Each sale is shown ONCE per page view, then the ticker rests. It used to loop
+ * the list forever, every 6.5 seconds: one sale from this morning popped up
+ * again and again for as long as the page was open, which reads as a stream of
+ * buyers that is not there. The same sale twice is a notification about
+ * nothing new.
  */
 export const FRESH_SECONDS = 48 * 3600;
 
@@ -17,27 +24,38 @@ export default function RecentlyDelivered() {
      but it tells a visitor nobody has bought since — the opposite of the point. */
   const all = useLiveFeed();
   const feed = all?.filter((r) => Number(r.secondsAgo) <= FRESH_SECONDS) || [];
-  const [idx, setIdx] = useState(0);
+  const shown = useRef(new Set());      // sale ids already announced on this page view
+  const [current, setCurrent] = useState(null);
   const [show, setShow] = useState(false);
+  const ids = feed.map((r) => r.id).join(',');
 
   useEffect(() => {
-    if (!feed?.length) return undefined;
+    /* Only sales not yet shown. A new sale arriving from the poller is
+       announced once, without replaying the ones before it. */
+    const queue = feed.filter((r) => !shown.current.has(r.id));
+    if (!queue.length) return undefined;
     let i = 0;
-    const cycle = () => {
-      setIdx(i % feed.length);
+    let loop = null;
+    const timers = [];
+    const next = () => {
+      // Every sale has had its turn: rest, rather than start again from the top.
+      if (i >= queue.length) { clearInterval(loop); return; }
+      const r = queue[i++];
+      shown.current.add(r.id);
+      setCurrent(r);
       setShow(true);
-      setTimeout(() => setShow(false), 4200);
-      i += 1;
+      timers.push(setTimeout(() => setShow(false), 4200));
     };
-    const first = setTimeout(cycle, 2500);
-    const id = setInterval(cycle, 6500);
-    return () => { clearTimeout(first); clearInterval(id); };
-  }, [feed.length]);
+    const first = setTimeout(next, 2500);
+    loop = setInterval(next, 6500);
+    return () => { clearTimeout(first); clearInterval(loop); timers.forEach(clearTimeout); };
+  }, [ids]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!feed?.length) return null;
-  const r = feed[idx] || feed[0];
+  if (!feed.length || !current) return null;
+  const r = current;
   const img = iconFor(r.category);
-  const delivered = deliveryPhrase(r.deliverySeconds);
+  // Payment → delivery for this order (server: liveFeed), in the reader's language.
+  const delivered = r.deliverySeconds ? durationText(r.deliverySeconds, t) : null;
   const who = r.city ? `${r.name || t('live.someone', 'Someone')} ${t('live.from', 'from')} ${r.city}` : (r.name || t('live.someone', 'Someone'));
 
   return (

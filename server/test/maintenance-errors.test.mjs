@@ -28,8 +28,10 @@ const { runMaintenance, lastMaintenanceRun } = await import('../src/services/mai
 const old = new Date(Date.now() - 400 * 86_400_000).toISOString();
 await run(`INSERT INTO login_attempts (id, identifier, channel, ip, created_at)
            VALUES ('la_old', 'x@test.local', 'email', '203.0.113.7', @at)`, { at: old });
-await run(`INSERT INTO sms_verifications (id, phone, code_hash, ip, expires_at, created_at)
-           VALUES ('sv_old', '+31600000000', 'h', '203.0.113.8', @at, @at)`, { at: old });
+/* A table that keeps its rows and only loses the address (SMS codes are now
+   deleted whole after two days, so they can no longer show this). */
+await run(`INSERT INTO audit_logs (id, action, ip, created_at)
+           VALUES ('al_old', 'test.old', '203.0.113.8', @at)`, { at: old });
 
 /* The failure, reproduced: one table refuses the update. */
 await run(`CREATE OR REPLACE FUNCTION fm_test_refuse() RETURNS trigger AS $$
@@ -43,8 +45,8 @@ console.log('\n— One table fails, the rest still forget —');
 {
   ok('the failing table is named in the error', /login_attempts: .*simulated lock timeout/.test(s.ipForgetError || ''),
     String(s.ipForgetError));
-  const sms = await get(`SELECT ip FROM sms_verifications WHERE id='sv_old'`);
-  ok('…and a table after it still has its old address forgotten', sms.ip === null, String(sms.ip));
+  const later = await get(`SELECT ip FROM audit_logs WHERE id='al_old'`);
+  ok('…and a table after it still has its old address forgotten', later?.ip === null, String(later?.ip));
   const la = await get(`SELECT ip FROM login_attempts WHERE id='la_old'`);
   ok('…while the failing one is left as it was, not half-written', la.ip === '203.0.113.7');
 }

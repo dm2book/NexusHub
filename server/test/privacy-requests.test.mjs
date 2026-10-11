@@ -48,6 +48,31 @@ const order = await createOrder({ email: buyer.email, userId: buyer.id, billing:
   useCredit: 500, items: [{ productId: product.id, quantity: 1 }], consent: true, consentText: 'x' });
 await run(`INSERT INTO newsletter_signups (id, email, source, created_at) VALUES (@id, @e, 'test', @at)`, { id: newId('nls'), e: buyer.email, at: nowIso() });
 
+/* Everything else the schema holds about a person, one row each. */
+const shotId = 'ab'.repeat(16);
+await run(`INSERT INTO social_events (id, type, order_id, first_name, city, product_label, status, created_at)
+           VALUES (@id, 'purchase', @o, 'Sam', 'Utrecht', '1,000 Robux', 'visible', @at) ON CONFLICT (order_id) DO NOTHING`,
+  { id: newId('soc'), o: order.id, at: nowIso() });
+await run(`INSERT INTO product_images (id, product_id, mime, bytes, byte_size, sha256, source, created_at)
+           VALUES (@id, NULL, 'image/png', '\\x89504e47', 4, 'x', 'proof', @at)`, { id: shotId, at: nowIso() });
+await run(`INSERT INTO payment_proofs (id, order_id, method, transaction_id, screenshot_url, note, amount, status, ip, created_at)
+           VALUES (@id, @o, 'tikkie', 'TX-778', @shot, 'betaald door S. Jansen, NL91ABNA0417164300', 499, 'pending', '198.51.100.4', @at)`,
+  { id: newId('prf'), o: order.id, shot: `/api/images/${shotId}`, at: nowIso() });
+await run(`INSERT INTO gift_cards (id, code, initial_balance, balance, recipient_email, created_at)
+           VALUES (@id, @c, 2500, 2500, @e, @at)`, { id: newId('gc'), c: `GIFT-${stamp}-WXYZ`, e: buyer.email, at: nowIso() });
+await run(`INSERT INTO sms_verifications (id, phone, code_hash, ip, expires_at, created_at)
+           VALUES (@id, '+31612345678', 'h', '198.51.100.4', @at, @at)`, { id: newId('sv'), at: nowIso() });
+await run(`INSERT INTO daily_claims (id, user_id, day, streak_day, points, ip, created_at)
+           VALUES (@id, @u, '2026-10-01', 1, 5, '198.51.100.4', @at)`, { id: newId('dc'), u: buyer.id, at: nowIso() });
+const ticketId = newId('tkt');
+await run(`INSERT INTO support_tickets (id, number, user_id, subject, created_at, updated_at)
+           VALUES (@id, @n, @u, 'Waar blijft mijn code?', @at, @at)`, { id: ticketId, n: `T-${stamp}`, u: buyer.id, at: nowIso() });
+await run(`INSERT INTO ticket_messages (id, ticket_id, author_id, author_kind, body, created_at)
+           VALUES (@id, @t, @u, 'customer', 'Ik ben Sam Jansen uit Utrecht', @at)`, { id: newId('tm'), t: ticketId, u: buyer.id, at: nowIso() });
+await run(`INSERT INTO referrals (code, user_id, created_at) VALUES (@c, @u, @at)`, { c: `SAMJA${stamp}`, u: buyer.id, at: nowIso() });
+await run(`INSERT INTO audit_logs (id, actor_id, actor_email, action, created_at) VALUES (@id, @u, @e, 'order.cancel', @at)`,
+  { id: newId('aud'), u: buyer.id, e: buyer.email, at: nowIso() });
+
 console.log('\n— Export —');
 {
   const r = await fetch(`${base}/export?email=${encodeURIComponent(buyer.email)}`, { headers: admin.H });
@@ -56,7 +81,37 @@ console.log('\n— Export —');
   ok('…the account, the order with its items, the wallet and the newsletter row',
     d.account?.email === buyer.email && d.orders?.[0]?.items?.length === 1 && d.walletLedger?.length >= 1 && d.newsletter?.length === 1);
   const text = JSON.stringify(d);
-  ok('…and no secrets in it', !text.includes('JBSWY3DPEHPK3PXP') && !/refresh|code_hash/.test(text));
+  ok('…and no secrets in it', !text.includes('JBSWY3DPEHPK3PXP') && !/refresh|code_hash|token_hash/.test(text));
+  ok('…the waiver they agreed to, with each order', !!d.orders?.[0]?.consent_at && d.orders[0].consent_text === 'x');
+  ok('…the payment proof they sent, without the image itself',
+    d.paymentProofs?.length === 1 && d.paymentProofs[0].transaction_id === 'TX-778' && d.paymentProofs[0].screenshot_on_file === true
+      && !text.includes('89504e47'));
+  ok('…where they are signed in, their referral code and their check-ins',
+    d.signedIn?.length >= 1 && d.referralCodes?.[0]?.code === `SAMJA${stamp}` && d.dailyCheckIns?.length === 1);
+  ok('…a gift card sent to them, but not its code',
+    d.giftCardsReceived?.length === 1 && d.giftCardsReceived[0].code_ends_with === 'WXYZ' && !text.includes(`GIFT-${stamp}`));
+}
+
+console.log('\n— Screenshots nobody will review —');
+{
+  /* An order that stopped waiting on its proof without the proof being
+     confirmed or rejected — cancelled here; marked paid by hand is the same. */
+  const { forgetStaleScreenshots } = await import('../src/services/paymentProofService.js');
+  const other = await createOrder({ email: buyer.email, userId: buyer.id, items: [{ productId: product.id, quantity: 1 }],
+    consent: true, consentText: 'x' });
+  await run(`UPDATE orders SET status = 'cancelled' WHERE id = @id`, { id: other.id });
+  const staleShot = 'cd'.repeat(16);
+  await run(`INSERT INTO product_images (id, product_id, mime, bytes, byte_size, sha256, source, created_at)
+             VALUES (@id, NULL, 'image/png', '\\x89504e47', 4, 'y', 'proof', @at)`, { id: staleShot, at: nowIso() });
+  await run(`INSERT INTO payment_proofs (id, order_id, method, screenshot_url, amount, status, created_at)
+             VALUES (@id, @o, 'tikkie', @shot, 999, 'pending', @at)`,
+    { id: newId('prf'), o: other.id, shot: `/api/images/${staleShot}`, at: nowIso() });
+  const n = await forgetStaleScreenshots();
+  ok('a screenshot on a cancelled order is dropped by maintenance', n >= 1
+    && !(await get('SELECT screenshot_url FROM payment_proofs WHERE order_id=@o', { o: other.id }))?.screenshot_url
+    && !(await get('SELECT 1 FROM product_images WHERE id=@id', { id: staleShot })));
+  ok('…while one still waiting for review on an open order stays',
+    !!(await get('SELECT screenshot_url FROM payment_proofs WHERE order_id=@o', { o: order.id }))?.screenshot_url);
 }
 
 console.log('\n— Erase —');
@@ -75,6 +130,25 @@ console.log('\n— Erase —');
     o.total === order.total && /@erased\.invalid$/.test(o.email) && !b.full_name && !b.city && !b.deliveryDetails && b.creditApplied === 500, JSON.stringify(b));
   ok('sessions and the newsletter row are gone',
     !(await get('SELECT 1 FROM sessions WHERE user_id=@u', { u: buyer.id })) && !(await get('SELECT 1 FROM newsletter_signups WHERE email=@e', { e: buyer.email })));
+  ok('their first name and city are off the live feed',
+    !(await get('SELECT 1 FROM social_events WHERE order_id=@o', { o: order.id })));
+  const proof = await get('SELECT transaction_id, amount, screenshot_url, note, ip FROM payment_proofs WHERE order_id=@o', { o: order.id });
+  ok('the payment proof stays as bookkeeping, without the screenshot, the note or the IP',
+    proof?.transaction_id === 'TX-778' && proof.amount === 499 && !proof.screenshot_url && !proof.note && !proof.ip, JSON.stringify(proof));
+  ok('…and the screenshot itself is deleted', !(await get('SELECT 1 FROM product_images WHERE id=@id', { id: shotId })));
+  const card = await get('SELECT balance, recipient_email FROM gift_cards WHERE code=@c', { c: `GIFT-${stamp}-WXYZ` });
+  ok('a gift card sent to them still works but no longer names them', card?.balance === 2500 && card.recipient_email === null, JSON.stringify(card));
+  ok('the phone number SMS sign-in kept is gone',
+    !(await get(`SELECT 1 FROM sms_verifications WHERE phone='+31612345678'`)));
+  ok('check-ins keep their points but not their address',
+    (await get('SELECT ip FROM daily_claims WHERE user_id=@u', { u: buyer.id }))?.ip === null);
+  ok('support conversations are deleted',
+    !(await get('SELECT 1 FROM support_tickets WHERE id=@t', { t: ticketId })) && !(await get('SELECT 1 FROM ticket_messages WHERE ticket_id=@t', { t: ticketId })));
+  ok('the referral code made from their address is gone',
+    !(await get('SELECT 1 FROM referrals WHERE code=@c', { c: `SAMJA${stamp}` })));
+  ok('the security log keeps the row but not their address',
+    !!(await get(`SELECT 1 FROM audit_logs WHERE actor_id=@u AND action='order.cancel'`, { u: buyer.id }))
+      && !(await get('SELECT 1 FROM audit_logs WHERE lower(actor_email)=@e', { e: buyer.email })));
   const again = await (await fetch(`${base}/export?email=${encodeURIComponent(buyer.email)}`, { headers: admin.H })).json();
   ok('an export afterwards finds nothing under the old address', !again.account && !again.orders.length);
   const audited = await get(`SELECT metadata FROM audit_logs WHERE action='privacy.erase' ORDER BY created_at DESC LIMIT 1`);

@@ -7,6 +7,8 @@ import { useStats } from '../lib/useStats.js';
 import { useReviews } from '../lib/useReviews.js';
 import { usePageMeta } from '../lib/useMeta.js';
 import { useI18n } from '../lib/i18n.jsx';
+import { durationText } from '../lib/trustLines.js';
+import { starsOf } from '../lib/stars.js';
 import LiveActivity from '../components/store/LiveActivity.jsx';
 import CommunityMilestones from '../components/store/CommunityMilestones.jsx';
 import SellerIdentity from '../components/store/SellerIdentity.jsx';
@@ -53,9 +55,6 @@ export default function Trust() {
      string here overrode it — the tab said "Trust Center — ForgeMarket" above a page written in
      German. */
   usePageMeta();
-  const avgDelivery = stats.avgDeliverySeconds == null ? '—'
-    : stats.avgDeliverySeconds < 60 ? `< ${Math.max(1, Math.round(stats.avgDeliverySeconds))}s`
-    : `${Math.round(stats.avgDeliverySeconds / 60)}m`;
   const fmt = (n) => `${Number(n || 0).toLocaleString(document.documentElement.lang || 'nl')}`;
 
   return (
@@ -88,12 +87,21 @@ export default function Trust() {
           stats.delivered > 0
             ? { icon: CheckCircle2, value: fmt(stats.delivered), label: t('trust.sDelivered', 'Orders delivered'), color: 'text-violet-600 bg-violet-100' }
             : null,
-          stats.avgDeliverySeconds != null
-            ? { icon: Clock, value: avgDelivery, label: t('trust.sAvg', 'Average delivery'), color: 'text-emerald-600 bg-emerald-100' }
+          /* The median from payment to delivery, and over how many orders. This
+             was "Average delivery": the mean from ORDER to the order's last
+             edit, slow deliveries left out, and printed as "< 34s" for a
+             figure of about 34 seconds. The server sends nothing until there
+             are enough real orders to say it (MIN_SAMPLE). */
+          stats.medianDeliverySeconds != null
+            ? { icon: Clock, value: durationText(stats.medianDeliverySeconds, t),
+                label: t('trust.sMedian', 'Median time from payment to delivery · {n} orders', { n: fmt(stats.deliverySample) }),
+                color: 'text-emerald-600 bg-emerald-100' }
             : null,
-          // Real fulfilment success rate — only once orders have finished.
+          // Delivered ÷ paid orders that finished — only once there are enough of them.
           stats.successRate != null
-            ? { icon: ShieldCheck, value: `${stats.successRate}%`, label: t('trust.sSuccess', 'Successfully delivered'), color: 'text-emerald-600 bg-emerald-100' }
+            ? { icon: ShieldCheck, value: `${stats.successRate}%`,
+                label: t('trust.sSuccessOf', 'Delivered, of {n} paid orders', { n: fmt(stats.successSample) }),
+                color: 'text-emerald-600 bg-emerald-100' }
             : null,
           stats.reviews > 0
             ? { icon: Star, value: `${stats.rating}/5`, label: `${stats.reviews.toLocaleString(document.documentElement.lang || 'nl')} ${t('trust.sReviews', 'reviews')}`, color: 'text-amber-600 bg-amber-100' }
@@ -101,8 +109,11 @@ export default function Trust() {
           // Was `: '24/7'` when the member count is unset (the default). One
           // person cannot staff 24/7, and presenting it as a statistic on the
           // page called Trust Center is the worst possible place to overreach.
-          stats.discordMembers > 0
-            ? { icon: Users, value: stats.discordMembers.toLocaleString(document.documentElement.lang || 'nl'), label: t('trust.sMembers', 'Discord members'), color: 'text-blue-600 bg-blue-100' }
+          /* Discord's live count of members ONLINE, so that is its label. It
+             was shown as "Discord members" — the online count when the widget
+             answered, a hand-typed number when it did not. */
+          stats.discordOnline > 0
+            ? { icon: Users, value: fmt(stats.discordOnline), label: t('trust.sOnline', 'online in our Discord now'), color: 'text-blue-600 bg-blue-100' }
             : null,
         ].filter(Boolean);
         if (!cards.length) return null;
@@ -146,11 +157,9 @@ export default function Trust() {
         style={{ backgroundImage: 'linear-gradient(150deg,#6366f1,#8b5cf6)' }}>
         <span className="w-14 h-14 rounded-2xl bg-white/15 grid place-items-center shrink-0"><MessageCircle size={26} /></span>
         <div className="flex-1">
-          <h3 className="text-xl font-extrabold">
-            {stats.discordMembers > 0
-              ? `${stats.discordMembers.toLocaleString(document.documentElement.lang || 'nl')} ${t('trust.membersVouch', 'members can vouch for us')}`
-              : t('trust.joinVouch', 'Ask real buyers before you buy')}
-          </h3>
+          {/* Not "{n} members can vouch for us": being in a Discord server is
+              not vouching for anyone, and the n was the online count. */}
+          <h3 className="text-xl font-extrabold">{t('trust.joinVouch', 'Ask real buyers before you buy')}</h3>
           <p className="text-white/85 text-sm mt-1">{t('trust.discordSub', 'Public reviews, proof of delivery, and buyers you can ask before you spend a cent.')}</p>
         </div>
         <Link to="/discord" className="inline-flex items-center justify-center gap-2 bg-white text-indigo-600 font-semibold text-sm rounded-xl h-11 px-6 hover:bg-indigo-50 transition shrink-0">
@@ -165,14 +174,21 @@ export default function Trust() {
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-12">
             {reviews.slice(0, 6).map((r) => (
               <div key={r.id} className="bg-white rounded-2xl border border-slate-200/70 shadow-sm p-5 fm-lift">
-                <div className="flex text-amber-400 mb-2">{Array.from({ length: r.stars || 5 }).map((_, i) => <Star key={i} size={14} fill="currentColor" />)}</div>
+                {/* The stars this person gave, out of five. A review with none
+                    on record used to be drawn with five. */}
+                <div role="img" aria-label={t('stars.outOf5', '{n} out of 5 stars', { n: starsOf(r) })} className="flex text-amber-400 mb-2">
+                  {Array.from({ length: 5 }).map((_, i) => <Star key={i} size={14} fill={i < starsOf(r) ? 'currentColor' : 'none'} />)}
+                </div>
                 <p className="text-slate-600 text-sm">"{r.body}"</p>
                 <div className="flex items-center gap-2 mt-3 text-xs text-slate-400">
                   {/* The green check used to render on every review; only the
                       words were gated. A checkmark next to a name reads as
-                      verification on its own. */}
-                  {r.verified && <BadgeCheck size={13} className="text-emerald-500" />} {r.author}{r.product ? ` · ${r.product}` : ''}
-                  {r.verified ? <span className="inline-flex items-center gap-1 text-emerald-600 font-semibold">· {t('trust.verifiedBuyer', 'Verified buyer')}</span> : ''}
+                      verification on its own. `verified` is 0 or 1 from the
+                      database, and `0 && …` drew a stray "0" beside a vouch. */}
+                  {r.verified ? <BadgeCheck size={13} className="text-emerald-500" /> : null} {r.author}{r.product ? ` · ${r.product}` : ''}
+                  {r.verified
+                    ? <span className="inline-flex items-center gap-1 text-emerald-600 font-semibold">· {t('trust.verifiedBuyer', 'Verified buyer')}</span>
+                    : <span>· {t('reviews.discordVouch', 'Discord vouch')}</span>}
                 </div>
               </div>
             ))}

@@ -62,6 +62,34 @@ console.log('\n— Old IPs are forgotten, the rows are not —');
   ok('yesterday\'s IP is untouched', newRow?.ip === IP, String(newRow?.ip));
 }
 
+console.log('\n— Rows that are nothing but personal data go whole —');
+{
+  /* An SMS sign-in row is a phone number and a code hash. It is read while the
+     code lives (minutes); after that it was a phone number kept forever. */
+  await run(`INSERT INTO sms_verifications (id, phone, code_hash, ip, expires_at, created_at)
+             VALUES ('ipret_sv_old', '+31600000001', 'h', @ip, @old, @old),
+                    ('ipret_sv_new', '+31600000002', 'h', @ip, @new, @new)`,
+    { ip: IP, old: ago(3), new: new Date().toISOString() });
+  /* A daily check-in keeps the row (streaks and points) but its address only
+     as long as the one-account-per-connection check reads it — a day. */
+  const uid = `ipret_u_${Date.now()}`;
+  await run(`INSERT INTO users (id, email, created_at, updated_at) VALUES (@id, @e, @at, @at)`,
+    { id: uid, e: `${uid}@example.test`, at: new Date().toISOString() });
+  await run(`INSERT INTO daily_claims (id, user_id, day, streak_day, points, ip, created_at)
+             VALUES ('ipret_dc_old', @u, '2026-01-01', 1, 5, @ip, @old),
+                    ('ipret_dc_new', @u, '2026-01-02', 1, 5, @ip, @new)`,
+    { u: uid, ip: IP, old: ago(40), new: ago(0.5) });
+  await runMaintenance();
+  ok('a three-day-old SMS code row is gone, phone number and all',
+    !(await get(`SELECT 1 FROM sms_verifications WHERE id='ipret_sv_old'`)));
+  ok('…a fresh one is still there for the code that is still alive',
+    !!(await get(`SELECT 1 FROM sms_verifications WHERE id='ipret_sv_new'`)));
+  const dcOld = await get(`SELECT ip, points FROM daily_claims WHERE id='ipret_dc_old'`);
+  const dcNew = await get(`SELECT ip FROM daily_claims WHERE id='ipret_dc_new'`);
+  ok('a 40-day-old check-in keeps its points but not its address', dcOld?.points === 5 && dcOld?.ip == null, JSON.stringify(dcOld));
+  ok('…while today\'s still has it for the multi-account check', dcNew?.ip === IP, JSON.stringify(dcNew));
+}
+
 console.log('\n— The job reports what it did —');
 {
   const summary = await runMaintenance();

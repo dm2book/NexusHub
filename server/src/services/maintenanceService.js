@@ -175,6 +175,11 @@ export async function runMaintenance({ deadline = Date.now() + 26_000 } = {}) {
     const r = await run(`DELETE FROM otp_codes WHERE expires_at < @cut OR (consumed_at IS NOT NULL AND created_at < @cut)`,
       { cut: HOURS(2) });
     summary.otpPurged = r?.changes ?? 0;
+    /* The SMS sign-in codes, phone number and all. Read only while the code is
+       alive and for the per-number request cap (minutes); a row older than a
+       day is a phone number kept for nothing. */
+    const s = await run(`DELETE FROM sms_verifications WHERE created_at < @cut`, { cut: HOURS(48) });
+    summary.otpPurged += s?.changes ?? 0;
   } catch (e) { summary.otpError = e.message; }
 
   // 1b. Forget IP addresses once they have done their job.
@@ -200,6 +205,7 @@ export async function runMaintenance({ deadline = Date.now() + 26_000 } = {}) {
       sessions: 90,           // current state while active; pointless once long expired
       trusted_devices: 180,   // "is this the device you always use" needs history
       payment_proofs: 365,    // fraud evidence attached to money
+      daily_claims: 30,       // the one-account-per-connection check looks back a day
       coupon_redemptions: 365,
       // Read by fraud scoring: "has this address ordered under other emails
       // today" and "has a chargeback come from here". Both windows are days to
@@ -231,6 +237,13 @@ export async function runMaintenance({ deadline = Date.now() + 26_000 } = {}) {
     summary.ipsForgotten = cleared;
     if (failed.length) summary.ipForgetError = failed.join('; ');
   } catch (e) { summary.ipForgetError = e.message; }
+
+  // 1c. Payment screenshots whose order no longer waits on them.
+  try {
+    const { forgetStaleScreenshots } = await import('./paymentProofService.js');
+    const n = await forgetStaleScreenshots();
+    if (n) summary.screenshotsForgotten = n;
+  } catch (e) { summary.screenshotError = e.message; }
 
   // 2. Mark expired refresh sessions revoked so they drop out of "active sessions".
   try {

@@ -11,6 +11,8 @@ import { useI18n } from '../../lib/i18n.jsx';
 import { usePageMeta } from '../../lib/useMeta.js';
 import { useTrustpilot, useTrustpilotLinks } from '../../lib/useTrustpilot.js';
 import StarPicker from '../../components/StarPicker.jsx';
+import { durationText } from '../../lib/trustLines.js';
+import { starsOf, filledFor } from '../../lib/stars.js';
 
 /** "Write a review" — verified buyers pick one of their delivered orders. */
 function WriteReview({ t }) {
@@ -119,13 +121,12 @@ export default function Reviews() {
   const reviews = useReviews();
   const stats = useStats();
   const { t } = useI18n();
-  const avgDelivery = stats.avgDeliverySeconds == null ? '—'
-    : stats.avgDeliverySeconds < 60 ? `< ${Math.max(1, Math.round(stats.avgDeliverySeconds))}s`
-    : `${Math.round(stats.avgDeliverySeconds / 60)}m`;
   const fmt = (n) => `${Number(n || 0).toLocaleString(document.documentElement.lang || 'nl')}`;
 
+  /* The eyebrow said "Loved by gamers" above a page that may hold no review
+     at all: a verdict the page has not earned. It now names what is here. */
   return (
-    <InfoShell eyebrow={t('reviews.eyebrow', 'Loved by gamers')} title={t('reviews.title', 'Customer reviews')}
+    <InfoShell eyebrow={t('reviews.eyebrow', 'Feedback')} title={t('reviews.title', 'Customer reviews')}
       subtitle={t('reviews.sub', 'Real feedback from verified buyers, plus vouches left in ForgeMarket Support.')} narrow={false}>
       {trustpilot && (
         <a href={trustpilot} target="_blank" rel="noreferrer"
@@ -144,8 +145,12 @@ export default function Reviews() {
           <>
             <div className="text-center">
               <div className="text-4xl font-display gradient-text">{stats.rating}/5</div>
-              <div aria-hidden="true" className="flex gap-0.5 justify-center text-amber-400 mt-1">{Array.from({ length: 5 }).map((_, i) => <Star key={i} size={16} fill="currentColor" />)}</div>
-              <div className="text-slate-500 text-sm mt-1">{t('home.basedOn', 'Based on {n} reviews', { n: stats.reviews.toLocaleString(document.documentElement.lang || 'nl') })}</div>
+              {/* As many stars as the rating, not five whatever it says. */}
+              <div aria-hidden="true" className="flex gap-0.5 justify-center text-amber-400 mt-1">{Array.from({ length: 5 }).map((_, i) => <Star key={i} size={16} fill={i < filledFor(stats.rating) ? 'currentColor' : 'none'} />)}</div>
+              {/* The rating counts verified buyers only; the list below also
+                  holds Discord vouches, so "N reviews" under a longer list read
+                  as if every card had voted. */}
+              <div className="text-slate-500 text-sm mt-1">{t('reviews.basedOnVerified', 'Based on {n} verified reviews', { n: fmt(stats.reviews) })}</div>
             </div>
             <div className="h-12 w-px bg-white/10 hidden sm:block" />
           </>
@@ -156,13 +161,20 @@ export default function Reviews() {
           // so the UI can hide it — and printing 100% beside "0 Delivered" on
           // launch day reads as either a lie or a bug. Drop the tile instead, and
           // let the grid follow how many real numbers there are.
+          /* Each tile only when it has a number: a dash under "Avg. delivery"
+             was the old way of saying "nothing yet". The delivery time is the
+             median from payment to delivery, and says over how many orders. */
           const tiles = [
-            [fmt(stats.delivered), t('reviews.delivered', 'Delivered')],
-            stats.successRate != null ? [`${stats.successRate}%`, t('home.s.fulfilled', 'Fulfilled')] : null,
-            [avgDelivery, t('reviews.avgDelivery', 'Avg. delivery')],
+            stats.delivered > 0 ? [fmt(stats.delivered), t('reviews.delivered', 'Delivered')] : null,
+            stats.successRate != null
+              ? [`${stats.successRate}%`, t('trust.sSuccessOf', 'Delivered, of {n} paid orders', { n: fmt(stats.successSample) })] : null,
+            stats.medianDeliverySeconds != null
+              ? [durationText(stats.medianDeliverySeconds, t),
+                t('trust.sMedian', 'Median time from payment to delivery · {n} orders', { n: fmt(stats.deliverySample) })] : null,
           ].filter(Boolean);
+          if (!tiles.length) return null;
           return (
-            <div className={`grid ${tiles.length === 3 ? 'grid-cols-3' : 'grid-cols-2'} gap-6 text-center`}>
+            <div className={`grid ${tiles.length === 3 ? 'grid-cols-3' : tiles.length === 2 ? 'grid-cols-2' : 'grid-cols-1'} gap-6 text-center`}>
               {tiles.map(([n, l]) => (
                 <div key={l}><div className="text-2xl font-display text-white">{n}</div><div className="text-slate-500 text-xs">{l}</div></div>
               ))}
@@ -182,8 +194,10 @@ export default function Reviews() {
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5 max-w-5xl mx-auto">
         {reviews.map((r) => (
           <div key={r.id} className="card p-6 fm-lift">
-            <div role="img" aria-label={t('stars.outOf5', '{n} out of 5 stars', { n: r.stars || 5 })}
-              className="flex gap-0.5 mb-3 text-amber-400">{Array.from({ length: r.stars || 5 }).map((_, i) => <Star key={i} size={14} fill="currentColor" />)}</div>
+            {/* The stars this person gave. `r.stars || 5` drew five for a
+                review with none on record, and told a screen reader so. */}
+            <div role="img" aria-label={t('stars.outOf5', '{n} out of 5 stars', { n: starsOf(r) })}
+              className="flex gap-0.5 mb-3 text-amber-400">{Array.from({ length: 5 }).map((_, i) => <Star key={i} size={14} fill={i < starsOf(r) ? 'currentColor' : 'none'} />)}</div>
             <p className="text-slate-200">“{r.body}”</p>
             <div className="flex items-center gap-3 mt-5">
               {r.avatarUrl
@@ -194,7 +208,8 @@ export default function Reviews() {
                     A Discord vouch has no order behind it, so it gets neither
                     the badge nor the word "verified". */}
                 <div className="text-white text-sm flex items-center gap-1">
-                  {r.author} {r.verified && <BadgeCheck size={13} className="text-emerald-400" />}
+                  {/* A ternary: `verified` is 0 or 1, and `0 && …` printed a "0". */}
+                  {r.author} {r.verified ? <BadgeCheck size={13} className="text-emerald-400" /> : null}
                 </div>
                 <div className="text-slate-500 text-xs flex items-center gap-1">
                   {r.verified

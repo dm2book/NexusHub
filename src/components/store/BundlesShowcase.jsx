@@ -94,7 +94,7 @@ export default function BundlesShowcase({ variant = 'grid' }) {
                   prices, the discount it gives, and what is left to pay. */}
               <div className="flex flex-wrap items-baseline gap-x-2 mt-2">
                 <span className="fm-num text-violet-700 text-[17px]">{money(b.total, b.currency)}</span>
-                <s className="text-[13px] text-slate-500">{money(b.subtotal, b.currency)}</s>
+                <span className="text-[12.5px] text-slate-500">{t('bundles.separately', 'Bought separately')} {money(b.subtotal, b.currency)}</span>
                 <span className="ml-auto text-[12.5px] font-semibold text-emerald-700">
                   {t('bundles.youSave', 'You save')} {money(b.discount, b.currency)}
                 </span>
@@ -141,7 +141,9 @@ export default function BundlesShowcase({ variant = 'grid' }) {
             </p>
             <div className="flex items-baseline gap-2 mt-3">
               <span className="text-2xl font-extrabold text-violet-600">{money(b.total, b.currency)}</span>
-              <span className="text-slate-400 text-sm line-through">{money(b.subtotal, b.currency)}</span>
+              {/* What the parts cost apart today, said in words. Struck through it
+                  read as an earlier price of the bundle, which it never had. */}
+              <span className="text-slate-500 text-sm">{t('bundles.separately', 'Bought separately')} {money(b.subtotal, b.currency)}</span>
             </div>
             <button onClick={() => addBundle(b)} className="btn-primary w-full mt-4 py-2.5">
               <Plus size={16} /> {t('bundle.add', 'Add bundle')} <ArrowRight size={15} className="fm-nudge" />

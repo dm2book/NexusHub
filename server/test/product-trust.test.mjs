@@ -99,10 +99,11 @@ console.log('\n— What the product page draws —');
   ok('nothing sent: no lines, so no block', trustLines(null, t).length === 0 && trustLines({}, t).length === 0);
   ok('only stock sent: one line', trustLines({ stock: { state: 'in_stock' } }, t).map((l) => l.k).join() === 'stock');
   const all = trustLines({ stock: { state: 'in_stock', left: 2 }, lastDelivery: at(DAY), successfulOrders: 12, sample: 14,
-    fulfillmentRate: 92.9, refundRate: 7.1, avgDelivery: { seconds: 5400, orders: 10 }, score: 81 }, t);
+    fulfillmentRate: 92.9, refundRate: 7.1, medianDelivery: { seconds: 5400, orders: 10 }, score: 81 }, t);
   ok('every field sent: a line each', all.map((l) => l.k).join() === 'stock,last,orders,fulfil,refund,avg,score');
   ok('…with the real numbers in them', /2 left/.test(all[0].text) && /12 successful/.test(all[2].text) && /92\.9% delivered, of 14/.test(all[3].text)
-    && /1\.5 h .*10 orders/.test(all[5].text) && /81\/100/.test(all[6].text));
+    // the page tells a buyer the median, and says it is one (productTrustService)
+    && /1\.5 h .*median of 10 orders/.test(all[5].text) && /81\/100/.test(all[6].text));
   ok('one order reads in the singular', trustLines({ successfulOrders: 1 }, t)[0].text === '1 successful order');
   ok('durations read as minutes, hours, days', durationParts(600)[2] === 10 && durationParts(7200)[0] === 'tr.hours' && durationParts(3 * 86_400)[0] === 'tr.days');
   const fs = await import('node:fs');

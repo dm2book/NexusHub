@@ -3,6 +3,7 @@ import { run, get, all, nowIso } from '../db/index.js';
 import { newId } from '../utils/ids.js';
 import { notFound, badRequest } from '../utils/errors.js';
 import { postDropEvent } from './discordService.js';
+import { priorPrice } from '../../../src/lib/priceHistory.js';
 
 const parse = (s) => { try { return JSON.parse(s || '{}'); } catch { return {}; } };
 const hydrate = (r) => {
@@ -114,11 +115,40 @@ export async function listProducts({ activeOnly = false } = {}) {
   const clause = activeOnly ? 'WHERE active = 1 AND kind <> ALL(@retired)' : '';
   const rows = await all(`SELECT * FROM products ${clause} ORDER BY created_at DESC`,
     { retired: [...RETIRED_KINDS] });
-  return rows.map(hydrate);
+  return lawfulSalePrices(rows.map(hydrate));
 }
 
 export async function getProduct(id) {
-  return hydrate(await get('SELECT * FROM products WHERE id = @id', { id }));
+  const product = hydrate(await get('SELECT * FROM products WHERE id = @id', { id }));
+  return product ? (await lawfulSalePrices([product]))[0] : product;
+}
+
+/**
+ * The "was" price a sale may be shown against (EU Omnibus rule, Prijzenbesluit
+ * art. 6a): the LOWEST price this product had in the 30 days before today's
+ * price began — not whatever the owner typed into compareAt. A typed €15 on a
+ * card that sold for €12 until yesterday shows €12; a price that never changed
+ * shows no reduction at all.
+ *
+ * Done here, once, so every place that draws a struck-through price — product
+ * cards, the product page, the wishlist, feeds — gets the same lawful figure.
+ * The product cards drew the typed value with a "-20%" badge beside it. Only
+ * products with a compareAt set cost a query, and that is one for all of them.
+ */
+async function lawfulSalePrices(products) {
+  const onSale = products.filter((p) => p?.compareAtPrice);
+  if (!onSale.length) return products;
+  const rows = await all(
+    `SELECT product_id, price, created_at AS at FROM price_history
+      WHERE product_id = ANY(@ids) ORDER BY created_at`, { ids: onSale.map((p) => p.id) }).catch(() => null);
+  const byProduct = new Map();
+  for (const r of rows || []) {
+    if (!byProduct.has(r.product_id)) byProduct.set(r.product_id, []);
+    byProduct.get(r.product_id).push(r);
+  }
+  // No history to read is no proof of an earlier price, so no reduction.
+  for (const p of onSale) p.compareAtPrice = priorPrice(byProduct.get(p.id) || [], p.price);
+  return products;
 }
 
 export async function createProduct(p = {}) {
