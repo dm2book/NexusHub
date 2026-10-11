@@ -52,7 +52,7 @@ export default function TicketDetail() {
       {ticket.status !== 'closed' && (
         <div className="flex gap-3">
           <textarea rows={2} value={body} onChange={(e) => setBody(e.target.value)}
-            className="input" placeholder={t('acc.ticket.replyPlaceholder', 'Write a reply…')} />
+            className="input" placeholder={t('acc.ticket.replyPlaceholder', 'Write a reply…')} aria-label={t('acc.ticket.replyPlaceholder', 'Write a reply…')} />
           <button onClick={reply} className="btn-primary px-5" aria-label={t('acc.ticket.send', 'Send reply')} title={t('acc.ticket.send', 'Send reply')}><Send size={16} /></button>
         </div>
       )}

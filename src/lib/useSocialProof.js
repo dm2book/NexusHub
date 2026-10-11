@@ -16,13 +16,13 @@ let statsCache = null;
  * seconds — the tickers rotate in on their own timers — and the request used to
  * go out in the same wave as the product itself, on a phone connection already
  * carrying the bundle, the fonts and the artwork. So the default waits, and a
- * caller whose first frame is even later (SiteExtras: six seconds) says so.
+ * caller whose first frame is even later says so.
  */
 /**
  * ONE poller for the whole page, and only while it can do something useful.
  *
  * Three components read this feed — the activity ticker, the recently-delivered
- * strip and SiteExtras — and each used to run its own `setInterval`. Three
+ * strip and a popup since removed — and each used to run its own `setInterval`. Three
  * requests a minute, per open tab, for one shared answer. Seen in the
  * production logs at one a minute per component, indefinitely, on a shop that
  * had not sold anything yet.

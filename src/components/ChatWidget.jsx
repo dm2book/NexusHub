@@ -23,6 +23,7 @@ const COPY = {
     title: 'Forge Assistant',
     status: 'Answers from live shop data',
     placeholder: 'Ask anything…',
+    send: 'Send',
     greeting: "Hey! I'm Forge ⚡ Ask me about prices, delivery, paying or your order — or paste an order number and I'll look it up.",
     offline: "I can't reach the shop right now, so I'd rather say nothing than guess. Try again in a moment, or ask us on Discord — a real person answers there.",
     browse: 'Browse all →',
@@ -35,6 +36,7 @@ const COPY = {
     title: 'Forge Assistent',
     status: 'Antwoordt met echte winkelgegevens',
     placeholder: 'Stel je vraag…',
+    send: 'Versturen',
     greeting: 'Hoi! Ik ben Forge ⚡ Vraag me naar prijzen, levertijd, betalen of je bestelling — of plak je bestelnummer, dan zoek ik het op.',
     offline: 'Ik kan de winkel nu niet bereiken, en dan zeg ik liever niets dan iets verkeerds. Probeer het zo nog eens, of vraag het op Discord — daar antwoordt een mens.',
     browse: 'Bekijk alles →',
@@ -47,6 +49,7 @@ const COPY = {
     title: 'Forge-Assistent',
     status: 'Antwortet mit echten Shop-Daten',
     placeholder: 'Frag einfach…',
+    send: 'Senden',
     greeting: 'Hi! Ich bin Forge ⚡ Frag mich nach Preisen, Lieferung, Bezahlen oder deiner Bestellung — oder füg deine Bestellnummer ein, dann sehe ich nach.',
     offline: 'Ich erreiche den Shop gerade nicht, und dann sage ich lieber nichts als etwas Falsches. Versuch es gleich noch einmal oder frag uns auf Discord — dort antwortet ein Mensch.',
     browse: 'Alles ansehen →',
@@ -59,6 +62,7 @@ const COPY = {
     title: 'Assistant Forge',
     status: 'Répond avec les vraies données de la boutique',
     placeholder: 'Pose ta question…',
+    send: 'Envoyer',
     greeting: 'Salut ! Je suis Forge ⚡ Demande-moi les prix, la livraison, le paiement ou ta commande — ou colle ton numéro de commande et je le retrouve.',
     offline: 'Je n’arrive pas à joindre la boutique pour le moment, et je préfère ne rien dire plutôt que de me tromper. Réessaie dans un instant, ou demande-nous sur Discord — une vraie personne y répond.',
     browse: 'Voir tout →',
@@ -199,10 +203,11 @@ export default function ChatWidget() {
               onChange={(e) => setInput(e.target.value)}
               maxLength={500}
               placeholder={L.placeholder}
+              aria-label={L.placeholder}
               className="input py-2.5 text-base"
             />
             <button type="submit" disabled={!input.trim() || typing}
-                    className="btn-primary w-11 h-11 shrink-0 !px-0 rounded-xl disabled:opacity-40" aria-label="Send">
+                    className="btn-primary w-11 h-11 shrink-0 !px-0 rounded-xl disabled:opacity-40" aria-label={L.send}>
               <Send size={17} />
             </button>
           </form>

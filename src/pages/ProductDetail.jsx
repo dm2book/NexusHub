@@ -643,7 +643,7 @@ export default function ProductDetail() {
                   <button onClick={addToCart} className="btn-ghost py-3"><ShoppingCart size={18} /> {t('product.addToCart', 'Add to cart')}</button>
                 </>
               )}
-              <button onClick={() => toggle(product.id)} aria-label="Wishlist"
+              <button onClick={() => toggle(product.id)} aria-label={t('nav.wishlist', 'Wishlist')} aria-pressed={wished}
                 className={`btn-ghost px-3.5 ${wished ? 'text-pink-500' : ''}`}>
                 <Heart size={18} fill={wished ? 'currentColor' : 'none'} />
               </button>

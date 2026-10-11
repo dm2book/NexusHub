@@ -36,9 +36,9 @@ export default function Settings() {
         <h3 className="text-white mb-4">{t('acc.settings.profile', 'Profile')}</h3>
         <div className="space-y-4">
           <div><label className="label">{t('acc.settings.email', 'Email')}</label>
-            <input className="input opacity-60" value={user?.email} disabled /></div>
+            <input className="input opacity-60" value={user?.email} disabled aria-label={t('acc.settings.email', 'Email')} /></div>
           <div><label className="label">{t('acc.settings.displayName', 'Display name')}</label>
-            <input className="input" value={displayName} onChange={(e) => setDisplayName(e.target.value)} /></div>
+            <input className="input" value={displayName} onChange={(e) => setDisplayName(e.target.value)} aria-label={t('acc.settings.displayName', 'Display name')} /></div>
           <button onClick={saveProfile} className="btn-primary">{t('acc.settings.saveProfile', 'Save profile')}</button>
         </div>
       </div>
@@ -129,7 +129,7 @@ function Toggle({ label, checked, onChange }) {
   return (
     <label className="flex items-center justify-between cursor-pointer">
       <span className="text-slate-300 text-sm">{label}</span>
-      <button type="button" onClick={() => onChange(!checked)}
+      <button type="button" onClick={() => onChange(!checked)} role="switch" aria-checked={checked} aria-label={label}
         className={`w-11 h-6 rounded-full transition relative ${checked ? 'bg-primary' : 'bg-white/10'}`}>
         <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition ${checked ? 'left-5' : 'left-0.5'}`} />
       </button>
@@ -179,8 +179,8 @@ function TrustedDevices() {
                 <div className="flex-1 min-w-0">
                   {editing === d.id ? (
                     <div className="flex gap-2">
-                      <input className="input py-1 text-sm" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
-                      <button onClick={() => rename(d.id)} className="btn-primary px-3 py-1 text-xs"><Check size={13} /></button>
+                      <input className="input py-1 text-sm" value={name} onChange={(e) => setName(e.target.value)} autoFocus aria-label={t('ui.deviceName', 'Device name')} />
+                      <button onClick={() => rename(d.id)} aria-label={t('ui.saveName', 'Save name')} className="btn-primary px-3 py-1 text-xs"><Check size={13} /></button>
                     </div>
                   ) : (
                     <>
@@ -190,7 +190,7 @@ function TrustedDevices() {
                   )}
                 </div>
                 {editing !== d.id && (
-                  <button onClick={() => { setEditing(d.id); setName(d.name || ''); }} className="p-1.5 text-slate-400 hover:text-white"><Pencil size={14} /></button>
+                  <button onClick={() => { setEditing(d.id); setName(d.name || ''); }} aria-label={t('ui.rename', 'Rename')} className="p-1.5 text-slate-400 hover:text-white"><Pencil size={14} /></button>
                 )}
                 <button onClick={() => revoke(d.id)} className="text-xs text-slate-400 hover:text-red-400">{t('acc.settings.remove', 'Remove')}</button>
               </div>

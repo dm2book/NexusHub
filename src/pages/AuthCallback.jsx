@@ -2,10 +2,12 @@ import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { PageLoader } from '../components/ui.jsx';
+import { useI18n } from '../lib/i18n.jsx';
 
 /** OAuth providers redirect here with #token=… in the fragment. */
 export default function AuthCallback() {
   const { login } = useAuth();
+  const { t } = useI18n();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -22,5 +24,5 @@ export default function AuthCallback() {
     }
   }, []);
 
-  return <PageLoader label="Completing sign in…" />;
+  return <PageLoader label={t('auth.completing', 'Completing sign in…')} />;
 }

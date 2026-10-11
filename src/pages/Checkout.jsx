@@ -681,6 +681,7 @@ export default function Checkout() {
                 <span className="text-slate-500 text-xs">({money(creditBalance, currency)} {t('checkout.available', 'available')})</span>
               </span>
               <button type="button" onClick={() => setUseCredit((v) => !v)}
+                role="switch" aria-checked={useCredit} aria-label={t('checkout.useCredit', 'Use store credit')}
                 className={`w-11 h-6 rounded-full transition relative shrink-0 ${useCredit ? 'bg-primary' : 'bg-white/10'}`}>
                 <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition ${useCredit ? 'left-5' : 'left-0.5'}`} />
               </button>
@@ -840,18 +841,19 @@ function PaymentProofForm({ orderId, email, method }) {
       <h3 className="text-white font-medium mb-1">{t('proof.title', 'Already paid? Confirm it')}</h3>
       <p className="text-slate-400 text-sm mb-3">{t('proof.sub', 'Paste your payment reference / transaction ID (and optionally a screenshot link). This speeds up verification a lot.')}</p>
       <div className="space-y-2.5">
-        <input value={txn} onChange={(e) => setTxn(e.target.value)} className="input" placeholder={t('proof.txnPh', 'Transaction ID / payment reference')} />
+        <input value={txn} onChange={(e) => setTxn(e.target.value)} className="input" placeholder={t('proof.txnPh', 'Transaction ID / payment reference')}
+          aria-label={t('proof.txnPh', 'Transaction ID / payment reference')} />
         {shot.startsWith('data:') ? (
           <div className="input flex items-center justify-between gap-2">
             <span className="flex items-center gap-2 text-sm text-slate-300">
               <img src={shot} alt="" className="w-8 h-8 rounded object-cover" /> {t('proof.attached', 'Screenshot attached')}
             </span>
-            <button type="button" onClick={() => setShot('')} className="text-slate-500 hover:text-red-400 text-sm">✕</button>
+            <button type="button" onClick={() => setShot('')} aria-label={t('ui.removeScreenshot', 'Remove screenshot')} className="text-slate-500 hover:text-red-400 text-sm"><span aria-hidden="true">✕</span></button>
           </div>
         ) : (
           <div className="flex gap-2">
             <input value={shot} onChange={(e) => setShot(e.target.value)} className="input flex-1"
-              placeholder={t('proof.shotPh', 'Screenshot link (optional)')} />
+              placeholder={t('proof.shotPh', 'Screenshot link (optional)')} aria-label={t('proof.shotPh', 'Screenshot link (optional)')} />
             {/* Buyers pay on a phone — the receipt is already in their camera roll. */}
             <label className={`btn-ghost text-sm whitespace-nowrap cursor-pointer ${shotBusy ? 'opacity-60 pointer-events-none' : ''}`}>
               {shotBusy ? '…' : t('proof.upload', 'Upload')}

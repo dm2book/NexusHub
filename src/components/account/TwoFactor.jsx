@@ -107,7 +107,8 @@ export default function TwoFactor() {
               </a>
               <div className="flex gap-2 mt-3">
                 <input className="input py-2 w-36 text-center font-mono tracking-widest" placeholder="123456"
-                  inputMode="numeric" maxLength={6} value={code}
+                  inputMode="numeric" maxLength={6} value={code} autoComplete="one-time-code"
+                  aria-label={t('ui.appCode', 'Code from your authenticator app')}
                   onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))} />
                 <button onClick={enable} disabled={busy || code.length !== 6} className="btn-primary">{t('acc.2fa.confirm', 'Confirm')}</button>
                 <button onClick={() => setSetup(null)} className="btn-ghost">{t('acc.2fa.cancel', 'Cancel')}</button>

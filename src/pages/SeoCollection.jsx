@@ -51,7 +51,7 @@ export default function SeoCollection() {
   if (!page || !products) return <PageLoader />;
   return (
     <div className="section py-10">
-      <nav className="text-sm text-slate-500 mb-4"><Link to="/" className="hover:text-violet-600">Home</Link> / <Link to="/shop" className="hover:text-violet-600">Shop</Link> / <span className="text-slate-700">{page.copy.h1}</span></nav>
+      <nav className="text-sm text-slate-500 mb-4"><Link to="/" className="hover:text-violet-600">{t('nav.home', 'Home')}</Link> / <Link to="/shop" className="hover:text-violet-600">{t('footer.shop', 'Shop')}</Link> / <span className="text-slate-700">{page.copy.h1}</span></nav>
       <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900">{page.copy.h1}</h1>
       <p className="text-slate-600 mt-2 max-w-2xl">{page.copy.intro}</p>
       <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 mt-6" data-testid="seo-products">
