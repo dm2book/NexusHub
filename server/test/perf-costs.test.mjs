@@ -95,7 +95,6 @@ console.log('\nâ€” The runtime config is fetched once, not once per component â€
 
   // Every consumer must go through it, or the dedupe is decorative.
   const consumers = [
-    '../../src/components/SiteExtras.jsx',
     '../../src/components/store/AnnouncementBar.jsx',
     '../../src/lib/useTrustpilot.js',
     '../../src/lib/useCategoryLogos.js',

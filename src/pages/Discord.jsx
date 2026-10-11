@@ -74,7 +74,7 @@ export default function Discord() {
   const JoinBtn = ({ className = '' }) => (
     invite
       ? <a href={invite} target="_blank" rel="noreferrer" className={`btn-primary ${className}`} style={{ background: 'linear-gradient(120deg,#5865F2,#a855f7)' }}><MessageCircle size={18} /> {t('discord.join', 'Join ForgeMarket Support')}</a>
-      : <span className={`btn-ghost cursor-default ${className}`} title="Invite link not configured yet"><MessageCircle size={18} /> {t('discord.soon', 'Invite coming soon')}</span>
+      : <span className={`btn-ghost cursor-default ${className}`} title={t('discord.soon', 'Invite coming soon')}><MessageCircle size={18} /> {t('discord.soon', 'Invite coming soon')}</span>
   );
 
   return (

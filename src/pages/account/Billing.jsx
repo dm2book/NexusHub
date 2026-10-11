@@ -28,7 +28,7 @@ export default function Billing() {
 
   const field = (key, label) => (
     <div><label className="label">{label}</label>
-      <input className="input" value={form[key]} onChange={(e) => setForm({ ...form, [key]: e.target.value })} /></div>
+      <input className="input" value={form[key]} onChange={(e) => setForm({ ...form, [key]: e.target.value })} aria-label={label} /></div>
   );
 
   return (

@@ -71,7 +71,8 @@ export default function Wallet() {
         <div className="flex-1">
           <label className="label flex items-center gap-1.5"><Gift size={13} className="text-pink-400" /> {t('acc.wallet.redeemTitle', 'Redeem a gift card')}</label>
           <input className="input font-mono" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())}
-            placeholder="GIFT-XXXX-XXXX-XXXX-XXXX" onKeyDown={(e) => e.key === 'Enter' && redeem()} />
+            placeholder="GIFT-XXXX-XXXX-XXXX-XXXX" onKeyDown={(e) => e.key === 'Enter' && redeem()}
+            aria-label={t('acc.wallet.redeemTitle', 'Redeem a gift card')} />
         </div>
         <button onClick={redeem} disabled={busy || !code.trim()} className="btn-primary sm:w-40 py-2.5">{busy ? t('acc.wallet.redeeming', 'Redeeming…') : t('acc.wallet.redeem', 'Redeem')}</button>
       </div>

@@ -248,7 +248,7 @@ export default function Login() {
             <OtpInput key={otpKey} onComplete={verifyTotp} disabled={busy} />
 
             {error && <p className="text-sm text-red-300 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2 text-center">{error}</p>}
-            {busy && <div className="flex items-center justify-center gap-2 text-sm text-slate-400"><Loader2 size={16} className="animate-spin" /> Verifying…</div>}
+            {busy && <div className="flex items-center justify-center gap-2 text-sm text-slate-400"><Loader2 size={16} className="animate-spin" /> {t('login.verifying', 'Verifying…')}</div>}
 
             <button type="button" onClick={() => { setStep('id'); setTotpTicket(null); setError(''); }}
               className="text-sm text-slate-400 hover:text-white w-full text-center">
@@ -350,6 +350,7 @@ export default function Login() {
 
 /** 6 OTP boxes with auto-focus, auto-advance, backspace and full paste support. */
 function OtpInput({ onComplete, disabled, sms = false }) {
+  const { t } = useI18n();
   const [vals, setVals] = useState(Array(OTP_LEN).fill(''));
   const refs = useRef([]);
 
@@ -404,12 +405,13 @@ function OtpInput({ onComplete, disabled, sms = false }) {
   }, [sms]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div className="flex justify-center gap-2"
+    <div className="flex justify-center gap-2" role="group" aria-label={t('ui.codeGroup', 'Six-digit code')}
       onPaste={(e) => { e.preventDefault(); onPaste(e.clipboardData.getData('text')); }}>
       {vals.map((v, i) => (
         <input key={i} ref={(el) => (refs.current[i] = el)}
           value={v} onChange={(e) => onChange(i, e)} onKeyDown={(e) => onKeyDown(i, e)}
           disabled={disabled} inputMode="numeric" autoComplete="one-time-code" maxLength={1}
+          aria-label={t('ui.codeDigit', 'Digit {n} of 6', { n: i + 1 })}
           className="w-11 h-14 sm:w-12 rounded-xl bg-white border border-slate-300 text-slate-900 text-center text-2xl font-mono caret-violet-600 shadow-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/30 transition disabled:opacity-50" />
       ))}
     </div>

@@ -45,8 +45,8 @@ export default function Referrals() {
 
         <label className="label">{t('acc.referrals.yourLink', 'Your referral link')}</label>
         <div className="flex gap-2">
-          <input readOnly value={refLink} className="input font-mono text-sm" />
-          <button onClick={() => copy(refLink, t('acc.referrals.linkCopied', 'Referral link copied'))} className="btn-primary px-4">{copied ? <Check size={15} /> : <Copy size={15} />}</button>
+          <input readOnly value={refLink} className="input font-mono text-sm" aria-label={t('acc.referrals.yourLink', 'Your referral link')} />
+          <button onClick={() => copy(refLink, t('acc.referrals.linkCopied', 'Referral link copied'))} aria-label={t('ui.copy', 'Copy')} className="btn-primary px-4">{copied ? <Check size={15} /> : <Copy size={15} />}</button>
           <button onClick={share} className="btn-ghost px-4" aria-label={t('acc.referrals.share', 'Share')}><Share2 size={15} /></button>
         </div>
       </div>

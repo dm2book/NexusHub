@@ -185,7 +185,8 @@ export default function OrderDetail() {
                     ))}
                   </div>
                   <textarea value={reviewBody} onChange={(e) => setReviewBody(e.target.value)} rows={3} maxLength={600}
-                    className="input" placeholder={t('acc.order.reviewPlaceholder', 'Tell other buyers about your experience…')} />
+                    className="input" placeholder={t('acc.order.reviewPlaceholder', 'Tell other buyers about your experience…')}
+                    aria-label={t('acc.order.reviewPlaceholder', 'Tell other buyers about your experience…')} />
                   <button onClick={submitReview} disabled={reviewBusy} className="btn-primary mt-3 text-sm">
                     {reviewBusy ? t('acc.order.submitting', 'Submitting…') : t('acc.order.submitReview', 'Submit review')}
                   </button>
@@ -210,7 +211,7 @@ export default function OrderDetail() {
                     </div>
                     {reveal[d.id] ? (
                       <button onClick={() => { navigator.clipboard?.writeText(reveal[d.id]); toast.success(t('acc.order.copied', 'Copied')); }}
-                        className="btn-ghost text-sm"><Copy size={14} /></button>
+                        aria-label={t('ui.copy', 'Copy')} className="btn-ghost text-sm"><Copy size={14} /></button>
                     ) : (
                       <button onClick={() => revealDelivery(d)} className="btn-primary text-sm">
                         <Download size={14} /> {t('acc.order.reveal', 'Reveal')}
@@ -245,7 +246,7 @@ export default function OrderDetail() {
         <RefundMethodChoice value={refundMethod} onChange={setRefundMethod} />
         <p className="text-slate-400 text-sm mb-3">{t('acc.order.refundWhy', 'Tell us why you’d like a refund for {number}.', { number: order.number })}</p>
         <textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={4}
-          className="input" placeholder={t('acc.order.reasonPlaceholder', 'Reason (optional)')} />
+          className="input" placeholder={t('acc.order.reasonPlaceholder', 'Reason (optional)')} aria-label={t('acc.order.reasonPlaceholder', 'Reason (optional)')} />
       </Modal>
     </div>
   );

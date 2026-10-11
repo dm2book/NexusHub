@@ -63,10 +63,10 @@ export default function Tickets() {
         </>}>
         <div className="space-y-4">
           <div><label className="label">{t('acc.tickets.subject', 'Subject')}</label>
-            <input className="input" value={form.subject}
+            <input className="input" value={form.subject} aria-label={t('acc.tickets.subject', 'Subject')}
               onChange={(e) => setForm({ ...form, subject: e.target.value })} /></div>
           <div><label className="label">{t('acc.tickets.category', 'Category')}</label>
-            <select className="input" value={form.category}
+            <select className="input" value={form.category} aria-label={t('acc.tickets.category', 'Category')}
               onChange={(e) => setForm({ ...form, category: e.target.value })}>
               <option value="general">{t('acc.tickets.cat.general', 'General')}</option>
               <option value="delivery">{t('acc.tickets.cat.delivery', 'Delivery')}</option>
@@ -74,7 +74,7 @@ export default function Tickets() {
               <option value="billing">{t('acc.tickets.cat.billing', 'Billing')}</option>
             </select></div>
           <div><label className="label">{t('acc.tickets.message', 'Message')}</label>
-            <textarea rows={4} className="input" value={form.message}
+            <textarea rows={4} className="input" value={form.message} aria-label={t('acc.tickets.message', 'Message')}
               onChange={(e) => setForm({ ...form, message: e.target.value })} /></div>
         </div>
       </Modal>

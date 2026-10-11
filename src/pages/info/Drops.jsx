@@ -33,7 +33,7 @@ export default function Drops() {
       subtitle={t('drops.sub', 'Scheduled restocks, new products and flash sales — never miss one.')} narrow={false}>
       <div className="max-w-2xl mx-auto">
         {drops === null ? (
-          <p className="text-slate-500 text-center py-10">Loading…</p>
+          <p className="text-slate-500 text-center py-10">{t('shop.loading', 'Loading…')}</p>
         ) : drops.length === 0 ? (
           <div className="text-center py-12">
             <CalendarDays size={40} className="text-slate-600 mx-auto mb-3" />

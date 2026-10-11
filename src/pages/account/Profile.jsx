@@ -61,13 +61,13 @@ function Identity() {
       <div className="space-y-4">
         <div>
           <label className="label">{t('acc.profile.username', 'Username')}</label>
-          <input className="input" value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder={t('acc.profile.usernamePlaceholder', 'Your display name')} />
+          <input className="input" value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder={t('acc.profile.usernamePlaceholder', 'Your display name')} aria-label={t('acc.profile.username', 'Username')} />
         </div>
         <div>
           <label className="label flex items-center gap-2">{t('acc.profile.email', 'Email')} {user?.emailVerified && <span className="inline-flex items-center gap-1 text-emerald-400 text-xs"><BadgeCheck size={12} /> {t('acc.profile.verified', 'Verified')}</span>}</label>
           <div className="relative">
             <Mail size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-            <input className="input pl-9 opacity-70" value={user?.email || ''} disabled />
+            <input className="input pl-9 opacity-70" value={user?.email || ''} disabled aria-label={t('acc.profile.email', 'Email')} />
           </div>
         </div>
         <button onClick={save} disabled={busy} className="btn-primary">{busy ? t('acc.profile.saving', 'Saving…') : t('acc.profile.save', 'Save profile')}</button>
@@ -142,7 +142,8 @@ function PhoneSection() {
         <div className="space-y-3">
           {step === 'enter' ? (
             <>
-              <input className="input" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+31 6 12345678" autoFocus />
+              <input className="input" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+31 6 12345678" autoFocus
+                type="tel" autoComplete="tel" aria-label={t('acc.profile.phoneTitle', 'Phone number')} />
               <div className="flex gap-2">
                 <button onClick={request} disabled={busy} className="btn-primary text-sm">{busy ? t('acc.profile.sending', 'Sending…') : t('acc.profile.sendCode', 'Send code')}</button>
                 <button onClick={() => setStep('idle')} className="btn-ghost text-sm"><X size={14} /> {t('acc.profile.cancel', 'Cancel')}</button>
@@ -152,7 +153,8 @@ function PhoneSection() {
             <>
               <p className="text-slate-400 text-sm">{sentPre}<span className="text-white">{phone}</span>{sentPost}</p>
               <input className="input tracking-[0.4em] font-mono text-center" value={code} maxLength={6}
-                onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))} placeholder="••••••" autoFocus />
+                onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))} placeholder="••••••" autoFocus
+                inputMode="numeric" autoComplete="one-time-code" aria-label={t('ui.smsCode', 'Code from the text message')} />
               <div className="flex gap-2">
                 <button onClick={verify} disabled={busy} className="btn-primary text-sm">{busy ? t('acc.profile.verifying', 'Verifying…') : t('acc.profile.verify', 'Verify')}</button>
                 <button onClick={() => setStep('enter')} className="btn-ghost text-sm">{t('acc.profile.back', 'Back')}</button>
@@ -216,7 +218,7 @@ function Toggle({ label, checked, onChange }) {
   return (
     <label className="flex items-center justify-between cursor-pointer">
       <span className="text-slate-300 text-sm">{label}</span>
-      <button type="button" onClick={() => onChange(!checked)}
+      <button type="button" onClick={() => onChange(!checked)} role="switch" aria-checked={checked} aria-label={label}
         className={`w-11 h-6 rounded-full transition relative ${checked ? 'bg-primary' : 'bg-white/10'}`}>
         <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition ${checked ? 'left-5' : 'left-0.5'}`} />
       </button>
@@ -312,8 +314,8 @@ function TrustedDevices() {
                 <div className="flex-1 min-w-0">
                   {editing === d.id ? (
                     <div className="flex gap-2">
-                      <input className="input py-1 text-sm" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
-                      <button onClick={() => rename(d.id)} className="btn-primary px-3 py-1 text-xs"><Check size={13} /></button>
+                      <input className="input py-1 text-sm" value={name} onChange={(e) => setName(e.target.value)} autoFocus aria-label={t('ui.deviceName', 'Device name')} />
+                      <button onClick={() => rename(d.id)} aria-label={t('ui.saveName', 'Save name')} className="btn-primary px-3 py-1 text-xs"><Check size={13} /></button>
                     </div>
                   ) : (
                     <>
@@ -322,7 +324,7 @@ function TrustedDevices() {
                     </>
                   )}
                 </div>
-                {editing !== d.id && <button onClick={() => { setEditing(d.id); setName(d.name || ''); }} className="p-1.5 text-slate-400 hover:text-white"><Pencil size={14} /></button>}
+                {editing !== d.id && <button onClick={() => { setEditing(d.id); setName(d.name || ''); }} aria-label={t('ui.rename', 'Rename')} className="p-1.5 text-slate-400 hover:text-white"><Pencil size={14} /></button>}
                 <button onClick={() => revoke(d.id)} className="text-xs text-slate-400 hover:text-red-400">{t('acc.profile.remove', 'Remove')}</button>
               </div>
             ))}

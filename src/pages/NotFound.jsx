@@ -40,7 +40,7 @@ export default function NotFound() {
           <div className="relative flex-1">
             <Search size={16} className="absolute left-3.5 top-3.5 text-slate-500" />
             <input value={q} onChange={(e) => setQ(e.target.value)} autoFocus
-              placeholder={t('shop.search', 'Search products…')} className="input pl-10" />
+              placeholder={t('shop.search', 'Search products…')} aria-label={t('shop.search', 'Search products…')} className="input pl-10" />
           </div>
           <button type="submit" className="btn-primary px-5">{t('nf.search', 'Search')}</button>
         </form>

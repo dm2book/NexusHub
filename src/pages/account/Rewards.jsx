@@ -126,8 +126,8 @@ export default function Rewards() {
 
         <label className="label">{t('acc.rewards.refLink', 'Your referral link')}</label>
         <div className="flex gap-2 mb-5">
-          <input readOnly value={refLink} className="input font-mono text-sm" />
-          <button onClick={() => copy(refLink, t('acc.rewards.linkCopied', 'Referral link copied'))} className="btn-primary px-4"><Copy size={15} /></button>
+          <input readOnly value={refLink} className="input font-mono text-sm" aria-label={t('acc.rewards.refLink', 'Your referral link')} />
+          <button onClick={() => copy(refLink, t('acc.rewards.linkCopied', 'Referral link copied'))} aria-label={t('ui.copy', 'Copy')} className="btn-primary px-4"><Copy size={15} /></button>
         </div>
 
         <div className="grid grid-cols-3 gap-3 mb-4">
