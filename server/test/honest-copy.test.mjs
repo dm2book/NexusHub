@@ -244,7 +244,8 @@ console.log('\n— Empty numbers are never dressed up —');
   // Every stat tile has to be gated on the number existing.
   ok('Trust Center stats are each gated on real data',
     /stats\.delivered > 0/.test(trust)
-    && /stats\.avgDeliverySeconds != null/.test(trust)
+    // the delivery figure is the median now (publicStatsService), gated the same way
+    && /stats\.medianDeliverySeconds != null/.test(trust)
     && /stats\.successRate != null/.test(trust)
     && /stats\.reviews > 0/.test(trust));
   ok('the whole grid disappears when nothing is measurable',

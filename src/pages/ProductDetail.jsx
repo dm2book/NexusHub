@@ -520,11 +520,17 @@ export default function ProductDetail() {
 
           <div className="flex items-center gap-3 mt-4">
             <span className="text-3xl font-semibold gradient-text gradient-anim">{money(product.price, product.currency)}</span>
-            {product.compareAtPrice > product.price && (
+            {/* A sale the owner switched on (compareAtPrice), shown against the
+                price the rules allow: the lowest of the 30 days before today's
+                price began, read from the price history (priorPrice). The
+                struck-through figure used to be whatever "was" price had been
+                typed in, with nothing behind it — and when the history cannot
+                show a higher earlier price, no reduction is announced. */}
+            {wasPrice && (
               <>
-                <span className="text-xl text-slate-500 line-through">{money(product.compareAtPrice, product.currency)}</span>
+                <span className="text-xl text-slate-500 line-through">{money(wasPrice, product.currency)}</span>
                 <span className="text-xs font-black text-white bg-rose-500 rounded-full px-2.5 py-1">
-                  -{Math.round((1 - product.price / product.compareAtPrice) * 100)}% {t('product.off', 'OFF')}
+                  -{Math.round((1 - product.price / wasPrice) * 100)}% {t('product.off', 'OFF')}
                 </span>
               </>
             )}

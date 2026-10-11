@@ -34,6 +34,7 @@ import { money, carriesOwnBackground, categoryLabel } from '../lib/catalog.js';
 import { withFallback, SAMPLE_PRODUCTS, iconPath, CATALOG_UNAVAILABLE } from '../lib/sampleCatalog.js';
 import { useCategoryLogos } from '../lib/useCategoryLogos.js';
 import { useTrustpilot } from '../lib/useTrustpilot.js';
+import { starsOf, filledFor } from '../lib/stars.js';
 import { SUPPORT_EMAIL } from '../lib/support.js';
 import { allowed, onConsentChange } from '../lib/consent.js';
 import CookieConsent from '../components/CookieConsent.jsx';
@@ -855,12 +856,15 @@ export default function HomeStore() {
                 <h2 className="fm-head text-2xl">{tr('home.reviewsTitle', 'What buyers say')}</h2>
                 {stats.reviews > 0 && (
                   <div className="flex items-center gap-2 mt-1">
-                    <div className="flex text-amber-500">
-                      {Array.from({ length: 5 }).map((_, i) => <Star key={i} size={15} fill="currentColor" />)}
+                    {/* As many stars as the rating — five full ones sat beside
+                        any average, a 3.2 included. */}
+                    <div className="flex text-amber-500" aria-hidden>
+                      {Array.from({ length: 5 }).map((_, i) => <Star key={i} size={15} fill={i < filledFor(stats.rating) ? 'currentColor' : 'none'} />)}
                     </div>
                     {stats.rating != null && <span className="fm-head text-slate-900">{stats.rating}</span>}
+                    {/* Verified buyers only; the cards below may include Discord vouches. */}
                     <span className="text-[13px] text-slate-500">
-                      {tr('home.basedOn', 'Based on {n} reviews', { n: fmtCount(stats.reviews) })}
+                      {tr('reviews.basedOnVerified', 'Based on {n} verified reviews', { n: fmtCount(stats.reviews) })}
                     </span>
                   </div>
                 )}
@@ -873,12 +877,18 @@ export default function HomeStore() {
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {reviews.slice(0, 3).map((r) => (
                   <div key={r.id} className="bg-white rounded-2xl border border-slate-200/70 shadow-sm p-5">
-                    <div className="flex text-amber-500 mb-2">
-                      {Array.from({ length: r.stars || 5 }).map((_, i) => <Star key={i} size={13} fill="currentColor" />)}
+                    {/* The stars this person gave; none on record used to draw five. */}
+                    <div role="img" aria-label={tr('stars.outOf5', '{n} out of 5 stars', { n: starsOf(r) })} className="flex text-amber-500 mb-2">
+                      {Array.from({ length: 5 }).map((_, i) => <Star key={i} size={13} fill={i < starsOf(r) ? 'currentColor' : 'none'} />)}
                     </div>
                     <p className="text-[14px] text-slate-700 leading-relaxed">&ldquo;{r.body}&rdquo;</p>
+                    {/* Which kind of review this is, as /reviews says it: a vouch
+                        from Discord has no order behind it, and under "What
+                        buyers say" it read exactly like a verified purchase. */}
                     <p className="text-[12px] text-slate-500 mt-2">
-                      – {r.author}{r.product ? ` · ${r.product}` : ''}
+                      – {r.author}{r.product ? ` · ${r.product}` : ''} · {r.verified
+                        ? <span className="text-emerald-700 font-semibold">{tr('product.verifiedBuyer', 'Verified buyer')}</span>
+                        : tr('reviews.discordVouch', 'Discord vouch')}
                     </p>
                   </div>
                 ))}
