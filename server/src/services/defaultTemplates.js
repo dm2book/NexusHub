@@ -389,7 +389,7 @@ export const DEFAULT_TEMPLATES = [
  * these — so improved defaults roll out everywhere except where an admin has
  * customized the template.
  */
-export const LEGACY_TEMPLATE_BODIES = {
+const ENGLISH_ORIGINALS = {
   /* ── The English originals ─────────────────────────────────────────────────
      Every one of these thirteen templates was English on a shop whose entire
      storefront, checkout and legal pages are Dutch — including the login code
@@ -551,7 +551,16 @@ export const LEGACY_TEMPLATE_BODIES = {
       <div class="notice">🛡️ <strong>Stay safe:</strong> {{brand.name}} will <strong>never</strong> ask
       you for this code — not by email, DM or phone. Didn't try to sign in? You can safely ignore
       this email; without the code nobody can access your account.</div>`],
+};
 
+/* The later superseded defaults. These were written into the SAME object
+   literal as the English originals above, so nine ids appeared twice — and in
+   an object literal the second key silently replaces the first. Four English
+   originals (order_received, payment_confirmed, order_processing,
+   order_completed) were therefore recognised by nothing, not even the hash
+   list below: a shop still holding one of them would never be upgraded. Kept
+   apart now and merged id by id. */
+const LATER_DEFAULTS = {
   // Same copy, before the optional Trustpilot line was added — so a live
   // database that never customized this mail picks the new one up on boot.
   review_request: [`
@@ -673,6 +682,10 @@ export const LEGACY_TEMPLATE_BODIES = {
       you for this code — not by email, DM or phone. Didn't try to sign in? You can safely ignore
       this email; without the code nobody can access your account.</div>`],
 };
+
+export const LEGACY_TEMPLATE_BODIES = Object.fromEntries(
+  [...new Set([...Object.keys(ENGLISH_ORIGINALS), ...Object.keys(LATER_DEFAULTS)])]
+    .map((id) => [id, [...(ENGLISH_ORIGINALS[id] || []), ...(LATER_DEFAULTS[id] || [])]]));
 
 /**
  * Every earlier default, in every language, as a fingerprint.

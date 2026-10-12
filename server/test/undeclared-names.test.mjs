@@ -113,6 +113,37 @@ for (const { dir, globals } of AREAS) {
   ok('every name used is declared, imported or a real global', unknown.length === 0, `\n      ${unknown.join('\n      ')}`);
 }
 
+console.log('\n— No object literal repeats a key —');
+{
+  /* In an object literal the second of two equal keys silently replaces the
+     first. The e-mail template upgrade list had nine ids twice, which threw
+     away four of the old bodies it existed to recognise. */
+  const dupes = [];
+  for (const { dir } of AREAS) {
+    for (const file of filesIn(join(root, dir))) {
+      let ast;
+      try { ast = parse(readFileSync(file, 'utf8'), { sourceType: 'module', plugins: ['jsx'] }); } catch { continue; }
+      traverse(ast, {
+        ObjectExpression(path) {
+          const seen = new Map();
+          for (const p of path.node.properties) {
+            if ((p.type !== 'ObjectProperty' && p.type !== 'ObjectMethod') || p.computed) continue;
+            const key = p.key.type === 'Identifier' ? p.key.name : String(p.key.value);
+            const kind = p.type === 'ObjectMethod' ? p.kind : 'value';
+            const prev = seen.get(key);
+            if (prev && !(prev !== 'value' && kind !== 'value' && prev !== kind)) {
+              dupes.push(`${relative(root, file)}:${p.loc.start.line} '${key}'`);
+            }
+            seen.set(key, kind);
+          }
+        },
+      });
+    }
+  }
+  ok('no object literal in the storefront, the API or the bot defines a key twice', dupes.length === 0,
+    `\n      ${dupes.join('\n      ')}`);
+}
+
 console.log('\n— The check catches what it is for —');
 {
   const found = (code) => {

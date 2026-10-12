@@ -132,7 +132,10 @@ console.log('\n— No delivery time the shop cannot back —');
 {
   const fs = await import('node:fs');
   const src = (f) => fs.readFileSync(new URL(`../src/services/${f}`, import.meta.url), 'utf8');
-  const current = src('defaultTemplates.js').split('export const LEGACY_TEMPLATE_BODIES')[0]
+  /* The templates as they are sent — not the source file, which also keeps the
+     superseded bodies the upgrade path has to recognise (old copy, on purpose). */
+  const { DEFAULT_TEMPLATES } = await import('../src/services/defaultTemplates.js');
+  const current = DEFAULT_TEMPLATES.map((t) => `${t.subject}\n${t.body_html}`).join('\n')
     + src('templateTranslations.js') + src('emailCopy.js') + src('assistantService.js');
   const claim = /(within|binnen|innerhalb|en)\s+(a few|een paar|weniger|quelques)\s+(hours|uur|Stunden|heures|minutes|minuten|Minuten)/i;
   ok('mails and the assistant promise no "within a few hours/minutes"', !claim.test(current), (current.match(claim) || [''])[0]);
