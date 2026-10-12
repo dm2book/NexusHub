@@ -27,7 +27,17 @@ export function getAccessToken() {
 }
 export function onTokenChange(fn) { listeners.add(fn); return () => listeners.delete(fn); }
 
-async function refresh() {
+/* One refresh at a time. Every request that met a 401 refreshed on its own, so
+   a page and the admin's nav counts after 15 idle minutes sent the same
+   refresh cookie twice — and the second use of a rotated secret is treated as
+   theft: the session was revoked and staff were sent back to the login page. */
+let refreshing = null;
+function refresh() {
+  if (!refreshing) refreshing = doRefresh().finally(() => { refreshing = null; });
+  return refreshing;
+}
+
+async function doRefresh() {
   const res = await fetch(`${API_BASE}/api/auth/refresh`, {
     method: 'POST', credentials: 'include',
   });

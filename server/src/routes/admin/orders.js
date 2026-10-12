@@ -15,7 +15,7 @@ import { refundOrder } from '../../services/refundService.js';
 import { PayLinkError } from '../../utils/payLink.js';
 import { fulfillOrderByHand, listFulfillment, listFulfillmentLogs } from '../../services/fulfillmentService.js';
 import * as analytics from '../../services/analyticsService.js';
-import { listPendingProofs, confirmProof, rejectProof } from '../../services/paymentProofService.js';
+import { listPendingProofs, pendingProofCount, proofScreenshot, confirmProof, rejectProof } from '../../services/paymentProofService.js';
 import { sendEmail } from '../../services/emailService.js';
 import { notify } from '../../services/notificationService.js';
 import { audit } from '../../services/auditService.js';
@@ -63,7 +63,13 @@ router.get('/export.csv', requirePermission('orders.read'), asyncHandler(async (
 
 // ── Payment verification queue ───────────────────────────────────────────────
 router.get('/payment/queue', requirePermission('orders.update'), asyncHandler(async (_req, res) => {
-  res.json({ proofs: await listPendingProofs() });
+  res.json({ proofs: await listPendingProofs(), total: await pendingProofCount() });
+}));
+
+// One uploaded screenshot at a time — the queue no longer carries them inline.
+router.get('/payment/proofs/:id/screenshot', requirePermission('orders.update'), asyncHandler(async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({ screenshotUrl: await proofScreenshot(req.params.id) });
 }));
 
 router.post('/payment/proofs/:id/confirm', requirePermission('orders.update'),

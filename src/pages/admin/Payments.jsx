@@ -14,11 +14,27 @@ const FLAG_LABEL = {
 export default function AdminPayments() {
   const toast = useToast();
   const [proofs, setProofs] = useState(null);
+  const [total, setTotal] = useState(0);
+  const [loadError, setLoadError] = useState('');
   const [busy, setBusy] = useState(null);
+  const [shots, setShots] = useState({});
 
+  /* A failed load is said as a failure. It used to read "Queue is empty" —
+     with paid orders waiting behind it, which is the worst thing this page
+     could say. */
   const load = useCallback(() => {
-    api.get('/api/admin/orders/payment/queue').then((r) => setProofs(r.proofs)).catch(() => setProofs([]));
+    api.get('/api/admin/orders/payment/queue')
+      .then((r) => { setProofs(r.proofs); setTotal(r.total ?? r.proofs.length); setLoadError(''); })
+      .catch((e) => { setLoadError(e.message || 'Could not load the queue'); setProofs((p) => p || []); });
   }, []);
+  // Uploaded screenshots come one at a time, when the reviewer opens them.
+  const openShot = async (p) => {
+    setShots((s) => ({ ...s, [p.id]: 'loading' }));
+    try {
+      const r = await api.get(`/api/admin/orders/payment/proofs/${p.id}/screenshot`);
+      setShots((s) => ({ ...s, [p.id]: r.screenshotUrl || 'none' }));
+    } catch (err) { setShots((s) => ({ ...s, [p.id]: 'error' })); toast.error(err.message); }
+  };
   useEffect(() => { load(); }, [load]);
 
   const confirm = async (p) => {
@@ -41,11 +57,17 @@ export default function AdminPayments() {
     <div>
       <div className="flex items-center justify-between mb-2">
         <h1 className="text-2xl text-white flex items-center gap-2"><ShieldCheck size={20} className="text-emerald-400" /> Payment verification</h1>
-        <span className="text-sm text-slate-400">{proofs.length} awaiting review</span>
+        <span className="text-sm text-slate-400">{total} awaiting review{total > proofs.length ? ` (oldest ${proofs.length} shown)` : ''}</span>
       </div>
+      {loadError && (
+        <div className="card p-4 mb-4 border border-red-500/30 text-red-300 text-sm flex items-center justify-between gap-3">
+          <span><AlertTriangle size={14} className="inline -mt-0.5 mr-1" /> The queue could not be loaded: {loadError}</span>
+          <button onClick={load} className="btn-ghost text-sm">Try again</button>
+        </div>
+      )}
       <p className="text-slate-400 text-sm mb-6">Customers submit a transaction ID / screenshot after paying via Tikkie, Revolut or PayPal. Verify the money landed, then confirm — the order moves to fulfillment automatically.</p>
 
-      {proofs.length === 0 ? (
+      {proofs.length === 0 && !loadError ? (
         <div className="card p-14 text-center">
           <Inbox className="mx-auto text-slate-600 mb-3" size={40} />
           <p className="text-slate-300 font-medium">Queue is empty</p>
@@ -74,17 +96,24 @@ export default function AdminPayments() {
                     </button>
                   )}
                   {p.note && <p className="text-slate-400 text-sm mt-2 italic">“{p.note}”</p>}
-                  {p.screenshotUrl && (
-                    p.screenshotUrl.startsWith('data:') ? (
-                      // Uploaded from a phone. Browsers block target=_blank on a
-                      // data: URI, so show it inline instead of linking out.
-                      <img src={p.screenshotUrl} alt="Payment screenshot"
+                  {p.screenshotUploaded && (
+                    // Uploaded from a phone: fetched on demand and shown inline
+                    // (browsers block target=_blank on a data: URI).
+                    shots[p.id] && shots[p.id].startsWith('data:') ? (
+                      <img src={shots[p.id]} alt="Payment screenshot"
                         className="mt-2 max-h-56 rounded-lg border border-white/10" />
                     ) : (
-                      <a href={p.screenshotUrl} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1.5 text-sm text-indigo-300 hover:text-indigo-200">
-                        <ExternalLink size={13} /> View payment screenshot
-                      </a>
+                      <button onClick={() => openShot(p)} disabled={shots[p.id] === 'loading'}
+                        className="mt-2 inline-flex items-center gap-1.5 text-sm text-indigo-300 hover:text-indigo-200">
+                        <ExternalLink size={13} /> {shots[p.id] === 'loading' ? 'Loading screenshot…'
+                          : shots[p.id] === 'none' ? 'Screenshot no longer on file' : 'Show uploaded screenshot'}
+                      </button>
                     )
+                  )}
+                  {p.screenshotUrl && (
+                    <a href={p.screenshotUrl} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1.5 text-sm text-indigo-300 hover:text-indigo-200">
+                      <ExternalLink size={13} /> View payment screenshot
+                    </a>
                   )}
                 </div>
                 <div className="flex gap-2 shrink-0">

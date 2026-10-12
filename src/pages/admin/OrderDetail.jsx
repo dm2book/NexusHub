@@ -175,7 +175,8 @@ export default function AdminOrderDetail() {
             </div>
           )}
 
-          {hasPermission('orders.complete') && !['completed', 'refunded', 'cancelled'].includes(order.status) && (
+          {/* Paid orders only: the server refuses an unpaid or failed one. */}
+          {hasPermission('orders.complete') && ['payment_received', 'processing', 'awaiting_fulfillment'].includes(order.status) && (
             <div className="card p-5 border border-emerald-500/20">
               <h3 className="text-white mb-1">Deliver code(s)</h3>
               <p className="text-slate-500 text-sm mb-4">Enter the code/key for each item. It's e-mailed to the customer and the order is marked <span className="text-emerald-300">completed</span>.</p>
