@@ -19,7 +19,9 @@ export async function addProductCodes(productId, codes = []) {
     for (const code of clean) {
       /* A code already in stock — this upload or an earlier one — is skipped:
          two rows of one code is one code sold twice. */
-      const known = await get(`SELECT 1 FROM product_codes WHERE product_id=@p AND md5(code)=md5(@c) LIMIT 1`, { p: productId, c: code });
+      // …and so is one already loaded under ANOTHER product (a near-duplicate
+      // listing): each product would sell it once.
+      const known = await get(`SELECT 1 FROM product_codes WHERE md5(code)=md5(@c) LIMIT 1`, { c: code });
       if (known) continue;
       const r = await run(`INSERT INTO product_codes (id, product_id, code, status, created_at)
            VALUES (@id, @p, @c, 'available', @at) ON CONFLICT DO NOTHING`,
@@ -215,6 +217,14 @@ export async function availableCounts(productIds = []) {
 export async function claimCodes(productId, n, orderId) {
   let claimed = [];
   await tx(async () => {
+    /* One claimer per order at a time. The read below made this "idempotent",
+       but only for a claim that had already committed: two claims for the same
+       order at the same moment — the payment's own dispense, the maintenance
+       sweep, a fraud approval clicked in two tabs — each saw nothing yet, and
+       SKIP LOCKED handed each of them a full set of different codes. Measured:
+       a two-code order delivered four. Locking the order row first makes the
+       second claimer wait, and its read then sees the first claimer's codes. */
+    await get('SELECT id FROM orders WHERE id=@o FOR UPDATE', { o: orderId });
     // Already claimed by THIS order? Return them (idempotent re-delivery).
     const existing = await all(
       `SELECT code FROM product_codes WHERE product_id=@p AND order_id=@o AND status='used'

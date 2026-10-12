@@ -149,7 +149,15 @@ console.log('\n— A keyring is only worth its key —');
     const r = spawnSync(process.execPath, ['-e', `
       const store = await import('${new URL('../src/services/secretStore.js', import.meta.url).pathname}');
       ${body}
-    `, '--input-type=module'], { encoding: 'utf8', env: { ...process.env, DATABASE_SSL_INSECURE: 'true', ...env } });  // local DB: self-signed cert
+    `, '--input-type=module'], {
+      encoding: 'utf8',
+      /* A "production" child asks the database for TLS. The test database is
+         local: here it presents a self-signed certificate, in CI (postgres:16)
+         it has no TLS at all and the child was refused — CI was red on main
+         for every push while this passed locally. TLS is not what these cases
+         test, so the child connects in plain text either way. */
+      env: { ...process.env, DATABASE_SSL: 'false', DATABASE_SSL_INSECURE: 'true', ...env },
+    });
     return (r.stdout || '').trim().split('\n').pop() + (r.stderr && !r.stdout ? r.stderr.slice(0, 200) : '');
   };
 

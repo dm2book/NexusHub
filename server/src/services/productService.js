@@ -89,7 +89,8 @@ export const MYSTERY_RETIRED = 'Mystery boxes are switched off: paid random priz
 
 /** May a customer see and buy this product? Active, and not a retired kind. */
 export function isSellable(p) {
-  return !!p && !!p.active && !RETIRED_KINDS.includes(p.kind);
+  // No price, not on sale: the checkout refuses it too (priceOrder).
+  return !!p && !!p.active && !RETIRED_KINDS.includes(p.kind) && Number(p.price) > 0;
 }
 
 /**
@@ -112,7 +113,7 @@ export function revivesRetired(current, patch = {}) {
  * mystery box, without each of them having to remember to ask.
  */
 export async function listProducts({ activeOnly = false } = {}) {
-  const clause = activeOnly ? 'WHERE active = 1 AND kind <> ALL(@retired)' : '';
+  const clause = activeOnly ? 'WHERE active = 1 AND kind <> ALL(@retired) AND price > 0' : '';
   const rows = await all(`SELECT * FROM products ${clause} ORDER BY created_at DESC`,
     { retired: [...RETIRED_KINDS] });
   return lawfulSalePrices(rows.map(hydrate));

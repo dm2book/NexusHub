@@ -211,7 +211,14 @@ router.post('/otp/verify', otpLimiter, asyncHandler(async (req, res) => {
       ? await verifyPhoneOtp(id, body.code, ctx)
       : await verifyEmailOtp(id, body.code, ctx);
   } catch (err) {
-    await recordLoginAttempt({ identifier: id, channel, success: false, reason: err.message, ctx });
+    /* Only a wrong guess at a code that exists counts towards the lockout on
+       /start. Junk checks against an address with no code ("No active code")
+       were enough for anyone to lock the owner out of signing in, ten every
+       fifteen minutes. The guesses themselves are capped per code
+       (claimOtpGuess), so this loses no protection. */
+    if (!/^No active code|^Code expired/.test(String(err.message))) {
+      await recordLoginAttempt({ identifier: id, channel, success: false, reason: err.message, ctx });
+    }
     throw err;
   }
 
@@ -432,8 +439,12 @@ router.get('/oauth/:provider/callback', asyncHandler(async (req, res) => {
   await audit({ actor: { id: session.user.id, email: session.user.email },
     action: 'auth.login', metadata: { method: provider }, req });
   setSessionCookie(res, session.refreshToken);
-  // Hand the access token to the SPA via a short-lived fragment.
-  res.redirect(`${config.appUrl}/auth/callback#token=${session.accessToken}`);
+  /* No token in the URL. A fragment token signed in whichever browser opened
+     the link — an attacker's own token mailed as "/auth/callback#token=…" put
+     the victim in the attacker's account, where the next purchase would land.
+     The httpOnly session cookie set above cannot be planted from another site;
+     the callback page exchanges it for an access token. */
+  res.redirect(`${config.appUrl}/auth/callback#session=1`);
 }));
 
 // ── Connecting Discord to an account you are already signed in to ──────────

@@ -56,6 +56,12 @@ export async function submitProof(orderId, input = {}, ctx = {}) {
   }
   const prior = await get(`SELECT COUNT(*) AS n FROM payment_proofs WHERE order_id=@o`, { o: orderId });
   if (Number(prior?.n || 0) >= 1) flags.push('multiple_submissions'); // this is the 2nd+ proof for the order
+  /* Three waiting at once is plenty for a buyer correcting a mistake; more was
+     a way to store megabytes of images per order, ten times a minute. */
+  const waiting = await get(`SELECT COUNT(*)::int AS n FROM payment_proofs WHERE order_id=@o AND status='pending'`, { o: orderId });
+  if (Number(waiting?.n || 0) >= 3) {
+    throw badRequest('We already have your proof and are checking it — you will hear from us shortly.');
+  }
 
   const id = newId('ppf');
   const at = nowIso();
@@ -84,16 +90,40 @@ export async function getOrderProof(orderId) {
        FROM payment_proofs WHERE order_id = @o ORDER BY created_at DESC LIMIT 1`, { o: orderId });
 }
 
-/** Admin: the verification queue — pending proofs with their order context. */
+/** Admin: the verification queue — pending proofs with their order context.
+ *
+ *  Without the uploaded images. Every screenshot rode along inline (up to 1.3 MB
+ *  each), so a handful of them — four from one visitor, or an ordinary busy day
+ *  — took the response past Vercel's 4.5 MB limit; the request failed and the
+ *  page read "Queue is empty". With manual payment the only way paid orders get
+ *  delivered, that stopped every delivery without a word. A linked screenshot
+ *  is still sent (it is a short URL); an uploaded one is fetched on demand
+ *  (proofScreenshot). The oldest MAX_QUEUE are shown, with the full count. */
+const MAX_QUEUE = 100;
 export async function listPendingProofs() {
-  return all(
+  const rows = await all(
     `SELECT p.id, p.order_id AS "orderId", p.method, p.transaction_id AS "transactionId",
-            p.screenshot_url AS "screenshotUrl", p.note, p.amount, p.fraud_flags AS "fraudFlags",
+            CASE WHEN p.screenshot_url LIKE 'data:%' THEN NULL ELSE p.screenshot_url END AS "screenshotUrl",
+            (p.screenshot_url LIKE 'data:%') AS "screenshotUploaded",
+            p.note, p.amount, p.fraud_flags AS "fraudFlags",
             p.created_at AS "createdAt", o.number AS "orderNumber", o.email, o.currency, o.status AS "orderStatus"
        FROM payment_proofs p JOIN orders o ON o.id = p.order_id
       WHERE p.status = 'pending'
-      ORDER BY p.created_at ASC`)
-    .then((rows) => rows.map((r) => ({ ...r, fraudFlags: safeArr(r.fraudFlags) })));
+      ORDER BY p.created_at ASC
+      LIMIT @max`, { max: MAX_QUEUE });
+  return rows.map((r) => ({ ...r, screenshotUploaded: !!r.screenshotUploaded, fraudFlags: safeArr(r.fraudFlags) }));
+}
+
+/** Admin: how many proofs are waiting in all (the queue shows the oldest MAX_QUEUE). */
+export async function pendingProofCount() {
+  return Number((await get(`SELECT COUNT(*)::int AS n FROM payment_proofs WHERE status = 'pending'`))?.n || 0);
+}
+
+/** Admin: one proof's uploaded screenshot, loaded when the reviewer opens it. */
+export async function proofScreenshot(proofId) {
+  const row = await get('SELECT screenshot_url AS "screenshotUrl" FROM payment_proofs WHERE id=@id', { id: proofId });
+  if (!row) throw notFound('Proof not found');
+  return row.screenshotUrl || null;
 }
 
 /** Admin confirms a proof → mark the order paid (normal pipeline continues). */
@@ -101,6 +131,14 @@ export async function confirmProof(proofId, ctx = {}) {
   const proof = await get('SELECT * FROM payment_proofs WHERE id=@id', { id: proofId });
   if (!proof) throw notFound('Proof not found');
   if (proof.status !== 'pending') throw badRequest('This proof was already reviewed.');
+  /* Only an order still waiting for its money can be confirmed. Confirming a
+     leftover second proof of an order that was already paid (or cancelled)
+     marked that proof "confirmed", deleted its screenshot and then failed —
+     the proof gone from the queue and nothing recorded. */
+  const before = await getOrder(proof.order_id);
+  if (!before || before.status !== 'pending') {
+    throw badRequest(`This order is ${before?.status || 'gone'} — there is no payment left to confirm.`);
+  }
 
   // Atomically claim the proof: only the caller whose UPDATE actually flips the
   // row from 'pending' proceeds to mark the order paid. A second click / second
@@ -110,10 +148,31 @@ export async function confirmProof(proofId, ctx = {}) {
     `UPDATE payment_proofs SET status='confirmed', reviewed_by=@by, reviewed_at=@at WHERE id=@id AND status='pending'`,
     { by: ctx.user?.id || 'admin', at: nowIso(), id: proofId });
   if (!claim?.changes) throw badRequest('This proof was already reviewed.');
-  await dropScreenshot(proof);
 
-  const updated = await markPaymentReceived(proof.order_id, proof.transaction_id || `proof_${proofId}`,
-    { actorId: ctx.user?.id || 'admin', reason: 'Payment proof verified' });
+  let updated;
+  try {
+    updated = await markPaymentReceived(proof.order_id, proof.transaction_id || `proof_${proofId}`,
+      { actorId: ctx.user?.id || 'admin', reason: 'Payment proof verified' });
+  } catch (e) {
+    /* The order moved underneath (cancelled in the same moment): the proof goes
+       back in the queue with its screenshot, and the owner hears about it —
+       money may have arrived for an order that is no longer open. */
+    await run(`UPDATE payment_proofs SET status='pending', reviewed_by=NULL, reviewed_at=NULL WHERE id=@id`, { id: proofId });
+    const { alertOwner } = await import('./notifyService.js');
+    await alertOwner('payment.failed',
+      `Confirming the payment proof for ${before.number} failed: ${e.message}. Check whether the money arrived and refund it if the order stays closed.`).catch(() => {});
+    throw e;
+  }
+  await dropScreenshot(proof);
+  /* Its other waiting proofs are settled by this one: closed without a mail,
+     so nobody later rejects a leftover and tells a paid buyer "not verified". */
+  const leftovers = await all(`SELECT * FROM payment_proofs WHERE order_id=@o AND status='pending' AND id<>@id`,
+    { o: proof.order_id, id: proofId });
+  for (const p of leftovers) {
+    await run(`UPDATE payment_proofs SET status='superseded', reviewed_by=@by, reviewed_at=@at WHERE id=@id AND status='pending'`,
+      { by: ctx.user?.id || 'admin', at: nowIso(), id: p.id });
+    await dropScreenshot(p);
+  }
 
   await audit({ action: 'payment.proof_confirm', actor: ctx.user, targetType: 'order',
     targetId: proof.order_id, metadata: { proofId }, req: ctx.req });
@@ -171,15 +230,21 @@ export async function rejectProof(proofId, reason = '', ctx = {}) {
   if (!proof) throw notFound('Proof not found');
   if (proof.status !== 'pending') throw badRequest('This proof was already reviewed.');
 
-  await run(`UPDATE payment_proofs SET status='rejected', reject_reason=@r, reviewed_by=@by, reviewed_at=@at WHERE id=@id`,
+  // Claimed atomically, like a confirm: a reject racing a confirm on the same
+  // proof must not both win.
+  const claim = await run(`UPDATE payment_proofs SET status='rejected', reject_reason=@r, reviewed_by=@by, reviewed_at=@at
+                            WHERE id=@id AND status='pending'`,
     { r: String(reason).slice(0, 300) || 'Could not verify payment', by: ctx.user?.id || 'admin', at: nowIso(), id: proofId });
+  if (!claim?.changes) throw badRequest('This proof was already reviewed.');
   await dropScreenshot(proof);
 
   await audit({ action: 'payment.proof_reject', actor: ctx.user, targetType: 'order',
     targetId: proof.order_id, metadata: { proofId, reason }, req: ctx.req });
 
   const order = await getOrder(proof.order_id);
-  if (order) {
+  /* "Resubmit your proof" only to a buyer whose order still waits for payment
+     — never to one whose order was already paid through another proof. */
+  if (order && order.status === 'pending') {
     sendEmailAsync('custom_message', order.email, {
       lang: order.billing?.lang || undefined,
       subject: `Payment not verified for ${order.number}`,

@@ -1034,7 +1034,9 @@ router.post('/track/:number/codes',
       item: nameOf[d.order_item_id || d.orderItemId] || null,
       type: d.type,
       // Files and links are in the email; a code is what a buyer needs here.
-      content: d.type === 'code' || d.type === 'text' ? d.content : null,
+      // Every kind staff or a supplier can record ('license', 'message', an
+      // image key) — only a file has nothing to show inline.
+      content: d.type === 'file' ? null : d.content,
     }));
     await audit({ action: 'delivery.view_guest', actor: { email: order.email }, targetType: 'order',
       targetId: order.id, metadata: { count: codes.length }, req }).catch(() => {});

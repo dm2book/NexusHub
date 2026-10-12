@@ -300,6 +300,14 @@ router.patch('/:id', requirePermission('suppliers.manage'), asyncHandler(async (
   if ((body.kind != null || body.active) && revivesRetired(await getProduct(req.params.id), body)) {
     throw badRequest(MYSTERY_RETIRED);
   }
+  /* Switched on, or left on with its price taken away: a shop product needs a
+     price. A €0 product was sold for nothing and auto-delivered. */
+  const current = await getProduct(req.params.id);
+  const willBeActive = body.active ?? current?.active;
+  const willCost = body.price ?? current?.price;
+  if (willBeActive && !(Number(willCost) > 0)) {
+    throw badRequest('Give this product a price before showing it in the shop.');
+  }
   guardImage(body.metadata);
   if (body.metadata) body.metadata = await storeUpload(body.metadata, req.params.id);
   const product = await updateProduct(req.params.id, body);
@@ -344,11 +352,17 @@ router.post('/bulk', requirePermission('suppliers.manage'), asyncHandler(async (
   }
 
   if (action === 'active') {
-    const r = await run(`UPDATE products SET active = @a, updated_at = @at WHERE id = ANY(@ids)`,
+    /* Showing skips anything without a price — and says which, so a selection
+       with one unpriced row is not refused whole. Hiding takes everything. */
+    const r = await run(`UPDATE products SET active = @a, updated_at = @at
+                          WHERE id = ANY(@ids) ${value ? 'AND price > 0' : ''}`,
       { a: value ? 1 : 0, at, ids: rows.map((p) => p.id) });
     const updated = r?.changes ?? rows.length;
-    await audit({ actor: req.user, action: 'product.bulk_update', metadata: { action, value, count: updated }, req });
-    return res.json({ updated });
+    const skipped = value
+      ? (await all(`SELECT name FROM products WHERE id = ANY(@ids) AND NOT (price > 0)`, { ids: rows.map((p) => p.id) })).map((p) => p.name)
+      : [];
+    await audit({ actor: req.user, action: 'product.bulk_update', metadata: { action, value, count: updated, skipped: skipped.length }, req });
+    return res.json({ updated, ...(skipped.length ? { skipped, reason: 'No price set' } : {}) });
   }
 
   // Set (or clear) the same product image across a whole selection — e.g. one

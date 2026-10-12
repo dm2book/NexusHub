@@ -5,7 +5,7 @@
  */
 import jwt from 'jsonwebtoken';
 import { config } from '../config/env.js';
-import { run, get, all, nowIso } from '../db/index.js';
+import { run, get, all, nowIso, tx } from '../db/index.js';
 import { newId, newOtp } from '../utils/ids.js';
 import { sha256, safeEqual, randomToken } from '../utils/crypto.js';
 import { badRequest, unauthorized, tooMany } from '../utils/errors.js';
@@ -111,43 +111,63 @@ export async function requestEmailOtp(email, ctx = {}) {
   return { sent: true, expiresAt: expires, cooldownSeconds: 30 };
 }
 
+/**
+ * One guess at a one-time code, counted BEFORE it is compared — atomically.
+ *
+ * The limit used to be read from a snapshot and the attempt written after the
+ * comparison, with nothing locked in between. Thirty guesses sent at once were
+ * all compared against an allowance of five, and spread over a few dozen
+ * addresses a 6-digit code (the owner's included) was walked in under a minute:
+ * reproduced, a correct guess in a burst of 30 signed in 5 times out of 5.
+ *
+ * Now the live codes for the address are locked, the attempt is recorded, and
+ * only then is the code compared — so concurrent guesses queue behind each
+ * other and the sixth one, however it arrives, finds the allowance spent.
+ * Every still-valid code counts, not only the newest: people tap "Send code"
+ * more than once, and any code we e-mailed should work. Hitting the limit
+ * burns them all.
+ */
+export async function claimOtpGuess(table, column, value, code) {
+  const supplied = sha256(String(code).trim());
+  let outcome = 'none';
+  let attempts = 0;
+  await tx(async () => {
+    const rows = await all(
+      `SELECT id, code_hash, attempts, expires_at FROM ${table}
+        WHERE ${column} = @v AND consumed_at IS NULL
+        ORDER BY created_at DESC LIMIT 10 FOR UPDATE`, { v: value });
+    if (!rows.length) { outcome = 'none'; return; }
+    const live = rows.filter((r) => new Date(r.expires_at) >= new Date());
+    if (!live.length) { outcome = 'expired'; return; }
+    const tried = live.reduce((a, r) => a + Number(r.attempts || 0), 0);
+    if (tried >= config.auth.otpMaxAttempts) {
+      await run(`UPDATE ${table} SET consumed_at = @at WHERE ${column} = @v AND consumed_at IS NULL`, { at: nowIso(), v: value });
+      outcome = 'exhausted';
+      return;
+    }
+    // The attempt is spent before anything is compared.
+    await run(`UPDATE ${table} SET attempts = attempts + 1 WHERE id = @id`, { id: live[0].id });
+    attempts = tried + 1;
+    const match = live.find((r) => safeEqual(r.code_hash, supplied));
+    if (!match) { outcome = 'wrong'; return; }
+    const used = await run(`UPDATE ${table} SET consumed_at = @at WHERE id = @id AND consumed_at IS NULL`, { at: nowIso(), id: match.id });
+    outcome = used?.changes ? 'ok' : 'wrong';
+  });
+  if (outcome === 'none') throw badRequest('No active code. Request a new one.');
+  if (outcome === 'expired') throw badRequest('Code expired. Request a new one.');
+  if (outcome === 'exhausted') throw tooMany('Too many attempts. Request a new code.');
+  return { ok: outcome === 'ok', attempts };
+}
+
 /** Verify an OTP and return an authenticated session. */
 export async function verifyEmailOtp(email, code, ctx = {}) {
   const e = String(email || '').trim().toLowerCase();
-  const supplied = sha256(String(code).trim());
-  // Check against every still-valid (unconsumed, unexpired) code for this
-  // address — not just the newest. People often tap "Send code" more than once,
-  // and any code we actually e-mailed should work, not only the latest one.
-  const rows = await all(
-    `SELECT * FROM otp_codes WHERE email = @e AND consumed_at IS NULL
-      ORDER BY created_at DESC LIMIT 10`, { e });
-  if (!rows.length) throw badRequest('No active code. Request a new one.');
-
-  const live = rows.filter((r) => new Date(r.expires_at) >= new Date());
-  if (!live.length) throw badRequest('Code expired. Request a new one.');
-
-  /* The limit is checked BEFORE the code, and across every live code for this
-     address: checked after, a correct guess still signed in once the "too
-     many attempts" answer had been given — and spread over IPs, the 6 digits
-     could be walked. Hitting it burns all live codes. */
-  const tried = live.reduce((a, r) => a + Number(r.attempts || 0), 0);
-  if (tried >= config.auth.otpMaxAttempts) {
-    await run(`UPDATE otp_codes SET consumed_at = @at WHERE email = @e AND consumed_at IS NULL`, { at: nowIso(), e });
-    throw tooMany('Too many attempts. Request a new code.');
-  }
-  const match = live.find((r) => safeEqual(r.code_hash, supplied));
-  if (!match) {
-    // Wrong code: counted against the newest live code.
-    const newest = live[0];
+  const guess = await claimOtpGuess('otp_codes', 'email', e, code);
+  if (!guess.ok) {
     await audit({ action: 'auth.otp_verify_fail', actor: { email: e }, targetType: 'email', targetId: e,
-      metadata: { ip: ctx.ip, attempts: newest.attempts + 1 }, req: ctx.req });
-    if (newest.attempts >= config.auth.otpMaxAttempts) {
-      throw tooMany('Too many attempts. Request a new code.');
-    }
-    await run('UPDATE otp_codes SET attempts = attempts + 1 WHERE id = @id', { id: newest.id });
+      metadata: { ip: ctx.ip, attempts: guess.attempts }, req: ctx.req });
     throw badRequest('Incorrect code');
   }
-  await run('UPDATE otp_codes SET consumed_at = @at WHERE id = @id', { at: nowIso(), id: match.id });
 
   const { user, created } = await upsertUserByEmail(e, { email_verified: true });
   if (!user.email_verified) {
@@ -205,24 +225,9 @@ export async function requestPhoneOtp(phone, ctx = {}) {
 /** Verify a phone OTP → authenticated session. */
 export async function verifyPhoneOtp(phone, code, ctx = {}) {
   const p = normalizePhone(phone);
-  const supplied = sha256(String(code).trim());
-  const rows = await all(
-    `SELECT * FROM sms_verifications WHERE phone=@p AND consumed_at IS NULL ORDER BY created_at DESC LIMIT 10`, { p });
-  if (!rows.length) throw badRequest('No active code. Request a new one.');
-  const live = rows.filter((r) => new Date(r.expires_at) >= new Date());
-  if (!live.length) throw badRequest('Code expired. Request a new one.');
-  const tried = live.reduce((a, r) => a + Number(r.attempts || 0), 0);
-  if (tried >= config.auth.otpMaxAttempts) {
-    await run(`UPDATE sms_verifications SET consumed_at=@at WHERE phone=@p AND consumed_at IS NULL`, { at: nowIso(), p });
-    throw tooMany('Too many attempts. Request a new code.');
-  }
-  const match = live.find((r) => safeEqual(r.code_hash, supplied));
-  if (!match) {
-    const newest = live[0];
-    await run('UPDATE sms_verifications SET attempts = attempts + 1 WHERE id=@id', { id: newest.id });
-    throw badRequest('Incorrect code');
-  }
-  await run('UPDATE sms_verifications SET consumed_at=@at WHERE id=@id', { at: nowIso(), id: match.id });
+  // Same atomic count-then-compare as the e-mailed code (claimOtpGuess).
+  const guess = await claimOtpGuess('sms_verifications', 'phone', p, code);
+  if (!guess.ok) throw badRequest('Incorrect code');
   const { user, created } = await upsertUserByPhone(p);
   if (user.totp_secret && user.totp_enabled_at) {
     return { totpRequired: true, ticket: issueTotpTicket(user), user, firstLogin: created };

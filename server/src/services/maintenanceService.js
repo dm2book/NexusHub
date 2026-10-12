@@ -254,7 +254,13 @@ export async function runMaintenance({ deadline = Date.now() + 26_000 } = {}) {
 
   // 3. Auto-cancel orders left unpaid for 14+ days (frees reserved intent).
   try {
-    const stale = await all(`SELECT id FROM orders WHERE status='pending' AND created_at < @cut LIMIT 100`,
+    /* Not an order whose buyer sent proof of payment that nobody has looked at
+       yet: that is a paid order waiting for us, not an abandoned one. It was
+       cancelled with the proof still in the queue, and confirming the proof
+       afterwards failed. */
+    const stale = await all(`SELECT id FROM orders WHERE status='pending' AND created_at < @cut
+                               AND NOT EXISTS (SELECT 1 FROM payment_proofs p WHERE p.order_id = orders.id AND p.status = 'pending')
+                             LIMIT 100`,
       { cut: DAYS(14) });
     for (const o of stale) {
       try {

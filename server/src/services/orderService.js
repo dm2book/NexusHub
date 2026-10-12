@@ -131,6 +131,11 @@ export async function priceOrder({ items = [], coupon = '', userId = null, email
     if (!product.active) throw conflict(`Product not available: ${product.name}`);
     const quantity = Math.max(1, Number(li.quantity || 1));
     const unitPrice = product.price;
+    /* A product without a price is not for sale. An unpriced row switched on
+       by hand (a market-discovery product is created at €0) made a €0 order —
+       which this file then settles as "covered in full by store credit" and
+       auto-delivers: a free code for anyone who found it. */
+    if (!(Number.isInteger(unitPrice) && unitPrice > 0)) throw conflict(`Product not available: ${product.name}`);
     const mystery = product.kind === 'mystery';
     subtotal += unitPrice * quantity;
     if (mystery) mysteryCents += unitPrice * quantity;
@@ -527,28 +532,47 @@ export async function createOrder(input, ctx = {}) {
  * emailing them a second time about codes they already have.
  */
 export async function insertDeliveries(orderId, list = []) {
-  const already = new Set((await all(
-    'SELECT content FROM deliveries WHERE order_id=@o', { o: orderId })).map((d) => d.content));
-  const fresh = [];
-  for (const d of list) {
-    const content = String(d.content ?? '').trim();
-    // A delivery with no content is a file or a done-on-the-supplier's-side
-    // top-up; there is nothing to compare, so it is written as given.
-    if (content && already.has(content)) continue;
-    if (content) already.add(content);
-    fresh.push({ ...d, content: content || null });
-  }
-  if (!fresh.length) return [];
-  // One transaction: a loop of separate INSERTs that throws halfway leaves the
-  // earlier rows written and the order never completed, which is a paid order
-  // showing part of its codes with no way to tell that is what happened.
+  let fresh = [];
+  /* One transaction, read and write under the order's row lock.
+
+     The duplicate check used to read before the transaction, so two deliveries
+     of the same codes at the same moment — two dispenses of one order, a staff
+     click during an automatic one — each read "nothing delivered yet" and each
+     wrote the whole set: the buyer saw every code twice and got two mails.
+
+     And all or nothing: a loop of separate INSERTs that throws halfway leaves
+     the earlier rows written and the order never completed, which is a paid
+     order showing part of its codes with no way to tell that is what happened. */
   await tx(async () => {
+    await get('SELECT id FROM orders WHERE id=@o FOR UPDATE', { o: orderId });
+    const already = new Set((await all(
+      'SELECT content FROM deliveries WHERE order_id=@o', { o: orderId })).map((d) => d.content));
+    fresh = [];
+    for (const d of list) {
+      const content = String(d.content ?? '').trim();
+      // A delivery with no content is a file or a done-on-the-supplier's-side
+      // top-up; there is nothing to compare, so it is written as given.
+      if (content && already.has(content)) continue;
+      if (content) already.add(content);
+      fresh.push({ ...d, content: content || null });
+    }
     for (const d of fresh) {
       await run(`INSERT INTO deliveries (id, order_id, order_item_id, type, content, filename, max_downloads, created_at)
            VALUES (@id, @oid, @iid, @type, @c, @file, @max, @at)`,
           { id: newId('dlv'), oid: orderId, iid: d.orderItemId || d.order_item_id || null,
             type: d.type || 'code', c: d.content, file: d.filename || null,
             max: d.maxDownloads ?? null, at: nowIso() });
+      /* A code staff hand out from their own list is the same code that sits
+         in stock. Delivered by hand it stayed 'available', and the next buyer
+         of that product was auto-dispensed the code already redeemed. Every
+         door into an order's deliveries comes through here, so the stocked copy
+         is retired here — for this order's products only. */
+      if (d.content) {
+        await run(`UPDATE product_codes SET status='used', order_id=@o, used_at=@at
+                    WHERE status='available' AND md5(code)=md5(@c)
+                      AND product_id IN (SELECT product_id FROM order_items WHERE order_id=@o)`,
+          { o: orderId, c: d.content, at: nowIso() });
+      }
     }
   });
   return fresh;
@@ -566,6 +590,13 @@ export async function deliverOrder(orderId, deliveries = [], ctx = {}) {
   // order read `completed` — nothing in the dashboard would ever have shown it.
   if (['refunded', 'cancelled'].includes(order.status)) {
     throw conflict(`Order is ${order.status} — it cannot be delivered`);
+  }
+  /* Only an order whose money is in — or a replacement on a completed one.
+     This force-completes, so staff "deliver & complete" on an unpaid (pending)
+     or fraud-blocked (failed) order sent the code and closed it as completed
+     with payment_status 'unpaid': free goods, past the proof queue. */
+  if (!['payment_received', 'processing', 'awaiting_fulfillment', 'completed'].includes(order.status)) {
+    throw conflict(`This order is ${order.status} — confirm the payment before delivering.`);
   }
   // Held for review. Refused here rather than only in auto-dispense, because
   // this is also the door the supplier queue and the staff button come through,
@@ -620,6 +651,20 @@ export async function transitionOrder(orderId, to, ctx = {}) {
      remember it. */
   if (['refunded', 'cancelled'].includes(order.status) && ['completed', 'payment_received'].includes(to)) {
     throw conflict(`Order is ${order.status} — it cannot become "${to}"`);
+  }
+
+  /* Reopening a failed order that used store credit or a discount code.
+     Failing it gave both back (credit to the wallet, the code's use released),
+     while the order's total stayed net of them — so reopening sold it at the
+     discounted price with the credit back in the wallet, and a later refund as
+     credit paid the credit out a second time (measured: €10 credit became €35
+     on a €25 order). A new order prices it afresh. */
+  if (order.status === 'failed' && to === 'pending') {
+    let billing = {};
+    try { billing = typeof order.billing === 'string' ? JSON.parse(order.billing || '{}') : (order.billing || {}); } catch { billing = {}; }
+    if (Number(billing.creditApplied || 0) > 0 || billing.coupon) {
+      throw conflict('This order used store credit or a discount code, which went back when it failed. Place a new order instead of reopening this one.');
+    }
   }
 
   let paymentSet = '';
@@ -965,7 +1010,18 @@ export async function autoDispenseFromStock(orderId, ctx = {}) {
     console.warn(`[autodispense] ${order.number} became ${now?.status} mid-delivery — returned ${freed} code(s) to stock`);
     return false;
   }
-  await deliverOrder(orderId, deliveries, { ...ctx, reason: 'Auto-delivered from stock' });
+  try {
+    await deliverOrder(orderId, deliveries, { ...ctx, reason: 'Auto-delivered from stock' });
+  } catch (e) {
+    /* Refused after the claim — a refund, cancellation or fraud hold landing
+       between the re-read above and deliverOrder's own check. The claimed codes
+       stayed marked `used` against an order nobody would receive: stock lost
+       for good (seen in the fulfilment race test under load). releaseCodes
+       frees only codes that never reached a delivery row. */
+    const freed = await releaseCodes(orderId).catch(() => 0);
+    if (freed) console.warn(`[autodispense] ${order.number}: delivery refused (${e.message}) — returned ${freed} code(s) to stock`);
+    throw e;
+  }
   /* Stock just moved — walk the alert ladder for anything now running low.
 
      Awaited, not fired and forgotten. On a serverless platform the function can
@@ -994,6 +1050,8 @@ export async function sendPaymentReminders({ afterMinutes = 60, maxAgeHours = 72
   const rows = await all(
     `SELECT id FROM orders
       WHERE status = 'pending' AND reminder_sent_at IS NULL
+        -- "We have not received your payment" is wrong once they sent proof.
+        AND NOT EXISTS (SELECT 1 FROM payment_proofs p WHERE p.order_id = orders.id AND p.status = 'pending')
         AND created_at < @newest AND created_at > @oldest
       ORDER BY created_at ASC LIMIT @limit`,
     { newest, oldest, limit });
@@ -1412,10 +1470,14 @@ export async function releaseFraudHold(orderId, ctx = {}) {
   if (!order) throw notFound('Order not found');
   if (!order.fraudHold) return { order, alreadyReleased: true };
 
-  await run(
+  /* Only the click that actually lifts the hold goes on to deliver. Two
+     approvals at once (two tabs, a double click) both passed the check above
+     and both dispensed. */
+  const lifted = await run(
     `UPDATE orders SET fraud_hold=0, fraud_status='ok', fraud_reviewed_at=@at,
-            fraud_reviewed_by=@by, updated_at=@at WHERE id=@id`,
+            fraud_reviewed_by=@by, updated_at=@at WHERE id=@id AND fraud_hold=1`,
     { at: nowIso(), by: ctx.actorId || 'staff', id: orderId });
+  if (!lifted?.changes) return { order: await getOrder(orderId), alreadyReleased: true };
 
   await audit({
     actor: ctx.user || { id: ctx.actorId || 'staff', email: ctx.actorId || 'staff' },
