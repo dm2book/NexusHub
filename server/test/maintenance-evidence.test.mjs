@@ -69,7 +69,11 @@ const checkUnder = (env) => {
     encoding: 'utf8',
     /* The local test database presents a self-signed certificate, which a
        "production" pool now rightly refuses; this is the explicit opt-out. */
-    env: { ...process.env, CRON_SECRET: '', NODE_ENV: 'development', DATABASE_SSL_INSECURE: 'true', ...env },
+    env: { ...process.env, CRON_SECRET: '', NODE_ENV: 'development', DATABASE_SSL_INSECURE: 'true',
+      /* …and in CI (postgres:16, no TLS at all) a "production" child was
+         refused outright: CI was red on main for every push while this passed
+         locally. TLS is not what this checks, so plain text either way. */
+      DATABASE_SSL: 'false', ...env },
   });
   try { return JSON.parse((r.stdout || '').trim().split('\n').pop()); }
   catch { return { status: '?', detail: r.stderr }; }
