@@ -822,6 +822,7 @@ const NL = {
   'checkout.payNowShort': 'Veilig betalen',
   'checkout.mollieChosen': 'Je gaat direct naar deze methode — geen extra scherm.',
   'checkout.mollieAny': 'Optioneel: kies hier een methode, of kies er een op de beveiligde betaalpagina.',
+  'checkout.paynlNote': 'Je betaalt op de beveiligde pagina van Pay., onze betaalprovider. Je code komt zodra de betaling is bevestigd.',
   'checkout.payTo': 'Maak',
   'checkout.payToWho': 'over naar',
   'checkout.refNeeded': 'Zet je bestelnummer in de omschrijving van de betaling',

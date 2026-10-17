@@ -398,6 +398,31 @@ export const config = {
       // whatever API_URL happens to be.
       webhookBase: (env.MOLLIE_WEBHOOK_BASE || '').trim(),
     },
+    /* Pay. (pay.nl): hosted checkout for iDEAL and Bancontact, and the provider
+       the shop chose after Stripe refused its category (third-party gift cards
+       and game currency) — Pay. lists "Giftcards / Gamecards" as an accepted,
+       high-risk category.
+
+       Two values switch it on: the sales location's service id (SL-xxxx-xxxx)
+       and that sales location's secret, both under Settings → Sales locations
+       in my.pay.nl. Pay. signs nothing we rely on: like Mollie, every exchange
+       call is verified by asking the API for the order with these credentials.
+
+       Pay. keys carry no test/live prefix, so the sandbox is an explicit
+       switch here. These are PAYNL_*, not PAY_*: PAY_* already means the manual
+       payment links below. */
+    paynl: {
+      serviceId: (env.PAYNL_SERVICE_ID || '').trim(),
+      serviceSecret: (env.PAYNL_SERVICE_SECRET || '').trim(),
+      // 'true' sends every order to Pay.'s sandbox (integration.test). A string,
+      // because the admin keystore writes strings into this same slot.
+      testMode: (env.PAYNL_TEST_MODE || '').trim(),
+      // Which methods the checkout offers, in order. Each must be activated on
+      // the sales location in my.pay.nl, or Pay. refuses the payment.
+      methods: (env.PAYNL_METHODS || 'ideal,bancontact').trim(),
+      // Optional, like MOLLIE_WEBHOOK_BASE: the public origin Pay. calls back.
+      exchangeBase: (env.PAYNL_EXCHANGE_BASE || '').trim(),
+    },
     // Manual payment methods (Tikkie / Revolut / PayPal). The customer pays via the
     // link with their order number as reference; an admin confirms in the dashboard.
     manual: {
@@ -677,9 +702,64 @@ export function commerceBlockers() {
     }
   }
   /* A Stripe key without its webhook secret takes the money and never hears
-     about it: every webhook is refused, so no order is ever marked paid. */
-  if (config.payments.stripe.secretKey && !config.payments.stripe.webhookSecret) {
+     about it: every webhook is refused, so no order is ever marked paid.
+
+     Only while Stripe is the provider the checkout actually uses. A Stripe key
+     left in the keystore after switching to Pay. sends nobody to Stripe, and
+     pausing every order over it closed a shop that could be paid perfectly
+     well — seen live: Stripe refused the category, its key stayed behind, and
+     ordering read "paused" for days. */
+  if (activePaymentProvider() === 'stripe'
+      && config.payments.stripe.secretKey && !config.payments.stripe.webhookSecret) {
     reasons.push('STRIPE_WEBHOOK_SECRET is missing, so paid orders would never be marked paid');
   }
+  /* Pay.'s sandbox, the same rule as a Stripe test key: fine before the shop
+     opens — that is how the owner tries the real checkout — and a blocker after,
+     because a sandbox payment is marked paid and no money moves. */
+  if (isProd && activePaymentProvider() === 'paynl' && paynlTestMode()) {
+    const launched = !config.launch.date || Date.now() >= new Date(config.launch.date).getTime();
+    if (launched) reasons.push('PAYNL_TEST_MODE is on, so no payment would be real (switch the Pay. sandbox off)');
+  }
   return reasons;
+}
+
+/**
+ * The Pay. methods this shop offers, as configured (PAYNL_METHODS), in order.
+ *
+ * Only methods whose Pay. payment-option id is confirmed in Pay.'s own table
+ * (developer.pay.nl/docs/payment-option-ids-subids): iDEAL 10 (NL, EUR) and
+ * Bancontact 436 (BE, EUR). Another method needs its id checked there before it
+ * is added — a wrong id is a payment Pay. refuses at the last step.
+ */
+export const PAYNL_METHOD_IDS = Object.freeze({
+  ideal: { payId: 10, label: 'iDEAL' },
+  bancontact: { payId: 436, label: 'Bancontact' },
+});
+export function paynlMethods() {
+  const wanted = String(config.payments.paynl.methods || '').split(',').map((m) => m.trim().toLowerCase());
+  return [...new Set(wanted)].filter((m) => PAYNL_METHOD_IDS[m])
+    .map((id) => ({ id, label: PAYNL_METHOD_IDS[id].label, payId: PAYNL_METHOD_IDS[id].payId }));
+}
+
+/** Pay.'s sandbox switch. A string in config, because the keystore writes strings. */
+export const paynlTestMode = () => /^(1|true|yes|on)$/i.test(String(config.payments.paynl.testMode || '').trim());
+
+/** Both halves of the Pay. credentials — one without the other cannot be paid. */
+export const paynlConfigured = () => !!(config.payments.paynl.serviceId && config.payments.paynl.serviceSecret);
+
+/**
+ * The provider the checkout sends a buyer to — one answer, used everywhere.
+ *
+ * Pay. first: it is the provider the shop chose, and the one that accepts what
+ * it sells. Stripe next, then Mollie, then the manual links. The readiness
+ * checks, the blockers and the storefront all ask this, so they can never name
+ * different providers for the same shop.
+ */
+export function activePaymentProvider() {
+  const p = config.payments;
+  if (paynlConfigured()) return 'paynl';
+  if (p.stripe.secretKey) return 'stripe';
+  if (p.mollie.apiKey) return 'mollie';
+  if (manualPayMethods().length) return 'manual';
+  return p.demoMode ? 'demo' : 'none';
 }

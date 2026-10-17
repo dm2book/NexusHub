@@ -632,6 +632,7 @@ export default {
   'checkout.payNowShort': 'Payer en sécurité',
   'checkout.mollieChosen': 'Tu vas directement vers ce moyen de paiement — pas d’écran en plus.',
   'checkout.mollieAny': 'Facultatif : choisis un moyen ici, ou choisis-en un sur la page de paiement sécurisée.',
+  'checkout.paynlNote': 'Tu paies sur la page sécurisée de Pay., notre prestataire de paiement. Ton code arrive dès que le paiement est confirmé.',
   'checkout.payTo': 'Vire',
   'checkout.payToWho': 'à',
   'checkout.refNeeded': 'Indique ton numéro de commande en description du paiement',

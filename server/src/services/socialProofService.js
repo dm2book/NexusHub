@@ -13,6 +13,7 @@ import { run, get, all, nowIso } from '../db/index.js';
 import { newId } from '../utils/ids.js';
 import { isTestKey as stripeTestKey } from './stripeService.js';
 import { isTestKey as mollieTestKey } from './mollieService.js';
+import { paynlTestMode } from '../config/env.js';
 
 // ── Privacy-safe display helpers ────────────────────────────────────────────
 
@@ -82,7 +83,8 @@ export async function recordPurchaseEvent(order) {
       { id: order.id }).catch(() => null);
     const country = countryOf(billing) || countryCodeOf(row?.country);
     const test = (row?.psp_provider === 'stripe' && stripeTestKey())
-      || (row?.psp_provider === 'mollie' && mollieTestKey()) ? 1 : 0;
+      || (row?.psp_provider === 'mollie' && mollieTestKey())
+      || (row?.psp_provider === 'paynl' && paynlTestMode()) ? 1 : 0;
     /* Payment to delivery, as every public delivery time is measured — not
        from when the order was placed, and not capped at a day. No payment on
        record (a free order): no time, rather than one counted from the order. */
@@ -132,7 +134,7 @@ export const STAFF_ORDER = `EXISTS (
  * runtime; the provider names are our own constants, never input.
  */
 export function notHouseOrder() {
-  const test = [stripeTestKey() && `'stripe'`, mollieTestKey() && `'mollie'`].filter(Boolean);
+  const test = [stripeTestKey() && `'stripe'`, mollieTestKey() && `'mollie'`, paynlTestMode() && `'paynl'`].filter(Boolean);
   return `NOT ${DEMO_ORDER} AND NOT ${STAFF_ORDER}
     AND NOT EXISTS (SELECT 1 FROM social_events te WHERE te.order_id = o.id AND te.test = 1)
     ${test.length ? `AND COALESCE(o.psp_provider, '') NOT IN (${test.join(', ')})` : ''}`;

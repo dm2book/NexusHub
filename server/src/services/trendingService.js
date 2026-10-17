@@ -34,6 +34,7 @@
 import { all, run, nowIso } from '../db/index.js';
 import { isTestKey as stripeTestKey } from './stripeService.js';
 import { isTestKey as mollieTestKey } from './mollieService.js';
+import { paynlTestMode } from '../config/env.js';
 
 export const HOT_MIN = 2;
 export const POPULAR_MIN = 3;
@@ -54,6 +55,7 @@ export function isRealOrder(o) {
   if (truthy(o.test_event)) return false;
   if (o.psp_provider === 'stripe' && stripeTestKey()) return false;
   if (o.psp_provider === 'mollie' && mollieTestKey()) return false;
+  if (o.psp_provider === 'paynl' && paynlTestMode()) return false;
   return true;
 }
 

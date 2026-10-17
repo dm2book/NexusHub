@@ -131,10 +131,13 @@ export default function Faq() {
   useEffect(() => {
     getConfig()
       .then((c) => setMethods({
-        names: [
-          ...(c.paymentMethods || []).map((m) => m.label).filter(Boolean),
-          ...(c.mollieMethods || []).map((m) => m.label || m.id).filter(Boolean),
-        ],
+        // With Pay., only what its checkout offers; the manual links are not.
+        names: c.paymentProvider === 'paynl'
+          ? (c.paynlMethods || []).map((m) => m.label).filter(Boolean)
+          : [
+            ...(c.paymentMethods || []).map((m) => m.label).filter(Boolean),
+            ...(c.mollieMethods || []).map((m) => m.label || m.id).filter(Boolean),
+          ],
         automatic: (c.mollieMethods || []).length > 0 || (c.paymentProvider && c.paymentProvider !== 'manual'),
       }))
       .catch(() => setMethods({ names: [], automatic: false }));

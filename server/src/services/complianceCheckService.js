@@ -32,7 +32,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { config, manualPayMethods } from '../config/env.js';
+import { config, manualPayMethods, activePaymentProvider, paynlTestMode } from '../config/env.js';
 import { isEnabled as mollieEnabled } from '../services/mollieService.js';
 import { isEnabled as stripeEnabled, hasWebhookSecret as stripeWebhook } from './stripeService.js';
 
@@ -343,7 +343,12 @@ export async function auditCompliance() {
     add('payments', 'payments.demo', 'FAIL', 'Demo payments are on',
       'Orders are marked paid without money arriving.', 'Set DEMO_PAYMENTS=false.');
   }
-  if (stripeEnabled()) {
+  const active = activePaymentProvider();
+  if (active === 'paynl') {
+    add('payments', 'payments.paynl', paynlTestMode() ? 'FAIL' : 'PASS', 'Pay.',
+      paynlTestMode() ? 'Pay. is in sandbox mode — buyers reach the sandbox and no money moves.'
+        : 'Live service configured. iDEAL and Bancontact must be activated on the sales location.');
+  } else if (active === 'stripe' && stripeEnabled()) {
     /* The silent one: without a webhook secret constructEvent refuses, which is
        the safe direction and the invisible one — the buyer pays, the money
        arrives, and no order is ever marked paid. */
@@ -357,7 +362,7 @@ export async function auditCompliance() {
     add('payments', 'payments.stripe', test ? 'FAIL' : 'PASS', 'Stripe',
       test ? 'STRIPE_SECRET_KEY is a test key — buyers reach test mode and no money moves.'
         : 'Live key configured.');
-  } else if (mollieEnabled()) {
+  } else if (active === 'mollie' && mollieEnabled()) {
     const test = /^test_/.test(config.payments.mollie.apiKey || '');
     add('payments', 'payments.mollie', test ? 'FAIL' : 'PASS', 'Mollie',
       test ? 'MOLLIE_API_KEY is a test key — buyers reach the sandbox and no money moves.'
@@ -374,7 +379,7 @@ export async function auditCompliance() {
      money in it takes the shop and the float with it. Named after whichever
      processor is actually configured, because "ask Mollie" is useless advice to
      a shop running Stripe. */
-  const processor = stripeEnabled() ? 'Stripe' : mollieEnabled() ? 'Mollie' : 'your payment provider';
+  const processor = { paynl: 'Pay.', stripe: 'Stripe', mollie: 'Mollie' }[active] || 'your payment provider';
   add('payments', 'payments.terms-match', 'OWNER', `Does your ${processor} account allow what you sell?`,
     'Payment providers restrict digital goods, prepaid codes and top-ups, and an account closed '
     + 'mid-launch takes the shop with it.',

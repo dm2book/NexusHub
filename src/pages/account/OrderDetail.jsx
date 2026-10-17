@@ -29,12 +29,13 @@ export default function OrderDetail() {
    *
    * Without this the only way back to an abandoned payment is placing the order
    * again, which reserves the stock twice. The server resumes the existing
-   * Mollie payment when there is one, so this cannot open a second charge.
+   * Pay. or Mollie payment when there is one, so this cannot open a second charge.
    */
   const payNow = async () => {
     setPayBusy(true);
     try {
-      const r = await api.post(`/api/orders/${id}/mollie`, {});
+      // The provider that holds the open payment: Pay. or Mollie.
+      const r = await api.post(`/api/orders/${id}/${order?.pspProvider === 'paynl' ? 'paynl' : 'mollie'}`, {});
       if (r.checkoutUrl) { window.location.href = r.checkoutUrl; return; }
       // Already settled while this tab sat open — show the truth, don't redirect.
       load();
@@ -111,7 +112,7 @@ export default function OrderDetail() {
           <StatusBadge status={order.status} />
           <a href={`${api.base}/api/account/orders/${id}/invoice`} target="_blank" rel="noreferrer"
              className="btn-ghost text-sm"><FileText size={16} /> {t('acc.order.invoice', 'Invoice')}</a>
-          {order.status === 'pending' && order.pspProvider === 'mollie' && (
+          {order.status === 'pending' && ['mollie', 'paynl'].includes(order.pspProvider) && (
             <button onClick={payNow} disabled={payBusy} className="btn-primary text-sm">
               <CreditCard size={16} /> {payBusy ? t('acc.order.oneMoment', 'One moment…') : t('acc.order.payAmount', 'Pay {amount}', { amount: money(order.total, order.currency) })}
             </button>

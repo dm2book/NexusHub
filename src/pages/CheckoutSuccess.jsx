@@ -39,13 +39,15 @@ export default function CheckoutSuccess() {
     const tick = async () => {
       tries += 1;
       try {
-        const r = await api.post(`/api/orders/${encodeURIComponent(orderId)}/mollie/sync`,
+        // The provider-neutral sync: it re-checks whichever provider (Pay. or
+        // Mollie) holds this order's payment, and only reports the status.
+        const r = await api.post(`/api/orders/${encodeURIComponent(orderId)}/payment/sync`,
           { number: number || undefined });
         if (!alive) return;
         if (SETTLED.includes(r.status)) { setState('paid'); feedback('success'); return; }
         if (['cancelled', 'failed'].includes(r.status)) { setState('failed'); return; }
       } catch {
-        // Not a Mollie order, not ours to read, or the API is unhappy. Either
+        // Not an order we can read, or the API is unhappy. Either
         // way this page must not assert something it cannot see.
         if (alive) setState('unknown');
         return;
