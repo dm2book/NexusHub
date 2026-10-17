@@ -27,12 +27,16 @@ export default function AdminOrderDetail() {
      Stripe or Mollie dashboard. A refund from here only sends the rest. */
   const refundedAtPsp = Number(order.refundedCents || 0);
   const refundable = Math.max(0, Number(order.total || 0) - refundedAtPsp);
-  const pspName = order.pspProvider === 'mollie' ? 'Mollie' : order.pspProvider === 'stripe' ? 'Stripe' : 'the payment provider';
+  const pspName = { mollie: 'Mollie', stripe: 'Stripe', paynl: 'Pay.' }[order.pspProvider] || 'the payment provider';
 
   const act = async (action, body) => {
     setBusy(true);
-    try { await api.post(`/api/admin/orders/${id}/${action}`, body);
-      toast.success('Done.'); setConfirm(false); load(); }
+    try { const r = await api.post(`/api/admin/orders/${id}/${action}`, body);
+      // A Pay. refund is made by hand in my.pay.nl — never reported as done.
+      if (r?.refund?.via === 'paynl') {
+        toast.success(`Marked refunded. Now refund ${money(r.refund.cents, data?.order?.currency)} in my.pay.nl — that is not automatic.`);
+      } else toast.success('Done.');
+      setConfirm(false); load(); }
     catch (err) { toast.error(err.message); }
     finally { setBusy(false); }
   };

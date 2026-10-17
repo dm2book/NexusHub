@@ -44,6 +44,7 @@
 import { all } from '../db/index.js';
 import { isTestKey as stripeTestKey } from './stripeService.js';
 import { isTestKey as mollieTestKey } from './mollieService.js';
+import { paynlTestMode } from '../config/env.js';
 import { PAID_AT, DEMO_ORDER, STAFF_ORDER } from './socialProofService.js';
 
 export const MIN_SAMPLE = 5;
@@ -84,6 +85,7 @@ export function isRealSale(o) {
   if (truthy(o.demo) || truthy(o.staff)) return false;
   if (o.psp_provider === 'stripe' && stripeTestKey()) return false;
   if (o.psp_provider === 'mollie' && mollieTestKey()) return false;
+  if (o.psp_provider === 'paynl' && paynlTestMode()) return false;
   const paid = !!o.paid_at || ['paid', 'refunded'].includes(o.payment_status) || ['completed', 'refunded'].includes(o.status);
   return paid;
 }

@@ -632,6 +632,7 @@ export default {
   'checkout.payNowShort': 'Sicher bezahlen',
   'checkout.mollieChosen': 'Du gehst direkt zu dieser Methode — ohne Zwischenschritt.',
   'checkout.mollieAny': 'Optional: wähl hier eine Methode, oder such dir eine auf der sicheren Zahlseite aus.',
+  'checkout.paynlNote': 'Du bezahlst auf der sicheren Seite von Pay., unserem Zahlungsanbieter. Dein Code kommt, sobald die Zahlung bestätigt ist.',
   'checkout.payTo': 'Überweise',
   'checkout.payToWho': 'an',
   'checkout.refNeeded': 'Trag deine Bestellnummer als Verwendungszweck ein',

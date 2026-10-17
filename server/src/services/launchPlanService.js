@@ -21,7 +21,7 @@
  * late, and a checklist that only starts working at launch is a checklist that
  * has never been run.
  */
-import { config, manualPayMethods } from '../config/env.js';
+import { config, manualPayMethods, activePaymentProvider, paynlTestMode } from '../config/env.js';
 import { launchState, launchAtIso, launchDayLabel } from './launchGateService.js';
 import { configuredChannels, EVENTS as ALERT_EVENTS } from './notifyService.js';
 import { isEnabled as mollieEnabled } from './mollieService.js';
@@ -165,6 +165,17 @@ export async function launchPlan() {
     add(PHASE.DAY, 'pay', 'Payment', 'fail',
       'DEMO_PAYMENTS is on: orders are marked paid without money arriving.',
       'Set DEMO_PAYMENTS=false.');
+  } else if (activePaymentProvider() === 'paynl') {
+    const test = paynlTestMode();
+    add(PHASE.DAY, 'pay', 'Payment', test ? 'fail' : 'ok',
+      test ? 'Pay. is in sandbox mode — buyers reach the sandbox and no money moves.'
+        : 'Pay. live — iDEAL and Bancontact through the Pay. checkout.',
+      test ? 'Switch the Pay. sandbox off in Keys and connections.' : null);
+  } else if (activePaymentProvider() === 'stripe') {
+    add(PHASE.DAY, 'pay', 'Payment', config.payments.stripe.webhookSecret ? 'ok' : 'fail',
+      config.payments.stripe.webhookSecret ? 'Stripe configured.'
+        : 'Stripe key without its webhook secret — paid orders would never be marked paid.',
+      config.payments.stripe.webhookSecret ? null : 'Add STRIPE_WEBHOOK_SECRET, or remove the Stripe key.');
   } else if (mollieEnabled()) {
     const test = /^test_/.test(config.payments.mollie.apiKey || '');
     add(PHASE.DAY, 'pay', 'Payment', test ? 'fail' : 'ok',
@@ -176,7 +187,7 @@ export async function launchPlan() {
       manualPayMethods().length
         ? 'Manual payment only — every order waits for a person to confirm a bank app.'
         : 'No way to pay at all.',
-      'Set MOLLIE_API_KEY for automatic iDEAL.');
+      'Set the Pay. service id and secret (or MOLLIE_API_KEY) for automatic iDEAL.');
   }
 
   const stocked = Number((await get(

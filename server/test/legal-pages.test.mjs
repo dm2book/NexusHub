@@ -140,13 +140,15 @@ console.log('— Matching reality —');
 {
   const t = nl('terms'), p = nl('privacy'), r = nl('refunds');
 
-  /* The shop sells through Stripe (the owner's choice), not Mollie. */
-  ok('the terms name the payment provider', /Stripe/.test(t) && !/Mollie/.test(t));
-  /* Exactly the pinned Stripe methods (STRIPE_PAYMENT_METHODS) — no PayPal or Apple Pay promised. */
+  /* The shop sells through Pay. — Stripe refused the category (third-party
+     gift cards and game currency), so naming Stripe would be untrue. */
+  ok('the terms name the payment provider', /\*\*Pay\.\*\*/.test(t) && !/Stripe|Mollie/.test(t));
+  /* Exactly the methods the Pay. checkout offers (PAYNL_METHODS): no card,
+     PayPal or Apple Pay promised that the checkout does not have. */
   ok('…and the methods actually offered',
-    ['iDEAL', 'Bancontact', 'betaalkaart'].every((m) => t.includes(m)) && !/PayPal|Apple Pay/.test(t));
+    ['iDEAL', 'Bancontact'].every((m) => t.includes(m)) && !/PayPal|Apple Pay|betaalkaart|Visa/.test(t));
   ok('the terms say payment confirms automatically', /automatisch bevestigd/.test(t));
-  ok('the privacy policy lists Stripe as a processor', /Stripe/.test(p));
+  ok('the privacy policy lists Pay. as a processor', /Pay\. \(pay\.nl/.test(p) && !/Stripe/.test(p));
   ok('…and says card details never reach us', /geen betaalgegevens/i.test(p));
 
   // The stale claims the previous versions carried.
@@ -201,7 +203,7 @@ console.log('— Cookies —');
     /fm_session/.test(c) && /30 dagen/.test(c));
   ok('localStorage is distinguished from cookies',
     /geen cookies/.test(c) && /winkelwagen/.test(c));
-  ok('third-party payment cookies are disclosed', /Stripe/.test(c));
+  ok('third-party payment cookies are disclosed', /\*\*Pay\.\*\*/.test(c));
   ok('it says how to delete them', /instellingen van je browser/.test(c));
   ok('the English version cites the same law', /11\.7a/.test(en('cookies')));
 }

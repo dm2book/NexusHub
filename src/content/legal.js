@@ -79,9 +79,9 @@ export const LEGAL_DOCS = {
         {
           h: 'Artikel 5 — Betaling',
           body: [
-            'Je betaalt direct bij het afrekenen via onze betaaldienstverlener **Stripe**. Je kunt kiezen uit iDEAL, Bancontact en betaalkaart (Visa, Mastercard). Je bank kan om een extra bevestiging vragen (3-D Secure).',
-            'Je betaalgegevens worden verwerkt door Stripe en komen niet bij ons binnen. Wij zien alleen dát een betaling is geslaagd, voor welk bedrag en met welke methode.',
-            'Je bestelling wordt automatisch bevestigd zodra Stripe de betaling bevestigt — bij iDEAL is dat doorgaans binnen enkele seconden. Betaal je niet, dan wordt de bestelling automatisch geannuleerd na de termijn die op je bestelpagina staat, en wordt er niets afgeschreven.',
+            'Je betaalt direct bij het afrekenen via onze betaaldienstverlener **Pay.** (pay.nl). Je kunt kiezen uit iDEAL en Bancontact. Je rondt de betaling af in je eigen bank-app of bij je bank.',
+            'Je betaalgegevens worden verwerkt door Pay. en je bank, en worden niet door ons opgeslagen. Wij zien alleen dát een betaling is geslaagd, voor welk bedrag en met welke methode.',
+            'Je bestelling wordt automatisch bevestigd zodra Pay. de betaling bevestigt — bij iDEAL is dat doorgaans binnen enkele seconden. Betaal je niet, dan wordt de bestelling automatisch geannuleerd na de termijn die op je bestelpagina staat, en wordt er niets afgeschreven.',
             'Betaal je bij uitzondering handmatig via een betaalverzoek, dan is je bestelnummer de betalingsreferentie. Zonder die referentie moeten we je betaling met de hand opzoeken, wat je levering vertraagt.',
           ],
         },
@@ -214,9 +214,9 @@ export const LEGAL_DOCS = {
         {
           h: 'Article 5 — Payment',
           body: [
-            'You pay at checkout through our payment provider **Stripe**, using iDEAL, Bancontact or a payment card (Visa, Mastercard). Your bank may ask for an extra confirmation (3-D Secure).',
-            'Your payment details are processed by Stripe and never reach us. We only see that a payment succeeded, for what amount, and by which method.',
-            'Your order is confirmed automatically as soon as Stripe confirms the payment — with iDEAL that is usually a matter of seconds. If you do not pay, the order is cancelled automatically after the period stated on your order page, and nothing is charged.',
+            'You pay at checkout through our payment provider **Pay.** (pay.nl), using iDEAL or Bancontact. You complete the payment in your own banking app or with your bank.',
+            'Your payment details are processed by Pay. and your bank, and are not stored by us. We only see that a payment succeeded, for what amount, and by which method.',
+            'Your order is confirmed automatically as soon as Pay. confirms the payment — with iDEAL that is usually a matter of seconds. If you do not pay, the order is cancelled automatically after the period stated on your order page, and nothing is charged.',
             'If you exceptionally pay by a manual payment request, your order number is the payment reference. Without it we have to find your payment by hand, which delays your delivery.',
           ],
         },
@@ -342,7 +342,7 @@ export const LEGAL_DOCS = {
                 '**Een betaalbewijs** — alleen als je zelf een screenshot uploadt, en alleen tot je betaling bevestigd is.',
               ],
             },
-            'Wij verwerken **geen betaalgegevens**. Je betaalt bij Stripe; wij zien alleen dát een betaling geslaagd is, voor welk bedrag en met welke methode. Je kaartnummer of rekeningnummer bereikt onze systemen niet.',
+            'Wij verwerken **geen betaalgegevens**. Je betaalt via Pay. en je bank; wij zien alleen dát een betaling geslaagd is, voor welk bedrag en met welke methode. Je rekeningnummer slaan wij niet op.',
           ],
         },
         {
@@ -372,7 +372,7 @@ export const LEGAL_DOCS = {
             'Wij gebruiken een klein aantal dienstverleners, die je gegevens uitsluitend in onze opdracht verwerken. Met elk van hen is een verwerkersovereenkomst gesloten.',
             {
               table: [
-                ['Stripe Payments Europe Ltd. (Ierland)', 'Betalingen. Verwerkt je betaalgegevens als zelfstandig verwerkingsverantwoordelijke; wij zien nooit je kaartgegevens.'],
+                ['Pay. (pay.nl, Nederland)', 'Betalingen via iDEAL en Bancontact. Verwerkt de betaling en de betaalgegevens die daarvoor nodig zijn.'],
                 ['Vercel Inc. (VS)', 'Hosting van de website en de API.'],
                 ['Neon Inc. (EU-regio)', 'De database waarin je account en bestellingen staan.'],
                 ['Resend (VS)', 'Verzending van je inlogcodes en bestelmails.'],
@@ -478,7 +478,7 @@ export const LEGAL_DOCS = {
                 '**A payment screenshot** — only if you upload one, and only until your payment is confirmed.',
               ],
             },
-            'We process **no payment details**. You pay at Stripe; we only see that a payment succeeded, for what amount and by which method. Your card or account number never reaches our systems.',
+            'We process **no payment details**. You pay through Pay. and your bank; we only see that a payment succeeded, for what amount and by which method. We do not store your account number.',
           ],
         },
         {
@@ -508,7 +508,7 @@ export const LEGAL_DOCS = {
             'We use a small number of providers, who process your data solely on our instructions. A data processing agreement is in place with each of them.',
             {
               table: [
-                ['Stripe Payments Europe Ltd. (Ireland)', 'Payments. Processes your payment details as an independent controller; we never see your card details.'],
+                ['Pay. (pay.nl, the Netherlands)', 'Payments by iDEAL and Bancontact. Processes the payment and the payment details it needs.'],
                 ['Vercel Inc. (US)', 'Hosting for the website and the API.'],
                 ['Neon Inc. (EU region)', 'The database holding your account and orders.'],
                 ['Resend (US)', 'Sending your login codes and order emails.'],
@@ -636,7 +636,7 @@ export const LEGAL_DOCS = {
             'Twee uitzonderingen die alleen ontstaan door iets wat jij doet:',
             {
               ul: [
-                '**Stripe** — zodra je op betalen klikt, ga je naar de beveiligde betaalpagina van Stripe. Daar gelden de cookies en het privacybeleid van Stripe. Wij ontvangen daaruit alleen of en hoeveel er betaald is — nooit je kaartgegevens.',
+                '**Pay.** — zodra je op betalen klikt, ga je naar de beveiligde betaalpagina van Pay. of je bank. Daar gelden hun cookies en privacybeleid. Wij ontvangen daaruit alleen of en hoeveel er betaald is.',
                 '**Discord** — klik je door naar onze Discord-server, dan gelden vanaf dat moment de cookies van Discord.',
               ],
             },
@@ -725,7 +725,7 @@ export const LEGAL_DOCS = {
             'Two exceptions, both of which only arise from something you do:',
             {
               ul: [
-                '**Stripe** — as soon as you click to pay you go to Stripe’s secure payment page, where Stripe’s cookies and privacy policy apply. We only learn whether and how much was paid — never your card details. We have no influence there and receive no data from it.',
+                '**Pay.** — as soon as you click to pay you go to the secure payment page of Pay. or your bank, where their cookies and privacy policy apply. We only learn whether and how much was paid. We have no influence there and receive no data from it.',
                 '**Discord** — if you follow a link to our Discord server, Discord’s cookies apply from that point.',
               ],
             },

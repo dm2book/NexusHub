@@ -121,6 +121,25 @@ export const SECRETS = [
     path: ['payments', 'mollie', 'apiKey'], group: 'Payments',
     why: 'An alternative to Stripe for iDEAL. Only needed if you use Mollie.',
     hint: 'live_… — a test_ key marks orders paid while no money moves.' },
+  /* Pay. (pay.nl). The ids are paynl.*, never pay.*: pay.* already holds the
+     manual Tikkie/Revolut/PayPal links below. */
+  { id: 'paynl.serviceId', label: 'Pay. service id (SL-xxxx-xxxx)', env: 'PAYNL_SERVICE_ID',
+    path: ['payments', 'paynl', 'serviceId'], group: 'Payments', secret: false,
+    why: 'Pay. — iDEAL and Bancontact for this shop. Needs the secret below as well.',
+    hint: 'my.pay.nl → Settings → Sales locations: the code that starts with SL-.',
+    validate: (v) => (/^SL-[A-Za-z0-9]{4}-[A-Za-z0-9]{4}$/i.test(v) ? null
+      : 'That does not look like a Pay. service id — it has the shape SL-1234-5678.') },
+  { id: 'paynl.serviceSecret', label: 'Pay. sales-location secret', env: 'PAYNL_SERVICE_SECRET',
+    path: ['payments', 'paynl', 'serviceSecret'], group: 'Payments',
+    why: 'Without it the shop cannot start a Pay. payment or check that one was paid.',
+    hint: 'The 40-character secret shown with the SL- code under Sales locations.',
+    validate: (v) => (/^\S{20,128}$/.test(v) ? null
+      : 'That does not look like a Pay. secret — paste the whole value, without spaces.') },
+  { id: 'paynl.testMode', label: 'Pay. sandbox (true / false)', env: 'PAYNL_TEST_MODE',
+    path: ['payments', 'paynl', 'testMode'], group: 'Payments', secret: false,
+    why: 'true sends payments to Pay.\'s sandbox: for trying the checkout before opening. Never on an open shop.',
+    hint: 'true while testing, empty or false when the shop is open.',
+    validate: (v) => (/^(true|false|1|0|yes|no|on|off)$/i.test(v) ? null : 'Use true or false.') },
   { id: 'pay.tikkie', label: 'Tikkie payment link', env: 'PAY_TIKKIE',
     path: ['payments', 'manual', 'tikkie'], group: 'Payments', secret: false,
     why: 'A manual fallback: the buyer pays by link and you confirm it by hand.' },
@@ -321,11 +340,18 @@ export async function missingEssentials() {
   const by = Object.fromEntries(status.map((s) => [s.id, s]));
   const out = [];
   const payments = by['stripe.secretKey'].set || by['mollie.apiKey'].set
+    || (by['paynl.serviceId'].set && by['paynl.serviceSecret'].set)
     || by['pay.tikkie'].set || by['pay.revolut'].set || by['pay.paypal'].set;
   if (!payments) out.push({ id: 'payments', what: 'a way to be paid', why: by['stripe.secretKey'].why });
   if (by['stripe.secretKey'].set && !by['stripe.webhookSecret'].set) {
     out.push({ id: 'stripe.webhookSecret', what: 'the Stripe webhook secret',
       why: by['stripe.webhookSecret'].why });
+  }
+  // One half of Pay. without the other cannot take a payment, and says nothing.
+  if (by['paynl.serviceId'].set !== by['paynl.serviceSecret'].set) {
+    const missing = by['paynl.serviceId'].set ? 'paynl.serviceSecret' : 'paynl.serviceId';
+    out.push({ id: missing, what: missing === 'paynl.serviceId' ? 'the Pay. service id (SL-…)' : 'the Pay. sales-location secret',
+      why: by[missing].why });
   }
   if (!by['email.resendApiKey'].set && !config.email.smtpUrl) {
     out.push({ id: 'email.resendApiKey', what: 'a way to email buyers',
