@@ -229,6 +229,9 @@ function rejectedMessage(refund) {
   if (refund.provider === 'stripe' || refund.provider === 'mollie') {
     return `Rejected and refunded through ${refund.provider === 'stripe' ? 'Stripe' : 'Mollie'}.`;
   }
+  if (refund.via === 'paynl' && refund.cents > 0) {
+    return 'Rejected and marked refunded — now refund it in my.pay.nl; Pay. refunds are not automatic.';
+  }
   return refund.cents > 0
     ? 'Rejected and marked refunded — now send the money back by hand, the way they paid.'
     : 'Rejected. The store credit it used is back in their wallet.';

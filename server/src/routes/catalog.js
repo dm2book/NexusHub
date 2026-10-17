@@ -3,7 +3,7 @@ import express, { Router } from 'express';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { httpUrl } from '../utils/httpUrl.js';
-import { config, manualPayMethods, commerceBlockers } from '../config/env.js';
+import { config, manualPayMethods, commerceBlockers, activePaymentProvider, paynlMethods } from '../config/env.js';
 import { asyncHandler } from '../middleware/error.js';
 import { publicCache } from '../utils/httpCache.js';
 import { requireLaunched, launchAtIso } from '../services/launchGateService.js';
@@ -233,11 +233,10 @@ const manual = () => manualPayMethods();
 /* Stripe first: it is the provider the shop chose, it confirms itself through
    its webhook like Mollie does, and with a live key it should win over any
    payment link left configured from before. */
-const paymentProvider = () =>
-  stripeEnabled() ? 'stripe'
-    : mollieEnabled() ? 'mollie'
-      : manual().length ? 'manual'
-        : config.payments.demoMode ? 'demo' : 'none';
+/* Pay. first, then Stripe, Mollie, the manual links — decided in one place
+   (activePaymentProvider) so the checkout, the blockers and the launch checks
+   cannot disagree about which provider this shop is using. */
+const paymentProvider = () => activePaymentProvider();
 
 // Public runtime config the SPA can read (feature flags, enabled providers).
 /**
@@ -404,7 +403,10 @@ router.get('/config', asyncHandler(async (_req, res) => {
     // actually offered depends on the amount and the country, so the checkout
     // asks /api/mollie/methods for the real list once it knows the total —
     // this is only the shop-level "we accept these" statement.
-    mollieMethods: mollieEnabled() ? MOLLIE_METHODS : [],
+    mollieMethods: paymentProvider() === 'mollie' ? MOLLIE_METHODS : [],
+    // Pay.: the methods the checkout offers, each one activated on the sales
+    // location. Empty unless Pay. is the provider the checkout uses.
+    paynlMethods: paymentProvider() === 'paynl' ? paynlMethods().map(({ id, label }) => ({ id, label })) : [],
     paymentNote: config.payments.manual.note,
     announcement: config.shop.announcement,  // optional promo bar text
     trustpilotUrl: config.shop.trustpilotUrl,  // '' when the shop has no profile yet
@@ -801,7 +803,9 @@ router.post('/orders/:id/pay', rateLimit({ bucket: 'pay', windowMs: 60_000, max:
        happening to hold the order, which is luck rather than a guard. */
     const realPaymentConfigured = mollieEnabled()
       || manualPayMethods().length > 0
-      || !!config.payments.stripe.secretKey;
+      || !!config.payments.stripe.secretKey
+      // Pay. too: the same free-stock hole as Mollie had, one provider later.
+      || activePaymentProvider() === 'paynl';
     if (!config.payments.demoMode || realPaymentConfigured) throw new ApiError(404, 'Not found');
     const order = await getOrder(req.params.id);
     if (!order) throw new ApiError(404, 'Order not found');
@@ -1095,7 +1099,7 @@ router.get('/track/:number', asyncHandler(async (req, res) => {
     // number is what got you here, and the page it opens only accepts money.
     // Cleared the moment the order stops being pending.
     payUrl: order.status === 'pending' ? (await getPspPayment(order.id)
-      .then((p) => (p?.provider === 'mollie' && ['open', 'pending'].includes(p.status || '') ? p.checkoutUrl : null))
+      .then((p) => (['mollie', 'paynl'].includes(p?.provider) && ['open', 'pending'].includes(p.status || '') ? p.checkoutUrl : null))
       .catch(() => null)) : null,
     // A held order is paid and normal on every other measure, so without this it
     // would show "payment confirmed, we're on it" while nothing is being

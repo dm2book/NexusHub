@@ -101,6 +101,16 @@ export async function runMaintenance({ deadline = Date.now() + 26_000 } = {}) {
     if (r.checked) summary.stripeReconciled = r;
   } catch (e) { summary.stripeReconcileError = e.message; }
 
+  /* 8c. The same for Pay.: an exchange call that never came (or that Pay.
+     gave up retrying) leaves a paid order pending — the buyer charged and
+     nothing delivered. Asked of Pay. directly, settled through the exchange's
+     own path, which also checks every payment attempt on the order. */
+  try {
+    const { reconcilePaynl } = await import('../routes/paynl.js');
+    const r = await reconcilePaynl({ deadline: Date.now() + 5_000 });
+    if (r.checked) summary.paynlReconciled = r;
+  } catch (e) { summary.paynlReconcileError = e.message; }
+
   // 9. The net under the pipeline: any paid order nothing has picked up.
   //    Delivery is started without being awaited, so on a serverless host it can
   //    simply never run — the order sits paid, in stock and undelivered. The

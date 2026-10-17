@@ -35,6 +35,9 @@ export function PayMark({ id, label, size = 'md' }) {
 export function usePayMarks() {
   const c = useConfig();
   const out = [];
+  // Pay.: only the methods its checkout offers — the manual links are not
+  // offered while Pay. is the provider, so showing them would be a promise.
+  if (c.paymentProvider === 'paynl') return (c.paynlMethods || []).map((m) => ({ id: m.id, label: m.label }));
   if (c.paymentProvider === 'stripe') out.push({ id: 'ideal', label: 'iDEAL' }, { id: 'creditcard', label: 'Card' });
   for (const m of c.mollieMethods || []) out.push({ id: String(m.id || m).toLowerCase(), label: m.description || m.label || String(m.id || m) });
   for (const m of c.paymentMethods || []) out.push({ id: m.id, label: m.label });

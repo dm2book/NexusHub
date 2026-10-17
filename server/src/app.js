@@ -32,6 +32,7 @@ import catalogRoutes from './routes/catalog.js';
 import discordRoutes from './routes/discord.js';
 import paymentRoutes from './routes/payments.js';
 import mollieWebhook, { mollieApi } from './routes/mollie.js';
+import paynlExchange, { paynlApi } from './routes/paynl.js';
 import seoRoutes from './routes/seo.js';
 import socialRoutes from './routes/social.js';
 import imageRoutes from './routes/images.js';
@@ -181,6 +182,10 @@ export function createApp({ lazyReady = false } = {}) {
   // Mollie POSTs form data (`id=tr_xxx`), not JSON — give that one path its own
   // parser before the JSON one rejects the content type.
   app.use('/api/payments/mollie/webhook', express.urlencoded({ extended: false, limit: '16kb' }));
+  // Pay.'s exchange call arrives as a GET, a form POST or a JSON POST; it gets
+  // both parsers here, before the general JSON one.
+  app.use('/api/payments/paynl/exchange', express.urlencoded({ extended: false, limit: '32kb' }),
+    express.json({ limit: '64kb' }));
   // 3mb so a (base64) product image an admin uploads fits — the image guard
   // (isSafeImageValue) still caps the actual data URI below this.
   app.use(express.json({ limit: '3mb' }));
@@ -290,6 +295,9 @@ export function createApp({ lazyReady = false } = {}) {
   // a busy hour can never turn a payment confirmation into a 429; the route
   // carries its own, far more generous, limiter.
   app.use('/api/payments', mollieWebhook);
+  // Pay.'s exchange: the same reasoning — a server-to-server confirmation that
+  // must never meet the general limiter. Its own limiter is in the route.
+  app.use('/api/payments', paynlExchange);
   /* Stripe's webhook too (it is the only route in paymentRoutes): a 429 on a
      payment confirmation is a paid order left pending. Signed, so the general
      limiter adds nothing but risk. */
@@ -306,6 +314,7 @@ export function createApp({ lazyReady = false } = {}) {
   app.use('/api/social', socialRoutes);
   app.use('/api/images', imageRoutes);
   app.use('/api', mollieApi);
+  app.use('/api', paynlApi);
   app.use('/api', catalogRoutes);
   app.use('/api/admin', adminRoutes);
 

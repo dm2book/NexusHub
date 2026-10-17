@@ -169,11 +169,16 @@ export async function refundOrder(orderId, { method = 'money', reason = '', ...c
       refund = await refundPaymentIntent(order.paymentRef || psp.paymentId, { cents, orderId: order.id });
     } catch (e) { throw fail('Stripe', e); }
   }
+  /* Pay.: the money goes back in my.pay.nl, by the owner. Pay.'s refund API
+     is not confirmed in its documentation, and a guessed money-moving call is
+     worse than an honest instruction — so this is reported as a refund still
+     to be made THROUGH Pay., never as one that already happened. */
+  const viaPaynl = cents > 0 && psp?.provider === 'paynl';
   const updated = await moveToRefunded(order.id, { ...ctx, reason: reason || 'Refunded by staff' });
   /* `cents` is the money that went back now. Nothing left at the provider
      (all of it refunded in its dashboard already) is still that provider's
      refund, not one the owner has to send by hand. */
   return { order: updated, refund: refund ? { method: 'money', provider: psp.provider, id: refund.id, cents }
     : psp && !cents && order.total > 0 ? { method: 'money', provider: psp.provider, id: null, cents: 0 }
-      : { method: 'money', provider: 'manual', cents } };
+      : { method: 'money', provider: 'manual', cents, ...(viaPaynl ? { via: 'paynl' } : {}) } };
 }

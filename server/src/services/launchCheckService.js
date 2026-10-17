@@ -3,7 +3,7 @@
  * so "can I sell today?" is a glance instead of a guess. Each check returns
  * { id, label, status: 'ok'|'warn'|'fail', detail } with a concrete fix hint.
  */
-import { config, manualPayMethods } from '../config/env.js';
+import { config, manualPayMethods, activePaymentProvider, paynlTestMode, paynlMethods } from '../config/env.js';
 import { get, all } from '../db/index.js';
 import { iconFor } from '../db/demoSeed.js';
 import { botSeenRecently } from './discordService.js';
@@ -38,8 +38,26 @@ export async function launchChecks() {
   // pay", and a shop with a Tikkie link but no Mollie key was told it was fine.
   // A readiness dashboard that disagrees with the checkout is worse than none.
   const manual = manualPayMethods();
-  const stripe = stripeEnabled();
-  if (stripe) {
+  const provider = activePaymentProvider();
+  const stripe = provider === 'stripe' && stripeEnabled();
+  if (provider === 'paynl') {
+    /* Pay.: no key prefix tells test from live, so the sandbox switch is the
+       thing to check. Fine while trying the checkout before opening; a fail
+       once the shop is open — every "paid" order would be test money. */
+    const methods = paynlMethods().map((m) => m.label);
+    if (paynlTestMode()) {
+      add('payments', 'Payment methods', 'fail',
+        'Pay. is in sandbox mode (PAYNL_TEST_MODE) — orders are marked paid and NO money arrives. '
+        + 'Fine for a test before opening; switch it off in the admin (Keys and connections) before selling.');
+    } else if (!methods.length) {
+      add('payments', 'Payment methods', 'fail',
+        'Pay. is configured but PAYNL_METHODS names no method the shop knows (ideal, bancontact).');
+    } else {
+      add('payments', 'Payment methods', 'ok',
+        `Pay. live — ${methods.join(', ')}. Each must be activated on the sales location in my.pay.nl.`
+        + `${manual.length ? ` (manual links also configured but not offered: ${manual.map((m) => m.label).join(', ')})` : ''}`);
+    }
+  } else if (stripe) {
     /* Stripe first, because a shop with both configured sends buyers to
        whichever the checkout picks, and this check exists to agree with the
        checkout rather than with whichever provider was added first.
@@ -141,7 +159,7 @@ export async function launchChecks() {
       add('stripe_hook', 'Stripe webhook endpoint', 'ok',
         `Stripe is sending ${WEBHOOK_EVENTS.length} events to ${hook.expected}.`);
     }
-  } else if (mollieEnabled()) {
+  } else if (provider === 'mollie' && mollieEnabled()) {
     // A test_ key is the expensive one. Checkout works, Mollie's sandbox marks
     // the payment paid, the order delivers — and no money ever moves. It only
     // surfaces when the bank statement does not match the orders.
@@ -154,7 +172,8 @@ export async function launchChecks() {
     // a bank app, so say that rather than a flat green.
     add('payments', 'Payment methods', 'warn',
       `Manual only: ${manual.map((m) => m.label).join(', ')} — every payment needs confirming by `
-      + 'hand. Set STRIPE_SECRET_KEY (+ STRIPE_WEBHOOK_SECRET) or MOLLIE_API_KEY for automatic iDEAL.');
+      + 'hand. Set STRIPE_SECRET_KEY (+ STRIPE_WEBHOOK_SECRET) or MOLLIE_API_KEY for automatic iDEAL '
+      + '(or the Pay. service id + secret, PAYNL_SERVICE_ID / PAYNL_SERVICE_SECRET).');
   } else if (config.payments.demoMode) {
     add('payments', 'Payment methods', 'warn',
       'DEMO mode only — orders are auto-marked paid without real money. Set STRIPE_SECRET_KEY '
@@ -163,7 +182,7 @@ export async function launchChecks() {
   } else {
     add('payments', 'Payment methods', 'fail',
       'No way to pay: set STRIPE_SECRET_KEY + STRIPE_WEBHOOK_SECRET, or MOLLIE_API_KEY, in Vercel '
-      + '→ orders currently dead-end as pending.');
+      + '(or PAYNL_SERVICE_ID + PAYNL_SERVICE_SECRET for Pay.) → orders currently dead-end as pending.');
   }
 
   /* 1b. The address everything public is built from.

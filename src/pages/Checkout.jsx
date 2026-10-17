@@ -60,12 +60,14 @@ export default function Checkout() {
     el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     el.querySelector('input')?.focus({ preventScroll: true });
   };
-  const [provider, setProvider] = useState('none');     // mollie | stripe | demo | manual | none
+  const [provider, setProvider] = useState('none');     // paynl | mollie | stripe | demo | manual | none
   // True when the server says it cannot fulfil an order right now.
   const [paused, setPaused] = useState(false);
   const [methods, setMethods] = useState([]);
   const [mollieOffered, setMollieOffered] = useState([]); // ['ideal','bancontact',…]
   const [mollieMethod, setMollieMethod] = useState('');   // '' = choose on Mollie's page
+  const [paynlOffered, setPaynlOffered] = useState([]);   // [{id,label}] — Pay.
+  const [paynlMethod, setPaynlMethod] = useState('');     // always one of paynlOffered
   const [note, setNote] = useState('');
   const [methodId, setMethodId] = useState('');
   // Restored from the cache before first paint, so returning from a banking app
@@ -237,6 +239,8 @@ export default function Checkout() {
       setMethods(c.paymentMethods || []);
       setNote(c.paymentNote || '');
       setMollieOffered(c.mollieMethods || []);
+      setPaynlOffered(c.paynlMethods || []);
+      if ((c.paynlMethods || []).length) setPaynlMethod(c.paynlMethods[0].id);
       // The shop cannot honour an order right now (no way to email a code, demo
       // payments still on, a Mollie test key). Say it here rather than letting
       // someone fill in their details and meet a 503 at the last step.
@@ -366,6 +370,20 @@ export default function Checkout() {
         }
         // No URL means the order was already settled — send them to the status
         // page rather than opening a second payment.
+        clear();
+        navigate(user ? `/account/orders/${order.id}` : `/track?number=${order.number}`);
+        return;
+      }
+      if (provider === 'paynl') {
+        // As for Mollie: the payment exists before the cart is cleared, so a
+        // refusal leaves the buyer with their cart and a retry.
+        const r = await api.post(`/api/orders/${order.id}/paynl`, { email, method: paynlMethod || undefined });
+        if (r.checkoutUrl) {
+          rememberOrder(order);
+          clear();
+          window.location.href = r.checkoutUrl;
+          return;
+        }
         clear();
         navigate(user ? `/account/orders/${order.id}` : `/track?number=${order.number}`);
         return;
@@ -588,6 +606,23 @@ export default function Checkout() {
             {provider === 'mollie' ? (
               <MollieMethods amount={grandTotal} value={mollieMethod}
                 onChange={setMollieMethod} offered={mollieOffered} />
+            ) : provider === 'paynl' ? (
+              <div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5" role="radiogroup"
+                  aria-label={t('checkout.method', 'Payment method')}>
+                  {paynlOffered.map((m) => (
+                    <button type="button" key={m.id} aria-checked={paynlMethod === m.id} role="radio"
+                      onClick={() => setPaynlMethod(m.id)}
+                      className={`rounded-xl border p-3 text-left transition min-h-[64px] flex items-center gap-2.5 ${
+                        paynlMethod === m.id ? 'border-primary bg-primary/10' : 'border-white/10 hover:border-white/25'}`}>
+                      <PayMark id={m.id} label={m.label} size="sm" />
+                    </button>
+                  ))}
+                </div>
+                <p className="text-slate-500 text-xs mt-3">
+                  {t('checkout.paynlNote', 'You pay on the secure page of Pay., our payment provider. Your code comes as soon as the payment is confirmed.')}
+                </p>
+              </div>
             ) : provider === 'manual' ? (
               <>
                 <div className="grid sm:grid-cols-3 gap-3">
@@ -751,7 +786,7 @@ export default function Checkout() {
           <button disabled={busy || paused} className="btn-primary w-full py-3">
             {busy ? <Loader2 size={18} className="animate-spin" />
               : paused ? <>{t('checkout.pausedBtn', 'Ordering paused')}</>
-              : provider === 'mollie' ? <>{t('checkout.payNow', 'Pay {amount} securely', { amount: money(grandTotal, currency) })}</>
+              : (provider === 'mollie' || provider === 'paynl') ? <>{t('checkout.payNow', 'Pay {amount} securely', { amount: money(grandTotal, currency) })}</>
               : provider === 'stripe' ? <>{t('checkout.payCard', 'Pay with card')}</>
               : <>{t('checkout.placePay', 'Place order & pay')}</>}
           </button>
@@ -783,7 +818,7 @@ export default function Checkout() {
             </div>
             <button type="submit" disabled={busy || paused} className="btn-primary flex-1 py-3 fm-tap">
               {busy ? <Loader2 size={18} className="animate-spin" />
-                : provider === 'mollie' ? <>{t('checkout.payNowShort', 'Pay securely')}</>
+                : (provider === 'mollie' || provider === 'paynl') ? <>{t('checkout.payNowShort', 'Pay securely')}</>
                 : provider === 'stripe' ? <>{t('checkout.payCard', 'Pay with card')}</>
                 : <>{t('checkout.placePay', 'Place order & pay')}</>}
             </button>

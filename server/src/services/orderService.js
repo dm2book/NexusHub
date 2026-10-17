@@ -19,7 +19,12 @@ const ROBLOX_USERNAME = /^(?=.{3,20}$)[A-Za-z0-9]+(?:_[A-Za-z0-9]+)?$/;
 const keepAlive = (p) => { try { waitUntil(p); } catch { /* not in a request */ } return p; };
 import { newId, newOrderNumber } from '../utils/ids.js';
 import { formatMoney } from '../utils/money.js';
-import { config, manualPayMethods } from '../config/env.js';
+import { config, manualPayMethods as allManualPayMethods, activePaymentProvider } from '../config/env.js';
+
+/* The manual links (Tikkie/Revolut/PayPal) as this shop offers them: not at
+   all while Pay. is the provider — its checkout does not offer them, so an
+   order mail or track page that did would be a second, unchecked way to pay. */
+const manualPayMethods = () => (activePaymentProvider() === 'paynl' ? [] : allManualPayMethods());
 import { badRequest, notFound, conflict } from '../utils/errors.js';
 import { sendEmailAsync } from './emailService.js';
 import { validatePayLink } from '../utils/payLink.js';
@@ -1434,10 +1439,11 @@ export async function markPaymentReceived(orderId, paymentRef, ctx = {}) {
  * money has moved. Fields are updated individually so a webhook that only knows
  * the status cannot wipe the checkout URL a buyer still needs.
  */
-export async function setPspPayment(orderId, { provider, paymentId, status, checkoutUrl } = {}) {
+export async function setPspPayment(orderId, { provider, paymentId, status, checkoutUrl, method } = {}) {
   const sets = ['updated_at=@at'];
   const params = { id: orderId, at: nowIso() };
   if (provider) { sets.push('psp_provider=@prov'); params.prov = provider; }
+  if (method !== undefined) { sets.push('psp_method=@meth'); params.meth = method || null; }
   if (paymentId) { sets.push('psp_payment_id=@pid'); params.pid = paymentId; }
   if (status) { sets.push('psp_status=@st'); params.st = status; }
   if (checkoutUrl !== undefined) { sets.push('psp_checkout_url=@url'); params.url = checkoutUrl || null; }

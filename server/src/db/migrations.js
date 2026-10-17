@@ -2354,4 +2354,38 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS lang TEXT;
        WHERE kind = 'mystery' AND active <> 0;
     `,
   },
+  {
+    /* Which method an open provider payment was started for (Pay.: ideal or
+       bancontact). Pay. has no idempotency key, so the checkout resumes the
+       open payment rather than opening a second one — but only for the SAME
+       method: a buyer who backed out of iDEAL and picks Bancontact must get a
+       Bancontact payment, not be sent back to their bank. */
+    id: '066_psp_method',
+    sql: `
+      ALTER TABLE orders ADD COLUMN IF NOT EXISTS psp_method TEXT;
+      /* Every payment ever started for an order, not just the latest. The
+         orders row holds one slot, and a buyer who starts iDEAL, backs out and
+         pays by Bancontact leaves the first payment open at their bank — if
+         they finish it after all, it must still be found and must not vanish
+         because a newer one took the slot. */
+      CREATE TABLE IF NOT EXISTS psp_attempts (
+        id TEXT PRIMARY KEY,
+        order_id TEXT NOT NULL,
+        provider TEXT NOT NULL,
+        payment_id TEXT NOT NULL,
+        method TEXT,
+        status TEXT,
+        -- Pay. answers with two ids: the one its status endpoint takes (above)
+        -- and its transaction/order id, which an exchange call may carry instead.
+        pay_order_id TEXT,
+        -- When the status was last confirmed with all its effects done; the
+        -- reconciliation checks the longest-unchecked open attempts first.
+        checked_at TEXT,
+        created_at TEXT NOT NULL
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_psp_attempts_payment ON psp_attempts (provider, payment_id);
+      CREATE INDEX IF NOT EXISTS idx_psp_attempts_order ON psp_attempts (order_id);
+      CREATE INDEX IF NOT EXISTS idx_psp_attempts_payorder ON psp_attempts (provider, pay_order_id);
+    `,
+  },
 ];
