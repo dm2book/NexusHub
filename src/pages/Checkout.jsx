@@ -611,7 +611,7 @@ export default function Checkout() {
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5" role="radiogroup"
                   aria-label={t('checkout.method', 'Payment method')}>
                   {paynlOffered.map((m) => (
-                    <button type="button" key={m.id} role="radio" aria-checked={paynlMethod === m.id}
+                    <button type="button" key={m.id} aria-checked={paynlMethod === m.id} role="radio"
                       onClick={() => setPaynlMethod(m.id)}
                       className={`rounded-xl border p-3 text-left transition min-h-[64px] flex items-center gap-2.5 ${
                         paynlMethod === m.id ? 'border-primary bg-primary/10' : 'border-white/10 hover:border-white/25'}`}>

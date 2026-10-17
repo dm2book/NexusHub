@@ -263,7 +263,10 @@ const CARD_SHELVES = ['giftcard', 'steam', 'playstation', 'psn', 'xbox', 'ninten
 console.log('— 2 Migration 065 switches every box off —');
 {
   const m = MIGRATIONS.find((x) => x.id === '065_retire_mystery_boxes');
-  ok('065 is the newest migration', !!m && MIGRATIONS[MIGRATIONS.length - 1] === m);
+  // Newer migrations may follow; none of them may switch a box back on.
+  ok('065 runs, after the migrations it builds on', !!m
+    && MIGRATIONS.indexOf(m) > MIGRATIONS.findIndex((x) => x.id === '064_coupon_owner')
+    && MIGRATIONS.slice(MIGRATIONS.indexOf(m) + 1).every((x) => !/kind\s*=\s*'mystery'[\s\S]*active\s*=\s*1|SET\s+active\s*=\s*1/i.test(x.sql)));
   const box = await insertBox({ name: 'Forge Mystery Box', active: 1, updatedAt: '2026-01-01T00:00:00.000Z' });
   const onSale = async () => Number((await get(
     `SELECT COUNT(*)::int AS n FROM products WHERE kind <> 'mystery' AND active = 1`)).n);

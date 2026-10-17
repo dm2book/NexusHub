@@ -20,6 +20,8 @@
 process.env.DATABASE_URL ||= 'postgres://postgres:postgres@127.0.0.1:5432/forge_paynl_test';
 process.env.NODE_ENV ||= 'development';
 process.env.LAUNCH_MODE ||= 'open';
+// This suite places dozens of orders in a minute; the buyer-facing limit is not what it tests.
+process.env.LIMIT_CHECKOUT_PER_MINUTE = '10000';
 process.env.PAYNL_SERVICE_ID = 'SL-1234-5678';
 process.env.PAYNL_SERVICE_SECRET = 'a'.repeat(40);
 process.env.APP_URL = 'http://localhost:3000';
