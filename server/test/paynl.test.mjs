@@ -98,7 +98,19 @@ const base = `http://127.0.0.1:${srv.address().port}`;
 
 let pass = 0, fail = 0;
 const ok = (n, c, x = '') => { if (c) { pass++; console.log(`  ✅ ${n}`); } else { fail++; console.log(`  ❌ ${n} ${x}`); } };
-const settle = () => new Promise((r) => setTimeout(r, 2500));
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+/* Wait for an order to stop moving (delivery runs in the background), not a
+   fixed time: a slower CI machine must not turn a correct run into a failure. */
+const settle = async (id) => {
+  if (!id) return sleep(2500);
+  let prev = '';
+  for (let i = 0; i < 50; i++) {
+    await sleep(400);
+    const now = JSON.stringify(await snap(id));
+    if (now === prev && !/"status":"(payment_received|processing)"/.test(now)) return;
+    prev = now;
+  }
+};
 
 async function product(name, codes = 4, mode = 'auto') {
   const id = newId('prd');
@@ -119,9 +131,19 @@ const place = async (pid) => {
   if (!b.order) throw new Error(`order not placed: ${JSON.stringify(b).slice(0, 200)}`);
   return b.order;
 };
+/* The buyer-facing limit on starting payments (30 a minute) is the shop's
+   real defence and stays on; this suite simply waits out the window when it
+   hits it, as a buyer would, instead of failing on a fast machine. */
+const respectLimit = async (doFetch) => {
+  for (;;) {
+    const r = await doFetch();
+    if (r.status !== 429) return r;
+    await sleep((Number(r.headers.get('retry-after')) || 5) * 1000 + 250);
+  }
+};
 const start = async (order, method = 'ideal') => {
-  const r = await fetch(`${base}/api/orders/${order.id}/paynl`, { method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ email: order.email, method }) });
+  const r = await respectLimit(() => fetch(`${base}/api/orders/${order.id}/paynl`, { method: 'POST',
+    headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: order.email, method }) }));
   return { status: r.status, body: await r.json() };
 };
 const exchangeForm = (id) => fetch(`${base}/api/payments/paynl/exchange`, { method: 'POST',
@@ -212,14 +234,14 @@ console.log('\n━━ Paid ━━');
   const r = await exchangeForm(s0.psp_payment_id);
   const text = await r.text();
   ok('a form exchange is answered TRUE|', r.status === 200 && text.startsWith('TRUE|'), `${r.status} ${text}`);
-  await settle();
+  await settle(o1.id);
   const s = await snap(o1.id);
   ok('the order is completed with one code', s.status === 'completed' && s.deliveries === 1, `${s.status} ${s.deliveries}`);
   ok('payment_status paid, payment_ref is the Pay. id', s.payment_status === 'paid' && s.payment_ref === s0.psp_payment_id);
   ok('audited as received', s.audit.includes('order.payment_received'));
 
   await Promise.all([1, 2, 3, 4].map(() => exchangeForm(s0.psp_payment_id)));
-  await settle();
+  await settle(o1.id);
   const s2 = await snap(o1.id);
   ok('four more exchanges deliver nothing more', s2.deliveries === 1, `${s2.deliveries}`);
   const r2 = await fetch(`${base}/api/payments/paynl/exchange?order_id=${s0.psp_payment_id}`);
@@ -238,7 +260,7 @@ for (const [label, patch] of [
   const r = await start(o);
   setCode(r.body.paymentId, 100, patch(o));
   await exchangeForm(r.body.paymentId);
-  await settle();
+  await settle(o.id);
   const s = await snap(o.id);
   ok(`${label}: still pending, nothing delivered, mismatch audited`,
     s.status === 'pending' && s.deliveries === 0 && s.audit.includes('order.payment_mismatch'), `${s.status} ${JSON.stringify(s.audit)}`);
@@ -265,14 +287,14 @@ console.log('\n━━ iDEAL started, Bancontact started, iDEAL finished after al
   setCode(first.body.paymentId, 100);
   const r = await exchangeForm(first.body.paymentId);
   ok('the exchange for the first payment is accepted', r.status === 200);
-  await settle();
+  await settle(o.id);
   const s = await snap(o.id);
   ok('the order is settled by the payment the buyer finished', s.status === 'completed' && s.payment_ref === first.body.paymentId,
     `${s.status} ${s.payment_ref}`);
 
   setCode(second.body.paymentId, 100);
   await exchangeForm(second.body.paymentId);
-  await settle();
+  await settle(o.id);
   const s2 = await snap(o.id);
   ok('a second finished payment reaches the owner and changes nothing else',
     s2.audit.includes('order.payment_stray') && s2.deliveries === 1 && s2.payment_ref === first.body.paymentId,
@@ -299,7 +321,7 @@ console.log('\n━━ A missed exchange is caught by reconciliation ━━');
   const r = await start(o);
   setCode(r.body.paymentId, 100);
   const res = await reconcilePaynl({ olderThanMs: 0, limit: 50, deadline: Date.now() + 20_000 });
-  await settle();
+  await settle(o.id);
   const s = await snap(o.id);
   ok(`reconciliation settles it (${JSON.stringify(res)})`, s.status === 'completed' && s.deliveries === 1, s.status);
 }
@@ -309,11 +331,11 @@ console.log('\n━━ The return page ━━');
   const o = await place(await product('PaySync'));
   const r = await start(o);
   setCode(r.body.paymentId, 100);
-  const sync = await (await fetch(`${base}/api/orders/${o.id}/payment/sync`, { method: 'POST',
-    headers: { 'content-type': 'application/json' }, body: JSON.stringify({ number: o.number }) })).json();
+  const sync = await (await respectLimit(() => fetch(`${base}/api/orders/${o.id}/payment/sync`, { method: 'POST',
+    headers: { 'content-type': 'application/json' }, body: JSON.stringify({ number: o.number }) }))).json();
   ok('the sync re-checks Pay. and reports paid', ['payment_received', 'processing', 'completed'].includes(sync.status), JSON.stringify(sync));
-  const wrong = await fetch(`${base}/api/orders/${o.id}/payment/sync`, { method: 'POST',
-    headers: { 'content-type': 'application/json' }, body: JSON.stringify({ number: 'FM-0000-NOTTHIS' }) });
+  const wrong = await respectLimit(() => fetch(`${base}/api/orders/${o.id}/payment/sync`, { method: 'POST',
+    headers: { 'content-type': 'application/json' }, body: JSON.stringify({ number: 'FM-0000-NOTTHIS' }) }));
   ok('without the order number it is refused', wrong.status >= 400, `${wrong.status}`);
 }
 
@@ -331,7 +353,7 @@ console.log('\n━━ Refunds ━━');
   const r = await start(o);
   setCode(r.body.paymentId, 100);
   await exchangeForm(r.body.paymentId);
-  await settle();
+  await settle(o.id);
   const postsBefore = calls.length;
   const out = await refundOrder(o.id, { method: 'money', actorId: 'staff', reason: 'test' });
   ok('the order is refunded here', out.order.status === 'refunded', out.order.status);
@@ -343,7 +365,7 @@ console.log('\n━━ Refunds ━━');
   const r2 = await start(o2);
   setCode(r2.body.paymentId, 100);
   await exchangeForm(r2.body.paymentId);
-  await settle();
+  await settle(o2.id);
   setCode(r2.body.paymentId, -71);
   await exchangeForm(r2.body.paymentId);
   const s = await snap(o2.id);
@@ -371,7 +393,7 @@ console.log('\n━━ Review findings ━━');
   await Promise.all([exchangeForm(a.body.paymentId), exchangeForm(b.body.paymentId),
     fetch(`${base}/api/orders/${o.id}/payment/sync`, { method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ number: o.number }) })]);
-  await settle();
+  await settle(o.id);
   const s = await snap(o.id);
   const strays = s.audit.filter((x) => x === 'order.payment_stray').length;
   ok(`two paid attempts at once: one delivery, the other reported (${strays})`,
@@ -408,7 +430,7 @@ console.log('\n━━ Review findings ━━');
   for (const [id, ord] of orders) if (ord.reference === svc.referenceFor(e.number) && id !== first.body.paymentId) setCode(id, -90);
   setCode(first.body.paymentId, 100);
   await exchangeForm(first.body.paymentId);
-  await settle();
+  await settle(e.id);
   const se = await snap(e.id);
   ok('the first of many attempts still settles the order', se.status === 'completed' && se.payment_ref === first.body.paymentId,
     `${se.status} ${se.payment_ref}`);
@@ -424,8 +446,8 @@ console.log('\n━━ Review findings ━━');
   // The account page's Pay button (no method) resumes the Bancontact payment.
   const g = await place(await product('PayResumeBc'));
   const gs = await start(g, 'bancontact');
-  const r = await fetch(`${base}/api/orders/${g.id}/paynl`, { method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ email: g.email }) });
+  const r = await respectLimit(() => fetch(`${base}/api/orders/${g.id}/paynl`, { method: 'POST',
+    headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: g.email }) }));
   const gb = await r.json();
   ok('Pay with no method resumes the open Bancontact payment', gb.resumed === true && gb.paymentId === gs.body.paymentId,
     JSON.stringify(gb));
@@ -447,7 +469,7 @@ console.log('\n━━ Review findings ━━');
   setCode(hs.body.paymentId, 100);
   await exchangeForm(hs.body.paymentId);
   config.payments.paynl.serviceId = 'SL-1234-5678';
-  await settle();
+  await settle(h.id);
   ok('a lower-case service id still settles', (await snap(h.id)).status === 'completed');
 
   // With Pay. live, the order mail and track page do not offer manual links.
