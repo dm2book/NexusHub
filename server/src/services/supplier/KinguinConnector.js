@@ -49,7 +49,7 @@ export class KinguinConnector extends SupplierConnector {
     }, { deadline, checkHost: !!this.config.baseUrl });
     const text = await res.text();
     const data = text ? safeJson(text) : null;
-    if (!res.ok) throw new Error(`Kinguin API: ${data?.message || data?.error || `HTTP ${res.status}`}`);
+    if (!res.ok) throw Object.assign(new Error(`Kinguin API: ${data?.message || data?.error || `HTTP ${res.status}`}`), { status: res.status });
     return data;
   }
 
@@ -140,7 +140,8 @@ export class KinguinConnector extends SupplierConnector {
       deadline: req.deadline,
     });
     const externalRef = String(order?.orderId ?? order?.id ?? '');
-    if (!externalRef) throw new Error('Kinguin: order created but no orderId returned');
+    // Created, but we cannot follow it: the purchase may well have happened.
+    if (!externalRef) throw Object.assign(new Error('Kinguin: order created but no orderId returned'), { outcomeUnknown: true });
     return { status: 'in_progress', externalRef, raw: order };
   }
 

@@ -49,7 +49,7 @@ export class ApiConnector extends SupplierConnector {
     let data; try { data = text ? JSON.parse(text) : null; } catch { data = text; }
     if (!res.ok) {
       const msg = (data && data.message) || `HTTP ${res.status}`;
-      throw new Error(`Supplier API error: ${msg}`);
+      throw Object.assign(new Error(`Supplier API error: ${msg}`), { status: res.status });
     }
     return data;
   }

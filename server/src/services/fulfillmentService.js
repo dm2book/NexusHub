@@ -161,7 +161,15 @@ async function runAutoFulfillment(order, item, { supplier, supplierProduct }, ct
        queue later on, would then buy it a second time. So such an item is
        never tried again automatically: it goes to a person, who looks at the
        supplier's own order list first. */
-    const unanswered = err?.name === 'TimeoutError' || err?.name === 'AbortError';
+    /* The same holds for a broken connection and a server error AFTER the
+       request went out: the supplier may have taken it and failed only on the
+       way back. Only a clear "no" (the supplier answering failed, or refusing
+       with a 4xx) is safe to try elsewhere — a double purchase is real money
+       that does not come back. */
+    const unanswered = err?.name === 'TimeoutError' || err?.name === 'AbortError' || err?.outcomeUnknown === true
+      || Number(err?.status) >= 500
+      || /fetch failed|ECONNRESET|ETIMEDOUT|ECONNREFUSED|EPIPE|socket hang up|network/i
+        .test(`${err?.message || ''} ${err?.cause?.code || ''}`);
     const failure = { error: err.message, ...(unanswered ? { outcome: 'unknown' } : {}) };
     await run(`UPDATE fulfillment_requests SET status='failed', result=@r, updated_at=@at WHERE id=@id`,
         { r: JSON.stringify(failure), at: nowIso(), id: reqId });
@@ -309,6 +317,14 @@ export async function refreshFulfillment(requestId, ctx = {}) {
   await persistResult(requestId, order, item, result);
   await logFulfillment('retried', { requestId, orderId: req.order_id, actor: ctx.actorId,
     detail: { status: result.status } });
+  /* A purchase that was pending at the supplier and has now FAILED there. It
+     used to stay a failed request with nobody told: the buyer had paid, the
+     sweep only looks at orders without a request, and the item sat. It goes to
+     a person now, exactly like a purchase that failed straight away — once:
+     the request only turns failed here from a pending state. */
+  if (result.status === 'failed' && req.status !== 'failed') {
+    await handToPerson(order, item, { requestId, supplier, error: result.error || 'the supplier reported the delivery as failed' }, ctx);
+  }
   await maybeCompleteOrder(req.order_id, ctx);
   return get('SELECT * FROM fulfillment_requests WHERE id=@id', { id: requestId });
 }

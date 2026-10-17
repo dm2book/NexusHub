@@ -2388,4 +2388,15 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS lang TEXT;
       CREATE INDEX IF NOT EXISTS idx_psp_attempts_payorder ON psp_attempts (provider, pay_order_id);
     `,
   },
+  {
+    /* A fingerprint of every payment-proof screenshot. One PayPal payment,
+       screenshotted once, could approve two orders: nothing compared the image
+       with the ones already sent. The hash stays when the image itself is
+       deleted after review, so the comparison keeps working. */
+    id: '067_proof_fingerprint',
+    sql: `
+      ALTER TABLE payment_proofs ADD COLUMN IF NOT EXISTS screenshot_sha256 TEXT;
+      CREATE INDEX IF NOT EXISTS idx_payment_proofs_sha ON payment_proofs (screenshot_sha256);
+    `,
+  },
 ];

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 /**
  * Payment verification queue for manual payments (Tikkie / Revolut / PayPal).
  *
@@ -54,6 +55,15 @@ export async function submitProof(orderId, input = {}, ctx = {}) {
       { t: transactionId, o: orderId });
     if (dup) flags.push('duplicate_transaction_id');
   }
+  /* The same image sent for another order: one payment, two claims. Exact
+     match only (the file as uploaded, or the same link) — a flag for the
+     person confirming, who checks the money arrived twice. */
+  const shotHash = screenshotUrl ? createHash('sha256').update(screenshotUrl).digest('hex') : null;
+  if (shotHash) {
+    const same = await get(`SELECT 1 FROM payment_proofs WHERE screenshot_sha256=@h AND order_id <> @o LIMIT 1`,
+      { h: shotHash, o: orderId });
+    if (same) flags.push('duplicate_screenshot');
+  }
   const prior = await get(`SELECT COUNT(*) AS n FROM payment_proofs WHERE order_id=@o`, { o: orderId });
   if (Number(prior?.n || 0) >= 1) flags.push('multiple_submissions'); // this is the 2nd+ proof for the order
   /* Three waiting at once is plenty for a buyer correcting a mistake; more was
@@ -66,10 +76,10 @@ export async function submitProof(orderId, input = {}, ctx = {}) {
   const id = newId('ppf');
   const at = nowIso();
   await run(
-    `INSERT INTO payment_proofs (id, order_id, method, transaction_id, screenshot_url, note, amount, status, fraud_flags, ip, created_at)
-     VALUES (@id, @o, @m, @t, @s, @n, @amt, 'pending', @flags, @ip, @at)`,
+    `INSERT INTO payment_proofs (id, order_id, method, transaction_id, screenshot_url, screenshot_sha256, note, amount, status, fraud_flags, ip, created_at)
+     VALUES (@id, @o, @m, @t, @s, @sha, @n, @amt, 'pending', @flags, @ip, @at)`,
     { id, o: orderId, m: input.method || order.billing?.paymentMethod || null,
-      t: transactionId, s: screenshotUrl, n: String(input.note || '').slice(0, 300) || null,
+      t: transactionId, s: screenshotUrl, sha: shotHash, n: String(input.note || '').slice(0, 300) || null,
       amt: order.total, flags: JSON.stringify(flags), ip: ctx.ip || null, at });
 
   await audit({ action: 'payment.proof_submit', actor: ctx.user || { email: order.email },

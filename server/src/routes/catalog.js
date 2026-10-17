@@ -603,7 +603,8 @@ router.get('/products/:id/mystery', asyncHandler(async () => {
    One answer for every refusal (an expired, used-up and non-existent code all
    look the same) and its own tight limit, counted across instances: otherwise
    this is a free way to try codes until one is real. */
-router.get('/coupons/:code', rateLimit({ bucket: 'coupon_lookup', windowMs: 10 * 60_000, max: 20, shared: true }),
+const couponGuessGuard = rateLimit({ bucket: 'coupon_lookup', windowMs: 10 * 60_000, max: 20, shared: true });
+router.get('/coupons/:code', couponGuessGuard,
   asyncHandler(async (req, res) => {
   const subtotal = Math.max(0, Number(req.query.subtotal) || 0);
   const r = await evaluateCoupon(req.params.code, { subtotal, userId: req.user?.id, email: req.user?.email });
@@ -643,6 +644,15 @@ router.post('/checkout/quote',
       items: body.items, coupon: body.coupon, useCredit: body.useCredit || 0,
       userId: req.user?.id || null, email: req.user?.email || '',
     });
+    /* A code that did not apply counts against the same budget as the coupon
+       lookup (20 per 10 minutes, shared across instances). The quote said
+       whether a code exists at 60 tries a minute per instance, which made the
+       lookup's limit decorative for anyone guessing codes. A code that works,
+       re-quoted on every cart change, costs nothing. */
+    if (body.coupon && !q.coupon) {
+      const limited = await new Promise((resolve) => couponGuessGuard(req, res, (err) => resolve(err || null)));
+      if (limited) throw limited;
+    }
     res.json({
       currency: q.currency,
       lines: q.lines.map((l) => ({
