@@ -19,7 +19,12 @@ const ROBLOX_USERNAME = /^(?=.{3,20}$)[A-Za-z0-9]+(?:_[A-Za-z0-9]+)?$/;
 const keepAlive = (p) => { try { waitUntil(p); } catch { /* not in a request */ } return p; };
 import { newId, newOrderNumber } from '../utils/ids.js';
 import { formatMoney } from '../utils/money.js';
-import { config, manualPayMethods } from '../config/env.js';
+import { config, manualPayMethods as allManualPayMethods, activePaymentProvider } from '../config/env.js';
+
+/* The manual links (Tikkie/Revolut/PayPal) as this shop offers them: not at
+   all while Pay. is the provider — its checkout does not offer them, so an
+   order mail or track page that did would be a second, unchecked way to pay. */
+const manualPayMethods = () => (activePaymentProvider() === 'paynl' ? [] : allManualPayMethods());
 import { badRequest, notFound, conflict } from '../utils/errors.js';
 import { sendEmailAsync } from './emailService.js';
 import { validatePayLink } from '../utils/payLink.js';

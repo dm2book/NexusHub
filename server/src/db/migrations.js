@@ -2375,10 +2375,17 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS lang TEXT;
         payment_id TEXT NOT NULL,
         method TEXT,
         status TEXT,
+        -- Pay. answers with two ids: the one its status endpoint takes (above)
+        -- and its transaction/order id, which an exchange call may carry instead.
+        pay_order_id TEXT,
+        -- When the status was last confirmed with all its effects done; the
+        -- reconciliation checks the longest-unchecked open attempts first.
+        checked_at TEXT,
         created_at TEXT NOT NULL
       );
       CREATE UNIQUE INDEX IF NOT EXISTS idx_psp_attempts_payment ON psp_attempts (provider, payment_id);
       CREATE INDEX IF NOT EXISTS idx_psp_attempts_order ON psp_attempts (order_id);
+      CREATE INDEX IF NOT EXISTS idx_psp_attempts_payorder ON psp_attempts (provider, pay_order_id);
     `,
   },
 ];

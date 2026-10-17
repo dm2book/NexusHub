@@ -20,7 +20,7 @@
  * Search Console is connected its impressions belong in this list first.
  */
 import { all } from '../db/index.js';
-import { config, manualPayMethods } from '../config/env.js';
+import { config, manualPayMethods, activePaymentProvider, paynlMethods } from '../config/env.js';
 import { isEnabled as stripeEnabled } from './stripeService.js';
 import { listProducts } from './productService.js';
 import { buildSeoPages, schemaFor, missingKeywords, SEO_LANGS } from '../../../src/lib/seoCatalog.js';
@@ -43,6 +43,9 @@ const WEIGHTS = { market: 0.35, sales: 0.35, visits: 0.15, depth: 0.15 };
     the same list /api/config hands the checkout. */
 export function payMethodLabels() {
   const out = [];
+  const provider = activePaymentProvider();
+  // Pay.: exactly what its checkout offers, and nothing else.
+  if (provider === 'paynl') return paynlMethods().map((m) => m.label);
   try { if (stripeEnabled()) out.push('iDEAL'); } catch { /* not configured */ }
   for (const m of manualPayMethods() || []) if (m?.label) out.push(m.label);
   return [...new Set(out)];

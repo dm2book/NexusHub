@@ -23,7 +23,8 @@ process.env.LAUNCH_MODE ||= 'open';
 process.env.PAYNL_SERVICE_ID = 'SL-1234-5678';
 process.env.PAYNL_SERVICE_SECRET = 'a'.repeat(40);
 process.env.APP_URL = 'http://localhost:3000';
-process.env.DEMO_PAYMENTS = 'true';   // to prove the demo self-pay route closes under Pay.
+process.env.DEMO_PAYMENTS = 'true';
+process.env.PAY_TIKKIE = 'https://tikkie.me/pay/test123';   // to prove the demo self-pay route closes under Pay.
 delete process.env.MOLLIE_API_KEY;
 delete process.env.STRIPE_SECRET_KEY;
 
@@ -355,6 +356,102 @@ console.log('\n━━ The demo self-pay route is closed ━━');
     body: JSON.stringify({ email: o.email }) });
   const s = await snap(o.id);
   ok('/pay answers 404 and the order stays pending', r.status === 404 && s.status === 'pending', `${r.status} ${s.status}`);
+}
+
+
+console.log('\n━━ Review findings ━━');
+{
+  // Two paid attempts settled at the same moment: one wins, the other reaches the owner.
+  const o = await place(await product('PayRace'));
+  const a = await start(o, 'ideal');
+  const b = await start(o, 'bancontact');
+  setCode(a.body.paymentId, 100); setCode(b.body.paymentId, 100);
+  await Promise.all([exchangeForm(a.body.paymentId), exchangeForm(b.body.paymentId),
+    fetch(`${base}/api/orders/${o.id}/payment/sync`, { method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ number: o.number }) })]);
+  await settle();
+  const s = await snap(o.id);
+  const strays = s.audit.filter((x) => x === 'order.payment_stray').length;
+  ok(`two paid attempts at once: one delivery, the other reported (${strays})`,
+    s.deliveries === 1 && strays >= 1 && [a.body.paymentId, b.body.paymentId].includes(s.payment_ref), JSON.stringify(s));
+
+  // A paid payment on an order the sweep already cancelled is reported, not dropped.
+  const c = await place(await product('PayCancelled'));
+  const cs = await start(c);
+  await run(`UPDATE orders SET status='cancelled' WHERE id=@id`, { id: c.id });
+  setCode(cs.body.paymentId, 100);
+  const rc = await exchangeForm(cs.body.paymentId);
+  const sc = await snap(c.id);
+  ok('paid on a cancelled order → owner told, nothing delivered', rc.status === 200 && sc.deliveries === 0
+    && sc.audit.includes('order.payment_stray'), JSON.stringify(sc.audit));
+
+  // Wrong credentials are not "Pay.'s final answer": retried and reported.
+  const d = await place(await product('PayAuth'));
+  const ds = await start(d);
+  const realStatus = orders.get(ds.body.paymentId);
+  orders.delete(ds.body.paymentId);
+  const saved = globalThis.fetch;
+  globalThis.fetch = async (url, init) => (String(url).startsWith('https://connect.pay.nl/')
+    ? new Response('{"message":"unauthorized"}', { status: 401 }) : saved(url, init));
+  const ra = await exchangeForm(ds.body.paymentId);
+  globalThis.fetch = saved;
+  orders.set(ds.body.paymentId, realStatus);
+  ok('a 401 from Pay. answers FALSE so Pay. retries', ra.status === 500 && (await ra.text()).startsWith('FALSE|'));
+
+  // An older attempt, named by the exchange, is found even after many newer ones.
+  const e = await place(await product('PayMany'));
+  const first = await start(e, 'ideal');
+  for (let i = 0; i < 4; i++) { await start(e, i % 2 ? 'ideal' : 'bancontact'); }
+  // the abandoned ones are closed at Pay.
+  for (const [id, ord] of orders) if (ord.reference === svc.referenceFor(e.number) && id !== first.body.paymentId) setCode(id, -90);
+  setCode(first.body.paymentId, 100);
+  await exchangeForm(first.body.paymentId);
+  await settle();
+  const se = await snap(e.id);
+  ok('the first of many attempts still settles the order', se.status === 'completed' && se.payment_ref === first.body.paymentId,
+    `${se.status} ${se.payment_ref}`);
+
+  // A payment Pay. holds for review blocks a second payment.
+  const f = await place(await product('PayVerify'));
+  const fs1 = await start(f, 'ideal');
+  setCode(fs1.body.paymentId, 85);
+  await exchangeForm(fs1.body.paymentId);
+  const again = await start(f, 'bancontact');
+  ok('no second payment while the first is under review', again.status === 409, `${again.status} ${JSON.stringify(again.body)}`);
+
+  // The account page's Pay button (no method) resumes the Bancontact payment.
+  const g = await place(await product('PayResumeBc'));
+  const gs = await start(g, 'bancontact');
+  const r = await fetch(`${base}/api/orders/${g.id}/paynl`, { method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ email: g.email }) });
+  const gb = await r.json();
+  ok('Pay with no method resumes the open Bancontact payment', gb.resumed === true && gb.paymentId === gs.body.paymentId,
+    JSON.stringify(gb));
+
+  // A forged call with no id does nothing at all.
+  const before = calls.length;
+  const rf = await fetch(`${base}/api/payments/paynl/exchange`, { method: 'POST' });
+  ok('an exchange without any id costs no Pay. request', rf.status === 200 && calls.length === before, `${calls.length - before}`);
+  await Promise.all([1, 2, 3].map(() => exchangeForm('deadbeef-0000-1111-2222-333344445555')));
+  const sweeps = calls.slice(before).length;
+  ok(`unmatched ids sweep at most once per 30 seconds (${sweeps} Pay. requests for 3 calls)`, sweeps <= 6);
+
+  // Pay. echoes the service id in capitals; a lower-case entry is the same service.
+  const { config } = await import('../src/config/env.js');
+  config.payments.paynl.serviceId = 'sl-1234-5678';
+  const h = await place(await product('PayCase'));
+  const hs = await start(h);
+  orders.get(hs.body.paymentId).serviceId = 'SL-1234-5678';
+  setCode(hs.body.paymentId, 100);
+  await exchangeForm(hs.body.paymentId);
+  config.payments.paynl.serviceId = 'SL-1234-5678';
+  await settle();
+  ok('a lower-case service id still settles', (await snap(h.id)).status === 'completed');
+
+  // With Pay. live, the order mail and track page do not offer manual links.
+  const { manualPayMethods: _m } = await import('../src/config/env.js');
+  const t = await (await fetch(`${base}/api/track/${f.number}`)).json();
+  ok('no manual pay links on a Pay. order', (t.payMethods || []).length === 0, JSON.stringify(t.payMethods));
 }
 
 console.log('\n━━ Wiring ━━');

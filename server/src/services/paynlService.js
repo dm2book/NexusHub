@@ -34,6 +34,10 @@ import { config, paynlConfigured, paynlTestMode, PAYNL_METHOD_IDS } from '../con
 const CONNECT = 'https://connect.pay.nl';
 
 export const isEnabled = () => paynlConfigured();
+
+/* Pay. writes the service id in capitals (SL-1234-5678). Typed in lower case it
+   is the same service — compared and sent in one canonical form. */
+export const serviceId = () => String(config.payments.paynl.serviceId || '').trim().toUpperCase();
 export const isTestMode = () => paynlTestMode();
 
 /** Pay. ids we will put in a URL: letters, digits and dashes, nothing else. */
@@ -55,8 +59,7 @@ export const referenceFor = (orderNumber) => String(orderNumber || '').replace(/
 
 async function call(path, { method = 'GET', body, timeoutMs = 10_000 } = {}) {
   if (!isEnabled()) throw new Error('Pay. is not configured');
-  const { serviceId, serviceSecret } = config.payments.paynl;
-  const auth = Buffer.from(`${serviceId}:${serviceSecret}`).toString('base64');
+  const auth = Buffer.from(`${serviceId()}:${String(config.payments.paynl.serviceSecret || '').trim()}`).toString('base64');
   /* A deadline on every call, as for Mollie: these run inside request handlers
      and an API that accepts the connection and never answers would hold the
      function until the platform kills it. */
@@ -139,7 +142,7 @@ export function statusIdFrom(data) {
 export async function createPayment(order, { returnUrl, exchangeUrl, method = null } = {}) {
   const m = method && PAYNL_METHOD_IDS[method] ? method : null;
   const body = {
-    serviceId: config.payments.paynl.serviceId,
+    serviceId: serviceId(),
     amount: { value: toCents(order.total), currency: String(order.currency || 'EUR').toUpperCase() },
     // On the buyer's bank statement: recognisable, with the number they quote.
     description: `${config.email.fromName || 'ForgeMarket'} ${order.number}`.slice(0, 32),
@@ -207,7 +210,7 @@ export function mismatchReasons(payment, order) {
   if (payment.amountCents !== order.total) out.push(`amount ${payment.amountCents ?? 'missing'} is not ${order.total}`);
   const want = String(order.currency || 'EUR').toUpperCase();
   if (payment.currency !== want) out.push(`currency ${payment.currency ?? 'missing'} is not ${want}`);
-  if (payment.serviceId && payment.serviceId !== config.payments.paynl.serviceId) out.push(`service ${payment.serviceId} is not ours`);
+  if (payment.serviceId && payment.serviceId.toUpperCase() !== serviceId()) out.push(`service ${payment.serviceId} is not ours`);
   if (payment.test === true && !isTestMode()) out.push('a sandbox payment on a shop that is not in sandbox mode');
   return out;
 }
