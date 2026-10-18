@@ -48,6 +48,11 @@ export async function fulfillOrder(orderId, ctx = {}) {
   if (!['processing', 'awaiting_fulfillment', 'payment_received'].includes(order.status)) {
     throw conflict(`Order in status "${order.status}" cannot be fulfilled`);
   }
+  /* A held order does not start fulfilment at all. The hold was checked only
+     after the order had already been moved to processing, so a payment whose
+     Radar verdict landed in the same moment showed "processing" while it sat
+     in review — nothing was delivered, but the status said otherwise. */
+  if (order.fraudHold) throw conflict('This order is held for fraud review — approve it under Security first.');
 
   if (order.status === 'payment_received') {
     await transitionOrder(orderId, 'processing', { actorId: ctx.actorId, reason: 'Begin fulfillment' });
@@ -475,6 +480,7 @@ async function queueForHandDelivery(order, ctx = {}) {
   const existing = await get(
     `SELECT id FROM fulfillment_requests WHERE order_id=@o AND status <> 'failed' LIMIT 1`, { o: order.id });
   if (existing) return false;
+  if (order.fraudHold) return false;   // held for review: nothing to queue yet
   if (order.status === 'payment_received') {
     await transitionOrder(order.id, 'processing', { actorId: ctx.actorId || 'system', reason: 'Begin fulfillment' });
     order = await getOrder(order.id);
