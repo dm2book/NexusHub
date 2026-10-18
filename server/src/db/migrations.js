@@ -2399,4 +2399,18 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS lang TEXT;
       CREATE INDEX IF NOT EXISTS idx_payment_proofs_sha ON payment_proofs (screenshot_sha256);
     `,
   },
+  {
+    /* One open hand-delivery task per order item (see openManualFulfillment).
+       If duplicates already exist the index is skipped rather than failing the
+       deploy; the check in the code still holds for new ones. */
+    id: '068_one_open_manual_task',
+    sql: `
+      DO $$ BEGIN
+        CREATE UNIQUE INDEX IF NOT EXISTS uq_fulfillment_manual_open
+          ON fulfillment_requests (order_item_id) WHERE mode = 'manual' AND status = 'pending';
+      EXCEPTION WHEN unique_violation THEN
+        RAISE NOTICE 'duplicate open manual tasks exist; unique index not created';
+      END $$;
+    `,
+  },
 ];

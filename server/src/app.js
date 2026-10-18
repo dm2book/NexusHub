@@ -253,7 +253,8 @@ export function createApp({ lazyReady = false } = {}) {
   let lastMaintenanceAt = 0;
   app.use((req, _res, next) => {
     const now = Date.now();
-    if (now - lastMaintenanceAt > 3_600_000) {
+    // The cron route runs maintenance itself; riding on it as well started two.
+    if (now - lastMaintenanceAt > 3_600_000 && !req.path.startsWith('/api/cron/')) {
       lastMaintenanceAt = now;
       // Finished well inside the invocation's 30 s, counted from its start.
       const deadline = (req.startedAt || now) + 26_000;

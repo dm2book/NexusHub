@@ -65,6 +65,24 @@ export async function lastMaintenanceRun({ now = Date.now(), staleAfterHours = D
 }
 
 export async function runMaintenance({ deadline = Date.now() + 26_000 } = {}) {
+  /* One run at a time, shop-wide. The cron route, the traffic-triggered run and
+     a cron call Vercel delivers twice could each start a full sweep at the
+     same moment; steps that check-then-act (owner alerts, the hand-delivery
+     queue, the photo and market jobs) then acted twice. A 60-second lease in
+     the database, released when the run ends, makes the second caller stand
+     down. A run killed mid-way lets go by itself when the lease runs out. */
+  const { claimInterval } = await import('./bootUpkeep.js');
+  if (!(await claimInterval('maintenance_running', 60_000).catch(() => true))) {
+    return { skipped: 'another maintenance run is in progress', at: nowIso() };
+  }
+  try {
+    return await runMaintenanceSteps({ deadline });
+  } finally {
+    await run(`UPDATE kv SET updated_at = '1970-01-01T00:00:00.000Z' WHERE key = 'interval:maintenance_running'`).catch(() => {});
+  }
+}
+
+async function runMaintenanceSteps({ deadline }) {
   const summary = { otpPurged: 0, ipsForgotten: 0, sessionsExpired: 0, ordersCancelled: 0, remindersSent: 0, reviewRequestsSent: 0, cartRemindersSent: 0, fulfillmentsRetried: 0, launchAnnounced: 0, at: nowIso() };
 
   /* Money first. The function has 30 seconds and this list grew to fifteen
