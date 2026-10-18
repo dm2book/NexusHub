@@ -9,6 +9,7 @@ import { useToast } from '../../context/ToastContext.jsx';
 const FLAG_LABEL = {
   duplicate_transaction_id: 'Duplicate transaction ID',
   multiple_submissions: 'Multiple submissions',
+  duplicate_screenshot: 'Same screenshot as another order — check the money arrived TWICE',
 };
 
 export default function AdminPayments() {

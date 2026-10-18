@@ -64,7 +64,7 @@ export class G2AConnector extends SupplierConnector {
     }, { deadline, checkHost: !!this.config.baseUrl });
     const text = await res.text();
     const data = text ? safeJson(text) : null;
-    if (!res.ok) throw new Error(`G2A API: ${data?.message || data?.error || `HTTP ${res.status}`}`);
+    if (!res.ok) throw Object.assign(new Error(`G2A API: ${data?.message || data?.error || `HTTP ${res.status}`}`), { status: res.status });
     return data;
   }
 
@@ -96,7 +96,8 @@ export class G2AConnector extends SupplierConnector {
       deadline: req.deadline,
     });
     const orderId = String(added?.order_id ?? added?.orderId ?? '');
-    if (!orderId) throw new Error('G2A: order added but no order_id returned');
+    // Added, but we cannot follow it: the purchase may well have happened.
+    if (!orderId) throw Object.assign(new Error('G2A: order added but no order_id returned'), { outcomeUnknown: true });
     await this.#request('/v3/order/pay', { method: 'PUT', body: { order_id: orderId }, deadline: req.deadline });
     return { status: 'in_progress', externalRef: orderId, raw: added };
   }
