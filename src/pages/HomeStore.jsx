@@ -4,6 +4,7 @@ import ScrollProgress from '../components/store/ScrollProgress.jsx';
 import { Link } from 'react-router-dom';
 import { Search, ShoppingCart, Zap, ShieldCheck, Headphones, Tag, Star, ArrowRight, Plus, LayoutGrid, Users, CheckCircle2, Clock, MessageCircle, ChevronRight, Shield, Menu, X, BadgeCheck, User as UserIcon, UserPlus, CloudOff } from 'lucide-react';
 import { useCart } from '../context/CartContext.jsx';
+import { useToast } from '../context/ToastContext.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { usePageMeta, useJsonLd } from '../lib/useMeta.js';
 /* Category links go to the category's own page where it has one.
@@ -134,6 +135,7 @@ const HERO_FEATURES = TRUST;
 const fmtCount = (n) => Number(n || 0).toLocaleString((typeof document !== 'undefined' && document.documentElement.lang) || 'nl-NL');
 export default function HomeStore() {
   const { count, add } = useCart();
+  const toast = useToast();
   const { user, isStaff } = useAuth();
   const { t: tr, lang } = useI18n();
   const stats = useStats();
@@ -268,7 +270,11 @@ export default function HomeStore() {
     const cheapest = live.reduce((a, b) => (a.price <= b.price ? a : b));
     return { count: live.length, from: cheapest.price, currency: cheapest.currency || 'EUR' };
   }, [products]);
-  const addToCart = (c) => add(c.cheapest);
+  const addToCart = (c, img) => {
+    // Before launch `add` refuses: no fly-to-cart, say why instead.
+    if (add(c.cheapest)) flyToCart(img);
+    else toast(tr('launch.cartClosed', 'ForgeMarket opens on launch day — you can browse everything until then.'));
+  };
   /* The bundle row arrives after the page is drawn. Its space is held from the
      first frame when this shop had bundles last time (or on a first visit), so
      "How it works" and everything under it stay where they were drawn. */
@@ -705,7 +711,12 @@ export default function HomeStore() {
                         {tr('home.viewProduct', 'View')}
                       </Link>
                       <button aria-label={tr('home.addOne', 'Add {n} to your cart', { n: p.name })}
-                        onClick={(e) => { flyToCart(e.currentTarget.closest('.snap-start')?.querySelector('img')); add(p); }}
+                        onClick={(e) => {
+                          // Before launch `add` refuses: no fly-to-cart, say why instead.
+                          const img = e.currentTarget.closest('.snap-start')?.querySelector('img');
+                          if (add(p)) flyToCart(img);
+                          else toast(tr('launch.cartClosed', 'ForgeMarket opens on launch day — you can browse everything until then.'));
+                        }}
                         className="w-11 h-11 shrink-0 rounded-lg border border-slate-200 grid place-items-center text-slate-600 hover:bg-slate-50 hover:text-violet-700 active:scale-90 transition-transform">
                         <ShoppingCart size={16} />
                       </button>
@@ -751,7 +762,7 @@ export default function HomeStore() {
                           the English one, so a Dutch screen reader heard "Gift
                           cards" in the middle of a Dutch sentence. */}
                       <button aria-label={tr('home.addCheapest', 'Add the cheapest {n} pack to your cart', { n: categoryLabel(c.slug, tr) })}
-                        onClick={(e) => { flyToCart(e.currentTarget.closest('.snap-start')?.querySelector('img')); addToCart(c); }}
+                        onClick={(e) => addToCart(c, e.currentTarget.closest('.snap-start')?.querySelector('img'))}
                         className="w-11 h-11 shrink-0 rounded-lg border border-slate-200 grid place-items-center text-slate-600 hover:bg-slate-50 hover:text-violet-700 active:scale-90 transition-transform">
                         <ShoppingCart size={16} />
                       </button>

@@ -183,7 +183,7 @@ export default function CommandPalette() {
                     combobox the keyboard moves with the arrows and Enter opens
                     the product, where the same button is a proper one. */}
                 <button type="button" tabIndex={-1} aria-hidden="true"
-                  onClick={(e) => { e.stopPropagation(); add(p); toast.success(t('palette.added', '{name} added to your cart', { name: p.name })); }}
+                  onClick={(e) => { e.stopPropagation(); if (!add(p)) { toast(t('launch.cartClosed', 'ForgeMarket opens on launch day — you can browse everything until then.')); return; } toast.success(t('palette.added', '{name} added to your cart', { name: p.name })); }}
                   title={t('palette.addToCart', 'Add to cart')}
                   className="w-7 h-7 rounded-md grid place-items-center text-slate-400 hover:text-violet-600 hover:bg-white shrink-0">
                   <ShoppingCart size={14} />

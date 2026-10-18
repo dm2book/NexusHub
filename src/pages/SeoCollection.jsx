@@ -55,7 +55,7 @@ export default function SeoCollection() {
       <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900">{page.copy.h1}</h1>
       <p className="text-slate-600 mt-2 max-w-2xl">{page.copy.intro}</p>
       <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 mt-6" data-testid="seo-products">
-        {shown.map((p) => <LightProductCard key={p.id} product={p} onAdd={(x) => { add(x); toast.success(`${x.name} ${t('cart.added', 'added')}`); }} />)}
+        {shown.map((p) => <LightProductCard key={p.id} product={p} onAdd={(x) => { if (!add(x)) { toast(t('launch.cartClosed', 'ForgeMarket opens on launch day — you can browse everything until then.')); return; } toast.success(`${x.name} ${t('cart.added', 'added')}`); }} />)}
       </div>
       <SeoFaq page={page} />
       <SeoLinks page={page} />
