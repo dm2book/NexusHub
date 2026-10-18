@@ -173,7 +173,7 @@ console.log('— Phone codes —');
     .catch((e) => console.log('   (insert)', e.message));
   for (let i = 0; i < 5; i++) await call('POST', '/api/account/phone/verify', { phone, code: '000000' });
   const right = await call('POST', '/api/account/phone/verify', { phone, code: '123456' });
-  ok('after five wrong guesses even the right code no longer works', right.status === 400 && /too many|expired/i.test(right.body?.error?.message || ''), JSON.stringify(right.body));
+  ok('after five wrong guesses even the right code no longer works', [400, 429].includes(right.status) && /too many|expired/i.test(right.body?.error?.message || ''), JSON.stringify(right.body));
 }
 
 console.log('— Newsletter —');

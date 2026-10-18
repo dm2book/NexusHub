@@ -1402,8 +1402,12 @@ export async function exportOrdersCsv({ status, statuses, search, from, to } = {
 
   const eur = (cents) => (Number(cents || 0) / 100).toFixed(2);
   const cell = (v) => {
-    const s = String(v ?? '');
-    return /[",\n;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    let s = String(v ?? '');
+    /* A cell that starts with = + - @ (or a tab/CR) is a formula to Excel and
+       Sheets, even quoted — and payment_ref, coupon and item names come from
+       buyers. A leading ' makes it text. Plain numbers (a negative amount) stay. */
+    if (/^[=+\-@\t\r]/.test(s) && !/^-?\d+(\.\d+)?$/.test(s)) s = `'${s}`;
+    return /[",\n;']/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   const header = ['order_number', 'date', 'customer_email', 'status', 'payment_status',
     'payment_ref', 'currency', 'subtotal_eur', 'discount_eur', 'store_credit_eur',
