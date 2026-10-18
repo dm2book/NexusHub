@@ -49,7 +49,7 @@ function assertCron(req) {
 // Scheduled maintenance.
 router.get('/cron/maintenance', asyncHandler(async (req, res) => {
   assertCron(req);
-  res.json(await runMaintenance({ deadline: (req.startedAt || Date.now()) + 26_000 }));
+  res.json(await runMaintenance({ deadline: (req.startedAt || Date.now()) + 26_000, waitForLease: true }));
 }));
 
 // The weekly backup, on its own schedule and its own time budget.

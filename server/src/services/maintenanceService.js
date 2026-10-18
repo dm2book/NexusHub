@@ -64,7 +64,7 @@ export async function lastMaintenanceRun({ now = Date.now(), staleAfterHours = D
   };
 }
 
-export async function runMaintenance({ deadline = Date.now() + 26_000 } = {}) {
+export async function runMaintenance({ deadline = Date.now() + 26_000, waitForLease = false } = {}) {
   /* One run at a time, shop-wide. The cron route, the traffic-triggered run and
      a cron call Vercel delivers twice could each start a full sweep at the
      same moment; steps that check-then-act (owner alerts, the hand-delivery
@@ -72,9 +72,16 @@ export async function runMaintenance({ deadline = Date.now() + 26_000 } = {}) {
      the database, released when the run ends, makes the second caller stand
      down. A run killed mid-way lets go by itself when the lease runs out. */
   const { claimInterval } = await import('./bootUpkeep.js');
-  if (!(await claimInterval('maintenance_running', 60_000).catch(() => true))) {
-    return { skipped: 'another maintenance run is in progress', at: nowIso() };
+  const claim = () => claimInterval('maintenance_running', 60_000).catch(() => true);
+  let mine = await claim();
+  /* The scheduled call waits its turn instead of standing down: the run in
+     progress is usually a traffic-triggered one about to finish, and the
+     scheduler's caller is the one that reads the result. */
+  while (!mine && waitForLease && Date.now() < deadline - 10_000) {
+    await new Promise((r) => setTimeout(r, 500));
+    mine = await claim();
   }
+  if (!mine) return { skipped: 'another maintenance run is in progress', at: nowIso() };
   try {
     return await runMaintenanceSteps({ deadline });
   } finally {
