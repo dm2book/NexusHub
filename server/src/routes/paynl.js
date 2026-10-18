@@ -387,31 +387,38 @@ paynlApi.post('/orders/:id/paynl', requireLaunched('Payment', { money: true }),
 
     const base = config.appUrl.replace(/\/+$/, '');
     let method = null;
-    const out = await tx(async () => {
-      const row = await get(`SELECT status, psp_provider, psp_payment_id, psp_status, psp_checkout_url, psp_method
-                               FROM orders WHERE id=@id FOR UPDATE`, { id: order.id });
-      if (row?.status !== 'pending') return { alreadySettled: true, status: row?.status };
-      // No method named (the account page's "Pay" button): the one already started.
-      method = offered.includes(body.method) ? body.method
-        : offered.includes(row.psp_method) ? row.psp_method : (offered[0] || null);
-      /* A payment Pay. is holding for review may already have taken the money.
-         A second one now would charge the buyer twice. */
-      const held = await get(`SELECT 1 FROM psp_attempts WHERE order_id=@o AND provider='paynl' AND status='verify' LIMIT 1`,
-        { o: order.id });
-      if (held) return { underReview: true };
-      // An open payment for the same method is resumed after asking Pay. about it.
-      if (row.psp_provider === 'paynl' && row.psp_payment_id && row.psp_checkout_url
-          && ['open', 'pending'].includes(row.psp_status || '')) {
-        const live = await getPayment(row.psp_payment_id).catch(() => null);
-        if (live?.status === 'paid') return { settleNow: true };
-        if (live && ['open', 'pending'].includes(live.status) && (row.psp_method || null) === method) {
-          return { checkoutUrl: row.psp_checkout_url, paymentId: row.psp_payment_id, resumed: true };
+    /* Pay. refusing to START a payment ("This service is blocked" while the
+       account awaits activation, a disabled method, a 4xx/5xx) is not a crash
+       in this shop: the buyer got "Internal server error" and the owner a "500"
+       page. The buyer is now told plainly that nothing was charged, and the
+       owner gets Pay.'s own reason, once per minute per reason. */
+    let out;
+    try {
+      out = await tx(async () => {
+        const row = await get(`SELECT status, psp_provider, psp_payment_id, psp_status, psp_checkout_url, psp_method
+                                 FROM orders WHERE id=@id FOR UPDATE`, { id: order.id });
+        if (row?.status !== 'pending') return { alreadySettled: true, status: row?.status };
+        // No method named (the account page's "Pay" button): the one already started.
+        method = offered.includes(body.method) ? body.method
+          : offered.includes(row.psp_method) ? row.psp_method : (offered[0] || null);
+        /* A payment Pay. is holding for review may already have taken the money.
+           A second one now would charge the buyer twice. */
+        const held = await get(`SELECT 1 FROM psp_attempts WHERE order_id=@o AND provider='paynl' AND status='verify' LIMIT 1`,
+          { o: order.id });
+        if (held) return { underReview: true };
+        // An open payment for the same method is resumed after asking Pay. about it.
+        if (row.psp_provider === 'paynl' && row.psp_payment_id && row.psp_checkout_url
+            && ['open', 'pending'].includes(row.psp_status || '')) {
+          const live = await getPayment(row.psp_payment_id).catch(() => null);
+          if (live?.status === 'paid') return { settleNow: true };
+          if (live && ['open', 'pending'].includes(live.status) && (row.psp_method || null) === method) {
+            return { checkoutUrl: row.psp_checkout_url, paymentId: row.psp_payment_id, resumed: true };
+          }
         }
-      }
-      const payment = await createPayment(order, {
-        returnUrl: `${base}/checkout/success?order=${encodeURIComponent(order.id)}&n=${encodeURIComponent(order.number)}`,
-        exchangeUrl: exchangeUrl(),
-        method,
+        const payment = await createPayment(order, {
+          returnUrl: `${base}/checkout/success?order=${encodeURIComponent(order.id)}&n=${encodeURIComponent(order.number)}`,
+          exchangeUrl: exchangeUrl(),
+          method,
       });
       await run(`INSERT INTO psp_attempts (id, order_id, provider, payment_id, pay_order_id, method, status, created_at)
                  VALUES (@id, @o, 'paynl', @p, @po, @m, @s, @at) ON CONFLICT (provider, payment_id) DO NOTHING`,
@@ -420,7 +427,20 @@ paynlApi.post('/orders/:id/paynl', requireLaunched('Payment', { money: true }),
       await setPspPayment(order.id, { provider: 'paynl', paymentId: payment.id, status: payment.status,
         checkoutUrl: payment.checkoutUrl, method });
       return { checkoutUrl: payment.checkoutUrl, paymentId: payment.id, created: true };
-    });
+      });
+    } catch (err) {
+      if (err instanceof ApiError || !Number.isInteger(err?.status)) throw err;
+      const reason = String(err.message || '').replace(/^Pay\. \S+ \S+: /, '').slice(0, 160);
+      console.error(`[paynl] start refused for ${order.number}: ${err.message}`);
+      await alertOwner('payment.failed', {
+        title: 'Pay. refused to start a payment',
+        lines: [`Order ${order.number}: ${reason || `HTTP ${err.status}`}`,
+          'Check the sales location and the account status in my.pay.nl.'],
+        url: `${config.appUrl}/admin/orders`,
+        key: `paynl-start-${reason.slice(0, 60)}:${new Date().toISOString().slice(0, 16)}`,
+      }).catch(() => {});
+      throw new ApiError(502, 'The payment could not be started at our payment provider. Nothing has been charged — please try again later or contact us.', 'payment_provider_refused');
+    }
 
     if (out.settleNow) {
       await applyPaynl(order.id).catch((e) => console.error('[paynl] settle on start:', e.message));
