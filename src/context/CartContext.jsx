@@ -77,11 +77,14 @@ export function CartProvider({ children }) {
           ...i, qty: i.qty + qty,
           price: Number.isFinite(product.price) ? product.price : i.price,
           name: product.name || i.name,
+          image: product.image || i.image,
         } : i));
       }
       return [...cur, {
         id: product.id, name: product.name, price: product.price,
         currency: product.currency || 'EUR', category: product.category, qty,
+        // The product's own picture, so the cart shows what was chosen.
+        ...(product.image ? { image: product.image } : {}),
       }];
     });
     return true;
