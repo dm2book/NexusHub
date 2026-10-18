@@ -10,7 +10,7 @@
 import { Router } from 'express';
 import express from 'express';
 import { z } from 'zod';
-import { config } from '../config/env.js';
+import { config, activePaymentProvider } from '../config/env.js';
 import { asyncHandler } from '../middleware/error.js';
 import { publicCache } from '../utils/httpCache.js';
 import { requireLaunched } from '../services/launchGateService.js';
@@ -264,7 +264,8 @@ mollieApi.get('/mollie/methods', asyncHandler(async (req, res) => {
 mollieApi.post('/orders/:id/mollie', requireLaunched('Payment', { money: true }),
   rateLimit({ bucket: 'pay', windowMs: 60_000, max: 30, shared: true }),
   asyncHandler(async (req, res) => {
-    if (!isEnabled()) throw new ApiError(400, 'Mollie is not configured');
+    // Only while Mollie IS the provider — the same reasoning as Stripe's route.
+    if (!isEnabled() || activePaymentProvider() !== 'mollie') throw new ApiError(400, 'Mollie is not configured');
 
     const body = z.object({
       email: z.string().email().optional(),
