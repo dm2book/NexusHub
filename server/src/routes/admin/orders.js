@@ -6,7 +6,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { asyncHandler } from '../../middleware/error.js';
-import { requirePermission, holdsPermission } from '../../middleware/rbac.js';
+import { requirePermission, holdsPermission, assertNotOwnOrder } from '../../middleware/rbac.js';
 import {
   listOrders, getOrder, transitionOrder, markPaymentReceived, setOrderNotes, deliverOrder,
   exportOrdersCsv, orderUrlFor, setOrderPayLink, clearOrderPayLink, getPspPayment,
@@ -74,6 +74,8 @@ router.get('/payment/proofs/:id/screenshot', requirePermission('orders.update'),
 
 router.post('/payment/proofs/:id/confirm', requirePermission('orders.update'),
   asyncHandler(async (req, res) => {
+    const proof = await get('SELECT order_id FROM payment_proofs WHERE id=@id', { id: req.params.id });
+    if (proof) assertNotOwnOrder(req.user, await getOrder(proof.order_id));
     const order = await confirmProof(req.params.id, { user: req.user, req });
     res.json({ order });
   }));
@@ -95,6 +97,14 @@ router.get('/:id', requirePermission('orders.read'), asyncHandler(async (req, re
 }));
 
 // Confirm payment (e.g. webhook reconciliation / manual).
+/* Money and delivery actions on an order: never on your own (see assertNotOwnOrder). */
+const SELF_GUARDED = new Set(['payment-received', 'fulfill', 'deliver', 'complete', 'refund', 'transition', 'cancel', 'pay-link']);
+router.post('/:id/:action', asyncHandler(async (req, _res, next) => {
+  if (!SELF_GUARDED.has(req.params.action)) return next();
+  assertNotOwnOrder(req.user, await getOrder(req.params.id));
+  next();
+}));
+
 router.post('/:id/payment-received', requirePermission('orders.update'),
   asyncHandler(async (req, res) => {
     const { paymentRef } = z.object({ paymentRef: z.string().optional() }).parse(req.body);

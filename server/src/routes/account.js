@@ -31,7 +31,7 @@ import { saveCart, getCart } from '../services/cartService.js';
 import { requireLaunched } from '../services/launchGateService.js';
 import { walletSummary, balanceOf, debit } from '../services/walletService.js';
 import { redeemGiftCard } from '../services/giftCardService.js';
-import { requestPhoneOtp } from '../services/authService.js';
+import { requestPhoneOtp, claimOtpGuess } from '../services/authService.js';
 import { normalizePhone, isValidPhone } from '../services/smsService.js';
 import { sha256, safeEqual } from '../utils/crypto.js';
 import { nowIso } from '../db/index.js';
@@ -190,23 +190,19 @@ router.post('/phone/request', asyncHandler(async (req, res) => {
   res.json({ sent: true, cooldownSeconds: r.cooldownSeconds });
 }));
 
-router.post('/phone/verify', rateLimit({ bucket: 'phone_verify', windowMs: 10 * 60_000, max: 10 }), asyncHandler(async (req, res) => {
+router.post('/phone/verify', rateLimit({ bucket: 'phone_verify', windowMs: 10 * 60_000, max: 10, shared: true }), asyncHandler(async (req, res) => {
   const { phone, code } = z.object({ phone: z.string().min(5).max(40), code: z.string().min(4).max(8) }).parse(req.body || {});
   const p = normalizePhone(phone);
-  const rows = await all(
-    `SELECT * FROM sms_verifications WHERE phone=@p AND consumed_at IS NULL ORDER BY created_at DESC LIMIT 10`, { p });
-  /* Five wrong guesses burn a code: a 6-digit code would otherwise fall to a
-     script within its lifetime. */
-  const live = rows.filter((x) => new Date(x.expires_at) >= new Date() && Number(x.attempts || 0) < 5);
-  if (!live.length) throw badRequest('Code expired or too many attempts. Request a new one.');
-  const match = live.find((x) => safeEqual(x.code_hash, sha256(String(code).trim())));
-  if (!match) {
-    await run(`UPDATE sms_verifications SET attempts = attempts + 1 WHERE id = ANY(@ids)`, { ids: live.map((x) => x.id) });
-    throw badRequest('Incorrect code');
-  }
   const taken = await get('SELECT id FROM users WHERE phone=@p AND phone_verified=1 AND id<>@me', { p, me: req.user.id });
   if (taken) throw badRequest('That phone number is already in use.');
-  await run('UPDATE sms_verifications SET consumed_at=@at WHERE id=@id', { at: nowIso(), id: match.id });
+  /* The same locked count-then-compare the SMS login uses. This route had its
+     own copy that read, compared and only then counted a wrong guess, so a
+     burst of parallel guesses each got a free try — enough to bind someone
+     else's number to your account, and with it their future SMS logins. */
+  const guess = await claimOtpGuess('sms_verifications', 'phone', p, code);
+  if (!guess.ok) throw badRequest('Incorrect code');
+  const takenNow = await get('SELECT id FROM users WHERE phone=@p AND phone_verified=1 AND id<>@me', { p, me: req.user.id });
+  if (takenNow) throw badRequest('That phone number is already in use.');
   await run('UPDATE users SET phone=@p, phone_verified=1, updated_at=@at WHERE id=@id',
     { p, at: nowIso(), id: req.user.id });
   await audit({ actor: req.user, action: 'profile.phone_verified', targetType: 'user', targetId: req.user.id, req });

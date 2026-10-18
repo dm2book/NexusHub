@@ -2,7 +2,8 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { asyncHandler } from '../../middleware/error.js';
-import { requirePermission } from '../../middleware/rbac.js';
+import { requirePermission, assertNotOwnOrder } from '../../middleware/rbac.js';
+import { getOrder } from '../../services/orderService.js';
 import * as support from '../../services/supportService.js';
 import { refundOrder } from '../../services/refundService.js';
 import { audit } from '../../services/auditService.js';
@@ -59,6 +60,7 @@ router.post('/refunds/:id/decide', requirePermission('orders.refund'),
     let refund = null;
     if (processOrder && (status === 'approved' || status === 'processed')) {
       try {
+        assertNotOwnOrder(req.user, await getOrder(request.order_id));
         refund = (await refundOrder(request.order_id, { method: how, actorId: req.user.id, user: req.user,
           reason: how === 'credit' ? 'Refund request approved — store credit' : 'Customer refund request approved' })).refund;
       } catch (e) {

@@ -2,7 +2,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { asyncHandler } from '../../middleware/error.js';
-import { requirePermission, requireRole } from '../../middleware/rbac.js';
+import { requirePermission, requireRole, assertNotOwnOrder } from '../../middleware/rbac.js';
 import { exportPersonalData, erasePersonalData } from '../../services/privacyService.js';
 import { all } from '../../db/index.js';
 import { listAuditLogs, audit } from '../../services/auditService.js';
@@ -54,6 +54,7 @@ router.get('/fraud', requirePermission('security.manage'), asyncHandler(async (_
 router.post('/fraud/:id/approve', requirePermission('security.manage'),
   asyncHandler(async (req, res) => {
     const { reason } = z.object({ reason: z.string().max(300).optional() }).parse(req.body || {});
+    assertNotOwnOrder(req.user, await getOrder(req.params.id));
     const result = await releaseFraudHold(req.params.id,
       { actorId: req.user.id, user: req.user, reason });
     res.json(result);
@@ -80,6 +81,7 @@ router.post('/fraud/:id/reject', requirePermission('security.manage'),
 
     const order = await getOrder(req.params.id);
     if (!order) throw notFound('Order not found');
+    assertNotOwnOrder(req.user, order);
 
     let refunded = null;
     // Only when money actually arrived. Rejecting an unpaid order is just a

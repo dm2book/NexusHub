@@ -46,3 +46,22 @@ export function requireStaff(req, _res, next) {
   }
   next();
 }
+
+/**
+ * Staff may not move money or goods on their OWN orders.
+ *
+ * The admin role can mark an order paid and refund it as store credit. On an
+ * order placed from their own account that made unlimited credit (mark the
+ * unpaid order paid, refund it to the wallet) — around the ban on granting
+ * yourself credit and the €100 staff cap — and free codes (mark paid, let it
+ * deliver). The owner is exempt: it is their money. Matched on the account and
+ * on the order's e-mail, so a guest checkout with the staff address counts too.
+ */
+export function assertNotOwnOrder(user, order) {
+  if (!user || !order) return;
+  if ((user.roles || []).includes('owner')) return;
+  const mine = (order.userId && order.userId === user.id)
+    || (order.email && user.email && String(order.email).toLowerCase() === String(user.email).toLowerCase());
+  if (mine) throw forbidden('You cannot process your own order — ask the owner or another staff member.');
+}
+

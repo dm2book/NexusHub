@@ -340,7 +340,25 @@ router.get('/totp', requireAuth, asyncHandler(async (req, res) => {
   res.json(await totpStatus(req.user.id));
 }));
 
+/* Switching 2FA ON is the one setting that can lock its owner out for good:
+   it signs every other device out, and from then on only the person holding
+   the authenticator app can sign in. With nothing but a session — a borrowed
+   browser, a stolen token — someone could take an account over permanently.
+   So it needs a sign-in from the last fifteen minutes, made with the first
+   factor (an email or SMS code), not a session that has merely been kept
+   alive. */
+const FRESH_LOGIN_MS = 15 * 60_000;
+async function requireFreshLogin(req) {
+  const sid = req.auth?.sid;
+  const row = sid ? await get('SELECT created_at FROM sessions WHERE id=@id AND revoked_at IS NULL', { id: sid }) : null;
+  if (!row || Date.now() - new Date(row.created_at).getTime() > FRESH_LOGIN_MS) {
+    throw new ApiError(403, 'For your safety, sign out and sign in again before switching on two-factor authentication.',
+      'fresh_login_required');
+  }
+}
+
 router.post('/totp/setup', requireAuth, asyncHandler(async (req, res) => {
+  await requireFreshLogin(req);
   const result = await startTotpEnrollment(req.user);
   await audit({ actor: { id: req.user.id, email: req.user.email }, action: 'auth.totp_setup', req });
   res.json(result);
@@ -348,6 +366,7 @@ router.post('/totp/setup', requireAuth, asyncHandler(async (req, res) => {
 
 router.post('/totp/enable', requireAuth, asyncHandler(async (req, res) => {
   const { code } = z.object({ code: z.string().min(6).max(8) }).parse(req.body);
+  await requireFreshLogin(req);
   const result = await confirmTotpEnrollment(req.user.id, code);
   /* Everything that signed in before there was a second factor is signed out
      now: other sessions, and every "remember this device" — a trusted device is
@@ -531,6 +550,13 @@ router.post('/refresh', asyncHandler(async (req, res) => {
 
 router.post('/logout', requireAuth, asyncHandler(async (req, res) => {
   if (req.auth?.sid) await revokeSession(req.auth.sid);
+  /* Logging out also forgets this browser as a trusted device. The device
+     cookie signs in with no code at all, so on a shared computer the next
+     person was the previous one again. Only this browser's device — the
+     others the user trusted are left alone (logout-all clears those). */
+  const deviceId = String(req.cookies?.[DEVICE_COOKIE] || '').split('.')[0];
+  if (deviceId) await revokeTrustedDevice(req.user.id, deviceId).catch(() => {});
+  res.clearCookie(DEVICE_COOKIE, { path: '/api/auth' });
   setSessionHint(res, false);
   res.clearCookie(config.auth.cookieName, { path: '/api/auth' });
   await audit({ actor: { id: req.user.id, email: req.user.email }, action: 'auth.logout', req });
