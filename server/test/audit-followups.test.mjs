@@ -137,5 +137,46 @@ console.log('\n— One screenshot, two orders —');
   ok('…even after the earlier images were deleted after review', third.flags.includes('duplicate_screenshot'));
 }
 
+
+console.log('\n— Maintenance runs once at a time —');
+{
+  const { runMaintenance } = await import('../src/services/maintenanceService.js');
+  const [a, b] = await Promise.all([runMaintenance({ deadline: Date.now() + 20_000 }), runMaintenance({ deadline: Date.now() + 20_000 })]);
+  const skipped = [a, b].filter((x) => x?.skipped).length;
+  ok(`two simultaneous runs: one works, one stands down (${skipped} skipped)`, skipped === 1, JSON.stringify([a?.skipped, b?.skipped]));
+  const c = await runMaintenance({ deadline: Date.now() + 20_000 });
+  ok('…and the lease is released afterwards', !c?.skipped, JSON.stringify(c?.skipped));
+  const app = (await import('node:fs')).readFileSync(new URL('../src/app.js', import.meta.url), 'utf8');
+  ok('the cron call does not also start the traffic-triggered run', /!req\.path\.startsWith\('\/api\/cron\/'\)/.test(app));
+}
+
+console.log('\n— One open hand task per item —');
+{
+  const p = await createProduct({ name: 'AF Hand', sku: `AF-H-${stamp}`, category: 'robux', price: 1000,
+    currency: 'EUR', active: true, announce: false });
+  const o = await createOrder({ consent: true, consentText: 'test', email: `af-h-${stamp}@test.local`, items: [{ productId: p.id, quantity: 1 }] });
+  const item = await get(`SELECT id FROM order_items WHERE order_id=@o`, { o: o.id });
+  const fs = await import('../src/services/fulfillmentService.js');
+  const { ensureManualFulfillment } = fs;
+  if (ensureManualFulfillment) {
+    await transitionOrder(o.id, 'payment_received', { actorId: 'admin' }).catch(() => {});
+    await Promise.all([1, 2, 3].map(() => ensureManualFulfillment(o.id, { actorId: 'system' }).catch(() => null)));
+  }
+  const open = await all(`SELECT 1 FROM fulfillment_requests WHERE order_item_id=@i AND mode='manual' AND status='pending'`, { i: item.id });
+  ok(`three sweeps at once open at most one task (${open.length})`, open.length <= 1);
+  const idx = await get(`SELECT 1 FROM pg_indexes WHERE indexname='uq_fulfillment_manual_open'`);
+  ok('…enforced by a unique index', !!idx);
+}
+
+console.log('\n— Discord bot —');
+{
+  const bot = (await import('node:fs')).readFileSync(new URL('../../discord/src/bot.js', import.meta.url), 'utf8');
+  ok('state that was never loaded is never written back to the store',
+    /if \(!STATE_LOADED\.has\(key\)\) \{ console\.warn/.test(bot) && /STATE_UNAVAILABLE/.test(bot));
+  const digest = bot.slice(bot.indexOf('function maybePostWeeklyDigest'), bot.indexOf('function maybePostWeeklyDigest') + 1500);
+  ok('the weekly revenue digest goes to the owners, not a staff channel',
+    !/staff-announcements|'leads'/.test(digest) && /OWNER_IDS/.test(digest));
+}
+
 console.log(`\n${fail ? '❌' : '✅'} audit-followups: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

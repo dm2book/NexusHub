@@ -192,7 +192,9 @@ const a1 = await buy(await newUser(), hangProduct.id);
   const req = (await requestsOf(a1.id)).find((r) => r.mode === 'auto');
   ok('the request says nobody knows whether it was bought',
     req?.status === 'failed' && parse(req.result)?.outcome === 'unknown', `${req?.status} ${req?.result}`);
-  const alert = await get(`SELECT lines FROM owner_alerts WHERE event='fulfillment.failed' AND title LIKE @t`, { t: `${a1.number}%` });
+  // The alert is written just after the hand task appears; on a slow machine, wait for it.
+  const alert = await waitFor(() => get(`SELECT lines FROM owner_alerts WHERE event='fulfillment.failed' AND title LIKE @t`,
+    { t: `${a1.number}%` }), 5_000);
   ok('…and the owner is told to look at the supplier before buying it again',
     /check/i.test(alert?.lines || '') && /before buying it again/i.test(alert?.lines || ''), alert?.lines);
   await waitFor(leaseFree, 5_000);

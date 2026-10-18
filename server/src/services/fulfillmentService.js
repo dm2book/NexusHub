@@ -255,12 +255,25 @@ async function persistResult(reqId, order, item, result) {
 }
 
 async function openManualFulfillment(order, item, ctx, reason = 'No supplier integration available') {
+  /* One open hand task per item. Two sweeps at once both found "nothing open"
+     and both inserted, so staff saw the same top-up twice — and two people
+     could deliver it twice. Checked here, and enforced by a unique index
+     (migration 068) where the database allows it. */
+  const open = await get(`SELECT * FROM fulfillment_requests
+                           WHERE order_item_id=@iid AND mode='manual' AND status='pending' LIMIT 1`, { iid: item.id });
+  if (open) return open;
   const reqId = newId('ful');
   const at = nowIso();
-  await run(`INSERT INTO fulfillment_requests
-        (id, order_id, order_item_id, mode, status, created_at, updated_at)
-       VALUES (@id, @oid, @iid, 'manual', 'pending', @at, @at)`,
-      { id: reqId, oid: order.id, iid: item.id, at });
+  try {
+    await run(`INSERT INTO fulfillment_requests
+          (id, order_id, order_item_id, mode, status, created_at, updated_at)
+         VALUES (@id, @oid, @iid, 'manual', 'pending', @at, @at)`,
+        { id: reqId, oid: order.id, iid: item.id, at });
+  } catch (e) {
+    if (e.code !== '23505') throw e;   // another sweep opened it a moment ago
+    return get(`SELECT * FROM fulfillment_requests
+                 WHERE order_item_id=@iid AND mode='manual' AND status='pending' LIMIT 1`, { iid: item.id });
+  }
   await logFulfillment('created', { requestId: reqId, orderId: order.id, actor: ctx.actorId,
     detail: { mode: 'manual', item: item.id, reason } });
   return get('SELECT * FROM fulfillment_requests WHERE id=@id', { id: reqId });

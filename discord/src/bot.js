@@ -159,17 +159,37 @@ const isTicketChannel = (ch) =>
  * site that is briefly unreachable costs nothing, because the file is written
  * too and read when the store has nothing to say.
  */
+/* "The store could not be asked" is not "the store is empty". A boot that
+   met a cold or busy site used to read as no XP, no giveaways and no META —
+   and the first save then overwrote every member's score and every running
+   giveaway in the store with that emptiness. Now a key the store has not
+   answered for is never written back to it, and its load is retried. */
+const STATE_UNAVAILABLE = Symbol('state unavailable');
+const STATE_LOADED = new Set();
+
 async function stateGet(key, file) {
   if (FORGEMARKET_API_URL && REVIEW_INGEST_SECRET) {
-    try {
-      const res = await signedPost('/api/discord/state/get', { key });
-      if (res.ok) {
-        const { value } = await res.json();
-        if (value !== null && value !== undefined) return value;
-      } else if (res.status !== 404) {
+    for (const wait of [0, 1_000, 3_000, 9_000]) {
+      if (wait) await new Promise((r) => setTimeout(r, wait));
+      try {
+        const res = await signedPost('/api/discord/state/get', { key });
+        if (res.ok) {
+          STATE_LOADED.add(key);
+          const { value } = await res.json();
+          if (value !== null && value !== undefined) return value;
+          break;                                   // answered: nothing stored
+        }
+        if (res.status === 404) { STATE_LOADED.add(key); break; }   // no store on this site
         console.error(`[state] get ${key}: ${res.status}`);
-      }
-    } catch (e) { console.error(`[state] get ${key} failed:`, e.message); }
+      } catch (e) { console.error(`[state] get ${key} failed:`, e.message); }
+    }
+    if (!STATE_LOADED.has(key)) {
+      // The local file, when this container has one, is still real state.
+      try { if (file && existsSync(file)) { STATE_LOADED.add(key); return JSON.parse(readFileSync(file, 'utf8')); } } catch { /* ignore */ }
+      return STATE_UNAVAILABLE;
+    }
+  } else {
+    STATE_LOADED.add(key);
   }
   // Nothing stored yet (or no store at all) — fall back to the file, which is
   // also how an existing bot's state migrates on its first boot after this.
@@ -181,6 +201,8 @@ async function stateSet(key, value, file) {
   // The file first: it is instant, and it is what makes a site outage free.
   try { if (file) writeFileSync(file, JSON.stringify(value)); } catch { /* ignore */ }
   if (!FORGEMARKET_API_URL || !REVIEW_INGEST_SECRET) return;
+  // Never overwrite what the store holds with state we never managed to read.
+  if (!STATE_LOADED.has(key)) { console.warn(`[state] not saving ${key}: it was never loaded`); return; }
   try {
     const res = await signedPost('/api/discord/state/set', { key, value: value ?? null });
     if (!res.ok && res.status !== 404) console.error(`[state] set ${key}: ${res.status}`);
@@ -207,7 +229,9 @@ function saveGiveaways() {
   }, 1500);
 }
 async function restoreGiveaways(c) {
-  const data = (await stateGet('giveaways', GW_FILE)) || [];
+  const got = await stateGet('giveaways', GW_FILE);
+  if (got === STATE_UNAVAILABLE) { setTimeout(() => restoreGiveaways(c), 60_000); return; }
+  const data = got || [];
   if (!Array.isArray(data)) return;
   const guild = homeGuild(c);
   if (!guild) return;
@@ -237,6 +261,7 @@ let XP = {};
    loses nothing, because the merge below never drops a stored score. */
 async function loadXP() {
   const stored = await stateGet('xp', XP_FILE);
+  if (stored === STATE_UNAVAILABLE) { setTimeout(loadXP, 60_000); return; }
   if (!stored || typeof stored !== 'object') return;
   // Anything earned in those first seconds is kept: the higher of the two wins,
   // so a boot-time race cannot roll somebody's level backwards.
@@ -2699,6 +2724,8 @@ let META = {};
 let metaLoaded = false;
 async function loadMeta() {
   const stored = await stateGet('meta', META_FILE);
+  // Until META is really known, the launch post and digests wait for it.
+  if (stored === STATE_UNAVAILABLE) { setTimeout(loadMeta, 60_000); return; }
   if (stored && typeof stored === 'object') META = { ...stored, ...META };
   metaLoaded = true;
 }
@@ -2877,13 +2904,18 @@ function maybePostWeeklyDigest(guild) {
   if (now.getUTCDay() !== 1 || now.getUTCHours() < 8) return; // Monday morning
   const week = `${now.getUTCFullYear()}-dw${Math.ceil(((now - new Date(Date.UTC(now.getUTCFullYear(), 0, 1))) / 86_400_000 + 1) / 7)}`;
   if (META.lastDigestPost === week) return;
-  fetchDigest().then((d) => {
+  /* To the owners only, by DM. /digest is owner-only because Support should not
+     read revenue and margins — posting the same figures to a staff channel every
+     Monday undid that. No owner ids configured: no digest, rather than a leak. */
+  if (!OWNER_IDS.size || !metaLoaded) return;
+  fetchDigest().then(async (d) => {
     if (!d) return;
-    const ch = findChannel(guild, 'staff-announcements') || findChannel(guild, 'leads');
-    if (!ch) return;
     META.lastDigestPost = week;
     saveMeta();
-    ch.send({ embeds: [digestEmbed(d)] }).catch(() => {});
+    for (const id of OWNER_IDS) {
+      const user = await guild.client.users.fetch(id).catch(() => null);
+      await user?.send({ embeds: [digestEmbed(d)] }).catch(() => {});
+    }
   });
 }
 
