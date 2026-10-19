@@ -51,7 +51,10 @@ export class EldoradoConnector extends SupplierConnector {
     const data = text ? safeJson(text) : null;
     if (!res.ok) {
       const msg = data?.message || data?.error || `HTTP ${res.status}`;
-      throw new Error(`Eldorado API: ${msg}`);
+      /* The status travels with the error, as with Kinguin and G2A: a 5xx after
+         the order went out may have been bought, and fulfillmentService reads
+         `status` to tell that apart from a clear refusal before failing over. */
+      throw Object.assign(new Error(`Eldorado API: ${msg}`), { status: res.status });
     }
     return data;
   }
