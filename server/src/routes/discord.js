@@ -218,8 +218,9 @@ router.post('/balance',
       ? await get(`SELECT user_id FROM oauth_accounts WHERE provider='discord' AND provider_uid=@uid LIMIT 1`, { uid })
       : null;
     if (!acct) return res.json({ linked: false });
-    const [progress, credit, loyalty] = await Promise.all([
+    const [progress, credit, loyalty, done] = await Promise.all([
       coinProgress(acct.user_id), balanceOf(acct.user_id), loyaltyFor(acct.user_id),
+      get(`SELECT COUNT(*)::int AS n FROM orders WHERE user_id=@u AND status='completed'`, { u: acct.user_id }),
     ]);
     res.json({
       linked: true, coins: progress.balance, creditCents: credit,
@@ -228,6 +229,10 @@ router.post('/balance',
          bot and the website cannot tell a member two different things about how
          far off their next reward is. */
       next: progress.next, boosts: progress.boosts, earned: progress.totals.earned,
+      /* What /vouch asks: has this member actually bought something? The bot
+         read this field and the response never carried it, so every vouch was
+         a "community vouch" and none ever reached the site's reviews. */
+      completedOrders: Number(done?.n || 0),
     });
   }));
 

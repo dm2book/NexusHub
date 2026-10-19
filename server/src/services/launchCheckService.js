@@ -388,13 +388,21 @@ export async function launchChecks() {
   const d = config.discord;
   const bits = [d.botToken && 'bot', d.orderWebhookUrl && 'orders', d.dropsWebhookUrl && 'drops'].filter(Boolean);
   const relayed = await botSeenRecently(24);
+  /* The relay is signed with REVIEW_INGEST_SECRET, so without it on THIS side
+     every bot call is refused (403 "Ingest is not configured") however the bot
+     is set up. This used to say "no Vercel setup needed", and an owner who set
+     the secret only on the bot host saw a bot that never connected and a check
+     that said nothing was missing. */
+  const relaySecret = !!d.reviewIngestSecret;
   add('discord', 'Discord automation',
-    bits.length >= 2 || relayed ? 'ok' : 'warn',
+    bits.length >= 2 || relayed ? 'ok' : (relaySecret ? 'warn' : 'fail'),
     relayed && !bits.length
       ? 'Bot connected via relay — delivery DMs, sales pings, drops and alerts flow through your bot.'
       : bits.length
         ? `Configured: ${bits.join(', ')}${relayed ? ' + bot relay' : ''}`
-        : 'Start your Discord bot (npm start in discord/) — it connects automatically, no Vercel setup needed.');
+        : relaySecret
+          ? 'Bot not seen yet. Start it (npm start in discord/) with the SAME REVIEW_INGEST_SECRET and FORGEMARKET_API_URL=https://www.forgemarket.nl, then check its log for "store relay: ok".'
+          : 'REVIEW_INGEST_SECRET is not set here, so every call from the bot is refused. Set it in Vercel (Production) to exactly the bot\'s value and redeploy.');
 
   // 7. Who is selling.
   //

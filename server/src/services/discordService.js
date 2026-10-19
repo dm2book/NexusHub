@@ -11,7 +11,7 @@
  * - postStockAlert(): pings staff when a product's code stock runs low
  *   (DISCORD_STOCK_WEBHOOK_URL, falls back to the order webhook).
  */
-import { config } from '../config/env.js';
+import { config, activePaymentProvider } from '../config/env.js';
 import { bannerUrl } from '../../../src/lib/discordBanners.js';
 import { run, get, all, nowIso } from '../db/index.js';
 import { newId } from '../utils/ids.js';
@@ -649,30 +649,45 @@ export async function postReferralEarned(discordUserId, { commissionCents } = {}
  */
 /* The two DMs the store sends a buyer, in the language they bought in. */
 const DM = {
-  nl: { payTitle: '💳 Je bestelling wacht op betaling', payBody: 'Maak het exacte bedrag over met je bestelnummer als omschrijving; we sturen hem zodra de betaling binnen is.', open: 'Open je bestelling', payFoot: 'er wordt niets automatisch afgeschreven',
+  nl: { pspBody: 'Je betaling is nog niet binnen. Rond hem af via je bestelling (iDEAL of Bancontact); we leveren zodra hij bevestigd is.', payNow: 'Betaal je bestelling', pspFoot: 'betalen kan tot de bestelling vervalt',
+    payTitle: '💳 Je bestelling wacht op betaling', payBody: 'Maak het exacte bedrag over met je bestelnummer als omschrijving; we sturen hem zodra de betaling binnen is.', open: 'Open je bestelling', payFoot: 'er wordt niets automatisch afgeschreven',
     revTitle: '⭐ Hoe ging het?', delivered: (p) => (p ? `Je **${p}** is geleverd.` : 'Je bestelling is geleverd.'), revBody: 'Een eerlijke review helpt andere kopers het meest.', vouch: (u) => `Typ \`/vouch\` in de server, of [schrijf hem op de site](${u}).`, tp: (u) => `⭐ Of zet hem op [Trustpilot](${u}) — die is openbaar en wij kunnen er niets aan veranderen.` },
-  en: { payTitle: '💳 Your order is waiting for payment', payBody: 'Transfer the exact amount shown with your order number as the reference, and it goes out as soon as the payment is matched.', open: 'Open your order', payFoot: 'nothing is charged automatically',
+  en: { pspBody: 'Your payment has not come in yet. Finish it from your order page (iDEAL or Bancontact); we deliver as soon as it is confirmed.', payNow: 'Pay for your order', pspFoot: 'you can pay until the order expires',
+    payTitle: '💳 Your order is waiting for payment', payBody: 'Transfer the exact amount shown with your order number as the reference, and it goes out as soon as the payment is matched.', open: 'Open your order', payFoot: 'nothing is charged automatically',
     revTitle: '⭐ How did it go?', delivered: (p) => (p ? `Your **${p}** was delivered.` : 'Your order was delivered.'), revBody: 'An honest review helps other buyers most.', vouch: (u) => `Type \`/vouch\` in the server, or [write it on the site](${u}).`, tp: (u) => `⭐ Or put it on [Trustpilot](${u}) — that one is public and we cannot change a word of it.` },
-  de: { payTitle: '💳 Deine Bestellung wartet auf Zahlung', payBody: 'Überweise den genauen Betrag mit deiner Bestellnummer als Verwendungszweck; sie geht raus, sobald die Zahlung zugeordnet ist.', open: 'Bestellung öffnen', payFoot: 'es wird nichts automatisch abgebucht',
+  de: { pspBody: 'Deine Zahlung ist noch nicht eingegangen. Schließe sie über deine Bestellseite ab (iDEAL oder Bancontact); wir liefern, sobald sie bestätigt ist.', payNow: 'Bestellung bezahlen', pspFoot: 'bezahlen geht, bis die Bestellung verfällt',
+    payTitle: '💳 Deine Bestellung wartet auf Zahlung', payBody: 'Überweise den genauen Betrag mit deiner Bestellnummer als Verwendungszweck; sie geht raus, sobald die Zahlung zugeordnet ist.', open: 'Bestellung öffnen', payFoot: 'es wird nichts automatisch abgebucht',
     revTitle: '⭐ Wie lief es?', delivered: (p) => (p ? `Dein **${p}** wurde geliefert.` : 'Deine Bestellung wurde geliefert.'), revBody: 'Eine ehrliche Bewertung hilft anderen Käufern am meisten.', vouch: (u) => `Tippe \`/vouch\` im Server, oder [schreib sie auf der Website](${u}).`, tp: (u) => `⭐ Oder auf [Trustpilot](${u}) — die ist öffentlich und wir können kein Wort ändern.` },
-  fr: { payTitle: '💳 Ta commande attend le paiement', payBody: 'Vire le montant exact avec ton numéro de commande en référence ; elle part dès que le paiement est reçu.', open: 'Ouvrir ta commande', payFoot: 'rien n’est prélevé automatiquement',
+  fr: { pspBody: 'Ton paiement n’est pas encore arrivé. Termine-le depuis la page de ta commande (iDEAL ou Bancontact) ; on livre dès qu’il est confirmé.', payNow: 'Payer ta commande', pspFoot: 'tu peux payer jusqu’à l’expiration de la commande',
+    payTitle: '💳 Ta commande attend le paiement', payBody: 'Vire le montant exact avec ton numéro de commande en référence ; elle part dès que le paiement est reçu.', open: 'Ouvrir ta commande', payFoot: 'rien n’est prélevé automatiquement',
     revTitle: '⭐ Ça s’est bien passé ?', delivered: (p) => (p ? `Ton **${p}** a été livré.` : 'Ta commande a été livrée.'), revBody: 'Un avis honnête aide le plus les autres acheteurs.', vouch: (u) => `Tape \`/vouch\` sur le serveur, ou [écris-le sur le site](${u}).`, tp: (u) => `⭐ Ou sur [Trustpilot](${u}) — public, et nous ne pouvons rien y changer.` },
 };
 const dmLang = (l) => DM[l] || DM.en;
 
+/**
+ * The reminder embed, by payment provider.
+ *
+ * It told every buyer to transfer the amount with the order number as the
+ * reference — right for the manual Tikkie/bank flow, wrong under Pay. (or
+ * Mollie/Stripe), where there is no account to transfer to and the order is
+ * paid from its own page. The emails were already provider-aware; this was not.
+ */
+export function paymentReminderEmbed({ orderNumber, amount, lang, provider = activePaymentProvider() } = {}) {
+  const t = dmLang(lang);
+  const psp = ['paynl', 'mollie', 'stripe'].includes(provider);
+  return {
+    title: t.payTitle,
+    description: `**${orderNumber}**${amount ? ` · ${amount}` : ''}\n\n${psp ? t.pspBody : t.payBody}\n\n`
+      + `[${psp ? t.payNow : t.open}](${config.appUrl}/track?number=${encodeURIComponent(orderNumber)})`,
+    color: 0x6366f1,
+    footer: { text: `${config.email.fromName} · ${psp ? t.pspFoot : t.payFoot}` },
+    timestamp: new Date().toISOString(),
+  };
+}
+
 export async function postPaymentReminder(discordUserId, { orderNumber, amount, lang } = {}) {
   if (!discordUserId || !orderNumber) return;
-  const t = dmLang(lang);
-  await relayDm(discordUserId, {
-    embeds: [{
-      title: t.payTitle,
-      description: `**${orderNumber}**${amount ? ` · ${amount}` : ''}\n\n${t.payBody}\n\n`
-        + `[${t.open}](${config.appUrl}/track?number=${encodeURIComponent(orderNumber)})`,
-      color: 0x6366f1,
-      footer: { text: `${config.email.fromName} · ${t.payFoot}` },
-      timestamp: new Date().toISOString(),
-    }],
-  }).catch(() => {});
+  await relayDm(discordUserId, { embeds: [paymentReminderEmbed({ orderNumber, amount, lang })] }).catch(() => {});
 }
 
 /**
