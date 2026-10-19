@@ -3,8 +3,10 @@ import { run, get, all, nowIso, tx } from '../db/index.js';
 import { newId, newTicketNumber } from '../utils/ids.js';
 import { notFound, badRequest } from '../utils/errors.js';
 import { notify } from './notificationService.js';
-import { getOrder } from './orderService.js';
+import { getOrder, orderUrlFor } from './orderService.js';
 import { sendEmailAsync } from './emailService.js';
+import { emailCopy } from './emailCopy.js';
+import { requestNoteHtml } from './emailBlocks.js';
 import { config } from '../config/env.js';
 
 // ── Tickets ──────────────────────────────────────────────────────────────
@@ -24,7 +26,11 @@ export async function openTicket({ userId, orderId, subject, category, message }
          VALUES (@id, @tid, @aid, 'customer', @body, @at)`,
         { id: newId('msg'), tid: id, aid: userId || null, body: message, at });
   });
-  return getTicket(id);
+  const ticket = await getTicket(id);
+  /* The translated ticket_opened mail existed and was never sent: the
+     customer's only proof their message arrived was a screen they had left. */
+  await emailTicketOpened(ticket).catch((e) => console.error('[support] opened email:', e.message));
+  return ticket;
 }
 
 export async function replyTicket(ticketId, { authorId, authorKind = 'staff', body } = {}) {
@@ -77,22 +83,45 @@ async function ticketRecipient(t) {
   return null;
 }
 
+/**
+ * The ticket fields every ticket mail needs, in the reader's language.
+ *
+ * `orderLine` was hardcoded English (" about order FM-…") inside a Dutch
+ * sentence, and the button always went to /account/tickets — a login wall for
+ * a guest, in a mail that says it works "without an account". A guest is sent
+ * to their order's track page instead.
+ */
+async function ticketFields(t, to) {
+  const order = t.order_id ? await getOrder(t.order_id).catch(() => null) : null;
+  const lang = to.lang || 'nl';
+  return {
+    number: t.number,
+    subject: t.subject,
+    // Rendered as text, so it carries its own leading space or nothing at all.
+    orderLine: order ? emailCopy(lang).orderLine(order.number) : '',
+    url: t.user_id ? `${config.appUrl}/account/tickets/${t.id}`
+      : (order ? orderUrlFor(order) : `${config.appUrl}/track`),
+  };
+}
+
 async function emailTicketReply(t, body) {
   const to = await ticketRecipient(t);
   if (!to) return;
-  const order = t.order_id
-    ? await get('SELECT number FROM orders WHERE id=@id', { id: t.order_id }) : null;
   await sendEmailAsync('support_reply', to.email, {
     lang: to.lang || undefined,
     user: { name: to.name },
     reply: body,
-    ticket: {
-      number: t.number,
-      subject: t.subject,
-      // Rendered as text, so it carries its own leading space or nothing at all.
-      orderLine: order ? ` about order ${order.number}` : '',
-      url: `${config.appUrl}/account/tickets/${t.id}`,
-    },
+    ticket: await ticketFields(t, to),
+  });
+}
+
+async function emailTicketOpened(t) {
+  const to = await ticketRecipient(t);
+  if (!to) return;
+  await sendEmailAsync('ticket_opened', to.email, {
+    lang: to.lang || undefined,
+    user: { name: to.name },
+    ticket: await ticketFields(t, to),
   });
 }
 
@@ -147,7 +176,21 @@ export async function requestRefund({ orderId, userId, reason, amount, method = 
            Mollie dashboard, order.total overstates it (moneyRefundAmount
            subtracts what the provider already sent back). */
         amt: amount ?? (method === 'credit' ? await creditRefundAmount(order) : await moneyRefundAmount(order)), method, at });
+  /* An online withdrawal form must be acknowledged on a durable medium (CRD
+     art. 11(3)). The translated mail existed and was never sent. */
+  await emailRefundRequest('refund_request_received', order, reason)
+    .catch((e) => console.error('[support] refund received email:', e.message));
   return get('SELECT * FROM refund_requests WHERE id=@id', { id });
+}
+
+async function emailRefundRequest(templateId, order, note) {
+  const lang = order.billing?.lang || 'nl';
+  await sendEmailAsync(templateId, order.email, {
+    lang,
+    user: { name: order.billing?.full_name || order.email.split('@')[0] },
+    order: { number: order.number, url: orderUrlFor(order) },
+    request: { reasonHtml: requestNoteHtml(note, lang) },
+  });
 }
 
 /**
@@ -178,7 +221,17 @@ export async function decideRefund(id, { status, decidedBy, method } = {}) {
   if (!['approved', 'rejected', 'processed'].includes(status)) {
     throw badRequest('Invalid refund decision');
   }
+  const before = await get('SELECT status, order_id FROM refund_requests WHERE id=@id', { id });
   await run(`UPDATE refund_requests SET status=@st, decided_by=@by, method=COALESCE(@m, method), updated_at=@at WHERE id=@id`,
       { st: status, by: decidedBy || null, m: method || null, at: nowIso(), id });
+  /* A rejection only changed this row — the buyer was never told. Sent once,
+     on the change to rejected, not again if the decision is saved twice. */
+  if (status === 'rejected' && before && before.status !== 'rejected') {
+    const order = await getOrder(before.order_id).catch(() => null);
+    if (order) {
+      await emailRefundRequest('refund_request_rejected', order, null)
+        .catch((e) => console.error('[support] refund rejected email:', e.message));
+    }
+  }
   return get('SELECT * FROM refund_requests WHERE id=@id', { id });
 }

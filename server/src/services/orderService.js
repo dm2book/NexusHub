@@ -25,6 +25,8 @@ import { config, manualPayMethods as allManualPayMethods, activePaymentProvider 
    all while Pay. is the provider — its checkout does not offer them, so an
    order mail or track page that did would be a second, unchecked way to pay. */
 const manualPayMethods = () => (activePaymentProvider() === 'paynl' ? [] : allManualPayMethods());
+/** A payment provider takes the payment (no manual transfer to explain). */
+const viaPsp = () => ['paynl', 'mollie', 'stripe'].includes(activePaymentProvider());
 import { badRequest, notFound, conflict } from '../utils/errors.js';
 import { sendEmailAsync } from './emailService.js';
 import { validatePayLink } from '../utils/payLink.js';
@@ -48,6 +50,7 @@ import { bustSocialCaches } from '../routes/social.js';
 import { balanceOf, debit, credit, hasOrderEntry, spentOnOrder } from './walletService.js';
 import { grantTierRewards, revokeTierRewards } from './loyaltyService.js';
 import { awardCoinsForOrder, reverseCoinsForOrder } from './forgeCoinService.js';
+import { canonicalConsent } from '../utils/consentWording.js';
 import { settleMysteryForOrder, reverseMysteryForOrder } from './mysteryBoxService.js';
 import { evaluateCoupon, recordCouponRedemption, releaseCouponRedemption } from './couponService.js';
 /* The one detail a category needs from the buyer, from the same module the
@@ -268,8 +271,11 @@ export async function createOrder(input, ctx = {}) {
   //
   // Refusing the order rather than defaulting to "consented" is deliberate: an
   // assumed waiver is exactly the thing a dispute would throw out.
-  const consentText = String(input.consentText || '').trim().slice(0, 400);
   if (!input.consent) throw badRequest('Please confirm immediate delivery before ordering');
+  // The sentence the checkout shows, never free text from the request — see
+  // utils/consentWording.js.
+  const consentText = canonicalConsent(input.consentText,
+    ['nl', 'en', 'de', 'fr'].includes(input.billing?.lang) ? input.billing.lang : 'nl');
 
   const orderId = newId('ord');
   const number = newOrderNumber();
@@ -1502,6 +1508,17 @@ export async function releaseFraudHold(orderId, ctx = {}) {
     delivered = await autoDispenseFromStock(orderId, { ...ctx, reason: 'Released after fraud review' })
       .catch((e) => { console.error('[fraud] release dispense:', e.message); return false; });
   }
+  /* The rewards a paid order earns — referral commission, loyalty tier bonus,
+     Forge Coins — wait while it is held (each one checks fraud_hold). Approving
+     a paid order is what grants them; each grant is idempotent per order. */
+  if (!['pending', 'refunded', 'cancelled', 'failed'].includes(order.status)) {
+    const paid = await getOrder(orderId);
+    await recordOrderCommission(paid).catch((e) => console.error('[fraud] release commission:', e.message));
+    if (paid?.userId) {
+      await grantTierRewards(paid.userId).catch((e) => console.error('[fraud] release loyalty:', e.message));
+      await awardCoinsForOrder(paid).catch((e) => console.error('[fraud] release coins:', e.message));
+    }
+  }
   /* Mystery boxes stay shut while an order is held (openMysteryBoxes) —
      approving it is what opens them, and completes an order of only boxes. */
   if (!['pending', 'refunded', 'cancelled', 'failed'].includes(order.status)) {
@@ -1710,6 +1727,15 @@ function paymentInstructionsHtml(order, lang) {
   // A per-order link stands on its own: it must still reach the buyer when no
   // generic method is configured, which is exactly the case while the owner is
   // between payment providers.
+  /* With a payment provider (Pay., Mollie, Stripe) there is no transfer to
+     explain — but the mail still went out under a "how to pay" preview with no
+     payment step in it at all, before the buyer had paid. Say plainly that it
+     is not paid yet, and link to where it can be finished. */
+  if (!methods.length && !order.payLink && viaPsp() && order.status === 'pending') {
+    const amt = formatMoney(order.total, order.currency, lang);
+    return `<div class="quote"><strong>${escapeHtml(c.pspNotPaid(amt))}</strong><br>${escapeHtml(c.pspPayBody)}</div>` +
+      `<p><a class="btn" href="${escapeHtml(orderUrlFor(order))}">${escapeHtml(c.pspPayBtn)}</a></p>`;
+  }
   if (!methods.length && !order.payLink) return '';
   const amt = formatMoney(order.total, order.currency, lang);
 
@@ -1749,13 +1775,19 @@ function paymentInstructionsHtml(order, lang) {
 
 function redeemHtml(order, lang) {
   const c = emailCopy(lang);
-  // Account top-ups have nothing to redeem — we already did it for them.
-  if (order.billing?.deliveryMethod === 'account' && order.billing?.deliveryDetails) return '';
+  // Nothing delivered as a code → nothing to redeem (an account top-up we
+  // already did for them, or a hand delivery still to come).
   if (!order.deliveries?.length) return '';
 
-  // One block per distinct category in the order, so a mixed order (Robux +
-  // a Steam card) explains both instead of guessing at one.
-  const cats = [...new Set((order.items || []).map((i) => String(i.metadata?.category || i.category || '').toLowerCase()).filter(Boolean))];
+  /* One block per distinct category in the order, so a mixed order (Robux +
+     a Steam card) explains both instead of guessing at one. On an account
+     order the top-up categories are left out: those went onto the account,
+     and only the code items in the same cart need instructions. This returned
+     '' for the whole order as soon as it was an account order, so a Steam card
+     bought next to Robux arrived with no way to redeem it. */
+  const onAccount = order.billing?.deliveryMethod === 'account' && order.billing?.deliveryDetails;
+  const cats = [...new Set((order.items || []).map((i) => String(i.metadata?.category || i.category || '').toLowerCase()).filter(Boolean))]
+    .filter((cat) => !(onAccount && deliveryFieldFor(cat, 'nl')));
   const recipes = cats.map((cat) => redeemSteps(lang, cat)).filter(Boolean);
   const list = recipes.length ? recipes : [redeemFallback(lang)];
 
@@ -1779,7 +1811,9 @@ function redeemHtml(order, lang) {
  *  styles are inline so it renders intact even where a client strips <style>. */
 function deliveryHtml(order, lang) {
   const c = emailCopy(lang);
-  // Direct account top-up → reassuring confirmation, no code to show.
+  /* Direct account top-up → reassuring confirmation. On a mixed cart (Robux +
+     a gift card) the codes delivered for the rest of the order follow it: this
+     returned the account box alone, so the gift-card code was never shown. */
   if (order.billing?.deliveryMethod === 'account' && order.billing?.deliveryDetails) {
     const label = escapeHtml(order.billing.deliveryLabel || c.yourAccount);
     const target = escapeHtml(order.billing.deliveryDetails);
@@ -1789,7 +1823,7 @@ function deliveryHtml(order, lang) {
         <div style="font:400 13.5px/1.6 'Segoe UI',Arial,sans-serif;color:#9fb8ad;margin:6px 0 12px">${escapeHtml(c.deliveredSub)}</div>
         <div style="font:600 11px/1 Arial,sans-serif;color:#6f8f83;text-transform:uppercase;letter-spacing:1.2px;margin:0 0 5px">${label}</div>
         <div style="font:700 18px/1.3 'Courier New',monospace;color:#eafff6;background-color:#0a1712;border:1px solid #1f5140;border-radius:10px;padding:12px 16px;word-break:break-all">${target}</div>
-      </td></tr></table>`;
+      </td></tr></table>` + codeCardsHtml(order, c);
   }
   /* Nothing recorded to show — and the mail around this block says "everything
      below is yours". Returning an empty string put that sentence above a gap.
@@ -1807,12 +1841,25 @@ function deliveryHtml(order, lang) {
       </td></tr></table>`;
   }
 
-  // Gift-code / key delivery → one premium card per delivered item.
-  return order.deliveries.map((d) => {
+  return codeCardsHtml(order, c);
+}
+
+/** One premium card per delivered item (gift code, key, licence, file, link).
+ *  A staff "message" is prose, not a code: a readable paragraph, not the 24px
+ *  letter-spaced code block. */
+function codeCardsHtml(order, c) {
+  return (order.deliveries || []).map((d) => {
     // CODE / KEY / FILE in the reader's language, not the database's type name.
     const type = String(d.type || 'code').toLowerCase();
     const label = escapeHtml((c.deliveryLabels[type] || c.deliveryLabels.code).toUpperCase());
     const value = d.content ? escapeHtml(d.content) : (d.filename ? escapeHtml(d.filename) : '—');
+    if (type === 'message') {
+      return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 10px">
+      <tr><td bgcolor="#17172a" style="background-color:#17172a;border:1px solid #34345a;border-radius:14px;padding:16px 18px">
+        <div style="font:700 11px/1 Arial,sans-serif;color:#8b8fa3;text-transform:uppercase;letter-spacing:1.4px;margin:0 0 9px">${label}</div>
+        <div style="font:400 14px/1.6 'Segoe UI',Arial,sans-serif;color:#e2e4ee;white-space:pre-line">${value}</div>
+      </td></tr></table>`;
+    }
     return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 10px">
       <tr><td bgcolor="#7c5cff" style="height:4px;background-color:#7c5cff;background-image:linear-gradient(90deg,#7c5cff,#d946ef);border-radius:14px 14px 0 0;font-size:0;line-height:0">&nbsp;</td></tr>
       <tr><td bgcolor="#17172a" style="background-color:#17172a;border:1px solid #34345a;border-top:0;border-radius:0 0 14px 14px;padding:16px 18px 18px">
@@ -2016,6 +2063,9 @@ function emailContext(order, ctx = {}) {
     user: { name: order.billing?.full_name || order.email.split('@')[0] },
     order: {
       lang,
+      // Paid on a provider's page: the order_received frame says "not paid yet"
+      // instead of "here is how to pay, reference = your order number".
+      viaPsp: viaPsp() && order.status === 'pending',
       number: order.number,
       total: formatMoney(order.total, order.currency, lang),
       status: order.statusLabel,

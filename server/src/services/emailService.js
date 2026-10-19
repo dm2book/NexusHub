@@ -11,7 +11,7 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 import { config } from '../config/env.js';
 import { get, all, run, nowIso } from '../db/index.js';
 import { newId } from '../utils/ids.js';
-import { renderTemplate, renderTokens, wrapBranded, wrapAdmin, baseContext, EMAIL_THEMES } from './templateService.js';
+import { renderTemplate, renderTokens, renderSubject, wrapBranded, wrapAdmin, baseContext, EMAIL_THEMES } from './templateService.js';
 import { alertOwner } from './notifyService.js';
 
 /* Logs go to Vercel and whoever reads them — an address there is personal data
@@ -511,7 +511,7 @@ export async function sendRawEmail({
   }
   const unsub = scope ? unsubscribeUrl(to, scope) : null;
   const ctx = baseContext({ ...context, ...(unsub ? { unsubscribe: { url: unsub } } : {}) });
-  const subj = renderTokens(subject, ctx);
+  const subj = renderSubject(subject, ctx);
   const inner = renderTokens(innerHtml, ctx);
   const html = admin
     ? wrapAdmin(inner, { preheader: subj })
