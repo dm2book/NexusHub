@@ -29,7 +29,7 @@ console.log('— No call to action promises a checkout that is closed —');
 {
   ok('the bot asks the store when it opens', /\/api\/config/.test(bot) && /launchAt/.test(bot));
   ok('…and caches the answer instead of asking per click',
-    /Date\.now\(\) - launchCache\.at < 300_000/.test(bot));
+    /const siteConfig = createCachedLoader\(\{\s*ttlMs: 300_000/.test(bot));
   ok('one helper decides what a shop button says', /async function shopCta\(/.test(bot));
   ok('…and every shop button is built from it', /async function shopButton\(/.test(bot));
 
@@ -80,7 +80,7 @@ console.log('\n— One place to set the Trustpilot profile, not two —');
      on Vercel and again on Railway, and a shop that set it once looked right
      everywhere except in Discord. The same response already carries it. */
   ok('the site config is fetched once and shared',
-    /async function siteConfig\(/.test(bot)
+    /const siteConfig = createCachedLoader\(/.test(bot)
     && /async function shopOpensAt\(\) \{\s*const cfg = await siteConfig\(\)/.test(bot));
   ok('…and Trustpilot comes from it', /async function trustpilotLinks\(/.test(bot)
     && /cfg\?\.trustpilotUrl/.test(bot));

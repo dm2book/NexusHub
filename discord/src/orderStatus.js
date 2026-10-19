@@ -63,16 +63,24 @@ export const ORDER_STATE = {
       de: 'Die Zahlung ist noch nicht bei uns. Überweise den Betrag mit deiner Bestellnummer als Verwendungszweck — der Status springt von selbst um, sobald sie ankommt.',
       fr: 'Nous n’avons pas encore reçu le paiement. Paie le montant en indiquant ton numéro de commande comme référence — le statut change tout seul dès qu’il arrive.',
     },
+    /* Under a payment provider (Pay., Mollie, Stripe) there is no account to
+       transfer to: the order is paid from its own page. */
+    nextPsp: {
+      en: 'We haven’t received the payment yet. Pay from your order page (iDEAL or Bancontact) — the status flips by itself once the payment is confirmed.',
+      nl: 'We hebben de betaling nog niet binnen. Betaal via je bestelpagina (iDEAL of Bancontact) — de status springt vanzelf om zodra de betaling bevestigd is.',
+      de: 'Die Zahlung ist noch nicht bei uns. Bezahle über deine Bestellseite (iDEAL oder Bancontact) — der Status springt von selbst um, sobald die Zahlung bestätigt ist.',
+      fr: 'Nous n’avons pas encore reçu le paiement. Paie depuis la page de ta commande (iDEAL ou Bancontact) — le statut change tout seul dès que le paiement est confirmé.',
+    },
   },
   payment_received: {
     color: 0x38bdf8, emoji: '✅',
     title: { en: 'Payment confirmed', nl: 'Betaling bevestigd',
       de: 'Zahlung bestätigt', fr: 'Paiement confirmé' },
     next: {
-      en: 'Nothing left for you to do. In-stock items go out automatically; anything else we deliver by hand, usually within a few hours.',
-      nl: 'Jij hoeft niets meer te doen. Wat op voorraad ligt gaat automatisch de deur uit; de rest leveren we met de hand, meestal binnen een paar uur.',
-      de: 'Für dich gibt es nichts mehr zu tun. Was auf Lager ist, geht automatisch raus; alles andere liefern wir von Hand, meist innerhalb weniger Stunden.',
-      fr: 'Tu n’as plus rien à faire. Ce qui est en stock part automatiquement ; le reste, nous le livrons à la main, généralement en quelques heures.',
+      en: 'Nothing left for you to do. In-stock items go out automatically; anything else we deliver by hand, and you get an email the moment it is sent.',
+      nl: 'Jij hoeft niets meer te doen. Wat op voorraad ligt gaat automatisch de deur uit; de rest leveren we met de hand, en je krijgt een mail zodra het verstuurd is.',
+      de: 'Für dich gibt es nichts mehr zu tun. Was auf Lager ist, geht automatisch raus; alles andere liefern wir von Hand, und du bekommst eine Mail, sobald es verschickt ist.',
+      fr: 'Tu n’as plus rien à faire. Ce qui est en stock part automatiquement ; le reste, nous le livrons à la main, et tu reçois un e-mail dès l’envoi.',
     },
   },
   processing: {
@@ -182,8 +190,11 @@ const FALLBACK = { color: 0x6366f1, emoji: '📦' };
  * Shape a /api/track payload into embed fields.
  * Returns plain data so this stays testable without discord.js.
  */
-export function orderStatusView(o, { money = (c) => `€${(c / 100).toFixed(2)}`, lang = 'en' } = {}) {
+export const isPspProvider = (p) => ['paynl', 'mollie', 'stripe'].includes(String(p || ''));
+
+export function orderStatusView(o, { money = (c) => `€${(c / 100).toFixed(2)}`, lang = 'en', provider = null } = {}) {
   const L = botLang(lang);
+  const psp = isPspProvider(provider);
   const state = ORDER_STATE[o.status];
   const title = state ? say(state.title, L) : (o.statusLabel || say(ORDER_UI.fallbackTitle, L));
   const emoji = state?.emoji || FALLBACK.emoji;
@@ -200,11 +211,12 @@ export function orderStatusView(o, { money = (c) => `€${(c / 100).toFixed(2)}`
   if (o.totalFormatted || o.total != null) {
     fields.push({ name: say(ORDER_UI.total, L), value: o.totalFormatted || money(o.total, o.currency), inline: true });
   }
-  // The reference only matters while we're still waiting for the money.
-  if (o.status === 'pending') fields.push({ name: say(ORDER_UI.reference, L), value: `\`${o.number}\``, inline: true });
+  // The reference only matters while we're still waiting for a manual transfer.
+  if (o.status === 'pending' && !psp) fields.push({ name: say(ORDER_UI.reference, L), value: `\`${o.number}\``, inline: true });
+  const next = state ? say((psp && state.nextPsp) || state.next, L) : '';
 
   return {
-    color, title: `${emoji} ${title}`, description: state ? say(state.next, L) : '',
+    color, title: `${emoji} ${title}`, description: next,
     author: `${say(ORDER_UI.order, L)} ${o.number}`, footer: say(ORDER_UI.live, L), fields,
   };
 }

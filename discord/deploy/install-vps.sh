@@ -55,8 +55,12 @@ mkdir -p "$APP_DIR"
 # bot keeps XP and running giveaways in xp.json / giveaways.json next to its
 # code; an update must not overwrite the server's live copies with whatever
 # old ones sit on your own PC.
+# bot-meta.json (launch post, weekly posts, giveaway history) and guild-map.json
+# are the server's live state too: the repo's copy of bot-meta.json is `{}`, and
+# shipping it re-armed the @everyone launch post and the Monday leaderboard.
 tar -C "$SRC_DIR" --exclude=node_modules --exclude=.env \
-  --exclude=xp.json --exclude=giveaways.json -cf - . | tar -C "$APP_DIR" -xf -
+  --exclude=xp.json --exclude=giveaways.json --exclude=bot-meta.json --exclude=guild-map.json \
+  -cf - . | tar -C "$APP_DIR" -xf -
 cd "$APP_DIR"
 say "Installing dependencies"
 npm ci --omit=dev --no-audit --no-fund

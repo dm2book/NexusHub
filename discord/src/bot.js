@@ -29,6 +29,10 @@ import {
   rolesPanelComponents, languagePickerRow, hasLanguagePicker, LANGUAGE_PICKER_ID,
 } from './panels.js';
 import { log, reportEnv, startHealthServer, loginWithRetry, startWatchdog } from './runtime.js';
+import {
+  apiBaseUrl, describeRelayFailure, createOnceLogger, selfTestRelay, createStateStore, STATE_UNAVAILABLE,
+  mergeMeta, shouldLeaveGuild, createCachedLoader,
+} from './storeRelay.js';
 import { scamReason } from './scamGuard.js';
 import { t, helpFor } from './i18n.js';
 import { createLimiter, createDailyCap, createRecentIds, accountOldEnough } from './limits.js';
@@ -164,50 +168,20 @@ const isTicketChannel = (ch) =>
    and the first save then overwrote every member's score and every running
    giveaway in the store with that emptiness. Now a key the store has not
    answered for is never written back to it, and its load is retried. */
-const STATE_UNAVAILABLE = Symbol('state unavailable');
-const STATE_LOADED = new Set();
-
-async function stateGet(key, file) {
-  if (FORGEMARKET_API_URL && REVIEW_INGEST_SECRET) {
-    for (const wait of [0, 1_000, 3_000, 9_000]) {
-      if (wait) await new Promise((r) => setTimeout(r, wait));
-      try {
-        const res = await signedPost('/api/discord/state/get', { key });
-        if (res.ok) {
-          STATE_LOADED.add(key);
-          const { value } = await res.json();
-          if (value !== null && value !== undefined) return value;
-          break;                                   // answered: nothing stored
-        }
-        if (res.status === 404) { STATE_LOADED.add(key); break; }   // no store on this site
-        console.error(`[state] get ${key}: ${res.status}`);
-      } catch (e) { console.error(`[state] get ${key} failed:`, e.message); }
-    }
-    if (!STATE_LOADED.has(key)) {
-      // The local file, when this container has one, is still real state.
-      try { if (file && existsSync(file)) { STATE_LOADED.add(key); return JSON.parse(readFileSync(file, 'utf8')); } } catch { /* ignore */ }
-      return STATE_UNAVAILABLE;
-    }
-  } else {
-    STATE_LOADED.add(key);
-  }
-  // Nothing stored yet (or no store at all) — fall back to the file, which is
-  // also how an existing bot's state migrates on its first boot after this.
-  try { if (file && existsSync(file)) return JSON.parse(readFileSync(file, 'utf8')); } catch { /* ignore */ }
-  return null;
-}
-
-async function stateSet(key, value, file) {
-  // The file first: it is instant, and it is what makes a site outage free.
-  try { if (file) writeFileSync(file, JSON.stringify(value)); } catch { /* ignore */ }
-  if (!FORGEMARKET_API_URL || !REVIEW_INGEST_SECRET) return;
-  // Never overwrite what the store holds with state we never managed to read.
-  if (!STATE_LOADED.has(key)) { console.warn(`[state] not saving ${key}: it was never loaded`); return; }
-  try {
-    const res = await signedPost('/api/discord/state/set', { key, value: value ?? null });
-    if (!res.ok && res.status !== 404) console.error(`[state] set ${key}: ${res.status}`);
-  } catch (e) { console.error(`[state] set ${key} failed:`, e.message); }
-}
+/* The rules — never write back a key the store has not answered for, and never
+   take a file this process wrote itself for the stored state — live in
+   storeRelay.js, where they are tested (discord/test/store-relay.test.mjs).
+   Created on first use: the env constants below are declared later in this file. */
+let stateStore = null;
+const theStore = () => (stateStore ??= createStateStore({
+  enabled: !!(FORGEMARKET_API_URL && REVIEW_INGEST_SECRET),
+  signedPost: (path, body) => signedPost(path, body),
+  fs: { existsSync, readFileSync, writeFileSync },
+  url: FORGEMARKET_API_URL,
+  log: { error: (m) => console.error(m), warn: (m) => console.warn(m) },
+}));
+const stateGet = (key, file) => theStore().get(key, file);
+const stateSet = (key, value, file) => theStore().set(key, value, file);
 
 // Giveaway store — persisted to giveaways.json so active giveaways (and their
 // entries) survive a bot restart; timers are re-armed on boot.
@@ -292,8 +266,10 @@ const xpCooldown = new Map();
 
 const {
   DISCORD_TOKEN, ANTHROPIC_API_KEY, AI_MODEL = 'claude-sonnet-4-6',
-  REVIEW_INGEST_SECRET = '',
 } = process.env;
+/* Trimmed, as the store trims it: a trailing space or newline pasted into one
+   dashboard made every signed call a permanent "Bad signature". */
+const REVIEW_INGEST_SECRET = String(process.env.REVIEW_INGEST_SECRET || '').trim();
 // URL envs, hardened: an EMPTY value in .env (`STORE_URL=`) must fall back to
 // the default just like a missing one, and a bare domain gets https:// added.
 const cleanUrl = (v, fallback = '') => {
@@ -304,7 +280,7 @@ const cleanUrl = (v, fallback = '') => {
 const STORE_URL = cleanUrl(process.env.STORE_URL, 'https://forgemarket.nl');
 // The store and its API live on the same domain, so default the API URL to the
 // store URL — /order, /digest and the live price list then work out of the box.
-const FORGEMARKET_API_URL = cleanUrl(process.env.FORGEMARKET_API_URL, STORE_URL);
+const FORGEMARKET_API_URL = apiBaseUrl(process.env.FORGEMARKET_API_URL, STORE_URL);
 
 // Anti-scam detection lives in its own module so it can be tested without a
 // Discord token — see discord/test/scam-guard.test.mjs.
@@ -383,18 +359,21 @@ async function pushReviewToSite({ author, avatarUrl, stars, body, externalId, di
  * on Vercel and again on Railway, and a shop that set it once looked correct
  * everywhere except in Discord. Two copies of one fact is the drift this
  * codebase keeps paying for. */
-let launchCache = { at: 0, cfg: null };
-async function siteConfig() {
-  if (Date.now() - launchCache.at < 300_000) return launchCache.cfg;
-  let cfg = null;
-  try {
-    const res = await fetch(`${FORGEMARKET_API_URL.replace(/\/$/, '')}/api/config`,
-      { signal: AbortSignal.timeout(8000) });
-    if (res.ok) cfg = await res.json();
-  } catch { /* unreachable — treated as open, see above */ }
-  launchCache = { at: Date.now(), cfg };
-  return cfg;
-}
+/* Never makes a Discord interaction wait: a cached copy (even a stale one)
+   answers at once and refreshes behind; with nothing cached the first caller
+   waits at most 1.5 s. It used to block up to 8 s on a cold site, and the
+   verify button, /help and /shop missed Discord's 3-second reply window —
+   "This interaction failed" on the server's entry gate. */
+const siteConfig = createCachedLoader({
+  ttlMs: 300_000,
+  firstWaitMs: 1_500,
+  fallback: null,
+  load: async () => {
+    const res = await fetch(`${FORGEMARKET_API_URL}/api/config`, { signal: AbortSignal.timeout(8000) });
+    if (!res.ok) throw new Error(`config ${res.status}`);
+    return res.json();
+  },
+});
 
 async function shopOpensAt() {
   const cfg = await siteConfig();
@@ -1036,6 +1015,16 @@ client.on(Events.GuildMemberUpdate, (oldM, newM) => {
 /** Leave a guild that is not ours, and say so in the log. */
 async function leaveForeign(guild, when) {
   if (ours(guild)) return false;
+  /* Only when OUR guild is confirmed: with a wrong DISCORD_GUILD_ID (a channel
+     id, the application id) this left every guild on first boot — the real
+     server included. */
+  if (!shouldLeaveGuild({ guildId: guild.id, homeId: GUILD_ID, homePresent: !!homeGuild(client) })) {
+    log.error('not leaving a guild: DISCORD_GUILD_ID is not among the guilds this bot is in', {
+      when, guildId: guild.id, name: guild.name, configured: GUILD_ID,
+      fix: 'Set DISCORD_GUILD_ID to the server id (right-click the server icon → Copy Server ID).',
+    });
+    return false;
+  }
   log.warn('left a guild that is not DISCORD_GUILD_ID', {
     when, guildId: guild.id, name: guild.name, owner: guild.ownerId,
     hint: 'Developer Portal → Bot → turn "Public Bot" OFF so nobody else can add it.',
@@ -1058,6 +1047,13 @@ async function maybeAnnounceLaunch(guild) {
   if (!metaLoaded || META.launchAnnounced || !launchDue(LAUNCH_DATE)) return;
   const ch = findChannel(guild, 'announcements');
   if (!ch) return;
+  /* META is the record, the channel is the evidence. A META rebuilt from an
+     empty file after a redeploy would post @everyone a second time; a launch
+     post by this bot already in the channel settles it. */
+  const recent = await ch.messages?.fetch({ limit: 50 }).catch(() => null);
+  const already = recent && [...recent.values()].some((m) => m.author?.id === client.user?.id
+    && m.mentions?.everyone && m.createdTimestamp >= Date.parse(LAUNCH_DATE) - 86_400_000);
+  if (already) { META.launchAnnounced = META.launchAnnounced || new Date().toISOString(); saveMeta(); return; }
   META.launchAnnounced = new Date().toISOString();
   saveMeta();
   const channelIdByName = {};
@@ -1123,12 +1119,17 @@ client.once(Events.ClientReady, async (c) => {
   // the moment rather than up to an hour after it.
   setInterval(() => onHome(c, maybeAnnounceLaunch), 5 * 60_000);
 
+  /* One line that says whether the store relay works, and if not, why. */
+  selfTestRelay({ enabled: !!(FORGEMARKET_API_URL && REVIEW_INGEST_SECRET), signedPost, url: FORGEMARKET_API_URL })
+    .then((r) => (r.ok ? log.info(r.reason, { api: FORGEMARKET_API_URL }) : log.error(r.reason)));
+
   /* Pull back everything a deploy would otherwise have erased, then resume any
      giveaways that were live before it. XP and the weekly bookkeeping load in
      parallel; none of them gate the rest of boot. */
   loadXP();
-  loadMeta().then(() => onHome(c, maybeAnnounceLaunch));
-  restoreGiveaways(c);
+  /* Giveaways after META: one that ended while offline records itself in
+     META.endedGiveaways, which must be the stored history plus it. */
+  loadMeta().then(() => { onHome(c, maybeAnnounceLaunch); restoreGiveaways(c); });
 
   // Self-heal the channel panels: verify banner URLs, then edit banners into
   // the existing setup messages (no manual re-run of setup needed).
@@ -2223,11 +2224,18 @@ async function ackOutbox(ids) {
     if (!res.ok) console.error(`[outbox] ack ${res.status} — events will be re-offered`);
   } catch (e) { console.error('[outbox] ack failed:', e.message); }
 }
+const relayOnce = createOnceLogger((m) => console.error(m));
 async function pollOutbox(c) {
   if (!FORGEMARKET_API_URL || !REVIEW_INGEST_SECRET) return;
   try {
     const res = await signedPost('/api/discord/outbox', {});
-    if (!res.ok) throw new Error(`outbox ${res.status}`);
+    if (!res.ok) {
+      /* Said once, with the URL and the store's own reason. A 404 was never
+         logged at all, and a 403 only as a number — so a wrong URL, a missing
+         secret on Vercel and a wrong secret here all looked like silence. */
+      relayOnce(`outbox-${res.status}`, `[outbox] ${await describeRelayFailure(res, `${FORGEMARKET_API_URL}/api/discord/outbox`)}`);
+      return;
+    }
     const { events = [] } = await res.json();
     // Only ids that genuinely reached Discord are acknowledged. Anything that
     // throws, or has no channel to go to, stays queued on the store side and is
@@ -2293,8 +2301,7 @@ async function pollOutbox(c) {
       log.info('outbox relayed', { delivered: delivered.length, offered: events.length, queuedForRetry: stuck });
     }
   } catch (e) {
-    // 404 = the store hasn't deployed the outbox yet; stay quiet about it.
-    if (!/outbox 404/.test(e.message)) console.error('[outbox]', e.message);
+    console.error('[outbox]', e.message);
   }
 }
 
@@ -2311,7 +2318,9 @@ async function fetchOrderStatus(num, lang = 'en') {
     const res = await fetch(`${FORGEMARKET_API_URL}/api/track/${encodeURIComponent(num)}`, { signal: deadline() });
     if (res.status === 404) return { status: 404 };
     if (!res.ok) return { status: 'error', code: res.status };
-    const v = orderStatusView(await res.json(), { money, lang });
+    // Which way the buyer pays decides what "waiting for payment" tells them.
+    const provider = (await siteConfig())?.paymentProvider || null;
+    const v = orderStatusView(await res.json(), { money, lang, provider });
     return { embed: new EmbedBuilder().setColor(v.color)
       .setAuthor({ name: v.author, iconURL: BRAND_ICON })
       .setTitle(v.title).setDescription(v.description || null)
@@ -2726,7 +2735,7 @@ async function loadMeta() {
   const stored = await stateGet('meta', META_FILE);
   // Until META is really known, the launch post and digests wait for it.
   if (stored === STATE_UNAVAILABLE) { setTimeout(loadMeta, 60_000); return; }
-  if (stored && typeof stored === 'object') META = { ...stored, ...META };
+  if (stored && typeof stored === 'object') META = mergeMeta(stored, META);
   metaLoaded = true;
 }
 const saveMeta = () => { stateSet('meta', META, META_FILE); };

@@ -193,9 +193,15 @@ console.log('\n— No local filesystem state is depended on —');
   /* The store is authoritative; the file is a convenience for a bot pointed at
      no site. A container that throws its disk away on every deploy must lose
      nothing that matters. */
-  ok('state is read from the store first', /async function stateGet\([\s\S]{0,600}api\/discord\/state\/get/.test(bot));
-  ok('…and only then from a file', /stateGet[\s\S]{0,1400}existsSync\(file\)/.test(bot));
-  ok('writes go to the store as well as the file', /async function stateSet\([\s\S]{0,700}api\/discord\/state\/set/.test(bot));
+  /* The rules live in storeRelay.js now (exercised in store-relay.test.mjs);
+     the bot's stateGet/stateSet are that store. */
+  const relay = read('src/storeRelay.js');
+  ok('state is read from the store first', /async function get\(key, file\)[\s\S]{0,900}api\/discord\/state\/get/.test(relay)
+    && /const stateGet = \(key, file\) => theStore\(\)\.get\(key, file\)/.test(bot));
+  ok('…and only then from a file', /async function get\(key, file\)[\s\S]{0,2400}readFile\(file\)/.test(relay)
+    && /fs\.existsSync\(file\)/.test(relay));
+  ok('writes go to the store as well as the file', /async function set\(key, value, file\)[\s\S]{0,700}api\/discord\/state\/set/.test(relay)
+    && /const stateSet = \(key, value, file\) => theStore\(\)\.set\(key, value, file\)/.test(bot));
   ok('nothing else writes to disk',
     [...bot.matchAll(/writeFileSync\(/g)].length <= 2,
     `${[...bot.matchAll(/writeFileSync\(/g)].length} write sites`);
