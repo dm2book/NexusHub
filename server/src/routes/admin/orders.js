@@ -72,7 +72,10 @@ router.get('/payment/proofs/:id/screenshot', requirePermission('orders.update'),
   res.json({ screenshotUrl: await proofScreenshot(req.params.id) });
 }));
 
-router.post('/payment/proofs/:id/confirm', requirePermission('orders.update'),
+/* Confirming a proof marks the order paid, and a paid order releases its codes:
+   that is a money decision, so it needs the refund permission, not the day-to-day
+   orders.update a fulfilment manager has. */
+router.post('/payment/proofs/:id/confirm', requirePermission('orders.refund'),
   asyncHandler(async (req, res) => {
     const proof = await get('SELECT order_id FROM payment_proofs WHERE id=@id', { id: req.params.id });
     if (proof) assertNotOwnOrder(req.user, await getOrder(proof.order_id));
@@ -108,6 +111,7 @@ router.post('/:id/:action', asyncHandler(async (req, _res, next) => {
 router.post('/:id/payment-received', requirePermission('orders.update'),
   asyncHandler(async (req, res) => {
     const { paymentRef } = z.object({ paymentRef: z.string().optional() }).parse(req.body);
+    await assertMayMoveMoney(req, req.params.id, 'payment_received');
     const order = await markPaymentReceived(req.params.id, paymentRef, actor(req));
     await audit({ actor: req.user, action: 'order.payment_received', targetType: 'order',
       targetId: order.id, req });
@@ -198,6 +202,12 @@ router.post('/:id/refund', requirePermission('orders.refund'),
 async function assertMayMoveMoney(req, orderId, to) {
   if (holdsPermission(req.user, 'orders.refund')) return;
   if (to === 'refunded') throw forbidden('Requires permission: orders.refund');
+  /* Marking an order paid releases its codes — for an unpaid order that is the
+     same money as a refund, in the other direction. orders.update alone let a
+     fulfilment manager do it for a friend's order. */
+  if (to === 'payment_received') {
+    throw forbidden('Marking an order paid releases its codes. Requires permission: orders.refund');
+  }
   if (['cancelled', 'failed'].includes(to)) {
     const paid = await get(`SELECT 1 AS x FROM order_status_history WHERE order_id=@id
       AND to_status IN ('payment_received','processing','awaiting_fulfillment','completed') LIMIT 1`, { id: orderId });
