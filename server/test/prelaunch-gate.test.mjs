@@ -153,6 +153,14 @@ console.log('\n— Staff are not locked out of their own shop —');
       }
     }
   }
+  /* A rail handed `add` as a prop calls it `onAdd` — the cart page's trending
+     and cross-sell rails did, and toasted "added" either way. */
+  for (const file of jsx(srcRoot)) {
+    const text = fs.readFileSync(file, 'utf8');
+    for (const m of text.matchAll(/(?<![.\w])onAdd\(x\);\s*toast\.success/g)) {
+      ignored.push(`${file.pathname.split('/src/')[1]}:${text.slice(0, m.index).split('\n').length}`);
+    }
+  }
   ok('every add-to-cart button reads the refusal instead of announcing "added"',
     ignored.length === 0, ignored.join(', '));
 

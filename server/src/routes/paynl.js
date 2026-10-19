@@ -376,13 +376,23 @@ paynlApi.post('/orders/:id/paynl', requireLaunched('Payment', { money: true }),
     const offered = paynlMethods().map((m) => m.id);
     const body = z.object({
       email: z.string().email().optional(),
+      number: z.string().max(40).optional(),
       method: z.string().optional(),
     }).parse(req.body || {});
 
     const order = await getOrder(req.params.id);
     if (!order) throw new ApiError(404, 'Order not found');
-    const { assertOwnsOrder } = await import('./catalog.js');
-    await assertOwnsOrder(req, order, body.email);
+    /* The order id and number together are proof enough to START a payment —
+       the same rule as the return page's sync and /api/track. A guest who
+       cancelled at the bank and came back in another browser (an Instagram
+       in-app browser hands over to Safari) has no saved email, and was told
+       "This order is not yours" by the "Pay again" button. Starting a payment
+       only lets someone pay this order's own amount; it reveals nothing. */
+    const knowsNumber = !!body.number && body.number.trim().toUpperCase() === order.number.toUpperCase();
+    if (!knowsNumber) {
+      const { assertOwnsOrder } = await import('./catalog.js');
+      await assertOwnsOrder(req, order, body.email);
+    }
     if (order.status !== 'pending') return res.json({ alreadySettled: true, status: order.status });
 
     const base = config.appUrl.replace(/\/+$/, '');
@@ -449,7 +459,7 @@ paynlApi.post('/orders/:id/paynl', requireLaunched('Payment', { money: true }),
     }
     if (out.alreadySettled) return res.json(out);
     if (out.underReview) {
-      throw new ApiError(409, 'Your payment is being checked by our payment provider. You will hear from us by email — please do not pay again.');
+      throw new ApiError(409, 'Your payment is being checked by our payment provider. You will hear from us by email — please do not pay again.', 'payment_under_review');
     }
     if (out.created) {
       await audit({

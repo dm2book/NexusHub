@@ -12,6 +12,7 @@ import { useCategoryLogos, logoFor } from '../lib/useCategoryLogos.js';
 import { navigateWithTransition } from '../lib/viewTransition.js';
 import LightProductCard from '../components/store/LightProductCard.jsx';
 import { usePageMeta } from '../lib/useMeta.js';
+import UnavailableLines from '../components/store/UnavailableLines.jsx';
 import { useStickyBarLift } from '../lib/useStickyBarLift.js';
 
 export default function Cart() {
@@ -116,6 +117,7 @@ export default function Cart() {
 
         <div style={{ viewTransitionName: 'order-summary' }} className="bg-white rounded-2xl border border-slate-200/70 shadow-sm p-6 h-fit">
           <h3 className="font-bold text-slate-900 mb-5">{t('cart.summary', 'Order summary')}</h3>
+          <UnavailableLines problems={quote?.problems} items={items} remove={remove} />
           {/* A price that moved since the item went into the cart: the cart
               now holds today's price, and says which one changed. */}
           {priceNotice.length > 0 && (
@@ -206,7 +208,7 @@ function EmptyCartTrending({ onAdd }) {
         {/* The first row is above the fold on a phone and was the cart's LCP
             element — measured at 2.9 s, most of it spent fading in. Marked
             priority so it paints on its first frame like the catalogue's. */}
-        {trending.slice(0, 4).map((p, i) => <LightProductCard key={p.id} product={p} priority={i < 2} onAdd={(x) => { onAdd(x); toast.success(`${x.name} ${t('cart.added', 'added')}`); }} />)}
+        {trending.slice(0, 4).map((p, i) => <LightProductCard key={p.id} product={p} priority={i < 2} onAdd={(x) => { if (!onAdd(x)) { toast(t('launch.cartClosed', 'ForgeMarket opens on launch day — you can browse everything until then.')); return; } toast.success(`${x.name} ${t('cart.added', 'added')}`); }} />)}
       </div>
     </div>
   );
@@ -244,7 +246,7 @@ function CartCrossSell({ items, onAdd }) {
     <div className="mt-12">
       <h2 className="text-xl font-extrabold text-slate-900 mb-5">{t('cart.completeOrder', 'Complete your order')}</h2>
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 fm-grid-in">
-        {show.map((p) => <LightProductCard key={p.id} product={p} onAdd={(x) => { onAdd(x); toast.success(`${x.name} ${t('cart.added', 'added')}`); }} />)}
+        {show.map((p) => <LightProductCard key={p.id} product={p} onAdd={(x) => { if (!onAdd(x)) { toast(t('launch.cartClosed', 'ForgeMarket opens on launch day — you can browse everything until then.')); return; } toast.success(`${x.name} ${t('cart.added', 'added')}`); }} />)}
       </div>
     </div>
   );
