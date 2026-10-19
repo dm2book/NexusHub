@@ -86,6 +86,7 @@ export default function Checkout() {
   const [priceNotice, setPriceNotice] = useState([]);     // lines whose price moved since they were added
   const [totalNotice, setTotalNotice] = useState(null);   // { was, now }: the total moved at the button
   const [pendingOrder, setPendingOrder] = useState(null); // placed at a total the buyer has yet to confirm
+  const [gone, setGone] = useState([]);                   // cart lines the shop no longer sells
   const [deliveryFields, setDeliveryFields] = useState({});   // productId → label (e.g. "Roblox username")
   const [deliveryChoices, setDeliveryChoices] = useState({}); // productId → offers a code/account choice
   const [productCats, setProductCats] = useState({});         // productId → category, for lines saved without one
@@ -140,9 +141,18 @@ export default function Checkout() {
   const refreshQuote = async () => {
     const mine = ++quoteSeq.current;
     const key = askKey;
-    const r = await priceCart({ coupon: couponCode, useCredit: creditWanted });
+    const r = await priceCart({ coupon: couponCode, useCredit: creditWanted }).catch((e) => {
+      /* A line the shop no longer sells: named, with a Remove, instead of a
+         summary left dimmed at old prices with no word about why. */
+      if (e?.code === 'product_unavailable' && mine === quoteSeq.current) {
+        setGone([{ code: 'unavailable', ...(e.details || {}) }]);
+        setQuoteKey(key);
+      }
+      throw e;
+    });
     notePriceChanges(r);
     if (!r || mine !== quoteSeq.current) return r;
+    setGone([]);
     setQuote(r.quote);
     setQuoteKey(key);
     /* A code that stopped applying — the cart changed under it, or someone
@@ -312,18 +322,14 @@ export default function Checkout() {
            that changed while this page was open stops here, before any order
            exists — the new total is shown and the buyer presses again. */
         const shownTotal = grandTotal;
-        const fresh = await refreshQuote().catch(() => null);
+        const fresh = await refreshQuote().catch((e) => (e?.code === 'product_unavailable' ? { unavailable: e } : null));
+        if (fresh?.unavailable) { toast.error(friendlyError(fresh.unavailable, t)); return; }
         const quoted = fresh?.quote;
         /* What the order would refuse, said before it is asked. A code that
            stopped applying was already taken off, with its reason. */
         if (quoted?.problems?.some((p) => p.code === 'coupon')) return;
         const blocked = quoted?.problems?.[0];
-        if (blocked) {
-          toast.error(blocked.code === 'unavailable'
-            ? t('cart.unavailable', '{name} is no longer available — remove it to continue.', { name: blocked.name || t('cart.aProduct', 'A product') })
-            : blocked.message);
-          return;
-        }
+        if (blocked) { toast.error(blocked.message); return; }
         if (quoted && quoted.total !== shownTotal) {
           setTotalNotice({ was: shownTotal, now: quoted.total });
           toast.error(totalChangedText(shownTotal, quoted.total));
@@ -712,7 +718,7 @@ export default function Checkout() {
               </div>
             ))}
           </div>
-          <UnavailableLines problems={quote?.problems} items={items} remove={remove} tone="dark" />
+          <UnavailableLines problems={gone} items={items} remove={remove} tone="dark" />
           {/* A price that moved since the item went into the cart, said before
               the buyer pays rather than discovered on the payment page. */}
           {priceNotice.length > 0 && (

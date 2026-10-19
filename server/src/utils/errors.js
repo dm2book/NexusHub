@@ -1,9 +1,11 @@
 /** Typed HTTP error so routes can `throw new ApiError(404, 'Not found')`. */
 export class ApiError extends Error {
-  constructor(status, message, code) {
+  constructor(status, message, code, details) {
     super(message);
     this.status = status;
     this.code = code || undefined;
+    // Small, public facts the page can act on (e.g. which cart line), never internals.
+    this.details = details || undefined;
   }
 }
 

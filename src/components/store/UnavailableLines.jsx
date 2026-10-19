@@ -4,10 +4,10 @@ import { useI18n } from '../../lib/i18n.jsx';
  * Cart lines the shop no longer sells — switched off or deleted since they went
  * into the cart — named, with a way to take them out.
  *
- * The quote used to fail as a whole for such a line, and both pages swallowed
- * the failure: the summary stayed dimmed at old prices until "Pay" answered
- * "Unknown product: prd_…". /api/checkout/quote now prices the rest and names
- * these as `unavailable` problems.
+ * The quote refuses a cart with such a line (as the order must), and both
+ * pages swallowed that refusal: the summary stayed dimmed at old prices until
+ * "Pay" answered "Unknown product: prd_…". The refusal now carries the code
+ * `product_unavailable` and the product, which the pages turn into this list.
  */
 export default function UnavailableLines({ problems, items, remove, tone = 'light' }) {
   const { t } = useI18n();

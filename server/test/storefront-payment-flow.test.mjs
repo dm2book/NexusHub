@@ -7,8 +7,8 @@
  *   - a refusal carries a code the storefront can translate;
  *   - the track page offers a new Pay. payment after a cancelled one, with the
  *     methods, and never the leftover manual Tikkie/Revolut links under Pay.;
- *   - a cart line the shop no longer sells is named in the quote instead of
- *     failing the whole quote;
+ *   - a cart line the shop no longer sells is named (code + product) in the
+ *     quote's refusal, so the page can offer to remove it;
  *   - the signed-in cart keeps each line's category (the Roblox username field
  *     depends on it).
  * Storefront source, statically: the orphan-order retry, Back from Pay., the
@@ -113,11 +113,16 @@ console.log('\n— A cart line the shop no longer sells —');
   const off = await product('Flow switched off', { active: 0 });
   const r = await post('/api/checkout/quote', { items: [{ productId: live, quantity: 1 }, { productId: off, quantity: 1 },
     { productId: 'prd_deleted_long_ago', quantity: 1 }] });
-  ok('the quote answers instead of failing', r.status === 200, JSON.stringify(r).slice(0, 200));
-  const gone = (r.body?.problems || []).filter((p) => p.code === 'unavailable').map((p) => p.productId);
-  ok('…naming the switched-off and the deleted product', gone.includes(off) && gone.includes('prd_deleted_long_ago'), JSON.stringify(r.body?.problems));
-  ok('…and pricing the rest', r.body?.lines?.length === 1 && r.body.lines[0].productId === live && r.body.subtotal === 999,
-    JSON.stringify(r.body?.lines));
+  ok('the quote still refuses the cart, as the order will', r.status === 409, JSON.stringify(r).slice(0, 200));
+  ok('…but says WHICH line, with a code the page acts on',
+    r.body?.error?.code === 'product_unavailable' && r.body.error.details?.productId === off
+    && r.body.error.details?.name === 'Flow switched off', JSON.stringify(r.body));
+  const del = await post('/api/checkout/quote', { items: [{ productId: 'prd_deleted_long_ago', quantity: 1 }] });
+  ok('a deleted product is named by its id the same way', del.status === 400
+    && del.body?.error?.code === 'product_unavailable' && del.body.error.details?.productId === 'prd_deleted_long_ago',
+    JSON.stringify(del.body));
+  const fine = await post('/api/checkout/quote', { items: [{ productId: live, quantity: 1 }] });
+  ok('once it is removed, the rest is priced', fine.status === 200 && fine.body?.subtotal === 999, JSON.stringify(fine.body).slice(0, 120));
   const order = await post('/api/orders', { email: 'sf-off@example.com', consent: true, consentText: 'ok',
     items: [{ productId: off, quantity: 1 }] });
   ok('the order itself still refuses it', order.status >= 400, JSON.stringify(order).slice(0, 160));
@@ -158,8 +163,10 @@ console.log('\n— The storefront source —');
     && /\{email \|\| placed\.email\}/.test(co));
   ok('"sign in" comes back to the checkout', /to="\/login" state=\{\{ from: '\/checkout' \}\}/.test(co));
   ok('a line without a category gets it from the catalogue', /deliveryField\(i\.category \|\| productCats\[i\.id\], lang\)/.test(co));
-  ok('unavailable lines are named with a Remove', /<UnavailableLines problems=\{quote\?\.problems\}/.test(co)
-    && /<UnavailableLines problems=\{quote\?\.problems\}/.test(read('pages/Cart.jsx')));
+  const cart = read('pages/Cart.jsx');
+  ok('an unavailable line is named with a Remove, on the cart and the checkout',
+    /<UnavailableLines problems=\{gone\}/.test(co) && /<UnavailableLines problems=\{gone\}/.test(cart)
+    && /e\?\.code === 'product_unavailable'/.test(co) && /e\?\.code === 'product_unavailable'/.test(cart));
 
   const again = read('components/store/PayAgain.jsx');
   ok('"Pay again" sends the order number and the chosen method',

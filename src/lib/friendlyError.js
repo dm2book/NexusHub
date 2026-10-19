@@ -24,6 +24,10 @@ const BY_CODE = {
 };
 
 export function friendlyError(err, t) {
+  if (err?.code === 'product_unavailable') {
+    return t('cart.unavailable', '{name} is no longer available — remove it to continue.',
+      { name: err.details?.name || t('cart.aProduct', 'A product') });
+  }
   const known = BY_CODE[err?.code];
   if (known) return t(known[0], known[1]);
   if (err?.status === 503) return t(BY_CODE.commerce_paused[0], BY_CODE.commerce_paused[1]);

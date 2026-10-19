@@ -641,30 +641,10 @@ router.post('/checkout/quote',
       useCredit: z.number().int().nonnegative().max(100_000_00).optional(),
     }).parse(req.body);
     const { priceOrder } = await import('../services/orderService.js');
-    /* A saved cart can hold a product that was switched off or deleted since.
-       priceOrder refuses the whole cart for it (as the order must), and the
-       pages swallowed that refusal: the summary stayed dimmed at old prices
-       until "Pay" answered "Unknown product: prd_…". Those lines are named here
-       as problems instead, and the rest is priced, so the page can say which
-       one and offer to remove it. */
-    const unavailable = [];
-    const sellable = [];
-    for (const it of body.items) {
-      const p = await getProduct(it.productId).catch(() => null);
-      const ok = p && p.kind !== 'mystery' && p.active && Number.isInteger(p.price) && p.price > 0;
-      if (ok) sellable.push(it);
-      else unavailable.push({ productId: it.productId, name: p?.name || null });
-    }
-    const q = sellable.length ? await priceOrder({
-      items: sellable, coupon: body.coupon, useCredit: body.useCredit || 0,
+    const q = await priceOrder({
+      items: body.items, coupon: body.coupon, useCredit: body.useCredit || 0,
       userId: req.user?.id || null, email: req.user?.email || '',
-    }) : { currency: 'EUR', lines: [], subtotal: 0, discountable: 0, coupon: null, memberPercent: 0, memberDiscount: 0,
-      bundle: null, bundleDiscount: 0, discount: 0, maxDiscountPercent: config.market.maxTotalDiscountPercent,
-      clamped: false, creditApplied: 0, total: 0, minCharge: 0, problems: [] };
-    for (const u of unavailable) {
-      q.problems.unshift({ code: 'unavailable', productId: u.productId, name: u.name,
-        message: u.name ? `${u.name} is no longer available.` : 'A product in your cart is no longer available.' });
-    }
+    });
     /* A code that did not apply counts against the same budget as the coupon
        lookup (20 per 10 minutes, shared across instances). The quote said
        whether a code exists at 60 tries a minute per instance, which made the
