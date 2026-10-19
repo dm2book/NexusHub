@@ -18,6 +18,8 @@ import { deliveryField } from '../lib/deliveryInfo.js';
 import { useStickyBarLift } from '../lib/useStickyBarLift.js';
 import { rememberOrder, recallOrder, forgetOrder } from '../lib/lastOrder.js';
 import { rememberMyOrder } from '../lib/myOrders.js';
+import { friendlyError } from '../lib/friendlyError.js';
+import UnavailableLines from '../components/store/UnavailableLines.jsx';
 import { reportStep, attributionForOrder } from '../lib/attribution.js';
 
 
@@ -33,7 +35,7 @@ export default function Checkout() {
      threw a ReferenceError on every render and the checkout was a blank page
      for everybody, gate open or closed. Found by driving a real purchase
      through it rather than by reading it. */
-  const { items, subtotal, currency, clear, prelaunch, quote: priceCart } = useCart();
+  const { items, subtotal, currency, clear, prelaunch, remove, quote: priceCart } = useCart();
   const { user } = useAuth();
   const toast = useToast();
   const navigate = useNavigate();
@@ -84,8 +86,10 @@ export default function Checkout() {
   const [priceNotice, setPriceNotice] = useState([]);     // lines whose price moved since they were added
   const [totalNotice, setTotalNotice] = useState(null);   // { was, now }: the total moved at the button
   const [pendingOrder, setPendingOrder] = useState(null); // placed at a total the buyer has yet to confirm
+  const [gone, setGone] = useState([]);                   // cart lines the shop no longer sells
   const [deliveryFields, setDeliveryFields] = useState({});   // productId → label (e.g. "Roblox username")
   const [deliveryChoices, setDeliveryChoices] = useState({}); // productId → offers a code/account choice
+  const [productCats, setProductCats] = useState({});         // productId → category, for lines saved without one
   const [deliveryDetail, setDeliveryDetail] = useState('');
   const [deliveryMethod, setDeliveryMethod] = useState('code'); // 'code' | 'account' (buyer's pick)
   /* Every figure in the summary is the server's: priceOrder(), the function
@@ -137,9 +141,18 @@ export default function Checkout() {
   const refreshQuote = async () => {
     const mine = ++quoteSeq.current;
     const key = askKey;
-    const r = await priceCart({ coupon: couponCode, useCredit: creditWanted });
+    const r = await priceCart({ coupon: couponCode, useCredit: creditWanted }).catch((e) => {
+      /* A line the shop no longer sells: named, with a Remove, instead of a
+         summary left dimmed at old prices with no word about why. */
+      if (e?.code === 'product_unavailable' && mine === quoteSeq.current) {
+        setGone([{ code: 'unavailable', ...(e.details || {}) }]);
+        setQuoteKey(key);
+      }
+      throw e;
+    });
     notePriceChanges(r);
     if (!r || mine !== quoteSeq.current) return r;
+    setGone([]);
     setQuote(r.quote);
     setQuoteKey(key);
     /* A code that stopped applying — the cart changed under it, or someone
@@ -202,12 +215,13 @@ export default function Checkout() {
   }, [askKey, prelaunch, placed]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     api.get('/api/products').then((r) => {
-      const m = {}, choices = {};
+      const m = {}, choices = {}, cats = {};
       (r.products || []).forEach((p) => {
         if (p.deliveryField) m[p.id] = p.deliveryField;
         if (p.deliveryChoice) choices[p.id] = true;
+        if (p.category) cats[p.id] = p.category;
       });
-      setDeliveryFields(m); setDeliveryChoices(choices);
+      setDeliveryFields(m); setDeliveryChoices(choices); setProductCats(cats);
     }).catch(() => {});
   }, []);
 
@@ -224,7 +238,11 @@ export default function Checkout() {
      deliveryField() is the same source that sentence comes from, keyed by
      category, and the cart item already carries its category — so this needs no
      network call and cannot be silenced by the products fetch below failing. */
-  const fieldFor = (i) => deliveryFields[i.id] || deliveryField(i.category, lang);
+  /* The category may be missing on a line: a cart restored on sign-in, or one
+     saved by an older version, came without it — and then the username field
+     never showed and a Robux order arrived with no account to deliver to. The
+     catalogue's own category fills the gap. */
+  const fieldFor = (i) => deliveryFields[i.id] || deliveryField(i.category || productCats[i.id], lang);
   const deliveryLabels = [...new Set(items.map(fieldFor).filter(Boolean))];
   // A product offers a CHOICE (code vs account) or REQUIRES account delivery.
   const offersChoice = items.some((i) => deliveryChoices[i.id]);
@@ -277,12 +295,23 @@ export default function Checkout() {
     );
   }
 
+  /* Off to the payment page — with this page's history entry turned into the
+     order's track page first. Back from Pay. or Mollie used to land on an
+     empty checkout ("Nothing to check out") with no way to the unpaid order;
+     now it lands where "Continue payment" is. */
+  const leaveForPayment = (order, url) => {
+    try { window.history.replaceState(null, '', `/track?number=${encodeURIComponent(order.number)}`); } catch { /* ignore */ }
+    window.location.href = url;
+  };
+
   const placeOrder = async (e) => {
     e.preventDefault();
     /* The button is live from the start; without the tick it takes the buyer
        to the box instead of greying out with a warning nobody had earned yet. */
     if (!consent) { setTriedConsent(true); jumpToConsent(); return; }
     setBusy(true);
+    /* The order this press created, if any — kept for the retry below. */
+    let created = null;
     try {
       /* Placed already, at a total the buyer has now been shown: pay that one. */
       let order = pendingOrder;
@@ -293,7 +322,8 @@ export default function Checkout() {
            that changed while this page was open stops here, before any order
            exists — the new total is shown and the buyer presses again. */
         const shownTotal = grandTotal;
-        const fresh = await refreshQuote().catch(() => null);
+        const fresh = await refreshQuote().catch((e) => (e?.code === 'product_unavailable' ? { unavailable: e } : null));
+        if (fresh?.unavailable) { toast.error(friendlyError(fresh.unavailable, t)); return; }
         const quoted = fresh?.quote;
         /* What the order would refuse, said before it is asked. A code that
            stopped applying was already taken off, with its reason. */
@@ -340,6 +370,7 @@ export default function Checkout() {
            about to be redirected away from and in an email that has not arrived
            yet. This is what lets /track offer it back to them tomorrow. */
         rememberMyOrder(order.number);
+        created = order;
 
         /* The order priced itself once more. If a price moved in the moment
            between that last quote and the order, the buyer sees the order's
@@ -365,7 +396,7 @@ export default function Checkout() {
           // banking app must not land on "Nothing to check out".
           rememberOrder(order);
           clear();
-          window.location.href = r.checkoutUrl;
+          leaveForPayment(order, r.checkoutUrl);
           return;
         }
         // No URL means the order was already settled — send them to the status
@@ -381,7 +412,7 @@ export default function Checkout() {
         if (r.checkoutUrl) {
           rememberOrder(order);
           clear();
-          window.location.href = r.checkoutUrl;
+          leaveForPayment(order, r.checkoutUrl);
           return;
         }
         clear();
@@ -436,7 +467,17 @@ export default function Checkout() {
       }
       clear(); toast.success(`${t('checkout.orderWord', 'Order')} ${order.number} ${t('checkout.placed', 'placed!')}`);
       navigate(user ? `/account/orders/${order.id}` : `/track?number=${order.number}`);
-    } catch (err) { toast.error(err.message); }
+    } catch (err) {
+      /* The order exists but its payment could not be started (Pay. refused,
+         the request timed out). Pressing Pay again created a SECOND order, while
+         the first kept the coupon and the store credit it had already taken.
+         The next press pays this same order instead. */
+      if (created) {
+        setPendingOrder(created);
+        if (user) api.get('/api/account/wallet').then((w) => setCreditBalance(w.balance || 0)).catch(() => {});
+      }
+      toast.error(friendlyError(err, t));
+    }
     finally { setBusy(false); }
   };
 
@@ -504,7 +545,9 @@ export default function Checkout() {
             </div>
           )}
 
-          <PaymentProofForm orderId={placed.id} email={email} method={methodId} />
+          {/* After iOS discards the tab, the typed email is gone: the order's own
+              address is used, and none at all rather than an empty string. */}
+          <PaymentProofForm orderId={placed.id} email={email || placed.email || undefined} method={methodId} />
 
           {/* The status page is the one link a buyer needs afterwards, and it
               works without an account. Say that it is also in their inbox, so
@@ -512,7 +555,7 @@ export default function Checkout() {
           <div className="mt-6 rounded-xl border border-white/10 bg-white/5 p-4 text-left">
             <div className="text-white text-sm font-semibold">{t('checkout.followTitle', 'Follow your order — no account needed')}</div>
             <p className="text-slate-400 text-[13px] mt-1">
-              {t('checkout.followSub', 'This link updates by itself the moment we confirm your payment. We also emailed it to')} <span className="text-slate-200">{email}</span>.
+              {t('checkout.followSub', 'This link updates by itself the moment we confirm your payment. We also emailed it to')} <span className="text-slate-200">{email || placed.email}</span>.
             </p>
             <Link to={user ? `/account/orders/${placed.id}` : `/track?number=${placed.number}`}
               className="btn-primary w-full mt-3 py-3"><CheckCircle2 size={18} /> {t('footer.track', 'Track order')}</Link>
@@ -596,7 +639,7 @@ export default function Checkout() {
             </div>
             {!user && (
               <p className="text-slate-500 text-sm mt-4">
-                {t('checkout.tip', 'Tip:')} <Link to="/login" className="text-indigo-400">{t('checkout.tipSignIn', 'sign in')}</Link> {t('checkout.tipRest', 'to see this order in your dashboard.')}
+                {t('checkout.tip', 'Tip:')} <Link to="/login" state={{ from: '/checkout' }} className="text-indigo-400">{t('checkout.tipSignIn', 'sign in')}</Link> {t('checkout.tipRest', 'to see this order in your dashboard.')}
               </p>
             )}
           </div>
@@ -675,6 +718,7 @@ export default function Checkout() {
               </div>
             ))}
           </div>
+          <UnavailableLines problems={gone} items={items} remove={remove} tone="dark" />
           {/* A price that moved since the item went into the cart, said before
               the buyer pays rather than discovered on the payment page. */}
           {priceNotice.length > 0 && (
@@ -832,6 +876,8 @@ export default function Checkout() {
             </div>
             <button type="submit" disabled={busy || paused} className="btn-primary flex-1 py-3 fm-tap">
               {busy ? <Loader2 size={18} className="animate-spin" />
+                /* Disabled AND saying why — the reason card is far below the fold. */
+                : paused ? <>{t('checkout.pausedBtn', 'Ordering paused')}</>
                 : (provider === 'mollie' || provider === 'paynl') ? <>{t('checkout.payNowShort', 'Pay securely')}</>
                 : provider === 'stripe' ? <>{t('checkout.payCard', 'Pay with card')}</>
                 : <>{t('checkout.placePay', 'Place order & pay')}</>}

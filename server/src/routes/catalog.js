@@ -472,7 +472,8 @@ router.post('/chat',
 export async function assertOwnsOrder(req, order, email) {
   const owns = (req.user && order.email.toLowerCase() === req.user.email.toLowerCase()) ||
     (email && email.toLowerCase() === order.email.toLowerCase());
-  if (!owns) throw forbidden('This order is not yours');
+  // The code lets the storefront say it in the buyer's language.
+  if (!owns) throw new ApiError(403, 'This order is not yours', 'order_not_yours');
 }
 
 
@@ -1106,7 +1107,10 @@ router.get('/track/:number', asyncHandler(async (req, res) => {
     payLink: order.status === 'pending' ? (order.payLink || null) : null,
     // Resolved server-side with the amount already in each URL where the
     // provider supports it, so the page never has to build a payment link.
-    payMethods: order.status === 'pending' ? order.payMethods : [],
+    /* Only while the shop takes manual payments. The links stayed configured
+       after the switch to Pay., so a Pay. order's track page offered Tikkie and
+       Revolut — a payment nobody would ever match to the order. */
+    payMethods: order.status === 'pending' && activePaymentProvider() === 'manual' ? order.payMethods : [],
     // The Mollie checkout page for an unpaid order, so a buyer who closed the
     // tab, ran out of battery or bounced off their banking app can pick the
     // payment straight back up. Same trust model as payLink above: the order
@@ -1115,6 +1119,13 @@ router.get('/track/:number', asyncHandler(async (req, res) => {
     payUrl: order.status === 'pending' ? (await getPspPayment(order.id)
       .then((p) => (['mollie', 'paynl'].includes(p?.provider) && ['open', 'pending'].includes(p.status || '') ? p.checkoutUrl : null))
       .catch(() => null)) : null,
+    /* A Pay. payment the buyer cancelled or let expire: the order is still
+       pending and can be paid, but there is no open checkout to resume — the
+       page offers a fresh one, with the methods to choose from. */
+    ...(order.status === 'pending' ? await getPspPayment(order.id).then((p) => (
+      p?.provider === 'paynl' && ['canceled', 'expired', 'failed'].includes(p.status || '') && activePaymentProvider() === 'paynl'
+        ? { paymentRetryable: true, paynlMethods: paynlMethods().map(({ id, label }) => ({ id, label })) } : {}
+    )).catch(() => ({})) : {}),
     // A held order is paid and normal on every other measure, so without this it
     // would show "payment confirmed, we're on it" while nothing is being
     // prepared at all. The buyer is owed the truth about why their code has not

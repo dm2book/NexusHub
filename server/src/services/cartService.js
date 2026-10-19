@@ -22,6 +22,12 @@ function clean(items = []) {
     price: Math.max(0, Math.round(Number(i.price) || 0)),
     currency: String(i.currency || 'EUR').slice(0, 3),
     qty: Math.max(1, Math.min(999, Math.round(Number(i.qty) || 1))),
+    /* Kept: the checkout decides from the category whether to ask for a Roblox
+       username. Dropped here, a cart restored on sign-in had no category, the
+       field never showed, and a Robux order arrived with no account to deliver
+       to. The image is what the cart line shows. */
+    ...(i.category ? { category: String(i.category).slice(0, 40) } : {}),
+    ...(typeof i.image === 'string' && /^(\/|https:\/\/)/.test(i.image) ? { image: i.image.slice(0, 300) } : {}),
   })).filter((i) => i.id);
 }
 

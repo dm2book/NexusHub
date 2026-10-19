@@ -58,7 +58,7 @@ export async function assertOrderLimits({ email, ip, total, value = total, curre
   if (L.maxOrderValue > 0 && value > L.maxOrderValue) {
     throw badRequest(
       `This order is larger than we accept in one go (max ${formatMoney(L.maxOrderValue, currency)}). `
-      + 'Split it into smaller orders, or email us and we will arrange it by hand.');
+      + 'Split it into smaller orders, or email us and we will arrange it by hand.', 'order_limit_value');
   }
 
   if (L.perEmailPerDay > 0) {
@@ -69,7 +69,7 @@ export async function assertOrderLimits({ email, ip, total, value = total, curre
     if (Number(r?.n || 0) >= L.perEmailPerDay) {
       throw tooMany(
         `That is ${L.perEmailPerDay} orders in 24 hours, which is as many as we take from one address. `
-        + 'Your existing orders are unaffected — email us if you need another today.');
+        + 'Your existing orders are unaffected — email us if you need another today.', 'order_limit_count');
     }
   }
 
@@ -83,7 +83,7 @@ export async function assertOrderLimits({ email, ip, total, value = total, curre
     if (Number(r?.sum || 0) + value > L.valuePerEmailPerDay) {
       throw badRequest(
         `This would take you over ${formatMoney(L.valuePerEmailPerDay, currency)} of orders in 24 hours, `
-        + 'which is our daily ceiling per customer. Email us and we will sort out anything larger by hand.');
+        + 'which is our daily ceiling per customer. Email us and we will sort out anything larger by hand.', 'order_limit_daily');
     }
   }
 
@@ -97,7 +97,7 @@ export async function assertOrderLimits({ email, ip, total, value = total, curre
     if (Number(r?.n || 0) >= L.perIpPerDay) {
       throw tooMany(
         'We have had an unusual number of orders from your connection today. '
-        + 'Email us and a person will place your order for you.');
+        + 'Email us and a person will place your order for you.', 'order_limit_ip');
     }
   }
 }
