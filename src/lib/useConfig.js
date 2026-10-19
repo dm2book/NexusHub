@@ -50,6 +50,29 @@ export function getConfig() {
 }
 
 /**
+ * The config as the server sees it now — for the checkout only.
+ *
+ * The page-life copy above can be minutes old: the CDN keeps /api/config for a
+ * minute plus ten of stale-while-revalidate, and the page keeps its copy until
+ * it is closed. The owner switched to Pay. and the checkout still offered
+ * Stripe under "Ordering is paused" from a copy taken before the switch. The
+ * checkout is where an old answer costs a sale, so it asks again, with a key
+ * that changes every minute: at most a minute old, and still one CDN entry per
+ * minute rather than one request per buyer.
+ */
+export function getFreshConfig() {
+  const minute = Math.floor(Date.now() / 60_000);
+  return api.get(`/api/config?v=${minute}`)
+    .then((c) => {
+      if (!c || typeof c !== 'object') return getConfig();
+      cache = c;
+      applyLegal(cache.legal);
+      return cache;
+    })
+    .catch(() => getConfig());
+}
+
+/**
  * The config as state.
  *
  * Starts from the cache when it is already known, so a component mounted after

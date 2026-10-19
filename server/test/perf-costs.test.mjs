@@ -106,7 +106,10 @@ console.log('\nâ€” The runtime config is fetched once, not once per component â€
   const direct = consumers.filter((f) => /api\.get\('\/api\/config'\)/.test(read(f)));
   ok('no surface fetches /api/config directly any more', direct.length === 0,
     direct.map((f) => f.split('/').pop()).join(', '));
-  const viaShared = consumers.filter((f) => /getConfig\(\)/.test(read(f)));
+  /* The checkout asks the shared module for a FRESH copy (getFreshConfig, one
+     CDN entry per minute): an old payment provider there costs a sale. Still
+     the shared module, never a direct fetch. */
+  const viaShared = consumers.filter((f) => /get(?:Fresh)?Config\(\)/.test(read(f)));
   ok(`all ${consumers.length} surfaces use the shared fetcher`,
     viaShared.length === consumers.length, `${viaShared.length}/${consumers.length}`);
 }
