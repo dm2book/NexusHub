@@ -142,15 +142,20 @@ console.log('\n— A Discord that stops answering cannot stall an order —');
 console.log('\n— The bot writes its state where a deploy cannot reach it —');
 {
   const bot = read('discord', 'src', 'bot.js');
+  /* The helper lives in storeRelay.js now, where its rules are tested
+     (discord/test/store-relay.test.mjs); bot.js routes every call through it. */
+  const relay = read('discord', 'src', 'storeRelay.js');
   ok('there is one helper for durable state, not three copies',
-    /async function stateGet\(/.test(bot) && /async function stateSet\(/.test(bot));
+    /export function createStateStore\(/.test(relay)
+    && /const stateGet = \(key, file\) => theStore\(\)\.get\(key, file\)/.test(bot)
+    && /const stateSet = \(key, value, file\) => theStore\(\)\.set\(key, value, file\)/.test(bot));
   ok('giveaways go through it', /stateSet\('giveaways'/.test(bot));
   ok('XP goes through it', /stateSet\('xp'/.test(bot));
   ok('the weekly bookkeeping goes through it', /stateSet\('meta'/.test(bot));
   ok('they are loaded again on ready',
     /loadXP\(\);/.test(bot) && /loadMeta\(\)/.test(bot) && /restoreGiveaways\(c\);/.test(bot));
   ok('the local file is kept as the fallback, not dropped',
-    /existsSync\(file\)/.test(bot) && /writeFileSync\(file/.test(bot));
+    /existsSync\(file\)/.test(relay) && /writeFileSync\(file/.test(relay));
 
   /* The store write is a signed round trip carrying the whole map; on a busy
      server the four-second file debounce would repost every member's score all

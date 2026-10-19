@@ -420,6 +420,19 @@ ready for five minutes, a terminal gateway close (bad token, intents switched
 off) exits 1, and an uncaught exception flushes state and exits 1. With restart
 policy **ALWAYS**, Railway then starts a fresh process.
 
+**One bot at a time.** During a deploy the new container goes live only once it
+is connected, so for a moment two bots are connected: welcome DMs and AI answers
+can arrive twice, and the old container's shutdown save can overwrite up to a
+minute of XP the new one already loaded. Keep it short: Railway → **Settings →
+Deploy → Overlap Seconds `0`** and **Draining Seconds `0`**. Never run a second
+copy elsewhere (PebbleHost, a PC) while Railway runs one.
+
+**Is it talking to the store?** The first lines after `bot online` include
+either `store relay: ok` or the exact reason it is not (a 403 with "Ingest is not
+configured" = `REVIEW_INGEST_SECRET` missing on Vercel; "Bad signature" = the two
+values differ; a 404 = `FORGEMARKET_API_URL` is wrong). Use
+`https://www.forgemarket.nl` for both `STORE_URL` and `FORGEMARKET_API_URL`.
+
 **Logs.** JSON, one line per event, so Railway's log search can filter them:
 
 ```json

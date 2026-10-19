@@ -137,11 +137,13 @@ export const config = {
     // Live member count shown on the storefront trust stats (optional).
     memberCount: Number(env.DISCORD_MEMBER_COUNT || 0) || null,
     // Shared secret the bot uses to push /vouch reviews to /api/reviews/ingest.
-    reviewIngestSecret: env.REVIEW_INGEST_SECRET || '',
+    /* Trimmed, like the bot does: a trailing space or newline pasted into one
+       dashboard made every signed call a permanent "Bad signature". */
+    reviewIngestSecret: (env.REVIEW_INGEST_SECRET || '').trim(),
     /* Its own secret: /paylink attaches a payment link to a customer's order,
        so a leak of the general bot secret must not be enough to redirect money.
        Unset = the command is off. */
-    paylinkSecret: env.DISCORD_PAYLINK_SECRET || '',
+    paylinkSecret: (env.DISCORD_PAYLINK_SECRET || '').trim(),
     /* Whether the bot's OLD signatures are still accepted (see
        middleware/ingestSignature.js). On by default, because the bot already
        running on its host sends them until it is redeployed, and the bot is

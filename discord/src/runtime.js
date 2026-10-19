@@ -69,10 +69,14 @@ export const ENV_SPEC = {
       + 'DISCORD_APPLICATION_ID is accepted as an alias.'],
     ['DISCORD_OWNER_IDS', 'Comma-separated Discord user ids allowed to run owner commands (/paylink, /digest, '
       + '/stock, /launch, /coupon, /announce). Without it only members with Manage Server can.'],
-    ['STORE_URL', 'Your storefront, e.g. https://forgemarket.nl. Every link the bot posts starts here.'],
-    ['FORGEMARKET_API_URL', 'Usually the same as STORE_URL. Without it /price, /order and the relay are off.'],
-    ['REVIEW_INGEST_SECRET', 'Must match the value in Vercel exactly, or the store relay stays silent: '
-      + 'no order pings, no drops, no delivery DMs, and no durable state.'],
+    ['STORE_URL', 'Your storefront, exactly https://www.forgemarket.nl (the www address: '
+      + 'forgemarket.nl redirects to it). Every link the bot posts starts here. Default https://forgemarket.nl.'],
+    ['FORGEMARKET_API_URL', 'The site origin the bot calls, e.g. https://www.forgemarket.nl, with no /api '
+      + 'and no other path. Unset, it falls back to STORE_URL. The log line "store relay: ok" at startup '
+      + 'confirms it works; otherwise the log says why.'],
+    ['REVIEW_INGEST_SECRET', 'Must be set in Vercel (Production) AND here, with exactly the same value, '
+      + 'or every store call is refused and the relay stays silent: no order pings, no drops, no delivery DMs, '
+      + 'and no durable state.'],
   ],
   optional: [
     ['ANTHROPIC_API_KEY', 'AI answers in #ask-the-bot. Without it a rule-based FAQ answers instead.'],
