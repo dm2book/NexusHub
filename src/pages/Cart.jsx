@@ -8,7 +8,7 @@ import { useI18n } from '../lib/i18n.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { api } from '../lib/api.js';
 import { categoryVisual, money } from '../lib/catalog.js';
-import { iconFor } from '../lib/sampleCatalog.js';
+import { useCategoryLogos, logoFor } from '../lib/useCategoryLogos.js';
 import { navigateWithTransition } from '../lib/viewTransition.js';
 import LightProductCard from '../components/store/LightProductCard.jsx';
 import { usePageMeta } from '../lib/useMeta.js';
@@ -22,6 +22,7 @@ export default function Cart() {
   usePageMeta();
   useStickyBarLift(); // keep the chat bubble off the sticky checkout bar
   const { items, setQty, remove, subtotal, currency, add, quote: priceCart } = useCart();
+  const logos = useCategoryLogos(); // owner-set category art (Admin → Categories)
   const { user } = useAuth();
   const { t } = useI18n();
   const navigate = useNavigate();
@@ -79,7 +80,7 @@ export default function Cart() {
       <div className="grid lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-3">
           {items.map((it) => {
-            const v = categoryVisual(it.category); const img = it.image || iconFor(it.category); const Icon = v.icon;
+            const v = categoryVisual(it.category); const img = it.image || logoFor(logos, it.category); const Icon = v.icon;
             return (
               /* Thumbnail, name, stepper, line price and remove were one
                  non-wrapping row. At 390px that row measured 472px, so the LINE

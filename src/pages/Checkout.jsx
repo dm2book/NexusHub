@@ -764,12 +764,6 @@ export default function Checkout() {
               {totalChangedText(totalNotice.was, totalNotice.now)}
             </div>
           )}
-          <label id="fm-consent" className="hidden lg:flex items-start gap-2.5 mb-3 text-[12.5px] text-slate-400 cursor-pointer scroll-mt-24"
-            style={triedConsent && !consent ? { outline: '2px solid #f59e0b', outlineOffset: 4, borderRadius: 8 } : undefined}>
-            <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)}
-              className="mt-0.5 shrink-0 w-4 h-4 accent-violet-600" />
-            <span>{consentSentence}</span>
-          </label>
           {/* The server will refuse this order (503) — say so before the buyer
               types anything, not after. */}
           {paused && (
@@ -783,6 +777,15 @@ export default function Checkout() {
           {/* Every label says that pressing it means paying (art. 6:230v lid 3 BW,
               § 312j BGB): a plain "Bestelling plaatsen" showed while the payment
               settings were still loading, and in demo mode. */}
+          {/* The legally required tick, directly above the button it unlocks —
+              on every screen size. On a phone it sat only in the pay bar, UNDER
+              that bar's button, while the warning here said "the box above". */}
+          <label id="fm-consent" className="flex items-start gap-2.5 mb-3 text-[12.5px] text-slate-400 cursor-pointer scroll-mt-24"
+            style={triedConsent && !consent ? { outline: '2px solid #f59e0b', outlineOffset: 4, borderRadius: 8 } : undefined}>
+            <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)}
+              className="mt-0.5 shrink-0 w-4 h-4 accent-violet-600" />
+            <span>{consentSentence}</span>
+          </label>
           <button disabled={busy || paused} className="btn-primary w-full py-3">
             {busy ? <Loader2 size={18} className="animate-spin" />
               : paused ? <>{t('checkout.pausedBtn', 'Ordering paused')}</>
@@ -808,9 +811,17 @@ export default function Checkout() {
 
         {/* Sticky pay bar — on a phone the real button is far below the fold. */}
         {/* The bar is the only thing a phone shows on arrival, so the consent
-            tick lives in it, right under the button it unlocks. */}
+            tick lives in it too, right above the button it unlocks. */}
         <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur border-t border-slate-200 px-4 py-3"
           style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}>
+          {/* The legally required tick, in the bar, right ABOVE the button it
+              unlocks — read before pressing, and where "the box above" points. */}
+          <label className="flex items-start gap-2 mb-2 leading-snug text-slate-600 cursor-pointer"
+            style={{ fontSize: 11.5, ...(triedConsent && !consent ? { color: '#b45309' } : {}) }}>
+            <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)}
+              className="mt-0.5 shrink-0 w-4 h-4 accent-violet-600" />
+            <span>{consentSentence}</span>
+          </label>
           <div className="flex items-center gap-3">
             <div className="min-w-0">
               <div className="text-[11px] text-slate-500">{t('cart.total', 'Total')}</div>
@@ -823,16 +834,6 @@ export default function Checkout() {
                 : <>{t('checkout.placePay', 'Place order & pay')}</>}
             </button>
           </div>
-          {/* The legally required tick, in the bar, next to the button it unlocks.
-              It used to sit 293px further down in the summary while the bar's
-              button read "Confirm delivery to continue" — an instruction instead
-              of an action, pointing at something off screen. */}
-          <label className="flex items-start gap-2 mt-2 leading-snug text-slate-600 cursor-pointer"
-            style={{ fontSize: 11.5, ...(triedConsent && !consent ? { color: '#b45309' } : {}) }}>
-            <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)}
-              className="mt-0.5 shrink-0 w-4 h-4 accent-violet-600" />
-            <span>{consentSentence}</span>
-          </label>
         </div>
       </form>
     </div>
