@@ -22,7 +22,7 @@ const FALLBACK = 'nl';
 const PHRASES = {
   nl: {
     redeemAt: 'Inwisselen op',
-    deliveredTitle: '⚡ Rechtstreeks op je account geleverd',
+    deliveredTitle: 'Rechtstreeks op je account geleverd',
     deliveredSub: 'Opgewaardeerd en klaar om te spelen — geen code om in te wisselen.',
     yourAccount: 'Je account',
     subtotal: 'Subtotaal', coupon: 'Kortingscode', memberOff: 'Forge+-korting',
@@ -31,6 +31,7 @@ const PHRASES = {
     withdrawalConfirmed: (stamp, sentence) => `Op ${stamp} bevestigde je: “${sentence}”`,
     withdrawalDefault: (stamp) => `Op ${stamp} vroeg je om directe levering en erkende je dat het herroepingsrecht van 14 dagen vervalt zodra de bestelling geleverd is.`,
     withdrawalCancel: 'Tot de levering kun je nog annuleren — beantwoord daarvoor gewoon deze mail.',
+    withdrawalDelivered: 'Je bestelling is geleverd, dus het herroepingsrecht is nu vervallen. Klopt er iets niet met je levering? Beantwoord deze mail, dan lossen we het op.',
     needTitle: '⚠️ We hebben nog één ding van je nodig',
     needBody: (need) => `Deze bestelling leveren we rechtstreeks op je account, dus we hebben je <strong style="color:#fff">${need}</strong> nodig. Beantwoord deze mail met alleen dat gegeven — we beginnen zodra we het hebben. We vragen <strong style="color:#fff">nooit</strong> om je wachtwoord.`,
     payExact: (amt) => `Betaal ${amt} — het bedrag staat er al in`,
@@ -47,7 +48,7 @@ const PHRASES = {
     /* When an order is completed with nothing recorded to show — the normal
        path for a product delivered by hand. The mail says "alles hieronder is
        van jou", so there has to BE something below, and it has to be true. */
-    byHandTitle: '✅ Met de hand geleverd',
+    byHandTitle: 'Met de hand geleverd',
     byHandSub: 'Deze bestelling is door ons persoonlijk afgehandeld — er staat geen code in dit overzicht.',
     byHandCheck: 'Kijk in je game of in de inbox waar we je eerder over deze bestelling schreven.',
     byHandMissing: 'Niets ontvangen? Beantwoord deze mail met je bestelnummer, dan zoeken we het uit.',
@@ -112,7 +113,7 @@ const PHRASES = {
   },
   en: {
     redeemAt: 'Redeem at',
-    deliveredTitle: '⚡ Delivered straight to your account',
+    deliveredTitle: 'Delivered straight to your account',
     deliveredSub: 'Topped up and ready to play — no code to redeem.',
     yourAccount: 'Your account',
     subtotal: 'Subtotal', coupon: 'Coupon', memberOff: 'Forge+ discount',
@@ -121,6 +122,7 @@ const PHRASES = {
     withdrawalConfirmed: (stamp, sentence) => `On ${stamp} you confirmed: “${sentence}”`,
     withdrawalDefault: (stamp) => `On ${stamp} you asked for immediate delivery and acknowledged that the 14-day right of withdrawal lapses once the order has been delivered.`,
     withdrawalCancel: 'Until delivery you can still cancel — just reply to this email.',
+    withdrawalDelivered: 'Your order has been delivered, so the right of withdrawal has now lapsed. Something wrong with your delivery? Reply to this email and we will sort it out.',
     needTitle: '⚠️ We still need one thing from you',
     needBody: (need) => `This order is delivered straight to your account, so we need your <strong style="color:#fff">${need}</strong>. Reply to this email with just that — we start as soon as we have it. We <strong style="color:#fff">never</strong> ask for your password.`,
     payExact: (amt) => `Pay ${amt} — the amount is already filled in`,
@@ -134,7 +136,7 @@ const PHRASES = {
     reviewAskBody: 'A short review on Trustpilot helps the next buyer more than anything we can say about ourselves — we cannot edit or remove a word of it.',
     reviewAskCta: 'Leave a review on Trustpilot',
     payHow: (number) => `Pay using one of the methods below and put your order number <strong>${number}</strong> as the reference. Your order is confirmed as soon as we receive it.`,
-    byHandTitle: '✅ Delivered by hand',
+    byHandTitle: 'Delivered by hand',
     byHandSub: 'We handled this order personally — there is no code to show in this summary.',
     byHandCheck: 'Check the game itself, or the inbox we last wrote to you about this order on.',
     byHandMissing: 'Nothing arrived? Reply to this email with your order number and we will look into it.',
@@ -195,7 +197,7 @@ const PHRASES = {
   },
   de: {
     redeemAt: 'Einlösen auf',
-    deliveredTitle: '⚡ Direkt auf dein Konto geliefert',
+    deliveredTitle: 'Direkt auf dein Konto geliefert',
     deliveredSub: 'Aufgeladen und startklar — kein Code zum Einlösen.',
     yourAccount: 'Dein Konto',
     subtotal: 'Zwischensumme', coupon: 'Rabattcode', memberOff: 'Forge+-Rabatt',
@@ -204,6 +206,7 @@ const PHRASES = {
     withdrawalConfirmed: (stamp, sentence) => `Am ${stamp} hast du bestätigt: „${sentence}“`,
     withdrawalDefault: (stamp) => `Am ${stamp} hast du um sofortige Lieferung gebeten und anerkannt, dass das 14-tägige Widerrufsrecht erlischt, sobald die Bestellung geliefert ist.`,
     withdrawalCancel: 'Bis zur Lieferung kannst du noch stornieren — antworte dafür einfach auf diese Mail.',
+    withdrawalDelivered: 'Deine Bestellung ist geliefert, das Widerrufsrecht ist damit erloschen. Stimmt etwas mit deiner Lieferung nicht? Antworte auf diese Mail, dann kümmern wir uns darum.',
     needTitle: '⚠️ Wir brauchen noch eine Sache von dir',
     needBody: (need) => `Diese Bestellung liefern wir direkt auf dein Konto, wir brauchen also ${/name$/.test(need) ? 'deinen' : 'dein'} <strong style="color:#fff">${/name$/.test(need) ? `${need}n` : need}</strong>. Antworte auf diese Mail mit nur dieser Angabe — wir legen los, sobald wir sie haben. Nach deinem Passwort fragen wir <strong style="color:#fff">nie</strong>.`,
     payExact: (amt) => `Zahle ${amt} — der Betrag steht schon drin`,
@@ -217,7 +220,7 @@ const PHRASES = {
     reviewAskBody: 'Eine kurze Bewertung auf Trustpilot hilft dem nächsten Käufer mehr als alles, was wir über uns selbst sagen können — wir können dort kein Wort ändern oder löschen.',
     reviewAskCta: 'Bewertung auf Trustpilot schreiben',
     payHow: (number) => `Zahl über eine der Methoden unten und gib deine Bestellnummer <strong>${number}</strong> als Verwendungszweck an. Deine Bestellung ist bestätigt, sobald wir sie haben.`,
-    byHandTitle: '✅ Von Hand geliefert',
+    byHandTitle: 'Von Hand geliefert',
     byHandSub: 'Diese Bestellung haben wir persönlich bearbeitet — in dieser Übersicht steht kein Code.',
     byHandCheck: 'Schau im Spiel selbst nach, oder in dem Postfach, an das wir zuletzt zu dieser Bestellung geschrieben haben.',
     byHandMissing: 'Nichts angekommen? Antworte auf diese Mail mit deiner Bestellnummer, dann gehen wir der Sache nach.',
@@ -278,7 +281,7 @@ const PHRASES = {
   },
   fr: {
     redeemAt: 'À utiliser sur',
-    deliveredTitle: '⚡ Livré directement sur ton compte',
+    deliveredTitle: 'Livré directement sur ton compte',
     deliveredSub: 'Crédité et prêt à jouer — aucun code à utiliser.',
     yourAccount: 'Ton compte',
     subtotal: 'Sous-total', coupon: 'Code de réduction', memberOff: 'Remise Forge+',
@@ -287,6 +290,7 @@ const PHRASES = {
     withdrawalConfirmed: (stamp, sentence) => `Le ${stamp} tu as confirmé : « ${sentence} »`,
     withdrawalDefault: (stamp) => `Le ${stamp} tu as demandé une livraison immédiate et reconnu que le droit de rétractation de 14 jours s’éteint dès que la commande est livrée.`,
     withdrawalCancel: 'Jusqu’à la livraison tu peux encore annuler — réponds simplement à cet e-mail.',
+    withdrawalDelivered: 'Ta commande a été livrée, le droit de rétractation est donc éteint. Un souci avec ta livraison ? Réponds à cet e-mail et nous réglerons ça.',
     needTitle: '⚠️ Il nous manque encore une chose',
     needBody: (need) => `Cette commande est livrée directement sur ton compte : il nous faut donc ton <strong style="color:#fff">${need}</strong>. Réponds à cet e-mail avec seulement cette information — nous commençons dès que nous l’avons. Nous ne demandons <strong style="color:#fff">jamais</strong> ton mot de passe.`,
     payExact: (amt) => `Paie ${amt} — le montant est déjà rempli`,
@@ -300,7 +304,7 @@ const PHRASES = {
     reviewAskBody: 'Un court avis sur Trustpilot aide le prochain acheteur bien plus que tout ce que nous pouvons dire de nous-mêmes — nous ne pouvons y modifier ni supprimer un mot.',
     reviewAskCta: 'Laisser un avis sur Trustpilot',
     payHow: (number) => `Paie avec un des moyens ci-dessous et mets ton numéro de commande <strong>${number}</strong> en référence. Ta commande est confirmée dès que nous le recevons.`,
-    byHandTitle: '✅ Livré à la main',
+    byHandTitle: 'Livré à la main',
     byHandSub: 'Nous avons traité cette commande personnellement — aucun code ne figure dans ce récapitulatif.',
     byHandCheck: 'Regarde dans le jeu, ou dans la boîte mail à laquelle nous avons écrit au sujet de cette commande.',
     byHandMissing: 'Rien reçu ? Réponds à cet e-mail avec ton numéro de commande et nous regardons ce qui s’est passé.',

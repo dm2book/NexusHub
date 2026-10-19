@@ -92,22 +92,15 @@ export const TEMPLATE_TRANSLATIONS = {
     order_completed: {
       subject: 'Order {{order.number}} is delivered 🎮',
       body_html: `
-      <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 22px"><tr>
-        <td style="padding:0 8px 0 0"><span style="display:inline-block;padding:6px 13px;background-color:#0e1f18;border:1px solid #145c43;border-radius:999px;color:#34d399;font-size:12px;font-weight:700;font-family:'Segoe UI',Arial,sans-serif">● Delivered</span></td>
-        <td><span style="display:inline-block;padding:6px 13px;background-color:#181826;border:1px solid #34345a;border-radius:999px;color:#9aa3b8;font-size:12px;font-weight:600;font-family:'Segoe UI',Arial,sans-serif">Order {{order.number}}</span></td>
-      </tr></table>
-      <div style="font:800 28px/1.2 'Segoe UI',Arial,sans-serif;color:#ffffff;letter-spacing:-.4px">Your order is delivered</div>
-      <div style="font:400 15px/1.6 'Segoe UI',Arial,sans-serif;color:#b9bfcd;padding-top:10px">Hi {{user.name}}, below is what you ordered and how to use it. Keep this email.</div>
-      <div style="padding-top:22px">{{order.deliveryHtml}}</div>
+      <h1>Your order is delivered</h1>
+      <p>Hi {{user.name}}, order <strong>{{order.number}}</strong> has been delivered. Below is what you
+      ordered and how to use it. Keep this email.</p>
+      <div style="padding-top:6px">{{order.deliveryHtml}}</div>
       {{order.redeemHtml}}
       <div style="height:1px;font-size:0;line-height:1px;background-color:#26263a;margin:26px 0 20px">&nbsp;</div>
       <div style="font:700 11px/1 'Segoe UI',Arial,sans-serif;letter-spacing:1.4px;text-transform:uppercase;color:#8b8fa3;padding-bottom:12px">Order summary</div>
       {{order.summaryHtml}}
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0 4px"><tr>
-        <td align="center" bgcolor="#7c5cff" style="border-radius:12px;background-color:#7c5cff;background-image:linear-gradient(120deg,#7c5cff 0%,#a855f7 55%,#d946ef 100%)">
-          <a class="btn" href="{{order.url}}" style="display:block;margin:0;padding:15px 24px;font:700 16px/20px 'Segoe UI',Arial,sans-serif;color:#ffffff;text-decoration:none;box-shadow:none">View order</a>
-        </td>
-      </tr></table>
+      <p><a class="btn" href="{{order.url}}">View order</a></p>
       {{order.invoiceHtml}}
       {{order.reviewAskHtml}}
       <div style="font:400 13px/1.6 'Segoe UI',Arial,sans-serif;color:#8b8fa3;text-align:center;padding-top:16px">Something not right? Reply to this email or open a ticket in our Discord.</div>
@@ -377,22 +370,15 @@ export const TEMPLATE_TRANSLATIONS = {
     order_completed: {
       subject: 'Bestellung {{order.number}} ist geliefert 🎮',
       body_html: `
-      <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 22px"><tr>
-        <td style="padding:0 8px 0 0"><span style="display:inline-block;padding:6px 13px;background-color:#0e1f18;border:1px solid #145c43;border-radius:999px;color:#34d399;font-size:12px;font-weight:700;font-family:'Segoe UI',Arial,sans-serif">● Geliefert</span></td>
-        <td><span style="display:inline-block;padding:6px 13px;background-color:#181826;border:1px solid #34345a;border-radius:999px;color:#9aa3b8;font-size:12px;font-weight:600;font-family:'Segoe UI',Arial,sans-serif">Bestellung {{order.number}}</span></td>
-      </tr></table>
-      <div style="font:800 28px/1.2 'Segoe UI',Arial,sans-serif;color:#ffffff;letter-spacing:-.4px">Deine Bestellung ist geliefert</div>
-      <div style="font:400 15px/1.6 'Segoe UI',Arial,sans-serif;color:#b9bfcd;padding-top:10px">Hallo {{user.name}}, unten steht, was du bestellt hast und wie du es benutzt. Bewahre diese Mail auf.</div>
-      <div style="padding-top:22px">{{order.deliveryHtml}}</div>
+      <h1>Deine Bestellung ist geliefert</h1>
+      <p>Hallo {{user.name}}, Bestellung <strong>{{order.number}}</strong> ist geliefert. Unten steht, was du
+      bestellt hast und wie du es benutzt. Bewahre diese Mail auf.</p>
+      <div style="padding-top:6px">{{order.deliveryHtml}}</div>
       {{order.redeemHtml}}
       <div style="height:1px;font-size:0;line-height:1px;background-color:#26263a;margin:26px 0 20px">&nbsp;</div>
       <div style="font:700 11px/1 'Segoe UI',Arial,sans-serif;letter-spacing:1.4px;text-transform:uppercase;color:#8b8fa3;padding-bottom:12px">Bestellübersicht</div>
       {{order.summaryHtml}}
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0 4px"><tr>
-        <td align="center" bgcolor="#7c5cff" style="border-radius:12px;background-color:#7c5cff;background-image:linear-gradient(120deg,#7c5cff 0%,#a855f7 55%,#d946ef 100%)">
-          <a class="btn" href="{{order.url}}" style="display:block;margin:0;padding:15px 24px;font:700 16px/20px 'Segoe UI',Arial,sans-serif;color:#ffffff;text-decoration:none;box-shadow:none">Bestellung ansehen</a>
-        </td>
-      </tr></table>
+      <p><a class="btn" href="{{order.url}}">Bestellung ansehen</a></p>
       {{order.invoiceHtml}}
       {{order.reviewAskHtml}}
       <div style="font:400 13px/1.6 'Segoe UI',Arial,sans-serif;color:#8b8fa3;text-align:center;padding-top:16px">Stimmt etwas nicht? Antworte auf diese Mail oder öffne ein Ticket in unserem Discord.</div>
@@ -664,22 +650,15 @@ export const TEMPLATE_TRANSLATIONS = {
     order_completed: {
       subject: 'La commande {{order.number}} est livrée 🎮',
       body_html: `
-      <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 22px"><tr>
-        <td style="padding:0 8px 0 0"><span style="display:inline-block;padding:6px 13px;background-color:#0e1f18;border:1px solid #145c43;border-radius:999px;color:#34d399;font-size:12px;font-weight:700;font-family:'Segoe UI',Arial,sans-serif">● Livrée</span></td>
-        <td><span style="display:inline-block;padding:6px 13px;background-color:#181826;border:1px solid #34345a;border-radius:999px;color:#9aa3b8;font-size:12px;font-weight:600;font-family:'Segoe UI',Arial,sans-serif">Commande {{order.number}}</span></td>
-      </tr></table>
-      <div style="font:800 28px/1.2 'Segoe UI',Arial,sans-serif;color:#ffffff;letter-spacing:-.4px">Ta commande est livrée</div>
-      <div style="font:400 15px/1.6 'Segoe UI',Arial,sans-serif;color:#b9bfcd;padding-top:10px">Bonjour {{user.name}}, voici ce que tu as commandé et comment l’utiliser. Garde cet e-mail.</div>
-      <div style="padding-top:22px">{{order.deliveryHtml}}</div>
+      <h1>Ta commande est livrée</h1>
+      <p>Bonjour {{user.name}}, la commande <strong>{{order.number}}</strong> est livrée. Voici ce que tu as
+      commandé et comment l’utiliser. Garde cet e-mail.</p>
+      <div style="padding-top:6px">{{order.deliveryHtml}}</div>
       {{order.redeemHtml}}
       <div style="height:1px;font-size:0;line-height:1px;background-color:#26263a;margin:26px 0 20px">&nbsp;</div>
       <div style="font:700 11px/1 'Segoe UI',Arial,sans-serif;letter-spacing:1.4px;text-transform:uppercase;color:#8b8fa3;padding-bottom:12px">Récapitulatif de la commande</div>
       {{order.summaryHtml}}
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0 4px"><tr>
-        <td align="center" bgcolor="#7c5cff" style="border-radius:12px;background-color:#7c5cff;background-image:linear-gradient(120deg,#7c5cff 0%,#a855f7 55%,#d946ef 100%)">
-          <a class="btn" href="{{order.url}}" style="display:block;margin:0;padding:15px 24px;font:700 16px/20px 'Segoe UI',Arial,sans-serif;color:#ffffff;text-decoration:none;box-shadow:none">Voir ma commande</a>
-        </td>
-      </tr></table>
+      <p><a class="btn" href="{{order.url}}">Voir ma commande</a></p>
       {{order.invoiceHtml}}
       {{order.reviewAskHtml}}
       <div style="font:400 13px/1.6 'Segoe UI',Arial,sans-serif;color:#8b8fa3;text-align:center;padding-top:16px">Un souci ? Réponds à cet e-mail ou ouvre un ticket sur notre Discord.</div>

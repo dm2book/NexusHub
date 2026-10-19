@@ -302,7 +302,43 @@ const FRAME = {
     nl: 'Digitale producten voor gamers', en: 'Digital goods for gamers',
     de: 'Digitale Produkte für Gamer', fr: 'Produits numériques pour joueurs',
   },
+  // The three stages of an order, for the progress strip on order mails.
+  stepPlaced: { nl: 'Geplaatst', en: 'Placed', de: 'Aufgegeben', fr: 'Passée' },
+  stepPaid: { nl: 'Betaald', en: 'Paid', de: 'Bezahlt', fr: 'Payée' },
+  stepDelivered: { nl: 'Geleverd', en: 'Delivered', de: 'Geliefert', fr: 'Livrée' },
 };
+
+/**
+ * Where an order mail sits on placed → paid → delivered: the number of steps
+ * done. A buyer reading "payment received" sees at a glance that delivery is
+ * next; one reading "not paid yet" sees what is still open. Mails that are not
+ * about an order's progress (cancelled, refunded, a support message) get no
+ * strip — a timeline there would only mislead.
+ */
+const ORDER_STEP = {
+  order_received: 1, payment_reminder: 1, payment_not_verified: 1,
+  payment_confirmed: 2, order_processing: 2, order_on_hold: 2,
+  order_completed: 3,
+};
+
+/** placed → paid → delivered as a three-column table that survives every
+    client: the dots and the rules between them are table cells, not shapes. */
+function progressHtml(done, accent, lang) {
+  const labels = [FRAME.stepPlaced, FRAME.stepPaid, FRAME.stepDelivered].map((t) => esc(pick(t, lang)));
+  const rule = (show, lit) => `<td style="padding:0;vertical-align:middle"><div style="height:2px;line-height:2px;font-size:0;background-color:${show ? (lit ? accent : '#2c2c44') : '#12121c'}">&nbsp;</div></td>`;
+  const cols = labels.map((label, i) => {
+    const isDone = i < done;
+    const isNext = i === done;
+    const dot = isDone
+      ? `<td width="26" height="26" bgcolor="${accent}" style="width:26px;height:26px;background-color:${accent};border-radius:999px;text-align:center;font:700 13px/26px Arial,sans-serif;color:#0b0b14">&#10003;</td>`
+      : `<td width="22" height="22" bgcolor="#12121c" style="width:22px;height:22px;background-color:#12121c;border:2px solid ${isNext ? accent : '#34344e'};border-radius:999px;text-align:center;font:700 12px/22px Arial,sans-serif;color:${isNext ? '#ffffff' : '#6b7287'}">${i + 1}</td>`;
+    return `<td width="33%" valign="top" style="width:33%;padding:0;text-align:center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>${rule(i > 0, i <= done)}${dot}${rule(i < 2, i + 1 <= done)}</tr></table>
+      <div style="font:${isDone || isNext ? 700 : 600} 12.5px/1.3 'Segoe UI',Arial,sans-serif;color:${isDone ? '#e5e7eb' : (isNext ? '#ffffff' : '#7a8197')};padding-top:8px">${label}</div>
+    </td>`;
+  }).join('');
+  return `<table role="presentation" class="steps" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 28px"><tr>${cols}</tr></table>`;
+}
 
 /** One language out of a table, never `undefined` in someone's inbox. */
 const pick = (table, lang) => (typeof table === 'string' ? table : (table?.[lang] ?? table?.nl ?? table?.en ?? ''));
@@ -324,24 +360,51 @@ const DEFAULT_THEME = { accent: null, eyebrow: FRAME.tagline, pills: [] };
  * about than a CSS engine in the send path. An element's own inline style is
  * written last, so anything a template set deliberately still wins.
  */
+/* The action button, inline. 15px padding + a 20px line box = a 50px target,
+   comfortably above the 44px a thumb needs, in clients that keep only inline
+   styles; display:block inside its cell so the whole bar is the link. */
+const BTN_STYLE = "display:block;background-color:#7c5cff;color:#ffffff;text-decoration:none;padding:15px 24px;border-radius:12px;font-weight:700;font-size:16px;line-height:20px;text-align:center;font-family:'Segoe UI',Arial,Helvetica,sans-serif";
+
+/**
+ * Every `<a class="btn">` as a bulletproof button.
+ *
+ * A styled link renders as plain blue underlined text in desktop Outlook,
+ * which ignores padding, radius and background on an <a>. The usual answer:
+ * the coloured cell carries the colour (bgcolor works everywhere), Outlook
+ * gets a VML round-rect it does draw, and every other client gets the real
+ * link. Done on the rendered body, so it also covers a template the owner
+ * edited — any `<a class="btn" href="…">label</a>` qualifies.
+ */
+function bulletproofButtons(html) {
+  return String(html).replace(
+    /(?:<p\b[^>]*>\s*)?<a class="btn" href="([^"]*)"([^>]*)>([\s\S]*?)<\/a>(?:\s*<\/p>)?/g,
+    (whole, href, attrs, label) => {
+      const text = label.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+      const rest = attrs.replace(/\s*\bstyle="[^"]*"/i, '');
+      return `<table role="presentation" class="btn-wrap" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:10px 0 22px"><tr>
+<td align="center" bgcolor="#7c5cff" style="border-radius:12px;background-color:#7c5cff;background-image:linear-gradient(120deg,#7c5cff 0%,#a855f7 55%,#d946ef 100%)">
+<!--[if mso]><v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="${href}" style="height:50px;v-text-anchor:middle;width:520px" arcsize="24%" stroke="f" fillcolor="#7c5cff"><w:anchorlock/><center style="color:#ffffff;font-family:Arial,sans-serif;font-size:16px;font-weight:bold">${text}</center></v:roundrect><![endif]-->
+<!--[if !mso]><!--><a class="btn" href="${href}"${rest} style="${BTN_STYLE}">${label}</a><!--<![endif]-->
+</td></tr></table>`;
+    });
+}
+
 function inlineCritical(html, accent) {
   const TAG = {
-    h1: 'color:#ffffff;font-size:23px;line-height:1.3;margin:0 0 14px;font-weight:800',
-    p: 'color:#b9bfcd;font-size:14.5px;line-height:1.7;margin:0 0 15px',
+    h1: "color:#ffffff;font-size:25px;line-height:1.25;margin:0 0 14px;font-weight:800;letter-spacing:-.3px;font-family:'Segoe UI',Arial,Helvetica,sans-serif",
+    p: "color:#b9bfcd;font-size:15.5px;line-height:1.65;margin:0 0 16px;font-family:'Segoe UI',Arial,Helvetica,sans-serif",
     strong: 'color:#ffffff',
-    a: 'color:#a78bfa',
+    a: 'color:#b9a7ff',
   };
   const CLASS = {
-    /* 15px padding + a 20px line box = a 50px target: comfortably above the
-       44px a thumb needs, in clients that keep the inline style only. */
-    btn: 'display:inline-block;background-color:#7c5cff;color:#ffffff;text-decoration:none;padding:15px 30px;border-radius:12px;font-weight:700;font-size:15.5px;line-height:20px;margin:8px 0 20px',
+    btn: BTN_STYLE,
     // The one small line under the button: "Vragen? Beantwoord deze mail…".
-    help: 'color:#8b93a7;font-size:13.5px;line-height:1.6;margin:0 0 12px',
+    help: 'color:#8b93a7;font-size:14px;line-height:1.6;margin:0 0 12px',
     // Unsubscribe / "why you get this" lines inside a body.
-    fine: 'color:#8b93a7;font-size:12px;line-height:1.6;margin:16px 0 0',
-    code: "font:800 30px/1 'Courier New',monospace;letter-spacing:8px;color:#ffffff;background-color:#1c1c2c;border:1px solid #34345a;border-radius:14px;padding:20px;text-align:center;margin:4px 0 16px",
-    notice: `background-color:#181826;border:1px solid #2c2c48;border-left:3px solid ${accent};padding:13px 16px;margin:6px 0 18px;color:#a8b0c2;font-size:13px;line-height:1.6`,
-    quote: `background-color:#1a1a2c;border-left:3px solid ${accent};padding:14px 18px;margin:0 0 18px;color:#cbd1de;font-size:14px;line-height:1.6`,
+    fine: 'color:#8b93a7;font-size:12.5px;line-height:1.6;margin:16px 0 0',
+    code: "font:800 30px/1.1 'Courier New',Courier,monospace;letter-spacing:8px;color:#ffffff;background-color:#1a1a2e;border:1px solid #3a3a64;border-radius:14px;padding:22px 16px;text-align:center;margin:4px 0 18px;-webkit-user-select:all;user-select:all",
+    notice: `background-color:#171727;border:1px solid #2c2c48;border-left:3px solid ${accent};border-radius:0 12px 12px 0;padding:14px 18px;margin:6px 0 20px;color:#aab2c4;font-size:14px;line-height:1.6`,
+    quote: `background-color:#171727;border:1px solid #2c2c48;border-left:3px solid ${accent};border-radius:0 12px 12px 0;padding:16px 18px;margin:0 0 20px;color:#cbd1de;font-size:14.5px;line-height:1.6`,
     badge: `width:64px;height:64px;border-radius:18px;background-color:${accent};text-align:center;font-size:30px;line-height:64px;margin:2px auto 18px`,
     'pill-note': 'display:inline-block;font:700 12px/1 Arial,sans-serif;color:#c7d2fe;background-color:#1b1b30;border:1px solid #34345c;border-radius:999px;padding:9px 16px',
     summary: 'width:100%;border-collapse:collapse;margin:2px 0 20px;font-size:14px;color:#cbd1de',
@@ -397,23 +460,27 @@ function sellerLine(lang) {
   return bits.join(' · ');
 }
 
+/** A footer promise without its leading emoji — the trust row draws its own
+    check mark, so a mail does not end in a row of pictographs. */
+const plainPill = (t) => String(t || '').replace(/^[\p{Extended_Pictographic}\u{FE0F}\u{200D}\s]+/u, '').trim();
+
 /** Wrap rendered content in the premium branded layout. */
 export function wrapBranded(contentHtml, {
   preheader = '', theme = DEFAULT_THEME, lang = 'nl', templateId = null, unsubscribeUrl = null,
 } = {}) {
   const brand = config.email.fromName;
-  // The accent tints the header, the button and the rules — so the mail's
-  // purpose is readable before a single word is.
+  // The accent tints the header, the progress strip and the rules — so the
+  // mail's purpose is readable before a single word is.
   const color = theme.accent || config.email.brandColor;
   const color2 = theme.accent2 || '#a855f7';
-  const pills = (theme.pills || []).map((t) => pick(t, lang)).filter(Boolean);
+  const pills = (theme.pills || []).map((t) => plainPill(pick(t, lang))).filter(Boolean);
   const eyebrow = pick(theme.eyebrow || DEFAULT_THEME.eyebrow, lang);
   const F = (key) => pick(FRAME[key], lang);
   const year = new Date().getFullYear();
   const app = String(config.appUrl || '').replace(/\/+$/, '');
   const why = pick(WHY[WHY_KIND[templateId]] || FRAME.why, lang).replace('{brand}', brand);
-  const linkStyle = 'display:inline-block;color:#c3b5ff;text-decoration:none;font-weight:600;font-size:12.5px;padding:2px 0';
-  const dot = '<span class="dot" style="color:#2f3448;padding:0 9px">·</span>';
+  const linkStyle = 'display:inline-block;color:#c3b5ff;text-decoration:none;font-weight:600;font-size:13px;padding:3px 0';
+  const dot = '<span class="dot" style="color:#3a3f55;padding:0 8px">·</span>';
   const links = [
     `<a href="${app}/track" style="${linkStyle}">${esc(F('track'))}</a>`,
     `<a href="${app}/discord" style="${linkStyle}">${esc(F('help'))}</a>`,
@@ -426,105 +493,120 @@ export function wrapBranded(contentHtml, {
     ] : []),
   ];
   const seller = sellerLine(lang);
+  const step = ORDER_STEP[templateId];
   const logo = config.email.logoUrl
     ? `<img src="${config.email.logoUrl}" alt="${esc(brand)}" height="34" style="display:block;border:0" />`
-    : `<table role="presentation" cellpadding="0" cellspacing="0"><tr>
-         <td style="background-color:#ffffff;background:rgba(255,255,255,.18);border-radius:10px;width:36px;height:36px;text-align:center;vertical-align:middle;font:800 18px/36px Arial,sans-serif;color:#ffffff">⚡</td>
-         <td style="padding-left:10px;font:800 21px/1 Arial,sans-serif;color:#ffffff;letter-spacing:-.3px">${esc(brand)}</td>
+    : `<table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+         <td width="38" height="38" bgcolor="#ffffff" style="width:38px;height:38px;background-color:#ffffff;background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.35);border-radius:11px;text-align:center;vertical-align:middle;font:800 19px/38px Arial,sans-serif;color:#ffffff">⚡</td>
+         <td style="padding-left:12px;font:800 22px/1 'Segoe UI',Arial,sans-serif;color:#ffffff;letter-spacing:-.4px">${esc(brand)}</td>
        </tr></table>`;
+  const body = bulletproofButtons(inlineCritical(contentHtml, color));
+  const trust = pills.length
+    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="trust" style="margin:4px 0 22px"><tr>
+        <td bgcolor="#161624" style="background-color:#161624;border:1px solid #26263c;border-radius:14px;padding:12px 16px;text-align:center">${pills.map((p) => `<span class="pill" style="display:inline-block;font:600 12.5px/1.5 'Segoe UI',Arial,sans-serif;color:#b6bdcd;padding:3px 9px"><span style="color:${color};font-weight:800">&#10003;</span>&nbsp;${esc(p)}</span>`).join('')}</td>
+      </tr></table>`
+    : '';
 
   return `<!doctype html>
-<html><head><meta charset="utf-8">
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="x-apple-disable-message-reformatting">
 <meta name="color-scheme" content="dark">
 <meta name="supported-color-schemes" content="dark">
+<!--[if mso]><noscript><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml></noscript>
+<style>body,table,td,a,p,div,span{font-family:Arial,Helvetica,sans-serif !important}</style><![endif]-->
 <style>
   body{margin:0;padding:0;background:#08080f;font-family:'Segoe UI',Arial,Helvetica,sans-serif;color:#e5e7eb;-webkit-text-size-adjust:100%}
   .wrap{max-width:600px;margin:0 auto;padding:32px 16px}
-  .card{background:#12121c;border:1px solid #26263a;border-radius:22px;overflow:hidden}
-  .head{background-color:${color};background:linear-gradient(120deg,${color} 0%,${color2} 100%);padding:28px 30px 24px;
-        background-image:radial-gradient(circle at 85% 15%,rgba(255,255,255,.26),transparent 48%),
-                         linear-gradient(rgba(255,255,255,.055) 1px,transparent 1px),
-                         linear-gradient(90deg,rgba(255,255,255,.055) 1px,transparent 1px),
-                         linear-gradient(120deg,${color} 0%,${color2} 100%);
-        background-size:auto,34px 34px,34px 34px,auto}
-  /* The eyebrow sat loose under the wordmark and read as a second, smaller
-     logo. In its own tinted chip it reads as what it is: a label saying which
-     of the mails this one is, before a single word of the letter. */
-  .head-sub{display:inline-block;font:700 10.5px/1 Arial,sans-serif;color:#fff;margin-top:14px;
-            letter-spacing:1.7px;text-transform:uppercase;background:rgba(0,0,0,.22);
-            border:1px solid rgba(255,255,255,.28);border-radius:999px;padding:7px 13px}
-
-  .body{padding:34px 30px 12px}
-  h1{font-size:23px;line-height:1.3;color:#ffffff;margin:0 0 14px;font-weight:800;letter-spacing:-.3px}
-  p{font-size:14.5px;line-height:1.7;color:#b9bfcd;margin:0 0 15px}
+  .card{background:#12121c;border:1px solid #26263a;border-radius:20px;overflow:hidden}
+  .head{background-color:${color};padding:26px 32px 22px;
+        background-image:radial-gradient(circle at 88% 0%,rgba(255,255,255,.30),transparent 46%),
+                         radial-gradient(circle at 0% 100%,rgba(0,0,0,.18),transparent 55%),
+                         linear-gradient(125deg,${color} 0%,${color2} 100%)}
+  /* The eyebrow is the status of THIS mail ("Geleverd", "Nog niet betaald"):
+     a chip, so it reads as a label rather than a second, smaller logo. */
+  .head-sub{display:inline-block;font:700 11px/1 Arial,sans-serif;color:#fff;margin-top:16px;
+            letter-spacing:1.6px;text-transform:uppercase;background:rgba(0,0,0,.24);
+            border:1px solid rgba(255,255,255,.32);border-radius:999px;padding:8px 14px}
+  .body{padding:36px 32px 10px}
+  h1{font-size:25px;line-height:1.25;color:#ffffff;margin:0 0 14px;font-weight:800;letter-spacing:-.3px}
+  p{font-size:15.5px;line-height:1.65;color:#b9bfcd;margin:0 0 16px}
   .badge{width:64px;height:64px;border-radius:18px;background-color:${color};background:linear-gradient(135deg,${color},${color2});
          text-align:center;font-size:30px;line-height:64px;margin:2px auto 18px;
          box-shadow:0 10px 26px rgba(0,0,0,.5)}
-  .pill-note{display:inline-block;font:700 12px/1 Arial,sans-serif;color:#c7d2fe;background:#1b1b30;
-             border:1px solid #34345c;border-radius:999px;padding:9px 16px;letter-spacing:.4px}
+  .pill-note{display:inline-block;font:700 12.5px/1 Arial,sans-serif;color:#c7d2fe;background:#1b1b30;
+             border:1px solid #34345c;border-radius:999px;padding:9px 16px;letter-spacing:.3px}
   strong{color:#fff}
-  a{color:#a78bfa}
+  a{color:#b9a7ff}
   /* One action colour across every mail, deliberately NOT the accent.
      The accent answers "which mail is this"; the button answers "what do I
      press". Those are different questions and they have different, consistent
      answers. The solid background-color comes first so a client that drops
      gradients still draws a purple button rather than white text on nothing. */
-  a.btn{display:inline-block;background-color:#7c5cff;
+  a.btn{display:block;background-color:#7c5cff;
         background-image:linear-gradient(120deg,#7c5cff 0%,#a855f7 55%,#d946ef 100%);
-        color:#ffffff !important;text-decoration:none;
-        padding:15px 30px;border-radius:12px;font-weight:700;font-size:15.5px;line-height:20px;margin:8px 0 20px;
-        box-shadow:0 8px 22px rgba(124,92,255,.28)}
-  p.help{color:#8b93a7;font-size:13.5px;line-height:1.6;margin:0 0 12px}
-  p.fine{color:#8b93a7;font-size:12px;line-height:1.6;margin:16px 0 0}
-  p.fine a,p.help a{color:#a78bfa}
-  .code{font:800 30px/1 'Courier New',monospace;letter-spacing:8px;color:#ffffff;
-        background-color:#1c1c2c;background-image:linear-gradient(180deg,#1c1c2c,#17172a);border:1px solid #34345a;border-radius:14px;
-        padding:20px;text-align:center;margin:4px 0 16px}
-  .notice{background:#181826;border:1px solid #2c2c48;border-left:3px solid ${color};border-radius:0 12px 12px 0;
-          padding:13px 16px;margin:6px 0 18px;color:#a8b0c2;font-size:13px;line-height:1.6}
+        color:#ffffff !important;text-decoration:none;text-align:center;
+        padding:15px 24px;border-radius:12px;font-weight:700;font-size:16px;line-height:20px;
+        box-shadow:0 10px 24px rgba(124,92,255,.32)}
+  p.help{color:#8b93a7;font-size:14px;line-height:1.6;margin:0 0 12px}
+  p.fine{color:#8b93a7;font-size:12.5px;line-height:1.6;margin:16px 0 0}
+  p.fine a,p.help a{color:#b9a7ff}
+  .code{font:800 30px/1.1 'Courier New',Courier,monospace;letter-spacing:8px;color:#ffffff;
+        background-color:#1a1a2e;background-image:linear-gradient(180deg,#1d1d33,#17172a);border:1px solid #3a3a64;border-radius:14px;
+        padding:22px 16px;text-align:center;margin:4px 0 18px}
+  .notice{background:#171727;border:1px solid #2c2c48;border-left:3px solid ${color};border-radius:0 12px 12px 0;
+          padding:14px 18px;margin:6px 0 20px;color:#aab2c4;font-size:14px;line-height:1.6}
   .notice strong{color:#e5e7eb}
-  .quote{border-left:3px solid ${color};background:#1a1a2c;border-radius:0 12px 12px 0;
-         padding:14px 18px;margin:0 0 18px;color:#cbd1de;font-size:14px;line-height:1.6}
-  .summary{width:100%;border-collapse:collapse;margin:2px 0 20px;font-size:14px}
+  .quote{border:1px solid #2c2c48;border-left:3px solid ${color};background:#171727;border-radius:0 12px 12px 0;
+         padding:16px 18px;margin:0 0 20px;color:#cbd1de;font-size:14.5px;line-height:1.6}
+  .summary{width:100%;border-collapse:collapse;margin:2px 0 20px;font-size:14.5px}
   .summary td{padding:10px 0;border-bottom:1px solid #24243a;color:#cbd1de}
   .summary .r{text-align:right;color:#fff;white-space:nowrap;font-weight:600}
-  .summary .tot td{border-top:2px solid #34345a;border-bottom:0;font-weight:800;color:#fff;padding-top:14px;font-size:15px}
-  .pill-row{padding:0 0 18px}
-  .pill{display:inline-block;font:600 11px/1 Arial,sans-serif;color:#9aa3b8;background:#1a1a2c;
-        border:1px solid #262640;border-radius:999px;padding:7px 12px;margin:0 6px 6px 0}
+  .summary .tot td{border-top:2px solid #34345a;border-bottom:0;font-weight:800;color:#fff;padding-top:14px;font-size:15.5px}
   .divider{height:1px;background:#22223a;margin:6px 0 20px}
   .foot{color:#8b93a7;font-size:12px;line-height:1.6;text-align:center}
-  .foot-links a{display:inline-block;color:#c3b5ff;text-decoration:none;font-weight:600;font-size:12.5px;padding:2px 0}
-  .foot .dot{color:#2f3448;padding:0 9px}
-  .foot-why{padding-top:14px;color:#5b6577;font-size:11.5px;line-height:1.6}
-  .foot-legal{padding-top:10px;color:#4b5466;font-size:11.5px}
-  .foot-legal a{color:#68718a;text-decoration:none}
+  .foot-links a{display:inline-block;color:#c3b5ff;text-decoration:none;font-weight:600;font-size:13px;padding:3px 0}
+  .foot .dot{color:#3a3f55;padding:0 8px}
   .preheader{display:none!important;visibility:hidden;opacity:0;height:0;width:0;overflow:hidden;mso-hide:all}
+  /* Phones: a little less air around the card, the code a size down so a
+     long key breaks at its dashes instead of running off the card. Progressive
+     only — every size above is already readable without it. */
+  @media only screen and (max-width:480px){
+    .outer{padding:16px 8px !important}
+    .wrap{padding:0 !important}
+    .head{padding:22px 22px 20px !important}
+    .body{padding:28px 22px 6px !important}
+    .foot-cell{padding:16px 22px 26px !important}
+    .pad-x{padding-left:22px !important;padding-right:22px !important}
+    h1{font-size:23px !important}
+    .code-val{font-size:19px !important;letter-spacing:1.5px !important}
+  }
 </style></head>
 <body bgcolor="#08080f" style="margin:0;padding:0;background-color:#08080f;color:#e5e7eb">
 <span class="preheader" style="display:none;visibility:hidden;opacity:0;color:transparent;height:0;width:0;max-height:0;max-width:0;overflow:hidden;mso-hide:all">${preheaderHtml(preheader)}</span>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#08080f" style="background-color:#08080f"><tr><td align="center" style="padding:32px 16px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#08080f" style="background-color:#08080f"><tr><td align="center" class="outer" style="padding:32px 16px">
 <div class="wrap" style="max-width:600px;margin:0 auto">
-  <table role="presentation" class="card" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#12121c" style="background-color:#12121c;border:1px solid #26263a;border-radius:22px;overflow:hidden">
-    <tr><td class="head" bgcolor="${color}" style="background-color:${color};background-image:linear-gradient(120deg,${color} 0%,${color2} 100%);padding:28px 30px 24px">${logo}
-      <div class="head-sub" style="display:inline-block;font:700 10.5px/1 Arial,sans-serif;color:#ffffff;margin-top:14px;letter-spacing:1.7px;text-transform:uppercase;background-color:#1f1f2e;background:rgba(0,0,0,.22);border-radius:999px;padding:7px 13px">${esc(eyebrow)}</div>
+<!--[if mso]><table role="presentation" width="600" align="center" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->
+  <table role="presentation" class="card" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#12121c" style="background-color:#12121c;border:1px solid #26263a;border-radius:20px;overflow:hidden">
+    <tr><td class="head" bgcolor="${color}" style="background-color:${color};background-image:linear-gradient(125deg,${color} 0%,${color2} 100%);padding:26px 32px 22px">${logo}
+      <div class="head-sub" style="display:inline-block;font:700 11px/1 Arial,sans-serif;color:#ffffff;margin-top:16px;letter-spacing:1.6px;text-transform:uppercase;background-color:#1f1f2e;background:rgba(0,0,0,.24);border:1px solid rgba(255,255,255,.32);border-radius:999px;padding:8px 14px">${esc(eyebrow)}</div>
     </td></tr>
-    <tr><td class="body" bgcolor="#12121c" style="background-color:#12121c;color:#b9bfcd;padding:34px 30px 12px;font-family:'Segoe UI',Arial,Helvetica,sans-serif">${inlineCritical(contentHtml, color)}</td></tr>
-    <tr><td bgcolor="#12121c" style="background-color:#12121c;padding:0 30px">
-      ${pills.length ? `<div class="pill-row" style="padding:0 0 18px">${pills.map((p) => `<span class="pill" style="display:inline-block;font:600 11px/1 Arial,sans-serif;color:#9aa3b8;background-color:#1a1a2c;border:1px solid #262640;border-radius:999px;padding:7px 12px;margin:0 6px 6px 0">${esc(p)}</span>`).join('')}</div>` : ''}
-      <div class="divider" style="height:1px;background-color:#22223a;margin:6px 0 20px;font-size:0;line-height:1px">&nbsp;</div>
+    <tr><td class="body" bgcolor="#12121c" style="background-color:#12121c;color:#b9bfcd;padding:36px 32px 10px;font-family:'Segoe UI',Arial,Helvetica,sans-serif">${step ? progressHtml(step, color, lang) : ''}${body}</td></tr>
+    <tr><td class="pad-x" bgcolor="#12121c" style="background-color:#12121c;padding:0 32px">
+      ${trust}
+      <div class="divider" style="height:1px;background-color:#22223a;margin:4px 0 4px;font-size:0;line-height:1px">&nbsp;</div>
     </td></tr>
-    <tr><td bgcolor="#12121c" style="background-color:#12121c;padding:18px 30px 28px;color:#8b93a7;font-size:12px;line-height:1.6;text-align:center">
+    <tr><td class="foot-cell" bgcolor="#12121c" style="background-color:#12121c;padding:20px 32px 30px;color:#8b93a7;font-size:12px;line-height:1.6;text-align:center;font-family:'Segoe UI',Arial,Helvetica,sans-serif">
     <div class="foot">
       <div class="foot-links">${links.join(dot)}</div>
-      <div class="foot-why" style="padding-top:14px;color:#8b93a7;font-size:11.5px;line-height:1.6">${esc(why)}${unsubscribeUrl
+      <div class="foot-why" style="padding-top:14px;color:#8b93a7;font-size:12px;line-height:1.6">${esc(why)}${unsubscribeUrl
         ? ` <a href="${esc(unsubscribeUrl)}" style="color:#c3b5ff;text-decoration:underline">${esc(F('unsubscribe'))}</a>` : ''}</div>
-      ${seller ? `<div class="foot-seller" style="padding-top:10px;color:#8b93a7;font-size:11.5px;line-height:1.6">${seller}</div>` : ''}
-      <div class="foot-legal" style="padding-top:10px;color:#8b93a7;font-size:11.5px">© ${year} ${esc(brand)} — <a href="${app}" style="color:#8b93a7;text-decoration:none">${app.replace(/^https?:\/\//, '')}</a></div>
+      ${seller ? `<div class="foot-seller" style="padding-top:10px;color:#8b93a7;font-size:12px;line-height:1.6">${seller}</div>` : ''}
+      <div class="foot-legal" style="padding-top:12px;color:#6b7287;font-size:12px">© ${year} ${esc(brand)} — <a href="${app}" style="color:#8b93a7;text-decoration:none">${app.replace(/^https?:\/\//, '')}</a></div>
     </div>
     </td></tr>
   </table>
+<!--[if mso]></td></tr></table><![endif]-->
 </div>
 </td></tr></table>
 </body></html>`;
