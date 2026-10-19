@@ -780,10 +780,13 @@ export default function Checkout() {
           {/* The legally required tick, directly above the button it unlocks —
               on every screen size. On a phone it sat only in the pay bar, UNDER
               that bar's button, while the warning here said "the box above". */}
+          {/* `[color-scheme:light]` on the box: the page root is `color-scheme: dark`,
+              so an unticked native checkbox painted as a dark filled square on
+              this light card — it looked already ticked. */}
           <label id="fm-consent" className="flex items-start gap-2.5 mb-3 text-[12.5px] text-slate-400 cursor-pointer scroll-mt-24"
             style={triedConsent && !consent ? { outline: '2px solid #f59e0b', outlineOffset: 4, borderRadius: 8 } : undefined}>
             <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)}
-              className="mt-0.5 shrink-0 w-4 h-4 accent-violet-600" />
+              className="mt-0.5 shrink-0 w-4 h-4 accent-violet-600 [color-scheme:light]" />
             <span>{consentSentence}</span>
           </label>
           <button disabled={busy || paused} className="btn-primary w-full py-3">
@@ -819,7 +822,7 @@ export default function Checkout() {
           <label className="flex items-start gap-2 mb-2 leading-snug text-slate-600 cursor-pointer"
             style={{ fontSize: 11.5, ...(triedConsent && !consent ? { color: '#b45309' } : {}) }}>
             <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)}
-              className="mt-0.5 shrink-0 w-4 h-4 accent-violet-600" />
+              className="mt-0.5 shrink-0 w-4 h-4 accent-violet-600 [color-scheme:light]" />
             <span>{consentSentence}</span>
           </label>
           <div className="flex items-center gap-3">
