@@ -23,6 +23,7 @@ import { FAQ, GAME_ROLES, NOTIFY_ROLES, LEVEL_ROLES, CATEGORY_GAME_ROLE,
   LANGUAGE_ROLES, bannerImage,
 } from './config.js';
 import { orderStatusView, pickedLang, say, ORDER_UI } from './orderStatus.js';
+import { styled, linkRow, PALETTE, configureEmbedStyle, orderStatusMessage } from './embedStyle.js';
 import { deliveryFor, DELIVERY_CATEGORIES, DELIVERY_FIELD } from './generated/delivery.js';
 import {
   buildPanels, panelNeedsUpdate, panelFooterIsStale, PANEL_FOOTER, isPanelFooter,
@@ -533,6 +534,8 @@ const chanRef = (guild, name) => {
   return ch ? `<#${ch.id}>` : `#${name}`;
 };
 const BRAND_ICON = `${STORE_URL}/icon-512.png`;
+// Every embed's footer carries the shop's name, address and this icon.
+configureEmbedStyle({ storeUrl: STORE_URL, icon: BRAND_ICON });
 
 const client = new Client({
   intents: [
@@ -803,7 +806,7 @@ async function updatePriceList(guild) {
       fields.push({ name, value });
     }
 
-    const embed = new EmbedBuilder().setColor(0x6366f1)
+    const embed = styled('info')
       .setTitle('🏷️ Live price list')
       .setThumbnail(BRAND_ICON)
       .setImage(BANNER('products'))
@@ -827,18 +830,18 @@ async function updatePriceList(guild) {
 // the owner to re-run setup, the bot upgrades its own panels in place on boot:
 // it finds each marker message and EDITS the embed to add the banner + colour.
 const PANEL_BANNERS = {
-  welcome: ['welcome', 0x7c5cff],
-  rules: ['rules', 0x94a3b8],
-  verify: ['verify', 0x22c55e],
-  'open-a-ticket': ['support', 0x3b82f6],
-  'support-info': ['support', 0x3b82f6],
-  products: ['products', 0x6366f1],
-  'price-list': ['products', 0x6366f1],
-  deals: ['deals', 0xef4444],
-  'discount-codes': ['deals', 0xec4899],
-  reviews: ['vouches', 0x22c55e],
-  vouches: ['vouches', 0x22c55e],
-  giveaways: ['giveaways', 0xa855f7],
+  welcome: ['welcome', PALETTE.brand],
+  rules: ['rules', PALETTE.neutral],
+  verify: ['verify', PALETTE.success],
+  'open-a-ticket': ['support', PALETTE.info],
+  'support-info': ['support', PALETTE.info],
+  products: ['products', PALETTE.info],
+  'price-list': ['products', PALETTE.info],
+  deals: ['deals', PALETTE.error],
+  'discount-codes': ['deals', PALETTE.highlight],
+  reviews: ['vouches', PALETTE.success],
+  vouches: ['vouches', PALETTE.success],
+  giveaways: ['giveaways', PALETTE.highlight],
 };
 
 async function syncPanelBanners(guild) {
@@ -997,7 +1000,7 @@ async function checkImpersonation(member) {
     // accusing the wrong member is its own harm. #mod-log is where staff decide.
     const ch = findChannel(member.guild, 'mod-log') || findChannel(member.guild, 'staff-chat');
     if (!ch) return;
-    await ch.send({ embeds: [new EmbedBuilder().setColor(0xef4444)
+    await ch.send({ embeds: [styled('error')
       .setTitle('🚨 Possible staff impersonation')
       .setDescription(
         `<@${member.id}> (\`${member.user.tag}\`) uses a name matching a staff member or the brand.\n` +
@@ -1059,7 +1062,7 @@ async function maybeAnnounceLaunch(guild) {
   const channelIdByName = {};
   guild.channels.cache.forEach((c) => { if (c.name) channelIdByName[c.name] = c.id; });
   const a = buildLaunchAnnouncement({ storeUrl: STORE_URL, channelIdByName });
-  const e = new EmbedBuilder().setColor(a.color).setTitle(a.title).setDescription(a.description)
+  const e = styled('info').setColor(a.color).setTitle(a.title).setDescription(a.description)
     .setImage(a.image).setTimestamp();
   const sent = await ch.send({
     content: '@everyone', embeds: [e], allowedMentions: { parse: ['everyone'] },
@@ -1173,7 +1176,7 @@ client.on(Events.GuildMemberAdd, async (member) => {
   /* A join carries no locale, so the server's own language is the guess —
      the same fallback every other plain event uses. */
   const lang = memberLang(member, member.guild.preferredLocale);
-  const dm = new EmbedBuilder().setColor(0x7c5cff)
+  const dm = styled('brand')
     .setTitle(t('welcomeTitle', lang, { guild: member.guild.name }))
     .setThumbnail(BRAND_ICON)
     .setImage(BANNER('welcome'))
@@ -1283,7 +1286,7 @@ async function handleButton(i) {
       storeUrl: STORE_URL, guildName: i.guild.name, channelIdByName,
       trustpilotUrl: (await trustpilotLinks()).profile,
     }).rules;
-    const rules = new EmbedBuilder().setColor(0x6366f1)
+    const rules = styled('info')
       .setTitle(t('rulesTitle', lang))
       .setDescription(`${rulesCopy.description}\n\n${t('rulesPrompt', lang)}`)
       .setFooter({ text: 'ForgeMarket • verification' });
@@ -1347,7 +1350,7 @@ async function handleButton(i) {
   if (i.customId === 'ticket:close:yes') return confirmClose(i);
   if (i.customId === 'ticket:close:no') {
     return i.update({
-      embeds: [new EmbedBuilder().setColor(0x10b981).setDescription('\u{1F44D} Left open.')],
+      embeds: [styled('success').setDescription('\u{1F44D} Left open.')],
       components: [],
     }).catch(() => {});
   }
@@ -1478,7 +1481,7 @@ async function claimTicket(i) {
     return r;
   });
   await i.message.edit({ components: rows }).catch(() => {});
-  await i.channel.send({ embeds: [new EmbedBuilder().setColor(0x10b981)
+  await i.channel.send({ embeds: [styled('success')
     .setDescription(`🛠️ Ticket claimed by <@${i.user.id}> — they’ll help you from here.`)] }).catch(() => {});
 }
 
@@ -1511,7 +1514,7 @@ async function enterGiveaway(i, messageId) {
 function updateGwCount(guild, gw) {
   const ch = guild.channels.cache.get(gw.channelId);
   ch?.messages?.fetch(gw.msgId).then((msg) => {
-    const emb = EmbedBuilder.from(msg.embeds[0]).setFields({ name: 'Entries', value: `🎟️ ${gw.entries.size}`, inline: true });
+    const emb = EmbedBuilder.from(msg.embeds[0]).setFields({ name: 'Inschrijvingen', value: `🎟️ ${gw.entries.size}`, inline: true });
     msg.edit({ embeds: [emb] }).catch(() => {});
   }).catch(() => {});
 }
@@ -1557,8 +1560,8 @@ async function openTicket(i, type, { orderNumber = '', details = '' } = {}) {
 
   const label = ticketLabel(type);
   const prio = priorityOf(type);
-  const embed = new EmbedBuilder()
-    .setColor(prio.key === 'high' ? 0xef4444 : prio.key === 'normal' ? 0x6366f1 : 0x64748b)
+  const embed = styled('info')
+    .setColor(prio.key === 'high' ? PALETTE.error : prio.key === 'normal' ? PALETTE.info : PALETTE.neutral)
     .setTitle(`${label}`)
     .setDescription(
       t('ticketHello', lang, { user: `<@${i.user.id}>` }) +
@@ -1587,8 +1590,8 @@ async function openTicket(i, type, { orderNumber = '', details = '' } = {}) {
      archived (a staff member removing the channel by hand) left none at all. */
   const openLog = findChannel(i.guild, 'ticket-logs');
   if (openLog) {
-    await openLog.send({ embeds: [new EmbedBuilder()
-      .setColor(prio.key === 'high' ? 0xef4444 : 0x6366f1)
+    await openLog.send({ embeds: [styled('info')
+      .setColor(prio.key === 'high' ? PALETTE.error : PALETTE.info)
       .setTitle(`${prio.dot} Ticket opened \u00b7 ${label}`)
       .addFields(
         { name: 'Channel', value: `<#${channel.id}>`, inline: true },
@@ -1630,7 +1633,7 @@ async function archiveTicket(ch, closedByText, dmLabel = null) {
 
   const logs = findChannel(ch.guild, 'ticket-logs');
   if (logs) {
-    const logEmbed = new EmbedBuilder().setColor(0x6366f1).setTitle('📄 Ticket closed')
+    const logEmbed = styled('info').setTitle('📄 Ticket closed')
       .addFields(
         { name: 'Channel', value: `#${ch.name}`, inline: true },
         { name: 'Owner', value: ownerId ? `<@${ownerId}>` : 'unknown', inline: true },
@@ -1688,7 +1691,7 @@ async function closeTicket(i) {
   // conversation cannot be reopened here".
   return i.reply({
     ephemeral: true,
-    embeds: [new EmbedBuilder().setColor(0xf59e0b)
+    embeds: [styled('warning')
       .setTitle(t('closeTitle', lang))
       .setDescription(t('closeBody', lang))],
     components: [rows],
@@ -1702,10 +1705,10 @@ async function confirmClose(i) {
     return i.update({ content: 'This isn\u2019t a ticket channel.', embeds: [], components: [] }).catch(() => {});
   }
   await i.update({
-    embeds: [new EmbedBuilder().setColor(0xef4444).setDescription('\u{1F512} Closing\u2026')],
+    embeds: [styled('error').setDescription('\u{1F512} Closing\u2026')],
     components: [],
   }).catch(() => {});
-  await ch.send({ embeds: [new EmbedBuilder().setColor(0xef4444)
+  await ch.send({ embeds: [styled('error')
     .setDescription(t('closing', memberLang(i.member, i.locale), { user: `<@${i.user.id}>` }))] }).catch(() => {});
   await archiveTicket(ch, `<@${i.user.id}>`, i.user.tag);
 }
@@ -1727,7 +1730,7 @@ async function sweepIdleTickets(guild) {
 
       if (meta.idleWarned) {
         // Warned 24h+ ago and still silence → close it (warning was the last message).
-        await ch.send({ embeds: [new EmbedBuilder().setColor(0xef4444)
+        await ch.send({ embeds: [styled('error')
           .setDescription('🔒 Closing this ticket due to inactivity. You can always open a new one in #open-a-ticket.')] }).catch(() => {});
         await archiveTicket(ch, 'Auto-close (inactive)');
       } else {
@@ -1735,7 +1738,7 @@ async function sweepIdleTickets(guild) {
         await ch.setTopic(`${ch.topic} · idlewarned`).catch(() => {});
         await ch.send({
           content: ownerId ? `<@${ownerId}>` : '',
-          embeds: [new EmbedBuilder().setColor(0xf59e0b)
+          embeds: [styled('warning')
             .setTitle('⏰ Still need help?')
             .setDescription('This ticket has been quiet for a day. Reply to keep it open — otherwise it closes automatically in **24 hours** (you’ll get the transcript by DM).')],
         }).catch(() => {});
@@ -1750,7 +1753,7 @@ async function rateSupport(i, stars, ticket) {
   const home = homeGuild(i.client);
   const logs = home ? findChannel(home, 'ticket-logs') : null;
   await i.update({ content: `Thanks for your feedback — you rated us ${'⭐'.repeat(stars)} (${stars}/5)! 💜`, components: [] }).catch(() => {});
-  if (logs) await logs.send({ embeds: [new EmbedBuilder().setColor(stars >= 4 ? 0x10b981 : 0xf5b324)
+  if (logs) await logs.send({ embeds: [styled('info').setColor(stars >= 4 ? PALETTE.success : PALETTE.warning)
     .setDescription(`\u2B50 Support rated **${stars}/5** by <@${i.user.id}>`
       + (ticket ? ` \u2014 ticket \`${ticket}\`` : ''))
     .setTimestamp()] }).catch(() => {});
@@ -1785,7 +1788,7 @@ async function handleCommand(i) {
     // help should not have to read past /flashsale and /clearpins to find
     // "where is my order?". In the member's language, like /order.
     const H = helpFor(lang);
-    const e = new EmbedBuilder().setColor(0x6366f1)
+    const e = styled('info')
       .setAuthor({ name: H.author, iconURL: BRAND_ICON })
       .setDescription(H.intro)
       .addFields(
@@ -1832,7 +1835,7 @@ async function handleCommand(i) {
   if (i.commandName === 'clearpins') return clearPinsCmd(i);
   if (i.commandName === 'serverinfo') {
     const g = i.guild;
-    const e = new EmbedBuilder().setColor(0x6366f1).setTitle(`📊 ${g.name}`)
+    const e = styled('info').setTitle(`📊 ${g.name}`)
       .setThumbnail(g.iconURL() || null)
       .addFields(
         { name: '👥 Members', value: `${g.memberCount}`, inline: true },
@@ -1862,7 +1865,7 @@ async function handleCommand(i) {
   }
   if (i.commandName === 'stats') {
     const g = i.guild;
-    const e = new EmbedBuilder().setColor(0x6366f1).setTitle(`📊 ${g.name}`)
+    const e = styled('info').setTitle(`📊 ${g.name}`)
       .addFields(
         { name: '👥 Members', value: `${g.memberCount}`, inline: true },
         { name: '💬 Channels', value: `${g.channels.cache.size}`, inline: true },
@@ -1892,9 +1895,9 @@ async function handleCommand(i) {
 // Approve / Planned / Decline buttons; a decision recolors the card and DMs the
 // author. Votes persist in bot-meta.json so a restart never loses them.
 const SUG_STATUS = {
-  approve: { label: '✅ Approved', color: 0x10b981 },
-  planned: { label: '🚧 Planned', color: 0xf59e0b },
-  decline: { label: '❌ Declined', color: 0xef4444 },
+  approve: { label: '✅ Approved', color: PALETTE.success },
+  planned: { label: '🚧 Planned', color: PALETTE.warning },
+  decline: { label: '❌ Declined', color: PALETTE.error },
 };
 const sugStore = () => (META.suggestions ||= {});
 function sugRows(rec) {
@@ -1916,7 +1919,7 @@ async function postSuggestion(i) {
   // which can blow past the 3s interaction deadline under load and throw
   // "Unknown interaction" even though the suggestion was posted fine.
   await i.deferReply({ ephemeral: true });
-  const e = new EmbedBuilder().setColor(0x6366f1).setTitle('💡 New suggestion')
+  const e = styled('info').setTitle('💡 New suggestion')
     .setDescription(text).setAuthor({ name: i.user.username, iconURL: i.user.displayAvatarURL() })
     .setFooter({ text: 'Vote below · staff review every idea' }).setTimestamp();
   const rec = { author: i.user.id, up: [], down: [], status: null };
@@ -1977,7 +1980,7 @@ client.on(Events.MessageReactionAdd, async (reaction) => {
     const board = findChannel(msg.guild, 'starboard');
     if (!board || board.id === msg.channel.id) return;
     starred.add(msg.id);
-    const e = new EmbedBuilder().setColor(0xf5b324)
+    const e = styled('warning')
       .setAuthor({ name: msg.author.username, iconURL: msg.author.displayAvatarURL() })
       .setDescription(msg.content || '*(no text)*')
       .addFields({ name: '​', value: `[Jump to message](${msg.url}) · in <#${msg.channel.id}>` })
@@ -2042,7 +2045,7 @@ async function moderateMessage(m) {
 
   const log = findChannel(m.guild, 'mod-log');
   if (log) {
-    log.send({ embeds: [new EmbedBuilder().setColor(0xef4444)
+    log.send({ embeds: [styled('error')
       .setTitle('🚫 Message auto-removed')
       .setDescription(`**Reason:** ${reason}\n**Member:** <@${m.author.id}> (\`${m.author.tag}\`)\n` +
         `**Channel:** <#${m.channel.id}>\n**Account age:** <t:${Math.floor(m.author.createdTimestamp / 1000)}:R>`)
@@ -2100,7 +2103,7 @@ async function announceLevelUp(guild, user, member, lvl, fallbackCh) {
      member who levels up chatting in French is congratulated in the room they
      are actually looking at rather than in one they cannot see. */
   const ch = isLanguageRoom(fallbackCh) ? fallbackCh : (houseChannel(guild) || fallbackCh);
-  ch?.send({ embeds: [new EmbedBuilder().setColor(0xf5b324)
+  ch?.send({ embeds: [styled('warning')
     .setAuthor({ name: user.username, iconURL: user.displayAvatarURL() })
     .setDescription(`🎉 GG <@${user.id}> — you reached **Level ${lvl}**!` +
       (unlocked ? `\n🏅 Role unlocked: **${unlocked}**` : '') +
@@ -2158,7 +2161,7 @@ function rankCmd(i) {
   const bar = '█'.repeat(Math.round(prog * 14)).padEnd(14, '░');
   const sorted = Object.entries(XP).sort((a, b) => b[1].xp - a[1].xp);
   const rankN = sorted.findIndex(([id]) => id === i.user.id) + 1;
-  const e = new EmbedBuilder().setColor(0xa855f7)
+  const e = styled('highlight')
     .setAuthor({ name: i.user.username, iconURL: i.user.displayAvatarURL() })
     .setTitle(`Level ${rec.lvl}`)
     .setDescription(`**Rank:** #${rankN || '—'}\n**XP:** ${rec.xp} / ${next}\n\`${bar}\` ${Math.round(prog * 100)}%`);
@@ -2166,8 +2169,8 @@ function rankCmd(i) {
 }
 function leaderboardCmd(i) {
   const top = Object.entries(XP).sort((a, b) => b[1].xp - a[1].xp).slice(0, 10);
-  const lines = top.map(([id, r], n) => `**${['🥇', '🥈', '🥉'][n] || `${n + 1}.`}** <@${id}> — Level ${r.lvl} · ${r.xp} XP`).join('\n') || 'No one has chatted yet — be the first!';
-  const e = new EmbedBuilder().setColor(0xa855f7).setTitle('🏆 XP Leaderboard').setDescription(lines).setFooter({ text: 'Chat to earn XP' });
+  const lines = top.map(([id, r], n) => `**${['🥇', '🥈', '🥉'][n] || `${n + 1}.`}** <@${id}> — level ${r.lvl} · ${r.xp} XP`).join('\n') || 'Nog niemand heeft gechat — wees de eerste!';
+  const e = styled('highlight').setTitle('🏆 XP-ranglijst').setDescription(lines).setFooter({ text: 'chat mee en verdien XP' });
   return i.reply({ embeds: [e] });
 }
 
@@ -2321,11 +2324,10 @@ async function fetchOrderStatus(num, lang = 'en') {
     // Which way the buyer pays decides what "waiting for payment" tells them.
     const provider = (await siteConfig())?.paymentProvider || null;
     const v = orderStatusView(await res.json(), { money, lang, provider });
-    return { embed: new EmbedBuilder().setColor(v.color)
-      .setAuthor({ name: v.author, iconURL: BRAND_ICON })
-      .setTitle(v.title).setDescription(v.description || null)
-      .addFields(...v.fields)
-      .setFooter({ text: v.footer }).setTimestamp() };
+    /* The embed and its one button — "pay" while a provider payment is still
+       owed, the live status page otherwise. Shared with the tests. */
+    const msg = orderStatusMessage(v, { trackUrl: `${STORE_URL}/track?number=${encodeURIComponent(num)}` });
+    return { embed: msg.embeds[0], components: msg.components };
   } catch { return { status: 'error' }; }
 }
 async function orderStatusEmbed(num, lang = 'en') {
@@ -2345,14 +2347,9 @@ async function lookupOrder(i) {
   const r = await fetchOrderStatus(num, lang);
   if (r.status === 404) return i.editReply(say(ORDER_UI.notFound, lang).replace('%s', num));
   if (!r.embed) return i.editReply(say(ORDER_UI.busy, lang));
-  const e = r.embed;
   // The track page is the live version of this embed and needs no account, so
   // the buyer never has to come back and re-run the command to refresh.
-  const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setLabel(say(ORDER_UI.page, lang)).setStyle(ButtonStyle.Link)
-      .setURL(`${STORE_URL}/track?number=${encodeURIComponent(num)}`),
-  );
-  return i.editReply({ embeds: [e], components: [row] });
+  return i.editReply({ embeds: [r.embed], components: r.components || [] });
 }
 
 // ── /vouch → posts to #vouches ────────────────────────────────────────────────
@@ -2405,7 +2402,7 @@ async function postVouch(i) {
      only verified ones are featured or sent to the website. */
   const purchase = await hasCompletedOrder(i.user.id);
   const ch = findChannel(i.guild, 'vouches') || findChannel(i.guild, 'vouchers');
-  const e = new EmbedBuilder().setColor(purchase ? 0x22c55e : 0x6366f1)
+  const e = styled('info').setColor(purchase ? PALETTE.success : PALETTE.info)
     .setAuthor({ name: i.user.username, iconURL: i.user.displayAvatarURL() })
     .setDescription(`${'⭐'.repeat(stars)}${'☆'.repeat(5 - stars)}\n\n${message}`)
     .setFooter({ text: purchase ? `✅ ${VERIFIED_VOUCH}` : COMMUNITY_VOUCH }).setTimestamp();
@@ -2465,7 +2462,7 @@ async function priceCmd(i) {
   const P = PRICE_UI[lang] || PRICE_UI.en;
   const d = deliveryFor(best.category, lang);
   const cta = await shopLink(`${STORE_URL}/product/${best.id}`);
-  const e = new EmbedBuilder().setColor(0x6366f1)
+  const e = styled('info')
     .setTitle(`🏷️ ${best.name}`)
     .setDescription(
       `**${money(best.price, best.currency)}**\n${cta}` +
@@ -2593,7 +2590,7 @@ async function deliveryCmd(i) {
   const d = deliveryFor(specific ? category : 'default', lang);
   const field = specific ? (DELIVERY_FIELD[category] || {})[lang] : null;
 
-  const e = new EmbedBuilder().setColor(specific ? 0x7c5cff : 0x94a3b8)
+  const e = styled('info').setColor(specific ? PALETTE.brand : PALETTE.neutral)
     .setTitle(specific ? T.title(label || CATEGORY_LABEL[category] || category) : T.titleGeneric)
     .setThumbnail(BRAND_ICON)
     .setDescription(d.method)
@@ -2623,11 +2620,11 @@ async function dropsCmd(i) {
     const res = await fetch(`${FORGEMARKET_API_URL}/api/drops`, { signal: deadline() });
     if (res.ok) drops = (await res.json()).drops || [];
   } catch { /* offline */ }
-  const e = new EmbedBuilder().setColor(0x7c5cff).setTitle('📅 Upcoming drops')
+  const e = styled('brand').setTitle('📅 Komende drops')
     .setThumbnail(BRAND_ICON).setImage(BANNER('deals'))
-    .setFooter({ text: 'ForgeMarket · turn on 🔔 Drops in #roles' });
+    .setFooter({ text: 'zet 🔔 Drops aan in #roles' });
   if (!drops.length) {
-    e.setDescription(`No drops scheduled right now — check ${STORE_URL}/drops or watch this space. 👀`);
+    e.setDescription(`Er staan nu geen drops gepland. Kijk op ${STORE_URL}/drops of houd dit kanaal in de gaten.`);
   } else {
     e.setDescription(drops.slice(0, 10).map((d) => {
       const ts = Math.floor(new Date(d.startsAt).getTime() / 1000);
@@ -2647,7 +2644,7 @@ async function pollCmd(i) {
     .map((n) => i.options.getString(`option${n}`))
     .filter(Boolean);
   const isYesNo = options.length === 0;
-  const e = new EmbedBuilder().setColor(0xa855f7).setTitle(`📊 ${question}`)
+  const e = styled('highlight').setTitle(`📊 ${question}`)
     .setDescription(isYesNo
       ? 'Vote with 👍 or 👎'
       : options.map((o, n) => `${POLL_EMOJI[n]} ${o}`).join('\n'))
@@ -2693,7 +2690,7 @@ function trackJoinForRaid(guild) {
     const log = findChannel(guild, 'mod-log');
     log?.send({
       content: '@here',
-      embeds: [new EmbedBuilder().setColor(0xef4444).setTitle('🚨 Possible raid')
+      embeds: [styled('error').setTitle('🚨 Possible raid')
         .setDescription(`**${recentJoins.length} accounts joined in the last 60 seconds.**\n` +
           'Consider enabling higher verification (Server Settings → Safety Setup → raid protection) and watch #mod-log.')
         .setTimestamp()],
@@ -2707,7 +2704,7 @@ client.on(Events.GuildMemberUpdate, (oldM, newM) => {
   if (!ours(newM.guild)) return;
   if (!oldM.premiumSince && newM.premiumSince) {
     const ch = houseChannel(newM.guild) || findChannel(newM.guild, 'announcements');
-    ch?.send({ embeds: [new EmbedBuilder().setColor(0xf47fff)
+    ch?.send({ embeds: [styled('highlight')
       .setDescription(`💎 **<@${newM.id}> just boosted the server!** Thank you — enjoy the extra love from the team. 💜`)] })
       .catch(() => {});
     leadLog(newM.guild, `💎 New boost from <@${newM.id}> (total ${newM.guild.premiumSubscriptionCount || 0})`);
@@ -2718,7 +2715,7 @@ function celebrateMilestone(guild) {
   const n = guild.memberCount;
   if (n > 0 && n % 100 === 0) {
     const ch = houseChannel(guild) || findChannel(guild, 'announcements');
-    ch?.send({ embeds: [new EmbedBuilder().setColor(0xf5b324)
+    ch?.send({ embeds: [styled('warning')
       .setTitle(`🎉 ${n} members!`)
       .setImage(BANNER('welcome'))
       .setDescription(`We just hit **${n} members** — thank you all! Keep an eye on #giveaways, something special might drop soon… 👀`)] })
@@ -2753,11 +2750,11 @@ function maybePostWeeklyLeaderboard(guild) {
   if (!ch) return;
   const lines = top.map(([id, r], n) =>
     `**${['🥇', '🥈', '🥉'][n] || `${n + 1}.`}** <@${id}> — Level ${r.lvl} · ${r.xp} XP`).join('\n');
-  ch.send({ embeds: [new EmbedBuilder().setColor(0xa855f7)
-    .setTitle('🏆 Weekly XP leaderboard')
+  ch.send({ embeds: [styled('highlight')
+    .setTitle('🏆 Ranglijst van de week')
     .setThumbnail(BRAND_ICON)
-    .setDescription(`${lines}\n\nChat to earn XP and don’t forget your \`/daily\` streak! 🔥`)
-    .setFooter({ text: 'Posted every Monday' }).setTimestamp()] }).catch(() => {});
+    .setDescription(`${lines}\n\nChat mee om XP te verdienen, en vergeet je \`/daily\`-reeks niet.`)
+    .setFooter({ text: 'elke maandag' })] }).catch(() => {});
 }
 
 // ── /flashsale (staff) → limited-time deal with a live countdown ─────────────
@@ -2772,27 +2769,27 @@ async function flashSale(i) {
   const ch = findChannel(i.guild, 'deals') || findChannel(i.guild, 'discount-codes') || i.channel;
   const dealRole = i.guild.roles.cache.find((r) => r.name === 'Deals');
 
-  const e = new EmbedBuilder().setColor(0xef4444).setTitle('⚡ FLASH SALE')
+  const e = styled('highlight').setTitle('⚡ Flash sale')
     .setImage(BANNER('deals'))
     .setThumbnail(BRAND_ICON)
     .setDescription(
       `**${deal}**\n\n` +
-      (code ? `Use code **\`${code.toUpperCase()}\`** at checkout.\n` : '') +
-      `🛒 ${STORE_URL}/shop\n\n` +
-      `⏳ Ends <t:${endsAt}:R> (at <t:${endsAt}:t>)`)
-    .setFooter({ text: 'ForgeMarket · limited time' }).setTimestamp();
+      (code ? `Gebruik code **\`${code.toUpperCase()}\`** bij het afrekenen.\n\n` : '') +
+      `Eindigt <t:${endsAt}:R> (om <t:${endsAt}:t>).`)
+    .setFooter({ text: 'tijdelijke actie' });
   const msg = await ch.send({
     content: dealRole ? `<@&${dealRole.id}>` : '',
     embeds: [e],
+    components: [linkRow({ label: 'Naar de shop', url: `${STORE_URL}/shop` })].filter(Boolean),
     allowedMentions: dealRole ? { parse: [], roles: [dealRole.id] } : { parse: [] },
   });
   // Grey out the post when the sale ends (best-effort; survives a restart only
   // visually via the timestamp, which is fine — the countdown itself is live).
   setTimeout(() => {
-    const ended = EmbedBuilder.from(msg.embeds[0]).setColor(0x64748b)
-      .setTitle('⚡ FLASH SALE — ENDED')
-      .setDescription(`**${deal}**\n\nThis flash sale has ended — keep an eye on <#${ch.id}> for the next one! 👀`);
-    msg.edit({ embeds: [ended] }).catch(() => {});
+    const ended = EmbedBuilder.from(msg.embeds[0]).setColor(PALETTE.neutral)
+      .setTitle('⚡ Flash sale — afgelopen')
+      .setDescription(`**${deal}**\n\nDeze actie is voorbij. Houd <#${ch.id}> in de gaten voor de volgende.`);
+    msg.edit({ embeds: [ended], components: [] }).catch(() => {});
   }, minutes * 60_000);
   leadLog(i.guild, `⚡ Flash sale started by <@${i.user.id}>: "${deal}" (${minutes} min${code ? `, code ${code.toUpperCase()}` : ''})`);
   return i.reply({ content: `Flash sale live in <#${ch.id}> — ends in **${minutes} min**.`, ephemeral: true });
@@ -2826,12 +2823,12 @@ async function checkSiteHealth(guild) {
     siteWasDown = true;
     lastDownAlert = Date.now();
     ch?.send({ content: '@here', allowedMentions: { parse: ['everyone'] },
-      embeds: [new EmbedBuilder().setColor(0xef4444).setTitle('🔴 Store API is DOWN')
+      embeds: [styled('error').setTitle('🔴 Store API is DOWN')
         .setDescription(`\`${FORGEMARKET_API_URL}/api/health\` is not responding.\nCustomers may not be able to order — check Vercel + Neon status.`)
         .setTimestamp()] }).catch(() => {});
   } else if (ok && siteWasDown) {
     siteWasDown = false;
-    ch?.send({ embeds: [new EmbedBuilder().setColor(0x10b981).setTitle('🟢 Store API recovered')
+    ch?.send({ embeds: [styled('success').setTitle('🟢 Store API recovered')
       .setDescription('Health checks are passing again.').setTimestamp()] }).catch(() => {});
   }
 }
@@ -2896,7 +2893,7 @@ function digestEmbed(d) {
   const top = (d.topProducts || []).map((p, i) =>
     `${i + 1}. ${p.name} — ${money(p.revenue ?? 0)} (${p.units ?? 0}×)`).join('\n') || '—';
   const low = (d.lowStock || []).map((p) => `• ${p.name}: **${p.available}** left`).join('\n') || 'All stocked ✅';
-  return new EmbedBuilder().setColor(0x6366f1)
+  return styled('info')
     .setTitle('📈 Weekly store digest')
     .setThumbnail(BRAND_ICON)
     .addFields(
@@ -2952,32 +2949,33 @@ async function refCmd(i) {
   } catch (e) { console.error('[ref]', e.message); }
   if (!d) return i.editReply('Couldn’t reach the store right now — try again in a minute.');
   if (!d.linked) {
-    return i.editReply({ embeds: [new EmbedBuilder().setColor(0xf59e0b)
-      .setTitle('🔗 Link your Discord first')
-      .setDescription(`Sign in on the store with **Discord** and your referral link shows up here.\n\n👉 ${STORE_URL}/login`)
-      .setFooter({ text: 'ForgeMarket · account link' })] });
+    return i.editReply({ embeds: [styled('warning')
+      .setTitle('🔗 Koppel eerst je Discord')
+      .setDescription('Log in op de winkel met **Discord**; daarna staat je verwijslink hier.')
+      .setFooter({ text: 'account koppelen' })],
+    components: [linkRow({ label: 'Inloggen met Discord', url: `${STORE_URL}/login` })].filter(Boolean) });
   }
   /* What it has earned, and only when it has earned something. A row of zeros
      is the shop telling a member their link does not work — the same reason the
      storefront hides an empty review count rather than printing 0.0. */
   const earned = (d.totalCents || 0) > 0;
-  const e = new EmbedBuilder().setColor(0xa855f7)
-    .setTitle('🤝 Your referral link')
+  const e = styled('highlight')
+    .setTitle('🤝 Je verwijslink')
     .setThumbnail(BRAND_ICON)
     .setDescription(
-      `Share this and you earn **${d.commissionPercent}%** of what they spend, on every order they place — not just the first.\n\n`
+      `Deel deze link en je krijgt **${d.commissionPercent}%** van wat ze uitgeven, op elke bestelling — niet alleen de eerste.\n\n`
       + `\`\`\`${d.url}\`\`\``)
-    .addFields({ name: 'Your code', value: `\`${d.code}\``, inline: true });
+    .addFields({ name: 'Je code', value: `\`${d.code}\``, inline: true });
   if (earned) {
     e.addFields(
-      { name: 'Referrals', value: String(d.referrals || 0), inline: true },
-      { name: 'Their orders', value: String(d.orders || 0), inline: true },
-      { name: '⏳ Pending', value: money(d.pendingCents || 0), inline: true },
-      { name: '✅ Paid out', value: money(d.paidCents || 0), inline: true });
+      { name: 'Aangemeld', value: String(d.referrals || 0), inline: true },
+      { name: 'Hun bestellingen', value: String(d.orders || 0), inline: true },
+      { name: '⏳ In behandeling', value: money(d.pendingCents || 0), inline: true },
+      { name: '✅ Uitbetaald', value: money(d.paidCents || 0), inline: true });
   } else {
-    e.addFields({ name: 'Earned so far', value: 'Nothing yet — nobody has ordered through it.', inline: false });
+    e.addFields({ name: 'Verdiend tot nu toe', value: 'Nog niets — er is nog niet via je link besteld.', inline: false });
   }
-  return i.editReply({ embeds: [e.setFooter({ text: 'ForgeMarket · referrals' })] });
+  return i.editReply({ embeds: [e.setFooter({ text: 'verwijzingen' })] });
 }
 
 // /balance — member self-service: Forge Coins + store credit + loyalty tier,
@@ -2994,27 +2992,28 @@ async function balanceCmd(i) {
   } catch (e) { console.error('[balance]', e.message); }
   if (!d) return i.editReply('Couldn’t reach the store right now — try again in a minute.');
   if (!d.linked) {
-    return i.editReply({ embeds: [new EmbedBuilder().setColor(0xf59e0b)
-      .setTitle('🔗 Link your Discord first')
-      .setDescription(`Sign in on the store with **Discord** and your balance shows up here.\n\n👉 ${STORE_URL}/login`)
-      .setFooter({ text: 'ForgeMarket · account link' })] });
+    return i.editReply({ embeds: [styled('warning')
+      .setTitle('🔗 Koppel eerst je Discord')
+      .setDescription('Log in op de winkel met **Discord**; daarna staat je saldo hier.')
+      .setFooter({ text: 'account koppelen' })],
+    components: [linkRow({ label: 'Inloggen met Discord', url: `${STORE_URL}/login` })].filter(Boolean) });
   }
-  return i.editReply({ embeds: [new EmbedBuilder().setColor(0x6366f1)
-    .setTitle('💰 Your ForgeMarket balance')
+  return i.editReply({ embeds: [styled('info')
+    .setTitle('💰 Je saldo')
     .setThumbnail(BRAND_ICON)
     .addFields(
       { name: '🪙 Forge Coins', value: String(d.coins ?? 0), inline: true },
-      { name: '💶 Store credit', value: money(d.creditCents || 0), inline: true },
-      { name: '🏅 Loyalty tier', value: d.tier || '—', inline: true },
+      { name: '💶 Tegoed', value: money(d.creditCents || 0), inline: true },
+      { name: '🏅 Niveau', value: d.tier || '—', inline: true },
       /* The same answer the account page gives, from the same function on the
          server. This used to be a bare number here while the website worked out
          the next reward and the distance to it — one question, answered on one
          surface and not the other. */
       ...(d.next ? [{
-        name: '🎯 Next reward',
-        value: `**${d.next.coinsAway}** more for ${d.next.label}\n`
-          + `≈ ${money(d.next.spendAwayCents)} of spending away`,
-      }] : [{ name: '🎯 Next reward', value: 'Everything in the shop is unlocked 🎉' }]),
+        name: '🎯 Volgende beloning',
+        value: `Nog **${d.next.coinsAway}** voor ${d.next.label}\n`
+          + `≈ ${money(d.next.spendAwayCents)} aan aankopen`,
+      }] : [{ name: '🎯 Volgende beloning', value: 'Je hebt alles in de shop vrijgespeeld.' }]),
       /* Giveaway "boosts" are no longer shown: the draw gives every entrant
          one equal chance, so a boost would be a promise the bot does not keep. */
     )
@@ -3037,7 +3036,7 @@ async function stockCmd(i) {
   const d = await fetchDigest();
   if (!d) return i.editReply('Couldn’t reach the store — check FORGEMARKET_API_URL & REVIEW_INGEST_SECRET.');
   const low = (d.lowStock || []).map((p) => `• ${p.name}: **${p.available}** codes left`).join('\n');
-  return i.editReply({ embeds: [new EmbedBuilder().setColor(low ? 0xf59e0b : 0x10b981)
+  return i.editReply({ embeds: [styled('info').setColor(low ? PALETTE.warning : PALETTE.success)
     .setTitle(low ? '🟠 Low stock' : '✅ Stock levels healthy')
     .setDescription(low || 'Every active product has enough pre-loaded codes.')
     .setFooter({ text: 'ForgeMarket · stock monitor' }).setTimestamp()] });
@@ -3051,8 +3050,8 @@ async function launchCmd(i) {
   if (!d?.launch) return i.editReply('Couldn’t reach the store — check FORGEMARKET_API_URL & REVIEW_INGEST_SECRET.');
   const MARK = { ok: '✅', warn: '🟡', fail: '🔴' };
   const lines = d.launch.checks.map((c) => `${MARK[c.status]} **${c.label}** — ${c.detail}`).join('\n');
-  return i.editReply({ embeds: [new EmbedBuilder()
-    .setColor(d.launch.ready ? 0x10b981 : 0xef4444)
+  return i.editReply({ embeds: [styled('info')
+    .setColor(d.launch.ready ? PALETTE.success : PALETTE.error)
     .setTitle(d.launch.ready ? '🚀 Ready to sell' : '⛔ Not ready to sell yet')
     .setDescription(`${lines}\n\n_${d.launch.summary}_`)
     .setThumbnail(BRAND_ICON)
@@ -3081,7 +3080,7 @@ async function maybeVouchSpotlight(guild) {
     META.lastSpotlight = today;
     saveMeta();
     const pick = candidates[Math.floor(Math.random() * candidates.length)];
-    const e = EmbedBuilder.from(pick.embeds[0]).setColor(0x22c55e)
+    const e = EmbedBuilder.from(pick.embeds[0]).setColor(PALETTE.success)
       .setFooter({ text: `Vouch spotlight · ${VERIFIED_VOUCH} · leave yours with /vouch` });
     await dst.send({ content: '💚 **Vouch of the day**', embeds: [e], allowedMentions: NO_PINGS });
   } catch (e) { console.error('[spotlight]', e.message); }
@@ -3198,16 +3197,16 @@ async function postCoupon(i) {
     return i.reply({ content: 'I couldn’t read that end date — use YYYY-MM-DD, e.g. 2026-11-01.', ephemeral: true });
   }
   const ch = findChannel(i.guild, 'discount-codes') || i.channel;
-  const e = new EmbedBuilder().setColor(0xec4899).setTitle('🏷️ New discount code!')
+  const e = styled('highlight').setTitle('🏷️ Nieuwe kortingscode')
     .setImage(BANNER('deals'))
-    .setDescription(`Use code **\`${code}\`** for **${percent}% OFF** your order.\n\n${note}`)
-    .addFields({ name: 'Code', value: `\`${code}\``, inline: true }, { name: 'Discount', value: `${percent}%`, inline: true },
+    .setDescription(`Gebruik code **\`${code}\`** voor **${percent}% korting** op je bestelling.${note ? `\n\n${note}` : ''}`)
+    .addFields({ name: 'Code', value: `\`${code}\``, inline: true }, { name: 'Korting', value: `${percent}%`, inline: true },
       ...(Number.isFinite(expiresAt)
-        ? [{ name: 'Valid until', value: `<t:${Math.floor(expiresAt / 1000)}:D>`, inline: true }] : []))
-    .setFooter({ text: 'ForgeMarket' }).setTimestamp();
+        ? [{ name: 'Geldig tot', value: `<t:${Math.floor(expiresAt / 1000)}:D>`, inline: true }] : []));
   const dealRole = i.guild.roles.cache.find((r) => r.name === 'Deals');
   await ch.send({
     content: dealRole ? `<@&${dealRole.id}>` : '', embeds: [e],
+    components: [linkRow({ label: 'Naar de shop', url: `${STORE_URL}/shop` })].filter(Boolean),
     allowedMentions: { parse: [], roles: dealRole ? [dealRole.id] : [] },
   }).catch(() => {});
   return i.reply({ content: `Posted code **${code}** in <#${ch.id}>. (Add it to the site's COUPONS env to make it work at checkout.)`, ephemeral: true });
@@ -3218,8 +3217,8 @@ async function postAnnounce(i) {
   if (!isOwnerLevel(i.member)) return i.reply(OWNER_ONLY);
   const message = i.options.getString('message');
   const ch = findChannel(i.guild, 'announcements') || i.channel;
-  const e = new EmbedBuilder().setColor(0x6366f1).setTitle('📢 Announcement')
-    .setDescription(message).setFooter({ text: `Posted by ${i.user.username}` }).setTimestamp();
+  const e = styled('brand').setTitle('📢 Mededeling')
+    .setDescription(message).setFooter({ text: `geplaatst door ${i.user.username}` });
   await ch.send({ content: '@everyone', embeds: [e], allowedMentions: { parse: ['everyone'] } }).catch(() => {});
   return i.reply({ content: `Announcement posted in <#${ch.id}>.`, ephemeral: true });
 }
@@ -3311,21 +3310,21 @@ async function startGiveaway(i) {
   const gwRole = i.guild.roles.cache.find((r) => r.name === 'Giveaways');
   /* Every giveaway links the same published terms, and says the two rules a
      member most needs before pressing Enter: it is free, and one entry each. */
-  const e = new EmbedBuilder().setColor(0xa855f7).setTitle('🎉 GIVEAWAY')
+  const e = styled('highlight').setTitle('🎉 Giveaway')
     .setThumbnail(BRAND_ICON)
     .setImage(BANNER('giveaways'))
-    .setDescription(`**Prize:** ${prize}\n**Winners:** ${winnersCount}\n**Ends:** <t:${Math.floor(endsAt / 1000)}:R>\n\n`
-      + 'Tap **Enter** below to join — free, one entry per person, everyone the same chance. '
-      + 'Discord account must be at least 7 days old.\n'
-      + `📜 Terms: ${chanRef(i.guild, 'giveaway-terms')}\nHosted by <@${i.user.id}>`)
-    .addFields({ name: 'Entries', value: '🎟️ 0', inline: true })
-    .setFooter({ text: 'ForgeMarket giveaway · organiser: ForgeMarket · no purchase necessary' });
+    .setDescription(`**Prijs:** ${prize}\n**Winnaars:** ${winnersCount}\n**Eindigt:** <t:${Math.floor(endsAt / 1000)}:R>\n\n`
+      + 'Druk hieronder op **Doe mee** — gratis, één inschrijving per persoon, iedereen dezelfde kans. '
+      + 'Je Discord-account moet minstens 7 dagen oud zijn.\n'
+      + `📜 Voorwaarden: ${chanRef(i.guild, 'giveaway-terms')}\nGeorganiseerd door <@${i.user.id}>`)
+    .addFields({ name: 'Inschrijvingen', value: '🎟️ 0', inline: true })
+    .setFooter({ text: 'giveaway · organisator: ForgeMarket · geen aankoop nodig' });
   const msg = await ch.send({
     content: gwRole ? `<@&${gwRole.id}>` : '', embeds: [e],
     allowedMentions: { parse: [], roles: gwRole ? [gwRole.id] : [] },
   });
   const btn = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId(`gw:enter:${msg.id}`).setLabel('Enter').setEmoji('🎉').setStyle(ButtonStyle.Success));
+    new ButtonBuilder().setCustomId(`gw:enter:${msg.id}`).setLabel('Doe mee').setEmoji('🎉').setStyle(ButtonStyle.Success));
   await msg.edit({ components: [btn] });
   GIVEAWAYS.set(msg.id, { prize, entries: new Set(), endsAt, channelId: ch.id, msgId: msg.id, winnersCount, hostId: i.user.id, guildId: i.guild.id });
   saveGiveaways();
@@ -3339,7 +3338,7 @@ async function startGiveaway(i) {
  */
 function logDraw(guild, { id, prize, entrants, winners, kind = 'draw' }) {
   const ch = findChannel(guild, 'mod-log') || findChannel(guild, 'leads');
-  ch?.send({ allowedMentions: NO_PINGS, embeds: [new EmbedBuilder().setColor(0xa855f7)
+  ch?.send({ allowedMentions: NO_PINGS, embeds: [styled('highlight')
     .setTitle(kind === 'reroll' ? '🔁 Giveaway reroll' : '🎲 Giveaway draw')
     .addFields(
       { name: 'Prize', value: String(prize).slice(0, 200), inline: true },
@@ -3368,18 +3367,28 @@ async function endGiveaway(guild, id, msg) {
   saveMeta();
   logDraw(guild, { id, prize: gw.prize, entrants: ids, winners: picks });
 
-  const tally = `${ids.length} ${ids.length === 1 ? 'entry' : 'entries'}`;
-  const text = picks.length
-    ? `🏆 The **${gw.prize}** giveaway ${picks.length > 1 ? 'winners are' : 'winner is'} ${picks.map((w) => `<@${w}>`).join(', ')}! Congrats 🎉 (${tally})\nWe'll contact you by DM or ticket within 7 days — or open a ticket in #open-a-ticket to claim.`
-    : `The **${gw.prize}** giveaway ended with no entries 😢`;
+  const tally = `${ids.length} ${ids.length === 1 ? 'inschrijving' : 'inschrijvingen'}`;
+  /* The result as an embed in the shop's style; the winners are mentioned in
+     the message text so they are actually pinged — and only they are. */
+  const result = picks.length
+    ? styled('success').setTitle('🏆 Giveaway afgelopen')
+      .setDescription(`**Prijs:** ${gw.prize}\n**${picks.length > 1 ? 'Winnaars' : 'Winnaar'}:** ${picks.map((w) => `<@${w}>`).join(', ')}\n\n`
+        + 'Gefeliciteerd! Open een ticket in #open-a-ticket om je prijs te claimen.')
+      .setFooter({ text: tally })
+    : styled('neutral').setTitle('Giveaway afgelopen')
+      .setDescription(`De giveaway voor **${gw.prize}** is afgelopen zonder inschrijvingen.`);
+  const announce = { content: picks.map((w) => `<@${w}>`).join(' ') || undefined, embeds: [result],
+    allowedMentions: { parse: [], users: picks } };
   const winners = findChannel(guild, 'winners');
-  if (winners) winners.send(text).catch(() => {});
+  if (winners) winners.send(announce).catch(() => {});
   const chan = guild.channels.cache.get(gw.channelId);
-  if (chan && chan.id !== winners?.id) chan.send(text).catch(() => {});
+  if (chan && chan.id !== winners?.id) chan.send(announce).catch(() => {});
   // DM each winner.
   for (const w of picks) {
     guild.members.fetch(w)
-      .then((mm) => mm.send(`🎉 You won the **${gw.prize}** giveaway on **${guild.name}**! Open a ticket in #open-a-ticket to claim your prize.`).catch(() => {}))
+      .then((mm) => mm.send({ embeds: [styled('success').setTitle('🎉 Je hebt gewonnen')
+        .setDescription(`Je hebt de giveaway voor **${gw.prize}** op **${guild.name}** gewonnen. `
+          + 'Open een ticket in #open-a-ticket om je prijs te claimen.')] }).catch(() => {}))
       .catch(() => {});
   }
   await msg?.edit?.({ components: [] }).catch(() => {});
