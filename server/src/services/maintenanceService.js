@@ -508,7 +508,12 @@ async function runMaintenanceSteps({ deadline }) {
       const market = await import('./market/engine.js');
       summary.marketSources = (await market.refreshSources({ checkRobots: false })).length;
 
-      const discovery = await market.runProductDiscovery();
+      /* The market jobs get the run's remaining budget as a deadline they stop
+         at themselves. Cut off from outside instead, pricing never reached its
+         "done" mark, so every run retried it and was cut off again — the
+         market data stopped refreshing. */
+      const marketDeadline = deadline - RESERVE_MS - 500;
+      const discovery = await market.runProductDiscovery({ deadline: marketDeadline });
       if (!discovery.skipped) {
         summary.marketObservations = discovery.collected?.recorded || 0;
         summary.marketClassified = discovery.classified?.classified || 0;
@@ -518,10 +523,11 @@ async function runMaintenanceSteps({ deadline }) {
         }
       }
 
-      const pricing = await market.refreshRecommendations();
+      const pricing = await market.refreshRecommendations({ deadline: marketDeadline });
       if (!pricing.skipped) {
         summary.marketPriced = pricing.priced;
         summary.marketNeedsReview = pricing.requiresReview;
+        if (pricing.partial) summary.marketPricingPartial = true;
       }
 
       const stale = await market.detectStaleData();
