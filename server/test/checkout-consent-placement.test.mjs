@@ -38,6 +38,13 @@ console.log('— Checkout: the tick above the button —');
     `tick@${barTick} button@${barButton}`);
 }
 
+{
+  const co = read('pages/Checkout.jsx');
+  const boxes = co.match(/<input type="checkbox" checked=\{consent\}[\s\S]*?\/>/g) || [];
+  ok('both consent boxes render light, so an unticked box does not look ticked',
+    boxes.length === 2 && boxes.every((b) => /\[color-scheme:light\]/.test(b)), String(boxes.length));
+}
+
 console.log('\n— Cart: the product\'s own picture —');
 {
   const ctx = read('context/CartContext.jsx');
