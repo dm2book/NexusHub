@@ -78,9 +78,12 @@ async function call(path, { method = 'GET', body, timeoutMs = 10_000 } = {}) {
       signal: ctrl.signal,
     });
   } catch (e) {
-    throw new Error(e.name === 'AbortError'
+    /* Tagged as Pay.'s, so a caller can tell "Pay. did not answer" from a bug
+       of ours; `outcomeUnknown` because a request that timed out may still
+       have been received. */
+    throw Object.assign(new Error(e.name === 'AbortError'
       ? `Pay. ${method} ${path}: timed out after ${Math.round(timeoutMs / 1000)}s`
-      : `Pay. ${method} ${path}: ${e.message}`);
+      : `Pay. ${method} ${path}: ${e.message}`), { paynl: true, outcomeUnknown: true });
   } finally {
     clearTimeout(timer);
   }
@@ -92,6 +95,7 @@ async function call(path, { method = 'GET', body, timeoutMs = 10_000 } = {}) {
       || text.slice(0, 200) || `HTTP ${res.status}`;
     const err = new Error(`Pay. ${method} ${path}: ${detail}`);
     err.status = res.status;
+    err.paynl = true;
     throw err;
   }
   return data;
@@ -157,7 +161,7 @@ export async function createPayment(order, { returnUrl, exchangeUrl, method = nu
   const checkoutUrl = String(data?.links?.redirect || '');
   if (!id || !/^https:\/\//i.test(checkoutUrl)) {
     // A payment we cannot check, or cannot send the buyer to, is not started.
-    throw new Error('Pay. answered without a usable order id or checkout link');
+    throw Object.assign(new Error('Pay. answered without a usable order id or checkout link'), { paynl: true });
   }
   return {
     id,

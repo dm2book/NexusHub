@@ -204,8 +204,9 @@ const ENV_BASELINE = Object.freeze(Object.fromEntries(
   SECRETS.map((s) => [s.id, String(readPath(config, s.path) ?? '')])));
 
 /** Stored rows, decrypted. Unreadable ones are reported, never treated as unset. */
-export async function storedSecrets() {
-  const rows = await all(`SELECT key, value, updated_at FROM app_secrets`).catch(() => []);
+export async function storedSecrets({ strict = false } = {}) {
+  const rows = await all(`SELECT key, value, updated_at FROM app_secrets`)
+    .catch((e) => { if (strict) throw e; return []; });
   const out = {};
   for (const r of rows) {
     if (!byId.has(r.key)) continue;
@@ -231,7 +232,12 @@ export async function secretValue(id) {
  * stored ones on top.
  */
 export async function applyStoredSecrets() {
-  const stored = await storedSecrets().catch(() => ({}));
+  /* A read that FAILS is not "nothing stored". Read leniently, a database
+     hiccup reset every admin-saved key to the environment's value for the next
+     minute — Pay. configured only in the admin then answered its own payment
+     callbacks "not configured", and Pay. stopped retrying them. Now a failed
+     read leaves the live config exactly as it was, and is tried again. */
+  const stored = await storedSecrets({ strict: true });
   const applied = [];
   for (const s of SECRETS) {
     const held = stored[s.id];
@@ -253,8 +259,9 @@ let appliedAt = 0;
 let applying = null;
 export async function refreshStoredSecrets({ maxAgeMs = 60_000, now = Date.now() } = {}) {
   if (now - appliedAt < maxAgeMs) return false;
-  applying ??= applyStoredSecrets().finally(() => { appliedAt = Date.now(); applying = null; });
-  await applying.catch(() => {});
+  // Only a successful read counts as applied; a failed one is retried next call.
+  applying ??= applyStoredSecrets().then(() => { appliedAt = Date.now(); }).finally(() => { applying = null; });
+  await applying.catch((e) => console.error('[secrets] could not re-read stored settings:', e.message));
   return true;
 }
 

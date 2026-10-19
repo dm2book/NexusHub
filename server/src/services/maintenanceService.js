@@ -347,10 +347,16 @@ async function runMaintenanceSteps({ deadline }) {
          yet: that is a paid order waiting for us, not an abandoned one. It was
          cancelled with the proof still in the queue, and confirming the proof
          afterwards failed. */
+      /* Only a MANUAL order is held open by a proof. Under a payment provider
+         a screenshot proves nothing (paymentProofService refuses them), and
+         one uploaded anyway kept an unpaid order out of this sweep forever. */
+      const { activePaymentProvider } = await import('../config/env.js');
+      const psp = ['paynl', 'mollie', 'stripe'].includes(activePaymentProvider());
       const stale = await all(`SELECT id FROM orders WHERE status='pending' AND created_at < @cut
-                                 AND NOT EXISTS (SELECT 1 FROM payment_proofs p WHERE p.order_id = orders.id AND p.status = 'pending')
+                                 AND (@psp = 1 OR psp_provider IS NOT NULL OR NOT EXISTS (
+                                   SELECT 1 FROM payment_proofs p WHERE p.order_id = orders.id AND p.status = 'pending'))
                                LIMIT 100`,
-        { cut: DAYS(14) });
+        { cut: DAYS(14), psp: psp ? 1 : 0 });
       for (const o of stale) {
         try {
           await transitionOrder(o.id, 'cancelled', { actorId: 'system', reason: 'Auto-cancelled: unpaid for 14 days' });

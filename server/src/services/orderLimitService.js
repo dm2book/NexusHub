@@ -45,6 +45,15 @@ export async function assertOrderLimits({ email, ip, total, value = total, curre
   const L = config.security.orderLimits;
   const since = new Date(Date.now() - DAY).toISOString();
   const addr = String(email || '').toLowerCase();
+  /* Which of this address's orders count towards ITS limits: the paid ones, and
+     unpaid ones placed from this same connection. Anyone can type someone
+     else's address at guest checkout — counting every unpaid order let two
+     €500 orders in a victim's name lock them out of buying for a day. A real
+     buyer retrying from their own connection is still counted (and a caller
+     with no connection at all — an internal one — counts unpaid orders that
+     had none either). */
+  const countsForAddress = `(status NOT IN ('pending','cancelled','failed')
+                              OR (status = 'pending' AND ip IS NOT DISTINCT FROM @ip::text))`;
 
   if (L.maxOrderValue > 0 && value > L.maxOrderValue) {
     throw badRequest(
@@ -55,8 +64,8 @@ export async function assertOrderLimits({ email, ip, total, value = total, curre
   if (L.perEmailPerDay > 0) {
     const r = await get(
       `SELECT COUNT(*) AS n FROM orders
-        WHERE email=@e AND created_at>@since AND status NOT IN ('cancelled','failed')`,
-      { e: addr, since });
+        WHERE email=@e AND created_at>@since AND ${countsForAddress}`,
+      { e: addr, since, ip: ip || null });
     if (Number(r?.n || 0) >= L.perEmailPerDay) {
       throw tooMany(
         `That is ${L.perEmailPerDay} orders in 24 hours, which is as many as we take from one address. `
@@ -69,8 +78,8 @@ export async function assertOrderLimits({ email, ip, total, value = total, curre
     const r = await get(
       `SELECT COALESCE(SUM(total + COALESCE((billing::jsonb ->> 'creditApplied')::numeric, 0)), 0) AS sum
          FROM orders
-        WHERE email=@e AND created_at>@since AND status NOT IN ('cancelled','failed')`,
-      { e: addr, since });
+        WHERE email=@e AND created_at>@since AND ${countsForAddress}`,
+      { e: addr, since, ip: ip || null });
     if (Number(r?.sum || 0) + value > L.valuePerEmailPerDay) {
       throw badRequest(
         `This would take you over ${formatMoney(L.valuePerEmailPerDay, currency)} of orders in 24 hours, `
