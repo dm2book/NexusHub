@@ -17,28 +17,26 @@ on:
     - cron: '17 * * * *'
   workflow_dispatch:
 
-permissions: {}
+# Read-only: the job checks out this repository only to run the script below.
+permissions:
+  contents: read
 
 jobs:
   maintenance:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Run shop maintenance
         env:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
           SITE: https://www.forgemarket.nl
+          MAINTENANCE_ROUTE: /api/cron/maintenance
+        # The repository is public, and so is this log. The script prints the
+        # status, a short failure category and numeric counts — never the
+        # response body, headers or the secret. Without CRON_SECRET it says
+        # "CRON_SECRET is not set" and stops.
         run: |
-          if [ -z "$CRON_SECRET" ]; then
-            echo "::notice::CRON_SECRET is not set as a repository secret — skipping. See the comment at the top of this file."
-            exit 0
-          fi
-          code=$(curl -sS -o body.json -w '%{http_code}' --max-time 60 \
-            -H "Authorization: Bearer $CRON_SECRET" "$SITE/api/cron/maintenance")
-          echo "HTTP $code"
-          # The summary has counts only (orders recovered, mails retried) — no customer data.
-          head -c 2000 body.json; echo
-          if [ "$code" != "200" ]; then
-            echo "::error::Maintenance answered $code"
-            exit 1
-          fi
+          bash .github/scripts/maintenance-call.sh

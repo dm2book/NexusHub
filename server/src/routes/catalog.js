@@ -771,7 +771,11 @@ router.post('/orders',
 router.post('/orders/:id/checkout', requireLaunched('Payment', { money: true }),
   rateLimit({ bucket: 'pay', windowMs: 60_000, max: 30, shared: true }),
   asyncHandler(async (req, res) => {
-    if (!stripeEnabled()) throw new ApiError(400, 'Card payments are not configured');
+    /* Only while Stripe IS the checkout's provider. A Stripe key left in the
+       keystore after switching to Pay. kept this page reachable by a direct
+       request — a payment that, without the webhook secret, would never mark
+       the order paid. */
+    if (!stripeEnabled() || activePaymentProvider() !== 'stripe') throw new ApiError(400, 'Card payments are not configured');
     const order = await getOrder(req.params.id);
     if (!order) throw new ApiError(404, 'Order not found');
     const { email } = z.object({ email: z.string().email().optional() }).parse(req.body || {});

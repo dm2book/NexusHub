@@ -689,16 +689,37 @@ export function commerceBlockers() {
     if (config.payments.demoMode) {
       reasons.push('demo payments are on, which marks orders paid without any money arriving (set DEMO_PAYMENTS=false)');
     }
-    // A test key takes real buyers to Mollie's sandbox: the order is marked paid
-    // and nothing moves. Silent until the bank statement disagrees.
-    if (/^test_/.test(config.payments.mollie.apiKey)) {
+    const active = activePaymentProvider();
+    /* A test key takes real buyers to Mollie's sandbox: the order is marked paid
+       and nothing moves. Silent until the bank statement disagrees.
+
+       Only while Mollie IS the provider. A test key left behind after switching
+       to Pay. sends nobody to Mollie (its payment route is closed too, see
+       routes/mollie.js) — pausing every order over it closed a shop that Pay.
+       could take payments for. */
+    if (active === 'mollie' && /^test_/.test(config.payments.mollie.apiKey)) {
       reasons.push('MOLLIE_API_KEY is a test key, so no payment would be real (use the live key)');
     }
     /* The same for Stripe — but only once the shop is open: before the launch
-       date a test key is how the owner tries the checkout on the real site. */
+       date a test key is how the owner tries the checkout on the real site.
+       And only while Stripe is the provider, for the reason above. */
     const launched = !config.launch.date || Date.now() >= new Date(config.launch.date).getTime();
-    if (launched && /^sk_test_/.test(config.payments.stripe.secretKey)) {
+    if (active === 'stripe' && launched && /^sk_test_/.test(config.payments.stripe.secretKey)) {
       reasons.push('STRIPE_SECRET_KEY is a test key, so no payment would be real (use the live sk_live_ key)');
+    }
+    /* No way to pay at all. The checkout would take the order and leave the
+       buyer with a pending order and nothing to pay it with — "placed!" on the
+       screen, and no money and no code. */
+    if (active === 'none') {
+      reasons.push('no payment provider is configured, so a buyer could not pay (configure Pay., or a payment link)');
+    }
+    /* Pay. with one of its two values. Pay. is only used when both are set, so
+       the shop silently fell back to whatever came next — the manual links, or
+       nothing — while the owner believed Pay. was live. Refused until it is
+       either complete or removed. */
+    const { serviceId, serviceSecret } = config.payments.paynl;
+    if (!!serviceId !== !!serviceSecret) {
+      reasons.push('Pay. is half-configured: PAYNL_SERVICE_ID and PAYNL_SERVICE_SECRET must both be set (or both be empty)');
     }
   }
   /* A Stripe key without its webhook secret takes the money and never hears
