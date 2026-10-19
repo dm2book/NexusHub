@@ -52,7 +52,11 @@ export default function Wishlist() {
   };
 
   const items = (products || []).filter((p) => wl.has(p.id));
-  const onAdd = (p) => { add(p); toast.success(`${p.name} ${t('cart.addedToCart', 'added to cart')}`); };
+  const onAdd = (p) => {
+    // `add` refuses before launch (returns false) — say so, never "added".
+    if (!add(p)) { toast(t('launch.cartClosed', 'ForgeMarket opens on launch day — you can browse everything until then.')); return; }
+    toast.success(`${p.name} ${t('cart.addedToCart', 'added to cart')}`);
+  };
 
   return (
     <div className="max-w-[1200px] mx-auto px-4 lg:px-8 py-12">

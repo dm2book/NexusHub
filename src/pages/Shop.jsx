@@ -150,7 +150,11 @@ export default function Shop({ landingCategory = null, landingPath = null } = {}
      React.memo on LightProductCard a no-op — twenty-four cards re-rendered for
      a state change none of them depend on. */
   const onAdd = useCallback(
-    (p) => { add(p); toast.success(`${p.name} ${t('cart.addedToCart', 'added to cart')}`); },
+    (p) => {
+      // `add` refuses before launch (returns false) — say so, never "added".
+      if (!add(p)) { toast(t('launch.cartClosed', 'ForgeMarket opens on launch day — you can browse everything until then.')); return; }
+      toast.success(`${p.name} ${t('cart.addedToCart', 'added to cart')}`);
+    },
     [add, toast, t]);
   const showTrending = !category && !search.trim() && trending?.length > 0;
 

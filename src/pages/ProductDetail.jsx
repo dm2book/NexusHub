@@ -825,7 +825,7 @@ export default function ProductDetail() {
         <div className="mt-16">
           <h2 className="text-2xl font-extrabold text-slate-900 mb-6">{coBought.length ? t('product.boughtTogether', 'Frequently bought together') : t('product.alsoLike', 'You might also like')}</h2>
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 fm-grid-in">
-            {crossSell.map((p) => <LightProductCard key={p.id} product={p} onAdd={(x) => { add(x); toast.success(`${x.name} ${t('cart.added', 'added')}`); }} />)}
+            {crossSell.map((p) => <LightProductCard key={p.id} product={p} onAdd={(x) => { if (!add(x)) { toast(t('launch.cartClosed', 'ForgeMarket opens on launch day — you can browse everything until then.')); return; } toast.success(`${x.name} ${t('cart.added', 'added')}`); }} />)}
           </div>
         </div>
       )}
@@ -837,7 +837,7 @@ export default function ProductDetail() {
           <div className="fm-rail flex gap-4 overflow-x-auto pb-2 snap-x">
             {recentlyViewed.filter((p) => p.id !== product.id).slice(0, 6).map((p) => (
               <div key={p.id} className="snap-start shrink-0 w-[210px]">
-                <LightProductCard product={p} onAdd={(x) => { add(x); toast.success(`${x.name} ${t('cart.added', 'added')}`); }} />
+                <LightProductCard product={p} onAdd={(x) => { if (!add(x)) { toast(t('launch.cartClosed', 'ForgeMarket opens on launch day — you can browse everything until then.')); return; } toast.success(`${x.name} ${t('cart.added', 'added')}`); }} />
               </div>
             ))}
           </div>

@@ -137,6 +137,25 @@ console.log('\n— Staff are not locked out of their own shop —');
     /prelaunch: gated/.test(cart) && /if \(gated\) return false;/.test(cart),
     'two different answers to "are we open" is how they drift apart');
 
+  /* `add` says "not yet" by returning false. A button that ignores that answer
+     tells a visitor "added to cart" before launch and shows them an empty cart —
+     what the owner met, testing in a private window. Every call has to read it. */
+  const srcRoot = new URL('../../src/', import.meta.url);
+  const jsx = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((d) => (d.isDirectory()
+    ? jsx(new URL(`${d.name}/`, dir)) : /\.jsx$/.test(d.name) ? [new URL(d.name, dir)] : []));
+  const ignored = [];
+  for (const file of jsx(srcRoot)) {
+    const text = fs.readFileSync(file, 'utf8');
+    if (!/\buseCart\(\)/.test(text) || !/const \{[^}]*\badd\b[^}]*\} = useCart\(\)/.test(text)) continue;
+    for (const m of text.matchAll(/(?<![.\w])add\(/g)) {
+      if (!/if \(!?$/.test(text.slice(Math.max(0, m.index - 6), m.index))) {
+        ignored.push(`${file.pathname.split('/src/')[1]}:${text.slice(0, m.index).split('\n').length}`);
+      }
+    }
+  }
+  ok('every add-to-cart button reads the refusal instead of announcing "added"',
+    ignored.length === 0, ignored.join(', '));
+
   ok('an address on the admin list may still create its account',
     gate.isAdminEmail('boss@forgemarket.nl'),
     'on a fresh deployment that sign-in IS the admin account');
