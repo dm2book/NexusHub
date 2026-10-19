@@ -250,11 +250,18 @@ export function createApp({ lazyReady = false } = {}) {
   //   side by side on one small pool. The hour is claimed in the database now
   //   (claimInterval), once for the whole shop. The in-process check stays as
   //   a cheap filter so a busy instance does not ask the database per request.
+  //
+  //   and it rode on any request — a payment provider's notification
+  //   included. A Pay. exchange call or a Stripe/Mollie webhook is the one
+  //   request that must settle an order inside its own time limit; the sweep
+  //   sharing its invocation and its five database connections slowed exactly
+  //   that. Those paths never carry it now; the next ordinary request does.
   let lastMaintenanceAt = 0;
+  const NO_PIGGYBACK = ['/api/cron/', '/api/payments/'];
   app.use((req, _res, next) => {
     const now = Date.now();
     // The cron route runs maintenance itself; riding on it as well started two.
-    if (now - lastMaintenanceAt > 3_600_000 && !req.path.startsWith('/api/cron/')) {
+    if (now - lastMaintenanceAt > 3_600_000 && !NO_PIGGYBACK.some((p) => req.path.startsWith(p))) {
       lastMaintenanceAt = now;
       // Finished well inside the invocation's 30 s, counted from its start.
       const deadline = (req.startedAt || now) + 26_000;

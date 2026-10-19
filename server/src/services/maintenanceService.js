@@ -109,21 +109,52 @@ async function runMaintenanceSteps({ deadline }) {
   const budget = Math.max(5_000, deadline - startedAt);
   const by = (ms) => startedAt + Math.round(ms * Math.min(1, budget / 26_000));
   const late = () => Date.now() > by(18_000);
+  /* A deadline on every step, not only between them.
+     The checkpoints above are read between steps; a step that hangs inside one
+     call — a locked table, a supplier or mail server that accepts the
+     connection and never answers — held the whole run until the database gave
+     up (25 s), and every step after it, the receipt included, never ran. Now a
+     step gets at most STEP_MS (the long-running ones: what is left), always
+     ends RESERVE_MS before the run's deadline, and is recorded as `<step>Error`
+     when it is cut off. A step there is no time left for is not started. The
+     work cut off is abandoned, not cancelled: a promise cannot be stopped, but
+     the run no longer waits for it. */
+  const STEP_MS = 10_000;
+  const RESERVE_MS = 1_500;
+  const step = (name, fn, capMs = STEP_MS) => {
+    const left = deadline - Date.now() - RESERVE_MS;
+    if (left < 250) {
+      summary.stepsSkipped = (summary.stepsSkipped || 0) + 1;
+      return Promise.resolve(undefined);
+    }
+    const ms = Math.min(capMs, left);
+    let timer;
+    return Promise.race([
+      Promise.resolve().then(fn).finally(() => clearTimeout(timer)),
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`${name}: stopped after ${(ms / 1000).toFixed(1)} s (step time limit)`)), ms);
+      }),
+    ]);
+  };
 
   /* 8a. The supplier queue BEFORE the sweep. A paid order waiting for the
      queue is not stuck, and the sweep below has nothing to offer it but stock
      or a person — so the queue gets the first eight seconds, and step 8 later
      carries on with whatever budget is left. */
   try {
-    summary.supplierQueue = (await drainSupplierQueue({ actorId: 'system' }, { budgetMs: Math.max(1_000, by(8_000) - Date.now()) })).processed || 0;
+    await step('supplierQueue', async () => {
+      summary.supplierQueue = (await drainSupplierQueue({ actorId: 'system' }, { budgetMs: Math.max(1_000, by(8_000) - Date.now()) })).processed || 0;
+    });
   } catch (e) { summary.supplierQueueError = e.message; }
 
   /* 8b. Stripe payments whose webhook never arrived: paid at Stripe, pending
      here. Asked of Stripe directly and settled through the webhook's own path. */
   try {
-    const { reconcileStripeSessions } = await import('./stripeSettlement.js');
-    const r = await reconcileStripeSessions({ deadline: Date.now() + 5_000 });
-    if (r.checked) summary.stripeReconciled = r;
+    await step('stripeReconcile', async () => {
+      const { reconcileStripeSessions } = await import('./stripeSettlement.js');
+      const r = await reconcileStripeSessions({ deadline: Date.now() + 5_000 });
+      if (r.checked) summary.stripeReconciled = r;
+    });
   } catch (e) { summary.stripeReconcileError = e.message; }
 
   /* 8c. The same for Pay.: an exchange call that never came (or that Pay.
@@ -131,9 +162,11 @@ async function runMaintenanceSteps({ deadline }) {
      nothing delivered. Asked of Pay. directly, settled through the exchange's
      own path, which also checks every payment attempt on the order. */
   try {
-    const { reconcilePaynl } = await import('../routes/paynl.js');
-    const r = await reconcilePaynl({ deadline: Date.now() + 5_000 });
-    if (r.checked) summary.paynlReconciled = r;
+    await step('paynlReconcile', async () => {
+      const { reconcilePaynl } = await import('../routes/paynl.js');
+      const r = await reconcilePaynl({ deadline: Date.now() + 5_000 });
+      if (r.checked) summary.paynlReconciled = r;
+    });
   } catch (e) { summary.paynlReconcileError = e.message; }
 
   // 9. The net under the pipeline: any paid order nothing has picked up.
@@ -143,46 +176,56 @@ async function runMaintenanceSteps({ deadline }) {
   //    (no stock, no auto-supplier — e.g. a P2P top-up) goes to the hand queue,
   //    so it surfaces there instead of sitting invisible.
   try {
-    const sweep = await sweepUnfulfilledPaidOrders({ limit: 50 });
-    summary.manualQueued = sweep.queued;
-    summary.autoDispensed = sweep.dispensed;
+    await step('manualQueue', async () => {
+      const sweep = await sweepUnfulfilledPaidOrders({ limit: 50 });
+      summary.manualQueued = sweep.queued;
+      summary.autoDispensed = sweep.dispensed;
+    });
   } catch (e) { summary.manualQueueError = e.message; }
 
   // 10. Re-send transactional emails that failed on a transient provider error
   //     (their full render context is persisted with the log row).
   try {
-    summary.emailsRetried = await retryFailedEmails({ deadline: by(16_000) });
+    await step('emailRetry', async () => {
+      summary.emailsRetried = await retryFailedEmails({ deadline: by(16_000) });
+    });
   } catch (e) { summary.emailRetryError = e.message; }
 
   /* 0a. The ad platforms' spend, impressions and clicks, every six hours,
      when their read-only keys are set (adSpendSyncService.js). */
   try {
-    const { metaConfigured, tiktokConfigured, syncAll } = await import('./adSpendSyncService.js');
-    if ((metaConfigured() || tiktokConfigured()) && !late()) {
-      const { claimInterval } = await import('./bootUpkeep.js');
-      if (await claimInterval('ads_sync', 6 * 3_600_000)) {
-        summary.adSpendSync = await syncAll({ days: 7, deadline: Math.min(Date.now() + 6_000, by(20_000)) });
+    await step('adSpendSync', async () => {
+      const { metaConfigured, tiktokConfigured, syncAll } = await import('./adSpendSyncService.js');
+      if ((metaConfigured() || tiktokConfigured()) && !late()) {
+        const { claimInterval } = await import('./bootUpkeep.js');
+        if (await claimInterval('ads_sync', 6 * 3_600_000)) {
+          summary.adSpendSync = await syncAll({ days: 7, deadline: Math.min(Date.now() + 6_000, by(20_000)) });
+        }
       }
-    }
+    });
   } catch (e) { summary.adSpendSyncError = e.message; }
 
   /* 0c. The Logo Library: brands not looked at for 30 days, a few per run.
      Never on a page view. */
   try {
-    if (!late()) {
-      const { claimInterval } = await import('./bootUpkeep.js');
-      if (await claimInterval('logo_discovery', 6 * 3_600_000)) {
-        const { refreshStale } = await import('./logoDiscoveryService.js');
-        const done = await refreshStale({ limit: 3, deadline: Math.min(Date.now() + 6_000, by(20_000)) });
-        if (done.length) summary.logosRefreshed = done;
+    await step('logoDiscovery', async () => {
+      if (!late()) {
+        const { claimInterval } = await import('./bootUpkeep.js');
+        if (await claimInterval('logo_discovery', 6 * 3_600_000)) {
+          const { refreshStale } = await import('./logoDiscoveryService.js');
+          const done = await refreshStale({ limit: 3, deadline: Math.min(Date.now() + 6_000, by(20_000)) });
+          if (done.length) summary.logosRefreshed = done;
+        }
       }
-    }
+    });
   } catch (e) { summary.logoDiscoveryError = e.message; }
 
   // 0. Is the Discord bot still polling? (alerts the owner once per outage)
   try {
-    const { checkBotHeartbeat } = await import('./discordService.js');
-    summary.discordBot = (await checkBotHeartbeat()).status;
+    await step('discordBot', async () => {
+      const { checkBotHeartbeat } = await import('./discordService.js');
+      summary.discordBot = (await checkBotHeartbeat()).status;
+    });
   } catch (e) { summary.discordBotError = e.message; }
 
   /* 0b. The owner's own artwork on every product. Early, because it used to
@@ -190,31 +233,35 @@ async function runMaintenanceSteps({ deadline }) {
      ran long — the owner's cards stayed off the shop for hours. Idempotent:
      a product that already has its artwork costs nothing. */
   try {
-    const { applyCategoryArtwork, artworkEnabled } = await import('./discovery/categoryArtService.js');
-    if (artworkEnabled()) {
-      const a = await applyCategoryArtwork({ deadline: by(8_000) });
-      if (a.applied) summary.artworkApplied = a.applied;
-      if (a.remaining) summary.artworkRemaining = a.remaining;
-    }
-    /* The free brand logos the product cards draw (one Commons search per
-       brand, cached 30 days — production only). */
-    const { logosEnabled, warmLogos } = await import('./discovery/commonsLogoService.js');
-    if (logosEnabled() && Date.now() < by(10_000)) {
-      const w = await warmLogos({ deadline: by(10_000) });
-      if (w.found) summary.brandLogos = w.found;
-    }
+    await step('artwork', async () => {
+      const { applyCategoryArtwork, artworkEnabled } = await import('./discovery/categoryArtService.js');
+      if (artworkEnabled()) {
+        const a = await applyCategoryArtwork({ deadline: by(8_000) });
+        if (a.applied) summary.artworkApplied = a.applied;
+        if (a.remaining) summary.artworkRemaining = a.remaining;
+      }
+      /* The free brand logos the product cards draw (one Commons search per
+         brand, cached 30 days — production only). */
+      const { logosEnabled, warmLogos } = await import('./discovery/commonsLogoService.js');
+      if (logosEnabled() && Date.now() < by(10_000)) {
+        const w = await warmLogos({ deadline: by(10_000) });
+        if (w.found) summary.brandLogos = w.found;
+      }
+    });
   } catch (e) { summary.artworkError = e.message; }
 
   // 1. Purge OTP codes that are long expired / already consumed (keep table small).
   try {
-    const r = await run(`DELETE FROM otp_codes WHERE expires_at < @cut OR (consumed_at IS NOT NULL AND created_at < @cut)`,
-      { cut: HOURS(2) });
-    summary.otpPurged = r?.changes ?? 0;
-    /* The SMS sign-in codes, phone number and all. Read only while the code is
-       alive and for the per-number request cap (minutes); a row older than a
-       day is a phone number kept for nothing. */
-    const s = await run(`DELETE FROM sms_verifications WHERE created_at < @cut`, { cut: HOURS(48) });
-    summary.otpPurged += s?.changes ?? 0;
+    await step('otp', async () => {
+      const r = await run(`DELETE FROM otp_codes WHERE expires_at < @cut OR (consumed_at IS NOT NULL AND created_at < @cut)`,
+        { cut: HOURS(2) });
+      summary.otpPurged = r?.changes ?? 0;
+      /* The SMS sign-in codes, phone number and all. Read only while the code is
+         alive and for the per-number request cap (minutes); a row older than a
+         day is a phone number kept for nothing. */
+      const s = await run(`DELETE FROM sms_verifications WHERE created_at < @cut`, { cut: HOURS(48) });
+      summary.otpPurged += s?.changes ?? 0;
+    });
   } catch (e) { summary.otpError = e.message; }
 
   // 1b. Forget IP addresses once they have done their job.
@@ -230,111 +277,129 @@ async function runMaintenanceSteps({ deadline }) {
   // history, fraud evidence all keep their shape) and only the IP is nulled,
   // well outside every window that reads it.
   try {
-    // Which of these actually carry an ip is a schema question, not something
-    // to hardcode — the first version of this listed refund_requests, which has
-    // no ip column, and the whole step aborted on the error.
-    const WINDOWS = {
-      login_attempts: 90,     // read within 15 min (failures) and ~90 days (familiar device)
-      sms_verifications: 7,   // read within the OTP lifetime only
-      otp_codes: 2,           // rows are deleted above anyway; this catches stragglers
-      sessions: 90,           // current state while active; pointless once long expired
-      trusted_devices: 180,   // "is this the device you always use" needs history
-      payment_proofs: 365,    // fraud evidence attached to money
-      daily_claims: 30,       // the one-account-per-connection check looks back a day
-      coupon_redemptions: 365,
-      // Read by fraud scoring: "has this address ordered under other emails
-      // today" and "has a chargeback come from here". Both windows are days to
-      // months, so a year is already generous — but a chargeback can arrive
-      // ~120 days after the payment, so the ledger keeps its address longer
-      // than the order does or the signal would expire before the fraud did.
-      orders: 365,
-      chargebacks: 540,
-      audit_logs: 365,        // security evidence — longest, but not forever
-    };
-    const present = await all(
-      `SELECT table_name FROM information_schema.columns
-        WHERE column_name = 'ip' AND table_schema = 'public'`);
-    const have = new Set(present.map((r) => r.table_name));
-    let cleared = 0;
-    /* Each table on its own. This was one loop in one try, so the first table
-       that threw — a timeout on a big audit log, a lock — left every table
-       after it keeping its addresses, and the error said "ipForgetError" and
-       nothing about which one. Seen live on 24 September 2026. */
-    const failed = [];
-    for (const [table, days] of Object.entries(WINDOWS)) {
-      if (!have.has(table)) continue;
-      try {
-        const r = await run(
-          `UPDATE ${table} SET ip = NULL WHERE ip IS NOT NULL AND created_at < @cut`, { cut: DAYS(days) });
-        cleared += r?.changes ?? 0;
-      } catch (e) { failed.push(`${table}: ${e.message}`); }
-    }
-    summary.ipsForgotten = cleared;
-    if (failed.length) summary.ipForgetError = failed.join('; ');
+    await step('ipForget', async () => {
+      // Which of these actually carry an ip is a schema question, not something
+      // to hardcode — the first version of this listed refund_requests, which has
+      // no ip column, and the whole step aborted on the error.
+      const WINDOWS = {
+        login_attempts: 90,     // read within 15 min (failures) and ~90 days (familiar device)
+        sms_verifications: 7,   // read within the OTP lifetime only
+        otp_codes: 2,           // rows are deleted above anyway; this catches stragglers
+        sessions: 90,           // current state while active; pointless once long expired
+        trusted_devices: 180,   // "is this the device you always use" needs history
+        payment_proofs: 365,    // fraud evidence attached to money
+        daily_claims: 30,       // the one-account-per-connection check looks back a day
+        coupon_redemptions: 365,
+        // Read by fraud scoring: "has this address ordered under other emails
+        // today" and "has a chargeback come from here". Both windows are days to
+        // months, so a year is already generous — but a chargeback can arrive
+        // ~120 days after the payment, so the ledger keeps its address longer
+        // than the order does or the signal would expire before the fraud did.
+        orders: 365,
+        chargebacks: 540,
+        audit_logs: 365,        // security evidence — longest, but not forever
+      };
+      const present = await all(
+        `SELECT table_name FROM information_schema.columns
+          WHERE column_name = 'ip' AND table_schema = 'public'`);
+      const have = new Set(present.map((r) => r.table_name));
+      let cleared = 0;
+      /* Each table on its own. This was one loop in one try, so the first table
+         that threw — a timeout on a big audit log, a lock — left every table
+         after it keeping its addresses, and the error said "ipForgetError" and
+         nothing about which one. Seen live on 24 September 2026. */
+      const failed = [];
+      for (const [table, days] of Object.entries(WINDOWS)) {
+        if (!have.has(table)) continue;
+        try {
+          const r = await run(
+            `UPDATE ${table} SET ip = NULL WHERE ip IS NOT NULL AND created_at < @cut`, { cut: DAYS(days) });
+          cleared += r?.changes ?? 0;
+        } catch (e) { failed.push(`${table}: ${e.message}`); }
+      }
+      summary.ipsForgotten = cleared;
+      if (failed.length) summary.ipForgetError = failed.join('; ');
+    });
   } catch (e) { summary.ipForgetError = e.message; }
 
   // 1c. Payment screenshots whose order no longer waits on them.
   try {
-    const { forgetStaleScreenshots } = await import('./paymentProofService.js');
-    const n = await forgetStaleScreenshots();
-    if (n) summary.screenshotsForgotten = n;
+    await step('screenshot', async () => {
+      const { forgetStaleScreenshots } = await import('./paymentProofService.js');
+      const n = await forgetStaleScreenshots();
+      if (n) summary.screenshotsForgotten = n;
+    });
   } catch (e) { summary.screenshotError = e.message; }
 
   // 2. Mark expired refresh sessions revoked so they drop out of "active sessions".
   try {
-    const r = await run(`UPDATE sessions SET revoked_at = @at WHERE revoked_at IS NULL AND expires_at < @now`,
-      { at: nowIso(), now: nowIso() });
-    summary.sessionsExpired = r?.changes ?? 0;
+    await step('session', async () => {
+      const r = await run(`UPDATE sessions SET revoked_at = @at WHERE revoked_at IS NULL AND expires_at < @now`,
+        { at: nowIso(), now: nowIso() });
+      summary.sessionsExpired = r?.changes ?? 0;
+    });
   } catch (e) { summary.sessionError = e.message; }
 
   // 3. Auto-cancel orders left unpaid for 14+ days (frees reserved intent).
   try {
-    /* Not an order whose buyer sent proof of payment that nobody has looked at
-       yet: that is a paid order waiting for us, not an abandoned one. It was
-       cancelled with the proof still in the queue, and confirming the proof
-       afterwards failed. */
-    const stale = await all(`SELECT id FROM orders WHERE status='pending' AND created_at < @cut
-                               AND NOT EXISTS (SELECT 1 FROM payment_proofs p WHERE p.order_id = orders.id AND p.status = 'pending')
-                             LIMIT 100`,
-      { cut: DAYS(14) });
-    for (const o of stale) {
-      try {
-        await transitionOrder(o.id, 'cancelled', { actorId: 'system', reason: 'Auto-cancelled: unpaid for 14 days' });
-        summary.ordersCancelled++;
-      } catch { /* skip individual failures */ }
-    }
+    await step('order', async () => {
+      /* Not an order whose buyer sent proof of payment that nobody has looked at
+         yet: that is a paid order waiting for us, not an abandoned one. It was
+         cancelled with the proof still in the queue, and confirming the proof
+         afterwards failed. */
+      const stale = await all(`SELECT id FROM orders WHERE status='pending' AND created_at < @cut
+                                 AND NOT EXISTS (SELECT 1 FROM payment_proofs p WHERE p.order_id = orders.id AND p.status = 'pending')
+                               LIMIT 100`,
+        { cut: DAYS(14) });
+      for (const o of stale) {
+        try {
+          await transitionOrder(o.id, 'cancelled', { actorId: 'system', reason: 'Auto-cancelled: unpaid for 14 days' });
+          summary.ordersCancelled++;
+        } catch { /* skip individual failures */ }
+      }
+    });
   } catch (e) { summary.orderError = e.message; }
 
   // 4. Abandoned-payment recovery: remind customers whose order is still unpaid
   //    an hour after checkout (one reminder per order, includes the pay links).
   if (!late()) try {
-    summary.remindersSent = await sendPaymentReminders({ afterMinutes: 60 });
+    await step('reminder', async () => {
+      summary.remindersSent = await sendPaymentReminders({ afterMinutes: 60 });
+    });
   } catch (e) { summary.reminderError = e.message; }
 
   // 5. Post-delivery review request: one "how was your order?" email per
   //    completed order, a day after delivery (one per order, never repeated).
   if (!late()) try {
-    summary.reviewRequestsSent = await sendReviewRequests({ afterHours: 24 });
+    await step('review', async () => {
+      summary.reviewRequestsSent = await sendReviewRequests({ afterHours: 24 });
+    });
   } catch (e) { summary.reviewError = e.message; }
 
   // 6. Abandoned-cart recovery: one reminder per idle cart (has items, no order
   //    placed since, not already reminded for this cart version).
   if (!late()) try {
-    summary.cartRemindersSent = await sendCartReminders({ afterHours: 4 });
+    await step('cart', async () => {
+      summary.cartRemindersSent = await sendCartReminders({ afterHours: 4 });
+    });
   } catch (e) { summary.cartError = e.message; }
 
   // 7. Re-poll async supplier fulfilments that returned a reference and are
   //    still in progress, so they complete without a manual nudge.
   if (!late()) try {
-    summary.fulfillmentsRetried = await retryPendingFulfillments({ limit: 25, deadline: Math.min(Date.now() + 8_000, by(20_000)) });
+    await step('fulfillment', async () => {
+      summary.fulfillmentsRetried = await retryPendingFulfillments({ limit: 25, deadline: Math.min(Date.now() + 8_000, by(20_000)) });
+    });
   } catch (e) { summary.fulfillmentError = e.message; }
 
   // 8. Drain the serial supplier queue (safety net if a payment-time drain was
   //    interrupted): buys + delivers pending paid orders one at a time.
   if (late()) summary.supplierQueueSkipped = 'time budget';
   else try {
-    const more = (await drainSupplierQueue({ actorId: 'system' }, { budgetMs: Math.max(1_000, by(24_000) - Date.now()) })).processed || 0;
-    summary.supplierQueue = (summary.supplierQueue || 0) + more;
+    await step('supplierQueue', async () => {
+      const more = (await drainSupplierQueue({ actorId: 'system' }, { budgetMs: Math.max(1_000, by(24_000) - Date.now()) })).processed || 0;
+      summary.supplierQueue = (summary.supplierQueue || 0) + more;
+    }, Infinity);
   } catch (e) { summary.supplierQueueError = e.message; }
 
 
@@ -346,8 +411,10 @@ async function runMaintenanceSteps({ deadline }) {
    *     launch that slips by a day should still send the mail on the day it
    *     actually happened. */
   if (!late()) try {
-    const ann = await sendLaunchAnnouncements({ limit: 40 });
-    summary.launchAnnounced = ann.sent;
+    await step('launchAnnounce', async () => {
+      const ann = await sendLaunchAnnouncements({ limit: 40 });
+      summary.launchAnnounced = ann.sent;
+    });
   } catch (e) { summary.launchAnnounceError = e.message; }
 
 
@@ -359,15 +426,19 @@ async function runMaintenanceSteps({ deadline }) {
   //     them. This also catches the other direction: a refund that happened
   //     while Discord was unreachable leaves a badge that should be gone.
   if (!late()) try {
-    const swept = await sweepMemberRoles({ limit: 25 });
-    summary.discordRolesChecked = swept.checked ?? 0;
-    summary.discordRolesChanged = swept.changed ?? 0;
+    await step('discordRole', async () => {
+      const swept = await sweepMemberRoles({ limit: 25 });
+      summary.discordRolesChecked = swept.checked ?? 0;
+      summary.discordRolesChanged = swept.changed ?? 0;
+    });
   } catch (e) { summary.discordRoleError = e.message; }
 
   // 12. Expired, unused link intents are junk — they are single-use and live
   //     ten minutes.
   try {
-    summary.linkIntentsPurged = await purgeExpiredLinkIntents();
+    await step('linkIntent', async () => {
+      summary.linkIntentsPurged = await purgeExpiredLinkIntents();
+    });
   } catch (e) { summary.linkIntentError = e.message; }
 
   // 13. Discard Discord events nobody is ever going to deliver.
@@ -378,7 +449,9 @@ async function runMaintenanceSteps({ deadline }) {
   //     carries the buyer's email, so an unattended outbox is an unbounded store
   //     of customer data sitting next to the IP retention rules above.
   try {
-    summary.discordOutboxPruned = await pruneOutbox();
+    await step('discordOutbox', async () => {
+      summary.discordOutboxPruned = await pruneOutbox();
+    });
   } catch (e) { summary.discordOutboxError = e.message; }
 
   // 14. Ad attribution past its retention window.
@@ -388,7 +461,9 @@ async function runMaintenanceSteps({ deadline }) {
   //     sentence in a privacy policy rather than a property of the system. The
   //     orders keep their revenue either way — only the visit rows go.
   try {
-    summary.adVisitsPruned = (await pruneAttribution()).removed;
+    await step('adVisits', async () => {
+      summary.adVisitsPruned = (await pruneAttribution()).removed;
+    });
   } catch (e) { summary.adVisitsError = e.message; }
 
   /* 15. Owner alerts that never got through, and storms that have blown over.
@@ -402,15 +477,19 @@ async function runMaintenanceSteps({ deadline }) {
    *     a storm is summarised in one line per event, which is the only reason
    *     suppressing them is honest rather than just quieter. */
   if (!late()) try {
-    const swept = await sweepAlerts({ limit: 20 });
-    summary.alertsRetried = swept.retried;
-    summary.alertsDelivered = swept.delivered;
-    if (swept.givenUp) summary.alertsGivenUp = swept.givenUp;
-    if (swept.summarised) summary.alertStormsSummarised = swept.summarised;
+    await step('alertSweep', async () => {
+      const swept = await sweepAlerts({ limit: 20 });
+      summary.alertsRetried = swept.retried;
+      summary.alertsDelivered = swept.delivered;
+      if (swept.givenUp) summary.alertsGivenUp = swept.givenUp;
+      if (swept.summarised) summary.alertStormsSummarised = swept.summarised;
+    });
   } catch (e) { summary.alertSweepError = e.message; }
 
   try {
-    summary.alertsPruned = await pruneAlerts();
+    await step('alertPrune', async () => {
+      summary.alertsPruned = await pruneAlerts();
+    });
   } catch (e) { summary.alertPruneError = e.message; }
 
   /* ── Market intelligence ────────────────────────────────────────────────
@@ -425,30 +504,32 @@ async function runMaintenanceSteps({ deadline }) {
      is write a recommendation with a status of requires_review; publishing is a
      separate, human, audited action. */
   if (!late()) try {
-    const market = await import('./market/engine.js');
-    summary.marketSources = (await market.refreshSources({ checkRobots: false })).length;
+    await step('market', async () => {
+      const market = await import('./market/engine.js');
+      summary.marketSources = (await market.refreshSources({ checkRobots: false })).length;
 
-    const discovery = await market.runProductDiscovery();
-    if (!discovery.skipped) {
-      summary.marketObservations = discovery.collected?.recorded || 0;
-      summary.marketClassified = discovery.classified?.classified || 0;
-      summary.marketNewCandidates = discovery.newCandidates || 0;
-      if (discovery.collected?.unavailable?.length) {
-        summary.marketSourcesUnavailable = discovery.collected.unavailable.length;
+      const discovery = await market.runProductDiscovery();
+      if (!discovery.skipped) {
+        summary.marketObservations = discovery.collected?.recorded || 0;
+        summary.marketClassified = discovery.classified?.classified || 0;
+        summary.marketNewCandidates = discovery.newCandidates || 0;
+        if (discovery.collected?.unavailable?.length) {
+          summary.marketSourcesUnavailable = discovery.collected.unavailable.length;
+        }
       }
-    }
 
-    const pricing = await market.refreshRecommendations();
-    if (!pricing.skipped) {
-      summary.marketPriced = pricing.priced;
-      summary.marketNeedsReview = pricing.requiresReview;
-    }
+      const pricing = await market.refreshRecommendations();
+      if (!pricing.skipped) {
+        summary.marketPriced = pricing.priced;
+        summary.marketNeedsReview = pricing.requiresReview;
+      }
 
-    const stale = await market.detectStaleData();
-    summary.marketStale = stale.stale;
+      const stale = await market.detectStaleData();
+      summary.marketStale = stale.stale;
 
-    const { pruneObservations } = await import('./market/observations.js');
-    summary.marketObservationsPruned = await pruneObservations();
+      const { pruneObservations } = await import('./market/observations.js');
+      summary.marketObservationsPruned = await pruneObservations();
+    }, Infinity);
   } catch (e) { summary.marketError = e.message; }
 
   /* 15b. Product discovery (services/discovery): the next few search terms at
@@ -458,7 +539,7 @@ async function runMaintenanceSteps({ deadline }) {
   if (!late()) {
     try {
       const { scheduledDiscovery } = await import('./discovery/discoveryPipeline.js');
-      const d = await scheduledDiscovery({ deadline: by(24_000) });
+      const d = await step('discovery', () => scheduledDiscovery({ deadline: by(24_000) }), Infinity);
       summary.discoveryQueries = d.categories?.queries?.length || 0;
       if (d.research?.mentions) summary.discoveryResearchMentions = d.research.mentions;
       if (d.firstEvaluation) summary.discoveryFirstEvaluated = d.firstEvaluation;
@@ -484,11 +565,13 @@ async function runMaintenanceSteps({ deadline }) {
    *      Content-addressed, so running it again finds the same rows and writes
    *      nothing. */
   try {
-    const logos = await migrateCategoryLogos();
-    if (logos.moved) {
-      summary.categoryLogosMoved = logos.moved;
-      summary.categoryLogoBytesFreed = logos.freedBytes;
-    }
+    await step('categoryLogo', async () => {
+      const logos = await migrateCategoryLogos();
+      if (logos.moved) {
+        summary.categoryLogosMoved = logos.moved;
+        summary.categoryLogoBytesFreed = logos.freedBytes;
+      }
+    });
   } catch (e) { summary.categoryLogoError = e.message; }
 
   /* 14. The weekly backup has its own cron now — see runScheduledBackup()
@@ -498,18 +581,22 @@ async function runMaintenanceSteps({ deadline }) {
   /* 14b. Price alerts that a price change armed but did not send — the
    *      overflow past its first batch, and any held back by the cooldown. */
   try {
-    const { sendPendingAlerts } = await import('./wishlistService.js');
-    const out = await sendPendingAlerts({ limit: 200 });
-    if (out.sent) summary.priceAlertsSent = out.sent;
+    await step('priceAlert', async () => {
+      const { sendPendingAlerts } = await import('./wishlistService.js');
+      const out = await sendPendingAlerts({ limit: 200 });
+      if (out.sent) summary.priceAlertsSent = out.sent;
+    });
   } catch (e) { summary.priceAlertError = e.message; }
 
   /* 14c. Supplier failover: move any product whose supplier went offline, out
    *      of stock, started failing or became too dear since the last look —
    *      before the next order finds out the hard way. Database only. */
   try {
-    const { sweepFailover } = await import('./supplier/supplierFailoverService.js');
-    const out = await sweepFailover();
-    if (out.switched) summary.suppliersSwitched = out.switched;
+    await step('failover', async () => {
+      const { sweepFailover } = await import('./supplier/supplierFailoverService.js');
+      const out = await sweepFailover();
+      if (out.switched) summary.suppliersSwitched = out.switched;
+    });
   } catch (e) { summary.failoverError = e.message; }
 
   /* 15. Real photos for products still showing a placeholder.
@@ -525,32 +612,34 @@ async function runMaintenanceSteps({ deadline }) {
    *     (supplierImageService.RETRY_AFTER_DAYS) would then hold them back for a
    *     fortnight after the owner connected one. */
   try {
-    const { getSetting: getS, setSetting: setS } = await import('./settingsService.js');
-    const lastAt = await getS('photo_sweep_last_at', null);
-    const due = !lastAt || Date.now() - Date.parse(lastAt) > 20 * 3_600_000;
-    if (due) {
-      const { photoQueue, findPhotos, photoScope } = await import('./supplier/supplierImageService.js');
-      const { scanSources } = await import('./supplier/bestSourceService.js');
-      const sources = await scanSources();
-      if (sources.length) {
-        /* The owner's choice: placeholders only, or the artwork too. */
-        const scope = await photoScope();
-        const missing = await photoQueue({ limit: Number(process.env.PHOTO_SWEEP_LIMIT || 8), scope });
-        /* Plus a few supplier photos that went stale or were weak: store
-           artwork changes with seasons, and a refresh is a cheap search. */
-        const { mediaReport } = await import('./productMediaService.js');
-        const stale = (await mediaReport()).items
-          .filter((i) => i.source === 'supplier' && ['outdated', 'low_quality'].includes(i.status))
-          .slice(0, 4).map((i) => i.id);
-        const ids = [...new Set([...missing, ...stale])];
-        if (ids.length) {
-          const out = await findPhotos(ids, { apply: true, sources, scope, refresh: true });
-          summary.photosLooked = ids.length;
-          summary.photosApplied = out.applied;
+    await step('photos', async () => {
+      const { getSetting: getS, setSetting: setS } = await import('./settingsService.js');
+      const lastAt = await getS('photo_sweep_last_at', null);
+      const due = !lastAt || Date.now() - Date.parse(lastAt) > 20 * 3_600_000;
+      if (due) {
+        const { photoQueue, findPhotos, photoScope } = await import('./supplier/supplierImageService.js');
+        const { scanSources } = await import('./supplier/bestSourceService.js');
+        const sources = await scanSources();
+        if (sources.length) {
+          /* The owner's choice: placeholders only, or the artwork too. */
+          const scope = await photoScope();
+          const missing = await photoQueue({ limit: Number(process.env.PHOTO_SWEEP_LIMIT || 8), scope });
+          /* Plus a few supplier photos that went stale or were weak: store
+             artwork changes with seasons, and a refresh is a cheap search. */
+          const { mediaReport } = await import('./productMediaService.js');
+          const stale = (await mediaReport()).items
+            .filter((i) => i.source === 'supplier' && ['outdated', 'low_quality'].includes(i.status))
+            .slice(0, 4).map((i) => i.id);
+          const ids = [...new Set([...missing, ...stale])];
+          if (ids.length) {
+            const out = await findPhotos(ids, { apply: true, sources, scope, refresh: true });
+            summary.photosLooked = ids.length;
+            summary.photosApplied = out.applied;
+          }
+          await setS('photo_sweep_last_at', nowIso());
         }
-        await setS('photo_sweep_last_at', nowIso());
       }
-    }
+    });
   } catch (e) { summary.photosError = e.message; }
 
   /* Leave a trace that this actually happened.
