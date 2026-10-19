@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Truck, CheckCircle2, RotateCcw, AlertTriangle } from 'lucide-react';
 import { api } from '../../lib/api.js';
-import { money, date, confirmRefund } from '../../lib/format.js';
+import { money, date, confirmRefund, refundOutcome } from '../../lib/format.js';
 import { PageLoader, StatusBadge, STATUS_META, Modal } from '../../components/ui.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
@@ -33,9 +33,7 @@ export default function AdminOrderDetail() {
     setBusy(true);
     try { const r = await api.post(`/api/admin/orders/${id}/${action}`, body);
       // A Pay. refund is made by hand in my.pay.nl — never reported as done.
-      if (r?.refund?.via === 'paynl') {
-        toast.success(`Marked refunded. Now refund ${money(r.refund.cents, data?.order?.currency)} in my.pay.nl — that is not automatic.`);
-      } else toast.success('Done.');
+      toast.success(r?.refund ? refundOutcome(r.refund, null, data?.order?.currency) : 'Done.');
       setConfirm(false); load(); }
     catch (err) { toast.error(err.message); }
     finally { setBusy(false); }
