@@ -329,7 +329,9 @@ export async function createOrder(input, ctx = {}) {
       // Snapshot the category: the delivery email picks its redeem instructions
       // from it, and it must stay correct even if the product is later re-filed
       // or deleted. Client-supplied metadata never overrides it.
-      metadata: { ...(metadata || {}), category: product.category },
+      metadata: { ...(metadata || {}), category: product.category,
+        // The picture, for the order mails' summary (a thumbnail when it is one).
+        ...(product.image ? { image: product.image } : {}) },
     });
   }
   /* What pricing refused — a code that does not apply, credit next to a box,
@@ -1628,10 +1630,16 @@ function consentHtml(order, lang) {
   const sentence = String(order.consentText || '').trim();
   const escaped = sentence
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  return `<p style="color:#8b93a7;font-size:12px;line-height:1.6;margin-top:18px;padding-top:14px;border-top:1px solid rgba(255,255,255,.08)">
-    <strong style="color:#b6c1d1">${escapeHtml(c.withdrawalTitle)}</strong><br>
+  /* What still holds depends on where the order is. Before delivery the buyer
+     can still cancel; once it is delivered that is exactly what they waived,
+     and the delivery mail said "until delivery you can still cancel" under the
+     code it had just handed over. */
+  const delivered = order.status === 'completed' || (order.deliveries || []).length > 0;
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:22px 0 4px">
+    <tr><td style="border-top:1px solid #24243a;padding:16px 0 0;color:#8b93a7;font:400 12.5px/1.6 'Segoe UI',Arial,sans-serif">
+    <strong style="color:#c3c9d6;font-weight:700">${escapeHtml(c.withdrawalTitle)}</strong><br>
     ${escaped ? `${c.withdrawalConfirmed(stamp, escaped)}<br>` : `${c.withdrawalDefault(stamp)}<br>`}
-    ${escapeHtml(c.withdrawalCancel)}</p>`;
+    ${escapeHtml(delivered ? c.withdrawalDelivered : c.withdrawalCancel)}</td></tr></table>`;
 }
 
 /**
@@ -1802,12 +1810,12 @@ function redeemHtml(order, lang) {
   return list.map((r) => `
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:14px 0 0">
       <tr><td style="background-color:#141426;border:1px solid #2c2c48;border-radius:14px;padding:16px 18px">
-        <div style="font:700 14px/1.3 'Segoe UI',Arial,sans-serif;color:#ffffff">${r.icon} ${escapeHtml(r.title)}</div>
-        <div style="font:400 12.5px/1.6 'Segoe UI',Arial,sans-serif;color:#8b8fa3;padding-top:3px">${escapeHtml(c.redeemAt)} ${escapeHtml(r.where)}</div>
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:11px">
+        <div style="font:700 15px/1.3 'Segoe UI',Arial,sans-serif;color:#ffffff">${escapeHtml(r.title)}</div>
+        <div style="font:400 13px/1.6 'Segoe UI',Arial,sans-serif;color:#8b8fa3;padding-top:3px">${escapeHtml(c.redeemAt)} ${escapeHtml(r.where)}</div>
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:12px">
           ${r.steps.map((s, n) => `<tr>
-            <td valign="top" style="padding:3px 9px 3px 0"><span style="display:inline-block;width:19px;height:19px;background-color:#26264a;border-radius:999px;color:#c7d2fe;font:700 11px/19px Arial,sans-serif;text-align:center">${n + 1}</span></td>
-            <td style="padding:3px 0;font:400 13.5px/1.55 'Segoe UI',Arial,sans-serif;color:#b9bfcd">${s}</td>
+            <td valign="top" style="padding:4px 10px 4px 0"><span style="display:inline-block;width:22px;height:22px;background-color:#2a2a52;border-radius:999px;color:#d7dcff;font:700 12px/22px Arial,sans-serif;text-align:center">${n + 1}</span></td>
+            <td style="padding:4px 0;font:400 14.5px/1.55 'Segoe UI',Arial,sans-serif;color:#c3c9d6">${s}</td>
           </tr>`).join('')}
         </table>
       </td></tr>
@@ -1852,6 +1860,18 @@ function deliveryHtml(order, lang) {
   return codeCardsHtml(order, c);
 }
 
+/**
+ * A code that breaks between its groups, never inside one.
+ *
+ * `word-break:break-all` split "STEAM-AB12-CD34" as "STEAM-AB12-C / D34" on a
+ * phone — a code read off a screen and typed into a launcher, broken in the
+ * middle of a group. A <wbr> after each dash (and each space) is a break the
+ * reader expects; it is not a character, so copying the code copies it whole.
+ * A code with no separators at all still wraps where it must (overflow-wrap).
+ * The value arrives escaped.
+ */
+const codeBreaks = (escaped) => String(escaped).replace(/([-\s/])/g, '$1<wbr>');
+
 /** One premium card per delivered item (gift code, key, licence, file, link).
  *  A staff "message" is prose, not a code: a readable paragraph, not the 24px
  *  letter-spaced code block. */
@@ -1868,11 +1888,11 @@ function codeCardsHtml(order, c) {
         <div style="font:400 14px/1.6 'Segoe UI',Arial,sans-serif;color:#e2e4ee;white-space:pre-line">${value}</div>
       </td></tr></table>`;
     }
-    return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 10px">
+    return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 12px">
       <tr><td bgcolor="#7c5cff" style="height:4px;background-color:#7c5cff;background-image:linear-gradient(90deg,#7c5cff,#d946ef);border-radius:14px 14px 0 0;font-size:0;line-height:0">&nbsp;</td></tr>
-      <tr><td bgcolor="#17172a" style="background-color:#17172a;border:1px solid #34345a;border-top:0;border-radius:0 0 14px 14px;padding:16px 18px 18px">
-        <div style="font:700 11px/1 Arial,sans-serif;color:#8b8fa3;text-transform:uppercase;letter-spacing:1.4px;margin:0 0 9px">${label}</div>
-        <div style="font:800 24px/1.25 'Courier New',monospace;letter-spacing:4px;color:#ffffff;word-break:break-all">${value}</div>
+      <tr><td bgcolor="#17172a" style="background-color:#17172a;border:1px solid #34345a;border-top:0;border-radius:0 0 14px 14px;padding:18px 20px 20px">
+        <div style="font:700 11px/1 Arial,sans-serif;color:#8b8fa3;text-transform:uppercase;letter-spacing:1.4px;margin:0 0 10px">${label}</div>
+        <div class="code-val" style="font:800 22px/1.4 'Courier New',Courier,monospace;letter-spacing:2px;color:#ffffff;word-break:normal;overflow-wrap:anywhere;-webkit-user-select:all;user-select:all">${codeBreaks(value)}</div>
       </td></tr></table>`;
   }).join('');
 }
@@ -1884,6 +1904,19 @@ function codeCardsHtml(order, c) {
    thousands written the way each language writes them (1.000 · 1,000 · 1 000). */
 const localName = (name, lang = 'nl') => (lang === 'en' ? String(name || '')
   : String(name || '').replace(/(\d),(\d{3})\b/g, lang === 'fr' ? '$1\u00a0$2' : '$1.$2'));
+
+/**
+ * The product's picture for the order summary, when there is one a mail
+ * client can show: an absolute https URL to a raster image. SVG tiles (Gmail
+ * blocks SVG) and anything unknown are left out — the row reads fine without.
+ */
+function itemThumb(item) {
+  const raw = String(item?.metadata?.image || '').trim();
+  if (!raw || !/\.(png|jpe?g|gif|webp)(\?.*)?$/i.test(raw)) return '';
+  const base = String(config.appUrl || '').replace(/\/+$/, '');
+  const url = /^https:\/\//i.test(raw) ? raw : (raw.startsWith('/') && /^https:\/\//i.test(base) ? `${base}${raw}` : '');
+  return url ? escapeHtml(url) : '';
+}
 
 function summaryHtml(order, lang) {
   const c = emailCopy(lang);
@@ -1901,11 +1934,15 @@ function summaryHtml(order, lang) {
   for (const i of order.items || []) {
     const mpv = rate > 0 && isVoucher(i)
       ? `<br><span style="color:#8b8fa3;font-size:12px">${escapeHtml(c.vatMpv)}</span>` : '';
-    rows.push(`<tr><td style="padding:9px 0;border-bottom:1px solid #24243a;color:#cbd1de;font-size:14px">${escapeHtml(localName(i.name, lang))} <span style="color:#8b8fa3">× ${i.quantity}</span>${mpv}</td>` +
-      `<td style="padding:9px 0;border-bottom:1px solid #24243a;color:#fff;font-size:14px;text-align:right;white-space:nowrap">${money(i.unit_price * i.quantity)}</td></tr>`);
+    const thumb = itemThumb(i);
+    const name = `${escapeHtml(localName(i.name, lang))} <span style="color:#8b8fa3;white-space:nowrap">× ${i.quantity}</span>${mpv}`;
+    rows.push(`<tr><td style="padding:11px 0;border-bottom:1px solid #24243a;color:#dfe3ec;font-size:14.5px;line-height:1.45">${thumb
+      ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td width="44" valign="middle" style="width:44px;padding:0 12px 0 0"><img src="${thumb}" width="44" height="44" alt="" style="display:block;width:44px;height:44px;border:0;border-radius:10px;background-color:#1d1d30;object-fit:cover"></td><td valign="middle" style="color:#dfe3ec;font-size:14.5px;line-height:1.45">${name}</td></tr></table>`
+      : name}</td>` +
+      `<td valign="middle" style="padding:11px 0 11px 12px;border-bottom:1px solid #24243a;color:#fff;font-size:14.5px;font-weight:600;text-align:right;white-space:nowrap">${money(i.unit_price * i.quantity)}</td></tr>`);
   }
-  const line = (label, cents, neg = false) => `<tr><td style="padding:8px 0;border-bottom:1px solid #24243a;color:#9aa3b8;font-size:13.5px">${label}</td>` +
-    `<td style="padding:8px 0;border-bottom:1px solid #24243a;font-size:13.5px;text-align:right;white-space:nowrap;color:${neg ? '#34d399' : '#cbd1de'}">${neg ? '−' : ''}${money(cents)}</td></tr>`;
+  const line = (label, cents, neg = false) => `<tr><td style="padding:9px 0;border-bottom:1px solid #24243a;color:#9aa3b8;font-size:14px">${label}</td>` +
+    `<td style="padding:9px 0 9px 12px;border-bottom:1px solid #24243a;font-size:14px;text-align:right;white-space:nowrap;color:${neg ? '#34d399' : '#cbd1de'}">${neg ? '−' : ''}${money(cents)}</td></tr>`;
   const couponDiscount = Number(b.discount || 0);
   const memberDiscount = Number(b.memberDiscount || 0);
   const bundleDiscount = Number(b.bundleDiscount || 0);
@@ -1931,12 +1968,16 @@ function summaryHtml(order, lang) {
         escapeHtml(c.vatIncl(formatMoney(vat, cur, lang), Math.round(rate * 1000) / 10))}</td></tr>`;
     }
   }
-  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:2px 0 20px">` +
+  /* A card of its own, so the money reads as one block apart from the letter
+     around it — the part a buyer checks against their bank statement. */
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:4px 0 22px"><tr>` +
+    `<td bgcolor="#161624" style="background-color:#161624;border:1px solid #26263c;border-radius:14px;padding:6px 18px 16px">` +
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">` +
     `<tbody>${rows.join('')}${extras.join('')}` +
-    `<tr><td style="padding:13px 0 0;border-top:2px solid #34345a;color:#fff;font-weight:800;font-size:15px">${escapeHtml(c.total)}</td>` +
-    `<td style="padding:13px 0 0;border-top:2px solid #34345a;color:#fff;font-weight:800;font-size:15px;text-align:right;white-space:nowrap">${money(order.total)}</td></tr>` +
+    `<tr><td style="padding:14px 0 0;border-top:2px solid #34345a;color:#fff;font-weight:800;font-size:16px">${escapeHtml(c.total)}</td>` +
+    `<td style="padding:14px 0 0 12px;border-top:2px solid #34345a;color:#fff;font-weight:800;font-size:16px;text-align:right;white-space:nowrap">${money(order.total)}</td></tr>` +
     vatRow +
-    `</tbody></table>`;
+    `</tbody></table></td></tr></table>`;
 }
 
 function escapeHtml(s) {

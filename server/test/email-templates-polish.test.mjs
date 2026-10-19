@@ -133,7 +133,8 @@ console.log('\n— The frame —');
   ok('the card is 600px wide', /\.wrap\{max-width:600px/.test(out.html) && /class="wrap" style="max-width:600px/.test(out.html));
   const btn = (out.html.match(/<a class="btn"[^>]*style="([^"]*)"/) || [])[1] || '';
   ok('the button carries a 20px line box + 15px padding (a 50px target) inline', /line-height:20px/.test(btn) && /padding:15px/.test(btn), btn);
-  ok('body text is at least 14px', /<p style="color:#b9bfcd;font-size:14\.5px/.test(out.html));
+  // 15.5px since the design pass (email-templates-design.test holds the floor).
+  ok('body text is at least 14px', /<p style="color:#b9bfcd;font-size:15\.5px/.test(out.html));
   ok('the body cell has an explicit dark background (dark-mode safe)', /<td class="body" bgcolor="#12121c"/.test(out.html));
   const gift = renderTemplate(rowsFor('de').find((r) => r.id === 'gift_card'), { ...ctx, lang: 'de' });
   ok('the gift-card button goes straight to the wallet', /<a class="btn" href="https:\/\/www\.forgemarket\.nl\/account\/wallet"/.test(gift.html));
