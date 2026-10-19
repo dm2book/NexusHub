@@ -121,6 +121,7 @@ async function runMaintenanceSteps({ deadline }) {
      the run no longer waits for it. */
   const STEP_MS = 10_000;
   const RESERVE_MS = 1_500;
+  const MARKET_MARGIN_MS = 5_000;
   const step = (name, fn, capMs = STEP_MS) => {
     const left = deadline - Date.now() - RESERVE_MS;
     if (left < 250) {
@@ -518,7 +519,11 @@ async function runMaintenanceSteps({ deadline }) {
          at themselves. Cut off from outside instead, pricing never reached its
          "done" mark, so every run retried it and was cut off again — the
          market data stopped refreshing. */
-      const marketDeadline = deadline - RESERVE_MS - 500;
+      /* Five seconds short of the step's own limit: one discovery or pricing
+         item costs several database round trips (~0.7 s each from the
+         function to Neon), so a check made just before the line can still
+         run past it. With 0.5 s the step was cut off at the very end anyway. */
+      const marketDeadline = deadline - RESERVE_MS - MARKET_MARGIN_MS;
       const discovery = await market.runProductDiscovery({ deadline: marketDeadline });
       if (!discovery.skipped) {
         summary.marketObservations = discovery.collected?.recorded || 0;
