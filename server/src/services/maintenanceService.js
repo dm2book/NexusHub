@@ -409,7 +409,6 @@ async function runMaintenanceSteps({ deadline }) {
     }, Infinity);
   } catch (e) { summary.supplierQueueError = e.message; }
 
-
   /* 9b. The mail the pre-launch banner promised.
    *
    *     Does nothing until the shop is actually open, and nothing twice — the
@@ -423,7 +422,6 @@ async function runMaintenanceSteps({ deadline }) {
       summary.launchAnnounced = ann.sent;
     });
   } catch (e) { summary.launchAnnounceError = e.message; }
-
 
   // 11. Reconcile Discord roles for the members checked longest ago.
   //
@@ -498,6 +496,20 @@ async function runMaintenanceSteps({ deadline }) {
       summary.alertsPruned = await pruneAlerts();
     });
   } catch (e) { summary.alertPruneError = e.message; }
+
+  /* (Runs before the market jobs: it is cheap, database-only and protects
+     orders, while discovery and pricing take whatever budget is left — placed
+     after them it was the step that ran out of time.) */
+  /* 14c. Supplier failover: move any product whose supplier went offline, out
+   *      of stock, started failing or became too dear since the last look —
+   *      before the next order finds out the hard way. Database only. */
+  try {
+    await step('failover', async () => {
+      const { sweepFailover } = await import('./supplier/supplierFailoverService.js');
+      const out = await sweepFailover();
+      if (out.switched) summary.suppliersSwitched = out.switched;
+    });
+  } catch (e) { summary.failoverError = e.message; }
 
   /* ── Market intelligence ────────────────────────────────────────────────
      Five jobs, each of which decides for ITSELF whether it is due — the
@@ -605,17 +617,6 @@ async function runMaintenanceSteps({ deadline }) {
     });
   } catch (e) { summary.priceAlertError = e.message; }
 
-  /* 14c. Supplier failover: move any product whose supplier went offline, out
-   *      of stock, started failing or became too dear since the last look —
-   *      before the next order finds out the hard way. Database only. */
-  try {
-    await step('failover', async () => {
-      const { sweepFailover } = await import('./supplier/supplierFailoverService.js');
-      const out = await sweepFailover();
-      if (out.switched) summary.suppliersSwitched = out.switched;
-    });
-  } catch (e) { summary.failoverError = e.message; }
-
   /* 15. Real photos for products still showing a placeholder.
    *
    *     Once a day, on its own "has it been long enough" key like the backup:
@@ -700,7 +701,6 @@ export async function healthCheck() {
     return { ok: false, db: 'down', error: e.message, latencyMs: Date.now() - started, ts: nowIso() };
   }
 }
-
 
 /** When the backup job runs: half an hour after the sweep, never inside it. */
 export const BACKUP_CRON = { path: '/api/cron/backup', expression: '30 4 * * *' };

@@ -85,6 +85,10 @@ console.log('\n— The maintenance run hands its deadline to the market jobs —
      because one item takes several ~0.7 s round trips. */
   const margin = Number((src.match(/MARKET_MARGIN_MS = ([\d_]+)/) || [])[1]?.replace(/_/g, ''));
   ok('…with a margin of several seconds before the step limit', margin >= 3_000, String(margin));
+  /* Seen live: with the market jobs finishing, failover (after them) was the
+     step that ran out of budget. It is cheap and protects orders: it goes first. */
+  ok('supplier failover runs before the market jobs',
+    src.indexOf("step('failover'") > 0 && src.indexOf("step('failover'") < src.indexOf("step('market'"));
 }
 
 console.log(`\n${fail ? '❌' : '✅'} market-step-budget: ${pass} passed, ${fail} failed`);
