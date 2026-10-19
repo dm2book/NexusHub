@@ -422,6 +422,24 @@ console.log('\n━━ Review findings ━━');
   orders.set(ds.body.paymentId, realStatus);
   ok('a 401 from Pay. answers FALSE so Pay. retries', ra.status === 500 && (await ra.text()).startsWith('FALSE|'));
 
+  /* Pay. refusing to START ("This service is blocked" while the account awaits
+     activation) is a clear 502 for the buyer, not a 500 crash. */
+  {
+    const f = await place(await product('PayBlocked'));
+    const before = globalThis.fetch;
+    globalThis.fetch = async (url, init) => (String(url).startsWith('https://connect.pay.nl/v1/orders')
+      && String(init?.method || 'GET').toUpperCase() === 'POST'
+      ? new Response('{"detail":"This service is blocked"}', { status: 403 }) : before(url, init));
+    const fb = await start(f);
+    globalThis.fetch = before;
+    const msg = JSON.stringify(fb.body || {});
+    ok('Pay. refusing to start a payment → 502 with a plain message, not a 500',
+      fb.status === 502 && /Nothing has been charged/.test(msg) && !/blocked|Pay\. POST/.test(msg), `${fb.status} ${msg}`);
+    const sf = await snap(f.id);
+    ok('…and the order is still pending, nothing recorded as started',
+      sf.status === 'pending' && !sf.psp_payment_id, JSON.stringify(sf));
+  }
+
   // An older attempt, named by the exchange, is found even after many newer ones.
   const e = await place(await product('PayMany'));
   const first = await start(e, 'ideal');
