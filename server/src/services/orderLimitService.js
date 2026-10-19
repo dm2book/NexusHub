@@ -49,9 +49,11 @@ export async function assertOrderLimits({ email, ip, total, value = total, curre
      unpaid ones placed from this same connection. Anyone can type someone
      else's address at guest checkout — counting every unpaid order let two
      €500 orders in a victim's name lock them out of buying for a day. A real
-     buyer retrying from their own connection is still counted. */
+     buyer retrying from their own connection is still counted (and a caller
+     with no connection at all — an internal one — counts unpaid orders that
+     had none either). */
   const countsForAddress = `(status NOT IN ('pending','cancelled','failed')
-                              OR (status = 'pending' AND @ip::text IS NOT NULL AND ip = @ip))`;
+                              OR (status = 'pending' AND ip IS NOT DISTINCT FROM @ip::text))`;
 
   if (L.maxOrderValue > 0 && value > L.maxOrderValue) {
     throw badRequest(
