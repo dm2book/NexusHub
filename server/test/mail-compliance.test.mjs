@@ -102,12 +102,17 @@ console.log('\n— Consent first —');
   ok('…nor to one that said no', !list.includes(no));
 
   const { sendCartReminders } = await import('../src/services/cartService.js');
+  /* A real product: the reminder now quotes the catalogue and leaves out
+     anything no longer for sale, so a cart of an unknown id sends nothing. */
+  const { createProduct } = await import('../src/services/productService.js');
+  const cardProduct = await createProduct({ name: `Card ${Date.now()}`, category: 'steam', price: 999,
+    currency: 'EUR', active: true, announce: false });
   const cartFor = async (email) => {
     const u = await get('SELECT id FROM users WHERE email=@e', { e: email });
     const old = new Date(Date.now() - 6 * 3_600_000).toISOString();
     await run(`INSERT INTO saved_carts (user_id, items, updated_at) VALUES (@u, @i, @at)
                ON CONFLICT (user_id) DO UPDATE SET items=@i, updated_at=@at, reminded_at=NULL`,
-      { u: u.id, i: JSON.stringify([{ productId: 'x', name: 'Card', quantity: 1, price: 999 }]), at: old });
+      { u: u.id, i: JSON.stringify([{ id: cardProduct.id, name: 'Card', qty: 1, price: 999 }]), at: old });
   };
   await cartFor(yes); await cartFor(unset);
   sent.length = 0;

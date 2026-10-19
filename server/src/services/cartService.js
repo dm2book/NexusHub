@@ -11,6 +11,7 @@ import { formatMoney } from '../utils/money.js';
 import { sendEmailAsync } from './emailService.js';
 import { notify } from './notificationService.js';
 import { config } from '../config/env.js';
+import { isSellable } from './productService.js';
 
 const parse = (s) => { try { const v = JSON.parse(s || '[]'); return Array.isArray(v) ? v : []; } catch { return []; } };
 
@@ -47,10 +48,33 @@ export async function getCart(userId) {
   return row ? parse(row.items) : [];
 }
 
-const itemsHtml = (items, currency = 'EUR') =>
+/**
+ * The saved cart as the shop sells it TODAY.
+ *
+ * The mirror stores what the browser sent: the price the shopper last saw,
+ * which can be weeks old and is, in the end, a value a client chose. The
+ * reminder quoted those numbers — "1× Robux €1,00" for a product that now
+ * costs €9,99 — and promised the cart was waiting. Each line is looked up
+ * instead: the catalogue's name and price, and only products that are still
+ * for sale. A line that is gone is left out rather than advertised.
+ */
+export async function cartReminderLines(items = []) {
+  const ids = [...new Set(items.map((i) => String(i.id || '')).filter(Boolean))];
+  if (!ids.length) return [];
+  const rows = await all(
+    'SELECT id, name, price, currency, active, kind FROM products WHERE id = ANY(@ids)', { ids });
+  const byId = new Map(rows.filter(isSellable).map((p) => [p.id, p]));
+  return items.filter((i) => byId.has(String(i.id))).map((i) => {
+    const p = byId.get(String(i.id));
+    return { id: p.id, name: p.name, price: Number(p.price), currency: p.currency || 'EUR', qty: i.qty || 1 };
+  });
+}
+
+// Money in the reader's language: "€ 9,99" in a Dutch mail, not "€9.99".
+const itemsHtml = (items, lang) =>
   `<table class="summary">${items.map((i) =>
     `<tr><td>${i.qty}× ${escapeHtml(i.name || 'Item')}</td>` +
-    `<td class="r">${formatMoney((i.price || 0) * (i.qty || 1), i.currency || currency)}</td></tr>`).join('')}</table>`;
+    `<td class="r">${formatMoney((i.price || 0) * (i.qty || 1), i.currency || 'EUR', lang)}</td></tr>`).join('')}</table>`;
 
 function escapeHtml(s) {
   return String(s ?? '').replace(/[&<>"']/g, (c) =>
@@ -77,8 +101,13 @@ export async function sendCartReminders({ afterHours = 4, maxDays = 14, limit = 
 
   let sent = 0;
   for (const row of rows) {
-    const items = parse(row.items);
-    if (!items.length) continue;
+    const items = await cartReminderLines(parse(row.items));
+    if (!items.length) {
+      /* Nothing in it is for sale any more: no mail. Stamped anyway, or the
+         same carts head the queue every run and starve the rest. */
+      await run(`UPDATE saved_carts SET reminded_at = @at WHERE user_id = @u`, { at: nowIso(), u: row.user_id });
+      continue;
+    }
     /* A cart reminder is marketing: only for someone who said yes to it. */
     let prefs = {};
     try { prefs = JSON.parse(row.preferences || '{}') || {}; } catch { /* none */ }
@@ -89,10 +118,11 @@ export async function sendCartReminders({ afterHours = 4, maxDays = 14, limit = 
         WHERE user_id = @u AND (reminded_at IS NULL OR reminded_at < updated_at)`,
       { at: nowIso(), u: row.user_id });
     if (!claim?.changes) continue;
+    const lang = ['nl', 'en', 'de', 'fr'].includes(row.lang) ? row.lang : 'nl';
     await sendEmailAsync('cart_reminder', row.email, {
-      lang: row.lang || undefined,
+      lang,
       user: { name: row.display_name || row.email.split('@')[0] },
-      cart: { itemsHtml: itemsHtml(items), url: `${config.appUrl}/cart` },
+      cart: { itemsHtml: itemsHtml(items, lang), url: `${config.appUrl}/cart` },
     });
     await notify(row.user_id, {
       type: 'system', title: 'You left items in your cart 🛒',

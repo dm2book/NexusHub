@@ -70,13 +70,13 @@ console.log('\n— The whole email follows the buyer, not just the template —'
   /* One marker per language for each half of the mail: a word from the
      TEMPLATE, and a word from a block the SERVER generates. Both have to move. */
   const EXPECT = {
-    nl: { subject: /Bedankt voor je bestelling/, total: /Totaal/, withdrawal: /Herroepingsrecht/,
+    nl: { subject: /is geplaatst — rond je betaling af/, total: /Totaal/, withdrawal: /Herroepingsrecht/,
       eyebrow: 'Bestelling ontvangen', foot: 'Bestelling volgen' },
-    en: { subject: /Thanks for your order/, total: /Total/, withdrawal: /Right of withdrawal/,
+    en: { subject: /is placed — complete your payment/, total: /Total/, withdrawal: /Right of withdrawal/,
       eyebrow: 'Order received', foot: 'Track order' },
-    de: { subject: /Danke für deine Bestellung/, total: /Gesamt/, withdrawal: /Widerrufsrecht/,
+    de: { subject: /ist aufgegeben — schließ deine Zahlung ab/, total: /Gesamt/, withdrawal: /Widerrufsrecht/,
       eyebrow: 'Bestellung eingegangen', foot: 'Bestellung verfolgen' },
-    fr: { subject: /Merci pour ta commande/, total: /Total/, withdrawal: /Droit de rétractation/,
+    fr: { subject: /passée — finalise ton paiement/, total: /Total/, withdrawal: /Droit de rétractation/,
       eyebrow: 'Commande reçue', foot: 'Suivre ma commande' },
   };
   for (const [lang, want] of Object.entries(EXPECT)) {

@@ -128,7 +128,8 @@ console.log('\n— Template upgrades —');
     { b: LEGACY_TEMPLATE_BODIES.payment_confirmed[0], i: 'payment_confirmed' });
   await syncEmailTemplates();
   const upgraded = await get("SELECT body_html FROM email_templates WHERE id='payment_confirmed' AND lang='nl'");
-  ok('an untouched old default is upgraded', /Wat er nu gebeurt/.test(upgraded.body_html));
+  ok('an untouched old default is upgraded',
+    upgraded.body_html === DEFAULT_TEMPLATES.find((t) => t.id === 'payment_confirmed').body_html);
 
   const mine = '<h1>Eigen tekst</h1><p>{{order.number}}</p>';
   await run("UPDATE email_templates SET body_html=@b WHERE id=@i AND lang='nl'", { b: mine, i: 'payment_confirmed' });

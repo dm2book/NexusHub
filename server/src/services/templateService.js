@@ -332,7 +332,13 @@ function inlineCritical(html, accent) {
     a: 'color:#a78bfa',
   };
   const CLASS = {
-    btn: 'display:inline-block;background-color:#7c5cff;color:#ffffff;text-decoration:none;padding:15px 30px;border-radius:12px;font-weight:700;font-size:15.5px;margin:8px 0 20px',
+    /* 15px padding + a 20px line box = a 50px target: comfortably above the
+       44px a thumb needs, in clients that keep the inline style only. */
+    btn: 'display:inline-block;background-color:#7c5cff;color:#ffffff;text-decoration:none;padding:15px 30px;border-radius:12px;font-weight:700;font-size:15.5px;line-height:20px;margin:8px 0 20px',
+    // The one small line under the button: "Vragen? Beantwoord deze mail…".
+    help: 'color:#8b93a7;font-size:13.5px;line-height:1.6;margin:0 0 12px',
+    // Unsubscribe / "why you get this" lines inside a body.
+    fine: 'color:#8b93a7;font-size:12px;line-height:1.6;margin:16px 0 0',
     code: "font:800 30px/1 'Courier New',monospace;letter-spacing:8px;color:#ffffff;background-color:#1c1c2c;border:1px solid #34345a;border-radius:14px;padding:20px;text-align:center;margin:4px 0 16px",
     notice: `background-color:#181826;border:1px solid #2c2c48;border-left:3px solid ${accent};padding:13px 16px;margin:6px 0 18px;color:#a8b0c2;font-size:13px;line-height:1.6`,
     quote: `background-color:#1a1a2c;border-left:3px solid ${accent};padding:14px 18px;margin:0 0 18px;color:#cbd1de;font-size:14px;line-height:1.6`,
@@ -434,7 +440,7 @@ export function wrapBranded(contentHtml, {
 <meta name="supported-color-schemes" content="dark">
 <style>
   body{margin:0;padding:0;background:#08080f;font-family:'Segoe UI',Arial,Helvetica,sans-serif;color:#e5e7eb;-webkit-text-size-adjust:100%}
-  .wrap{max-width:568px;margin:0 auto;padding:32px 16px}
+  .wrap{max-width:600px;margin:0 auto;padding:32px 16px}
   .card{background:#12121c;border:1px solid #26263a;border-radius:22px;overflow:hidden}
   .head{background-color:${color};background:linear-gradient(120deg,${color} 0%,${color2} 100%);padding:28px 30px 24px;
         background-image:radial-gradient(circle at 85% 15%,rgba(255,255,255,.26),transparent 48%),
@@ -467,8 +473,11 @@ export function wrapBranded(contentHtml, {
   a.btn{display:inline-block;background-color:#7c5cff;
         background-image:linear-gradient(120deg,#7c5cff 0%,#a855f7 55%,#d946ef 100%);
         color:#ffffff !important;text-decoration:none;
-        padding:15px 30px;border-radius:12px;font-weight:700;font-size:15.5px;margin:8px 0 20px;
+        padding:15px 30px;border-radius:12px;font-weight:700;font-size:15.5px;line-height:20px;margin:8px 0 20px;
         box-shadow:0 8px 22px rgba(124,92,255,.28)}
+  p.help{color:#8b93a7;font-size:13.5px;line-height:1.6;margin:0 0 12px}
+  p.fine{color:#8b93a7;font-size:12px;line-height:1.6;margin:16px 0 0}
+  p.fine a,p.help a{color:#a78bfa}
   .code{font:800 30px/1 'Courier New',monospace;letter-spacing:8px;color:#ffffff;
         background-color:#1c1c2c;background-image:linear-gradient(180deg,#1c1c2c,#17172a);border:1px solid #34345a;border-radius:14px;
         padding:20px;text-align:center;margin:4px 0 16px}
@@ -496,7 +505,7 @@ export function wrapBranded(contentHtml, {
 <body bgcolor="#08080f" style="margin:0;padding:0;background-color:#08080f;color:#e5e7eb">
 <span class="preheader" style="display:none;visibility:hidden;opacity:0;color:transparent;height:0;width:0;max-height:0;max-width:0;overflow:hidden;mso-hide:all">${preheaderHtml(preheader)}</span>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#08080f" style="background-color:#08080f"><tr><td align="center" style="padding:32px 16px">
-<div class="wrap" style="max-width:568px;margin:0 auto">
+<div class="wrap" style="max-width:600px;margin:0 auto">
   <table role="presentation" class="card" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#12121c" style="background-color:#12121c;border:1px solid #26263a;border-radius:22px;overflow:hidden">
     <tr><td class="head" bgcolor="${color}" style="background-color:${color};background-image:linear-gradient(120deg,${color} 0%,${color2} 100%);padding:28px 30px 24px">${logo}
       <div class="head-sub" style="display:inline-block;font:700 10.5px/1 Arial,sans-serif;color:#ffffff;margin-top:14px;letter-spacing:1.7px;text-transform:uppercase;background-color:#1f1f2e;background:rgba(0,0,0,.22);border-radius:999px;padding:7px 13px">${esc(eyebrow)}</div>
