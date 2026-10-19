@@ -173,8 +173,11 @@ console.log('\n— One open hand task per item —');
 console.log('\n— Discord bot —');
 {
   const bot = (await import('node:fs')).readFileSync(new URL('../../discord/src/bot.js', import.meta.url), 'utf8');
+  /* The state guard lives in discord/src/storeRelay.js since the relay was
+     split out of bot.js; the bot still checks for STATE_UNAVAILABLE. */
+  const relay = (await import('node:fs')).readFileSync(new URL('../../discord/src/storeRelay.js', import.meta.url), 'utf8');
   ok('state that was never loaded is never written back to the store',
-    /if \(!STATE_LOADED\.has\(key\)\) \{ console\.warn/.test(bot) && /STATE_UNAVAILABLE/.test(bot));
+    /if \(!loaded\.has\(key\)\) \{ log\.warn\(`\[state\] not saving/.test(relay) && /STATE_UNAVAILABLE/.test(bot));
   const digest = bot.slice(bot.indexOf('function maybePostWeeklyDigest'), bot.indexOf('function maybePostWeeklyDigest') + 1500);
   ok('the weekly revenue digest goes to the owners, not a staff channel',
     !/staff-announcements|'leads'/.test(digest) && /OWNER_IDS/.test(digest));
