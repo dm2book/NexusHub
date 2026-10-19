@@ -36,6 +36,7 @@ jobs:
           cache-dependency-path: |
             package-lock.json
             server/package-lock.json
+            discord/package-lock.json
 
       - name: Install frontend deps
         run: npm ci
@@ -46,6 +47,13 @@ jobs:
       - name: Install server deps
         run: npm ci
         working-directory: server
+
+      # The bot's shared embed style builds real discord.js embeds, and its
+      # test checks Discord's own limits against them — so the bot's
+      # dependencies are installed too. Still no token and no network.
+      - name: Install Discord bot deps
+        run: npm ci
+        working-directory: discord
 
       - name: Discord bot syntax check
         run: |

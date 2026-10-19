@@ -12,6 +12,7 @@
  *   (DISCORD_STOCK_WEBHOOK_URL, falls back to the order webhook).
  */
 import { config, activePaymentProvider } from '../config/env.js';
+import { brandEmbed, linkButtons, PALETTE } from './discordStyle.js';
 import { bannerUrl } from '../../../src/lib/discordBanners.js';
 import { run, get, all, nowIso } from '../db/index.js';
 import { newId } from '../utils/ids.js';
@@ -39,17 +40,18 @@ const TTL_MS = 60_000;
  * Refused when the bot has not been seen: a queue nobody drains looks
  * configured and delivers nothing, which is worse than the email it replaced.
  */
-export async function queueOwnerAlert({ title, lines = [], url = null, colour = 0x7c5cff }) {
+export async function queueOwnerAlert({ title, lines = [], url = null, colour = PALETTE.brand }) {
   /* null = "not a channel right now", not "failed": an offline bot would
      otherwise mark every alert failed and have it retried until it is back. */
   if (!(await botSeenRecently(24))) return null;
   return enqueueOutbox('alerts', {
     embeds: [{
-      title: String(title || 'ForgeMarket'),
-      description: lines.join('\n').slice(0, 3800),
+      ...brandEmbed('brand', {
+        title: String(title || 'ForgeMarket'),
+        description: lines.join('\n').slice(0, 3800),
+        url: url || undefined,
+      }, { footer: 'melding' }),
       color: colour,
-      url: url || undefined,
-      timestamp: new Date().toISOString(),
     }],
   });
 }
@@ -85,10 +87,24 @@ async function deliver(channel, url, body) {
      this event belongs to. A webhook has no roles to resolve and no member list
      to be careful with, so it is dropped here rather than posted as an unknown
      field. */
-  const { fmPing, ...forDiscord } = body || {};
+  /* Nor can a plain webhook carry buttons — those only the bot can send. The
+     first one is kept as a link at the end of the embed, so a webhook post
+     still leads somewhere. */
+  const { fmPing, components, ...rest } = body || {};
+  const forDiscord = withLinkFallback(rest, components);
   if (await postWebhook(url, forDiscord)) return true;
   console.warn(`[discord] ${channel} webhook failed — queued for the bot relay instead`);
   return enqueueOutbox(channel, body);
+}
+
+/** The first link button as a markdown link in the first embed, for posts without buttons. */
+function withLinkFallback(body, components) {
+  const btn = components?.[0]?.components?.[0];
+  const first = body?.embeds?.[0];
+  if (!btn?.url || !first) return body;
+  const line = `[${btn.label}](${btn.url})`;
+  const description = first.description ? `${first.description}\n\n${line}` : line;
+  return { ...body, embeds: [{ ...first, description }, ...body.embeds.slice(1)] };
 }
 
 /** Queue a DM for the bot relay (used when no bot token on the server). */
@@ -309,7 +325,7 @@ export async function getServerInfo() {
   }
 }
 
-const COLORS = { received: 0x6366f1, completed: 0x10b981, refunded: 0xec4899 };
+const ORDER_STATE = { received: 'info', completed: 'success', refunded: 'neutral' };
 
 /** Post an order event embed to the configured Discord webhook (best-effort). */
 export async function postOrderEvent(order, event = 'received') {
@@ -320,18 +336,15 @@ export async function postOrderEvent(order, event = 'received') {
     refunded: '↩️ Order refunded',
   }[event] || 'Order update';
 
-  const embed = {
+  const embed = brandEmbed(ORDER_STATE[event] || 'info', {
     title,
-    color: COLORS[event] || 0x6366f1,
     thumbnail: { url: `${config.appUrl}/icon-512.png` },
     fields: [
       { name: 'Order', value: `\`${order.number}\``, inline: true },
       { name: 'Total', value: order.totalFormatted || String(order.total), inline: true },
       { name: 'Items', value: String(order.items?.length ?? '—'), inline: true },
     ],
-    footer: { text: config.email.fromName },
-    timestamp: new Date().toISOString(),
-  };
+  }, { footer: 'orders' });
 
   await deliver('leads', url, { embeds: [embed] });
 }
@@ -366,16 +379,13 @@ export async function postDeliveryProof(order) {
   const lines = items.slice(0, 4)
     .map((i) => `• ${i.quantity > 1 ? `${i.quantity}× ` : ''}${i.name}`)
     .join('\n');
-  const more = items.length > 4 ? `\n• …and ${items.length - 4} more` : '';
+  const more = items.length > 4 ? `\n• …en nog ${items.length - 4}` : '';
 
   await deliver('proof', config.discord.reviewsWebhookUrl, {
-    embeds: [{
-      title: '✅ Delivered',
-      description: `${lines}${more}` + (speed ? `\n\nDelivered in **${speed}**.` : ''),
-      color: 0x10b981,
-      footer: { text: `${config.email.fromName} · every order, as it lands` },
-      timestamp: new Date().toISOString(),
-    }],
+    embeds: [brandEmbed('success', {
+      title: '✅ Geleverd',
+      description: `${lines}${more}` + (speed ? `\n\nGeleverd in **${speed}**.` : ''),
+    }, { footer: 'elke levering, zodra hij binnen is' })],
   });
 }
 
@@ -387,9 +397,8 @@ export async function postDeliveryProof(order) {
  */
 export async function postPaymentProofAlert(order, proof = {}) {
   const flags = Array.isArray(proof.flags) ? proof.flags : [];
-  const embed = {
+  const embed = brandEmbed(flags.length ? 'warning' : 'success', { // amber when fraud flags, green otherwise
     title: '💸 Payment proof submitted — verify now',
-    color: flags.length ? 0xf59e0b : 0x10b981, // amber when fraud flags, green otherwise
     fields: [
       { name: 'Order', value: `\`${order.number}\``, inline: true },
       { name: 'Amount', value: money(order.total, order.currency), inline: true },
@@ -398,9 +407,7 @@ export async function postPaymentProofAlert(order, proof = {}) {
       ...(flags.length ? [{ name: '⚠️ Flags', value: flags.join(', ') }] : []),
       { name: 'Review', value: `${config.appUrl}/admin/payments` },
     ],
-    footer: { text: config.email.fromName },
-    timestamp: new Date().toISOString(),
-  };
+  }, { footer: 'payments' });
   await deliver('leads', config.discord.orderWebhookUrl, { embeds: [embed] });
 }
 
@@ -413,10 +420,9 @@ export async function postPaymentProofAlert(order, proof = {}) {
  * exact signals rather than just a score, and links straight to the queue.
  */
 export async function postFraudHoldAlert(order, { score, signals = [] } = {}) {
-  const embed = {
+  const embed = brandEmbed('error', {
     title: '🛑 Delivery held — order needs a human',
     description: 'Nothing has been delivered. It stays held until someone approves or rejects it.',
-    color: 0xef4444,
     fields: [
       { name: 'Order', value: `\`${order.number}\``, inline: true },
       { name: 'Amount', value: money(order.total, order.currency), inline: true },
@@ -425,9 +431,7 @@ export async function postFraudHoldAlert(order, { score, signals = [] } = {}) {
       ...(signals.length ? [{ name: 'Why', value: signals.map((s) => `• ${s.detail}`).join('\n').slice(0, 1000) }] : []),
       { name: 'Review', value: `${config.appUrl}/admin/security` },
     ],
-    footer: { text: config.email.fromName },
-    timestamp: new Date().toISOString(),
-  };
+  }, { footer: 'fraud check' });
   await deliver('leads', config.discord.orderWebhookUrl, { embeds: [embed] });
 }
 
@@ -471,8 +475,9 @@ async function postWebhook(url, payload) {
   }
 }
 
+/* Dutch notation (€ 9,99), like the shop itself — this was en-IE (€9.99). */
 const money = (cents, cur = 'EUR') =>
-  new Intl.NumberFormat('en-IE', { style: 'currency', currency: cur }).format((cents || 0) / 100);
+  new Intl.NumberFormat('nl-NL', { style: 'currency', currency: cur }).format((cents || 0) / 100);
 
 /**
  * Announce a storefront event in the community #drops-and-deals channel.
@@ -484,30 +489,32 @@ export async function postDropEvent(kind, data = {}) {
   let embed;
   if (kind === 'product') {
     embed = {
-      title: `🆕 New drop: ${data.name}`,
+      title: `🆕 Nieuw: ${data.name}`,
       /* Was "instant delivery". 0 of 72 products auto-deliver, every product
          page says "delivered by hand, usually within a few hours", and the
          phrase is on honest-copy's banned list — which never scanned this
          directory, so the claim survived here after being removed everywhere
          a person could see it on the site. */
-      description: `Fresh in the shop — **${money(data.price, data.currency)}**.\n[Grab it now](${config.appUrl}/product/${data.id})`,
-      color: 0x6366f1,
+      description: `Nieuw in de shop voor **${money(data.price, data.currency)}**.`,
+      state: 'highlight',
+      action: { label: 'Bekijk het product', url: `${config.appUrl}/product/${data.id}` },
     };
   } else if (kind === 'restock') {
     embed = {
-      title: `📦 Restocked: ${data.name}`,
-      description: `**${data.added}** new codes just landed${data.price ? ` — ${money(data.price, data.currency)}` : ''}.\n[Bekijk het](${config.appUrl}/product/${data.id})`,
-      color: 0x10b981,
+      title: `📦 Weer op voorraad: ${data.name}`,
+      description: `**${data.added}** nieuwe codes binnen${data.price ? ` — ${money(data.price, data.currency)}` : ''}.`,
+      state: 'success',
+      action: { label: 'Bekijk het product', url: `${config.appUrl}/product/${data.id}` },
     };
   } else if (kind === 'coupon') {
     const off = data.kind === 'fixed' ? money(data.value, 'EUR') : `${data.value}%`;
     embed = {
-      title: `🏷️ New discount code: ${data.code}`,
-      description: `Use code **\`${data.code}\`** for **${off} OFF** at checkout.` +
-        (data.minSubtotal ? `\nMinimum spend ${money(data.minSubtotal, 'EUR')}.` : '') +
-        (data.expiresAt ? `\nValid until <t:${Math.floor(new Date(data.expiresAt).getTime() / 1000)}:D>.` : '') +
-        `\n[Start shopping](${shop})`,
-      color: 0xec4899,
+      title: `🏷️ Nieuwe kortingscode: ${data.code}`,
+      description: `Gebruik code **\`${data.code}\`** voor **${off} korting** bij het afrekenen.` +
+        (data.minSubtotal ? `\nMinimaal ${money(data.minSubtotal, 'EUR')} besteden.` : '') +
+        (data.expiresAt ? `\nGeldig tot <t:${Math.floor(new Date(data.expiresAt).getTime() / 1000)}:D>.` : ''),
+      state: 'highlight',
+      action: { label: 'Naar de shop', url: shop },
     };
   } else if (kind === 'drop-scheduled') {
     // dropService.createDrop has always sent this kind, and nothing here handled
@@ -517,17 +524,19 @@ export async function postDropEvent(kind, data = {}) {
     // to nobody.
     const when = data.startsAt ? Math.floor(new Date(data.startsAt).getTime() / 1000) : null;
     embed = {
-      title: `⏰ Drop scheduled: ${data.title}`,
+      title: `⏰ Drop gepland: ${data.title}`,
       description: (data.note ? `${data.note}\n\n` : '')
-        + (when ? `Goes live <t:${when}:F> — <t:${when}:R>.\n` : '')
-        + `Grab the 🔔 Drops & Restocks role in #roles so you hear it first.\n[See what's coming](${config.appUrl}/drops)`,
-      color: 0xf59e0b,
+        + (when ? `Live op <t:${when}:F> — <t:${when}:R>.\n` : '')
+        + 'Neem de rol 🔔 Drops & Restocks in #roles, dan hoor je het als eerste.',
+      state: 'warning',
+      action: { label: 'Bekijk komende drops', url: `${config.appUrl}/drops` },
     };
   } else if (kind === 'bundle') {
     embed = {
-      title: `🎁 New bundle: ${data.name}`,
-      description: `${data.description || 'Buy them together and save.'}\n**${data.discountPercent}% OFF** when bought together.\n[View bundles](${shop})`,
-      color: 0xa855f7,
+      title: `🎁 Nieuwe bundel: ${data.name}`,
+      description: `${data.description || 'Samen kopen en besparen.'}\n**${data.discountPercent}% korting** als je ze samen koopt.`,
+      state: 'highlight',
+      action: { label: 'Bekijk de bundels', url: shop },
     };
   } else return;
 
@@ -554,8 +563,8 @@ export async function postDropEvent(kind, data = {}) {
     ? (/^https?:\/\//.test(data.image) ? data.image : `${config.appUrl}${data.image}`)
     : `${config.appUrl}/icon-512.png`;
   embed.thumbnail = { url: thumb };
-  embed.footer = { text: `${config.email.fromName} · drops & deals` };
-  embed.timestamp = new Date().toISOString();
+  const { state, action, ...content } = embed;
+  embed = brandEmbed(state, content, { footer: 'drops & deals' });
 
   /* Which game this is about, so the bot can ping the people who asked about
      THAT game.
@@ -565,6 +574,7 @@ export async function postDropEvent(kind, data = {}) {
      every Steam restock, which is how an opt-in role becomes an opt-out. */
   await deliver('deals', url, {
     embeds: [embed],
+    components: linkButtons(action),
     ...(data.category ? { fmPing: { category: String(data.category) } } : {}),
   });
 }
@@ -584,21 +594,14 @@ export async function postReviewEvent({ author, stars, body, product, verified =
   const text = String(body || '').trim();
   if (!text) return;
   const s = Math.min(5, Math.max(1, Number(stars) || 5));
-  const embed = {
-    author: { name: String(author || 'Customer').slice(0, 80) },
+  const embed = brandEmbed(verified ? 'success' : 'brand', {
+    author: { name: String(author || 'Klant').slice(0, 80) },
     description: `${'⭐'.repeat(s)}${s < 5 ? '☆'.repeat(5 - s) : ''}\n\n${text.slice(0, 900)}`,
-    color: verified ? 0x22c55e : 0x6366f1,
     fields: [
       ...(product ? [{ name: 'Product', value: String(product).slice(0, 100), inline: true }] : []),
-      ...(city ? [{ name: 'From', value: String(city).slice(0, 60), inline: true }] : []),
+      ...(city ? [{ name: 'Uit', value: String(city).slice(0, 60), inline: true }] : []),
     ],
-    footer: {
-      text: verified
-        ? `${config.email.fromName} · verified purchase`
-        : `${config.email.fromName} · community vouch`,
-    },
-    timestamp: new Date().toISOString(),
-  };
+  }, { footer: verified ? 'geverifieerde aankoop' : 'community-vouch' });
   await deliver('reviews', config.discord.reviewsWebhookUrl, { embeds: [embed] });
 }
 
@@ -623,15 +626,13 @@ const errorAlertAt = new Map(); // route -> last alert ts
 export async function postReferralEarned(discordUserId, { commissionCents } = {}) {
   if (!discordUserId || !(commissionCents > 0)) return;
   await relayDm(discordUserId, {
-    embeds: [{
-      title: '🤝 Your referral link just earned',
-      description: `**${money(commissionCents, 'EUR')}** in store credit has been added to your account.\n`
-        + 'It spends like money at checkout — nothing to claim.\n\n'
-        + `[See your wallet](${config.appUrl}/account/wallet) · \`/ref\` for your link`,
-      color: 0xa855f7,
-      footer: { text: `${config.email.fromName} · referrals` },
-      timestamp: new Date().toISOString(),
-    }],
+    embeds: [brandEmbed('success', {
+      title: '🤝 Je verwijslink heeft iets opgeleverd',
+      description: `Er is **${money(commissionCents, 'EUR')}** tegoed op je account gezet.\n`
+        + 'Je gebruikt het gewoon bij het afrekenen — je hoeft niets te claimen.\n\n'
+        + 'Je link vind je met `/ref`.',
+    }, { footer: 'verwijzingen' })],
+    components: linkButtons({ label: 'Bekijk je tegoed', url: `${config.appUrl}/account/wallet` }),
   }).catch(() => {});
 }
 
@@ -675,19 +676,26 @@ const dmLang = (l) => DM[l] || DM.en;
 export function paymentReminderEmbed({ orderNumber, amount, lang, provider = activePaymentProvider() } = {}) {
   const t = dmLang(lang);
   const psp = ['paynl', 'mollie', 'stripe'].includes(provider);
-  return {
+  return brandEmbed('warning', {
     title: t.payTitle,
-    description: `**${orderNumber}**${amount ? ` · ${amount}` : ''}\n\n${psp ? t.pspBody : t.payBody}\n\n`
-      + `[${psp ? t.payNow : t.open}](${config.appUrl}/track?number=${encodeURIComponent(orderNumber)})`,
-    color: 0x6366f1,
-    footer: { text: `${config.email.fromName} · ${psp ? t.pspFoot : t.payFoot}` },
-    timestamp: new Date().toISOString(),
+    description: `**${orderNumber}**${amount ? ` · ${amount}` : ''}\n\n${psp ? t.pspBody : t.payBody}`,
+  }, { footer: psp ? t.pspFoot : t.payFoot });
+}
+
+/** The reminder as a full message: the embed and one button to the order page. */
+export function paymentReminderMessage({ orderNumber, amount, lang, provider = activePaymentProvider() } = {}) {
+  const t = dmLang(lang);
+  const psp = ['paynl', 'mollie', 'stripe'].includes(provider);
+  return {
+    embeds: [paymentReminderEmbed({ orderNumber, amount, lang, provider })],
+    components: linkButtons({ label: psp ? t.payNow : t.open,
+      url: `${config.appUrl}/track?number=${encodeURIComponent(orderNumber)}` }),
   };
 }
 
 export async function postPaymentReminder(discordUserId, { orderNumber, amount, lang } = {}) {
   if (!discordUserId || !orderNumber) return;
-  await relayDm(discordUserId, { embeds: [paymentReminderEmbed({ orderNumber, amount, lang })] }).catch(() => {});
+  await relayDm(discordUserId, paymentReminderMessage({ orderNumber, amount, lang })).catch(() => {});
 }
 
 /**
@@ -706,7 +714,7 @@ export async function postReviewRequest(discordUserId, { orderNumber, productNam
   if (!discordUserId) return;
   const t = dmLang(lang);
   await relayDm(discordUserId, {
-    embeds: [{
+    embeds: [brandEmbed('brand', {
       title: t.revTitle,
       /* "Landed a day ago" was a guess — the sweep runs a day or more after
          delivery. And a /vouch is no longer only from a delivered order. */
@@ -718,10 +726,7 @@ export async function postReviewRequest(discordUserId, { orderNumber, productNam
            edit — which is exactly why it is worth more than the two we can.
            Empty when no profile is configured, like every other optional line. */
         + (config.shop.trustpilotReviewUrl ? `\n\n${t.tp(config.shop.trustpilotReviewUrl)}` : ''),
-      color: 0xf59e0b,
-      footer: { text: `${config.email.fromName}${orderNumber ? ` · ${orderNumber}` : ''}` },
-      timestamp: new Date().toISOString(),
-    }],
+    }, { footer: orderNumber || '' })],
   }).catch(() => {});
 }
 
@@ -730,13 +735,10 @@ export async function postErrorAlert(route, message) {
   const now = Date.now();
   if (now - (errorAlertAt.get(route) || 0) < 5 * 60_000) return;
   errorAlertAt.set(route, now);
-  await deliver('leads', url, { embeds: [{
+  await deliver('leads', url, { embeds: [brandEmbed('error', {
     title: '🚨 API error (500)',
     description: `**Route:** \`${route}\`\n**Error:** ${String(message || 'unknown').slice(0, 300)}\n\nCheck the Vercel function logs for the stack trace.`,
-    color: 0xef4444,
-    footer: { text: `${config.email.fromName} · error monitor` },
-    timestamp: new Date().toISOString(),
-  }] });
+  }, { footer: 'error monitor' })] });
 }
 
 /** Ping staff that a product's pre-loaded code stock is running low. */
@@ -748,7 +750,7 @@ export async function postStockAlert(product, remaining, tier = null) {
   const crossed = tier === null ? config.discord.lowStockThreshold : tier;
   const out = remaining === 0;
   const critical = !out && crossed <= 5;
-  const embed = {
+  const embed = brandEmbed(out ? 'error' : 'warning', {
     title: out ? `🔴 OUT OF STOCK: ${product.name}`
       : `${critical ? '🟠' : '📉'} ${critical ? 'Stock critical' : 'Low stock'}: ${product.name}`,
     description: out
@@ -756,9 +758,6 @@ export async function postStockAlert(product, remaining, tier = null) {
         + `Load codes in the admin panel → Products → Codes, or take it offline.`
       : `**${remaining}** code${remaining === 1 ? '' : 's'} left — below the ${crossed} mark.\n`
         + `Top up in the admin panel → Products → Codes.`,
-    color: out ? 0xef4444 : critical ? 0xf59e0b : 0xf97316,
-    footer: { text: `${config.email.fromName} · stock monitor` },
-    timestamp: new Date().toISOString(),
-  };
+  }, { footer: 'stock monitor' });
   await deliver('leads', url, { embeds: [embed] });
 }

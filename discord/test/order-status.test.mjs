@@ -4,6 +4,7 @@
  */
 import { orderStatusView, ORDER_STATE, ORDER_UI, BOT_LANGS, botLang, pickedLang, say } from '../src/orderStatus.js';
 import { LANGUAGE_ROLES } from '../src/config.js';
+import { PALETTE } from '../src/palette.js';
 
 let pass = 0, fail = 0;
 const ok = (name, cond, extra = '') => { if (cond) { pass++; console.log(`  ✅ ${name}`); } else { fail++; console.log(`  ❌ ${name} ${extra}`); } };
@@ -15,7 +16,7 @@ console.log('— /order status view —');
 // Waiting on the buyer: amber, and the reference must be right there.
 {
   const v = orderStatusView({ ...base, status: 'pending', history: [{ to: 'pending', at: '2026-07-25T10:00:00.000Z' }] });
-  ok('pending is amber', v.color === 0xf5b324, `#${v.color.toString(16)}`);
+  ok('pending is amber (the shop palette: your move)', v.color === PALETTE.warning, `#${v.color.toString(16)}`);
   ok('pending shows the payment reference', v.fields.some((f) => f.value.includes(base.number)));
   ok('pending explains what the buyer must do', /reference/i.test(v.description));
 }
@@ -23,7 +24,7 @@ console.log('— /order status view —');
 // Waiting on us: no call to action, no reference clutter.
 {
   const v = orderStatusView({ ...base, status: 'payment_received', history: [] });
-  ok('paid is blue', v.color === 0x38bdf8);
+  ok('paid is the shop violet (ours to do)', v.color === PALETTE.info);
   ok('paid says nothing is required from the buyer', /nothing left for you to do/i.test(v.description));
   ok('paid drops the payment reference', !v.fields.some((f) => f.name === 'Payment reference'));
   ok('paid never promises instant delivery', !/instant/i.test(v.description));
@@ -32,7 +33,7 @@ console.log('— /order status view —');
 // Done.
 {
   const v = orderStatusView({ ...base, status: 'completed', history: [] });
-  ok('delivered is green', v.color === 0x22c55e);
+  ok('delivered is green', v.color === PALETTE.success);
   ok('delivered says where the code went', /email/i.test(v.description));
   ok('delivered offers a route when it is missing', /spam|ticket/i.test(v.description));
 }
@@ -40,7 +41,11 @@ console.log('— /order status view —');
 // Money back.
 {
   const v = orderStatusView({ ...base, status: 'refunded', history: [] });
-  ok('refunded gives a real timeframe', /1–3 working days/.test(v.description));
+  /* Says where the money goes, and no number of days: under Pay. a refund is
+     made by hand in my.pay.nl and then takes as long as the buyer's bank does —
+     a window the shop cannot promise. */
+  ok('refunded says where the money goes, without promising days',
+    /where you paid from/.test(v.description) && !/\d\s*[–-]\s*\d/.test(v.description), v.description);
 }
 
 // Unknown status must degrade, never crash or show a raw enum as the headline.

@@ -19,6 +19,7 @@
  */
 
 import { LANGUAGE_ROLES } from './config.js';
+import { PALETTE } from './palette.js';
 
 /** The languages this file writes. Matches the storefront's set exactly. */
 export const BOT_LANGS = ['nl', 'en', 'de', 'fr'];
@@ -54,7 +55,7 @@ export const pickedLang = (roleNames = [], locale) => {
 
 export const ORDER_STATE = {
   pending: {
-    color: 0xf5b324, emoji: '⏳',
+    color: PALETTE.warning, emoji: '⏳',
     title: { en: 'Waiting for your payment', nl: 'We wachten op je betaling',
       de: 'Wir warten auf deine Zahlung', fr: 'Nous attendons ton paiement' },
     next: {
@@ -73,7 +74,7 @@ export const ORDER_STATE = {
     },
   },
   payment_received: {
-    color: 0x38bdf8, emoji: '✅',
+    color: PALETTE.info, emoji: '✅',
     title: { en: 'Payment confirmed', nl: 'Betaling bevestigd',
       de: 'Zahlung bestätigt', fr: 'Paiement confirmé' },
     next: {
@@ -84,7 +85,7 @@ export const ORDER_STATE = {
     },
   },
   processing: {
-    color: 0x38bdf8, emoji: '🔧',
+    color: PALETTE.info, emoji: '🔧',
     title: { en: 'Being prepared', nl: 'Wordt klaargemaakt',
       de: 'Wird vorbereitet', fr: 'En cours de préparation' },
     next: {
@@ -95,7 +96,7 @@ export const ORDER_STATE = {
     },
   },
   awaiting_fulfillment: {
-    color: 0x38bdf8, emoji: '📦',
+    color: PALETTE.info, emoji: '📦',
     title: { en: 'Almost there', nl: 'Bijna klaar',
       de: 'Fast geschafft', fr: 'Presque terminé' },
     next: {
@@ -106,7 +107,7 @@ export const ORDER_STATE = {
     },
   },
   completed: {
-    color: 0x22c55e, emoji: '🎉',
+    color: PALETTE.success, emoji: '🎉',
     title: { en: 'Delivered', nl: 'Geleverd', de: 'Geliefert', fr: 'Livrée' },
     next: {
       en: 'Your code was sent to the email used at checkout. Can’t find it? Check spam, then open a ticket — we can resend.',
@@ -116,17 +117,19 @@ export const ORDER_STATE = {
     },
   },
   refunded: {
-    color: 0xa855f7, emoji: '↩️',
+    color: PALETTE.brand, emoji: '↩️',
     title: { en: 'Refunded', nl: 'Terugbetaald', de: 'Zurückerstattet', fr: 'Remboursée' },
     next: {
-      en: 'The money is on its way back to where you paid from — usually 1–3 working days.',
-      nl: 'Het geld is onderweg terug naar waar je vandaan betaalde — meestal 1–3 werkdagen.',
-      de: 'Das Geld ist unterwegs zurück dorthin, woher du bezahlt hast — meist 1–3 Werktage.',
-      fr: 'L’argent repart vers le compte depuis lequel tu as payé — généralement 1 à 3 jours ouvrés.',
+      /* No number of days: how long a refund takes is up to the payment
+         provider and the buyer's bank, not something this shop controls. */
+      en: 'The money goes back to where you paid from. How quickly it shows up depends on your bank.',
+      nl: 'Het geld gaat terug naar waar je vandaan betaalde. Hoe snel het binnen is, hangt af van je bank.',
+      de: 'Das Geld geht dorthin zurück, woher du bezahlt hast. Wie schnell es ankommt, hängt von deiner Bank ab.',
+      fr: 'L’argent repart vers le compte depuis lequel tu as payé. Le délai dépend de ta banque.',
     },
   },
   cancelled: {
-    color: 0x64748b, emoji: '✖️',
+    color: PALETTE.neutral, emoji: '✖️',
     title: { en: 'Cancelled', nl: 'Geannuleerd', de: 'Storniert', fr: 'Annulée' },
     next: {
       en: 'This order was closed. Think that’s wrong? Open a ticket with the order number.',
@@ -136,7 +139,7 @@ export const ORDER_STATE = {
     },
   },
   failed: {
-    color: 0x64748b, emoji: '⚠️',
+    color: PALETTE.neutral, emoji: '⚠️',
     title: { en: 'Closed', nl: 'Afgesloten', de: 'Abgeschlossen', fr: 'Clôturée' },
     next: {
       en: 'Something went wrong with this order. Open a ticket and we’ll sort it out.',
@@ -160,6 +163,10 @@ export const ORDER_UI = {
     de: 'Live aus dem Shop', fr: 'En direct de la boutique' },
   page: { en: 'Live status page', nl: 'Live statuspagina',
     de: 'Live-Statusseite', fr: 'Page de statut en direct' },
+  /* The button when the buyer still has to pay — under a payment provider the
+     order page IS where you pay, so the button says so. */
+  payNow: { en: 'Pay for your order', nl: 'Betaal je bestelling',
+    de: 'Bestellung bezahlen', fr: 'Payer ta commande' },
   notFound: {
     en: 'No order found for `%s`. Order numbers look like `FM-2026-XXXXXXXX` — check the confirmation email, or open a ticket in #open-a-ticket and we’ll look it up for you.',
     nl: 'Geen bestelling gevonden voor `%s`. Bestelnummers zien eruit als `FM-2026-XXXXXXXX` — check je bevestigingsmail, of open een ticket in #open-a-ticket, dan zoeken wij het op.',
@@ -184,7 +191,7 @@ export const ORDER_UI = {
 /** One language out of a table, never `undefined` in front of a buyer. */
 export const say = (table, lang) => table?.[botLang(lang)] ?? table?.en ?? '';
 
-const FALLBACK = { color: 0x6366f1, emoji: '📦' };
+const FALLBACK = { color: PALETTE.info, emoji: '📦' };
 
 /**
  * Shape a /api/track payload into embed fields.
@@ -218,5 +225,7 @@ export function orderStatusView(o, { money = (c) => `€${(c / 100).toFixed(2)}`
   return {
     color, title: `${emoji} ${title}`, description: next,
     author: `${say(ORDER_UI.order, L)} ${o.number}`, footer: say(ORDER_UI.live, L), fields,
+    /* The one thing to do next, as the message's button. */
+    action: say(o.status === 'pending' && psp ? ORDER_UI.payNow : ORDER_UI.page, L),
   };
 }

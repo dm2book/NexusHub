@@ -49,9 +49,9 @@ console.log('— The referral programme is reachable from Discord —');
   /* Same HMAC scheme as every other bot endpoint: the uid is bound into the
      signature, so a member cannot ask for someone else's earnings. */
   ok('the uid is bound into the signature', /canonicalReferral = \(b = \{\}\) => `referral:\$\{b\.uid/.test(routes));
-  ok('and an unlinked member is told how to link', /linked: false/.test(routes) && /Link your Discord first/.test(bot));
+  ok('and an unlinked member is told how to link', /linked: false/.test(routes) && /Koppel eerst je Discord/.test(bot));
   /* A row of zeros is the shop telling a member their link does not work. */
-  ok('an unused link shows no empty earnings table', /Nothing yet — nobody has ordered through it/.test(bot));
+  ok('an unused link shows no empty earnings table', /Nog niets — er is nog niet via je link besteld/.test(bot));
 }
 
 console.log('\n— And it is findable without knowing it exists —');

@@ -30,6 +30,7 @@
  */
 import { config } from '../config/env.js';
 import { isDiscordWebhookUrl } from '../utils/discordWebhook.js';
+import { brandEmbed } from './discordStyle.js';
 
 /** One attempt gets this long before we stop waiting for it. */
 const TIMEOUT_MS = 5_000;
@@ -241,12 +242,14 @@ function discord(event, { title, lines, url }) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       username: config.email.fromName,
+      /* The shop's footer and Discord's size limits, with the event's own colour. */
       embeds: [{
-        title: `${meta.emoji} ${title}`,
-        description: lines.join('\n'),
+        ...brandEmbed('brand', {
+          title: `${meta.emoji} ${title}`,
+          description: lines.join('\n'),
+          url: url || undefined,
+        }, { footer: 'melding' }),
         color: meta.color,
-        url: url || undefined,
-        timestamp: new Date().toISOString(),
       }],
     }),
   }, ms));

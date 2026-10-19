@@ -135,7 +135,7 @@ console.log('\n— A Discord that stops answering cannot stall an order —');
      one and a restock that failed over would reach everybody instead of the
      people who asked about that game. */
   ok('…keeping the routing hint the bot needs',
-    /const \{ fmPing, \.\.\.forDiscord \} = body/.test(src)
+    /const \{ fmPing, (components, )?\.\.\.(forDiscord|rest) \} = body/.test(src)
     && /enqueueOutbox\(channel, body\);\s*\n\}/.test(src));
 }
 
