@@ -55,14 +55,14 @@ console.log('— Withdrawal consent —');
 
   const order = await createOrder({
     email: `consent${tag}@x.dev`, items: [{ productId: p.id, quantity: 1 }],
-    consent: true, consentText: 'Ik wil mijn bestelling meteen geleverd krijgen.',
+    consent: true, consentText: 'Ik wil mijn bestelling meteen geleverd krijgen en begrijp dat ik daarmee mijn 14 dagen bedenktijd verlies zodra hij geleverd is.',
   });
   const row = await get('SELECT consent_at, consent_text FROM orders WHERE id=@id', { id: order.id });
   ok('consent is stamped with a timestamp', !!row?.consent_at, JSON.stringify(row));
   // The sentence, not a boolean: the wording is what was agreed to, and it will
   // change over time (and differs per language).
   ok('the exact sentence the buyer read is stored',
-    row?.consent_text === 'Ik wil mijn bestelling meteen geleverd krijgen.', row?.consent_text);
+    row?.consent_text === 'Ik wil mijn bestelling meteen geleverd krijgen en begrijp dat ik daarmee mijn 14 dagen bedenktijd verlies zodra hij geleverd is.', row?.consent_text);
 
   // Evidence nobody can retrieve is not evidence. It was written on creation but
   // hydrate() never read it back, so producing it in a dispute meant opening the
@@ -70,7 +70,7 @@ console.log('— Withdrawal consent —');
   const { getOrder } = await import('../src/services/orderService.js');
   const fetched = await getOrder(order.id);
   ok('the waiver comes back on the order the admin screen reads',
-    !!fetched?.consentAt && fetched.consentText === 'Ik wil mijn bestelling meteen geleverd krijgen.',
+    !!fetched?.consentAt && fetched.consentText === 'Ik wil mijn bestelling meteen geleverd krijgen en begrijp dat ik daarmee mijn 14 dagen bedenktijd verlies zodra hij geleverd is.',
     JSON.stringify({ at: fetched?.consentAt, text: fetched?.consentText }));
 
   // EU distance selling also requires CONFIRMING the waiver to the consumer on a
@@ -80,7 +80,7 @@ console.log('— Withdrawal consent —');
   ok('the confirmation email states the withdrawal right',
     /Herroepingsrecht/i.test(mail.html), mail.html.slice(0, 120));
   ok('it quotes the buyer back their own sentence',
-    mail.html.includes('Ik wil mijn bestelling meteen geleverd krijgen.'));
+    mail.html.includes('Ik wil mijn bestelling meteen geleverd krijgen en begrijp'));
 
   // And an order placed before this existed must not print an empty legal block.
   await run('UPDATE orders SET consent_at=NULL, consent_text=NULL WHERE id=@id', { id: order.id });

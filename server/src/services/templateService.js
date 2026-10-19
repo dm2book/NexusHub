@@ -40,6 +40,25 @@ export function renderTokens(str, ctx, { where = 'template' } = {}) {
 }
 
 /**
+ * Tokens filled in for a SUBJECT line — plain text, so nothing is HTML-escaped.
+ *
+ * A subject is not HTML: rendered through renderTokens a product called
+ * "App Store & iTunes" arrived as "App Store &amp; iTunes", and a buyer's own
+ * ticket subject "Can't find" as "Can&#39;t find". Line breaks are flattened —
+ * a newline in a header is the one thing a subject must never carry.
+ */
+export function renderSubject(str, ctx, { where = 'subject' } = {}) {
+  return String(str).replace(/\{\{\s*([\w.]+)\s*\}\}/g, (_, pathExpr) => {
+    const val = pathExpr.split('.').reduce((o, k) => (o == null ? undefined : o[k]), ctx);
+    if (val == null) {
+      console.warn(`[email] ${where}: {{${pathExpr}}} had no value — rendered as empty`);
+      return '';
+    }
+    return String(val);
+  }).replace(/[\r\n]+/g, ' ').replace(/\s{2,}/g, ' ').trim();
+}
+
+/**
  * Per-email identity.
  *
  * Every mail used to carry the same purple header and the same three pills
@@ -62,6 +81,15 @@ export const EMAIL_THEMES = {
     eyebrow: { nl: 'Bestelling ontvangen', en: 'Order received', de: 'Bestellung eingegangen', fr: 'Commande reçue' },
     pills: [
       { nl: '🧾 Kenmerk = je bestelnummer', en: '🧾 Reference = your order number', de: '🧾 Verwendungszweck = deine Bestellnummer', fr: '🧾 Référence = ton numéro de commande' },
+      { nl: '🛡 Geld terug als we niet leveren', en: '🛡 Money back if we cannot deliver', de: '🛡 Geld zurück, wenn wir nicht liefern', fr: '🛡 Remboursé si nous ne livrons pas' },
+    ] },
+  /* order_received when a payment provider takes the payment: the reference
+     pill is for a bank transfer that does not exist, and "Order received" read
+     as if the order was settled. Chosen in renderTemplate by ctx.order.viaPsp. */
+  order_received_psp: { accent: '#f5b324', accent2: '#fb923c',
+    eyebrow: { nl: 'Nog niet betaald', en: 'Not paid yet', de: 'Noch nicht bezahlt', fr: 'Pas encore payée' },
+    pills: [
+      { nl: '🔒 Betalen via de beveiligde betaalpagina', en: '🔒 Pay on the secure payment page', de: '🔒 Bezahlen auf der sicheren Zahlungsseite', fr: '🔒 Paiement sur la page sécurisée' },
       { nl: '🛡 Geld terug als we niet leveren', en: '🛡 Money back if we cannot deliver', de: '🛡 Geld zurück, wenn wir nicht liefern', fr: '🛡 Remboursé si nous ne livrons pas' },
     ] },
   payment_reminder: { accent: '#f5b324', accent2: '#f97316',
@@ -215,6 +243,7 @@ const WHY = {
 const PREHEADER = {
   account_created: { nl: 'Je account staat klaar — inloggen gaat met een code per mail.', en: 'Your account is ready — you sign in with a code by email.', de: 'Dein Konto ist bereit — du meldest dich mit einem Code per Mail an.', fr: 'Ton compte est prêt — tu te connectes avec un code par e-mail.' },
   order_received: { nl: 'Bestelling {{order.number}} — zo betaal je, en wat er daarna gebeurt.', en: 'Order {{order.number}} — how to pay, and what happens next.', de: 'Bestellung {{order.number}} — so zahlst du, und was danach passiert.', fr: 'Commande {{order.number}} — comment payer, et la suite.' },
+  order_received_psp: { nl: 'Bestelling {{order.number}} is geplaatst, maar nog niet betaald.', en: 'Order {{order.number}} is placed but not paid yet.', de: 'Bestellung {{order.number}} ist aufgegeben, aber noch nicht bezahlt.', fr: 'La commande {{order.number}} est passée mais pas encore payée.' },
   payment_reminder: { nl: 'We hebben je betaling voor {{order.number}} nog niet ontvangen.', en: 'We have not received your payment for {{order.number}} yet.', de: 'Deine Zahlung für {{order.number}} ist noch nicht bei uns.', fr: 'Nous n’avons pas encore reçu ton paiement pour {{order.number}}.' },
   payment_confirmed: { nl: 'Betaling ontvangen voor {{order.number}} — je hoeft niets meer te doen.', en: 'Payment received for {{order.number}} — nothing left for you to do.', de: 'Zahlung für {{order.number}} eingegangen — du musst nichts mehr tun.', fr: 'Paiement reçu pour {{order.number}} — tu n’as plus rien à faire.' },
   order_processing: { nl: 'We maken bestelling {{order.number}} met de hand klaar.', en: 'We are preparing order {{order.number}} by hand.', de: 'Wir machen Bestellung {{order.number}} von Hand fertig.', fr: 'Nous préparons la commande {{order.number}} à la main.' },
@@ -545,16 +574,17 @@ function withDerived(ctx = {}) {
 /** Render a stored template row → { subject, html }. */
 export function renderTemplate(template, rawCtx) {
   const ctx = withDerived(rawCtx);
-  const subject = renderTokens(template.subject, ctx, { where: `${template.id} subject` });
+  const subject = renderSubject(template.subject, ctx, { where: `${template.id} subject` });
   const inner = renderTokens(template.body_html, ctx, { where: `${template.id} body` });
   const lang = template.lang || 'nl';
   /* A chosen preview line when the mail has one; otherwise the first words of
      the letter, as before. */
-  const chosen = PREHEADER[template.id];
+  const psp = template.id === 'order_received' && ctx?.order?.viaPsp;
+  const chosen = psp ? PREHEADER.order_received_psp : PREHEADER[template.id];
   const preheader = chosen
     ? renderTokens(pick(chosen, lang), ctx, { where: `${template.id} preheader` })
     : inner.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 110);
-  const theme = EMAIL_THEMES[template.id] || DEFAULT_THEME;
+  const theme = (psp && EMAIL_THEMES.order_received_psp) || EMAIL_THEMES[template.id] || DEFAULT_THEME;
   /* The row already knows: loadTemplate picked it by language. Passing it on is
      what stops a German letter arriving inside a Dutch frame. */
   return {

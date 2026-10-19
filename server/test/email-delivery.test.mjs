@@ -195,7 +195,11 @@ console.log('\n— A support reply reaches a guest —');
      WHERE to_email=@e AND template_id='support_reply'`, { e: buyer });
   ok('the guest is emailed the reply', mail.length === 1 && mail[0].status === 'sent',
     JSON.stringify(mail));
-  const raw = inbox.slice(before).find((m) => /ticket/i.test(m));
+  /* Two ticket mails now: opening the ticket is confirmed (ticket_opened), and
+     the reply follows it — the reply is the later one. */
+  const ticketMails = inbox.slice(before).filter((m) => /ticket/i.test(m));
+  const raw = ticketMails[ticketMails.length - 1];
+  ok('…opening the ticket was confirmed first', ticketMails.length === 2, String(ticketMails.length));
   ok('…and the reply text is in it', !!raw && raw.includes('a fresh code is on its way'));
   ok('…addressed to the address the order was placed with',
     !!raw && headersOf(raw).to?.includes(buyer), raw && headersOf(raw).to);

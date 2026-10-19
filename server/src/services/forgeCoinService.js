@@ -125,8 +125,10 @@ export async function awardCoinsForOrder(order) {
   try {
     return await tx(async () => {
       await lockUser(order.userId);
-      const live = await get('SELECT status FROM orders WHERE id=@id', { id: order.id });
+      const live = await get('SELECT status, fraud_hold FROM orders WHERE id=@id', { id: order.id });
       if (!SALE_STATUSES.includes(live?.status)) return 0;
+      // Not while the order is on fraud hold; releaseFraudHold awards them.
+      if (Number(live?.fraud_hold)) return 0;
       await run(
         `INSERT INTO forge_coin_ledger (id, user_id, delta, reason, ref, created_at)
          VALUES (@id, @u, @d, 'order', @ref, @at)`,

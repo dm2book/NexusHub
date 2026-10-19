@@ -101,25 +101,25 @@ export default function Fulfillment() {
                 )}
               </div>
             )}
-            {active.deliveryMethod === 'account' ? (
+            {/* An account order can still hold a code item — Robux next to a
+                gift card in one cart. The code fields stay available here, or
+                the card in such an order could never be delivered. */}
+            {active.deliveryMethod === 'account' && (
               <div className="rounded-xl bg-emerald-500/5 border border-emerald-500/20 p-3 text-sm text-slate-300">
-                ⚡ This is a <strong className="text-white">direct account top-up</strong>. Top up the account above, then click <strong className="text-white">Deliver</strong> to confirm — no code needed. (You can add a note below.)
+                ⚡ This order is a <strong className="text-white">direct account top-up</strong>. For a top-up item, top up the account above and click <strong className="text-white">Deliver</strong> — no code needed. For a gift card or key in the same order, enter its code below.
               </div>
-            ) : (
-              <>
-                <div><label className="label">Delivery type</label>
-                  <select className="input" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
-                    <option value="code">Code</option>
-                    <option value="license">License</option>
-                    <option value="message">Message</option>
-                    <option value="file">File reference</option>
-                  </select></div>
-                <div><label className="label">Content</label>
-                  <textarea rows={3} className="input font-mono" value={form.content}
-                    onChange={(e) => setForm({ ...form, content: e.target.value })}
-                    placeholder="e.g. XXXX-YYYY-ZZZZ" /></div>
-              </>
             )}
+            <div><label className="label">Delivery type</label>
+              <select className="input" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
+                <option value="code">Code</option>
+                <option value="license">License</option>
+                <option value="message">Message</option>
+                <option value="file">File reference</option>
+              </select></div>
+            <div><label className="label">Content</label>
+              <textarea rows={3} className="input font-mono" value={form.content}
+                onChange={(e) => setForm({ ...form, content: e.target.value })}
+                placeholder={active.deliveryMethod === 'account' ? 'Only for a code item — leave empty for a top-up' : 'e.g. XXXX-YYYY-ZZZZ'} /></div>
             <div><label className="label">Internal note (optional)</label>
               <input className="input" value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} /></div>
           </div>

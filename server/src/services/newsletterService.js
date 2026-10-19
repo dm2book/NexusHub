@@ -39,6 +39,49 @@ export function tokenMatches(email, token) {
   return want.length === got.length && timingSafeEqual(want, got);
 }
 
+/**
+ * The double opt-in link's proof: the same HMAC idea as unsubscribe, with its
+ * own prefix so one token can never stand in for the other.
+ */
+export function confirmToken(email) {
+  return createHmac('sha256', config.auth.jwtSecret)
+    .update(`newsletter-confirm:${String(email || '').trim().toLowerCase()}`)
+    .digest('hex').slice(0, 32);
+}
+export function confirmTokenMatches(email, token) {
+  const want = Buffer.from(confirmToken(email));
+  const got = Buffer.from(String(token || ''));
+  return want.length === got.length && timingSafeEqual(want, got);
+}
+export function confirmUrl(email, lang = null) {
+  const e = encodeURIComponent(String(email || '').trim().toLowerCase());
+  return `${config.appUrl.replace(/\/+$/, '')}/api/newsletter/confirm`
+    + `?e=${e}&t=${confirmToken(email)}${lang ? `&lang=${encodeURIComponent(lang)}` : ''}`;
+}
+
+/** Send the one confirmation request an address gets, stamped first. */
+async function requestConfirmation(email, lang) {
+  const claim = await run(
+    `UPDATE newsletter_signups SET confirm_sent_at = @now
+      WHERE email = @e AND confirm_sent_at IS NULL AND confirmed_at IS NULL AND unsubscribed_at IS NULL`,
+    { now: nowIso(), e: email });
+  if (!claim?.changes) return false;
+  await sendEmailAsync('newsletter_confirm', email, {
+    lang: lang || 'nl',
+    newsletter: { confirmUrl: confirmUrl(email, lang) },
+  });
+  return true;
+}
+
+/** The link in the confirmation mail, after the visitor pressed the button. */
+export async function confirmSubscription(email, token) {
+  const e = String(email || '').trim().toLowerCase();
+  if (!confirmTokenMatches(e, token)) return { ok: false };
+  await run(`UPDATE newsletter_signups SET confirmed_at = @at
+              WHERE email = @e AND confirmed_at IS NULL AND unsubscribed_at IS NULL`, { at: nowIso(), e });
+  return { ok: true };
+}
+
 /** The link that goes in the mail. */
 export function unsubscribeUrl(email) {
   const e = encodeURIComponent(String(email || '').trim().toLowerCase());
@@ -69,6 +112,9 @@ export async function subscribe(email, { source = 'prelaunch', consentText = nul
        at launch, and a mail in the wrong language from a shop you have never
        bought from reads like spam. */
     { id: newId('nws'), e, s: source, c: consentText, lang: lang || null, at: nowIso() });
+  /* Double opt-in: nothing but this one confirmation request goes to the
+     address until its owner clicks the link in it. */
+  await requestConfirmation(e, lang).catch((err) => console.error('[newsletter] confirm mail:', err.message));
   return { ok: true, alreadySubscribed: false };
 }
 
@@ -107,9 +153,23 @@ export async function sendLaunchAnnouncements({ limit = 40, now = Date.now() } =
   const at = launchAtIso();
   if (!at || now < Date.parse(at)) return { sent: 0, reason: 'not open yet' };
 
+  /* Only confirmed addresses. A row from before double opt-in existed (no
+     confirmation request sent yet) gets that request instead of the launch
+     mail; once confirmed, a later sweep announces to it as to anyone else. */
+  const unconfirmed = await all(
+    `SELECT email, lang FROM newsletter_signups
+      WHERE confirmed_at IS NULL AND confirm_sent_at IS NULL AND unsubscribed_at IS NULL
+        AND created_at < @at
+      ORDER BY created_at ASC LIMIT @limit`,
+    { at, limit });
+  let confirmRequests = 0;
+  for (const r of unconfirmed) {
+    if (await requestConfirmation(r.email, r.lang).catch(() => false)) confirmRequests += 1;
+  }
+
   const rows = await all(
     `SELECT id, email, lang FROM newsletter_signups
-      WHERE announced_at IS NULL AND unsubscribed_at IS NULL
+      WHERE announced_at IS NULL AND unsubscribed_at IS NULL AND confirmed_at IS NOT NULL
         AND created_at < @at
       ORDER BY created_at ASC LIMIT @limit`,
     { at, limit });
@@ -130,7 +190,7 @@ export async function sendLaunchAnnouncements({ limit = 40, now = Date.now() } =
     });
     sent += 1;
   }
-  return { sent, remaining: rows.length - sent };
+  return { sent, remaining: rows.length - sent, confirmRequests };
 }
 
 export async function subscriberCount() {

@@ -32,6 +32,7 @@ import { get } from '../db/index.js';
 import { attributeSignup } from '../services/affiliateService.js';
 import { audit } from '../services/auditService.js';
 import { sendEmailAsync } from '../services/emailService.js';
+import { loginDetailsHtml } from '../services/emailBlocks.js';
 import { notify } from '../services/notificationService.js';
 import { badRequest, tooMany, unauthorized, ApiError } from '../utils/errors.js';
 import { isPrelaunch, isAdminEmail, closedMessage } from '../services/launchGateService.js';
@@ -53,6 +54,11 @@ const ctxOf = (req) => ({
   lang: LANGS.has(req.get('x-lang')) ? req.get('x-lang') : null,
   req,
 });
+
+/** The language a mail to this account goes out in: the one the account
+ *  chose, else the page the visitor is looking at, else Dutch. */
+const langOf = (user, req) => (LANGS.has(user?.lang) ? user.lang
+  : LANGS.has(req.get('x-lang')) ? req.get('x-lang') : 'nl');
 
 /**
  * A readable "there is something to restore" flag beside the real cookies.
@@ -233,10 +239,16 @@ router.post('/otp/verify', otpLimiter, asyncHandler(async (req, res) => {
   if (suspicious) {
     await audit({ actor: { id: session.user.id, email: session.user.email }, action: 'auth.login_suspicious',
       metadata: { ip: ctx.ip, device: ctx.userAgent }, req });
-    sendEmailAsync('custom_message', session.user.email, {
-      subject: 'New sign-in to your ForgeMarket account',
-      message: `We noticed a sign-in from a new device or location (IP ${ctx.ip || 'unknown'}). If this was you, you can ignore this. If not, revoke the device in your account security settings and contact support.`,
-      order: { number: '', url: `${config.appUrl}/account/settings` },
+    /* The purpose-built, translated security_alert mail. This went out through
+       the order "custom_message" template: an English subject glued to
+       "— bestelling " with no number, "Hoi , dit gaat over je bestelling :",
+       an order button pointing at the settings page, always in the Dutch
+       frame. For a security mail, looking like phishing is the worst outcome. */
+    const lang = langOf(session.user, req);
+    sendEmailAsync('security_alert', session.user.email, {
+      lang,
+      user: { name: session.user.display_name || String(session.user.email).split('@')[0] },
+      login: { detailsHtml: loginDetailsHtml({ ip: ctx.ip, device: ctx.userAgent, at: new Date() }, lang) },
     });
     if (session.user.id) await notify(session.user.id, { type: 'security', title: 'New device sign-in',
       body: 'A new device signed in to your account. Review your active devices if this wasn’t you.', link: '/account/settings' });
@@ -244,7 +256,10 @@ router.post('/otp/verify', otpLimiter, asyncHandler(async (req, res) => {
 
   if (session.firstLogin) {
     if (session.user.email && !session.user.email.endsWith('@phone.forgemarket.local')) {
-      sendEmailAsync('account_created', session.user.email, { user: { name: session.user.display_name || String(id).split('@')[0] } });
+      sendEmailAsync('account_created', session.user.email, {
+        lang: langOf(session.user, req),
+        user: { name: session.user.display_name || String(id).split('@')[0] },
+      });
     }
     if (body.ref) await attributeSignup(session.user.id, body.ref).catch(() => {});
   }

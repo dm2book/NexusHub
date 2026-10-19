@@ -17,6 +17,8 @@ import { notify } from './notificationService.js';
 import { postPaymentProofAlert } from './discordService.js';
 import { audit } from './auditService.js';
 import { sendEmailAsync } from './emailService.js';
+import { proofReasonHtml } from './emailBlocks.js';
+import { formatMoney } from '../utils/money.js';
 import { badRequest, notFound, conflict } from '../utils/errors.js';
 
 /* A payment provider that confirms payments itself. With one active, the
@@ -282,13 +284,16 @@ export async function rejectProof(proofId, reason = '', ctx = {}) {
   /* "Resubmit your proof" only to a buyer whose order still waits for payment
      — never to one whose order was already paid through another proof. */
   if (order && order.status === 'pending') {
-    sendEmailAsync('custom_message', order.email, {
-      lang: order.billing?.lang || undefined,
-      subject: `Payment not verified for ${order.number}`,
-      message: `We couldn't verify your payment yet${reason ? `: ${reason}` : ''}. Please double-check the amount and reference and resubmit your proof.`,
+    /* The translated payment_not_verified mail, not custom_message with an
+       English subject and message inside an nl/de/fr frame and no name. */
+    const lang = order.billing?.lang || 'nl';
+    sendEmailAsync('payment_not_verified', order.email, {
+      lang,
+      user: { name: order.billing?.full_name || order.email.split('@')[0] },
       // Pre-filled track link: a rejected proof is exactly the moment the buyer
       // must not have to hunt for their own order number.
-      order: { number: order.number, url: orderUrlFor(order) },
+      order: { number: order.number, total: formatMoney(order.total, order.currency, lang), url: orderUrlFor(order) },
+      proof: { reasonHtml: reason ? proofReasonHtml(reason, lang) : '' },
     });
     if (order.userId) await notify(order.userId, { type: 'order', title: 'Payment needs attention',
       body: reason || 'We couldn’t verify your payment. Please resubmit.', link: `/account/orders/${order.id}` });

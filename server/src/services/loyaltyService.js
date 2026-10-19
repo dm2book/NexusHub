@@ -77,8 +77,12 @@ async function tierState(userId, tierId) {
   return { grants, held: grants > revokes, lastAmount: Number(r?.last || 0) };
 }
 
+/* Held orders do not count yet: a €500 order on fraud hold granted the Gold
+   bonus the moment it was paid, spendable before anyone had looked at it.
+   releaseFraudHold grants it once the hold is lifted. */
 const paidSpend = async (userId) => Number((await get(
-  `SELECT COALESCE(SUM(total),0) AS spent FROM orders WHERE user_id = @u AND ${PAID}`, { u: userId }))?.spent || 0);
+  `SELECT COALESCE(SUM(total),0) AS spent FROM orders
+    WHERE user_id = @u AND ${PAID} AND COALESCE(fraud_hold, 0) = 0`, { u: userId }))?.spent || 0);
 
 /* Grant and revoke both run under the buyer's row lock (the one every wallet
    write takes), reading spend and tags inside it: a refund and a payment for

@@ -2413,4 +2413,17 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS lang TEXT;
       END $$;
     `,
   },
+  {
+    /* Newsletter double opt-in. The form took any typed address and the launch
+       mail went to every row, so a stranger's address could be signed up for
+       marketing mail. confirmed_at is set only by the link in the confirmation
+       mail; confirm_sent_at stops a second request. Existing rows are NOT
+       confirmed here: they get one confirmation request instead of the launch
+       announcement (newsletterService.sendLaunchAnnouncements). */
+    id: '069_newsletter_confirmed',
+    sql: `
+      ALTER TABLE newsletter_signups ADD COLUMN IF NOT EXISTS confirmed_at TEXT;
+      ALTER TABLE newsletter_signups ADD COLUMN IF NOT EXISTS confirm_sent_at TEXT;
+    `,
+  },
 ];

@@ -82,7 +82,8 @@ console.log('\n— Export —');
     d.account?.email === buyer.email && d.orders?.[0]?.items?.length === 1 && d.walletLedger?.length >= 1 && d.newsletter?.length === 1);
   const text = JSON.stringify(d);
   ok('…and no secrets in it', !text.includes('JBSWY3DPEHPK3PXP') && !/refresh|code_hash|token_hash/.test(text));
-  ok('…the waiver they agreed to, with each order', !!d.orders?.[0]?.consent_at && d.orders[0].consent_text === 'x');
+  // Not the request's free text ('x'): the sentence the checkout shows (utils/consentWording.js).
+  ok('…the waiver they agreed to, with each order', !!d.orders?.[0]?.consent_at && /^Ik wil mijn bestelling meteen geleverd/.test(d.orders[0].consent_text || ''));
   ok('…the payment proof they sent, without the image itself',
     d.paymentProofs?.length === 1 && d.paymentProofs[0].transaction_id === 'TX-778' && d.paymentProofs[0].screenshot_on_file === true
       && !text.includes('89504e47'));

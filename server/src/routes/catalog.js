@@ -7,7 +7,8 @@ import { config, manualPayMethods, commerceBlockers, activePaymentProvider, payn
 import { asyncHandler } from '../middleware/error.js';
 import { publicCache } from '../utils/httpCache.js';
 import { requireLaunched, launchAtIso } from '../services/launchGateService.js';
-import { subscribe, unsubscribe, tokenMatches } from '../services/newsletterService.js';
+import { subscribe, unsubscribe, tokenMatches, confirmSubscription, confirmTokenMatches } from '../services/newsletterService.js';
+import { CONFIRM_PAGE } from '../services/emailCopy.js';
 import { unsubscribeTokenOk, applyUnsubscribe, UNSUBSCRIBE_SCOPES } from '../services/emailService.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 import { listProducts, getProduct, priceHistory, isSellable } from '../services/productService.js';
@@ -329,6 +330,31 @@ router.post('/unsubscribe', express.urlencoded({ extended: false, limit: '4kb' }
   const q = unsubQuery.safeParse(req.query || {});
   if (q.success && unsubscribeTokenOk(q.data.e, q.data.s, q.data.t)) await applyUnsubscribe(q.data.e, q.data.s);
   res.set('Cache-Control', 'no-store').type('html').send(unsubPage(lang, `<p>${escHtml(q.success ? c.done : c.bad)}</p>`));
+}));
+
+/* The newsletter's double opt-in link. Opening it only ASKS, like the
+   unsubscribe page: mail scanners open links, and a GET that confirmed would
+   confirm addresses whose owners never saw the mail — the exact thing double
+   opt-in exists to prevent. The button POSTs. */
+const confirmQuery = z.object({ e: z.string().email().max(200), t: z.string().max(64) });
+const confirmLang = (req) => (CONFIRM_PAGE[String(req.query.lang || '').slice(0, 2)] ? String(req.query.lang).slice(0, 2) : unsubLang(req));
+router.get('/newsletter/confirm', asyncHandler(async (req, res) => {
+  const lang = confirmLang(req);
+  const c = CONFIRM_PAGE[lang];
+  const q = confirmQuery.safeParse(req.query || {});
+  res.set('Cache-Control', 'no-store').type('html');
+  if (!q.success || !confirmTokenMatches(q.data.e, q.data.t)) return res.send(unsubPage(lang, `<p>${escHtml(c.invalid)}</p>`));
+  const action = `/api/newsletter/confirm?e=${encodeURIComponent(q.data.e)}&t=${encodeURIComponent(q.data.t)}&lang=${lang}`;
+  res.send(unsubPage(lang, `<p style="margin:0 0 18px">${escHtml(c.ask)}</p>
+    <p style="margin:0 0 18px;color:#a9a3c9;font-size:14px">${escHtml(q.data.e)}</p>
+    <form method="post" action="${escHtml(action)}"><button type="submit" style="width:100%;padding:12px;border:0;border-radius:999px;background:#a855f7;color:#fff;font-weight:700;font-size:16px;cursor:pointer">${escHtml(c.button)}</button></form>`));
+}));
+router.post('/newsletter/confirm', express.urlencoded({ extended: false, limit: '4kb' }), asyncHandler(async (req, res) => {
+  const lang = confirmLang(req);
+  const c = CONFIRM_PAGE[lang];
+  const q = confirmQuery.safeParse(req.query || {});
+  const r = q.success ? await confirmSubscription(q.data.e, q.data.t) : { ok: false };
+  res.set('Cache-Control', 'no-store').type('html').send(unsubPage(lang, `<p>${escHtml(r.ok ? c.done : c.invalid)}</p>`));
 }));
 
 /* The link in every price alert. Same shape as the newsletter's: an HMAC of

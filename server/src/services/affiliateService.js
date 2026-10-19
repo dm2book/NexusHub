@@ -67,6 +67,10 @@ export async function recordOrderCommission(order) {
   if (!code) return;
   const referrerId = await referrerForCode(code);
   if (!referrerId || referrerId === buyerId) return;
+  /* Not while the order is on fraud hold: the commission is spendable credit,
+     and a held order may still be rejected. releaseFraudHold pays it. */
+  const live = await get('SELECT fraud_hold FROM orders WHERE id=@o', { o: order.id });
+  if (Number(live?.fraud_hold)) return;
   // One commission per order.
   const dupe = await get(`SELECT id FROM referral_events WHERE order_id=@o AND kind='order'`, { o: order.id });
   if (dupe) return;

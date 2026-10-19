@@ -32,7 +32,7 @@ const shape = (r) => r && ({
    credit once redeemed (env STAFF_CREDIT_MAX_CENTS, default €100). */
 export const staffCreditCap = () => Number(process.env.STAFF_CREDIT_MAX_CENTS || 10_000);
 
-export async function issueGiftCard({ amount, currency = 'EUR', note = null, recipientEmail = null }, issuedBy = null,
+export async function issueGiftCard({ amount, currency = 'EUR', note = null, recipientEmail = null, lang = 'nl' }, issuedBy = null,
   { isOwner = false } = {}) {
   const cents = Math.round(Number(amount));
   if (!cents || cents < 1) throw badRequest('Enter a gift-card amount');
@@ -57,10 +57,15 @@ export async function issueGiftCard({ amount, currency = 'EUR', note = null, rec
   let emailedTo = null;
   if (rec) {
     try {
+      /* In a language, and the amount written the way that language writes
+         it: with neither, a Dutch mail said "€25.00" (en-IE). The recipient's
+         language is unknown, so it is the shop's (Dutch) unless the admin chose. */
+      const mailLang = ['nl', 'en', 'de', 'fr'].includes(lang) ? lang : 'nl';
       await sendEmail('gift_card', rec, {
+        lang: mailLang,
         giftCard: {
           code: card.code,
-          amount: formatMoney(cents, currency),
+          amount: formatMoney(cents, currency, mailLang),
           noteHtml: note ? `<div class="quote">${String(note).replace(/[<>&]/g, '')}</div>` : '',
         },
       });
