@@ -73,6 +73,14 @@ Health probe for uptime monitors: **`/api/health`**.
 | `MOLLIE_API_KEY` | **iDEAL, Bancontact, Apple Pay, card and PayPal.** Takes priority over the manual links — it is the only method that confirms itself and dispatches stock without you |
 | `STRIPE_SECRET_KEY` | enable card payments instead of/alongside manual |
 
+### Login by SMS (Twilio)
+Phone login stays off until all three values are set. Enter them in **Admin → Keys and connections → Login by SMS** (no redeploy), or as `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` / `TWILIO_FROM` in Vercel.
+1. Create an account at twilio.com and upgrade it from trial — a trial account only texts numbers you verified yourself.
+2. **Account SID** (`AC…`) and **Auth Token**: Twilio Console → Account Info.
+3. **SMS sender**: either a Twilio phone number (Phone Numbers → Buy a number; written as `+31…` / `+44…`), or an alphanumeric sender name of at most 11 characters such as `ForgeMarket`. Check Twilio's country rules for the Netherlands and Belgium before choosing — some countries require the name to be registered first.
+4. Twilio charges per SMS sent and for a rented number; see twilio.com/pricing for the current Dutch rates.
+5. Test: `/api/health` → `sms.status` should read `configured`, and the login page offers "phone".
+
 ---
 
 ## 7. Smoke test (2 min) once deployed

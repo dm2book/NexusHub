@@ -164,10 +164,14 @@ export const config = {
     openaiKey: (env.OPENAI_API_KEY || '').trim(),
   },
   sms: {
-    accountSid: env.TWILIO_ACCOUNT_SID || '',
-    authToken: env.TWILIO_AUTH_TOKEN || '',
-    from: env.TWILIO_FROM || '',
-    enabled: !!(env.TWILIO_ACCOUNT_SID && env.TWILIO_AUTH_TOKEN && env.TWILIO_FROM),
+    accountSid: (env.TWILIO_ACCOUNT_SID || '').trim(),
+    authToken: (env.TWILIO_AUTH_TOKEN || '').trim(),
+    from: (env.TWILIO_FROM || '').trim(),
+    /* Worked out on every read, not once at boot: the three values can also be
+       typed into Admin → Keys and connections, which writes them into this
+       object while the shop is running. A boolean frozen at start-up kept SMS
+       off until the next deploy. */
+    get enabled() { return !!(this.accountSid && this.authToken && this.from); },
   },
 
   email: {

@@ -100,7 +100,8 @@ function smsHealth() {
     ok: config.sms.enabled,
     status: config.sms.enabled ? 'configured' : 'not_configured',
     provider: config.sms.enabled ? 'twilio' : 'none',
-    note: config.sms.enabled ? undefined : 'Set TWILIO_ACCOUNT_SID / AUTH_TOKEN / FROM for phone OTP.',
+    note: config.sms.enabled ? undefined
+      : 'Enter the Twilio Account SID, Auth Token and SMS sender in Admin → Keys and connections (or set TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN / TWILIO_FROM) for phone login.',
   };
 }
 
@@ -152,6 +153,8 @@ async function queueHealth() {
 export async function healthSummary({ deep = false, tables = false } = {}) {
   const database = await databaseHealth(deep, tables);
   const email = emailHealth();
+  // Keys saved in the admin count too, not only the deploy's environment.
+  await import('./secretStore.js').then((m) => m.refreshStoredSecrets()).catch(() => {});
   const sms = smsHealth();
   const storage = storageHealth();
   const queue = await queueHealth();

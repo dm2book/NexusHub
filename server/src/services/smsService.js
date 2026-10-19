@@ -27,6 +27,16 @@ export const isValidPhone = (p) => E164.test(normalizePhone(p));
  */
 export const smsAvailable = () => config.sms.enabled || !config.isProd;
 
+/**
+ * Re-read what the owner typed in Admin → Keys and connections (at most once a
+ * minute per instance) before deciding whether SMS can be offered. Without
+ * this, Twilio keys saved in the admin reached only the instance that saved
+ * them — every other warm instance went on refusing SMS until it restarted.
+ */
+export async function refreshSmsSettings() {
+  await import('./secretStore.js').then((m) => m.refreshStoredSecrets()).catch(() => {});
+}
+
 /* The login SMS, per language. Plain GSM-7 characters only (no emoji, no
    curly quotes): one character outside that set and the carrier sends the
    whole message as UCS-2, which halves its length and can split a code SMS
