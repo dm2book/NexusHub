@@ -136,7 +136,7 @@ console.log('\n— A restock rearms every rung —');
     after.low_stock_alert_level === null && after.low_stock_alerted_at === null,
     JSON.stringify(after));
   ok('…and announces the restock', (await alertsFor('RearmProduct')).some(
-    (r) => /Restocked/.test(r.payload)));
+    (r) => /Weer op voorraad|Restocked/.test(r.payload)));
 
   // And the whole ladder can be walked again.
   await buy(p, 3);
@@ -216,7 +216,7 @@ console.log('\n— Staff alerts stay with staff —');
 
   const svc = (await import('node:fs')).readFileSync(
     new URL('../src/services/discordService.js', import.meta.url), 'utf8');
-  ok('…nor the webhook path', /const \{ fmPing, \.\.\.forDiscord \} = body/.test(svc));
+  ok('…nor the webhook path', /const \{ fmPing, (components, )?\.\.\.(forDiscord|rest) \} = body/.test(svc));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

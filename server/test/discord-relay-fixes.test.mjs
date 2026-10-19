@@ -101,10 +101,14 @@ console.log('\n— The payment-reminder DM follows the provider —');
   const { paymentReminderEmbed } = await import('../src/services/discordService.js');
   const pay = paymentReminderEmbed({ orderNumber: 'FM-2026-AAAA1111', amount: '€ 9,99', lang: 'nl', provider: 'paynl' });
   ok('under Pay.: pay from the order page, no bank transfer', /bestelling/.test(pay.description) && !/Maak het exacte bedrag over/.test(pay.description), pay.description);
-  ok('…and the link says to pay', /Betaal je bestelling/.test(pay.description));
+  /* The link moved from the text into the message's button (one link, not two). */
+  const { paymentReminderMessage } = await import('../src/services/discordService.js');
+  const btn = paymentReminderMessage({ orderNumber: 'FM-2026-AAAA1111', amount: '€ 9,99', lang: 'nl', provider: 'paynl' })
+    .components?.[0]?.components?.[0] || {};
+  ok('…and the button says to pay', /Betaal je bestelling/.test(btn.label || ''), JSON.stringify(btn));
   const manual = paymentReminderEmbed({ orderNumber: 'FM-2026-AAAA1111', lang: 'nl', provider: 'manual' });
   ok('a manual shop still gets the transfer instructions', /Maak het exacte bedrag over/.test(manual.description));
-  ok('the link goes to the order\'s track page', /\/track\?number=FM-2026-AAAA1111/.test(pay.description));
+  ok('the button goes to the order\'s track page', /\/track\?number=FM-2026-AAAA1111$/.test(btn.url || ''), btn.url);
 }
 
 srv.close();

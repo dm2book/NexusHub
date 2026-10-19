@@ -24,6 +24,7 @@
  * second channel, not a second opinion: both say the same three numbers.
  */
 import { createHmac, timingSafeEqual } from 'node:crypto';
+import { brandEmbed, linkButtons } from './discordStyle.js';
 import { run, get, all, nowIso } from '../db/index.js';
 import { newId } from '../utils/ids.js';
 import { config } from '../config/env.js';
@@ -193,16 +194,14 @@ export async function disableAllAlerts(userId, token) {
 /** The DM: the same three numbers as the email. */
 export function dmFor({ name, url, previous, current, lang }) {
   const fmt = (c) => formatPrice(c, lang);
+  const view = lang === 'nl' ? 'Bekijk het product' : lang === 'de' ? 'Zum Produkt' : lang === 'fr' ? 'Voir le produit' : 'View the product';
   return {
-    embeds: [{
+    embeds: [brandEmbed('success', {
       title: `\u{1F4C9} ${name}`,
       url,
-      description: `~~${fmt(previous)}~~ → **${fmt(current)}**  (−${fmt(previous - current)})\n\n`
-        + `[${lang === 'nl' ? 'Bekijk het product' : lang === 'de' ? 'Zum Produkt' : lang === 'fr' ? 'Voir le produit' : 'View the product'}](${url})`,
-      color: 0x22c55e,
-      footer: { text: `${config.email.fromName} · ${lang === 'nl' ? 'verlanglijst' : lang === 'de' ? 'Wunschliste' : lang === 'fr' ? 'liste de souhaits' : 'wishlist'}` },
-      timestamp: new Date().toISOString(),
-    }],
+      description: `~~${fmt(previous)}~~ → **${fmt(current)}**  (−${fmt(previous - current)})\n\n[${view}](${url})`,
+    }, { footer: lang === 'nl' ? 'verlanglijst' : lang === 'de' ? 'Wunschliste' : lang === 'fr' ? 'liste de souhaits' : 'wishlist' })],
+    components: linkButtons({ label: view, url }),
   };
 }
 
