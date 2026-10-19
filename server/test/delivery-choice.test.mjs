@@ -67,7 +67,8 @@ console.log('\n— Gift-code delivery —');
   const dels = await all('SELECT content FROM deliveries WHERE order_id=@o', { o: o.id });
   ok('a real code was dispensed', dels.some((d) => /GC-/.test(d.content)), JSON.stringify(dels.map((d) => d.content)));
   const email = await renderOrderEmail(o.id, 'order_completed');
-  ok('completed email contains the delivered code', dels.length && email.html.includes(dels[0].content), '');
+  // The code carries <wbr> break hints after its dashes (email-templates-design).
+  ok('completed email contains the delivered code', dels.length && email.html.replace(/<wbr>/g, '').includes(dels[0].content), '');
 }
 
 // ── Price breakdown: item price + coupon must reconcile to the total ─────────

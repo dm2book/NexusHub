@@ -84,7 +84,8 @@ console.log('\n— #1 #12 a mixed cart shows the gift-card code —');
              VALUES (@id, @o, @i, 'message', 'Top-up done on player_one', @at)`, { id: newId('dlv'), o: o.id, i: steamItem.id, at: nowIso() });
   const mail = await os.renderOrderEmail(o.id, 'order_completed');
   ok('the account top-up is confirmed', mail.html.includes('player_one'));
-  ok('…and the gift-card code is in the same mail', mail.html.includes('STEAM-AAAA-BBBB'), mail.html.slice(0, 200));
+  // The code carries <wbr> break hints after its dashes (email-templates-design).
+  ok('…and the gift-card code is in the same mail', mail.html.replace(/<wbr>/g, '').includes('STEAM-AAAA-BBBB'), mail.html.slice(0, 200));
   ok('…with redeem steps for the code item', /steam/i.test(mail.html) && /store\.steampowered|Steam/i.test(mail.html));
   ok('a staff "message" delivery is labelled and shown as text, not a 24px code block',
     /BERICHT/.test(mail.html) && /white-space:pre-line">Top-up done on player_one/.test(mail.html));
