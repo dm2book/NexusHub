@@ -8,92 +8,95 @@
  * {{refund.amount}}, plus any extra context passed by the caller.
  */
 export const DEFAULT_TEMPLATES = [
+  /* House style, the same in every mail and every language:
+       <h1> what happened, in a few words
+       <p>  "Hoi {{user.name}}," + one or two sentences: what it means and what
+            (if anything) the reader does next
+       the details block(s) the server builds
+       ONE primary button (class="btn") — the next step
+       <p class="help"> one small help line
+     Emoji: at most one, in the subject, never in a heading. Order numbers are
+     always written as "bestelling <strong>{{order.number}}</strong>". */
   {
     id: 'account_created',
     name: 'Account Created',
     subject: 'Welkom bij {{brand.name}} 🎉',
     body_html: `
-      <h1>Welkom, {{user.name}}! 🎉</h1>
-      <p>Je {{brand.name}}-account staat klaar. Je kunt nu bestellen, je levering
-      volgen, facturen downloaden en alles beheren vanuit je dashboard.</p>
-      <p><strong>Geen wachtwoord om te onthouden.</strong> Elke keer dat je inlogt
-      mailen we je een nieuwe eenmalige code — en op dit apparaat blijf je
-      ingelogd, dus vaak zul je dat niet hoeven.</p>
-      <p><a class="btn" href="{{app.url}}/account">Naar je dashboard</a></p>
-      <p>Vragen? Beantwoord deze mail gewoon, of open een ticket in onze Discord. 💜</p>`,
+      <h1>Welkom, {{user.name}}</h1>
+      <p>Je {{brand.name}}-account staat klaar. Je kunt nu bestellen, je bestellingen volgen en je
+      facturen downloaden vanuit je account.</p>
+      <p><strong>Geen wachtwoord nodig.</strong> Je logt in met een code die we je per mail sturen, en op
+      dit apparaat blijf je ingelogd.</p>
+      <p><a class="btn" href="{{app.url}}/account">Naar je account</a></p>
+      <p class="help">Vragen? Beantwoord deze mail of open een ticket in onze Discord.</p>`,
   },
   {
     id: 'order_received',
     name: 'Order Received',
-    subject: 'Bedankt voor je bestelling {{order.number}} 🎮',
+    subject: 'Bestelling {{order.number}} is geplaatst — rond je betaling af',
     body_html: `
-      <h1>Bedankt voor je bestelling! 🎉</h1>
-      <p>Hoi {{user.name}}, bedankt voor je aankoop bij {{brand.name}}. We hebben
-      bestelling <strong>{{order.number}}</strong> ontvangen (totaal <strong>{{order.total}}</strong>).</p>
+      <h1>Je bestelling is geplaatst</h1>
+      <p>Hoi {{user.name}}, we hebben bestelling <strong>{{order.number}}</strong> ontvangen (totaal
+      <strong>{{order.total}}</strong>). Rond je betaling af; zodra die binnen is, leveren we.</p>
+      {{order.paymentHtml}}
       {{order.itemsHtml}}
       {{order.needsFromBuyerHtml}}
-      {{order.paymentHtml}}
-      <p>Zodra je betaling bevestigd is, leveren we. Wat we op voorraad hebben gaat
-      automatisch de deur uit; de rest leveren we met de hand.
-      Volg de status hier — geen account nodig:</p>
-      <p><a class="btn" href="{{order.url}}">Volg je bestelling</a></p>
-      <p>Hulp nodig? Beantwoord deze mail of open een ticket in onze Discord.</p>
+      <p><a class="btn" href="{{order.url}}">Betaling afronden</a></p>
+      <p class="help">Op die pagina zie je ook de status van je bestelling — zonder account. Vragen?
+      Beantwoord deze mail of open een ticket in onze Discord.</p>
       {{order.consentHtml}}`,
   },
   {
     id: 'payment_reminder',
     name: 'Payment Reminder',
-    subject: 'Je {{brand.name}}-bestelling {{order.number}} wacht nog ⏳',
+    subject: 'Bestelling {{order.number}} wacht nog op je betaling ⏳',
     body_html: `
-      <h1>Je bestelling wacht op je betaling</h1>
-      <p>Hoi {{user.name}}, je hebt bestelling <strong>{{order.number}}</strong> geplaatst
-      (totaal <strong>{{order.total}}</strong>), maar we hebben je betaling nog niet ontvangen.
-      Je bestelling blijft {{order.openDays}} dagen na het plaatsen open; komt er in die tijd geen
-      betaling binnen, dan annuleren we hem automatisch.</p>
-      {{order.itemsHtml}}
+      <h1>We wachten nog op je betaling</h1>
+      <p>Hoi {{user.name}}, je hebt bestelling <strong>{{order.number}}</strong> geplaatst (totaal
+      <strong>{{order.total}}</strong>), maar je betaling is nog niet binnen. De bestelling blijft
+      {{order.openDays}} dagen na het plaatsen open; daarna annuleren we hem automatisch.</p>
       {{order.paymentHtml}}
-      <p><a class="btn" href="{{order.url}}">Bestelling afronden</a></p>
-      <p>Al betaald? Dan kun je deze mail negeren — een betaling kan even duren
-      voordat hij bevestigd is. Vragen? Beantwoord deze mail of open een ticket in onze Discord.</p>`,
+      {{order.itemsHtml}}
+      <p><a class="btn" href="{{order.url}}">Betaling afronden</a></p>
+      <p class="help">Al betaald? Dan kun je deze mail negeren — een betaling kan even duren voordat hij
+      bevestigd is. Vragen? Beantwoord deze mail of open een ticket in onze Discord.</p>`,
   },
   {
     id: 'payment_confirmed',
     name: 'Payment Confirmed',
-    subject: 'Betaling bevestigd voor {{order.number}} ✅',
+    subject: 'Betaling ontvangen voor bestelling {{order.number}} ✅',
     body_html: `
-      <h1>Betaling ontvangen ✅</h1>
-      <p>Hoi {{user.name}}, we hebben je betaling gekoppeld aan bestelling
-      <strong>{{order.number}}</strong>. We maken hem nu klaar.</p>
-      {{order.summaryHtml}}
+      <h1>Betaling ontvangen</h1>
+      <p>Hoi {{user.name}}, je betaling voor bestelling <strong>{{order.number}}</strong> is binnen. Je
+      hoeft niets meer te doen: we maken je bestelling nu klaar.</p>
       {{order.needsFromBuyerHtml}}
-      <p><strong>Wat er nu gebeurt:</strong> wat we op voorraad hebben gaat automatisch de deur uit.
-      Wat we voor je inkopen leveren we met de hand.
-      Hoe dan ook: de levering komt in deze inbox terecht.</p>
-      <p><a class="btn" href="{{order.url}}">Volg je bestelling</a></p>
-      <p style="color:#8b93a7;font-size:13px">Die pagina ververst zichzelf — geen account nodig.
-      Ondertussen een vraag? Beantwoord deze mail gerust.</p>
+      {{order.summaryHtml}}
+      <p>Wat we op voorraad hebben, gaat automatisch de deur uit; wat we voor je inkopen, leveren we met de
+      hand. De levering komt in elk geval in deze inbox.</p>
+      <p><a class="btn" href="{{order.url}}">Bestelling volgen</a></p>
+      <p class="help">Die pagina ververst zichzelf — zonder account. Vragen? Beantwoord deze mail of open
+      een ticket in onze Discord.</p>
       {{order.invoiceHtml}}
       {{order.consentHtml}}`,
   },
   {
     id: 'order_processing',
     name: 'Order Processing',
-    subject: 'Je bestelling {{order.number}} wordt klaargemaakt',
+    subject: 'We maken bestelling {{order.number}} klaar',
     body_html: `
-      <h1>We zijn ermee bezig 🔧</h1>
-      <p>Hoi {{user.name}}, bestelling <strong>{{order.number}}</strong> wordt op dit moment klaargemaakt.</p>
-      {{order.summaryHtml}}
+      <h1>We maken je bestelling klaar</h1>
+      <p>Hoi {{user.name}}, we zetten bestelling <strong>{{order.number}}</strong> nu met de hand voor je
+      klaar. Je krijgt een mail zodra hij geleverd is.</p>
       {{order.needsFromBuyerHtml}}
-      <p>Deze status betekent dat we je items met de hand klaarzetten. Je krijgt een mail zodra
-      het geleverd is; de status volg je altijd via de knop hieronder.</p>
-      <p><a class="btn" href="{{order.url}}">Volg je bestelling</a></p>
-      <p style="color:#8b93a7;font-size:13px">Duurt het langer dan je verwachtte? Beantwoord deze mail
-      of open een ticket in onze Discord — we horen het liever te vroeg dan te laat.</p>`,
+      {{order.summaryHtml}}
+      <p><a class="btn" href="{{order.url}}">Bestelling volgen</a></p>
+      <p class="help">Duurt het langer dan je verwachtte? Beantwoord deze mail of open een ticket in onze
+      Discord — we horen het liever te vroeg dan te laat.</p>`,
   },
   {
     id: 'order_completed',
     name: 'Order Completed',
-    subject: 'Je bestelling {{order.number}} is klaar 🎮',
+    subject: 'Bestelling {{order.number}} is geleverd 🎮',
     // Premium, fully inline-styled (survives clients that strip <style>). The
     // delivery hero + order breakdown are injected server-side.
     body_html: `
@@ -101,8 +104,8 @@ export const DEFAULT_TEMPLATES = [
         <td style="padding:0 8px 0 0"><span style="display:inline-block;padding:6px 13px;background-color:#0e1f18;border:1px solid #145c43;border-radius:999px;color:#34d399;font-size:12px;font-weight:700;font-family:'Segoe UI',Arial,sans-serif">● Geleverd</span></td>
         <td><span style="display:inline-block;padding:6px 13px;background-color:#181826;border:1px solid #34345a;border-radius:999px;color:#9aa3b8;font-size:12px;font-weight:600;font-family:'Segoe UI',Arial,sans-serif">Bestelling {{order.number}}</span></td>
       </tr></table>
-      <div style="font:800 29px/1.15 'Segoe UI',Arial,sans-serif;color:#ffffff;letter-spacing:-.4px">Je bestelling staat klaar 🎮</div>
-      <div style="font:400 15px/1.6 'Segoe UI',Arial,sans-serif;color:#b9bfcd;padding-top:10px">Hoi {{user.name}} — je betaling is rond en hieronder staat wat je hebt besteld.</div>
+      <div style="font:800 28px/1.2 'Segoe UI',Arial,sans-serif;color:#ffffff;letter-spacing:-.4px">Je bestelling is geleverd</div>
+      <div style="font:400 15px/1.6 'Segoe UI',Arial,sans-serif;color:#b9bfcd;padding-top:10px">Hoi {{user.name}}, hieronder staat wat je hebt besteld en hoe je het gebruikt. Bewaar deze mail.</div>
       <div style="padding-top:22px">{{order.deliveryHtml}}</div>
       {{order.redeemHtml}}
       <div style="height:1px;font-size:0;line-height:1px;background-color:#26263a;margin:26px 0 20px">&nbsp;</div>
@@ -110,27 +113,27 @@ export const DEFAULT_TEMPLATES = [
       {{order.summaryHtml}}
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0 4px"><tr>
         <td align="center" bgcolor="#7c5cff" style="border-radius:12px;background-color:#7c5cff;background-image:linear-gradient(120deg,#7c5cff 0%,#a855f7 55%,#d946ef 100%)">
-          <a href="{{order.url}}" style="display:block;padding:15px 24px;font:700 16px/1 'Segoe UI',Arial,sans-serif;color:#ffffff;text-decoration:none">Bekijk je bestelling</a>
+          <a class="btn" href="{{order.url}}" style="display:block;margin:0;padding:15px 24px;font:700 16px/20px 'Segoe UI',Arial,sans-serif;color:#ffffff;text-decoration:none;box-shadow:none">Bestelling bekijken</a>
         </td>
       </tr></table>
       {{order.invoiceHtml}}
       {{order.reviewAskHtml}}
-      <div style="font:400 13px/1.6 'Segoe UI',Arial,sans-serif;color:#8b8fa3;text-align:center;padding-top:16px">Klopt er iets niet? Beantwoord deze mail of open een ticket in onze Discord. 💬</div>
+      <div style="font:400 13px/1.6 'Segoe UI',Arial,sans-serif;color:#8b8fa3;text-align:center;padding-top:16px">Klopt er iets niet? Beantwoord deze mail of open een ticket in onze Discord.</div>
       {{order.consentHtml}}`,
   },
   {
     id: 'refund_issued',
     name: 'Refund Issued',
-    subject: 'Terugbetaling voor {{order.number}} — {{refund.amount}}',
+    subject: 'Terugbetaling voor bestelling {{order.number}}: {{refund.amount}}',
     body_html: `
-      <h1>Je terugbetaling is verwerkt ↩️</h1>
+      <h1>Je terugbetaling is verwerkt</h1>
       <p>Hoi {{user.name}}, we hebben <strong>{{refund.amount}}</strong> terugbetaald voor bestelling
-      <strong>{{order.number}}</strong>.</p>
+      <strong>{{order.number}}</strong>. Hieronder staat hoe en waarheen.</p>
       {{refund.detailsHtml}}
       {{order.summaryHtml}}
-      <p><a class="btn" href="{{order.url}}">Bekijk deze bestelling</a></p>
-      <p style="color:#8b93a7;font-size:13px">Niet wat je verwachtte, of na een paar werkdagen nog niets binnen?
-      Beantwoord deze mail met je bestelnummer en we gaan erachteraan.</p>`,
+      <p><a class="btn" href="{{order.url}}">Bestelling bekijken</a></p>
+      <p class="help">Klopt het bedrag niet, of na een paar werkdagen nog niets ontvangen? Beantwoord deze
+      mail, dan zoeken we het uit.</p>`,
   },
   {
     id: 'custom_message',
@@ -138,38 +141,34 @@ export const DEFAULT_TEMPLATES = [
     subject: '{{subject}} — bestelling {{order.number}}',
     body_html: `
       <h1>{{subject}}</h1>
-      <p>Hoi {{user.name}}, dit gaat over je bestelling <strong>{{order.number}}</strong>:</p>
+      <p>Hoi {{user.name}}, dit bericht gaat over bestelling <strong>{{order.number}}</strong>:</p>
       <div class="quote">{{messageHtml}}</div>
-      <p><a class="btn" href="{{order.url}}">Bekijk je bestelling</a></p>
-      <p style="color:#8b93a7;font-size:13px">Je kunt gewoon op deze mail antwoorden — hij komt bij
-      dezelfde persoon terecht die hem stuurde. Liever chatten? Onderaan staat de link naar onze Discord.</p>`,
+      <p><a class="btn" href="{{order.url}}">Bestelling bekijken</a></p>
+      <p class="help">Je kunt gewoon op deze mail antwoorden — hij komt terecht bij degene die hem stuurde.</p>`,
   },
   {
     id: 'support_reply',
     name: 'Support Reply',
     subject: 'Re: {{ticket.subject}} · ticket {{ticket.number}}',
     body_html: `
-      <h1>We hebben op je ticket geantwoord</h1>
-      <p>Hoi <strong>{{user.name}}</strong>, iemand van de shop heeft ticket
-      <strong>{{ticket.number}}</strong>{{ticket.orderLine}} beantwoord:</p>
+      <h1>Nieuw antwoord op je ticket</h1>
+      <p>Hoi {{user.name}}, we hebben ticket <strong>{{ticket.number}}</strong>{{ticket.orderLine}} beantwoord:</p>
       <div class="quote">{{replyHtml}}</div>
-      <p><a class="btn" href="{{ticket.url}}">Lees het hele gesprek</a></p>
-      <p style="color:#8b93a7;font-size:13px">Antwoord gewoon op deze mail — je bericht komt terug op
-      hetzelfde ticket, zonder account.</p>`,
+      <p><a class="btn" href="{{ticket.url}}">Gesprek lezen</a></p>
+      <p class="help">Antwoord gewoon op deze mail — je bericht komt bij hetzelfde ticket terecht.</p>`,
   },
   {
     id: 'cart_reminder',
     name: 'Abandoned Cart',
-    subject: 'Je hebt iets in je winkelwagen laten staan 🛒',
+    subject: 'Dit staat nog in je winkelwagen 🛒',
     body_html: `
-      <div class="badge">🛒</div>
-      <h1 style="text-align:center">Nog aan het twijfelen?</h1>
-      <p style="text-align:center;max-width:420px;margin-left:auto;margin-right:auto">Hoi {{user.name}}, dit stond
-      nog in je winkelwagen bij {{brand.name}}. Je winkelwagen is bewaard, mocht je verder willen.</p>
+      <h1>Dit staat nog in je winkelwagen</h1>
+      <p>Hoi {{user.name}}, je winkelwagen bij {{brand.name}} is bewaard. Wil je verder? Hij staat voor je
+      klaar, met de prijzen van nu.</p>
       {{cart.itemsHtml}}
-      <p style="text-align:center"><a class="btn" href="{{cart.url}}">Naar je winkelwagen</a></p>
-      <p style="text-align:center;color:#8b93a7;font-size:13px">Vragen? Beantwoord deze mail of open een ticket in onze Discord.</p>
-      <p style="text-align:center;color:#8b93a7;font-size:12px">Geen herinneringen meer? <a href="{{unsubscribe.url}}" style="color:#8b93a7">Uitschrijven</a></p>`,
+      <p><a class="btn" href="{{cart.url}}">Naar je winkelwagen</a></p>
+      <p class="help">Vragen? Beantwoord deze mail of open een ticket in onze Discord.</p>
+      <p class="fine">Geen herinneringen meer? <a href="{{unsubscribe.url}}">Uitschrijven</a></p>`,
   },
   {
     id: 'price_drop',
@@ -179,36 +178,29 @@ export const DEFAULT_TEMPLATES = [
        only when the price is below what they last knew. Every one carries the
        link that turns alerts off without signing in. */
     body_html: `
-      <div class="badge">\u{1F4C9}</div>
-      <h1 style="text-align:center">Prijsdaling op je verlanglijst</h1>
-      <p style="text-align:center;max-width:420px;margin-left:auto;margin-right:auto">Hoi {{user.name}},
-      <strong>{{product.name}}</strong> is goedkoper geworden.</p>
-      <p style="text-align:center;font-size:15px;margin:18px 0 4px">
+      <h1>Prijsdaling op je verlanglijst</h1>
+      <p>Hoi {{user.name}}, <strong>{{product.name}}</strong> is goedkoper geworden.</p>
+      <p style="font-size:15px;margin:18px 0 4px">
         <span style="color:#8b93a7;text-decoration:line-through">{{price.previous}}</span>
         &nbsp;→&nbsp;<strong style="font-size:22px">{{price.current}}</strong></p>
-      <p style="text-align:center;margin:0 0 18px"><span class="pill-note">{{price.diff}} goedkoper</span></p>
-      <p style="text-align:center"><a class="btn" href="{{product.url}}">Bekijk het product</a></p>
-      <p style="text-align:center;color:#8b93a7;font-size:13px">Je bewaarde dit product voor {{price.saved}}.
-      <a href="{{wishlist.url}}" style="color:#8b93a7">Naar je verlanglijst</a></p>
-      <p style="text-align:center;color:#8b93a7;font-size:12px;margin-top:22px">Je krijgt dit omdat je een prijsalert
-      aanzette. <a href="{{wishlist.alertsOffUrl}}" style="color:#8b93a7">Alle prijsalerts uitzetten</a></p>`,
+      <p style="margin:0 0 18px"><span class="pill-note">{{price.diff}} goedkoper</span></p>
+      <p><a class="btn" href="{{product.url}}">Product bekijken</a></p>
+      <p class="help">Je bewaarde dit product voor {{price.saved}}. <a href="{{wishlist.url}}">Naar je verlanglijst</a></p>
+      <p class="fine">Je krijgt dit omdat je een prijsalert aanzette.
+      <a href="{{wishlist.alertsOffUrl}}">Alle prijsalerts uitzetten</a></p>`,
   },
   {
     id: 'review_request',
     name: 'Review Request',
-    subject: 'Hoe was je bestelling {{order.number}}? ⭐',
+    subject: 'Hoe was bestelling {{order.number}}? ⭐',
     body_html: `
-      <div class="badge">⭐</div>
-      <h1 style="text-align:center">Hoe deden we het?</h1>
-      <p style="text-align:center;max-width:420px;margin-left:auto;margin-right:auto">Hoi {{user.name}}, nogmaals bedankt
-      voor bestelling <strong>{{order.number}}</strong>! Kwam alles aan zoals verwacht, dan zouden we een korte review
-      waarderen — het helpt andere gamers om in te schatten of ze bij ons willen kopen.</p>
-      <p style="text-align:center"><a class="btn" href="{{review.url}}">Schrijf een korte review</a></p>
+      <h1>Hoe was je bestelling?</h1>
+      <p>Hoi {{user.name}}, bedankt voor bestelling <strong>{{order.number}}</strong>. Kwam alles aan zoals
+      verwacht? Een korte review helpt andere gamers om in te schatten of ze bij ons willen kopen.</p>
+      <p><a class="btn" href="{{review.url}}">Review schrijven</a></p>
       {{review.trustpilotHtml}}
-      <p style="text-align:center;color:#8b93a7;font-size:13px">Klopt er iets niet? Beantwoord deze mail of open
-      een ticket in onze Discord, dan kijken we ernaar.</p>
-      <p style="text-align:center;color:#8b93a7;font-size:12px">Liever geen reviewverzoeken meer?
-      <a href="{{unsubscribe.url}}" style="color:#8b93a7">Zet ze uit</a></p>`,
+      <p class="help">Klopt er iets niet? Beantwoord deze mail of open een ticket in onze Discord, dan kijken we ernaar.</p>
+      <p class="fine">Liever geen reviewverzoeken meer? <a href="{{unsubscribe.url}}">Zet ze uit</a></p>`,
   },
   {
     id: 'launch_announcement',
@@ -217,35 +209,29 @@ export const DEFAULT_TEMPLATES = [
     /* The one mail the pre-launch banner promised. Sent once, only after the
        shop has actually opened, only to people who confirmed their sign-up. */
     body_html: `
-      <div class="badge">\u{1F680}</div>
-      <h1 style="text-align:center">We zijn open</h1>
-      <p style="text-align:center;max-width:440px;margin-left:auto;margin-right:auto">Je vroeg of we je een
-      berichtje wilden sturen zodra {{shop.name}} opengaat. Bij dezen: de winkel is open en je kunt bestellen.</p>
-      <p style="text-align:center"><a class="btn" href="{{shop.url}}/shop">Bekijk de winkel</a></p>
-      <p style="text-align:center;color:#8b93a7;font-size:13px">Op voorraad gaat automatisch de deur uit; de rest
-      met de hand. Je betaalt pas na je bestelling.</p>
-      <p style="text-align:center;color:#8b93a7;font-size:12px;margin-top:22px">Je krijgt deze mail omdat je
-      je had aangemeld. <a href="{{unsubscribe.url}}" style="color:#8b93a7">Uitschrijven</a></p>`,
+      <h1>We zijn open</h1>
+      <p>Hoi, je vroeg ons je te laten weten wanneer {{shop.name}} opengaat. Bij dezen: de winkel is open en
+      je kunt bestellen.</p>
+      <p><a class="btn" href="{{shop.url}}/shop">Naar de winkel</a></p>
+      <p class="help">Wat we op voorraad hebben, gaat automatisch de deur uit; de rest leveren we met de hand.</p>
+      <p class="fine">Je krijgt deze mail omdat je je had aangemeld. <a href="{{unsubscribe.url}}">Uitschrijven</a></p>`,
   },
   {
     id: 'gift_card',
     name: 'Gift Card',
     subject: 'Je hebt een {{brand.name}}-cadeaubon van {{giftCard.amount}} gekregen 🎁',
     body_html: `
-      <div class="badge">🎁</div>
-      <h1 style="text-align:center">Je hebt een cadeaubon!</h1>
-      <p style="text-align:center;max-width:420px;margin-left:auto;margin-right:auto">Iemand heeft je
-      <strong>{{giftCard.amount}}</strong> gestuurd om bij {{brand.name}} uit te geven aan Robux, V-Bucks,
-      giftcards en meer.</p>
+      <h1>Je hebt een cadeaubon gekregen</h1>
+      <p>Hoi, iemand heeft je <strong>{{giftCard.amount}}</strong> gestuurd om bij {{brand.name}} uit te geven.
+      Wissel de code hieronder in; het saldo komt op je tegoed en wordt bij het afrekenen vanzelf verrekend.</p>
       <p class="code">{{giftCard.code}}</p>
-      <p style="text-align:center;margin:14px 0 6px"><span class="pill-note">💳 Waarde {{giftCard.amount}} · eenmalig in te wisselen</span></p>
+      <p style="text-align:center;margin:14px 0 6px"><span class="pill-note">Waarde {{giftCard.amount}} · eenmalig in te wisselen</span></p>
       {{giftCard.noteHtml}}
-      <p style="text-align:center"><a class="btn" href="{{app.url}}/account">Wissel je cadeaubon in</a></p>
-      <p style="text-align:center;color:#8b93a7;font-size:13px">Log in (of maak een gratis account), open
-      <strong>Wallet</strong> en plak de code hierboven — het saldo komt in je tegoed te staan en wordt
-      automatisch verrekend bij het afrekenen.</p>
-      <div class="notice">🔒 <strong>Houd deze code privé.</strong> Iedereen met deze code kan het saldo
-      inwisselen. Eenmalig te gebruiken, op elke bestelling.</div>`,
+      <p><a class="btn" href="{{app.url}}/account/wallet">Cadeaubon inwisselen</a></p>
+      <p class="help">De knop brengt je naar je Wallet. Nog geen account? Maak er gratis een aan met dit
+      e-mailadres en plak daarna de code.</p>
+      <div class="notice"><strong>Houd deze code privé.</strong> Iedereen met deze code kan het saldo
+      inwisselen.</div>`,
   },
   {
     id: 'login_otp',
@@ -256,17 +242,15 @@ export const DEFAULT_TEMPLATES = [
        we know, and greeting someone as "jan.de.vries84" reads like a script. */
     subject: 'Je inlogcode voor {{brand.name}}',
     body_html: `
-      <div class="badge">🔐</div>
       <h1 style="text-align:center">Je inlogcode</h1>
-      <p style="text-align:center;max-width:400px;margin-left:auto;margin-right:auto">Vul deze code in op het
-      inlogscherm van {{brand.name}}.</p>
+      <p style="text-align:center">Vul deze code in op het inlogscherm van {{brand.name}}.</p>
       {{otp.codeHtml}}
-      <p style="text-align:center;margin:14px 0 6px"><span class="pill-note">⏱ Verloopt over {{otp.ttl}} minuten · eenmalig te gebruiken</span></p>
-      <p style="text-align:center;color:#8b93a7;font-size:13px">Typ je hem op een ander apparaat over? De code is
+      <p style="text-align:center;margin:14px 0 6px"><span class="pill-note">Verloopt over {{otp.ttl}} minuten · eenmalig te gebruiken</span></p>
+      <p class="help" style="text-align:center">Typ je hem op een ander apparaat over? De code is
       <strong style="letter-spacing:2px;color:#e5e7eb">{{otp.code}}</strong></p>
-      <div class="notice">🛡️ <strong>Vul deze code alleen in op {{app.host}}.</strong> {{brand.name}} vraagt je
+      <div class="notice"><strong>Vul deze code alleen in op {{app.host}}.</strong> {{brand.name}} vraagt je
       <strong>nooit</strong> om deze code — niet per e-mail, DM of telefoon. Probeerde jij niet in te loggen? Dan kun
-      je deze mail gerust negeren; zonder de code kan niemand bij je account.</div>`,
+      je deze mail negeren; zonder de code kan niemand bij je account.</div>`,
   },
   {
     id: 'security_alert',
@@ -275,111 +259,107 @@ export const DEFAULT_TEMPLATES = [
        address is only useful to the account holder, inside the mail. */
     subject: 'Nieuwe aanmelding op je {{brand.name}}-account',
     body_html: `
-      <div class="badge">🛡️</div>
-      <h1 style="text-align:center">Nieuwe aanmelding op je account</h1>
+      <h1>Nieuwe aanmelding op je account</h1>
       <p>Hoi {{user.name}}, er is zojuist ingelogd op je {{brand.name}}-account vanaf een apparaat of
       locatie die we nog niet kenden.</p>
       <div class="quote">{{login.detailsHtml}}</div>
-      <p><strong>Was jij dit?</strong> Dan hoef je niets te doen.</p>
-      <p><strong>Was jij dit niet?</strong> Meld het apparaat af in je beveiligingsinstellingen en beantwoord
-      deze mail, dan kijken we met je mee.</p>
-      <p><a class="btn" href="{{app.url}}/account/settings">Naar je beveiligingsinstellingen</a></p>`,
+      <p><strong>Was jij dit?</strong> Dan hoef je niets te doen.<br>
+      <strong>Was jij dit niet?</strong> Meld het apparaat af in je beveiligingsinstellingen en beantwoord deze
+      mail, dan kijken we met je mee.</p>
+      <p><a class="btn" href="{{app.url}}/account/settings">Beveiligingsinstellingen openen</a></p>
+      <p class="help">We vragen je nooit om een inlogcode of wachtwoord — niet per e-mail, DM of telefoon.</p>`,
   },
   {
     id: 'order_cancelled',
     name: 'Order Cancelled',
-    subject: 'Je bestelling {{order.number}} is geannuleerd',
+    subject: 'Bestelling {{order.number}} is geannuleerd',
     body_html: `
       <h1>Je bestelling is geannuleerd</h1>
       <p>Hoi {{user.name}}, bestelling <strong>{{order.number}}</strong> (totaal <strong>{{order.total}}</strong>)
-      is geannuleerd.</p>
+      is geannuleerd. Wil je het toch hebben? Je kunt altijd een nieuwe bestelling plaatsen.</p>
       {{cancel.reasonHtml}}
       {{order.summaryHtml}}
-      <p>Wil je het toch hebben? Je kunt altijd een nieuwe bestelling plaatsen.</p>
       <p><a class="btn" href="{{app.url}}/shop">Naar de winkel</a></p>
-      <p style="color:#8b93a7;font-size:13px">Had je al betaald, of klopt dit niet? Beantwoord deze mail met
-      je bestelnummer, dan zoeken we het uit.</p>`,
+      <p class="help">Had je al betaald, of klopt dit niet? Beantwoord deze mail, dan zoeken we het uit.</p>`,
   },
   {
     id: 'order_on_hold',
     name: 'Order On Hold (review)',
-    subject: 'Je bestelling {{order.number}}: betaling ontvangen, nog een korte controle',
+    subject: 'Bestelling {{order.number}}: betaling ontvangen, nog een korte controle',
     body_html: `
-      <h1>Betaling ontvangen — nog een extra controle</h1>
-      <p>Hoi {{user.name}}, we hebben je betaling voor bestelling <strong>{{order.number}}</strong> ontvangen.</p>
-      <p>Voordat we leveren, bekijkt iemand van ons deze bestelling nog even. Dat doen we bij een deel van de
-      bestellingen, onder meer om misbruik van betaalgegevens te voorkomen. Je hoeft hiervoor niets te doen;
-      als we iets van je nodig hebben, mailen we je.</p>
-      {{order.summaryHtml}}
+      <h1>Betaling ontvangen — nog een korte controle</h1>
+      <p>Hoi {{user.name}}, je betaling voor bestelling <strong>{{order.number}}</strong> is binnen. Voordat we
+      leveren, bekijkt iemand van ons de bestelling nog even. Je hoeft niets te doen; hebben we iets van je
+      nodig, dan mailen we je.</p>
+      <p>Dat doen we bij een deel van de bestellingen, onder meer om misbruik van betaalgegevens te voorkomen.</p>
       {{order.needsFromBuyerHtml}}
-      <p><a class="btn" href="{{order.url}}">Volg je bestelling</a></p>
-      <p style="color:#8b93a7;font-size:13px">Vragen? Beantwoord deze mail.</p>
+      {{order.summaryHtml}}
+      <p><a class="btn" href="{{order.url}}">Bestelling volgen</a></p>
+      <p class="help">Vragen? Beantwoord deze mail of open een ticket in onze Discord.</p>
       {{order.consentHtml}}`,
   },
   {
     id: 'payment_not_verified',
     name: 'Payment Not Verified',
-    subject: 'We konden je betaling voor {{order.number}} nog niet vinden',
+    subject: 'We vonden je betaling voor bestelling {{order.number}} nog niet',
     body_html: `
-      <h1>We konden je betaling nog niet vinden</h1>
-      <p>Hoi {{user.name}}, je stuurde een betaalbewijs voor bestelling <strong>{{order.number}}</strong>,
-      maar we konden die betaling nog niet terugvinden.</p>
+      <h1>We vonden je betaling nog niet</h1>
+      <p>Hoi {{user.name}}, je stuurde een betaalbewijs voor bestelling <strong>{{order.number}}</strong>, maar
+      we konden die betaling nog niet terugvinden. Controleer het bedrag (<strong>{{order.total}}</strong>) en of
+      je bestelnummer als omschrijving is meegegeven, en stuur je bewijs daarna opnieuw in.</p>
       {{proof.reasonHtml}}
-      <p>Controleer het bedrag (<strong>{{order.total}}</strong>) en of je bestelnummer als omschrijving
-      is meegegeven, en stuur je bewijs daarna opnieuw in.</p>
       <p><a class="btn" href="{{order.url}}">Bewijs opnieuw insturen</a></p>
-      <p style="color:#8b93a7;font-size:13px">Zeker dat het klopt? Beantwoord deze mail met een screenshot
-      van de betaling, dan kijken we het na.</p>`,
+      <p class="help">Zeker dat het klopt? Beantwoord deze mail met een screenshot van de betaling, dan kijken we het na.</p>`,
   },
   {
     id: 'refund_request_received',
     name: 'Refund Request Received',
-    subject: 'We hebben je terugbetalingsverzoek voor {{order.number}} ontvangen',
+    subject: 'Je terugbetalingsverzoek voor bestelling {{order.number}} is ontvangen',
     body_html: `
       <h1>Je verzoek is binnen</h1>
       <p>Hoi {{user.name}}, we hebben je verzoek om terugbetaling voor bestelling
-      <strong>{{order.number}}</strong> ontvangen. Iemand van ons bekijkt het en je hoort per mail wat we besluiten.</p>
+      <strong>{{order.number}}</strong> ontvangen. Iemand van ons bekijkt het; je hoort per mail wat we besluiten.</p>
       {{request.reasonHtml}}
-      <p><a class="btn" href="{{order.url}}">Bekijk je bestelling</a></p>
-      <p style="color:#8b93a7;font-size:13px">Wil je iets toevoegen? Beantwoord deze mail.</p>`,
+      <p><a class="btn" href="{{order.url}}">Bestelling bekijken</a></p>
+      <p class="help">Wil je iets toevoegen? Beantwoord deze mail.</p>`,
   },
   {
     id: 'refund_request_rejected',
     name: 'Refund Request Rejected',
-    subject: 'Je terugbetalingsverzoek voor {{order.number}}',
+    subject: 'Besluit over je terugbetalingsverzoek voor bestelling {{order.number}}',
     body_html: `
       <h1>We kunnen dit verzoek niet toekennen</h1>
       <p>Hoi {{user.name}}, we hebben je verzoek om terugbetaling voor bestelling
       <strong>{{order.number}}</strong> bekeken en kunnen het niet toekennen.</p>
       {{request.reasonHtml}}
-      <p>Ben je het hier niet mee eens, of hebben we iets gemist? Beantwoord deze mail met wat er speelt —
-      dan bekijkt iemand het opnieuw. Op de pagina over herroeping en terugbetaling lees je wanneer je recht
-      hebt op je geld terug.</p>
-      <p><a class="btn" href="{{app.url}}/refunds">Herroeping &amp; terugbetaling</a></p>`,
+      <p>Ben je het er niet mee eens, of hebben we iets gemist? Beantwoord deze mail met wat er speelt, dan
+      bekijkt iemand het opnieuw. Op de pagina over herroeping en terugbetaling lees je wanneer je recht hebt
+      op je geld terug.</p>
+      <p><a class="btn" href="{{app.url}}/refunds">Herroeping &amp; terugbetaling</a></p>
+      <p class="help">Je kunt gewoon op deze mail antwoorden.</p>`,
   },
   {
     id: 'ticket_opened',
     name: 'Ticket Opened',
-    subject: 'We hebben je ticket ontvangen · {{ticket.number}}',
+    subject: 'Je ticket {{ticket.number}} is ontvangen',
     body_html: `
       <h1>We hebben je bericht ontvangen</h1>
-      <p>Hoi {{user.name}}, je ticket <strong>{{ticket.number}}</strong>{{ticket.orderLine}} staat bij ons.
-      Je krijgt ons antwoord per mail.</p>
+      <p>Hoi {{user.name}}, ticket <strong>{{ticket.number}}</strong>{{ticket.orderLine}} staat bij ons. Je krijgt
+      ons antwoord per mail.</p>
       <div class="quote">{{ticket.subject}}</div>
-      <p><a class="btn" href="{{ticket.url}}">Bekijk je ticket</a></p>
-      <p style="color:#8b93a7;font-size:13px">Iets toevoegen? Antwoord gewoon op deze mail.</p>`,
+      <p><a class="btn" href="{{ticket.url}}">Ticket bekijken</a></p>
+      <p class="help">Iets toevoegen? Antwoord gewoon op deze mail.</p>`,
   },
   {
     id: 'newsletter_confirm',
     name: 'Newsletter Confirmation',
     subject: 'Bevestig je aanmelding bij {{brand.name}}',
     body_html: `
-      <div class="badge">✉️</div>
-      <h1 style="text-align:center">Bevestig je aanmelding</h1>
-      <p style="text-align:center;max-width:440px;margin-left:auto;margin-right:auto">Dit adres is opgegeven
-      voor berichten van {{brand.name}}. Pas als je hieronder bevestigt, sturen we je iets.</p>
-      <p style="text-align:center"><a class="btn" href="{{newsletter.confirmUrl}}">Ja, bevestig mijn aanmelding</a></p>
-      <p style="text-align:center;color:#8b93a7;font-size:13px">Was jij dit niet? Negeer deze mail dan gewoon.</p>`,
+      <h1>Bevestig je aanmelding</h1>
+      <p>Hoi, dit adres is opgegeven voor berichten van {{brand.name}}. Pas als je hieronder bevestigt,
+      sturen we je iets.</p>
+      <p><a class="btn" href="{{newsletter.confirmUrl}}">Aanmelding bevestigen</a></p>
+      <p class="help">Was jij dit niet? Negeer deze mail dan gewoon.</p>`,
   },
 ];
 
@@ -699,10 +679,12 @@ export const LEGACY_TEMPLATE_BODIES = Object.fromEntries(
  * an untouched default and may be upgraded; anything else is an owner's edit
  * and is left exactly as they wrote it.
  *
- * Captured from the shipped defaults before the October 2026 mail audit.
+ * Captured from the shipped defaults before the October 2026 mail audit, and
+ * again (all 23 templates × 4 languages) before the house-style pass that gave
+ * every mail one primary button and the same help line.
  * Keyed lang → template id → { body: [hash], subject: [hash] }.
  */
-export const LEGACY_TEMPLATE_HASHES = {"nl":{"account_created":{"body":["f5ca783b94c816c9","61e284fded7d043c"],"subject":["d423e67f2b3e7e75","070fe34cce4b6739"]},"order_received":{"body":["7d015f84020815cf","22d30c17af2538f9","41c9971f88527349","a94cc5354277fea6"],"subject":["b2f2efc93f8e2ade","6f1118c93ae504ed"]},"payment_reminder":{"body":["6b8ebc650de3a1d6","b38b9e6184082d77"],"subject":["7969968b066a32e3","1f862fe5125e8329"]},"payment_confirmed":{"body":["06c3d477740da7a3","8b7fab2c5f442dc5","036d89e4a9375514"],"subject":["f7747a22afda6d27","0e6d55a8a0732c56"]},"order_processing":{"body":["c4aca96240d7541f","05817ce136df1f78","5becfb338752456c"],"subject":["7e77f6fb7031a5da","cdefd042dd95a6b9"]},"order_completed":{"body":["1cc0e2e0fffbb808","16e416dfe6b31cde","5c160e01cc040545","b6143e29c6fb9634","82511debbd9bc129"],"subject":["1ecf88fac65277e7","a1722a02e0079575"]},"refund_issued":{"body":["8f91ab6098b5aeca","85783c2a31b4df9f","aadc09fb3a6f47ae"],"subject":["9ad71828a48434b1","f2c25f8be6f1a24c"]},"custom_message":{"body":["0fe55eec42192430","a0f0d52934c56271","ddb14c456d7a4923"],"subject":["7b8812f957edf979","3683c9433ba177d4"]},"support_reply":{"body":["f808146730a118ed","e21f0a5a13c2bac1"],"subject":["3c45c64c6e1457d8"]},"cart_reminder":{"body":["6501ac1b4a57ad88","b46a6e7adbe9f821","7a2916d997a3caef"],"subject":["51bcbb7181727b9e","c7b7429e0dbb8a3d"]},"price_drop":{"body":["1706d72f597eed15","e8de81a3458e7fc7"],"subject":["982b3ddf025b9d7c","10658c1483f1f644"]},"review_request":{"body":["d8d49a99217b6d81","600674f3d75089af","b27ce7fbd14c71c7"],"subject":["53be0b6f38fa15d4","b8814658043af021"]},"launch_announcement":{"body":["ceaa1c69e7eba628","2d08313ab72f9c2b"],"subject":["09c44a8ab8bea398"]},"gift_card":{"body":["fd60cc88a1a44dc9","8446ec35f0297e41"],"subject":["70476dbcbf28e423","453af286fa5740ff"]},"login_otp":{"body":["04fa9fe9f91f4796","3d32d1276bdea772","ed52c887e0683947","db9520ab62fcbb26"],"subject":["db2b757370a7c6a9","1be089caa70f7ecd"]}},"en":{"account_created":{"body":["61e284fded7d043c"],"subject":["070fe34cce4b6739"]},"order_received":{"body":["a94cc5354277fea6"],"subject":["6f1118c93ae504ed"]},"payment_reminder":{"body":["b38b9e6184082d77"],"subject":["1f862fe5125e8329"]},"payment_confirmed":{"body":["036d89e4a9375514"],"subject":["0e6d55a8a0732c56"]},"order_processing":{"body":["5becfb338752456c"],"subject":["cdefd042dd95a6b9"]},"order_completed":{"body":["82511debbd9bc129"],"subject":["a1722a02e0079575"]},"refund_issued":{"body":["aadc09fb3a6f47ae"],"subject":["f2c25f8be6f1a24c"]},"custom_message":{"body":["ddb14c456d7a4923"],"subject":["3683c9433ba177d4"]},"support_reply":{"body":["e21f0a5a13c2bac1"],"subject":["3c45c64c6e1457d8"]},"cart_reminder":{"body":["7a2916d997a3caef"],"subject":["c7b7429e0dbb8a3d"]},"price_drop":{"body":["e8de81a3458e7fc7"],"subject":["10658c1483f1f644"]},"review_request":{"body":["b27ce7fbd14c71c7"],"subject":["b8814658043af021"]},"launch_announcement":{"body":["2d08313ab72f9c2b"],"subject":["09c44a8ab8bea398"]},"gift_card":{"body":["8446ec35f0297e41"],"subject":["453af286fa5740ff"]},"login_otp":{"body":["db9520ab62fcbb26"],"subject":["1be089caa70f7ecd"]}},"de":{"account_created":{"body":["a16acdcb2b4ca8c7"],"subject":["77ee94ba672a9449"]},"order_received":{"body":["6eea40cac1f33d1e"],"subject":["2b6ec6cdb5caed26"]},"payment_reminder":{"body":["317e85eab440c78a"],"subject":["ae84f87d2241beca"]},"payment_confirmed":{"body":["6597799df390e7be"],"subject":["9f93cbc6ac369cb0"]},"order_processing":{"body":["7486eb0807af9015"],"subject":["1d2e95827dfe7604"]},"order_completed":{"body":["f4c93f4dd4da210d"],"subject":["edffb871478230f8"]},"refund_issued":{"body":["7ab493c8436ee037"],"subject":["dfdc8d5bbde14e8e"]},"custom_message":{"body":["b744c4047638d4fc"],"subject":["970666274d12617d"]},"support_reply":{"body":["0942934603c01842"],"subject":["ebba493caa7b0f95"]},"cart_reminder":{"body":["d710447428b56f76"],"subject":["728dfbaefc3874e8"]},"price_drop":{"body":["04bb9fe49d8acc89"],"subject":["fe118219a3e70f17"]},"review_request":{"body":["b571a5546a8e9fb7"],"subject":["b9af8e73bc604ea5"]},"launch_announcement":{"body":["c27376eb738c901e"],"subject":["83709444e872da91"]},"gift_card":{"body":["e30c2267bfc888fa"],"subject":["55290b9f8ee7d03f"]},"login_otp":{"body":["e781020ed5468aac"],"subject":["cdd6e9958ac1fa80"]}},"fr":{"account_created":{"body":["e00e10b25e89e868"],"subject":["775a113b533690d5"]},"order_received":{"body":["0488f5285152b0aa"],"subject":["c3b4d4f29124d092"]},"payment_reminder":{"body":["48217d1e546c2b3f"],"subject":["946d9368526d3e9d"]},"payment_confirmed":{"body":["05aed3b51db7599c"],"subject":["c8003e00227826b7"]},"order_processing":{"body":["a6ad4a52125f9227"],"subject":["89886d16dbe459c2"]},"order_completed":{"body":["42c4d4467e673600"],"subject":["e009fc10b9fcc2d9"]},"refund_issued":{"body":["e531187eb0782ff4"],"subject":["6f4b2e9e02769387"]},"custom_message":{"body":["9c856753ad707bd1"],"subject":["7ee743deaf99ea31"]},"support_reply":{"body":["85826ebdbc9ae7bc"],"subject":["01299ff4a22043fb"]},"cart_reminder":{"body":["be0e8cc7ed010864"],"subject":["f4bcbc7a12fb41ba"]},"price_drop":{"body":["4b23aae73690fa07"],"subject":["15add653a1716062"]},"review_request":{"body":["141c6a284b410572"],"subject":["cfb6edb7f2b1ec4b"]},"launch_announcement":{"body":["4b205147a72e7fb2"],"subject":["38f33447b56ae6a7"]},"gift_card":{"body":["e002dccbc5866f17"],"subject":["19834f212638005e"]},"login_otp":{"body":["b14b5de8328050fe"],"subject":["8c77203a2ee88d09"]}}};
+export const LEGACY_TEMPLATE_HASHES = {"nl":{"account_created":{"body":["f5ca783b94c816c9","61e284fded7d043c"],"subject":["d423e67f2b3e7e75","070fe34cce4b6739"]},"order_received":{"body":["7d015f84020815cf","22d30c17af2538f9","41c9971f88527349","a94cc5354277fea6","b8affdbb77f17b4d"],"subject":["b2f2efc93f8e2ade","6f1118c93ae504ed"]},"payment_reminder":{"body":["6b8ebc650de3a1d6","b38b9e6184082d77","4c7c2c3b9f15a033"],"subject":["7969968b066a32e3","1f862fe5125e8329"]},"payment_confirmed":{"body":["06c3d477740da7a3","8b7fab2c5f442dc5","036d89e4a9375514","f92fa826469a2f41"],"subject":["f7747a22afda6d27","0e6d55a8a0732c56"]},"order_processing":{"body":["c4aca96240d7541f","05817ce136df1f78","5becfb338752456c","6b0ba030e5b9979b"],"subject":["7e77f6fb7031a5da","cdefd042dd95a6b9"]},"order_completed":{"body":["1cc0e2e0fffbb808","16e416dfe6b31cde","5c160e01cc040545","b6143e29c6fb9634","82511debbd9bc129","87603a2fa8c3b329"],"subject":["1ecf88fac65277e7","a1722a02e0079575"]},"refund_issued":{"body":["8f91ab6098b5aeca","85783c2a31b4df9f","aadc09fb3a6f47ae","08ca748821e5c8be"],"subject":["9ad71828a48434b1","f2c25f8be6f1a24c"]},"custom_message":{"body":["0fe55eec42192430","a0f0d52934c56271","ddb14c456d7a4923","d3e8dd5782ed7e30"],"subject":["7b8812f957edf979","3683c9433ba177d4"]},"support_reply":{"body":["f808146730a118ed","e21f0a5a13c2bac1","2c02193260024831"],"subject":["3c45c64c6e1457d8"]},"cart_reminder":{"body":["6501ac1b4a57ad88","b46a6e7adbe9f821","7a2916d997a3caef","1fa21a1b8c9556fb"],"subject":["51bcbb7181727b9e","c7b7429e0dbb8a3d"]},"price_drop":{"body":["1706d72f597eed15","e8de81a3458e7fc7"],"subject":["982b3ddf025b9d7c","10658c1483f1f644"]},"review_request":{"body":["d8d49a99217b6d81","600674f3d75089af","b27ce7fbd14c71c7","765d61d43040b3c5"],"subject":["53be0b6f38fa15d4","b8814658043af021"]},"launch_announcement":{"body":["ceaa1c69e7eba628","2d08313ab72f9c2b","1a2aa8130aaf32a2"],"subject":["09c44a8ab8bea398"]},"gift_card":{"body":["fd60cc88a1a44dc9","8446ec35f0297e41","2780e7673d0f03a2"],"subject":["70476dbcbf28e423","453af286fa5740ff"]},"login_otp":{"body":["04fa9fe9f91f4796","3d32d1276bdea772","ed52c887e0683947","db9520ab62fcbb26","fb2088e55931802c"],"subject":["db2b757370a7c6a9","1be089caa70f7ecd","39afd0b8be27aadd"]},"security_alert":{"body":["a37ccd6269318e30"],"subject":["f207280bb144aa95"]},"order_cancelled":{"body":["ff8f60121cec1871"],"subject":["bc7d81ff76e0bc7b"]},"order_on_hold":{"body":["dfac8c3e7d3e832e"],"subject":["8bb35bfdd4cfe803"]},"payment_not_verified":{"body":["070564100d6bfa82"],"subject":["8359cbd23c3f90f9"]},"refund_request_received":{"body":["28f736746c4b10cc"],"subject":["dfc7fddf36bd8a0b"]},"refund_request_rejected":{"body":["6065b09dcedd8cb1"],"subject":["33e414e42948c1e7"]},"ticket_opened":{"body":["8fe6483f9f3d7660"],"subject":["16afde9ebe29e9d6"]},"newsletter_confirm":{"body":["9c62fbbe0ce01875"],"subject":["cf1d7a74c025a7c1"]}},"en":{"account_created":{"body":["61e284fded7d043c"],"subject":["070fe34cce4b6739"]},"order_received":{"body":["a94cc5354277fea6","24cf5de1f0652248"],"subject":["6f1118c93ae504ed"]},"payment_reminder":{"body":["b38b9e6184082d77","525fca884f736f33"],"subject":["1f862fe5125e8329"]},"payment_confirmed":{"body":["036d89e4a9375514","9fd7530ab4c9070e"],"subject":["0e6d55a8a0732c56"]},"order_processing":{"body":["5becfb338752456c","77be052d8554e11a"],"subject":["cdefd042dd95a6b9"]},"order_completed":{"body":["82511debbd9bc129","e2f92142e496125b"],"subject":["a1722a02e0079575"]},"refund_issued":{"body":["aadc09fb3a6f47ae","b884a0a63405d6e5"],"subject":["f2c25f8be6f1a24c"]},"custom_message":{"body":["ddb14c456d7a4923","794a9e72ba84cce2"],"subject":["3683c9433ba177d4"]},"support_reply":{"body":["e21f0a5a13c2bac1","691fe4632d3eb45e"],"subject":["3c45c64c6e1457d8"]},"cart_reminder":{"body":["7a2916d997a3caef","e9c677ff1357c9c2"],"subject":["c7b7429e0dbb8a3d"]},"price_drop":{"body":["e8de81a3458e7fc7"],"subject":["10658c1483f1f644"]},"review_request":{"body":["b27ce7fbd14c71c7","dd8e4fa3cb035a4e"],"subject":["b8814658043af021"]},"launch_announcement":{"body":["2d08313ab72f9c2b","cd37bdbc31e573c9"],"subject":["09c44a8ab8bea398"]},"gift_card":{"body":["8446ec35f0297e41","ed41e5bdce7b9313"],"subject":["453af286fa5740ff"]},"login_otp":{"body":["db9520ab62fcbb26","7549ef775c7de635"],"subject":["1be089caa70f7ecd","a0d88d7dcdc79961"]},"security_alert":{"body":["12c42936270f607a"],"subject":["24301abf8f94b99a"]},"order_cancelled":{"body":["0936470cdbc49e9a"],"subject":["64dded36b2628a8d"]},"order_on_hold":{"body":["17225344598d0516"],"subject":["10ae4c56c416826b"]},"payment_not_verified":{"body":["23e42812254c9ec8"],"subject":["8fc1d6c4a084f90a"]},"refund_request_received":{"body":["2f0750f3042a8353"],"subject":["28bafa07b6a39090"]},"refund_request_rejected":{"body":["1ea513358c2e9ae0"],"subject":["e7fa3a730fd4ce78"]},"ticket_opened":{"body":["4715d37cf60c936c"],"subject":["fbd6d431c28d7161"]},"newsletter_confirm":{"body":["00c1042293f20370"],"subject":["75fb6f959c3d08da"]}},"de":{"account_created":{"body":["a16acdcb2b4ca8c7"],"subject":["77ee94ba672a9449"]},"order_received":{"body":["6eea40cac1f33d1e","7a8aa7c5c40a9d12"],"subject":["2b6ec6cdb5caed26"]},"payment_reminder":{"body":["317e85eab440c78a","1be4d316bebf4379"],"subject":["ae84f87d2241beca"]},"payment_confirmed":{"body":["6597799df390e7be","edea72c197023b86"],"subject":["9f93cbc6ac369cb0"]},"order_processing":{"body":["7486eb0807af9015","8f7e493059e2f2ab"],"subject":["1d2e95827dfe7604"]},"order_completed":{"body":["f4c93f4dd4da210d","bb85c47de567f1c4"],"subject":["edffb871478230f8"]},"refund_issued":{"body":["7ab493c8436ee037","303ed633270af1e8"],"subject":["dfdc8d5bbde14e8e"]},"custom_message":{"body":["b744c4047638d4fc","5765e54de0bf0362"],"subject":["970666274d12617d"]},"support_reply":{"body":["0942934603c01842","16c0acd170559ba2"],"subject":["ebba493caa7b0f95"]},"cart_reminder":{"body":["d710447428b56f76","38f492ea9734d064"],"subject":["728dfbaefc3874e8"]},"price_drop":{"body":["04bb9fe49d8acc89"],"subject":["fe118219a3e70f17"]},"review_request":{"body":["b571a5546a8e9fb7","1ceab2ba75f07678"],"subject":["b9af8e73bc604ea5"]},"launch_announcement":{"body":["c27376eb738c901e","f5a28e901f1e50d1"],"subject":["83709444e872da91"]},"gift_card":{"body":["e30c2267bfc888fa","3755869847676359"],"subject":["55290b9f8ee7d03f"]},"login_otp":{"body":["e781020ed5468aac","0c0577fb14ec9fb0"],"subject":["cdd6e9958ac1fa80","616249968987827c"]},"security_alert":{"body":["a477159e582c78c0"],"subject":["6120ee99db759309"]},"order_cancelled":{"body":["200e8d6f2d70fb10"],"subject":["d4e2f325ba5ab091"]},"order_on_hold":{"body":["7730bd267f51e1d6"],"subject":["1aa84b5f7e1834cb"]},"payment_not_verified":{"body":["7425ae22387fdc1b"],"subject":["b7b74a0f445c39e1"]},"refund_request_received":{"body":["ef8dd243b8cbac09"],"subject":["ff98dc0297f1586b"]},"refund_request_rejected":{"body":["a78703d380fbc121"],"subject":["7454214d8918a0ad"]},"ticket_opened":{"body":["b8d285e9310a67e9"],"subject":["eea148c8f6e02112"]},"newsletter_confirm":{"body":["ec0154169bf13368"],"subject":["b52969d6034456df"]}},"fr":{"account_created":{"body":["e00e10b25e89e868"],"subject":["775a113b533690d5"]},"order_received":{"body":["0488f5285152b0aa","fe7e11c2add6bde2"],"subject":["c3b4d4f29124d092"]},"payment_reminder":{"body":["48217d1e546c2b3f","b79bb8267d9a4997"],"subject":["946d9368526d3e9d"]},"payment_confirmed":{"body":["05aed3b51db7599c","5c27dac7bbd59bd3"],"subject":["c8003e00227826b7"]},"order_processing":{"body":["a6ad4a52125f9227","901702b928ece3e5"],"subject":["89886d16dbe459c2"]},"order_completed":{"body":["42c4d4467e673600","b9b342fefa1da8da"],"subject":["e009fc10b9fcc2d9"]},"refund_issued":{"body":["e531187eb0782ff4","a9c92f8a9db29db6"],"subject":["6f4b2e9e02769387"]},"custom_message":{"body":["9c856753ad707bd1","60ceecf5ed2276b0"],"subject":["7ee743deaf99ea31"]},"support_reply":{"body":["85826ebdbc9ae7bc","e40ef33b6407c5a1"],"subject":["01299ff4a22043fb"]},"cart_reminder":{"body":["be0e8cc7ed010864","804f05d3549d5090"],"subject":["f4bcbc7a12fb41ba"]},"price_drop":{"body":["4b23aae73690fa07","f9c4facf045b4887"],"subject":["15add653a1716062"]},"review_request":{"body":["141c6a284b410572","6087923ae02c3ae3"],"subject":["cfb6edb7f2b1ec4b"]},"launch_announcement":{"body":["4b205147a72e7fb2","80b2f337e876a180"],"subject":["38f33447b56ae6a7"]},"gift_card":{"body":["e002dccbc5866f17","d45e3accb41ab20f"],"subject":["19834f212638005e"]},"login_otp":{"body":["b14b5de8328050fe","47261c051a2711d5"],"subject":["8c77203a2ee88d09","ef66ed623d84ad8e"]},"security_alert":{"body":["57a62c9ee94be337"],"subject":["96825e85b776e2a1"]},"order_cancelled":{"body":["eb88a341a349d7dc"],"subject":["71d2bea537834e37"]},"order_on_hold":{"body":["aa336d182adf00bc"],"subject":["745f953ab2af1880"]},"payment_not_verified":{"body":["baa086ff38ba64fa"],"subject":["ce15b9e50d547cb8"]},"refund_request_received":{"body":["9e1a4cfdca15cd67"],"subject":["8227bd2ef2cca14c"]},"refund_request_rejected":{"body":["8dc3ea196305adfa"],"subject":["bf70f5e1228a490e"]},"ticket_opened":{"body":["aa1aa2e3df9d2032"],"subject":["0cbe9fb625546895"]},"newsletter_confirm":{"body":["c7909efecb1701bc"],"subject":["50a948b19cf38fbd"]}}};
 
 /**
  * The comparison both upgrade paths use.

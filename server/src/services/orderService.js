@@ -1737,10 +1737,12 @@ function paymentInstructionsHtml(order, lang) {
      explain — but the mail still went out under a "how to pay" preview with no
      payment step in it at all, before the buyer had paid. Say plainly that it
      is not paid yet, and link to where it can be finished. */
+  /* No button of its own: the mail around it already ends in the one
+     "Betaling afronden" button, to the same page. Two identical buttons a
+     screen apart read as two different steps. */
   if (!methods.length && !order.payLink && viaPsp() && order.status === 'pending') {
     const amt = formatMoney(order.total, order.currency, lang);
-    return `<div class="quote"><strong>${escapeHtml(c.pspNotPaid(amt))}</strong><br>${escapeHtml(c.pspPayBody)}</div>` +
-      `<p><a class="btn" href="${escapeHtml(orderUrlFor(order))}">${escapeHtml(c.pspPayBtn)}</a></p>`;
+    return `<div class="quote"><strong>${escapeHtml(c.pspNotPaid(amt))}</strong><br>${escapeHtml(c.pspPayBody)}</div>`;
   }
   if (!methods.length && !order.payLink) return '';
   const amt = formatMoney(order.total, order.currency, lang);

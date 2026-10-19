@@ -239,7 +239,7 @@ console.log('\n— Every template renders, on a phone, without a token hole —'
     ok(`${t.id}: renders`, !!html && html.includes('<!doctype html>'));
     ok(`${t.id}: leaves no {{token}} in the output`, !/\{\{/.test(subject + html),
       (subject + html).match(/\{\{[\w.]+\}\}/)?.[0]);
-    ok(`${t.id}: fits a phone`, /max-width:568px/.test(html) && /width=device-width/.test(html));
+    ok(`${t.id}: fits a phone`, /max-width:600px/.test(html) && /width=device-width/.test(html));
   }
 }
 
