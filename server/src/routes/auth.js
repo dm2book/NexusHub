@@ -27,7 +27,7 @@ import {
   revokeTrustedDevice, revokeAllTrustedDevices, recordLoginAttempt, recentFailures,
   loginHistory, isSuspiciousLogin,
 } from '../services/deviceService.js';
-import { normalizePhone, isValidPhone, smsAvailable } from '../services/smsService.js';
+import { normalizePhone, isValidPhone, smsAvailable, refreshSmsSettings } from '../services/smsService.js';
 import { get } from '../db/index.js';
 import { attributeSignup } from '../services/affiliateService.js';
 import { audit } from '../services/auditService.js';
@@ -417,7 +417,8 @@ router.post('/totp/disable', requireAuth, totpDisableLimiter, asyncHandler(async
 }));
 
 // ── OAuth ────────────────────────────────────────────────────────────────
-router.get('/providers', (_req, res) => {
+router.get('/providers', asyncHandler(async (_req, res) => {
+  await refreshSmsSettings();
   // `channels` is what the login form asks itself before promising anything:
   // email always works, SMS only when a provider is wired up. Offering a way
   // in that cannot deliver is worse than not offering it.
@@ -425,7 +426,7 @@ router.get('/providers', (_req, res) => {
     providers: listEnabledProviders(),
     channels: smsAvailable() ? ['email', 'sms'] : ['email'],
   });
-});
+}));
 
 /**
  * These two routes are entered by *navigating*, not by fetch — the browser is

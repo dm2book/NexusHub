@@ -162,6 +162,26 @@ export const SECRETS = [
     why: 'Optional. A second premium voice option for Ad Studio.',
     hint: 'sk-… — from platform.openai.com. Billed by OpenAI.' },
 
+  /* SMS login codes. Twilio is named in the privacy policy as the processor
+     for phone numbers, so no other provider is offered here. */
+  { id: 'sms.accountSid', label: 'Twilio Account SID', env: 'TWILIO_ACCOUNT_SID',
+    path: ['sms', 'accountSid'], group: 'Login by SMS', secret: false,
+    why: 'Turns on signing in with a phone number. Needs the auth token and the sender below as well.',
+    hint: 'twilio.com → Console → Account Info: the value that starts with AC.',
+    validate: (v) => (/^AC[0-9a-f]{32}$/i.test(v) ? null
+      : 'That does not look like a Twilio Account SID — it starts with AC followed by 32 letters and digits.') },
+  { id: 'sms.authToken', label: 'Twilio Auth Token', env: 'TWILIO_AUTH_TOKEN',
+    path: ['sms', 'authToken'], group: 'Login by SMS',
+    why: 'Lets the shop send the login code through your Twilio account.',
+    hint: 'twilio.com → Console → Account Info → Auth Token (click to reveal).',
+    validate: (v) => (/^[0-9a-f]{32}$/i.test(v) ? null
+      : 'That does not look like a Twilio Auth Token — 32 letters and digits, without spaces.') },
+  { id: 'sms.from', label: 'SMS sender', env: 'TWILIO_FROM',
+    path: ['sms', 'from'], group: 'Login by SMS', secret: false,
+    why: 'Who the code SMS comes from: a Twilio number like +3197…, or a name like ForgeMarket.',
+    hint: 'A number you bought in Twilio (with +, e.g. +31970…), or an alphanumeric sender of at most 11 characters.',
+    validate: (v) => validSmsSender(v) },
+
   { id: 'email.resendApiKey', label: 'Resend API key', env: 'RESEND_API_KEY',
     path: ['email', 'resendApiKey'], group: 'Email',
     why: 'Without it a delivered code is written to a table and never reaches the buyer.',
@@ -197,6 +217,18 @@ export const SECRETS = [
 ];
 
 const byId = new Map(SECRETS.map((s) => [s.id, s]));
+
+/**
+ * A sender Twilio will accept: an E.164 number, or an alphanumeric sender ID
+ * (1–11 letters, digits or spaces, at least one letter — all digits would be
+ * read as a number).
+ */
+export function validSmsSender(v) {
+  const s = String(v || '').trim();
+  if (/^\+[1-9]\d{7,14}$/.test(s)) return null;
+  if (/^[A-Za-z0-9 ]{1,11}$/.test(s) && /[A-Za-z]/.test(s)) return null;
+  return 'Use a phone number with country code (e.g. +31970…) or a name of at most 11 letters/digits, such as ForgeMarket.';
+}
 
 /** The environment's own values, snapshotted before anything is applied. */
 const readPath = (obj, path) => path.reduce((o, k) => (o == null ? o : o[k]), obj);
