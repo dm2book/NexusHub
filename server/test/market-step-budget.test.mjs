@@ -81,6 +81,10 @@ console.log('\n— The maintenance run hands its deadline to the market jobs —
   const src = fs.readFileSync(new URL('../src/services/maintenanceService.js', import.meta.url), 'utf8');
   ok('discovery gets the deadline', /runProductDiscovery\(\{ deadline: marketDeadline \}\)/.test(src));
   ok('pricing gets the deadline', /refreshRecommendations\(\{ deadline: marketDeadline \}\)/.test(src));
+  /* Seen live: with a 0.5 s margin the step was still cut off at 15.2 s,
+     because one item takes several ~0.7 s round trips. */
+  const margin = Number((src.match(/MARKET_MARGIN_MS = ([\d_]+)/) || [])[1]?.replace(/_/g, ''));
+  ok('…with a margin of several seconds before the step limit', margin >= 3_000, String(margin));
 }
 
 console.log(`\n${fail ? '❌' : '✅'} market-step-budget: ${pass} passed, ${fail} failed`);
