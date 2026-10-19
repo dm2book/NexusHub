@@ -338,6 +338,36 @@ console.log('\n━━ The return page ━━');
     headers: { 'content-type': 'application/json' }, body: JSON.stringify({ number: 'FM-0000-NOTTHIS' }) }));
   ok('without the order number it is refused', wrong.status >= 400, `${wrong.status}`);
 }
+{
+  /* C6: a buyer who cancels on Pay.'s page (or lets it expire) comes back to an
+     order that is still pending. The status alone read "still confirming"
+     forever, and a guest had no way back to the payment. */
+  const syncOf = async (o) => (await respectLimit(() => fetch(`${base}/api/orders/${o.id}/payment/sync`, { method: 'POST',
+    headers: { 'content-type': 'application/json' }, body: JSON.stringify({ number: o.number }) }))).json();
+  for (const [code, word] of [[-90, 'cancelled'], [-80, 'expired']]) {
+    const o = await place(await product(`PayGone${-code}`));
+    const r = await start(o);
+    setCode(r.body.paymentId, code);
+    const sync = await syncOf(o);
+    ok(`a ${word} Pay. payment: the order stays pending and the page is told it can pay again`,
+      sync.status === 'pending' && sync.paymentRetryable === true, JSON.stringify(sync));
+    const again = await start(o);
+    ok(`…and "pay again" starts a NEW Pay. payment for the guest (${word})`,
+      again.status === 201 && again.body.checkoutUrl && again.body.paymentId !== r.body.paymentId, JSON.stringify(again));
+    const after = await syncOf(o);
+    ok(`…after which the page no longer offers a retry (${word})`, !after.paymentRetryable, JSON.stringify(after));
+  }
+  const open = await place(await product('PayStillOpen'));
+  await start(open);
+  ok('a payment still open at Pay. is not offered as retryable', !(await syncOf(open)).paymentRetryable);
+
+  // …and the return page acts on it: a "cancelled" state with a "Pay again" button.
+  const page = (await import('node:fs')).readFileSync(new URL('../../src/pages/CheckoutSuccess.jsx', import.meta.url), 'utf8');
+  ok('the return page turns paymentRetryable into a "cancelled, nothing charged" state',
+    /r\.paymentRetryable\)\s*\{\s*setState\('retry'\)/.test(page) && /nothing has been charged/.test(page));
+  ok('…with a "Pay again" button that restarts the Pay. payment with the guest\'s email',
+    /success\.payAgain/.test(page) && /\/paynl`/.test(page) && /recallOrder\(number\)\?\.email/.test(page));
+}
 
 console.log('\n━━ Resuming from the track page ━━');
 {

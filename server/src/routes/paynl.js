@@ -474,7 +474,14 @@ paynlApi.post('/orders/:id/payment/sync',
       }
     }
     const now = await getOrder(order.id);
-    res.json({ status: now.status, statusLabel: now.statusLabel });
+    /* A Pay. payment the buyer cancelled (or let expire) leaves the ORDER
+       pending — it can still be paid — so the status alone read as "still
+       confirming" forever, and a guest had no way back to the payment. Say
+       when the latest Pay. attempt is over, so the page can offer a new one. */
+    const psp = now.status === 'pending'
+      ? await get('SELECT psp_provider, psp_status FROM orders WHERE id=@id', { id: order.id }) : null;
+    const retryable = psp?.psp_provider === 'paynl' && ['canceled', 'expired', 'failed'].includes(psp.psp_status || '');
+    res.json({ status: now.status, statusLabel: now.statusLabel, ...(retryable ? { paymentRetryable: true } : {}) });
   }));
 
 export { referenceFor };
