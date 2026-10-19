@@ -143,7 +143,7 @@ async function request(path, { method = 'GET', body, raw = false, retry = true, 
     const err = new Error(res.status >= 500 && generic
       ? translate('err.server', 'Something is wrong on our side. Please try again in a few minutes.')
       : (fromServer || `Request failed (${res.status})`));
-    err.status = res.status; err.details = data?.error?.details;
+    err.status = res.status; err.details = data?.error?.details; err.code = data?.error?.code;
     if (fromServer) err.serverMessage = fromServer;
     throw err;
   }

@@ -19,7 +19,8 @@ export function errorHandler(err, req, res, _next) {
     });
   }
   if (err instanceof ApiError) {
-    return res.status(err.status).json({ error: { message: err.message, code: err.code } });
+    return res.status(err.status).json({ error: { message: err.message, code: err.code,
+      ...(err.details ? { details: err.details } : {}) } });
   }
   /* A body the parser refused is the caller's mistake, not a crash. Malformed
      JSON and an oversized body answered 500 and paged the owner ("500 on …")

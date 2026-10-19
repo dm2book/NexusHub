@@ -365,8 +365,10 @@ console.log('\n━━ The return page ━━');
   const page = (await import('node:fs')).readFileSync(new URL('../../src/pages/CheckoutSuccess.jsx', import.meta.url), 'utf8');
   ok('the return page turns paymentRetryable into a "cancelled, nothing charged" state',
     /r\.paymentRetryable\)\s*\{\s*setState\('retry'\)/.test(page) && /nothing has been charged/.test(page));
+  const again = (await import('node:fs')).readFileSync(new URL('../../src/components/store/PayAgain.jsx', import.meta.url), 'utf8');
   ok('…with a "Pay again" button that restarts the Pay. payment with the guest\'s email',
-    /success\.payAgain/.test(page) && /\/paynl`/.test(page) && /recallOrder\(number\)\?\.email/.test(page));
+    /<PayAgain orderId=\{orderId\} number=\{number\}/.test(page)
+    && /success\.payAgain/.test(again) && /\/paynl`/.test(again) && /recallOrder\(number\)\?\.email/.test(again));
 }
 
 console.log('\n━━ Resuming from the track page ━━');

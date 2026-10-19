@@ -45,6 +45,8 @@ const ACTOR = { id: 'paynl', email: 'paynl' };
 
 /** Attempt statuses that can no longer take money. */
 const FINAL_UNPAID = ['canceled', 'expired', 'failed', 'gone'];
+/* Order statuses that mean "this payment settled it". */
+const PAID_LIKE = ['payment_received', 'processing', 'awaiting_fulfillment', 'completed'];
 
 /**
  * The Pay. payments of an order that still matter, newest first: every attempt
@@ -157,6 +159,15 @@ async function settleWith(order, payment, reason, ctx) {
       await strayPayment(now, payment, `The order could not be settled: ${err.message}`);
       return { settled: false, stray: true };
     }
+  }
+  /* The state machine does not always throw when it refuses: an order a
+     cancel moved between the claim and the transition comes back cancelled.
+     That is money on an order that will not deliver — the buyer's, for the
+     owner — not a settled payment. */
+  const after = await getOrder(order.id);
+  if (!PAID_LIKE.includes(after?.status)) {
+    await strayPayment(after || order, payment, `The order is ${after?.status || 'gone'} after settling — it was moved while the payment was applied.`);
+    return { settled: false, stray: true };
   }
   await audit({ actor: ACTOR, action: 'order.payment_received', targetType: 'order', targetId: order.id,
     metadata: { provider: 'paynl', method: payment.method, paymentId: payment.id } }).catch(() => {});
@@ -303,7 +314,10 @@ router.all('/paynl/exchange',
       ? res.status(status).json({ result: ok, message: msg })
       : res.status(status).type('text/plain').send(`${ok ? 'TRUE' : 'FALSE'}|${msg}`));
     await fresh();
-    if (!isEnabled()) return reply(true, 'not configured');
+    /* FALSE, not TRUE: "not configured" here is almost always this instance
+       failing to read the keys for a moment. TRUE told Pay. the callback was
+       handled, and Pay. stopped retrying a paid order it was telling us about. */
+    if (!isEnabled()) return reply(false, 'not configured', 503);
 
     const { ids, refs } = exchangeHints(req);
     // Nothing that could name a payment: not Pay., and nothing to look at.
@@ -376,13 +390,23 @@ paynlApi.post('/orders/:id/paynl', requireLaunched('Payment', { money: true }),
     const offered = paynlMethods().map((m) => m.id);
     const body = z.object({
       email: z.string().email().optional(),
+      number: z.string().max(40).optional(),
       method: z.string().optional(),
     }).parse(req.body || {});
 
     const order = await getOrder(req.params.id);
     if (!order) throw new ApiError(404, 'Order not found');
-    const { assertOwnsOrder } = await import('./catalog.js');
-    await assertOwnsOrder(req, order, body.email);
+    /* The order id and number together are proof enough to START a payment —
+       the same rule as the return page's sync and /api/track. A guest who
+       cancelled at the bank and came back in another browser (an Instagram
+       in-app browser hands over to Safari) has no saved email, and was told
+       "This order is not yours" by the "Pay again" button. Starting a payment
+       only lets someone pay this order's own amount; it reveals nothing. */
+    const knowsNumber = !!body.number && body.number.trim().toUpperCase() === order.number.toUpperCase();
+    if (!knowsNumber) {
+      const { assertOwnsOrder } = await import('./catalog.js');
+      await assertOwnsOrder(req, order, body.email);
+    }
     if (order.status !== 'pending') return res.json({ alreadySettled: true, status: order.status });
 
     const base = config.appUrl.replace(/\/+$/, '');
@@ -429,12 +453,15 @@ paynlApi.post('/orders/:id/paynl', requireLaunched('Payment', { money: true }),
       return { checkoutUrl: payment.checkoutUrl, paymentId: payment.id, created: true };
       });
     } catch (err) {
-      if (err instanceof ApiError || !Number.isInteger(err?.status)) throw err;
+      /* Pay.'s failures only — a refusal, a timeout, a dropped connection, an
+         answer we cannot use. Our own errors (the database) stay a 500. */
+      if (err instanceof ApiError || !(err?.paynl || Number.isInteger(err?.status))) throw err;
       const reason = String(err.message || '').replace(/^Pay\. \S+ \S+: /, '').slice(0, 160);
       console.error(`[paynl] start refused for ${order.number}: ${err.message}`);
       await alertOwner('payment.failed', {
         title: 'Pay. refused to start a payment',
         lines: [`Order ${order.number}: ${reason || `HTTP ${err.status}`}`,
+          ...(err.outcomeUnknown ? ['No answer from Pay. — a payment may have been created there; the buyer was told nothing was charged.'] : []),
           'Check the sales location and the account status in my.pay.nl.'],
         url: `${config.appUrl}/admin/orders`,
         key: `paynl-start-${reason.slice(0, 60)}:${new Date().toISOString().slice(0, 16)}`,
@@ -449,7 +476,7 @@ paynlApi.post('/orders/:id/paynl', requireLaunched('Payment', { money: true }),
     }
     if (out.alreadySettled) return res.json(out);
     if (out.underReview) {
-      throw new ApiError(409, 'Your payment is being checked by our payment provider. You will hear from us by email — please do not pay again.');
+      throw new ApiError(409, 'Your payment is being checked by our payment provider. You will hear from us by email — please do not pay again.', 'payment_under_review');
     }
     if (out.created) {
       await audit({

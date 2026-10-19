@@ -10,7 +10,7 @@ import { createHash } from 'node:crypto';
  * for already-paid/rapid-fire orders are flagged for the admin.
  */
 import { run, get, all, nowIso } from '../db/index.js';
-import { config } from '../config/env.js';
+import { config, activePaymentProvider } from '../config/env.js';
 import { newId } from '../utils/ids.js';
 import { getOrder, markPaymentReceived, orderUrlFor } from './orderService.js';
 import { notify } from './notificationService.js';
@@ -19,7 +19,14 @@ import { audit } from './auditService.js';
 import { sendEmailAsync } from './emailService.js';
 import { proofReasonHtml } from './emailBlocks.js';
 import { formatMoney } from '../utils/money.js';
-import { badRequest, notFound } from '../utils/errors.js';
+import { badRequest, notFound, conflict } from '../utils/errors.js';
+
+/* A payment provider that confirms payments itself. With one active, the
+   manual links are hidden "so there is no second, unchecked way to pay" — and
+   a screenshot must not become that second way: confirming one marked an order
+   paid that Pay. never saw a cent for. */
+const PSP = ['paynl', 'mollie', 'stripe'];
+const pspActive = (order) => PSP.includes(order?.pspProvider) || PSP.includes(activePaymentProvider());
 import { isSafeImageValue } from '../utils/imageUrl.js';
 
 const PAID = ['payment_received', 'processing', 'awaiting_fulfillment', 'completed'];
@@ -30,6 +37,9 @@ export async function submitProof(orderId, input = {}, ctx = {}) {
   if (!order) throw notFound('Order not found');
   if (PAID.includes(order.status)) throw badRequest('This order is already paid.');
   if (['refunded', 'cancelled'].includes(order.status)) throw badRequest('This order is closed.');
+  if (pspActive(order)) {
+    throw conflict('This order is paid through our payment page — a screenshot cannot confirm it. Use "Pay" on the order page; the payment is confirmed automatically.');
+  }
 
   const transactionId = String(input.transactionId || '').trim().slice(0, 120) || null;
   const rawShot = String(input.screenshotUrl || '').trim();
@@ -150,6 +160,23 @@ export async function confirmProof(proofId, ctx = {}) {
   const before = await getOrder(proof.order_id);
   if (!before || before.status !== 'pending') {
     throw badRequest(`This order is ${before?.status || 'gone'} — there is no payment left to confirm.`);
+  }
+  /* Under a payment provider the provider decides, not a screenshot. For Pay.
+     it is asked now: a payment it has settles the order through its own,
+     checked path (amount, reference, account); none, and nothing is marked. */
+  if (pspActive(before)) {
+    if (before.pspProvider === 'paynl' || activePaymentProvider() === 'paynl') {
+      const { applyPaynl } = await import('../routes/paynl.js');
+      await applyPaynl(before.id, { reason: 'Payment found at Pay. while reviewing a proof' }).catch(() => null);
+    }
+    const now = await getOrder(before.id);
+    if (!PAID.includes(now?.status)) {
+      throw conflict('The payment provider has no payment for this order — a screenshot cannot mark it paid. Check the payment in the provider\'s dashboard.');
+    }
+    await run(`UPDATE payment_proofs SET status='superseded', reviewed_by=@by, reviewed_at=@at WHERE id=@id AND status='pending'`,
+      { by: ctx.user?.id || 'admin', at: nowIso(), id: proofId });
+    await dropScreenshot(proof);
+    return now;
   }
 
   // Atomically claim the proof: only the caller whose UPDATE actually flips the

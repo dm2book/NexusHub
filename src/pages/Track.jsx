@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import PayFacts from '../components/store/PayFacts.jsx';
+import PayAgain from '../components/store/PayAgain.jsx';
 import RefundMethodChoice from '../components/store/RefundMethodChoice.jsx';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
@@ -277,6 +278,19 @@ export default function Track() {
               <p className="text-slate-300 text-[12.5px] mt-2">
                 {t('track.resumePaySub', 'Your payment was started but not finished. Nothing has been charged yet — this takes you back to the secure payment page, and this page updates by itself the moment it goes through.')}
               </p>
+            </div>
+          )}
+
+          {/* A Pay. payment that was cancelled or expired: the order can still be
+              paid, but there is no open checkout to resume. Before this the page
+              said "Placed" and offered nothing — or leftover manual links. */}
+          {result.status === 'pending' && !result.payUrl && result.paymentRetryable && result.id && (
+            <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-5 mb-6 text-center">
+              <div className="text-amber-200 font-semibold">{t('success.cancelled', 'Payment cancelled')}</div>
+              <p className="text-slate-300 text-[12.5px] mt-1">
+                {t('track.retrySub', 'Your last payment was not completed, so nothing has been charged. Your order is still reserved — you can pay for it now.')}
+              </p>
+              <PayAgain orderId={result.id} number={result.number} methods={result.paynlMethods} />
             </div>
           )}
 

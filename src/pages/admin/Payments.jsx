@@ -5,6 +5,7 @@ import { api } from '../../lib/api.js';
 import { money, date } from '../../lib/format.js';
 import { PageLoader } from '../../components/ui.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
+import { useAuth } from '../../context/AuthContext.jsx';
 
 const FLAG_LABEL = {
   duplicate_transaction_id: 'Duplicate transaction ID',
@@ -14,6 +15,10 @@ const FLAG_LABEL = {
 
 export default function AdminPayments() {
   const toast = useToast();
+  /* Confirming marks the order paid and releases its codes — the server asks
+     for orders.refund, so the button is only offered to those who hold it. */
+  const { hasPermission } = useAuth();
+  const mayConfirm = hasPermission('orders.refund');
   const [proofs, setProofs] = useState(null);
   const [total, setTotal] = useState(0);
   const [loadError, setLoadError] = useState('');
@@ -121,9 +126,11 @@ export default function AdminPayments() {
                   <button disabled={busy === p.id} onClick={() => reject(p)} className="btn-ghost text-sm text-red-300 hover:bg-red-500/10">
                     <X size={16} /> Reject
                   </button>
-                  <button disabled={busy === p.id} onClick={() => confirm(p)} className="btn-primary text-sm">
-                    <Check size={16} /> Confirm payment
-                  </button>
+                  {mayConfirm && (
+                    <button disabled={busy === p.id} onClick={() => confirm(p)} className="btn-primary text-sm">
+                      <Check size={16} /> Confirm payment
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

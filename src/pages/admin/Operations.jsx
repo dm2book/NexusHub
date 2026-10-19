@@ -6,7 +6,7 @@ import {
   Users, LineChart,
 } from 'lucide-react';
 import { api } from '../../lib/api.js';
-import { money, dateShort } from '../../lib/format.js';
+import { money, dateShort, refundOutcome } from '../../lib/format.js';
 import { StatusBadge, EmptyState, Modal, SkeletonStat, SkeletonRows, Skeleton } from '../../components/ui.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
@@ -61,8 +61,9 @@ export default function Operations() {
   const act = async (order, action, body) => {
     setBusy(true);
     try {
-      await api.post(`/api/admin/orders/${order.id}/${action}`, body);
-      toast.success(`Order ${order.number}: ${action} done.`);
+      const r = await api.post(`/api/admin/orders/${order.id}/${action}`, body);
+      // A Pay. refund has not moved any money yet — say so, never "done".
+      toast.success(r?.refund ? refundOutcome(r.refund, order.number, order.currency) : `Order ${order.number}: ${action} done.`);
       setConfirm(null); setRefund(null); setContact(null); setRefundReason('');
       load(); loadStats();
     } catch (err) { toast.error(err.message); } finally { setBusy(false); }
@@ -236,6 +237,9 @@ export default function Operations() {
         {refund && (
           <div className="space-y-3">
             <p className="text-slate-300">Refund <span className="font-mono text-white">{refund.number}</span> ({money(Math.max(0, refund.amount - (refund.refundedCents || 0)), refund.currency)}). Any store credit applied to this order is returned automatically.</p>
+            {refund.pspProvider === 'paynl' && (
+              <p className="text-amber-300 text-sm">Paid with Pay.: this only marks the order refunded. The money is not sent back automatically — refund it yourself in my.pay.nl afterwards.</p>
+            )}
             {refund.refundedCents > 0 && (
               <p className="text-amber-300 text-sm">{money(refund.refundedCents, refund.currency)} of {money(refund.amount, refund.currency)} was already refunded at the payment provider — only the rest goes back now.</p>
             )}

@@ -27,7 +27,7 @@ import { config, manualPayMethods as allManualPayMethods, activePaymentProvider 
 const manualPayMethods = () => (activePaymentProvider() === 'paynl' ? [] : allManualPayMethods());
 /** A payment provider takes the payment (no manual transfer to explain). */
 const viaPsp = () => ['paynl', 'mollie', 'stripe'].includes(activePaymentProvider());
-import { badRequest, notFound, conflict } from '../utils/errors.js';
+import { ApiError, badRequest, notFound, conflict } from '../utils/errors.js';
 import { sendEmailAsync } from './emailService.js';
 import { validatePayLink } from '../utils/payLink.js';
 import { payMethodsFor } from '../utils/payMethodUrl.js';
@@ -131,19 +131,23 @@ export async function priceOrder({ items = [], coupon = '', userId = null, email
   let mysteryCents = 0;
   for (const li of merged.values()) {
     const product = await getProduct(li.productId);
-    if (!product) throw badRequest(`Unknown product: ${li.productId}`);
+    /* Which line, said so the cart can name it and offer to remove it: a saved
+       cart can hold a product switched off or deleted since it was added. */
+    const unavailable = (status, message) => new ApiError(status, message, 'product_unavailable',
+      { productId: li.productId, name: product?.name || null });
+    if (!product) throw unavailable(400, `Unknown product: ${li.productId}`);
     /* Mystery boxes are retired (productService.RETIRED_KINDS): never priced
        and never sold, even one switched back on by hand — here, so the quote
        and the order both refuse it. Ahead of `active`, so the buyer reads why. */
-    if (product.kind === 'mystery') throw conflict(`${product.name} is no longer sold: mystery boxes are retired.`);
-    if (!product.active) throw conflict(`Product not available: ${product.name}`);
+    if (product.kind === 'mystery') throw unavailable(409, `${product.name} is no longer sold: mystery boxes are retired.`);
+    if (!product.active) throw unavailable(409, `Product not available: ${product.name}`);
     const quantity = Math.max(1, Number(li.quantity || 1));
     const unitPrice = product.price;
     /* A product without a price is not for sale. An unpriced row switched on
        by hand (a market-discovery product is created at €0) made a €0 order —
        which this file then settles as "covered in full by store credit" and
        auto-delivers: a free code for anyone who found it. */
-    if (!(Number.isInteger(unitPrice) && unitPrice > 0)) throw conflict(`Product not available: ${product.name}`);
+    if (!(Number.isInteger(unitPrice) && unitPrice > 0)) throw unavailable(409, `Product not available: ${product.name}`);
     const mystery = product.kind === 'mystery';
     subtotal += unitPrice * quantity;
     if (mystery) mysteryCents += unitPrice * quantity;
@@ -1379,6 +1383,8 @@ async function summarize(row) {
     product: productLabel, itemCount: items.length,
     amount: row.total, amountFormatted: formatMoney(row.total, row.currency),
     refundedCents: Number(row.refunded_cents || 0),
+    // Which provider took the money: a Pay. refund is made by hand in my.pay.nl.
+    pspProvider: row.psp_provider || null,
     currency: row.currency, status: row.status, statusLabel: labelFor(row.status),
     fraudStatus: row.fraud_status, fraudScore: row.fraud_score, fraudHold: !!row.fraud_hold,
     date: row.created_at,
