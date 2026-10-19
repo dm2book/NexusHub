@@ -4,7 +4,7 @@ import {
   Search, Eye, Truck, CheckCircle2, RotateCcw, Mail, AlertTriangle, Download,
 } from 'lucide-react';
 import { api, getAccessToken } from '../../lib/api.js';
-import { money, dateShort, confirmRefund } from '../../lib/format.js';
+import { money, dateShort, confirmRefund, refundOutcome } from '../../lib/format.js';
 import { PageLoader, StatusBadge, EmptyState, Modal } from '../../components/ui.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
@@ -57,8 +57,11 @@ export default function AdminOrders() {
   const act = async (order, action, body) => {
     setBusy(true);
     try {
-      await api.post(`/api/admin/orders/${order.id}/${action}`, body);
-      toast.success(`Order ${order.number}: ${action.replace('-', ' ')} done.`);
+      const r = await api.post(`/api/admin/orders/${order.id}/${action}`, body);
+      /* A refund says what happened to the money: on a Pay. order nothing has
+         moved yet, it has to be refunded in my.pay.nl. */
+      toast.success(r?.refund ? refundOutcome(r.refund, order.number, order.currency)
+        : `Order ${order.number}: ${action.replace('-', ' ')} done.`);
       setConfirm(null); setContact(null);
       load();
     } catch (err) { toast.error(err.message); }

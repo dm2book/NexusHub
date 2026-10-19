@@ -1373,6 +1373,8 @@ async function summarize(row) {
     product: productLabel, itemCount: items.length,
     amount: row.total, amountFormatted: formatMoney(row.total, row.currency),
     refundedCents: Number(row.refunded_cents || 0),
+    // Which provider took the money: a Pay. refund is made by hand in my.pay.nl.
+    pspProvider: row.psp_provider || null,
     currency: row.currency, status: row.status, statusLabel: labelFor(row.status),
     fraudStatus: row.fraud_status, fraudScore: row.fraud_score, fraudHold: !!row.fraud_hold,
     date: row.created_at,
