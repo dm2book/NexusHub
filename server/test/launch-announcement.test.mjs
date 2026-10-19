@@ -60,7 +60,9 @@ const seed = async (rows) => {
     // eslint-disable-next-line no-await-in-loop
     await subscribe(email, { lang });
     // eslint-disable-next-line no-await-in-loop
-    await run('UPDATE newsletter_signups SET created_at = @at WHERE email = @e',
+    // Confirmed through the double opt-in link: only confirmed addresses are
+    // announced to (newsletter-double-optin is covered in email-scan-fixes).
+    await run('UPDATE newsletter_signups SET created_at = @at, confirmed_at = @at WHERE email = @e',
       { at: ago(hoursAgo), e: email });
     // eslint-disable-next-line no-await-in-loop
     if (unsub) await unsubscribe(email);
