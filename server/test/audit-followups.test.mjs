@@ -147,7 +147,9 @@ console.log('\n— Maintenance runs once at a time —');
   const c = await runMaintenance({ deadline: Date.now() + 20_000 });
   ok('…and the lease is released afterwards', !c?.skipped, JSON.stringify(c?.skipped));
   const app = (await import('node:fs')).readFileSync(new URL('../src/app.js', import.meta.url), 'utf8');
-  ok('the cron call does not also start the traffic-triggered run', /!req\.path\.startsWith\('\/api\/cron\/'\)/.test(app));
+  ok('the cron call does not also start the traffic-triggered run',
+    /!req\.path\.startsWith\('\/api\/cron\/'\)/.test(app)
+    || (/NO_PIGGYBACK = \[[^\]]*'\/api\/cron\/'/.test(app) && /!NO_PIGGYBACK\.some\(\(p\) => req\.path\.startsWith\(p\)\)/.test(app)));
 }
 
 console.log('\n— One open hand task per item —');
