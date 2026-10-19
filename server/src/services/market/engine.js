@@ -103,12 +103,16 @@ export async function discoveryQueries() {
   return [...new Set([...fromCatalogue, ...GAMES.map((g) => g.label)])];
 }
 
-export async function runProductDiscovery({ force = false, fetchImpl = fetch } = {}) {
+export async function runProductDiscovery({ force = false, fetchImpl = fetch, deadline = null } = {}) {
   if (!force && !(await dueFor('discovery', config.market.discoveryIntervalHours))) {
     return { skipped: 'not due', nextIn: config.market.discoveryIntervalHours };
   }
-  const collected = await collectFromSources(await discoveryQueries(), { fetchImpl });
-  const classified = await runDiscovery();
+  /* A caller with a time budget (the maintenance run) passes its deadline, so
+     both halves stop in time instead of being cut off from outside — which
+     left the run marked "not done" and retried, and cut off, every time. */
+  const until = (fallbackMs) => (deadline ? Math.min(deadline, Date.now() + fallbackMs) : Date.now() + fallbackMs);
+  const collected = await collectFromSources(await discoveryQueries(), { fetchImpl, deadline: until(18_000) });
+  const classified = await runDiscovery({ deadline: until(15_000) });
   await markRun('discovery');
 
   /* A genuinely new product is worth telling the owner about — once, and only
@@ -205,15 +209,20 @@ async function persistRecommendation(mp, forgeProductId, stats, rec, extra = {})
   return { id, product: mp, stats, ...rec };
 }
 
-export async function refreshRecommendations({ force = false } = {}) {
+export async function refreshRecommendations({ force = false, deadline = null } = {}) {
   if (!force && !(await dueFor('pricing', config.market.priceRefreshIntervalHours))) {
     return { skipped: 'not due', nextIn: config.market.priceRefreshIntervalHours };
   }
+  /* Least recently priced first, so a run that stops at its deadline still
+     moves forward: the next run starts where this one left off. */
   const products = await all(
-    `SELECT DISTINCT p.id FROM market_products p
-       JOIN market_observations o ON o.market_product_id = p.id`);
+    `SELECT p.id FROM market_products p
+      WHERE EXISTS (SELECT 1 FROM market_observations o WHERE o.market_product_id = p.id)
+      ORDER BY (SELECT MAX(r.created_at) FROM market_price_recommendations r
+                 WHERE r.market_product_id = p.id) ASC NULLS FIRST, p.id`);
   const out = { priced: 0, requiresReview: 0, errors: [] };
   for (const p of products) {
+    if (deadline && deadline - Date.now() < 1_500) { out.partial = true; break; }
     try {
       const r = await recommendFor(p.id);
       out.priced += 1;
@@ -221,7 +230,8 @@ export async function refreshRecommendations({ force = false } = {}) {
       await maybeAlert(r);
     } catch (err) { out.errors.push({ product: p.id, error: err.message }); }
   }
-  await markRun('pricing');
+  // Only a complete pass counts as done; a partial one is picked up next run.
+  if (!out.partial) await markRun('pricing');
   return out;
 }
 
