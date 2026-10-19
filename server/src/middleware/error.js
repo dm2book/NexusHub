@@ -21,6 +21,20 @@ export function errorHandler(err, req, res, _next) {
   if (err instanceof ApiError) {
     return res.status(err.status).json({ error: { message: err.message, code: err.code } });
   }
+  /* A body the parser refused is the caller's mistake, not a crash. Malformed
+     JSON and an oversized body answered 500 and paged the owner ("500 on …")
+     for what any client can send. body-parser marks its own errors with `type`;
+     answer those with their own 4xx and no alert. */
+  if (err?.type === 'entity.parse.failed') {
+    return res.status(400).json({ error: { message: 'The request body is not valid JSON', code: 'invalid_json' } });
+  }
+  if (err?.type === 'entity.too.large') {
+    return res.status(413).json({ error: { message: 'The request body is too large', code: 'body_too_large' } });
+  }
+  if (typeof err?.type === 'string' && err.type.startsWith('entity.')
+      && Number.isInteger(err.status) && err.status >= 400 && err.status < 500) {
+    return res.status(err.status).json({ error: { message: 'The request body could not be read', code: 'bad_body' } });
+  }
   console.error('[unhandled]', err);
 
   /* A 500 goes to the owner through the same path as everything else.

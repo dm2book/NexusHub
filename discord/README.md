@@ -494,7 +494,10 @@ cd discord
 docker build -t forgemarket-bot .
 docker run -d --name forgemarket-bot --restart unless-stopped \
   -e DISCORD_TOKEN=... -e DISCORD_CLIENT_ID=... -e DISCORD_GUILD_ID=... \
+  -e DISCORD_OWNER_IDS=... \
   -e STORE_URL=https://forgemarket.nl \
+  -e FORGEMARKET_API_URL=https://forgemarket.nl \
+  -e REVIEW_INGEST_SECRET=... \
   forgemarket-bot
 ```
 Or without Docker, keep it alive with **pm2**: `npm i -g pm2 && pm2 start npm --name forgemarket-bot -- start && pm2 save`.

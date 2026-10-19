@@ -42,9 +42,15 @@ Customers pay → submit a transaction ID/screenshot → you confirm in **Admin 
 | `REVIEW_INGEST_SECRET` | a shared random string (same on both) |
 
 On the **bot** host (Railway) also set: `DISCORD_TOKEN`, `DISCORD_CLIENT_ID`,
-`DISCORD_GUILD_ID`, `FORGEMARKET_API_URL=https://forgemarket.nl`,
+`DISCORD_GUILD_ID`, `STORE_URL=https://forgemarket.nl`,
+`FORGEMARKET_API_URL=https://forgemarket.nl`, `DISCORD_OWNER_IDS`
 and optionally `ANTHROPIC_API_KEY`. Then `/vouch` in Discord auto‑publishes (HMAC‑signed)
 to the site's reviews + Trust Center.
+
+| Variable | Where | Value |
+|---|---|---|
+| `DISCORD_OWNER_IDS` | bot | Comma-separated Discord **user** IDs (Developer Mode → right-click your name → *Copy User ID*), no spaces or quotes. They may run the owner commands (`/paylink`, `/digest`, `/stock`, `/launch`, `/coupon`, `/announce`). Unset: only members with *Manage Server* can. |
+| `BOT_LEGACY_SIGNATURES` | site (Vercel) | Leave **unset** until the bot has been redeployed from current `main`. Only the value `off` (also `0`/`false`/`no`) refuses the bot's old-style signatures; an empty value keeps them **accepted**. Set `off` only **after** the new bot runs and Vercel's logs no longer show "old-style bot signature" — setting it first cuts a still-running old bot off (403 on order pings, XP, giveaways, `/balance`). |
 
 ## 5. Background maintenance (Phase 8)  **(only you)**
 | Variable | Value |
