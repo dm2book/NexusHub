@@ -1,5 +1,5 @@
 import { Link, useSearchParams } from 'react-router-dom';
-import { CheckCircle2, LayoutDashboard, Search, Loader2, AlertCircle } from 'lucide-react';
+import { CheckCircle2, LayoutDashboard, Search, Loader2, AlertCircle, RotateCcw } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
 import { useCart } from '../context/CartContext.jsx';
@@ -7,6 +7,7 @@ import { useI18n } from '../lib/i18n.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import Confetti from '../components/Confetti.jsx';
 import { feedback } from '../lib/feedback.js';
+import { recallOrder } from '../lib/lastOrder.js';
 
 /** Order statuses that mean the money genuinely arrived. */
 const SETTLED = ['payment_received', 'processing', 'awaiting_fulfillment', 'completed'];
@@ -23,6 +24,8 @@ export default function CheckoutSuccess() {
   // with "Payment received 🎉" for anyone who reached the URL — including a
   // buyer who cancelled at the bank. A redirect proves nothing; the order does.
   const [state, setState] = useState(orderId ? 'checking' : 'unknown');
+  const [retrying, setRetrying] = useState(false);
+  const [retryError, setRetryError] = useState('');
 
   useEffect(() => { clear(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -46,6 +49,9 @@ export default function CheckoutSuccess() {
         if (!alive) return;
         if (SETTLED.includes(r.status)) { setState('paid'); feedback('success'); return; }
         if (['cancelled', 'failed'].includes(r.status)) { setState('failed'); return; }
+        // Cancelled (or expired) at Pay.: the order is still open and can be paid,
+        // so offer that instead of "still confirming" forever.
+        if (r.status === 'pending' && r.paymentRetryable) { setState('retry'); return; }
       } catch {
         // Not an order we can read, or the API is unhappy. Either
         // way this page must not assert something it cannot see.
@@ -58,6 +64,22 @@ export default function CheckoutSuccess() {
     tick();
     return () => { alive = false; if (timer) clearTimeout(timer); };
   }, [orderId, number]);
+
+  /* Start a new Pay. payment for this order. A signed-in buyer is recognised by
+     their session; a guest by the email they typed at checkout, which the
+     checkout kept for exactly this order (lastOrder) before leaving for Pay. */
+  const payAgain = async () => {
+    setRetrying(true); setRetryError('');
+    try {
+      const email = recallOrder(number)?.email;
+      const r = await api.post(`/api/orders/${encodeURIComponent(orderId)}/paynl`, email ? { email } : {});
+      if (r.checkoutUrl) { window.location.href = r.checkoutUrl; return; }
+      if (r.alreadySettled) { setState(SETTLED.includes(r.status) ? 'paid' : 'unknown'); }
+    } catch (e) {
+      setRetryError(e?.message || t('success.retryFailed', 'The payment could not be started. Please try again from your order page.'));
+    }
+    setRetrying(false);
+  };
 
   const orderRef = number ? <> <span className="font-mono text-white">{number}</span></> : '';
 
@@ -90,6 +112,13 @@ export default function CheckoutSuccess() {
       title: t('success.notPaid', 'Payment not completed'),
       body: <>{t('success.notPaidBody', 'Your order')}{orderRef} {t('success.notPaidBody2', 'was not paid, so you have not been charged. You can start the payment again from your order page, or pick another method.')}</>,
     },
+    retry: {
+      icon: <AlertCircle size={40} className="text-amber-300" />,
+      ring: 'bg-amber-500/15 border-amber-500/30',
+      orb: 'bg-amber-500/15',
+      title: t('success.cancelled', 'Payment cancelled'),
+      body: <>{t('success.cancelledBody', 'The payment for your order')}{orderRef} {t('success.cancelledBody2', 'was cancelled, so nothing has been charged. Your order is still reserved — you can pay for it now.')}</>,
+    },
     unknown: {
       icon: <CheckCircle2 size={40} className="text-emerald-300" />,
       ring: 'bg-emerald-500/15 border-emerald-500/30',
@@ -116,6 +145,15 @@ export default function CheckoutSuccess() {
         </div>
         <h1 className="text-3xl text-white" aria-live="polite">{head.title}</h1>
         <p className="text-slate-400 mt-3">{head.body}</p>
+        {state === 'retry' && (
+          <div className="mt-6">
+            <button type="button" onClick={payAgain} disabled={retrying} className="btn-primary mx-auto">
+              {retrying ? <Loader2 size={18} className="animate-spin" /> : <RotateCcw size={18} />}
+              {' '}{t('success.payAgain', 'Pay again')}
+            </button>
+            {retryError && <p role="alert" className="text-amber-300 text-[13px] mt-3">{retryError}</p>}
+          </div>
+        )}
 
         <div className="mt-6 mx-auto max-w-sm rounded-2xl border border-indigo-500/25 bg-indigo-500/10 p-4 text-left">
           <div className="text-white text-sm font-semibold">💬 {t('success.discord', 'ForgeMarket Support')}</div>
