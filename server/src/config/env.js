@@ -236,11 +236,12 @@ export const config = {
        moment, and one whose fix is another deploy. Set LAUNCH_DATE to open the
        gate's mouth: `LAUNCH_DATE=2026-10-24T00:00:00Z`. Blank means "we are
        open", which is the only safe thing for a value nobody has set yet. */
-    /* Production opens on 24 October 2026 at 00:00 Amsterdam time unless
+    /* Production opens on Friday 30 October 2026 at 00:00 Amsterdam time
+       (CET: summer time ends on 25 October, so that is 29 Oct 23:00 UTC) unless
        LAUNCH_DATE says otherwise (or LAUNCH_MODE=open forces it open). The
        owner asked for the date to live here, so the checkout cannot open
        early because a variable was never set. Development stays open. */
-    date: env.LAUNCH_DATE ?? (isProd ? '2026-10-23T22:00:00Z' : ''),
+    date: env.LAUNCH_DATE ?? (isProd ? '2026-10-29T23:00:00Z' : ''),
     /* A deliberate override, in either direction.
        `open` sells whatever the date says; `prelaunch` refuses whatever it
        says. Neither is a default — the default is worked out from evidence in
