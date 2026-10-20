@@ -163,6 +163,17 @@ export const config = {
     elevenlabsVoice: (env.ELEVENLABS_VOICE_ID || '').trim(),
     openaiKey: (env.OPENAI_API_KEY || '').trim(),
   },
+  /* Suppliers whose credentials are account-wide rather than per supplier row.
+     Reloadly: entered in Admin → Keys and connections (or the env); a supplier
+     row of kind "reloadly" uses these unless its own config overrides them.
+     Sandbox unless explicitly switched off — sandbox codes are not real cards. */
+  suppliers: {
+    reloadly: {
+      clientId: (env.RELOADLY_CLIENT_ID || '').trim(),
+      clientSecret: (env.RELOADLY_CLIENT_SECRET || '').trim(),
+      sandbox: (env.RELOADLY_SANDBOX || '').trim(),
+    },
+  },
   sms: {
     accountSid: (env.TWILIO_ACCOUNT_SID || '').trim(),
     authToken: (env.TWILIO_AUTH_TOKEN || '').trim(),

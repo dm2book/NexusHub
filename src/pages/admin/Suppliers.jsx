@@ -22,6 +22,8 @@ const KIND_HINT = {
   eldorado: 'Eldorado.gg has no public BUYER API — you cannot auto-buy others’ listings. '
     + 'config: { apiKey, autoDeliver }. The same apiKey enables Eldorado as a price-discovery source under Market.',
   kinguin: 'Real auto-buy: config: { apiKey:"<kinguin key>", autoDeliver:true }. Map product → kinguinId; paid orders are purchased & keys delivered automatically.',
+  reloadly: 'Official gift cards, auto-buy. Paste the client id/secret in Keys and connections, then config can stay {}. '
+    + 'Optional: { sandbox:false, countryCode:"NL" }. Map product → "<reloadly productId>:<amount>", e.g. 15077:25 (search finds it).',
   g2a: 'Real auto-buy: config: { apiHash, email, apiKey, currency:"EUR", autoDeliver:true }. '
     + 'Map product → G2A product_id; buy price is capped at your cost. '
     + 'The same three credentials enable G2A as a price-discovery source under Market.',
@@ -368,6 +370,10 @@ export default function Suppliers() {
                 <div>
                   <h3 className="text-white">{s.name}</h3>
                   <span className="text-xs uppercase tracking-wider text-indigo-400 font-rajdhani">{s.connector_kind}</span>
+                  {s.sandbox && (
+                    <span className="ml-2 text-[11px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300"
+                      title="Buys from the Reloadly sandbox: test wallet, the codes are not real cards.">SANDBOX</span>
+                  )}
                 </div>
                 <span className={`text-xs px-2 py-1 rounded-md ${s.status === 'active'
                   ? 'bg-emerald-500/15 text-emerald-300' : s.status === 'error'
@@ -415,6 +421,7 @@ export default function Suppliers() {
               onChange={(e) => setForm({ ...form, connectorKind: e.target.value })}>
               <option value="kinguin">Kinguin (auto-buy)</option>
               <option value="g2a">G2A (auto-buy)</option>
+              <option value="reloadly">Reloadly — official gift cards (auto-buy)</option>
               <option value="api">API</option>
               <option value="csv">CSV</option>
               <option value="eldorado">Eldorado</option>

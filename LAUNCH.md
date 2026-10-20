@@ -81,6 +81,16 @@ Phone login stays off until all three values are set. Enter them in **Admin → 
 4. Twilio charges per SMS sent and for a rented number; see twilio.com/pricing for the current Dutch rates.
 5. Test: `/api/health` → `sms.status` should read `configured`, and the login page offers "phone".
 
+### Leverancier: Reloadly (officiële cadeaukaarten, automatisch inkopen)
+Reloadly verkoopt officiële digitale cadeaukaarten (Steam, PlayStation, Xbox, App Store, Roblox…) in het groot. Aanmelden is gratis; elk account heeft een **sandbox** met een testtegoed.
+1. Maak gratis een account op reloadly.com.
+2. **Testen (sandbox):** zet het dashboard op *Test mode* → **Developers → API settings** → kopieer de *client id* en *client secret*. Het testtegoed staat er al op.
+3. Plak ze in **Admin → Sleutels & koppelingen → Suppliers & market**: *Reloadly client id* en *Reloadly client secret*. Laat *Reloadly sandbox* leeg of `true`.
+4. **Admin → Leveranciers → Add supplier**: naam "Reloadly", soort **Reloadly — official gift cards**, config `{}` → *Create* → **Test** (moet "Connected to Reloadly (SANDBOX)" en je saldo tonen). De kaart toont een geel **SANDBOX**-label.
+5. **Map products**: zoek bijv. "Steam" of "Roblox", kies de juiste waarde (SKU heeft de vorm `productId:bedrag`, bv. `15077:25`). Alleen een kaart met een bekende inkoopprijs in **EUR** wordt automatisch ingekocht — anders gaat de bestelling naar jou (marge-bewaking).
+6. **Live gaan:** vraag in Reloadly de zakelijke verificatie (KYB) aan met je KvK-gegevens, stort tegoed, zet het dashboard op *Live mode* en kopieer de **live** client id/secret. Vervang ze in Sleutels & koppelingen en zet *Reloadly sandbox* op `false`.
+7. Zolang de sandbox aan staat op een geopende winkel weigert de shop om bij Reloadly "in te kopen" (sandbox-codes zijn niet echt): die bestellingen gaan naar jou, en de lanceercheck meldt het.
+
 ---
 
 ## 7. Smoke test (2 min) once deployed

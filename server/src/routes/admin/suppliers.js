@@ -43,7 +43,15 @@ router.get('/connector-kinds', requirePermission('suppliers.read'), (_req, res) 
 });
 
 router.get('/', requirePermission('suppliers.read'), asyncHandler(async (_req, res) => {
-  res.json({ suppliers: (await suppliers.listSuppliers()).map(suppliers.publicSupplier) });
+  /* `sandbox` for a supplier that has one: a Reloadly row buying from the
+     sandbox hands out codes that are not real, and the page says so. */
+  res.json({ suppliers: (await suppliers.listSuppliers()).map((s) => {
+    const out = suppliers.publicSupplier(s);
+    if (s.connector_kind === 'reloadly') {
+      try { out.sandbox = createConnector(s).sandbox; } catch { out.sandbox = true; }
+    }
+    return out;
+  }) });
 }));
 
 // Performance dashboard: margin, reliability, fulfillment speed per supplier.
