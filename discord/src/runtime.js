@@ -87,8 +87,8 @@ export const ENV_SPEC = {
       + 'Unset = /paylink is disabled.'],
     ['PAYLINK_HOSTS', 'Optional comma-separated extra check for /paylink hosts (e.g. tikkie.me,bunq.me). '
       + 'The API always enforces its own payment-host allow-list.'],
-    ['LAUNCH_DATE', 'When the one-off launch announcement may post (ISO time). Default 2026-10-23T22:00:00Z '
-      + '(24 Oct 00:00 Amsterdam). Posted once, never before this moment.'],
+    ['LAUNCH_DATE', 'When the one-off launch announcement may post (ISO time). Default 2026-10-29T23:00:00Z '
+      + '(Fri 30 Oct 00:00 Amsterdam). Posted once, never before this moment.'],
     ['AI_DAILY_CAP', 'Maximum AI answers per day across the server (/ask, /recommend, #ask-the-bot). Default 300.'],
     ['SUPPORT_HOURS', 'Support availability text shown in #support-info. Default: '
       + '"Elke dag, reactie meestal binnen 24 uur (NL tijd)".'],

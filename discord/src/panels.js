@@ -125,7 +125,7 @@ export function buildLaunchAnnouncement({ storeUrl, channelIdByName = {} } = {})
 }
 
 /** Has LAUNCH_DATE passed? Invalid dates fall back to the default launch moment. */
-export const DEFAULT_LAUNCH_DATE = '2026-10-23T22:00:00Z';
+export const DEFAULT_LAUNCH_DATE = '2026-10-29T23:00:00Z';
 export function launchDue(launchDate, now = Date.now()) {
   const t = Date.parse(launchDate || DEFAULT_LAUNCH_DATE);
   return now >= (Number.isFinite(t) ? t : Date.parse(DEFAULT_LAUNCH_DATE));
