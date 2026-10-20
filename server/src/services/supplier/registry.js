@@ -10,6 +10,7 @@ import { ManualConnector } from './ManualConnector.js';
 import { EldoradoConnector } from './EldoradoConnector.js';
 import { KinguinConnector } from './KinguinConnector.js';
 import { G2AConnector } from './G2AConnector.js';
+import { ReloadlyConnector } from './ReloadlyConnector.js';
 
 const REGISTRY = new Map();
 
@@ -24,6 +25,7 @@ registerConnector(ManualConnector);
 registerConnector(EldoradoConnector);
 registerConnector(KinguinConnector);
 registerConnector(G2AConnector);
+registerConnector(ReloadlyConnector);
 
 export function availableKinds() {
   return [...REGISTRY.keys()];

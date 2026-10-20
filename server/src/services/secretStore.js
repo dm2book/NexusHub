@@ -214,6 +214,22 @@ export const SECRETS = [
   { id: 'market.g2a.apiHash', label: 'G2A API hash', env: 'G2A_API_HASH',
     path: ['market', 'sources', 'g2a', 'apiHash'], group: 'Suppliers & market',
     why: 'The second half of the G2A credentials.' },
+  /* Reloadly: official gift cards, bought automatically for paid orders. One
+     account, so the keys live here and every "reloadly" supplier row uses them. */
+  { id: 'reloadly.clientId', label: 'Reloadly client id', env: 'RELOADLY_CLIENT_ID',
+    path: ['suppliers', 'reloadly', 'clientId'], group: 'Suppliers & market', secret: false,
+    why: 'Reloadly — official gift cards (Steam, PSN, Xbox, App Store…) bought automatically for paid orders. Needs the secret below.',
+    hint: 'reloadly.com → Developers → API settings. Test mode and live mode each have their own client id.' },
+  { id: 'reloadly.clientSecret', label: 'Reloadly client secret', env: 'RELOADLY_CLIENT_SECRET',
+    path: ['suppliers', 'reloadly', 'clientSecret'], group: 'Suppliers & market',
+    why: 'Without it the shop cannot log in to Reloadly to buy a card.',
+    hint: 'Shown next to the client id under Developers → API settings.',
+    validate: (v) => (/^\S{10,256}$/.test(v) ? null : 'That does not look like a Reloadly secret — paste the whole value, without spaces.') },
+  { id: 'reloadly.sandbox', label: 'Reloadly sandbox (true / false)', env: 'RELOADLY_SANDBOX',
+    path: ['suppliers', 'reloadly', 'sandbox'], group: 'Suppliers & market', secret: false,
+    why: 'true (the default) buys from Reloadly\'s sandbox with the test wallet — the codes are not real. Set false with the LIVE keys before selling.',
+    hint: 'Empty or true while testing; false once your Reloadly account is approved and you use the live client id/secret.',
+    validate: (v) => (/^(true|false|1|0|yes|no|on|off)$/i.test(v) ? null : 'Use true or false.') },
 ];
 
 const byId = new Map(SECRETS.map((s) => [s.id, s]));

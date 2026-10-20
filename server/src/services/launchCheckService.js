@@ -244,6 +244,25 @@ export async function launchChecks() {
   const cap = await capacityLine({ target: 10 }).catch(() => null);
   if (cap) add('capacity', 'Orders you can serve unattended', cap.status, cap.detail);
 
+  /* 2b. A supplier still buying from a sandbox. Reloadly's sandbox hands out
+     codes that look real and redeem nowhere: fine for trying the flow before
+     opening, a fail once the shop is open (the connector also refuses to
+     "buy" there, so those orders fall to a person rather than a fake code). */
+  const sandboxSuppliers = [];
+  for (const row of await all(`SELECT id, name, connector_kind, config FROM suppliers WHERE status='active' AND connector_kind='reloadly'`).catch(() => [])) {
+    try {
+      const { createConnector } = await import('./supplier/registry.js');
+      if (createConnector(row).sandbox) sandboxSuppliers.push(row.name);
+    } catch { /* an unreadable row is the supplier page's problem, not this one */ }
+  }
+  if (sandboxSuppliers.length) {
+    const open = !config.launch.date || Date.now() >= new Date(config.launch.date).getTime();
+    add('supplier-sandbox', 'Supplier sandbox', open ? 'fail' : 'warn',
+      `${sandboxSuppliers.join(', ')} buy${sandboxSuppliers.length === 1 ? 's' : ''} from Reloadly's SANDBOX — the codes are not real cards. `
+      + 'Fine for a test before opening; before selling, paste the LIVE client id/secret and set RELOADLY_SANDBOX to false '
+      + 'in Admin → Keys and connections.');
+  }
+
   /* 3a. The hourly sweep, judged on whether it RAN.
    *
    * Everything that happens on its own happens here: paid orders swept for
